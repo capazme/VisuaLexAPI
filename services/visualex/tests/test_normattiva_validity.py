@@ -345,6 +345,128 @@ class TestAbrogationWithNotes:
         assert elapsed < TestHostilePages.BOUND
 
 
+class TestAbrogationWhateverTheNoticeClass:
+    """The portal does not always give a repeal notice the `art_abrogato-akn` class.
+
+    A whole-article notice is sometimes a plain `ins-akn` (art. 155-ter c.c.), and the
+    notice of a whole repealed act ("PROVVEDIMENTO ABROGATO") always is: both were shown
+    "In vigore". The words decide, in any `ins-akn`.
+    """
+
+    def test_art_155ter_cc_whole_article_notice_in_a_plain_ins_akn(self):
+        v = extract_validity(
+            page("art155ter_cc_in_force_abrogated_plain_notice_trimmed.html"), article="155-ter"
+        )
+        assert v["state"] == "abrogated"
+        assert v["valid_from"] == "2014-02-07"
+        assert v["valid_to"] is None
+        assert v["version_number"] == 2
+
+    def test_art_1_dlgs_163_2006_the_act_is_repealed(self):
+        v = extract_validity(page("dlgs163_2006_art1_provvedimento_abrogato_trimmed.html"), article="1")
+        assert v["state"] == "abrogated"
+        assert v["valid_from"] == "2016-04-19"
+        assert v["valid_to"] is None
+
+    def test_art_1_tuir_as_served_for_a_future_day_says_the_act_is_repealed(self):
+        v = extract_validity(page("tuir_art1_at_2027-01-01_provvedimento_abrogato_trimmed.html"), article="1")
+        assert v["state"] == "abrogated"
+        assert v["valid_from"] == "2027-01-01"
+        assert v["valid_to"] is None
+        assert v["version_number"] == 3
+
+    def test_a_closure_announced_for_the_future_leaves_the_text_current(self):
+        v = extract_validity(
+            page("tuir_art1_in_force_closing_2026-12-31_trimmed.html"),
+            article="1",
+            today=date(2026, 10, 2),
+        )
+        assert v["state"] == "current"
+        assert v["valid_from"] == "2004-01-01"
+        assert v["valid_to"] == "2026-12-31"
+        assert v["version_number"] == 2
+
+    @pytest.mark.parametrize(
+        "notice",
+        [
+            "((ARTICOLO ABROGATO DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+            "(( ARTICOLO ABROGATO DAL D.LGS. 1 GENNAIO 2000, N. 1 ))",
+            "((PROVVEDIMENTO ABROGATO DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+            "((ARTICOLO SOPPRESSO DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+            "((PROVVEDIMENTO SOPPRESSO DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+            "((articolo abrogato dal d.lgs. 1 gennaio 2000, n. 1))",
+            "((provvedimento  abrogato   dal d.lgs. 1 gennaio 2000, n. 1))",
+        ],
+    )
+    def test_a_plain_ins_akn_notice_decides_by_its_words(self, notice):
+        content = (
+            '<span class="art-just-text-akn">(Rubrica rimasta)</span>'
+            f'<div class="ins-akn">{notice}</div>'
+        )
+        v = extract_validity(synthetic(dal="1-1-2000", content=content), article="7")
+        assert v["state"] == "abrogated"
+
+    @pytest.mark.parametrize(
+        "notice",
+        [
+            "((COMMA ABROGATO DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+            "((PERIODO SOPPRESSO DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+            "((NUMERO ABROGATO DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+            "((LETTERA SOPPRESSA DAL D.LGS. 1 GENNAIO 2000, N. 1))",
+        ],
+    )
+    def test_a_partial_plain_notice_among_other_commi_is_not_an_abrogation(self, notice):
+        content = (
+            '<div class="art-commi-div-akn">'
+            '<div class="art-comma-div-akn"><span class="comma-num-akn">1. </span>'
+            '<span class="art_text_in_comma">Il debitore paga.</span></div>'
+            f'<div class="art-comma-div-akn"><div class="ins-akn">{notice}</div></div>'
+            "</div>"
+        )
+        v = extract_validity(synthetic(dal="1-1-2000", content=content), article="7")
+        assert v["state"] == "current"
+
+    def test_a_plain_note_marker_beside_the_text_is_not_an_abrogation(self):
+        content = (
+            '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
+            '<div class="ins-akn">((12))</div>'
+        )
+        v = extract_validity(synthetic(dal="1-1-2000", content=content), article="7")
+        assert v["state"] == "current"
+
+    @pytest.mark.parametrize("words", ["PROVVEDIMENTO ABROGATO", "ARTICOLO ABROGATO"])
+    def test_the_words_in_the_update_notes_are_not_a_notice(self, words):
+        content = (
+            '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
+            + _notes(3, f"{words} DAL D.LGS. 1 GENNAIO 2000, N. 1")
+        )
+        v = extract_validity(synthetic(dal="1-1-2000", content=content), article="7")
+        assert v["state"] == "current"
+
+    def test_five_thousand_plain_markers_and_no_repeal(self):
+        content = (
+            '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
+            + "".join(f'<div class="ins-akn">(({n}))</div>' for n in range(5_000))
+        )
+        found, elapsed = TestHostilePages._timed(
+            lambda: extract_validity(synthetic(dal="1-1-2000", content=content), article="7")
+        )
+        assert found["state"] == "current"
+        assert elapsed < TestHostilePages.BOUND
+
+    def test_five_thousand_plain_markers_then_a_whole_article_notice(self):
+        content = (
+            '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
+            + "".join(f'<div class="ins-akn">(({n}))</div>' for n in range(5_000))
+            + '<div class="ins-akn">((ARTICOLO ABROGATO DAL D.LGS. 1 GENNAIO 2000, N. 1))</div>'
+        )
+        found, elapsed = TestHostilePages._timed(
+            lambda: extract_validity(synthetic(dal="1-1-2000", content=content), article="7")
+        )
+        assert found["state"] == "abrogated"
+        assert elapsed < TestHostilePages.BOUND
+
+
 class TestTheArticleAskedFor:
     def test_a_page_for_another_article_says_nothing(self):
         """Normattiva answers 200 for a URN that names something else: the decree

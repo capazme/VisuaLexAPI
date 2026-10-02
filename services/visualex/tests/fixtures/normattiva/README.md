@@ -47,6 +47,25 @@ the update link, the "Ultimo aggiornamento" line and `div.bodyTesto` — wrapped
   notes (`div.art_aggiornamento-akn`). It exists because the first version of the rule
   counted those as text and read the article as in force. The file keeps the portal's
   CRLF line endings: do not retype it.
+- `art155ter_cc_in_force_abrogated_plain_notice_trimmed.html` — art. 155-ter c.c. in force
+  on 2026-10-02 (`urn:nir:stato:regio.decreto:1942-03-16;262:2~art155ter`): repealed by
+  D.Lgs. 154/2013, window "dal 7-2-2014", version 2. The notice "(( ARTICOLO ABROGATO … ))"
+  is a plain `div.ins-akn`, with no `art_abrogato-akn` class: it exists because the rule
+  looked at that class only and read the article as in force. CRLF kept.
+- `dlgs163_2006_art1_provvedimento_abrogato_trimmed.html` — art. 1 D.Lgs. 163/2006 in force
+  on 2026-10-02 (`urn:nir:stato:decreto.legislativo:2006-04-12;163~art1!vig=`): the whole act
+  is repealed by D.Lgs. 50/2016, window "dal 19-04-2016", and the notice
+  "((PROVVEDIMENTO ABROGATO DAL D.LGS. 18 APRILE 2016, N. 50))" is a plain `div.ins-akn`.
+  A whole-act notice, on every article of a repealed act. CRLF kept.
+- `tuir_art1_at_2027-01-01_provvedimento_abrogato_trimmed.html` — art. 1 d.P.R. 917/1986
+  (TUIR) as the portal serves it for 2027-01-01
+  (`urn:nir:stato:decreto.del.presidente.della.repubblica:1986-12-22;917~art1!vig=2027-01-01`):
+  a version that starts in the future, version 3, whose notice reads "((PROVVEDIMENTO ABROGATO
+  DAL D.LGS. 19 GIUGNO 2026, N. 117))". CRLF kept.
+- `tuir_art1_in_force_closing_2026-12-31_trimmed.html` — the same article in force on
+  2026-10-02 (`...;917~art1!vig=`): the window announces its closure ("dal 1-1-2004 al:
+  31-12-2026"), version 2. The control that a closure announced for the future leaves the
+  state `current` and keeps its end. CRLF kept.
 
 The portal prints the end of the window as `<span class="indent">al: <span id="artFine" class="rosso">29-12-2007</span></span>`
 when the window has a start (the start is `<span id="artInizio" class="rosso">`, preceded by `&nbsp;`),
