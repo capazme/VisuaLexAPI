@@ -678,15 +678,90 @@ async def test_modifications_are_counted_by_their_dated_edges_up_to_the_referenc
     assert "1990" not in cypher and "2026" not in cypher
 
 
-async def test_the_undated_modification_count_on_the_node_does_not_make_a_norm_modified():
-    # Art. 1632 c.c.: n_modifiche 1 (its 1971 abrogation), no MODIFICA edge. As at 1960 it is in force.
+async def test_n_modifiche_counts_nothing_its_edges_account_for():
+    # Art. 1632 c.c.: n_modifiche 1, which is its 1971 abrogation (one ABROGA edge), and no
+    # MODIFICA edge. The remainder is 0: as at 1960 it is in force.
     from merlt.storage.temporal.validity_service import TemporalValidityService
 
     row = _validity_row(mod_count=1, last_modified="1971-02-22", is_abrogated=True,
                         abr_urn="l11", abr_estremi="L. 11/1971", abr_date="1971-02-22", abr_pending=True)
-    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", [row])])
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS edges", [{"edges": 1}]), ("AS is_abrogated", [row])])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC, "1960-01-01")
     assert (result.status, result.modification_count, [p["type"] for p in result.pending]) == ("vigente", 0, ["abroga"])
+
+
+async def test_the_modified_warning_names_the_latest_dated_amendment_in_force():
+    # The node's ultima_modifica (2017) is after the date asked about (2000): the warning
+    # names the latest amendment the count took, from its edges.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    row = _validity_row(last_modified="2017-07-31")
+    count = {"n": 2, "undated": 0, "latest": "1999-03-19"}
+    graph = _GraphRecorder(answers=[("count(*) AS n", [count]), ("AS is_abrogated", [row])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC, "2000-01-01")
+    assert result.status == "modificato"
+    assert result.warning_message == "Norma modificata (ultima modifica: 1999-03-19) - verificare vigenza attuale"
+
+
+async def test_the_modified_warning_says_when_some_amendments_carry_no_date():
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    count = {"n": 3, "undated": 1, "latest": "1999-03-19"}
+    graph = _GraphRecorder(answers=[("count(*) AS n", [count]), ("AS is_abrogated", [_validity_row()])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC, "2000-01-01")
+    assert result.status == "modificato"
+    assert result.warning_message == (
+        "Norma modificata (ultima modifica datata: 1999-03-19; alcune modifiche sono prive di data, "
+        "quindi lo stato a una data passata può differire) - verificare vigenza attuale"
+    )
+    undated_only = _GraphRecorder(answers=[("count(*) AS n", [{"n": 1, "undated": 1, "latest": None}]),
+                                           ("AS is_abrogated", [_validity_row()])])
+    result = await TemporalValidityService(graph_db=undated_only).check_validity(CC)
+    assert result.warning_message == (
+        "Norma modificata (modifiche prive di data, quindi lo stato a una data passata può differire) "
+        "- verificare vigenza attuale"
+    )
+
+
+async def test_amendment_events_without_an_edge_count_as_undated_modifications():
+    # n_modifiche 3 and no edge: the graph lacks the acts, the norm was amended: modificato today.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0, "undated": 0, "latest": None}]),
+                                    ("AS edges", [{"edges": 0}]), ("AS is_abrogated", [_validity_row(mod_count=3)])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.modification_count) == ("modificato", 3)
+    assert "prive di data" in result.warning_message
+    edges_cypher = next(c for c in graph.cyphers if "AS edges" in c)
+    assert "<-[r:MODIFICA|INSERISCE|ABROGA|SOSTITUISCE]-" in edges_cypher
+    assert graph.params[graph.cyphers.index(edges_cypher)] == {"urn": CC}
+
+
+async def test_an_article_shaped_like_1469_counts_its_eight_unrecorded_amendments():
+    # Art. 1469 c.c. on the seed: n_modifiche 13, five edges (4 MODIFICA, 1 INSERISCE, the latest 2005).
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 5, "undated": 0, "latest": "2005-10-08"}]),
+                                    ("AS edges", [{"edges": 5}]), ("AS is_abrogated", [_validity_row(mod_count=13)])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.modification_count) == ("modificato", 13)
+    assert result.warning_message.startswith("Norma modificata (ultima modifica datata: 2005-10-08; alcune modifiche")
+
+
+async def test_more_edges_than_n_modifiche_leave_no_remainder_and_are_logged():
+    from structlog.testing import capture_logs
+
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 4, "undated": 0, "latest": "2017-07-31"}]),
+                                    ("AS edges", [{"edges": 4}]), ("AS is_abrogated", [_validity_row(mod_count=2)])])
+    with capture_logs() as logs:
+        result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.modification_count) == ("modificato", 4)
+    assert result.warning_message == "Norma modificata (ultima modifica: 2017-07-31) - verificare vigenza attuale"
+    assert [(e["event"], e["log_level"], e["urn"]) for e in logs if e["event"] == "amendment_edges_exceed_n_modifiche"] == [
+        ("amendment_edges_exceed_n_modifiche", "debug", CC),
+    ]
 
 
 def _knowledge_graph_on(graph):

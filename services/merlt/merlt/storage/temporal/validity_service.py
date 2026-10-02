@@ -223,10 +223,22 @@ class TemporalValidityService:
             # "Modified" means modified as at the reference date: the incoming MODIFICA and
             # INSERISCE edges (an inserted comma is an amendment) in force by then, an
             # undated one included. ABROGA and SOSTITUISCE are never modifications: they
-            # have their own status and `pending`. The node's `n_modifiche` (multivigenza
-            # only, 34 of 1,539 seed articles) has no date and counts the abrogation too
-            # (art. 1632 c.c.), so it no longer counts.
-            node_data["mod_count"] = await self._count_modifications(key, reference)
+            # have their own status and `pending`.
+            #
+            # The node's `n_modifiche` (multivigenza only) counts every amendment event,
+            # abrogations and replacements included: on the Libro IV seed it equals the
+            # incoming MODIFICA+INSERISCE+ABROGA+SOSTITUISCE edges on 30 of the 34 articles
+            # that carry it (art. 1632 c.c.: 1, its abrogation). The graph lacks the acts of
+            # the rest (art. 1469: 13 events, 5 edges), so only the remainder,
+            # max(0, n_modifiche - those edges), is unknown: it counts as undated
+            # modifications. Known limits: an undated remainder counts at every reference
+            # date (the warning says so), and an abrogation the graph lacks reads as a
+            # modification.
+            counted = await self._modification_summary(key, reference)
+            remainder = await self._unrecorded_amendments(key, node_data.get("mod_count"))
+            node_data["mod_count"] = counted["n"] + remainder
+            node_data["mod_undated"] = counted["undated"] + remainder
+            node_data["mod_latest"] = counted["latest"]
             if node_data["mod_count"] > 0:
                 modifications = await self._query_modifications(key)
 
@@ -384,21 +396,58 @@ class TemporalValidityService:
         Returns:
             Numero di archi MODIFICA o INSERISCE in vigore a quella data (0 se non leggibile)
         """
+        return (await self._modification_summary(urn, as_of))["n"]
+
+    async def _modification_summary(self, urn: str, as_of: Optional[str] = None) -> Dict[str, Any]:
+        """The MODIFICA and INSERISCE edges in force at `as_of` (`_count_modifications`):
+        how many (`n`), how many of them undated (`undated`), and the latest effect date
+        among the dated ones (`latest`, None when there is none)."""
         cypher = """
             MATCH (norma {URN: $urn})<-[r:MODIFICA|INSERISCE]-(modificante)
             WITH coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS mod_date
             WHERE mod_date = '' OR left(mod_date, 10) <= $as_of
-            RETURN count(*) AS n
+            RETURN count(*) AS n,
+                sum(CASE WHEN mod_date = '' THEN 1 ELSE 0 END) AS undated,
+                max(CASE WHEN mod_date = '' THEN null ELSE left(mod_date, 10) END) AS latest
         """
-
+        empty = {"n": 0, "undated": 0, "latest": None}
         try:
             results = await self.graph_db.ro_query(
                 cypher, {"urn": canonical_urn(urn), "as_of": (as_of or date.today().isoformat())[:10]}
             )
-            return int(results[0]["n"]) if results else 0
         except Exception as e:
             log.error("modification_count_failed", urn=urn, error=str(e))
+            return empty
+        if not results:
+            return empty
+        row = results[0]
+        return {"n": int(row.get("n") or 0), "undated": int(row.get("undated") or 0), "latest": row.get("latest") or None}
+
+    async def _unrecorded_amendments(self, urn: str, n_modifiche: Any) -> int:
+        """The amendment events `n_modifiche` counts that have no edge in the graph:
+        max(0, n_modifiche - incoming MODIFICA/INSERISCE/ABROGA/SOSTITUISCE edges, any
+        date). 0 when the node has no count; more edges than events give 0 (logged)."""
+        if isinstance(n_modifiche, bool):
             return 0
+        try:
+            events = int(n_modifiche or 0)
+        except (TypeError, ValueError):
+            return 0
+        if events <= 0:
+            return 0
+        cypher = """
+            MATCH (norma {URN: $urn})<-[r:MODIFICA|INSERISCE|ABROGA|SOSTITUISCE]-()
+            RETURN count(r) AS edges
+        """
+        try:
+            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
+        except Exception as e:
+            log.error("amendment_edge_count_failed", urn=urn, error=str(e))
+            return 0
+        edges = int(results[0].get("edges") or 0) if results else 0
+        if edges > events:
+            log.debug("amendment_edges_exceed_n_modifiche", urn=urn, n_modifiche=events, edges=edges)
+        return max(0, events - edges)
 
     async def _query_modifications(self, urn: str) -> List[Dict[str, Any]]:
         """
@@ -540,8 +589,12 @@ class TemporalValidityService:
             )
 
         if relevant_mod_count > 0:
-            last_mod_date = str(last_modified) if last_modified else "data non disponibile"
-            warning_msg = self._format_warning("modificato", {"date": last_mod_date})
+            if "mod_latest" in node_data:
+                # the latest amendment the count took, and whether some carry no date
+                details = {"date": node_data.get("mod_latest"), "undated": bool(node_data.get("mod_undated"))}
+            else:
+                details = {"date": str(last_modified) if last_modified else "data non disponibile"}
+            warning_msg = self._format_warning("modificato", details)
             return ValidityResult(
                 urn=urn,
                 status="modificato",
@@ -581,8 +634,18 @@ class TemporalValidityService:
             Messaggio formattato
         """
         if status == "modificato":
-            date = details.get("date", "data non disponibile")
-            return f"Norma modificata (ultima modifica: {date}) - verificare vigenza attuale"
+            date = details.get("date")
+            if details.get("undated"):
+                if date:
+                    return (
+                        f"Norma modificata (ultima modifica datata: {date}; alcune modifiche sono prive "
+                        "di data, quindi lo stato a una data passata può differire) - verificare vigenza attuale"
+                    )
+                return (
+                    "Norma modificata (modifiche prive di data, quindi lo stato a una data passata può "
+                    "differire) - verificare vigenza attuale"
+                )
+            return f"Norma modificata (ultima modifica: {date or 'data non disponibile'}) - verificare vigenza attuale"
 
         if status == "abrogato":
             date = details.get("date", "data non disponibile")

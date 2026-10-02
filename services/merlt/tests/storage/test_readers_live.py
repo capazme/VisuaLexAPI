@@ -453,6 +453,49 @@ async def test_a_norm_is_modified_as_at_a_date_only_by_amendments_in_force_by_th
     assert (result.status, result.modification_count, result.is_valid) == (status, count, True)
 
 
+# The four seed articles whose n_modifiche counts more amendment events than they have edges,
+# with their real edges (type, data_efficacia).
+_SEED_SHAPES = {
+    "1469": (13, [("MODIFICA", "2005-10-08"), ("MODIFICA", "2003-02-07"), ("MODIFICA", "2000-01-18"),
+                  ("MODIFICA", "2000-01-18"), ("INSERISCE", "1996-02-10")]),
+    "1519": (24, [("ABROGA", "2005-10-08"), ("MODIFICA", "2002-03-08"), ("INSERISCE", "2002-03-08")]),
+    "1751": (7, [("INSERISCE", "2001-01-20"), ("MODIFICA", "1999-03-19"), ("INSERISCE", "1991-09-20"),
+                 ("MODIFICA", "1991-09-20"), ("MODIFICA", "1971-11-16"), ("MODIFICA", "1991-09-20")]),
+    "1785": (5, [("INSERISCE", "1978-07-03"), ("MODIFICA", "1978-07-03")]),
+}
+
+
+@pytest.mark.parametrize("art, as_of, status, count, latest", [
+    ("1469", None, "modificato", 13, "2005-10-08"),  # 5 edges in force + 8 without an edge
+    ("1469", "1960-01-01", "modificato", 8, None),   # only the undated remainder
+    ("1519", None, "abrogato", 23, None),            # its 2005 ABROGA decides; 2 + 21
+    ("1519", "1960-01-01", "modificato", 21, None),  # the abrogation is pending, never a modification
+    ("1751", None, "modificato", 7, "2001-01-20"),
+    ("1785", None, "modificato", 5, "1978-07-03"),
+])
+async def test_the_seeds_unrecorded_amendments_count_as_undated(graph, art, as_of, status, count, latest):
+    events, edges = _SEED_SHAPES[art]
+    urn = f"urn:test:seed-{art}-{as_of}"
+    await graph.query(
+        "CREATE (:Norma {URN: $urn, tipo_documento: 'articolo', n_modifiche: $events, abrogato: false})",
+        {"urn": urn, "events": events},
+    )
+    for i, (rel, effect) in enumerate(edges):
+        await graph.query(
+            f"MATCH (a:Norma {{URN: $urn}}) CREATE (:Norma {{URN: $act, tipo_documento: 'legge'}})"
+            f"-[:{rel} {{data_efficacia: $effect, certezza: 1.0}}]->(a)",
+            {"urn": urn, "act": f"{urn}-act{i}", "effect": effect},
+        )
+    result = await TemporalValidityService(graph_db=graph).check_validity(urn, as_of)
+    assert (result.status, result.modification_count) == (status, count)
+    if status == "modificato":
+        assert "prive di data" in result.warning_message
+        if latest:
+            assert f"ultima modifica datata: {latest}" in result.warning_message
+        else:
+            assert "datata" not in result.warning_message
+
+
 async def test_an_inserted_comma_is_an_amendment(graph):
     history = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=ART6)
     assert history.success, history.error
