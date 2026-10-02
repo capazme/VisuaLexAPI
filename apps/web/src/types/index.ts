@@ -119,11 +119,34 @@ export interface ArticleData {
     brocardi_info?: BrocardiInfo | null;
     error?: string;
     queue_position?: number;
+    /** What the source's own page says about the text it served; absent when it cannot be read. */
+    validity?: ArticleValidity;
     versionInfo?: {
         isHistorical: boolean;
         requestedDate?: string;
         effectiveDate?: string;
     };
+}
+
+export type ValidityState = 'current' | 'historical' | 'not_yet' | 'abrogated';
+
+/**
+ * The window of days a Normattiva page states for the text it served (dates in
+ * ISO form). The source's own statement of which version came back — never an
+ * echo of the date the reader typed. It says which text was in force, not which
+ * discipline governs a fact.
+ */
+export interface ArticleValidity {
+    state: ValidityState;
+    /** First day in force; null for an article that did not exist yet. */
+    valid_from: string | null;
+    /** Last day in force; null while the text is still in force. */
+    valid_to: string | null;
+    version_number: number | null;
+    /** The day the act's consolidated text was last updated. */
+    act_updated: string | null;
+    /** Whether the window contains the requested day; null when no day was requested. */
+    request_in_window: boolean | null;
 }
 
 export interface SearchFilters {
