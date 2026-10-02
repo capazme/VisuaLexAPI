@@ -220,12 +220,13 @@ class TemporalValidityService:
 
         modifications = []
         if node_data is not None:
-            # The modifications are the incoming MODIFICA and INSERISCE edges (an inserted
-            # comma is an amendment). `n_modifiche` is set by the multivigenza run only
-            # (measured on the seed: 34 of 1,539 articles carry it, and there are 54
-            # MODIFICA edges), so it can only add to the count, never gate it.
-            edge_count = await self._count_modifications(key)
-            node_data["mod_count"] = max(node_data.get("mod_count") or 0, edge_count)
+            # "Modified" means modified as at the reference date: the incoming MODIFICA and
+            # INSERISCE edges (an inserted comma is an amendment) in force by then, an
+            # undated one included. ABROGA and SOSTITUISCE are never modifications: they
+            # have their own status and `pending`. The node's `n_modifiche` (multivigenza
+            # only, 34 of 1,539 seed articles) has no date and counts the abrogation too
+            # (art. 1632 c.c.), so it no longer counts.
+            node_data["mod_count"] = await self._count_modifications(key, reference)
             if node_data["mod_count"] > 0:
                 modifications = await self._query_modifications(key)
 
@@ -372,21 +373,28 @@ class TemporalValidityService:
             log.error("validity_query_failed", urn=urn, error=str(e))
             return None
 
-    async def _count_modifications(self, urn: str) -> int:
+    async def _count_modifications(self, urn: str, as_of: Optional[str] = None) -> int:
         """
-        Query Cypher per contare le modifiche in entrata (archi MODIFICA e INSERISCE:
-        un comma inserito e' una modifica; ABROGA e SOSTITUISCE hanno il loro stato).
+        Query Cypher per contare le modifiche in entrata in vigore alla data di riferimento
+        (archi MODIFICA e INSERISCE: un comma inserito e' una modifica; ABROGA e
+        SOSTITUISCE hanno il loro stato). An edge counts when it takes effect on or before
+        `as_of` (a parameter; default today), dated as the history tool dates it, or when
+        it has no date.
 
         Returns:
-            Numero di archi MODIFICA o INSERISCE verso la norma (0 se non leggibile)
+            Numero di archi MODIFICA o INSERISCE in vigore a quella data (0 se non leggibile)
         """
         cypher = """
-            MATCH (norma {URN: $urn})<-[r:MODIFICA|INSERISCE]-()
-            RETURN count(r) AS n
+            MATCH (norma {URN: $urn})<-[r:MODIFICA|INSERISCE]-(modificante)
+            WITH coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS mod_date
+            WHERE mod_date = '' OR left(mod_date, 10) <= $as_of
+            RETURN count(*) AS n
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
+            results = await self.graph_db.ro_query(
+                cypher, {"urn": canonical_urn(urn), "as_of": (as_of or date.today().isoformat())[:10]}
+            )
             return int(results[0]["n"]) if results else 0
         except Exception as e:
             log.error("modification_count_failed", urn=urn, error=str(e))
@@ -432,7 +440,7 @@ class TemporalValidityService:
         - Se sostituito alla data di riferimento (as_of_date o oggi) -> critical
         - Se abrogato alla data di riferimento -> critical
         - Un'abrogazione o sostituzione successiva alla data di riferimento -> pending
-        - Se modificato (n_modifiche > 0, post as_of_date) -> warning
+        - Se modificato alla data di riferimento (archi MODIFICA o INSERISCE in vigore) -> warning
         - Altrimenti -> vigente, nessun warning
         """
         checked_at = datetime.now(timezone.utc).isoformat()
@@ -481,15 +489,8 @@ class TemporalValidityService:
             }
             recent_mods.append(mod_entry)
 
-        # Filter by as_of_date if provided
+        # `mod_count` is already the count as at the reference date (`_count_modifications`)
         relevant_mod_count = mod_count
-        if as_of_date and modifications:
-            # Count only modifications AFTER as_of_date
-            post_date_mods = [
-                m for m in recent_mods
-                if m["date"] and m["date"] > as_of_date
-            ]
-            relevant_mod_count = len(post_date_mods)
 
         # Determine status (priority: sostituito > abrogato > modificato > vigente).
         # `sost_*` and `abr_*` name only an end in force at the reference date (the query

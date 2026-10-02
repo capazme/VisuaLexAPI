@@ -414,7 +414,8 @@ async def test_a_dated_abrogation_decides_over_the_seeds_string_flag(graph, as_o
     # Art. 1632 c.c. as the seed has it: abrogato 'true', and an ABROGA dated 1971-02-22.
     art = f"urn:test:art1632-{as_of}"
     await graph.query(
-        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', abrogato: 'true', is_versione_vigente: 'true'}) "
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', abrogato: 'true', is_versione_vigente: 'true', "
+        "n_modifiche: 1, ultima_modifica: '1971-02-22'}) "
         "CREATE (act:Norma {URN: $act, estremi: 'L. 11/1971', tipo_documento: 'legge'}) "
         "CREATE (act)-[:ABROGA {disposizione: 'art. 29, comma 2', data_efficacia: '1971-02-22', certezza: 1.0}]->(a)",
         {"art": art, "act": art + "-act"},
@@ -432,6 +433,24 @@ async def test_the_seeds_string_false_is_not_an_abrogation(graph):
     )
     result = await TemporalValidityService(graph_db=graph).check_validity(art)
     assert (result.status, result.is_valid, result.pending) == ("vigente", True, [])
+
+
+@pytest.mark.parametrize("effect, as_of, status, count", [
+    ("1980-01-01", "1970-01-01", "vigente", 0),
+    ("1980-01-01", "1990-01-01", "modificato", 1),
+    (None, None, "modificato", 1),  # an undated amendment counts, as before
+])
+async def test_a_norm_is_modified_as_at_a_date_only_by_amendments_in_force_by_then(graph, effect, as_of, status, count):
+    art = f"urn:test:modified-{effect}-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.', n_modifiche: 1}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 5/1980', tipo_documento: 'legge'}) "
+        "CREATE (act)-[r:MODIFICA {disposizione: 'art. 1', certezza: 1.0, fonte: 'Normattiva'}]->(a) "
+        "SET r.data_efficacia = $effect",
+        {"art": art, "act": art + "-act", "effect": effect},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert (result.status, result.modification_count, result.is_valid) == (status, count, True)
 
 
 async def test_an_inserted_comma_is_an_amendment(graph):

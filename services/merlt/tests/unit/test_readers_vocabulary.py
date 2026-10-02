@@ -557,7 +557,7 @@ async def test_a_norm_no_amendment_run_has_touched_is_checked():
         "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
         "abr_urn": None, "abr_estremi": None, "abr_date": None, "sost_urn": None, "sost_estremi": None, "sost_date": None,
     }
-    graph = _GraphRecorder(rows=[row], answers=[("count(r)", [{"n": 0}])])
+    graph = _GraphRecorder(rows=[row], answers=[("count(*) AS n", [{"n": 0}])])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.is_valid) == ("vigente", True)
     assert len(graph.cyphers) == 2  # the status and the count: no modification, so no modification query
@@ -609,7 +609,7 @@ async def test_a_pending_abrogation_leaves_the_norm_in_force_and_is_reported_as_
     from merlt.storage.temporal.validity_service import TemporalValidityService
 
     row = _validity_row(abr_urn="act9", abr_estremi="L. 9/2099", abr_date="2099-01-01", abr_pending=True)
-    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [row])])
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", [row])])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.is_valid, result.abrogating_norm) == ("vigente", True, None)
     assert result.pending == [{"type": "abroga", "date": "2099-01-01", "by_urn": "act9", "by_estremi": "L. 9/2099"}]
@@ -626,7 +626,7 @@ async def test_an_abrogation_in_force_wins_over_a_pending_one_and_a_pending_repl
         _validity_row(abr_urn="act1", abr_estremi="L. 1/2020", abr_date="2020-01-01",
                       sost_urn="act8", sost_estremi="L. 8/2098", sost_date="2098-01-01", sost_pending=True),
     ]
-    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", rows)])
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", rows)])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.abrogating_norm["urn"]) == ("abrogato", "act1")
     assert [(p["type"], p["by_urn"]) for p in result.pending] == [("sostituisce", "act8"), ("abroga", "act9")]
@@ -641,7 +641,7 @@ async def test_the_abrogato_flag_counts_only_when_it_is_true(flag, status):
     # (abrogato 'false', no ABROGA edge) read as abrogated.
     from merlt.storage.temporal.validity_service import TemporalValidityService
 
-    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [_validity_row(is_abrogated=flag)])])
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", [_validity_row(is_abrogated=flag)])])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert result.status == status
 
@@ -652,9 +652,41 @@ async def test_a_dated_abrogation_decides_over_the_abrogato_flag():
     from merlt.storage.temporal.validity_service import TemporalValidityService
 
     row = _validity_row(is_abrogated="true", abr_urn="l11", abr_estremi="L. 11/1971", abr_date="1971-02-22", abr_pending=True)
-    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [row])])
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", [row])])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC, "1960-01-01")
     assert (result.status, [p["type"] for p in result.pending]) == ("vigente", ["abroga"])
+
+
+async def test_modifications_are_counted_by_their_dated_edges_up_to_the_reference_date():
+    # "modificato" means modified as at the reference date: only MODIFICA and INSERISCE edges
+    # in force by then count (an undated one counts); ABROGA and SOSTITUISCE never do.
+    from datetime import date
+
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder(rows=[{"n": 0}])
+    service = TemporalValidityService(graph_db=graph)
+    with patch("merlt.storage.temporal.validity_service.date", SimpleNamespace(today=lambda: date(2026, 10, 2))):
+        await service._count_modifications(CC)
+    await service._count_modifications(CC, "1990-01-01")
+    assert graph.params == [{"urn": CC, "as_of": "2026-10-02"}, {"urn": CC, "as_of": "1990-01-01"}]
+    assert set(graph.methods) == {"ro_query"}
+    cypher = graph.cyphers[0]
+    assert "<-[r:MODIFICA|INSERISCE]-" in cypher and "ABROGA" not in cypher and "SOSTITUISCE" not in cypher
+    assert "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS mod_date" in cypher
+    assert "WHERE mod_date = '' OR left(mod_date, 10) <= $as_of" in cypher
+    assert "1990" not in cypher and "2026" not in cypher
+
+
+async def test_the_undated_modification_count_on_the_node_does_not_make_a_norm_modified():
+    # Art. 1632 c.c.: n_modifiche 1 (its 1971 abrogation), no MODIFICA edge. As at 1960 it is in force.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    row = _validity_row(mod_count=1, last_modified="1971-02-22", is_abrogated=True,
+                        abr_urn="l11", abr_estremi="L. 11/1971", abr_date="1971-02-22", abr_pending=True)
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", [row])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC, "1960-01-01")
+    assert (result.status, result.modification_count, [p["type"] for p in result.pending]) == ("vigente", 0, ["abroga"])
 
 
 def _knowledge_graph_on(graph):
@@ -850,7 +882,7 @@ async def test_a_validity_answer_keeps_the_urn_that_was_asked():
     from merlt.storage.temporal.validity_service import TemporalValidityService
 
     marked = CC + "!vig=2023-01-01"
-    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}])], rows=[{"mod_count": 0}])
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}])], rows=[{"mod_count": 0}])
     result = await TemporalValidityService(graph_db=graph).check_validity(marked)
     assert result.urn == marked  # the caller matches the answer to its own spelling
     assert {params["urn"] for params in graph.params} == {CC}  # the graph is asked with its key
@@ -970,14 +1002,14 @@ async def test_modifications_are_found_by_counting_the_incoming_modifica_edges()
     }
     edges = [{"event_type": "MODIFICA", "by_urn": "act1", "by_estremi": "L. 1/2020", "event_date": "2020-02-01"}]
     graph = _GraphRecorder(answers=[
-        ("count(r)", [{"n": 2}]),
+        ("count(*) AS n", [{"n": 2}]),
         ("type(r) AS event_type", edges),
         ("AS is_abrogated", [status]),
     ])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.modification_count) == ("modificato", 2)
     assert [mod["type"] for mod in result.recent_modifications] == ["modifica"]
-    count_cypher = next(c for c in graph.cyphers if "count(r)" in c)
+    count_cypher = next(c for c in graph.cyphers if "count(*) AS n" in c)
     assert "<-[r:MODIFICA|INSERISCE]-" in count_cypher  # an inserted comma is an amendment too
 
 
@@ -988,7 +1020,7 @@ async def test_an_article_nothing_modifies_is_checked_without_a_modification_que
         "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
         "abr_urn": None, "abr_estremi": None, "abr_date": None, "sost_urn": None, "sost_estremi": None, "sost_date": None,
     }
-    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [status])])
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", [status])])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.modification_count) == ("vigente", 0)
     assert not any("type(r) AS event_type" in cypher for cypher in graph.cyphers)
