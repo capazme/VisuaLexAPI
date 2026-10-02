@@ -20,13 +20,13 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-# Needs a live FalkorDB (the compose falkordb service): excluded by default through
-# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
-pytestmark = pytest.mark.integration
-
 from merlt.storage.enrichment.models import PendingEntity
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.entity_writer import EntityGraphWriter
+
+# Needs a live FalkorDB (the compose falkordb service): excluded by default through
+# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
+pytestmark = pytest.mark.integration
 
 TEST_GRAPH = "merlt_test_twins"
 ACT = "urn:nir:stato:regio.decreto:1942-03-16;262:2"

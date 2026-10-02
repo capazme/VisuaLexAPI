@@ -15,14 +15,17 @@ Features:
 import json
 import os
 import structlog
-from typing import List, Optional, Dict, Any, Type
+from typing import TYPE_CHECKING, List, Optional, Dict, Any
 from uuid import UUID
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-from .models import Base, get_bridge_table_model
+from .models import get_bridge_table_model
+
+if TYPE_CHECKING:  # an annotation only
+    from merlt.config.environments import Environment
 
 log = structlog.get_logger()
 
@@ -76,7 +79,7 @@ class BridgeTableConfig:
         )
 
     @classmethod
-    def from_environment(cls, env_config: "EnvironmentConfig") -> "BridgeTableConfig":
+    def from_environment(cls, env_config: "Environment") -> "BridgeTableConfig":
         """
         Crea configurazione da ambiente corrente.
 

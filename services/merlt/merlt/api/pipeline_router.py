@@ -427,7 +427,6 @@ async def start_pipeline(
     """
     import asyncio
     from datetime import datetime, timezone
-    from uuid import uuid4
 
     try:
         # Genera run_id univoco
@@ -518,7 +517,6 @@ async def _run_batch_pipeline(run_id: str, request: StartPipelineRequest):
     Questo task viene avviato da start_pipeline e aggiorna il progresso
     via pipeline_orchestrator per WebSocket updates.
     """
-    import asyncio
 
     try:
         log.info("Background pipeline started", run_id=run_id)
@@ -786,7 +784,6 @@ async def export_dataset(
     """
     import json
     import csv
-    import os
     import tempfile
     from datetime import datetime, timezone
     from uuid import uuid4

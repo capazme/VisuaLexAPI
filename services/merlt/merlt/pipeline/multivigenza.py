@@ -32,12 +32,11 @@ import structlog
 import re
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
 from merlt.clients import (
     NormaVisitata,
-    Norma,
     Modifica,
     TipoModifica,
     StoriaArticolo,

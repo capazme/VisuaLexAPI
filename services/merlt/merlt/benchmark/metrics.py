@@ -19,7 +19,7 @@ Uso:
 """
 
 from typing import List, Set, Union, Dict, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import statistics
 
 

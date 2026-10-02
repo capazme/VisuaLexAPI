@@ -26,12 +26,11 @@ Example:
 import asyncio
 import os
 import time
-import uuid
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime
+from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from merlt.api.auth import verify_api_key
 from merlt.experts.models import ApiKey

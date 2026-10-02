@@ -322,7 +322,7 @@ class FalkorDBClient:
 
             return None
 
-        except Exception as e:
+        except Exception:
             # If nodes not found or no path exists, return None silently
             return None
 

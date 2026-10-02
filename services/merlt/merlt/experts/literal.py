@@ -36,7 +36,7 @@ from merlt.experts.base import (
     FeedbackHook,
 )
 from merlt.experts.react_mixin import ReActMixin
-from merlt.tools import BaseTool, SemanticSearchTool, GraphSearchTool
+from merlt.tools import BaseTool
 from merlt.storage.graph.schema import Rel, node_text
 from merlt.storage.retriever.models import get_source_types_for_expert
 
@@ -153,7 +153,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
         self._init_trace(context)
 
         log.info(
-            f"LiteralExpert analyzing",
+            "LiteralExpert analyzing",
             query=context.query_text[:50],
             trace_id=context.trace_id,
             use_react=self.use_react,
@@ -169,7 +169,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
                 novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
             )
             log.info(
-                f"LiteralExpert ReAct completed",
+                "LiteralExpert ReAct completed",
                 sources=len(retrieved_sources),
                 react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
             )
@@ -211,7 +211,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
             response.metadata["execution_trace"] = self.get_trace_dict()
 
         log.info(
-            f"LiteralExpert completed",
+            "LiteralExpert completed",
             confidence=response.confidence,
             sources=len(response.legal_basis),
             time_ms=response.execution_time_ms,
@@ -291,7 +291,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
         graph_tool = self._tool_registry.get("graph_search")
         if graph_tool and urns_to_explore:
             log.debug(
-                f"LiteralExpert graph expansion",
+                "LiteralExpert graph expansion",
                 urns_count=len(urns_to_explore),
                 urns=list(urns_to_explore)[:3]  # Log solo primi 3
             )
@@ -318,7 +318,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
                         })
 
         log.info(
-            f"LiteralExpert sources retrieved",
+            "LiteralExpert sources retrieved",
             total=len(sources),
             from_semantic=len(semantic_results),
             from_graph=len(sources) - len(semantic_results) - len(context.retrieved_chunks)
@@ -421,10 +421,10 @@ class LiteralExpert(BaseExpert, ReActMixin):
         ]
 
         if context.norm_references:
-            sections.append(f"\n## NORME CITATE NELLA DOMANDA\n" + ", ".join(context.norm_references))
+            sections.append("\n## NORME CITATE NELLA DOMANDA\n" + ", ".join(context.norm_references))
 
         if context.legal_concepts:
-            sections.append(f"\n## CONCETTI GIURIDICI IDENTIFICATI\n" + ", ".join(context.legal_concepts))
+            sections.append("\n## CONCETTI GIURIDICI IDENTIFICATI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
             sections.append("\n## TESTI NORMATIVI RECUPERATI")

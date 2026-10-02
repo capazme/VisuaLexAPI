@@ -23,10 +23,6 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-# Needs a live FalkorDB (the compose falkordb service): excluded by default through
-# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
-pytestmark = pytest.mark.integration
-
 from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 from merlt.experts.base import ExpertContext
 from merlt.experts.literal import LiteralExpert
@@ -42,6 +38,10 @@ from merlt.tools.principle_lookup import PrincipleLookupTool
 from merlt.tools.search import GraphSearchTool, SemanticSearchTool
 from merlt.tools.textual_reference import TextualReferenceTool
 from merlt.tools.verification import VerificationTool
+
+# Needs a live FalkorDB (the compose falkordb service): excluded by default through
+# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
+pytestmark = pytest.mark.integration
 
 TEST_GRAPH = "merlt_test_readers"
 ACT = "urn:nir:stato:regio.decreto:1942-03-16;262:2"

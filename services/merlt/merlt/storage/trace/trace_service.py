@@ -15,14 +15,17 @@ Pattern follows BridgeTable service architecture.
 """
 
 import structlog
-from typing import List, Optional, Dict, Any
+from typing import TYPE_CHECKING, List, Optional, Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text, select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-from merlt.experts.models import QATrace, QAFeedback
+from merlt.experts.models import QATrace
+
+if TYPE_CHECKING:  # an annotation only
+    from merlt.storage.bridge.bridge_table import BridgeTable
 
 log = structlog.get_logger()
 

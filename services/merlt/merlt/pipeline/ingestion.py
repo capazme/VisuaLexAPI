@@ -21,13 +21,12 @@ Usage:
 
 import structlog
 import re
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from uuid import UUID
 
-from merlt.pipeline.parsing import CommaParser, ArticleStructure, Comma, Lettera, parse_article
-from merlt.pipeline.chunking import StructuralChunker, Chunk, chunk_article
+from merlt.pipeline.parsing import CommaParser, ArticleStructure
+from merlt.pipeline.chunking import StructuralChunker, Chunk
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 from merlt.models import BridgeMapping
 

@@ -19,12 +19,10 @@ Uso:
     >>> print(results.overall_metrics.recall_at_5)
 """
 
-import asyncio
 import time
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Callable
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
 from dataclasses import dataclass, field
 import structlog
 
@@ -34,9 +32,11 @@ from merlt.benchmark.metrics import (
     compute_retrieval_metrics,
     compute_latency_metrics,
     recall_at_k,
-    mrr,
 )
-from merlt.benchmark.gold_standard import GoldStandard, Query, QueryCategory
+from merlt.benchmark.gold_standard import GoldStandard, QueryCategory
+
+if TYPE_CHECKING:  # an annotation only: the benchmark never imports the whole graph facade
+    from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 
 # A search returns chunks, the benchmark scores articles: ask for this many
 # chunks per article wanted, so that k distinct articles survive deduplication.

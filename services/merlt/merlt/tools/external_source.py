@@ -231,8 +231,6 @@ class ExternalSourceTool(BaseTool):
             f"external_source - query='{query}', priority={source_priority}"
         )
 
-        first_source = source_priority[0] if source_priority else None
-
         for idx, source in enumerate(source_priority):
             try:
                 result = None

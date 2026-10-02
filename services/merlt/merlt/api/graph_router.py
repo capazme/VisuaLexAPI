@@ -27,6 +27,7 @@ from rq import Queue, Retry
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, Iterable, List, Tuple
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1046,9 +1047,6 @@ async def resolve_norm(
 # ====================================================
 # SUBGRAPH VISUALIZATION
 # ====================================================
-
-from pydantic import BaseModel, Field
-
 
 class SubgraphNode(BaseModel):
     """Node in subgraph response."""

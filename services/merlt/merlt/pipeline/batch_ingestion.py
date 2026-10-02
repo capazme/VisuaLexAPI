@@ -26,9 +26,8 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
-from merlt.pipeline.ingestion import IngestionPipelineV2, IngestionResult
+from merlt.pipeline.ingestion import IngestionResult
 from merlt.clients import NormaVisitata, Norma
-from merlt.models import BridgeMapping
 from merlt.storage.graph.schema import Fonte, SourceType, canonical_urn, point_id
 from merlt.pipeline.orchestrator import pipeline_orchestrator
 from merlt.pipeline.types import PipelineType
@@ -110,7 +109,7 @@ class BatchIngestionPipeline:
         self._fetch_semaphore = asyncio.Semaphore(max_concurrent_fetches)
 
         log.info(
-            f"BatchIngestionPipeline initialized",
+            "BatchIngestionPipeline initialized",
             batch_size=batch_size,
             max_concurrent=max_concurrent_fetches,
             embedding_batch=embedding_batch_size,
