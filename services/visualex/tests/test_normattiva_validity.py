@@ -373,3 +373,23 @@ class TestHostilePages:
         found, elapsed = self._timed(lambda: extract_validity(hostile))
         assert found is not None and found["state"] == "abrogated"
         assert elapsed < self.BOUND
+
+    @pytest.mark.parametrize("word", ["vigore", "bodyTesto"])
+    @pytest.mark.parametrize("closing", ["", '"'])
+    def test_a_class_value_that_repeats_the_searched_word(self, word, closing):
+        hostile = '<div class="' + (word + " ") * 10_000 + closing
+        found, elapsed = self._timed(lambda: extract_validity(hostile))
+        assert found is None
+        assert elapsed < self.BOUND
+
+    def test_other_attributes_and_single_quotes_still_find_the_two_blocks(self):
+        page = (
+            "<html><body>"
+            "<div id='w' class='note vigore my-5' data-x=\"1\">Testo in vigore dal: <span>25-12-2003</span></div>"
+            "<div role=\"main\" class=\"bodyTesto\" data-y='2'><h2 class=\"article-num-akn\">Art. 7</h2>x</div>"
+            "</body></html>"
+        )
+        found = extract_validity(page, article="7")
+        assert found is not None
+        assert found["state"] == "current"
+        assert found["valid_from"] == "2003-12-25"

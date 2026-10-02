@@ -44,9 +44,14 @@ _BODY_SLICE = 200_000
 # These patterns run on a page the portal served and must stay linear on one it did
 # not (a changed or compromised portal): `re` holds the GIL, so a quadratic pattern
 # stalls the whole event loop even from a thread. Hence no character class here may run
-# past the next "<" or ">".
-_VIGORE_DIV = re.compile(r"""<div[^<>]*\bclass=["'][^"'<>]*\bvigore\b[^"'<>]*["'][^<>]*>""", re.I)
-_BODY_DIV = re.compile(r"""<div[^<>]*\bclass=["'][^"'<>]*\bbodyTesto\b[^"'<>]*["'][^<>]*>""", re.I)
+# past the next "<" or ">", and no pattern searches a repeated word inside an attribute
+# value it may have to give back (that is how the first version of the `div` finders
+# went quadratic): a tag is found first, then its class attribute is read from that
+# one tag's text.
+_DIV_OPENING = re.compile(r"<div\b[^<>]*>", re.I)
+_CLASS_VALUE = re.compile(r"""\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')""", re.I)
+_VIGORE_WORD = re.compile(r"\bvigore\b", re.I)
+_BODY_WORD = re.compile(r"\bbodyTesto\b", re.I)
 _TAG = re.compile(r"<[^<>]+>")
 _DAY = r"(\d{1,2})\s*-\s*(\d{1,2})\s*-\s*(\d{4})"
 # "Testo in vigore dal: 25-12-2003 al: 29-12-2007", "... dal: 28-12-2025" or
@@ -102,9 +107,22 @@ def _iso_day(value: Any) -> Optional[str]:
         return None
 
 
+def _find_div(raw: str, word: re.Pattern[str]) -> Optional[re.Match[str]]:
+    """The first `<div ...>` opening whose class attribute holds `word`, or None.
+
+    Linear in the page: the openings come from a pattern that cannot run past the
+    next "<" or ">", and the class attribute is read from one opening's text only.
+    """
+    for opening in _DIV_OPENING.finditer(raw):
+        value = _CLASS_VALUE.search(opening.group())
+        if value is not None and word.search(value.group(1) or value.group(2) or ""):
+            return opening
+    return None
+
+
 def _read_window(raw: str) -> Optional[Tuple[Optional[str], Optional[str]]]:
     """(valid_from, valid_to) from the "Testo in vigore" block, or None when unreadable."""
-    opening = _VIGORE_DIV.search(raw)
+    opening = _find_div(raw, _VIGORE_WORD)
     if opening is None:
         return None
     end = raw.find("</div>", opening.end())
@@ -139,7 +157,7 @@ def _read_act_updated(raw: str) -> Optional[str]:
 
 
 def _read_body(raw: str) -> Optional[Tag]:
-    opening = _BODY_DIV.search(raw)
+    opening = _find_div(raw, _BODY_WORD)
     if opening is None:
         return None
     soup = BeautifulSoup(raw[opening.start():opening.start() + _BODY_SLICE], "html.parser")
