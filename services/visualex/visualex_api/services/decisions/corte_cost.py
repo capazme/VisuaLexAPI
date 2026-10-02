@@ -5,7 +5,9 @@ never contacts it. Each decision links to its page there (scheda-pronuncia/<anno
 which the reader's browser opens. The complete source is the open-data distribution of
 dati.cortecostituzionale.it: three range bundles of per-year JSON (latin-1), the last one
 regenerated daily. A bundle is kept on disk (closed ranges for 30 days, the current one for 24
-hours: D3 of the 2026-08-29 design) and only the requested year is read out of it.
+hours: D3 of the 2026-08-29 design) and only the requested year is read out of it. When a
+refresh fails, a year before the current one is read from the copy on disk, however old; the
+current year never is. A failed refresh of the 2001-today bundle hides no closed year.
 
 Ported from mcp-legal-it 2.15's open-data client (same author, relicensed MIT): the bundle
 names and the nested layout are its findings. Here the text is never cut.
@@ -18,6 +20,7 @@ import io
 import json
 import os
 import re
+import tempfile
 import time
 import unicodedata
 import zipfile
@@ -28,9 +31,12 @@ from datetime import date
 from pathlib import Path
 
 import aiohttp
+import structlog
 
 from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
+
+log = structlog.get_logger()
 
 BASE_URL = "https://dati.cortecostituzionale.it/opendata/distribuzione/pronunce"
 # opened by the reader's browser, never fetched
@@ -101,9 +107,10 @@ def to_decision(rec: dict) -> Decision:
 
 
 def read_year(bundle: Path, year: int) -> list[dict] | None:
-    """The records of one year, read out of a range bundle (two nested zips, latin-1 JSON);
-    None when the bundle has no entry for that year. A year whose layout is not the court's
-    raises ValueError: a changed layout is never read as "no such decision"."""
+    """The records of one year, read out of a range bundle (two nested zips, JSON in latin-1,
+    or in UTF-8 should the court switch); None when the bundle has no entry for that year. A
+    year whose layout is not the court's raises ValueError: a changed layout is never read as
+    "no such decision"."""
     with zipfile.ZipFile(bundle) as outer:
         names = [n for n in outer.namelist() if n.endswith(_YEAR_ZIP.format(year=year))]
         if not names:
@@ -113,11 +120,41 @@ def read_year(bundle: Path, year: int) -> list[dict] | None:
     with zipfile.ZipFile(io.BytesIO(inner_bytes)) as inner:
         if target not in inner.namelist():
             raise ValueError(f"{bundle.name}: manca {target}")
-        obj = json.loads(inner.read(target).decode("latin-1"))
+        raw = inner.read(target)
+    try:
+        # UTF-8 first: latin-1 decodes any byte, so it would turn a UTF-8 file into mojibake
+        # without a sign, while latin-1 text with accents is almost never valid UTF-8
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")  # the court's encoding, as measured
+    obj = json.loads(text)
     records = obj.get(_ROOT_KEY) if isinstance(obj, dict) else None
     if not isinstance(records, list) or not all(isinstance(r, dict) for r in records):
         raise ValueError(f"{bundle.name}: {target} non ha la forma attesa")
     return records
+
+
+def _store_bundle(path: Path, text: str) -> None:
+    """A downloaded bundle, checked and put in place of the copy on disk. Synchronous and heavy
+    (the 2001-today bundle is about 56 MB): called through asyncio.to_thread, never on the
+    event loop."""
+    data = text.encode("latin-1")  # the bytes as served: latin-1 maps 0-255 one to one
+    if data[:2] != b"PK":
+        raise ValueError(f"{path.name}: la risposta non è un archivio zip")
+    try:
+        zipfile.ZipFile(io.BytesIO(data)).close()  # reads the end record: a cut file fails
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"{path.name}: l'archivio zip è incompleto") from exc
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # a name of its own: a write left running by a cancelled request never meets another
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)  # already gone once the replace succeeded
 
 
 class CorteCostReader:
@@ -135,37 +172,32 @@ class CorteCostReader:
                 return name, (OPEN_TTL if high >= self.today().year else CLOSED_TTL)
         return None
 
-    async def _bundle_path(self, name: str, ttl: int) -> Path:
+    async def _bundle_path(self, name: str, ttl: int, allow_stale: bool = False) -> Path:
+        """The bundle on disk, downloaded again once older than `ttl`. When that refresh
+        fails and an older copy will do (`allow_stale`: a year before the current one), the
+        copy on disk is served; otherwise the failure propagates."""
         path = self.cache_dir / name
         lock = self._locks.setdefault(name, asyncio.Lock())
         async with lock:  # concurrent misses wait for the same download
             if path.exists() and time.time() - path.stat().st_mtime < ttl:
                 return path
-            result = await decisions_http_client.request(
-                "GET", f"{BASE_URL}/{name}", source="corte_cost", text_encoding="latin-1",
-                timeout=_DOWNLOAD_TIMEOUT, headers=http_headers({"Accept": "application/zip"}))
-            data = result.text.encode("latin-1")
-            if data[:2] != b"PK":
-                raise ValueError(f"{name}: la risposta non è un archivio zip")
             try:
-                zipfile.ZipFile(io.BytesIO(data)).close()  # reads the end record: a cut file fails
-            except zipfile.BadZipFile as exc:
-                raise ValueError(f"{name}: l'archivio zip è incompleto") from exc
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_name(f"{name}.{os.getpid()}.tmp")
-            try:
-                tmp.write_bytes(data)
-                os.replace(tmp, path)
-            except OSError:
-                tmp.unlink(missing_ok=True)
-                raise
+                result = await decisions_http_client.request(
+                    "GET", f"{BASE_URL}/{name}", source="corte_cost", text_encoding="latin-1",
+                    timeout=_DOWNLOAD_TIMEOUT, headers=http_headers({"Accept": "application/zip"}))
+                await asyncio.to_thread(_store_bundle, path, result.text)
+            except Exception as exc:  # a cancellation is not an Exception: it propagates
+                if not (allow_stale and path.exists()):
+                    raise
+                log.warning("Corte costituzionale bundle refresh failed; serving the copy on disk",
+                            bundle=name, error=str(exc))
             return path
 
     async def _records(self, year: int) -> list[dict]:
         found = self._bundle(year)
         if found is None:
             return []
-        path = await self._bundle_path(*found)
+        path = await self._bundle_path(*found, allow_stale=year < self.today().year)
         key = (found[0], path.stat().st_mtime, year)
         if key not in self._years:
             try:

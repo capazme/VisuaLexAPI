@@ -5,6 +5,7 @@ import io
 import json
 import os
 import pathlib
+import threading
 import time
 import zipfile
 from datetime import date
@@ -14,20 +15,23 @@ import pytest
 from visualex_api.services.decisions import corte_cost
 from visualex_api.services.decisions.corte_cost import CorteCostReader, clean
 from visualex_api.services.http_client import HttpResult
+from visualex_api.tools.exceptions import NetworkError
 
 SAMPLE = json.loads((pathlib.Path(__file__).parent / "fixtures" / "decisions"
                      / "corte_cost_2014_sample.json").read_text(encoding="utf-8"))
 
 
-def make_bundle(years: dict[int, list[dict]]) -> bytes:
-    """A range bundle as the court publishes it: a zip of per-year zips of latin-1 JSON."""
+def make_bundle(years: dict[int, list[dict]], encoding: str = "latin-1") -> bytes:
+    """A range bundle as the court publishes it: a zip of per-year zips of JSON, latin-1
+    unless told otherwise."""
     outer_buf = io.BytesIO()
     with zipfile.ZipFile(outer_buf, "w") as outer:
         for year, records in years.items():
             inner_buf = io.BytesIO()
             with zipfile.ZipFile(inner_buf, "w") as inner:
                 inner.writestr(f"Cc_Opendata_Pronunce_{year}.json",
-                               json.dumps({"elenco_pronunce": records}, ensure_ascii=False).encode("latin-1"))
+                               json.dumps({"elenco_pronunce": records},
+                                          ensure_ascii=False).encode(encoding))
             outer.writestr(f"Cc_Opendata_Pronunce_{year}_json.zip", inner_buf.getvalue())
     return outer_buf.getvalue()
 
@@ -159,6 +163,80 @@ async def test_before_1956_there_is_nothing_to_download(monkeypatch, tmp_path):
     calls = _serve(monkeypatch, make_bundle({}))
     assert await _reader(tmp_path).lookup(1, 1950) is None
     assert calls == []
+
+
+def _source_down(monkeypatch):
+    calls = []
+
+    async def fake_request(method, url, **kwargs):
+        calls.append(url)
+        raise NetworkError("Exceeded retry budget")
+
+    monkeypatch.setattr(corte_cost.decisions_http_client, "request", fake_request)
+    return calls
+
+
+def _copy_aged(tmp_path, hours: float):
+    """A good copy of the 2001-today bundle on disk, last written `hours` ago."""
+    path = tmp_path / "P_json2001_oggi.zip"
+    path.write_bytes(make_bundle({2014: SAMPLE}))
+    aged = time.time() - hours * 3600
+    os.utime(path, (aged, aged))
+
+
+async def test_a_failed_refresh_serves_a_past_year_from_the_copy_on_disk(monkeypatch, tmp_path):
+    _copy_aged(tmp_path, hours=25)  # past the 24 hours of the bundle holding the current year
+    calls = _source_down(monkeypatch)
+    warnings = []
+
+    class Log:
+        def warning(self, event, **fields):
+            warnings.append((event, fields))
+
+    monkeypatch.setattr(corte_cost, "log", Log())
+    d = await _reader(tmp_path).lookup(1, 2014)
+    assert d.ecli == "ECLI:IT:COST:2014:1"
+    assert len(calls) == 1  # the refresh was tried first
+    assert warnings == [("Corte costituzionale bundle refresh failed; serving the copy on disk",
+                         {"bundle": "P_json2001_oggi.zip", "error": "Exceeded retry budget"})]
+
+
+async def test_a_failed_refresh_never_serves_the_current_year_from_an_old_copy(monkeypatch,
+                                                                                tmp_path):
+    _copy_aged(tmp_path, hours=25)
+    _source_down(monkeypatch)
+    with pytest.raises(NetworkError):
+        await _reader(tmp_path).lookup(1, 2026)
+
+
+async def test_a_failed_refresh_without_a_copy_is_still_an_error(monkeypatch, tmp_path):
+    _source_down(monkeypatch)
+    with pytest.raises(NetworkError):
+        await _reader(tmp_path).lookup(1, 2014)
+
+
+async def test_the_download_is_checked_and_written_off_the_event_loop(monkeypatch, tmp_path):
+    _serve(monkeypatch, make_bundle({2014: SAMPLE}))
+    threads = []
+    store = corte_cost._store_bundle
+
+    def recording_store(*args):
+        threads.append(threading.get_ident())
+        return store(*args)
+
+    monkeypatch.setattr(corte_cost, "_store_bundle", recording_store)
+    assert (await _reader(tmp_path).lookup(1, 2014)).ecli == "ECLI:IT:COST:2014:1"
+    assert len(threads) == 1 and threads[0] != threading.get_ident()  # ~56 MB in production
+
+
+async def test_a_bundle_in_utf8_reads_as_the_latin1_one(monkeypatch, tmp_path):
+    # the court's JSON is latin-1 today; a switch to UTF-8 must not become mojibake
+    _serve(monkeypatch, make_bundle({2014: SAMPLE}, encoding="utf-8"))
+    utf8 = await _reader(tmp_path / "utf8").lookup(1, 2014)
+    _serve(monkeypatch, make_bundle({2014: SAMPLE}))
+    latin1 = await _reader(tmp_path / "latin1").lookup(1, 2014)
+    assert utf8 == latin1
+    assert "legittimità" in utf8.testo["epigrafe"]
 
 
 def test_the_text_as_the_page_receives_it():
