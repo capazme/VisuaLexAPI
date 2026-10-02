@@ -268,7 +268,7 @@ export const CITATION_GOLDEN: CitationCase[] = [
     expected: null,
   },
   {
-    name: 'a repealed article asked for a day after the repeal: the citation says what the page says, the text in force from the repeal (the owner confirms)',
+    name: 'a repealed article asked for a day after the repeal: the citation says it was repealed, and since when (the owner confirms; the alternative is to cite nothing)',
     context: {
       norma: { tipo_atto: 'codice penale', numero_articolo: '594', allegato: '1' },
       validity: { state: 'abrogated', valid_from: '2016-02-06', valid_to: null, version_number: 2, act_updated: null, request_in_window: true },
@@ -276,9 +276,74 @@ export const CITATION_GOLDEN: CitationCase[] = [
       consultedAt: CONSULTED,
     },
     expected: {
-      short: 'art. 594 c.p., nel testo in vigore al 1° marzo 2016',
-      long: 'art. 594 c.p., nel testo in vigore dal 6 febbraio 2016 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+      short: 'art. 594 c.p., abrogato dal 6 febbraio 2016',
+      long: 'art. 594 c.p., abrogato dal 6 febbraio 2016 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
     },
+  },
+  {
+    name: 'the original text of a repealed article: the day of the repeal is not given as the start of the text, so no window is stated',
+    context: {
+      norma: { tipo_atto: 'codice penale', numero_articolo: '594', allegato: '1' },
+      validity: { state: 'abrogated', valid_from: '2016-02-06', valid_to: null, version_number: 2, act_updated: null, request_in_window: null },
+      original: true,
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 594 c.p., nel testo originale',
+      long: 'art. 594 c.p., nel testo originale (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
+  },
+  {
+    name: 'a repealed article with no repeal day stated: nothing is cited',
+    context: {
+      norma: { tipo_atto: 'codice penale', numero_articolo: '594', allegato: '1' },
+      validity: { state: 'abrogated', valid_from: null, valid_to: null, version_number: 2, act_updated: null, request_in_window: true },
+      requestedDate: '2016-03-01',
+      consultedAt: CONSULTED,
+    },
+    expected: null,
+  },
+  {
+    name: 'a historical version reached with no day asked for: the window is cited',
+    context: {
+      norma: { tipo_atto: 'codice civile', numero_articolo: '1284', allegato: '2' },
+      validity: { state: 'historical', valid_from: '2003-12-25', valid_to: '2007-12-29', version_number: 7, act_updated: null, request_in_window: null },
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007',
+      long: 'art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
+  },
+  {
+    name: 'a historical version reached with no day asked for, of which only the end of the window is known: only that end is cited',
+    context: {
+      norma: { tipo_atto: 'codice civile', numero_articolo: '1284', allegato: '2' },
+      validity: { state: 'historical', valid_from: null, valid_to: '2007-12-29', version_number: 7, act_updated: null, request_in_window: null },
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 1284 c.c., nel testo in vigore al 29 dicembre 2007',
+      long: 'art. 1284 c.c., nel testo in vigore al 29 dicembre 2007 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
+  },
+  {
+    name: 'a historical version reached with no day asked for and no window stated: nothing is cited',
+    context: {
+      norma: { tipo_atto: 'codice civile', numero_articolo: '1284', allegato: '2' },
+      validity: { state: 'historical', valid_from: null, valid_to: null, version_number: 7, act_updated: null, request_in_window: null },
+      consultedAt: CONSULTED,
+    },
+    expected: null,
+  },
+  {
+    name: 'an EU act asked with a day, from an old link or dossier item: the server ignores the day, so nothing is cited',
+    context: {
+      norma: { tipo_atto: 'regolamento ue', tipo_atto_reale: 'regolamento ue', numero_atto: '679', data: '2016-04-27', numero_articolo: '5' },
+      requestedDate: '2007-10-12',
+      consultedAt: CONSULTED,
+    },
+    expected: null,
   },
   {
     name: 'the version returned does not contain the day: nothing is cited',

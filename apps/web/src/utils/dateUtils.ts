@@ -206,7 +206,10 @@ export function addDaysToIsoDate(isoDate: string, days: number): string {
  * differ for a reader in another time zone.
  */
 export function todayInRome(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
+  // From the parts, not from a locale's pattern: no locale is trusted to write YYYY-MM-DD.
+  const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(now);
+  }).formatToParts(now);
+  const part = (type: 'year' | 'month' | 'day') => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
 }

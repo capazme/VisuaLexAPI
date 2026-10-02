@@ -198,14 +198,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
     const readOnly = display.readOnly;
     const requestedDate = norma_data.data_versione?.trim() || undefined;
-    const initialDate = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : undefined;
     // "art. 1284 c.c., nel testo in vigore …" for a past text; null for the text in force.
     const citationNow = () => (display.canCite
         ? formatNormCitation({
             norma: norma_data,
             validity: data.validity,
             requestedDate,
-            original: !requestedDate && norma_data.versione === 'originale',
+            original: !requestedDate && requestIsHistorical(norma_data),
             consultedAt: todayInRome(),
         })
         : null);
@@ -1262,7 +1261,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onConfirm={handleTextAtDate}
                 euAct={isEuropeanAct(norma_data.tipo_atto)}
                 today={todayInRome()}
-                initialDate={initialDate}
+                initialDate={requestedDate}
             />
 
             {/* Citation Preview Popup */}

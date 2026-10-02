@@ -1,5 +1,6 @@
 import type { ArticleValidity, NormaVisitata } from '../types';
 import { abbreviateActType, formatDateForCitation } from './dateUtils';
+import { isEuropeanAct } from './versionDisplay';
 
 /**
  * How a lawyer cites a norm "in the text in force at …".
@@ -76,26 +77,44 @@ function articleHead(norma: CitedNorma): string {
 /**
  * The citation of a past text, or null when there is nothing honest to cite:
  * the text in force (the plain citation stays as it is), an article that did
- * not exist on the day, or a version whose window does not contain the day.
+ * not exist on the day, a version whose window does not contain the day, an act
+ * of the Union (the server ignores the day and the source is not Normattiva), a
+ * repealed article with no repeal day stated.
  */
 export function formatNormCitation(context: CitationContext): NormCitation | null {
   const { norma, validity, requestedDate, original, consultedAt } = context;
   if (validity?.state === 'not_yet' || validity?.request_in_window === false) return null;
-  if (!requestedDate && !original) return null;
+  if (isEuropeanAct(norma.tipo_atto)) return null;
 
   const head = articleHead(norma);
+  const source = `Normattiva, testo consolidato${consultedAt ? `, consultato il ${formatDateForCitation(consultedAt)}` : ''}`;
+  const from = validity?.valid_from ? formatDateForCitation(validity.valid_from) : undefined;
+  const to = validity?.valid_to ? formatDateForCitation(validity.valid_to) : undefined;
+  const repealed = validity?.state === 'abrogated';
+  // For a repealed article `valid_from` is the day of the REPEAL, not the day the text came into force.
+  const window = !repealed && (from || to) ? `in vigore${from ? ` dal ${from}` : ''}${to ? ` al ${to}` : ''}` : undefined;
+
+  if (!requestedDate && !original) {
+    // Reached with no day: a past version still goes out with its window.
+    if (validity?.state !== 'historical' || !window) return null;
+    const short = `${head}, nel testo ${window}`;
+    return { short, long: `${short} (${source})` };
+  }
+
+  if (repealed && requestedDate) {
+    if (!from) return null;
+    const short = `${head}, abrogato dal ${from}`;
+    return { short, long: `${short} (${source})` };
+  }
+
   const asked = requestedDate ? formatDateForCitation(requestedDate) : undefined;
   const short = `${head}, ${asked ? `nel testo in vigore al ${asked}` : 'nel testo originale'}`;
 
-  const from = validity?.valid_from ? formatDateForCitation(validity.valid_from) : undefined;
-  const to = validity?.valid_to ? formatDateForCitation(validity.valid_to) : undefined;
-  const window = from || to ? `in vigore${from ? ` dal ${from}` : ''}${to ? ` al ${to}` : ''}` : undefined;
   const clause = original
     ? `nel testo originale${window ? `, ${window}` : ''}`
     : window
       ? `nel testo ${window}`
       : `nel testo in vigore al ${asked}`;
-  const source = `Normattiva, testo consolidato${consultedAt ? `, consultato il ${formatDateForCitation(consultedAt)}` : ''}`;
 
   return { short, long: `${head}, ${clause} (${source})` };
 }

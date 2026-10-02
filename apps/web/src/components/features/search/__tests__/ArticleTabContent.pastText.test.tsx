@@ -248,6 +248,15 @@ describe('ArticleTabContent — the way back and the way on', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument()); // it fades out
   });
 
+  it('starts the dialog from the day a shared link wrote in words', async () => {
+    show(article(MIDDLE, { versione: 'vigente', data_versione: '12 ottobre 2007' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Testo storico · dal 25-12-2003 al 29-12-2007' }));
+    const dialog = screen.getByRole('dialog', { name: 'Testo alla data' });
+    expect(within(dialog).getByLabelText('Data')).toHaveValue('2007-10-12');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
   it('refuses an act of the Union in the dialog', () => {
     show(article(undefined, { tipo_atto: 'regolamento ue', allegato: undefined }));
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
@@ -311,6 +320,34 @@ describe('ArticleTabContent — copying a past text', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied: string = writeText.mock.calls[0][0];
     expect(copied.endsWith('\n\n---\ncodice civile n. 262 del 1942-03-16, Art. 1284 (Allegato 2)')).toBe(true);
+  });
+
+  it('cites the window of a historical version reached with no day asked for, in a copy and from the banner', async () => {
+    const noDay = { versione: 'vigente', data_versione: '' };
+    show(article(MIDDLE, noDay));
+    fireEvent.click(copyButton());
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0].startsWith(
+      'art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 (Normattiva, testo consolidato, consultato il ',
+    )).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Copia citazione' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+  });
+
+  it('reads the request for the original text however it is written', async () => {
+    show(article(MIDDLE, { versione: ' Originale ', data_versione: '' }));
+    fireEvent.click(copyButton());
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\., nel testo originale, in vigore dal 25 dicembre 2003/);
+  });
+
+  it('copies the copy of an act of the Union with the plain trailer: the day was ignored, the text is the current one', async () => {
+    show(article(undefined, { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016-04-27', numero_articolo: '5', allegato: undefined, versione: 'vigente', data_versione: '2007-10-12' }));
+    fireEvent.click(copyButton());
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied: string = writeText.mock.calls[0][0];
+    expect(copied.endsWith('\n\n---\nregolamento ue n. 679 del 2016-04-27, Art. 5')).toBe(true);
+    expect(copied).not.toContain('nel testo in vigore');
   });
 
   it('copies the citation alone from the banner', async () => {
