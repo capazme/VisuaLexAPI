@@ -76,6 +76,11 @@ _LABEL = re.compile(
 )
 # Everything up to and including the label: "Codice Penale-art. 524" is label.
 _UP_TO_LABEL = re.compile(r"^.*?" + _LABEL.pattern, re.I | re.S)
+# A notice that repeals the whole article says so in so many words; a partial one says
+# "COMMA ABROGATO", "LETTERA ... ABROGATA", "PERIODO ...".
+_WHOLE_ARTICLE_NOTICE = re.compile(r"\W*ARTICOLO\s+ABROGAT[OA]\b", re.I)
+# The note markers the portal leaves in the text: "((178))", "(129a)".
+_NOTE_REFERENCE = re.compile(r"\(\(?\s*\d+\s*[a-z]?\s*\)\)?", re.I)
 
 
 class Validity(TypedDict):
@@ -165,19 +170,27 @@ def _read_body(raw: str) -> Optional[Tag]:
 
 
 def _is_abrogated(body: Tag) -> bool:
-    """The whole article is a repeal notice and nothing else.
+    """The article is repealed as a whole.
 
-    A partial notice ("COMMA ABROGATO") leaves the other commi behind, so it is
-    not this state. Consumes the notices: call it last.
+    Two ways, in this order. A notice that says "ARTICOLO ABROGATO" is decisive,
+    whatever else sits in the body (a kept heading, note markers, the update notes).
+    Otherwise the notice must be all that is left once the label, the update notes
+    (`art_aggiornamento-akn`), their markers ("((178))") and punctuation are removed:
+    a repealed article keeps its notes on the page, and they are not its text. A
+    partial notice ("COMMA ABROGATO") leaves the other commi behind, so it is not
+    this state. Consumes the notices and the notes: call it last.
     """
     notices = body.find_all(class_="art_abrogato-akn")
     if not notices:
         return False
     for notice in notices:
-        notice.extract()
+        if _WHOLE_ARTICLE_NOTICE.match(" ".join(notice.get_text(" ", strip=True).split())):
+            return True
+    for node in notices + body.find_all(class_="art_aggiornamento-akn"):
+        node.extract()
     # Blanks are collapsed first: a long run of them is quadratic for the label pattern.
     text = " ".join(body.get_text(" ", strip=True).split())
-    rest = _UP_TO_LABEL.sub("", text, count=1)
+    rest = _NOTE_REFERENCE.sub("", _UP_TO_LABEL.sub("", text, count=1))
     return not re.sub(r"[\W_]+", "", rest)
 
 

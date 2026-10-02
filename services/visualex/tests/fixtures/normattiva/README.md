@@ -40,6 +40,13 @@ the update link, the "Ultimo aggiornamento" line and `div.bodyTesto` — wrapped
 - `art183_cpc_at_2015-01-01_partial_abrogation_trimmed.html` — art. 183 c.p.c. at
   2015-01-01: a closed window and a "COMMA ABROGATO" notice among other commi, to prove
   that a partial notice is not the state "abrogated".
+- `art183bis_cpc_in_force_abrogated_with_notes_trimmed.html` — art. 183-bis c.p.c. in
+  force on 2026-10-02 (`urn:nir:stato:regio.decreto:1940-10-28;1443:1~art183bis!vig=`):
+  repealed by D.Lgs. 164/2024 from 26-11-2024, version 4. Besides the label and the
+  "ARTICOLO ABROGATO" notice the body carries a note marker (`((178))`) and the update
+  notes (`div.art_aggiornamento-akn`). It exists because the first version of the rule
+  counted those as text and read the article as in force. The file keeps the portal's
+  CRLF line endings: do not retype it.
 
 The portal prints the end of the window as `<span class="indent">al: <span id="artFine" class="rosso">29-12-2007</span></span>`
 when the window has a start (the start is `<span id="artInizio" class="rosso">`, preceded by `&nbsp;`),

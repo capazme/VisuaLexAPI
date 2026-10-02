@@ -47,7 +47,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     window ending today or later is `current` with its `valid_to` kept). Read
     from the raw page the scraper already keeps in its persistent cache (the key
     is the URN `get_document` returns), so it costs no request and never
-    touches `article_text` (gotcha 23). Best effort: a page it cannot read yields
+    touches `article_text` (gotcha 23). A repealed article keeps its update notes
+    and their markers on the page and they are not its text (art. 183-bis c.p.c.),
+    so `abrogated` does not require an empty body. Best effort: a page it cannot read yields
     no `validity` key at all, never a guess. It also holds the two request
     guards, `reject_future_version_date` and `is_historical_request`.
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
@@ -391,6 +393,8 @@ Breaking one of these breaks the product. Read before editing.
     cannot be read. A closed window is `historical` only when its last day is before
     today (Europe/Rome): a window ending today or later is the text in force, `current`
     with `valid_to` as stated, and `request_in_window` still judges the request against it.
+    A repealed article keeps its update notes and their markers on the page and they are
+    not its text (art. 183-bis c.p.c.): `abrogated` does not require an empty body.
     The window says which text was in force, not which discipline
     governs a fact: transitional provisions and retroactive rules are not on the page.
     `version` is read stripped and lower-cased wherever it is read
