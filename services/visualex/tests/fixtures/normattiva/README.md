@@ -26,5 +26,24 @@ wrapped in `<html><body>`), taken 2026-09-19 from
   the text reads `Art. 544. \n\n((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981,
   N. 442))`.
 
+Trimmed captures of 2026-10-01, for the validity reader
+(`normattiva_validity.py`, spec `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`).
+Each keeps the four blocks the reader looks at, as served — `div.vigore` (the window),
+the update link, the "Ultimo aggiornamento" line and `div.bodyTesto` — wrapped in
+`<html><body>`:
+
+- `art1284_cc_at_2007-12-29_trimmed.html` — art. 1284 c.c. at 2007-12-29: a middle
+  version, window 25-12-2003 to 29-12-2007, version 7. Both ends of the window.
+- `art183bis_cpc_at_2010-01-01_not_yet_trimmed.html` — art. 183-bis c.p.c. at
+  2010-01-01, before the article existed: the window only ends (12-9-2014) and the text is
+  "… NON ANCORA ESISTENTE O VIGENTE".
+- `art183_cpc_at_2015-01-01_partial_abrogation_trimmed.html` — art. 183 c.p.c. at
+  2015-01-01: a closed window and a "COMMA ABROGATO" notice among other commi, to prove
+  that a partial notice is not the state "abrogated".
+
+The portal prints the end of the window as `<span class="indent">al: <span id="artFine" class="rosso">29-12-2007</span></span>`
+when the window has a start (the start is `<span id="artInizio" class="rosso">`, preceded by `&nbsp;`),
+and as the bare text `<span>Testo in vigore al: 12-9-2014</span>`, with no `id` and no `class`, when it has none.
+
 The extractor's output for every file here is frozen (CLAUDE.md gotcha 23:
 `article_text` is the offset space of every stored highlight and note).
