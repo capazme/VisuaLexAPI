@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
-  computeNormaGroups, searchParamsFromGroup, dossierItemPdfTitle,
+  computeNormaGroups, searchParamsFromGroup, dossierItemPdfTitle, tabLabelForGroup, searchesForGroups,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -234,5 +234,52 @@ describe('dossierItemPdfTitle', () => {
   it('says it is the original text', () => {
     expect(dossierItemPdfTitle(item({ data: { ...norma, versione: 'originale' } }), 0))
       .toBe('1. codice civile n. 262 · Art. 2043 · Testo originale');
+  });
+});
+
+describe('tabLabelForGroup', () => {
+  const group = (over: Partial<ReturnType<typeof computeNormaGroups>[number]> = {}) => ({
+    key: 'k', tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
+    articles: ['1284'], versione: '', data_versione: '', ...over,
+  });
+
+  it('is the dossier\'s title for the text in force', () => {
+    expect(tabLabelForGroup('Pratica', group())).toBe('Pratica');
+    expect(tabLabelForGroup('Pratica', group({ versione: 'vigente', data_versione: '' }))).toBe('Pratica');
+  });
+  it('adds the day to the title for a group asking for a past text', () => {
+    expect(tabLabelForGroup('Pratica', group({ versione: 'vigente', data_versione: '2007-12-29' })))
+      .toBe('Pratica — testo al 29/12/2007');
+  });
+  it('says "testo originale" for the original text', () => {
+    expect(tabLabelForGroup('Pratica', group({ versione: 'originale' }))).toBe('Pratica — testo originale');
+  });
+});
+
+describe('searchesForGroups', () => {
+  const g = (over: Partial<ReturnType<typeof computeNormaGroups>[number]>) => ({
+    key: `k${Math.random()}`, tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
+    articles: ['1284'], versione: '', data_versione: '', ...over,
+  });
+  const PAST = { versione: 'vigente', data_versione: '2007-12-29' };
+
+  function run(groups: ReturnType<typeof g>[]) {
+    const created: string[] = [];
+    const searches = searchesForGroups('Pratica', groups, (label) => { created.push(label); return `tab-${created.length}`; });
+    return { created, searches };
+  }
+
+  it('shares one tab among the texts in force and gives a past group a tab of its own', () => {
+    const { created, searches } = run([g({}), g({ numero_atto: '1', articles: ['2'] }), g(PAST)]);
+    expect(created).toEqual(['Pratica', 'Pratica — testo al 29/12/2007']);
+    expect(searches.map((s) => s.targetTabId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
+    expect(searches.map((s) => s.tabLabel)).toEqual(['Pratica', 'Pratica', 'Pratica — testo al 29/12/2007']);
+    expect(searches[2]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
+    expect(searches[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
+  });
+
+  it('creates no shared tab when every group asks for a past text', () => {
+    const { created } = run([g(PAST), g({ versione: 'originale' })]);
+    expect(created).toEqual(['Pratica — testo al 29/12/2007', 'Pratica — testo originale']);
   });
 });

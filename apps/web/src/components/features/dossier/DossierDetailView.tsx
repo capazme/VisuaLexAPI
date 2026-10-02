@@ -43,9 +43,8 @@ import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import { SortableDossierItem } from './SortableDossierItem';
 import {
-  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchParamsFromGroup, dossierItemPdfTitle, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, dossierItemPdfTitle, type NormaGroup,
 } from './dossierUtils';
-import { requestIsHistorical, versionTabSuffix } from '../../../utils/versionDisplay';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
@@ -224,33 +223,22 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   // into pre-existing custom tabs with the same label (e.g. orphans from past
   // sessions, workspaceTabs is persisted in localStorage).
   const openGroupOnDashboard = (group: NormaGroup) => {
-    const tabLabel = tabLabelForGroup(group);
+    const tabLabel = tabLabelForGroup(dossier.title, group);
     const tabId = addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
     navigate('/');
     triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
   };
 
-  // A group asking for a past text opens in a tab of its own, named as the
-  // "Testo alla data" dialog's tabs are: it must not sit among the texts in force.
-  const tabLabelForGroup = (group: NormaGroup) => requestIsHistorical(group)
-    ? `${dossier.title}${versionTabSuffix({ version: group.versione, versionDate: group.data_versione })}`
-    : dossier.title;
-
-  // Queue one search per norma-group. We pre-create an empty custom tab and
-  // pass its id as `targetTabId` in every params — this avoids any label-match
-  // timing races inside SearchPanel (each search knows exactly where to write).
+  // Queue one search per norma-group. The tabs are created up front (the texts
+  // in force share the dossier's, each past group has its own) and their ids
+  // passed as `targetTabId` — this avoids any label-match timing races inside
+  // SearchPanel (each search knows exactly where to write).
   const openAllGroupsOnDashboard = () => {
     if (normaGroups.length === 0) return;
-    const tabId = addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true });
-    const paramsList = normaGroups.map((g) => {
-      if (!requestIsHistorical(g)) return { ...searchParamsFromGroup(g), tabLabel: dossier.title, targetTabId: tabId };
-      const tabLabel = tabLabelForGroup(g);
-      return {
-        ...searchParamsFromGroup(g),
-        tabLabel,
-        targetTabId: addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true }),
-      };
-    });
+    const paramsList = searchesForGroups(
+      dossier.title, normaGroups,
+      (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
+    );
     navigate('/');
     triggerMultiSearch(paramsList);
   };

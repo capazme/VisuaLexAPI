@@ -1,5 +1,6 @@
 import { BookOpen, Layers, X } from 'lucide-react';
 import { formatDateItalianLong } from '../../../utils/dateUtils';
+import { historicalItemLabel } from '../../../utils/versionDisplay';
 import type { NormaGroup } from './dossierUtils';
 
 interface Props {
@@ -11,8 +12,8 @@ interface Props {
 
 // Shown when a dossier spans multiple norms: the backend pipeline is
 // single-norma per search call, so we surface the norms as a picker. The first
-// row is a "open them all" shortcut that queues every group into one single
-// workspace tab (shared tabLabel → merged via addNormaToTab upstream).
+// row is an "open them all" shortcut that queues every group: the texts in force
+// into one workspace tab, each past group into a tab of its own.
 export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Props) {
   const totalArticles = groups.reduce((sum, g) => sum + g.articles.length, 0);
 
@@ -33,7 +34,7 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
 
         <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-            Il dossier contiene articoli da {groups.length} norme diverse. Scegli quale aprire, o apri tutto in un'unica tab.
+            Il dossier contiene articoli da {groups.length} norme o versioni. Scegli quale aprire, o apri tutto: un testo storico si apre in una tab a parte.
           </p>
 
           <button
@@ -44,10 +45,10 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
             <Layers size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm text-slate-900 dark:text-white">
-                Apri tutte le norme in una sola tab
+                Apri tutto
               </div>
               <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                {groups.length} norme, {totalArticles} articoli totali
+                {groups.length} gruppi, {totalArticles} articoli totali
               </div>
             </div>
           </button>
@@ -72,6 +73,9 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
                   {g.numero_atto ? ` ${g.numero_atto}` : ''}
                   {g.data ? ` — ${formatDateItalianLong(g.data)}` : ''}
                 </div>
+                {historicalItemLabel(g) && (
+                  <div className="text-xs font-medium text-amber-700 dark:text-amber-300 mt-0.5">{historicalItemLabel(g)}</div>
+                )}
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {g.articles.length} articoli: {g.articles.slice(0, 6).join(', ')}
                   {g.articles.length > 6 ? `, +${g.articles.length - 6} altri` : ''}

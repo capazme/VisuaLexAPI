@@ -1,7 +1,7 @@
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import { historicalItemLabel, requestIsHistorical, versionKey } from '../../../utils/versionDisplay';
+import { historicalItemLabel, requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
 import type { ArticleData, Dossier, DossierItem, Norma, NormaVisitata, SearchParams } from '../../../types';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
@@ -73,6 +73,37 @@ export function searchParamsFromGroup(group: NormaGroup): SearchParams {
     version_date: group.data_versione || '',
     show_brocardi_info: !requestIsHistorical({ versione: group.versione, data_versione: group.data_versione }),
   };
+}
+
+// The tab a group opens in: the dossier's own for the texts in force, and for a
+// group asking for a past text a tab of its own, named as the tabs of the "Testo
+// alla data" dialog are. A past text must not sit among the texts in force.
+export function tabLabelForGroup(dossierTitle: string, group: NormaGroup): string {
+  return requestIsHistorical(group)
+    ? `${dossierTitle}${versionTabSuffix({ version: group.versione, versionDate: group.data_versione })}`
+    : dossierTitle;
+}
+
+// One search per group, each routed to the tab it belongs to (`createTab` makes a
+// tab and returns its id). The texts in force share the dossier's tab, created
+// only when there is one to put in it; every past group gets a tab of its own.
+export function searchesForGroups(
+  dossierTitle: string,
+  groups: NormaGroup[],
+  createTab: (label: string) => string,
+): SearchParams[] {
+  let sharedTabId: string | undefined;
+  return groups.map((group) => {
+    const tabLabel = tabLabelForGroup(dossierTitle, group);
+    let targetTabId: string;
+    if (requestIsHistorical(group)) {
+      targetTabId = createTab(tabLabel);
+    } else {
+      sharedTabId ??= createTab(tabLabel);
+      targetTabId = sharedTabId;
+    }
+    return { ...searchParamsFromGroup(group), tabLabel, targetTabId };
+  });
 }
 
 // The heading of an item in the dossier's PDF: a past text says so, or the page
