@@ -77,7 +77,9 @@ async def graph():
 async def _seed(client):
     """What this graph holds, node by node (hand-written Cypher, not the writers' output):
     partitions with a rubrica and no estremi; articles with `testo`, `testo_vigente` or both;
-    the acts that modify, repeal or replace three of them, and one that INSERISCE a comma into art. 6;
+    the acts that modify, repeal or replace three of them, and one that INSERISCE a comma into art. 6,
+    as multivigenza writes them (the act carries no date of its own that a reader takes: the date
+    the amendment takes effect sits on the edge, `data_efficacia`);
     concepts, principles, massime and doctrine keyed by node_id only; the seed's definitions
     (`Norma -[DEFINISCE]-> DefinizioneLegale {node_id, nome, descrizione}`, never to a
     ConcettoGiuridico) and one community definition that carries the old `:Entity:Definizione`
@@ -95,19 +97,19 @@ async def _seed(client):
         CREATE (a4:Norma {URN: $art4, tipo_documento: 'articolo', testo: 'Modificato dal rinvio.'})
         CREATE (a5:Norma {URN: $art5, tipo_documento: 'articolo', testo: 'Mai toccato.'})
         CREATE (a6:Norma {URN: $art6, tipo_documento: 'articolo', testo: 'Con un comma inserito.'})
-        CREATE (m4:Norma {URN: 'urn:test:act4', estremi: 'L. 4/2023', data_atto: '2023-01-01'})
-        CREATE (m4)-[:INSERISCE {data_efficacia: '2023-02-01'}]->(a6)
-        CREATE (m1:Norma {URN: 'urn:test:act1', estremi: 'L. 1/2020', data_atto: '2020-01-01'})
-        CREATE (m2:Norma {URN: 'urn:test:act2', estremi: 'L. 2/2021', data_atto: '2021-01-01'})
-        CREATE (m3:Norma {URN: 'urn:test:act3', estremi: 'L. 3/2022', data_atto: '2022-01-01'})
+        CREATE (m4:Norma {URN: 'urn:test:act4', node_id: 'urn:test:act4', estremi: 'L. 4/2023', tipo_documento: 'legge', data_pubblicazione: '2023-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
+        CREATE (m4)-[:INSERISCE {disposizione: 'art. 1', data_efficacia: '2023-02-01', data_pubblicazione_gu: '2023-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 4/2023', data_decorrenza: '2023-02-01'}]->(a6)
+        CREATE (m1:Norma {URN: 'urn:test:act1', node_id: 'urn:test:act1', estremi: 'L. 1/2020', tipo_documento: 'legge', data_pubblicazione: '2020-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
+        CREATE (m2:Norma {URN: 'urn:test:act2', node_id: 'urn:test:act2', estremi: 'L. 2/2021', tipo_documento: 'legge', data_pubblicazione: '2021-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
+        CREATE (m3:Norma {URN: 'urn:test:act3', node_id: 'urn:test:act3', estremi: 'L. 3/2022', tipo_documento: 'legge', data_pubblicazione: '2022-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
         CREATE (cod)-[:CONTIENE]->(libro)
         CREATE (libro)-[:CONTIENE]->(titolo)
         CREATE (titolo)-[:CONTIENE]->(a1)
         CREATE (titolo)-[:CONTIENE]->(a2)
         CREATE (titolo)-[:CONTIENE]->(a3)
-        CREATE (m1)-[:MODIFICA {data_efficacia: '2020-02-01'}]->(a1)
-        CREATE (m2)-[:ABROGA {data_efficacia: '2021-02-01'}]->(a2)
-        CREATE (m3)-[:SOSTITUISCE {data_efficacia: '2022-02-01'}]->(a3)
+        CREATE (m1)-[:MODIFICA {disposizione: 'art. 1', data_efficacia: '2020-02-01', data_pubblicazione_gu: '2020-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 1/2020', data_decorrenza: '2020-02-01'}]->(a1)
+        CREATE (m2)-[:ABROGA {disposizione: 'art. 1', data_efficacia: '2021-02-01', data_pubblicazione_gu: '2021-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 2/2021', data_decorrenza: '2021-02-01'}]->(a2)
+        CREATE (m3)-[:SOSTITUISCE {disposizione: 'art. 1', data_efficacia: '2022-02-01', data_pubblicazione_gu: '2022-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 3/2022', data_decorrenza: '2022-02-01'}]->(a3)
         CREATE (a1)-[:RINVIA]->(a2)
         CREATE (a1)-[:MODIFICA]->(a4)
         CREATE (k:ConcettoGiuridico {node_id: 'concetto:buona_fede', nome: 'Buona fede', descrizione: 'La buona fede e correttezza.'})
@@ -302,21 +304,22 @@ async def test_history_lists_the_events_and_the_status(graph):
 
 
 async def test_the_history_leaves_out_future_amendments_unless_asked(graph):
-    # Three amendments of one article: one in the past, one dated years ahead, one with no
-    # date at all. The future one is out by default and in with `include_future`; the undated
-    # one is never dropped. An act dated by `data_vigore` only is read the same way.
+    # Four amendments of one article, dated on the edge as multivigenza writes them: one in the
+    # past, two that take effect years ahead (a MODIFICA and a SOSTITUISCE), one with no date at
+    # all. The future ones are out by default, counted in `future_omitted`, and in with
+    # `include_future`; the undated one is never dropped.
     art = "urn:test:future-art"
     await graph.query(
         """
         CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.'})
-        CREATE (past:Norma {URN: 'urn:test:past', estremi: 'L. 1/2020', data_atto: '2020-01-01'})
-        CREATE (future:Norma {URN: 'urn:test:future', estremi: 'L. 9/2099', data_atto: '2099-01-01'})
-        CREATE (undated:Norma {URN: 'urn:test:undated', estremi: 'Atto senza data'})
-        CREATE (vigore:Norma {URN: 'urn:test:vigore', estremi: 'L. 8/2098', data_vigore: '2098-06-01'})
-        CREATE (past)-[:MODIFICA]->(a)
-        CREATE (future)-[:MODIFICA]->(a)
-        CREATE (undated)-[:INSERISCE]->(a)
-        CREATE (vigore)-[:SOSTITUISCE]->(a)
+        CREATE (past:Norma {URN: 'urn:test:past', estremi: 'L. 1/2020', tipo_documento: 'legge', data_pubblicazione: '2020-01-01'})
+        CREATE (future:Norma {URN: 'urn:test:future', estremi: 'L. 9/2025', tipo_documento: 'legge', data_pubblicazione: '2025-01-01'})
+        CREATE (undated:Norma {URN: 'urn:test:undated', estremi: 'Atto senza data', tipo_documento: 'legge'})
+        CREATE (later:Norma {URN: 'urn:test:later', estremi: 'L. 8/2025', tipo_documento: 'legge', data_pubblicazione: '2025-06-01'})
+        CREATE (past)-[:MODIFICA {disposizione: 'art. 1', data_efficacia: '2020-02-01', certezza: 1.0, fonte: 'Normattiva'}]->(a)
+        CREATE (future)-[:MODIFICA {disposizione: 'art. 2', data_efficacia: '2099-01-01', certezza: 1.0, fonte: 'Normattiva'}]->(a)
+        CREATE (undated)-[:INSERISCE {disposizione: 'art. 3', certezza: 1.0, fonte: 'Normattiva'}]->(a)
+        CREATE (later)-[:SOSTITUISCE {disposizione: 'art. 4', data_efficacia: '2098-06-01', certezza: 1.0, fonte: 'Normattiva'}]->(a)
         """,
         {"art": art},
     )
@@ -325,10 +328,13 @@ async def test_the_history_leaves_out_future_amendments_unless_asked(graph):
     assert default.success, default.error
     assert sorted(e["by_urn"] for e in default.data["timeline"]) == ["urn:test:past", "urn:test:undated"]
     assert default.data["total_events"] == 2
+    assert default.metadata["future_omitted"] == 2
+    assert [e["date"] for e in default.data["timeline"] if e["by_urn"] == "urn:test:past"] == ["2020-02-01"]
     everything = await tool.execute(article_urn=art, include_future=True)
     assert sorted(e["by_urn"] for e in everything.data["timeline"]) == [
-        "urn:test:future", "urn:test:past", "urn:test:undated", "urn:test:vigore",
+        "urn:test:future", "urn:test:later", "urn:test:past", "urn:test:undated",
     ]
+    assert everything.metadata["future_omitted"] == 0
     no_future_replacement = await tool._get_timeline(art, False, ["sostituisce"])
     assert no_future_replacement == []
 

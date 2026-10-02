@@ -309,9 +309,48 @@ async def test_the_history_leaves_out_future_amendments_unless_asked():
     assert "$today" in cypher and "2026" not in cypher
     # the filter reads the event's date as the query returns it, and an empty date passes
     assert "WHERE event_date = '' OR left(event_date, 10) <= $today" in cypher
-    assert cypher.index("COALESCE(modificante.data_atto") < cypher.index("WHERE event_date")
+    assert cypher.index("coalesce(r.data_efficacia") < cypher.index("WHERE event_date")
     assert cypher.index("WHERE event_date") < cypher.index("RETURN event_type")
     assert "ORDER BY event_date ASC" in cypher
+
+
+async def test_an_amendment_is_dated_by_its_edge_first():
+    # multivigenza and the seed write the date an amendment takes effect on the edge
+    # (`r.data_efficacia`); no writer puts `data_atto` or `data_vigore` on the amending
+    # node. Read from the node alone, every event was undated and passed the filter.
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _GraphRecorder()
+    await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, False, None)
+    assert "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS event_date" in graph.cyphers[0]
+
+
+async def test_the_history_counts_the_future_amendments_it_leaves_out():
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _GraphRecorder(answers=[("RETURN count(*) AS future", [{"future": 2}])])
+    result = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=CC)
+    assert result.success, result.error
+    assert result.metadata["future_omitted"] == 2
+    count = next(c for c in graph.cyphers if "AS future" in c)
+    assert "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS event_date" in count
+    assert "left(event_date, 10) > $today" in count and "2026" not in count
+    assert set(graph.methods) == {"ro_query"}
+    # asked for the future, nothing is left out and nothing is counted
+    asked = _GraphRecorder()
+    result = await HistoricalEvolutionTool(graph_db=asked).execute(article_urn=CC, include_future=True)
+    assert result.metadata["future_omitted"] == 0
+    assert not any("AS future" in c for c in asked.cyphers)
+
+
+def test_the_history_tells_the_model_that_future_amendments_are_left_out():
+    # Without it the model reads "no amendment coming", which is what a lawyer needs to know.
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    tool = HistoricalEvolutionTool()
+    flag = next(p for p in tool.parameters if p.name == "include_future")
+    assert "include_future" in tool.description and "dopo oggi" in tool.description
+    assert "dopo oggi" in flag.description and "default" in flag.description
 
 
 async def test_the_history_with_include_future_is_not_filtered_by_date():

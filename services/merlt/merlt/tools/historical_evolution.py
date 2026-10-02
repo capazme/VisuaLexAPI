@@ -29,6 +29,12 @@ from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
 
 log = structlog.get_logger()
 
+# The date an amendment takes effect: on the edge, where multivigenza and the seed write it
+# (`data_efficacia`); the amending act's own date only as a fallback, which no writer sets
+# today. The dates are ISO strings, so they compare as text; the first ten characters are
+# compared, so a date that carries a time still reads as a day. An undated event is ''.
+_EVENT_DATE = "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '')"
+
 
 @dataclass
 class HistoricalEvent:
@@ -94,7 +100,10 @@ class HistoricalEvolutionTool(BaseTool):
         "Ricostruisce l'evoluzione storica di una norma. "
         "Trova tutte le modifiche, gli inserimenti, le abrogazioni e le sostituzioni nel tempo. "
         "Determina lo status corrente (vigente/abrogato/sostituito). "
-        "Utile per applicare 'tempus regit actum' (art. 14 c.c.)."
+        "Utile per applicare 'tempus regit actum' (art. 14 c.c.). "
+        "Per impostazione predefinita esclude le modifiche che entrano in vigore dopo oggi: "
+        "se il risultato non ne elenca, non significa che non ce ne siano. "
+        "Per vederle chiedi include_future=True."
     )
 
     def __init__(
@@ -126,8 +135,9 @@ class HistoricalEvolutionTool(BaseTool):
                 name="include_future",
                 param_type=ParameterType.BOOLEAN,
                 description=(
-                    "Se True, include anche modifiche future (entrata in vigore differita). "
-                    "Utile per pianificazione normativa."
+                    "Se True, include anche le modifiche che entrano in vigore dopo oggi "
+                    "(entrata in vigore differita). Con False (il default) sono escluse: "
+                    "usalo per sapere se una modifica e' gia' in arrivo."
                 ),
                 required=False,
                 default=False
@@ -177,6 +187,9 @@ class HistoricalEvolutionTool(BaseTool):
             timeline = await self._get_timeline(
                 article_urn, include_future, event_types
             )
+            # What the timeline left out because it takes effect after today: metadata, so
+            # the data keeps its shape.
+            future_omitted = 0 if include_future else await self._count_future(article_urn, event_types)
 
             # Get current status
             status = await self._get_current_status(article_urn)
@@ -203,7 +216,8 @@ class HistoricalEvolutionTool(BaseTool):
                 tool_name=self.name,
                 article_urn=article_urn,
                 events_found=len(timeline),
-                status=status
+                status=status,
+                future_omitted=future_omitted
             )
 
         except Exception as e:
@@ -212,6 +226,37 @@ class HistoricalEvolutionTool(BaseTool):
                 error=f"Errore nella ricostruzione storica: {str(e)}",
                 tool_name=self.name
             )
+
+    @staticmethod
+    def _event_rel_types(event_types: Optional[List[str]]) -> str:
+        """The graph's names (the schema's) of the events asked for, whatever case the
+        caller used, joined for a relation pattern. A name the graph does not have is
+        dropped; '' when none is left, and the caller then queries nothing: a filter is
+        never run unfiltered. By default every amendment: an inserted comma or letter
+        (INSERISCE) is one too."""
+        names = cypher_rel_names(
+            event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value, Rel.INSERISCE.value]
+        )
+        return "|".join(names)
+
+    async def _count_future(self, urn: str, event_types: Optional[List[str]]) -> int:
+        """How many of the events asked for take effect after today. A count the caller
+        reports, never a reason to fail: on a query error it is 0."""
+        rel_types = self._event_rel_types(event_types)
+        if not rel_types:
+            return 0
+        cypher = f"""
+            MATCH (norma {{URN: $urn}})<-[r:{rel_types}]-(modificante)
+            WITH {_EVENT_DATE} AS event_date
+            WHERE event_date <> '' AND left(event_date, 10) > $today
+            RETURN count(*) AS future
+        """
+        try:
+            rows = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn), "today": date.today().isoformat()})
+        except Exception as e:
+            log.warning("historical_evolution future count failed", error_type=type(e).__name__, error=str(e))
+            return 0
+        return int(rows[0].get("future") or 0) if rows else 0
 
     async def _get_timeline(
         self,
@@ -226,22 +271,13 @@ class HistoricalEvolutionTool(BaseTool):
         """
         urn = canonical_urn(urn)  # the graph's key has no version marker
 
-        # Build event type filter: the graph's names (the schema's), whatever
-        # case the caller used. A name the graph does not have is dropped, and a
-        # filter that comes out empty finds no events: it is never run unfiltered.
-        # By default every amendment: an inserted comma or letter (INSERISCE) is one too.
-        names = cypher_rel_names(
-            event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value, Rel.INSERISCE.value]
-        )
-        if not names:
+        rel_types = self._event_rel_types(event_types)
+        if not rel_types:
             return []
-        rel_types = "|".join(names)
 
-        # An event is dated by its act (`data_atto`), else by its entry into force
-        # (`data_vigore`); the dates are ISO strings, so they compare as text. Without
-        # `include_future` an event dated after today is left out and an undated one is
-        # kept (it is not known to be in the future). Today is a parameter, and the first
-        # ten characters are compared so a date that carries a time still reads as a day.
+        # An event is dated by `_EVENT_DATE`. Without `include_future` an event dated after
+        # today is left out and an undated one is kept (it is not known to be in the
+        # future). Today is a parameter, never Cypher text.
         params: Dict[str, Any] = {"urn": urn}
         date_filter = ""
         if not include_future:
@@ -254,7 +290,7 @@ class HistoricalEvolutionTool(BaseTool):
                 type(r) AS event_type,
                 modificante.URN AS by_urn,
                 modificante.estremi AS by_estremi,
-                COALESCE(modificante.data_atto, modificante.data_vigore, '') AS event_date,
+                {_EVENT_DATE} AS event_date,
                 COALESCE(r.descrizione, '') AS description
             {date_filter}
             RETURN event_type, by_urn, by_estremi, event_date, description
