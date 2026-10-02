@@ -17,7 +17,7 @@ from typing import Dict, List, Any, Optional
 from falkordb import FalkorDB, Graph
 
 from merlt.storage.graph.config import FalkorDBConfig
-from merlt.storage.graph.schema import node_type_cypher
+from merlt.storage.graph.schema import canonical_urn, node_type_cypher
 
 log = structlog.get_logger()
 
@@ -350,19 +350,10 @@ class FalkorDBClient:
                 "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"
             )
         """
-        # Extract numero_articolo from URN
-        import re
-        match = re.search(r'~art(\d+)', article_urn)
-        if not match:
-            log.warning(f"Could not extract article number from URN: {article_urn}")
-            return []
-
-        numero_articolo = match.group(1)
-
         # Query both outgoing and incoming relationships
         # `node_label` is what the node reads as: its first label that is not Entity.
         cypher = f"""
-            MATCH (n:Norma {{numero_articolo: $numero}})
+            MATCH (n:Norma {{URN: $urn}})
             OPTIONAL MATCH (n)-[r_out]->(m_out)
             WHERE m_out IS NOT NULL
             WITH n, collect(DISTINCT {{
@@ -388,10 +379,11 @@ class FalkorDBClient:
         """
 
         try:
-            results = await self.query(cypher, {"numero": numero_articolo})
+            urn = canonical_urn(article_urn)
+            results = await self.query(cypher, {"urn": urn})
 
             if not results or not results[0].get("related_nodes"):
-                log.debug(f"No related nodes for art.{numero_articolo}")
+                log.debug(f"No related nodes for {urn}")
                 return []
 
             related = results[0]["related_nodes"]
@@ -402,7 +394,7 @@ class FalkorDBClient:
                 if node.get("rel_type") and node.get("node_label")
             ][:max_results]
 
-            log.debug(f"Found {len(valid_nodes)} related nodes for art.{numero_articolo}")
+            log.debug(f"Found {len(valid_nodes)} related nodes for {urn}")
             return valid_nodes
 
         except Exception as e:

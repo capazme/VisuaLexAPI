@@ -21,9 +21,23 @@ import re
 import structlog
 from typing import Any, Dict, List, Optional
 
+from merlt.storage.graph.schema import canonical_urn
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.utils.urngenerator import generate_urn
 
 log = structlog.get_logger()
+
+_NORMATTIVA_PREFIX = "https://www.normattiva.it/uri-res/N2Ls?"
+_ARTICLE = re.compile(
+    r"art(?:\.|icolo)?\s*(\d+(?:\s?-?(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)"
+)
+# Longer abbreviations first: "c.p." is inside "c.p.c." and "c.p.p.".
+_CODES = (
+    ("c.p.c.", "codice di procedura civile"), ("codice di procedura civile", "codice di procedura civile"),
+    ("c.p.p.", "codice di procedura penale"), ("codice di procedura penale", "codice di procedura penale"),
+    ("c.c.", "codice civile"), ("codice civile", "codice civile"),
+    ("c.p.", "codice penale"), ("codice penale", "codice penale"),
+)
 
 
 class ExternalSourceTool(BaseTool):
@@ -209,7 +223,7 @@ class ExternalSourceTool(BaseTool):
         if urn:
             cypher = """
             MATCH (a:Norma {URN: $urn})
-            RETURN a.testo_vigente AS text, a.URN AS urn,
+            RETURN coalesce(a.testo, a.testo_vigente) AS text, a.URN AS urn,
                    a.estremi AS estremi, a.numero_articolo AS numero
             """
             params = {"urn": urn}
@@ -219,15 +233,17 @@ class ExternalSourceTool(BaseTool):
             MATCH (a:Norma)
             WHERE a.estremi CONTAINS $query
                OR a.numero_articolo = $query
-               OR toLower(a.testo_vigente) CONTAINS toLower($query)
-            RETURN a.testo_vigente AS text, a.URN AS urn,
+               OR toLower(coalesce(a.testo, a.testo_vigente, '')) CONTAINS toLower($query)
+            RETURN coalesce(a.testo, a.testo_vigente) AS text, a.URN AS urn,
                    a.estremi AS estremi, a.numero_articolo AS numero
             LIMIT 1
             """
             params = {"query": query}
 
+        # The query is the LLM's text: it only ever travels as a parameter, and the
+        # read-only call is the second line of defence if that ever slips.
         try:
-            result = await self.graph_db.query(cypher, params)
+            result = await self.graph_db.ro_query(cypher, params)
 
             if result and len(result) > 0:
                 row = result[0]
@@ -340,35 +356,20 @@ class ExternalSourceTool(BaseTool):
         return None
 
     def _parse_urn_from_query(self, query: str) -> Optional[str]:
-        """
-        Estrae URN da query.
-
-        Args:
-            query: Query utente
-
-        Returns:
-            URN normalizzato oppure None
-        """
-        # Se query è già un URN, ritornalo
-        if query.startswith("urn:"):
-            return query
-
-        query_lower = query.lower().strip()
-
-        # Pattern codice civile: "art. 1453 c.c." → URN
-        if "c.c." in query_lower or "codice civile" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                num_art = match.group(1)
-                return f"urn:nir:stato:regio.decreto:1942-03-16;262~art{num_art}"
-
-        # Pattern codice penale: "art. 52 c.p." → URN
-        if "c.p." in query_lower or "codice penale" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                num_art = match.group(1)
-                return f"urn:nir:stato:regio.decreto:1930-10-19;1398~art{num_art}"
-
+        """The graph key of the article a query cites, or None."""
+        text = query.strip()
+        if text.startswith("urn:"):
+            return canonical_urn(_NORMATTIVA_PREFIX + text)
+        if text.startswith(_NORMATTIVA_PREFIX):
+            return canonical_urn(text)
+        lower = text.lower()
+        match = _ARTICLE.search(lower)
+        if not match:
+            return None
+        article = re.sub(r"[\s-]", "", match.group(1))  # "2-bis", "2 bis" -> "2bis"
+        for marker, act in _CODES:
+            if marker in lower:
+                return canonical_urn(generate_urn(act, article=article))
         return None
 
     def _parse_normattiva_query(self, query: str) -> Optional[Dict[str, str]]:
