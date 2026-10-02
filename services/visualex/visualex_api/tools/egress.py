@@ -25,6 +25,9 @@ ALLOWED_HOSTS: dict[str, str] = {
     "www.normattiva.it": "Normattiva — Istituto Poligrafico e Zecca dello Stato",
     # --- European Union ---
     "eur-lex.europa.eu": "EUR-Lex — Ufficio delle pubblicazioni UE",
+    # --- Italian State: courts (decision pages, design 2026-10-01) ---
+    "www.italgiure.giustizia.it": "Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb)",
+    "dati.cortecostituzionale.it": "Corte costituzionale — dati aperti (CC BY-SA 3.0)",
     # --- Private ---
     # The only non-institutional source. Brocardi supplies doctrinal notes and
     # case-law abstracts, never the text of a norm: that always comes from
@@ -45,6 +48,14 @@ NON_NETWORK_HOSTS: dict[str, str] = {
     "docs.oasis-open.org": (
         "the Akoma Ntoso 3.0 XML namespace URI, named in the akn_parser "
         "docstring; the parser resolves nothing (no_network=True)"
+    ),
+    "visualex.org": (
+        "the contact URL in the decision readers' User-Agent; sent as a header value, "
+        "never fetched"
+    ),
+    "titrust.crt.sectigo.com": (
+        "the AIA URI named in tools/tls.py's rotation procedure; read by hand, never "
+        "fetched at run time"
     ),
 }
 

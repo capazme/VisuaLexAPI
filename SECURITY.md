@@ -10,6 +10,8 @@ is actually enforced today:
 |---|---|
 | `www.normattiva.it` | Normattiva — Istituto Poligrafico e Zecca dello Stato |
 | `eur-lex.europa.eu` | EUR-Lex — Ufficio delle pubblicazioni UE |
+| `www.italgiure.giustizia.it` | Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb) |
+| `dati.cortecostituzionale.it` | Corte costituzionale — dati aperti (CC BY-SA 3.0) |
 | `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 
@@ -126,6 +128,12 @@ BFF must carry `X-Internal-Secret`.
 ## Transport
 
 Certificate verification is enabled for every outbound request.
+
+One host needs help to be verified. `www.italgiure.giustizia.it` serves an incomplete chain:
+it omits the intermediate "TI Trust Technologies OV CA". VisuaLex ships that intermediate
+(`services/visualex/visualex_api/tools/certs/titrust_ov_ca.der`) and trusts it only when its
+SHA-256 matches the pin in `visualex_api/tools/tls.py`; nothing is downloaded at run time and
+verification is never switched off. The rotation procedure is in that file.
 
 ## Reporting
 
