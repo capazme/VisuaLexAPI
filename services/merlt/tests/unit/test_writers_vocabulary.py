@@ -477,3 +477,12 @@ def test_a_provisional_source_that_is_no_norm_keeps_its_whole_url():
     url = "https://www.italgiure.giustizia.it/xway/nif/hc.dll?db=snciv&id=./20210630/snciv@s10@a2021@n18325@tS.clean.pdf"
     assert _canonical_url(url) == url
     assert _canonical_url("") == "" and _canonical_url(None) is None
+
+
+async def test_a_new_community_entity_carries_its_id_as_node_id():
+    # Readers name a node by coalesce(URN, node_id): with `id` alone a community entity had no key.
+    writer, client = _writer(rows=[{"id": "principio:buona_fede"}])
+    await writer._create_new_entity_node(_proposal("principio"))
+    cypher, params = client.query.await_args.args
+    assert "node_id: $id" in cypher
+    assert params["id"] == "principio:buona_fede"

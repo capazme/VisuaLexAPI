@@ -261,7 +261,7 @@ async def get_article_entities(
 
         query += f"""
         RETURN
-            COALESCE(e.node_id, e.URN, id(e)) as entity_id,
+            COALESCE(e.URN, e.node_id) as entity_id,
             {node_type_cypher('e')} as entity_type,
             COALESCE(e.nome, e.estremi, e.titolo, e.testo_vigente) as entity_text,
             COALESCE(e.validation_status, 'approved') as validation_status,

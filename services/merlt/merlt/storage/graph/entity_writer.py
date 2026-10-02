@@ -400,6 +400,11 @@ class EntityGraphWriter:
 
         Properties:
             - id: Unique identifier
+            - node_id: the same value as `id`. The readers name a node by
+              `coalesce(URN, node_id)`; an entity with `id` alone had no key for them
+              (a null target_urn, FalkorDB's internal id). A seed twin the writer
+              adopts keeps the seed's own `node_id` (`_check_duplicate_mechanical`
+              does not touch it).
             - nome: Display name
             - tipo: Entity type
             - descrizione: Description
@@ -423,7 +428,7 @@ class EntityGraphWriter:
 
         # Provenance / trust (Loop β, task B.1): entities written here have
         # already cleared community consensus, so they carry the highest trust.
-        # `provenance` distinguishes them from `lazy_ingest` (auto-scraped) and
+        # `provenance` distinguishes them from `ingestion` (auto-scraped) and
         # `seed` (Libro IV snapshot) nodes; `trust` (0..1) feeds the
         # provenance-aware traversal scoring (task B.3).
         provenance = "community_validated"
@@ -435,6 +440,7 @@ class EntityGraphWriter:
         query = f"""
         CREATE (e:{node_labels} {{
             id: $id,
+            node_id: $id,
             nome: $nome,
             tipo: $tipo,
             descrizione: $descrizione,

@@ -14,6 +14,9 @@ the Libro IV graph is never touched.
 
 from __future__ import annotations
 
+import importlib
+from unittest.mock import patch
+
 import pytest
 import pytest_asyncio
 
@@ -213,3 +216,38 @@ async def test_the_stub_of_a_bare_urn_is_the_article_the_seed_keys(graph):
         {"u": f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art1374"},
     )
     assert stub == [{"stub": True, "nid": f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art1374", "e": "Art. 1374 c.c."}]
+
+
+class _Lent:
+    """The router opens and closes its own client: lend it the test's connected one."""
+
+    def __init__(self, client):
+        self._client = client
+
+    async def connect(self):
+        pass
+
+    async def close(self):
+        pass
+
+    async def query(self, *args):
+        return await self._client.query(*args)
+
+    async def ro_query(self, *args):
+        return await self._client.ro_query(*args)
+
+
+async def test_the_article_readers_name_a_community_entity_by_its_key(graph):
+    await graph.query("CREATE (:Norma {URN: $u, node_id: $u, provenance: 'seed'})", {"u": ART_1322})
+    await EntityGraphWriter(graph).write_entity(_approved("pe-1", "sanzione", "Multa"))
+
+    assert await graph.query("MATCH (e:Entity {id: 'sanzione:multa'}) RETURN e.node_id AS nid", {}) == [
+        {"nid": "sanzione:multa"}
+    ]
+    graph_router = importlib.import_module("merlt.api.graph_router")
+    with patch("merlt.api.graph_router.FalkorDBClient", return_value=_Lent(graph)):
+        relations = await graph_router.get_article_relations(ART_1322, relation_type=None, api_key=None)
+        entities = await graph_router.get_article_entities(ART_1322, validation_status=None, api_key=None)
+    # before: a null target_urn, and FalkorDB's internal id
+    assert [r["target_urn"] for r in relations["relations"]] == ["sanzione:multa"]
+    assert [e["entity_id"] for e in entities["entities"]] == ["sanzione:multa"]
