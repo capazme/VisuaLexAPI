@@ -47,6 +47,28 @@ describe('TextAtDateDialog', () => {
         expect(dateField().value).toBe('2005-06-01');
     });
 
+    it('starts from a day written in Italian, as a shared link may carry it', () => {
+        const { onConfirm } = setup({ initialDate: '12 ottobre 2007' });
+        expect(dateField().value).toBe('2007-10-12');
+        fireEvent.click(confirm());
+        expect(onConfirm).toHaveBeenCalledWith({ kind: 'date', date: '2007-10-12' });
+    });
+
+    it.each(['non è una data', '31 febbraio 2007', '2007-02-31', '2007'])('starts empty, with nothing to confirm, from "%s"', (initialDate) => {
+        const { onConfirm } = setup({ initialDate });
+        expect(dateField().value).toBe('');
+        expect(confirm()).toBeDisabled();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('refuses a day after today however it was written', () => {
+        setup({ initialDate: '25 dicembre 2999' });
+        expect(dateField().value).toBe('2999-12-25');
+        expect(screen.getByRole('alert')).toHaveTextContent('La data non può essere futura');
+        expect(confirm()).toBeDisabled();
+    });
+
     it('asks for the original text instead of a day', () => {
         const { onConfirm } = setup();
         type('2007-12-29');

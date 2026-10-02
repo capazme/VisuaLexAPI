@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { Clock } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
+import { parseItalianDate } from '../../../utils/dateUtils';
 import type { TextAtDateChoice } from '../../../utils/versionDisplay';
 
 const FUTURE_MESSAGE = 'La data non può essere futura: Normattiva mostrerebbe il testo attuale.';
@@ -23,9 +24,24 @@ interface FormProps extends Omit<TextAtDateDialogProps, 'isOpen'> {
     inputRef: RefObject<HTMLInputElement | null>;
 }
 
+/**
+ * The value for the date field: an ISO day as it is, a day written in Italian or as
+ * DD-MM-YYYY converted (a shared link or an old history entry may carry one), anything
+ * else, or a day that does not exist, empty. The state of the form is therefore always
+ * an ISO day or nothing, so what reaches `onConfirm` is always a day.
+ */
+function toIsoDay(value: string | undefined): string {
+    const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(parseItalianDate(value ?? ''));
+    if (!parts) return '';
+    const [year, month, day] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+    const real = new Date(Date.UTC(year, month - 1, day));
+    const exists = real.getUTCFullYear() === year && real.getUTCMonth() === month - 1 && real.getUTCDate() === day;
+    return exists ? parts[0] : '';
+}
+
 // Mounted only while the dialog is open, so every opening starts clean.
 function TextAtDateForm({ onClose, onConfirm, euAct, today, initialDate, inputRef }: FormProps) {
-    const [date, setDate] = useState(initialDate ?? '');
+    const [date, setDate] = useState(() => toIsoDay(initialDate));
     const [original, setOriginal] = useState(false);
 
     const future = !original && date !== '' && date > today;
