@@ -20,19 +20,21 @@ Integrazione:
 import asyncio
 import hashlib
 import os
+import uuid
 import structlog
 from redis import Redis
 from rq import Queue, Retry
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, Iterable, List, Tuple
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from merlt.api.auth import verify_api_key, require_role
 from merlt.experts.models import ApiKey
 from merlt.storage.graph.client import FalkorDBClient
+from merlt.storage.graph.schema import node_type_cypher, node_type_from_labels, resolve_rel, resolve_rels
 from merlt.storage.enrichment import get_db_session_dependency, PendingEntity
 from merlt.api.models.enrichment_models import NormResolveRequest, NormResolveResponse
 from merlt.pipeline.enrichment.models import EntityType
@@ -153,16 +155,16 @@ async def get_node_details(
     await graph_client.connect()
 
     try:
-        query = """
-        MATCH (n {id: $node_id})
+        query = f"""
+        MATCH (n {{id: $node_id}})
         OPTIONAL MATCH (n)-[r]->(m)
         RETURN
             n as node,
-            collect({
+            collect({{
                 type: type(r),
                 target_id: m.id,
-                target_label: labels(m)[0]
-            }) as relations
+                target_label: {node_type_cypher('m')}
+            }}) as relations
         """
 
         result = await graph_client.query(query, {"node_id": node_id})
@@ -257,10 +259,10 @@ async def get_article_entities(
         if validation_status:
             query += " AND e.validation_status = $status"
 
-        query += """
+        query += f"""
         RETURN
             COALESCE(e.node_id, e.URN, id(e)) as entity_id,
-            labels(e)[0] as entity_type,
+            {node_type_cypher('e')} as entity_type,
             COALESCE(e.nome, e.estremi, e.titolo, e.testo_vigente) as entity_text,
             COALESCE(e.validation_status, 'approved') as validation_status,
             COALESCE(e.approval_score, 0.0) as approval_score,
@@ -325,7 +327,7 @@ async def get_article_relations(
 
     Args:
         article_urn: URN dell'articolo
-        relation_type: Tipo relazione per filtrare (opzionale, es. "CITA", "DISCIPLINA")
+        relation_type: Tipo relazione per filtrare (opzionale, es. "RINVIA", "DISCIPLINA")
 
     Returns:
         {
@@ -360,8 +362,8 @@ async def get_article_relations(
             ]
         }
 
-        >>> GET /api/v1/graph/article/urn:lex:it:codice.civile:1942;art1218/relations?relation_type=CITA
-        # Solo relazioni di tipo CITA
+        >>> GET /api/v1/graph/article/urn:lex:it:codice.civile:1942;art1218/relations?relation_type=RINVIA
+        # Solo relazioni di tipo RINVIA
     """
     log.info("Fetching article relations", article_urn=article_urn, relation_type=relation_type)
 
@@ -381,22 +383,23 @@ async def get_article_relations(
         if relation_type:
             query += " WHERE type(r) = $relation_type"
 
-        query += """
+        query += f"""
         RETURN
             type(r) as relation_type,
             COALESCE(target.URN, target.node_id) as target_urn,
             COALESCE(target.node_id, target.URN) as target_id,
             COALESCE(target.nome, target.rubrica, target.estremi, target.titolo) as target_label,
-            labels(target)[0] as target_node_type,
+            {node_type_cypher('target')} as target_node_type,
             COALESCE(r.certezza, r.confidence, 0.5) as confidence
         ORDER BY confidence DESC, relation_type ASC
         """
 
         params = {"urn": article_urn}
         if relation_type:
-            params["relation_type"] = relation_type
+            # The graph's own name, whichever vocabulary the caller spoke (CITA is RINVIA).
+            params["relation_type"] = resolve_rel(relation_type)
 
-        result = await graph_client.query(query, params)
+        result = await graph_client.ro_query(query, params)
 
         relations = [
             {
@@ -1428,7 +1431,7 @@ async def get_subgraph(
         RETURN root, indegree(root) + outdegree(root) as degree
         LIMIT 1
         """
-        root_result = await graph_client.query(root_cypher, {"root_urn": root_urn})
+        root_result = await graph_client.ro_query(root_cypher, {"root_urn": root_urn})
 
         if not root_result or not root_result[0].get("root"):
             query_time = (time.time() - start_time) * 1000
@@ -1452,20 +1455,22 @@ async def get_subgraph(
         params: Dict[str, Any] = {"root_urn": root_urn, "max_nodes": max_nodes}
         filter_clauses: List[str] = []
         if relation_types:
-            # Case-insensitive: the live graph mixes lowercase seed types
-            # ("commenta", "contiene") with uppercase enrichment types
-            # ("DISCIPLINA"), and the legacy Python filter uppercased both sides.
-            allowed_rels = [t.strip().lower() for t in relation_types.split(",") if t.strip()]
-            if allowed_rels:
-                filter_clauses.append("toLower(type(r)) IN $allowed_rels")
-                params["allowed_rels"] = allowed_rels
+            # The graph's own names, whichever vocabulary the caller spoke (`cita`
+            # meets RINVIA), as a parameter.
+            relation_clause, relation_params = _relation_filter(
+                [t.strip() for t in relation_types.split(",") if t.strip()]
+            )
+            if relation_clause:
+                filter_clauses.append(relation_clause)
+                params.update(relation_params)
         if entity_types:
             allowed_types = [t.strip().lower() for t in entity_types.split(",") if t.strip()]
             if allowed_types:
                 # Norma nodes always pass (same carve-out as the old Python filter).
+                connected_type = node_type_cypher("connected")
                 filter_clauses.append(
-                    "(toLower(labels(connected)[0]) IN $allowed_types"
-                    " OR toLower(labels(connected)[0]) = 'norma')"
+                    f"(toLower({connected_type}) IN $allowed_types"
+                    f" OR toLower({connected_type}) = 'norma')"
                 )
                 params["allowed_types"] = allowed_types
         where_filter = ("WHERE " + " AND ".join(filter_clauses)) if filter_clauses else ""
@@ -1555,7 +1560,7 @@ async def get_subgraph(
                    indegree(connected) + outdegree(connected) as node_degree
             """
 
-        result = await graph_client.query(edge_cypher, params)
+        result = await graph_client.ro_query(edge_cypher, params)
 
         nodes: List[SubgraphNode] = []
         edges: List[SubgraphEdge] = []
@@ -1651,6 +1656,72 @@ async def get_subgraph(
         raise HTTPException(status_code=500, detail=f"Subgraph query failed: {str(e)}")
     finally:
         await graph_client.close()
+
+
+# ====================================================
+# RELATION FILTER
+# ====================================================
+
+def _relation_filter(relation_types: Iterable[str]) -> Tuple[str, Dict[str, Any]]:
+    """`type(r) IN $allowed_rels` and its parameters, from the relation names a request carried.
+
+    The names are resolved to the graph's own (`cita` meets RINVIA) and passed as a
+    parameter: they are never part of the Cypher text. A name the graph does not
+    have stays in the list and matches nothing. No names: no clause."""
+    allowed = resolve_rels(relation_types)
+    if not allowed:
+        return "", {}
+    return "type(r) IN $allowed_rels", {"allowed_rels": allowed}
+
+
+async def _bridge_mappings(bridge_table: Any, chunk_ids: Iterable[Any]) -> List[Dict[str, Any]]:
+    """The graph nodes the chunks map to, one entry per (chunk, node):
+    `{chunk_id, node_urn, mapping_confidence}` (a mapping without a confidence counts in full).
+
+    The bridge table keys a chunk by a UUID. A point id that is not one (a legacy integer id)
+    has no mapping there, and a query on it would fail the search for every other chunk: it is
+    skipped."""
+    mappings: List[Dict[str, Any]] = []
+    for chunk_id in chunk_ids:
+        try:
+            chunk_key = uuid.UUID(str(chunk_id))
+        except ValueError:
+            continue
+        for node in await bridge_table.get_nodes_for_chunk(chunk_key):
+            confidence = node.get("confidence")
+            mappings.append({
+                "chunk_id": chunk_id,
+                "node_urn": node["graph_node_urn"],
+                "mapping_confidence": 1.0 if confidence is None else confidence,
+            })
+    return mappings
+
+
+async def _query_search_subgraph(
+    graph_client: FalkorDBClient,
+    node_urns: Iterable[str],
+    relation_types: Optional[List[str]],
+    max_results: int,
+) -> List[Dict[str, Any]]:
+    """The nodes the search found and their relations, optionally of the given types."""
+    relation_clause, relation_params = _relation_filter(relation_types or [])
+    relation_filter = f"AND {relation_clause}" if relation_clause else ""
+
+    cypher = f"""
+    MATCH (n)
+    WHERE n.URN IN $urns
+       OR n.urn IN $urns
+    WITH n
+    OPTIONAL MATCH (n)-[r]-(connected)
+    WHERE connected IS NOT NULL
+    {relation_filter}
+    RETURN n, type(r) as rel_type, connected
+    LIMIT $max_results
+    """
+    return await graph_client.ro_query(
+        cypher,
+        {"urns": list(node_urns), "max_results": max_results, **relation_params},
+    )
 
 
 # ====================================================
@@ -1840,10 +1911,9 @@ async def search_graph(
             )
 
         # === 3. Map chunks → graph nodes via Bridge Table ===
-        from merlt.storage.bridge.bridge_table import BridgeTable
-        from merlt.rlcf.database import get_db_url
+        from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
 
-        bridge_table = BridgeTable(db_url=get_db_url())
+        bridge_table = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await bridge_table.connect()
 
         try:
@@ -1857,7 +1927,7 @@ async def search_graph(
             chunk_ids = list(chunk_id_to_score.keys())
 
             # Get graph node URNs from bridge table
-            mappings = await bridge_table.get_nodes_for_chunks(chunk_ids)
+            mappings = await _bridge_mappings(bridge_table, chunk_ids)
 
             log.debug(
                 "Bridge mappings retrieved",
@@ -1914,32 +1984,12 @@ async def search_graph(
         await graph_client.connect()
 
         try:
-            # Build Cypher query to get nodes and their relations
-            # Filter by relation_types if specified
-            relation_filter = ""
-            if request.filters and request.filters.relation_types:
-                allowed_rels = request.filters.relation_types
-                relation_filter = f"AND type(r) IN {allowed_rels}"
-
-            cypher = f"""
-            MATCH (n)
-            WHERE n.URN IN $urns
-               OR n.urn IN $urns
-            WITH n
-            OPTIONAL MATCH (n)-[r]-(connected)
-            WHERE connected IS NOT NULL
-            {relation_filter}
-            RETURN n, type(r) as rel_type, connected
-            LIMIT $max_results
-            """
-
-            node_urns_list = list(node_urns)
-            result = await graph_client.query(
-                cypher,
-                {
-                    "urns": node_urns_list,
-                    "max_results": request.limit * 10,  # Allow for edges
-                }
+            # Nodes and their relations, filtered by relation_types if specified
+            result = await _query_search_subgraph(
+                graph_client,
+                node_urns,
+                request.filters.relation_types if request.filters else None,
+                request.limit * 10,  # Allow for edges
             )
 
             # Parse results into SubgraphResponse
@@ -1959,8 +2009,7 @@ async def search_graph(
                         if n_internal_id not in seen_node_ids and n_urn:
                             # Apply entity_type filter if specified
                             if request.filters and request.filters.entity_types:
-                                node_labels = n_data.get("labels", [])
-                                entity_type = node_labels[0] if node_labels else ""
+                                entity_type = node_type_from_labels(n_data.get("labels", []), "")
                                 if entity_type.lower() not in [t.lower() for t in request.filters.entity_types]:
                                     # Check if it's a Norma node (always include)
                                     if entity_type != "Norma" and entity_type != "Article":
@@ -1981,8 +2030,7 @@ async def search_graph(
                         if conn_internal_id not in seen_node_ids and conn_urn:
                             # Apply entity_type filter
                             if request.filters and request.filters.entity_types:
-                                conn_labels = conn_data.get("labels", [])
-                                entity_type = conn_labels[0] if conn_labels else ""
+                                entity_type = node_type_from_labels(conn_data.get("labels", []), "")
                                 if entity_type.lower() not in [t.lower() for t in request.filters.entity_types]:
                                     if entity_type != "Norma" and entity_type != "Article":
                                         continue
@@ -2080,8 +2128,8 @@ def _parse_graph_node_v2(node_data: Dict[str, Any], include_metadata: bool) -> S
         or str(node_data.get("id", ""))
     )
 
-    # Get node type from labels
-    node_type = labels[0] if labels else "Unknown"
+    # Get node type from labels (the first that is not Entity: a community node is :Entity:<Label>)
+    node_type = node_type_from_labels(labels, "Unknown")
 
     # Get display label (A1: nome→estremi→rubrica→titolo→Norma synth→
     # numero_articolo→testo→URN-derived "Art. N"→id, never the raw URL).
@@ -2124,13 +2172,10 @@ def _parse_graph_node(node_data: Dict[str, Any], include_metadata: bool) -> Subg
         or str(hash(str(node_data)))[:12]
     )
 
-    # Get node type from labels
+    # Get node type from labels: the first that is not Entity (a community node is
+    # :Entity:<Label>, and which label comes first depends on the graph)
     labels = node_data.get("labels", [])
-    node_type = labels[0] if labels else "Unknown"
-
-    # Handle Entity subtypes
-    if "Entity" in labels and len(labels) > 1:
-        node_type = labels[1]  # Use more specific label (Principio, Concetto, etc.)
+    node_type = node_type_from_labels(labels, "Unknown")
 
     # Get display label
     label = (

@@ -7,7 +7,7 @@ Request/response models for document upload and parsing endpoints.
 
 from datetime import datetime, date
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ====================================================
@@ -74,8 +74,7 @@ class DocumentInfo(BaseModel):
     created_at: datetime
     processing_completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DocumentListResponse(BaseModel):
@@ -147,8 +146,7 @@ class PendingAmendmentInfo(BaseModel):
     contributed_by: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ====================================================

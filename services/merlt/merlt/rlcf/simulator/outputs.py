@@ -487,7 +487,8 @@ class ThesisOutputGenerator:
         latex += f"Feedback totali & {results.total_feedbacks} \\\\\n"
         latex += f"Feedback persistiti & {results.total_feedbacks_persisted} \\\\\n"
         latex += f"Durata totale & {results.total_duration_seconds:.1f}s \\\\\n"
-        latex += f"Successo complessivo & {'S\\`i' if stats.overall_success else 'No'} \\\\\n"
+        success = "S\\`i" if stats.overall_success else "No"
+        latex += f"Successo complessivo & {success} \\\\\n"
 
         latex += r"""\bottomrule
 \end{tabular}

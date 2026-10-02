@@ -32,24 +32,14 @@ from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 from merlt.models import BridgeMapping
 
 from merlt.clients import NormTree, get_article_position
+from merlt.storage.graph.schema import Fonte, Provenance, canonical_urn, text_fingerprint
 
 log = structlog.get_logger()
 
 
 def _canonical_urn(urn: str) -> str:
-    """Strip ONLY the NIR version marker (`!vig=` / `!orig=…`).
-
-    **Anti-regressione (vedi CLAUDE.md "URN version-marker mismatch"):**
-    la chiave del grafo è la forma URL Normattiva COMPLETA, wrapper INCLUSO
-    ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:…~art2043"). VisuaLex e
-    MERL-T producono la stessa forma e fanno match esatto. Strippare il
-    wrapper rende il seed Libro IV irreperibile; strippare il marker `!vig=`
-    invece SÌ, perché le viste con `!vig=` non matcherebbero altrimenti.
-    """
-    if not urn:
-        return urn
-    bang = urn.find("!")
-    return urn[:bang] if bang != -1 else urn
+    """The graph key of a norm (`schema.canonical_urn`); kept for its importers."""
+    return canonical_urn(urn)
 
 
 def _extract_number_from_urn(urn: str, level: str) -> Optional[int]:
@@ -216,20 +206,24 @@ class IngestionPipelineV2:
         Returns:
             IngestionResult with chunks, mappings, and graph info
         """
-        # Normalizzazione: estrai brocardi_info dai metadati se non presenti a livello root
-        if not article.brocardi_info and article.metadata and "brocardi_info" in article.metadata:
+        # A legacy caller may hand the doctrine inside a dict `metadata`; the
+        # common NormaMetadata dataclass has no such field (`in` on it raised
+        # TypeError and aborted every article without doctrine).
+        if not article.brocardi_info and isinstance(article.metadata, dict) and article.metadata.get("brocardi_info"):
             article.brocardi_info = article.metadata["brocardi_info"]
             log.info("Injected brocardi_info from metadata")
 
         meta = article.metadata
 
         # Get URNs from existing urngenerator, then CANONICALIZE for the graph:
-        # VisuaLex's `meta.to_urn()` returns the URL-wrapped form
-        # ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:…!vig="), but the
-        # Libro IV seed (and the BFF `normalizeGraphUrn` used by check-article
-        # / subgraph) index the bare canonical NIR form. Without this strip the
-        # nodes are unreachable from the read path → 0-records → infinite
-        # lazy-ingest loop. The full URL stays in `article.url` for display.
+        # VisuaLex's `meta.to_urn()` returns the URL-wrapped form with the version
+        # marker ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:…!vig="). The
+        # Libro IV seed (and the BFF `normalizeGraphUrn` used by check-article /
+        # subgraph) key a norm by that same full URL WITHOUT the marker:
+        # `canonical_urn` cuts the marker and keeps the URL wrapper (the bare
+        # `urn:nir:…` form is not the key). Without the cut the nodes are
+        # unreachable from the read path → 0-records → infinite lazy-ingest loop.
+        # `article.url` keeps the URL as VisuaLex gave it, for display.
         article_urn = _canonical_urn(meta.to_urn())
         article_url = article.url
         codice_urn = _canonical_urn(meta.to_codice_urn())
@@ -470,7 +464,8 @@ class IngestionPipelineV2:
                 codice.vigenza = 'vigente',
                 codice.efficacia = 'permanente',
                 codice.ambito_territoriale = 'nazionale',
-                codice.fonte = 'VisualexAPI',
+                codice.fonte = 'Normattiva',
+                codice.provenance = coalesce(codice.provenance, 'ingestion'),
                 codice.created_at = $timestamp
             """,
             {
@@ -529,7 +524,8 @@ class IngestionPipelineV2:
                     libro.titolo = $titolo,
                     libro.rubrica = $titolo,
                     libro.vigenza = 'vigente',
-                    libro.fonte = 'Brocardi',
+                    libro.fonte = 'Brocardi.it',
+                    libro.provenance = coalesce(libro.provenance, 'ingestion'),
                     libro.created_at = $timestamp,
                     libro.updated_at = $timestamp
                 """,
@@ -537,17 +533,17 @@ class IngestionPipelineV2:
             )
             result.nodes_created.append(f"Norma({tipo_doc}):{hierarchy.libro}")
 
-            # Relation: codice -[contiene]-> libro
+            # Relation: codice -[CONTIENE]-> libro
             await self.falkordb.query(
                 """
                 MATCH (codice:Norma {URN: $codice_urn})
                 MATCH (libro:Norma {URN: $libro_urn})
-                MERGE (codice)-[r:contiene]->(libro)
+                MERGE (codice)-[r:CONTIENE]->(libro)
                 ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                 """,
                 {"codice_urn": codice_urn, "libro_urn": hierarchy.libro}
             )
-            result.relations_created.append(f"contiene:{codice_urn}->{hierarchy.libro}")
+            result.relations_created.append(f"CONTIENE:{codice_urn}->{hierarchy.libro}")
 
         # Create Titolo node
         if hierarchy.titolo and hierarchy.libro:
@@ -562,7 +558,8 @@ class IngestionPipelineV2:
                     titolo.titolo = $titolo,
                     titolo.rubrica = $titolo,
                     titolo.vigenza = 'vigente',
-                    titolo.fonte = 'Brocardi',
+                    titolo.fonte = 'Brocardi.it',
+                    titolo.provenance = coalesce(titolo.provenance, 'ingestion'),
                     titolo.created_at = $timestamp,
                     titolo.updated_at = $timestamp
                 """,
@@ -570,17 +567,17 @@ class IngestionPipelineV2:
             )
             result.nodes_created.append(f"Norma(titolo):{hierarchy.titolo}")
 
-            # Relation: libro -[contiene]-> titolo
+            # Relation: libro -[CONTIENE]-> titolo
             await self.falkordb.query(
                 """
                 MATCH (libro:Norma {URN: $libro_urn})
                 MATCH (titolo:Norma {URN: $titolo_urn})
-                MERGE (libro)-[r:contiene]->(titolo)
+                MERGE (libro)-[r:CONTIENE]->(titolo)
                 ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                 """,
                 {"libro_urn": hierarchy.libro, "titolo_urn": hierarchy.titolo}
             )
-            result.relations_created.append(f"contiene:{hierarchy.libro}->{hierarchy.titolo}")
+            result.relations_created.append(f"CONTIENE:{hierarchy.libro}->{hierarchy.titolo}")
 
         # Create Capo node
         if hierarchy.capo and hierarchy.titolo:
@@ -595,7 +592,8 @@ class IngestionPipelineV2:
                     capo.titolo = $titolo,
                     capo.rubrica = $titolo,
                     capo.vigenza = 'vigente',
-                    capo.fonte = 'Brocardi',
+                    capo.fonte = 'Brocardi.it',
+                    capo.provenance = coalesce(capo.provenance, 'ingestion'),
                     capo.created_at = $timestamp,
                     capo.updated_at = $timestamp
                 """,
@@ -603,17 +601,17 @@ class IngestionPipelineV2:
             )
             result.nodes_created.append(f"Norma(capo):{hierarchy.capo}")
 
-            # Relation: titolo -[contiene]-> capo
+            # Relation: titolo -[CONTIENE]-> capo
             await self.falkordb.query(
                 """
                 MATCH (titolo:Norma {URN: $titolo_urn})
                 MATCH (capo:Norma {URN: $capo_urn})
-                MERGE (titolo)-[r:contiene]->(capo)
+                MERGE (titolo)-[r:CONTIENE]->(capo)
                 ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                 """,
                 {"titolo_urn": hierarchy.titolo, "capo_urn": hierarchy.capo}
             )
-            result.relations_created.append(f"contiene:{hierarchy.titolo}->{hierarchy.capo}")
+            result.relations_created.append(f"CONTIENE:{hierarchy.titolo}->{hierarchy.capo}")
 
         # Create Sezione node
         if hierarchy.sezione and hierarchy.capo:
@@ -628,7 +626,8 @@ class IngestionPipelineV2:
                     sezione.titolo = $titolo,
                     sezione.rubrica = $titolo,
                     sezione.vigenza = 'vigente',
-                    sezione.fonte = 'Brocardi',
+                    sezione.fonte = 'Brocardi.it',
+                    sezione.provenance = coalesce(sezione.provenance, 'ingestion'),
                     sezione.created_at = $timestamp,
                     sezione.updated_at = $timestamp
                 """,
@@ -636,17 +635,17 @@ class IngestionPipelineV2:
             )
             result.nodes_created.append(f"Norma(sezione):{hierarchy.sezione}")
 
-            # Relation: capo -[contiene]-> sezione
+            # Relation: capo -[CONTIENE]-> sezione
             await self.falkordb.query(
                 """
                 MATCH (capo:Norma {URN: $capo_urn})
                 MATCH (sezione:Norma {URN: $sezione_urn})
-                MERGE (capo)-[r:contiene]->(sezione)
+                MERGE (capo)-[r:CONTIENE]->(sezione)
                 ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                 """,
                 {"capo_urn": hierarchy.capo, "sezione_urn": hierarchy.sezione}
             )
-            result.relations_created.append(f"contiene:{hierarchy.capo}->{hierarchy.sezione}")
+            result.relations_created.append(f"CONTIENE:{hierarchy.capo}->{hierarchy.sezione}")
 
     def _extract_hierarchy_title(self, position: str, level: str) -> Optional[str]:
         """
@@ -706,8 +705,11 @@ class IngestionPipelineV2:
                 art.numero_articolo = $numero_articolo,
                 art.rubrica = $rubrica,
                 art.testo_vigente = $testo,
+                art.testo = $testo,
+                art.testo_sha256 = $testo_sha256,
                 art.titolo = $titolo_atto,
-                art.fonte = 'VisualexAPI',
+                art.fonte = $fonte,
+                art.provenance = $provenance,
                 art.autorita_emanante = $autorita,
                 art.data_pubblicazione = $data,
                 art.vigenza = 'vigente',
@@ -724,8 +726,11 @@ class IngestionPipelineV2:
                 art.numero_articolo = $numero_articolo,
                 art.rubrica = $rubrica,
                 art.testo_vigente = $testo,
+                art.testo = $testo,
+                art.testo_sha256 = $testo_sha256,
                 art.titolo = $titolo_atto,
-                art.fonte = 'VisualexAPI',
+                art.fonte = $fonte,
+                art.provenance = coalesce(art.provenance, $provenance),
                 art.autorita_emanante = $autorita,
                 art.data_pubblicazione = $data,
                 art.vigenza = 'vigente',
@@ -743,7 +748,10 @@ class IngestionPipelineV2:
                 "numero_articolo": article_structure.numero_articolo,
                 "rubrica": article_structure.rubrica or "",
                 "testo": article.article_text,
+                "testo_sha256": text_fingerprint(article.article_text) if article.article_text else None,
                 "titolo_atto": titolo_atto,
+                "fonte": Fonte.NORMATTIVA.value,
+                "provenance": Provenance.INGESTION.value,
                 "autorita": autorita,
                 "data": data_pubb,
                 "timestamp": self._timestamp,
@@ -751,7 +759,7 @@ class IngestionPipelineV2:
         )
         result.nodes_created.append(f"Norma(articolo):{result.article_urn}")
 
-        # Relation: closest_parent -[contiene]-> articolo
+        # Relation: closest_parent -[CONTIENE]-> articolo
         # Find closest parent (sezione > capo > titolo > libro > codice)
         codice_urn = meta.to_codice_urn()
         brocardi_pos = None
@@ -764,12 +772,12 @@ class IngestionPipelineV2:
             """
             MATCH (parent:Norma {URN: $parent_urn})
             MATCH (art:Norma {URN: $art_urn})
-            MERGE (parent)-[r:contiene]->(art)
+            MERGE (parent)-[r:CONTIENE]->(art)
             ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
             """,
             {"parent_urn": parent_urn, "art_urn": result.article_urn}
         )
-        result.relations_created.append(f"contiene:{parent_urn}->{result.article_urn}")
+        result.relations_created.append(f"CONTIENE:{parent_urn}->{result.article_urn}")
 
     async def _create_comma_nodes(
         self,
@@ -781,7 +789,7 @@ class IngestionPipelineV2:
         Create Comma and Lettera nodes for an article.
 
         Graph structure:
-            (Articolo)-[:contiene]->(Comma)-[:contiene]->(Lettera)
+            (Articolo)-[:CONTIENE]->(Comma)-[:CONTIENE]->(Lettera)
 
         URN format (NIR-like):
             Comma:   {article_urn}-com{N}
@@ -803,7 +811,9 @@ class IngestionPipelineV2:
                     c.numero = $numero,
                     c.testo = $testo,
                     c.token_count = $tokens,
+                    c.provenance = coalesce(c.provenance, 'ingestion'),
                     c.created_at = $timestamp
+                SET c.fonte = coalesce(c.fonte, 'Normattiva')
                 """,
                 {
                     "urn": comma_urn,
@@ -815,17 +825,17 @@ class IngestionPipelineV2:
             )
             result.nodes_created.append(f"Comma:{comma_urn}")
 
-            # Relation: Articolo -[contiene]-> Comma
+            # Relation: Articolo -[CONTIENE]-> Comma
             await self.falkordb.query(
                 """
                 MATCH (art:Norma {URN: $art_urn})
                 MATCH (c:Comma {URN: $comma_urn})
-                MERGE (art)-[r:contiene]->(c)
+                MERGE (art)-[r:CONTIENE]->(c)
                 ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                 """,
                 {"art_urn": article_urn, "comma_urn": comma_urn}
             )
-            result.relations_created.append(f"contiene:{article_urn}->{comma_urn}")
+            result.relations_created.append(f"CONTIENE:{article_urn}->{comma_urn}")
 
             # Create Lettera nodes (if present)
             for lettera in comma.lettere:
@@ -839,7 +849,9 @@ class IngestionPipelineV2:
                         l.lettera = $lettera,
                         l.testo = $testo,
                         l.token_count = $tokens,
+                        l.provenance = coalesce(l.provenance, 'ingestion'),
                         l.created_at = $timestamp
+                    SET l.fonte = coalesce(l.fonte, 'Normattiva')
                     """,
                     {
                         "urn": lettera_urn,
@@ -851,17 +863,17 @@ class IngestionPipelineV2:
                 )
                 result.nodes_created.append(f"Lettera:{lettera_urn}")
 
-                # Relation: Comma -[contiene]-> Lettera
+                # Relation: Comma -[CONTIENE]-> Lettera
                 await self.falkordb.query(
                     """
                     MATCH (c:Comma {URN: $comma_urn})
                     MATCH (l:Lettera {URN: $lettera_urn})
-                    MERGE (c)-[r:contiene]->(l)
+                    MERGE (c)-[r:CONTIENE]->(l)
                     ON CREATE SET r.certezza = 1.0, r.tipo = 'esplicita'
                     """,
                     {"comma_urn": comma_urn, "lettera_urn": lettera_urn}
                 )
-                result.relations_created.append(f"contiene:{comma_urn}->{lettera_urn}")
+                result.relations_created.append(f"CONTIENE:{comma_urn}->{lettera_urn}")
 
         log.info(
             f"Created {len(article_structure.commas)} comma nodes with "
@@ -889,6 +901,7 @@ class IngestionPipelineV2:
                     d.descrizione = $descrizione,
                     d.tipo_dottrina = 'ratio',
                     d.fonte = 'Brocardi.it',
+                    d.provenance = coalesce(d.provenance, 'ingestion'),
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
                     d.created_at = $timestamp
@@ -902,17 +915,17 @@ class IngestionPipelineV2:
             )
             result.nodes_created.append(f"Dottrina:{dottrina_id}")
 
-            # Relation: Dottrina -[commenta]-> Norma
+            # Relation: Dottrina -[COMMENTA]-> Norma
             await self.falkordb.query(
                 """
                 MATCH (d:Dottrina {node_id: $d_id})
                 MATCH (art:Norma {URN: $art_urn})
-                MERGE (d)-[r:commenta]->(art)
+                MERGE (d)-[r:COMMENTA]->(art)
                 ON CREATE SET r.certezza = 0.9, r.tipo = 'esplicita', r.fonte = 'Brocardi.it'
                 """,
                 {"d_id": dottrina_id, "art_urn": article_urn}
             )
-            result.relations_created.append(f"commenta:{dottrina_id}->{article_urn}")
+            result.relations_created.append(f"COMMENTA:{dottrina_id}->{article_urn}")
 
         # Spiegazione → Dottrina (tipo: spiegazione)
         if brocardi.get("Spiegazione"):
@@ -925,6 +938,7 @@ class IngestionPipelineV2:
                     d.descrizione = $descrizione,
                     d.tipo_dottrina = 'spiegazione',
                     d.fonte = 'Brocardi.it',
+                    d.provenance = coalesce(d.provenance, 'ingestion'),
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
                     d.created_at = $timestamp
@@ -942,12 +956,12 @@ class IngestionPipelineV2:
                 """
                 MATCH (d:Dottrina {node_id: $d_id})
                 MATCH (art:Norma {URN: $art_urn})
-                MERGE (d)-[r:commenta]->(art)
+                MERGE (d)-[r:COMMENTA]->(art)
                 ON CREATE SET r.certezza = 0.9, r.tipo = 'esplicita', r.fonte = 'Brocardi.it'
                 """,
                 {"d_id": dottrina_id, "art_urn": article_urn}
             )
-            result.relations_created.append(f"commenta:{dottrina_id}->{article_urn}")
+            result.relations_created.append(f"COMMENTA:{dottrina_id}->{article_urn}")
 
         # Relazioni di accompagnamento → Dottrina (tipo: relazione_accompagnamento)
         # Gestisce: RelazioneCostituzione (Ruini 1947), Relazioni Guardasigilli (CC 1942), etc.
@@ -1001,6 +1015,7 @@ class IngestionPipelineV2:
                     d.tipo_dottrina = 'relazione_accompagnamento',
                     d.sottotipo = 'relazione_costituzione',
                     d.fonte = 'Brocardi.it',
+                    d.provenance = coalesce(d.provenance, 'ingestion'),
                     d.autore = $autore,
                     d.anno = $anno,
                     d.confidence = 0.95,
@@ -1022,12 +1037,12 @@ class IngestionPipelineV2:
                 """
                 MATCH (d:Dottrina {node_id: $d_id})
                 MATCH (art:Norma {URN: $art_urn})
-                MERGE (d)-[r:commenta]->(art)
+                MERGE (d)-[r:COMMENTA]->(art)
                 ON CREATE SET r.certezza = 0.95, r.tipo = 'storica', r.fonte = 'Brocardi.it'
                 """,
                 {"d_id": dottrina_id, "art_urn": article_urn}
             )
-            result.relations_created.append(f"commenta:{dottrina_id}->{article_urn}")
+            result.relations_created.append(f"COMMENTA:{dottrina_id}->{article_urn}")
 
         # 2. Relazioni Guardasigilli e simili (caricate via AJAX per Codici)
         relazioni = brocardi.get("Relazioni", [])
@@ -1055,6 +1070,7 @@ class IngestionPipelineV2:
                         d.tipo_dottrina = 'relazione_accompagnamento',
                         d.sottotipo = $sottotipo,
                         d.fonte = 'Brocardi.it',
+                        d.provenance = coalesce(d.provenance, 'ingestion'),
                         d.autore = $autore,
                         d.anno = $anno,
                         d.confidence = 0.9,
@@ -1077,12 +1093,12 @@ class IngestionPipelineV2:
                     """
                     MATCH (d:Dottrina {node_id: $d_id})
                     MATCH (art:Norma {URN: $art_urn})
-                    MERGE (d)-[r:commenta]->(art)
+                    MERGE (d)-[r:COMMENTA]->(art)
                     ON CREATE SET r.certezza = 0.9, r.tipo = 'storica', r.fonte = 'Brocardi.it'
                     """,
                     {"d_id": dottrina_id, "art_urn": article_urn}
                 )
-                result.relations_created.append(f"commenta:{dottrina_id}->{article_urn}")
+                result.relations_created.append(f"COMMENTA:{dottrina_id}->{article_urn}")
 
     def _normalize_massima(self, massima: Dict[str, Any], index: int) -> Dict[str, Any]:
         """
@@ -1190,6 +1206,7 @@ class IngestionPipelineV2:
                 a.massima = $massima,
                 a.tipo_atto = 'sentenza',
                 a.fonte = 'Brocardi.it',
+                a.provenance = coalesce(a.provenance, 'ingestion'),
                 a.confidence = 0.9,
                 a.created_at = $timestamp
             """,
@@ -1205,12 +1222,12 @@ class IngestionPipelineV2:
         )
         result.nodes_created.append(f"AttoGiudiziario:{atto_id}")
 
-        # Relation: AttoGiudiziario -[interpreta]-> Norma
+        # Relation: AttoGiudiziario -[INTERPRETA]-> Norma
         await self.falkordb.query(
             """
             MATCH (a:AttoGiudiziario {node_id: $a_id})
             MATCH (art:Norma {URN: $art_urn})
-            MERGE (a)-[r:interpreta]->(art)
+            MERGE (a)-[r:INTERPRETA]->(art)
             ON CREATE SET
                 r.certezza = 0.9,
                 r.tipo_interpretazione = 'giurisprudenziale',
@@ -1218,7 +1235,7 @@ class IngestionPipelineV2:
             """,
             {"a_id": atto_id, "art_urn": article_urn}
         )
-        result.relations_created.append(f"interpreta:{atto_id}->{article_urn}")
+        result.relations_created.append(f"INTERPRETA:{atto_id}->{article_urn}")
 
 
 # Convenience function

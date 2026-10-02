@@ -23,9 +23,16 @@ import json
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import (
+    EXPERT_SOURCE_TYPES, canonical_urn, cypher_labels, cypher_rel_names, node_type_from_labels,
+)
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
+
+# The deepest traversal graph_search will run. It is interpolated into the Cypher
+# (`*1..N`) and, in both directions, the number of paths grows with every hop.
+MAX_HOPS = 3
 
 
 @dataclass
@@ -215,10 +222,10 @@ class SemanticSearchTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Filtra per tipo di fonte. Specializzazione per expert: "
-                    "LiteralExpert=['norma'], "
-                    "SystemicExpert=['norma'], "
-                    "PrinciplesExpert=['ratio','spiegazione'], "
-                    "PrecedentExpert=['massima']"
+                    + ", ".join(
+                        f"{name.capitalize()}Expert={types}"
+                        for name, types in EXPERT_SOURCE_TYPES.items()
+                    )
                 ),
                 required=False
             )
@@ -428,7 +435,7 @@ class GraphSearchTool(BaseTool):
         >>> tool = GraphSearchTool(graph_db=falkordb_client)
         >>> result = await tool(
         ...     start_node="urn:norma:cp:art52",
-        ...     relation_types=["disciplina", "definisce"],
+        ...     relation_types=["DISCIPLINA", "DEFINISCE"],
         ...     max_hops=2
         ... )
     """
@@ -474,7 +481,7 @@ class GraphSearchTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Tipi di relazione da seguire. "
-                    "Es: ['disciplina', 'definisce', 'cita']"
+                    "Es: ['DISCIPLINA', 'DEFINISCE', 'RINVIA']"
                 ),
                 required=False
             ),
@@ -539,6 +546,27 @@ class GraphSearchTool(BaseTool):
             )
 
         try:
+            max_hops = bounded_int(max_hops, "max_hops", 1, MAX_HOPS)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
+
+        if self._names_nothing_of_the_graph(relation_types, target_type):
+            # The caller filtered on names the graph does not have, so nothing can
+            # match; the traversal must not run unfiltered instead.
+            return ToolResult.ok(
+                data={
+                    "start_node": start_node,
+                    "nodes": [],
+                    "edges": [],
+                    "total_nodes": 0,
+                    "total_edges": 0
+                },
+                tool_name=self.name,
+                start_node=start_node,
+                max_hops=max_hops
+            )
+
+        try:
             # Costruisci query Cypher
             query, params = self._build_traversal_query(
                 start_node=start_node,
@@ -548,8 +576,8 @@ class GraphSearchTool(BaseTool):
                 direction=direction
             )
 
-            # Esegui query (FalkorDBClient usa .query(), non .execute_query())
-            result = await self.graph_db.query(query, params)
+            # Esegui query in sola lettura (FalkorDBClient.ro_query)
+            result = await self.graph_db.ro_query(query, params)
 
             # Processa risultati
             nodes = []
@@ -586,6 +614,14 @@ class GraphSearchTool(BaseTool):
                 tool_name=self.name
             )
 
+    @staticmethod
+    def _names_nothing_of_the_graph(relation_types: Optional[List[str]], target_type: Optional[str]) -> bool:
+        """True when the caller asked for a filter and none of its names is the graph's."""
+        return bool(
+            (relation_types and not cypher_rel_names(relation_types))
+            or (target_type and not cypher_labels(target_type))
+        )
+
     def _build_traversal_query(
         self,
         start_node: str,
@@ -597,9 +633,20 @@ class GraphSearchTool(BaseTool):
         """
         Costruisce query Cypher per il traversal.
 
+        Relation types, the target label and the hop count are the only parts
+        interpolated into the text: the first two only as names of the graph, the
+        third as a clamped integer. Everything else is a parameter.
+
         Returns:
             Tuple (query_string, params_dict)
+
+        Raises:
+            ValueError: max_hops is not an integer, or a filter names nothing of the graph
         """
+        max_hops = bounded_int(max_hops, "max_hops", 1, MAX_HOPS)
+        if self._names_nothing_of_the_graph(relation_types, target_type):
+            raise ValueError("relation_types or target_type names nothing the graph has")
+
         # Direzione della relazione
         if direction == "outgoing":
             rel_pattern = f"-[r*1..{max_hops}]->"
@@ -610,20 +657,24 @@ class GraphSearchTool(BaseTool):
 
         # Filtro per tipo relazione
         if relation_types:
-            rel_types = "|".join(relation_types)
+            # The graph's names, whichever vocabulary the caller spoke (legacy
+            # lowercase, traversal-weight keys, TraversalPolicy names).
+            rel_types = "|".join(cypher_rel_names(relation_types))
             rel_pattern = rel_pattern.replace("[r*", f"[r:{rel_types}*")
 
-        # Target type filter
-        target_filter = f":{target_type}" if target_type else ""
+        # Target type filter: a label of the graph, in its canonical spelling
+        target_filter = f":{cypher_labels(target_type)[0]}" if target_type else ""
 
         # Match the seed by URN *or* source_url: a co-evolved (live_unconfirmed)
         # node is keyed URN=`live:<hash>` and carries the CANONICAL urn in
         # source_url, so a URN-only match silently missed every live-retrieved
         # norm — the traversal came back empty for anything outside the CC seed
-        # even when the node existed with real CORRELATO edges.
+        # even when the node existed with real CORRELATO edges. Most seed nodes
+        # (concepts, principles, massime, doctrine) have neither: their key is
+        # `node_id`, and that is the key the tool hands to the LLM.
         query = f"""
         MATCH (start)
-        WHERE start.URN = $start_urn OR start.source_url = $start_urn
+        WHERE start.URN = $start_urn OR start.source_url = $start_urn OR start.node_id = $start_urn
         MATCH path = (start){rel_pattern}(target{target_filter})
         UNWIND nodes(path) AS node
         UNWIND relationships(path) AS rel
@@ -631,7 +682,7 @@ class GraphSearchTool(BaseTool):
         LIMIT 100
         """
 
-        params = {"start_urn": start_node}
+        params = {"start_urn": canonical_urn(start_node)}
 
         return query, params
 
@@ -652,7 +703,8 @@ class GraphSearchTool(BaseTool):
 
         return {
             "urn": props.get("URN", props.get("node_id", "")),
-            "type": labels[0] if labels else props.get("_type", "Unknown"),
+            # the first label that is not Entity: a community node is `:Entity:<Label>`
+            "type": node_type_from_labels(labels, props.get("_type", "Unknown")),
             "properties": props
         }
 

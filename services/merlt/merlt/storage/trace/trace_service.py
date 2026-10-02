@@ -16,7 +16,7 @@ Pattern follows BridgeTable service architecture.
 
 import structlog
 from typing import List, Optional, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text, select, func, update
@@ -41,10 +41,45 @@ class TraceStorageConfig:
     password: str = "devpassword"
     pool_size: int = 10
     max_overflow: int = 20
+    # The URL's query (`?ssl=require`): the writer opens the URL as it is, a reader must too.
+    query: Dict[str, Any] = field(default_factory=dict)
 
     def get_connection_string(self) -> str:
-        """Get async PostgreSQL connection string."""
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        """Get async PostgreSQL connection string, the credentials escaped for a SQLAlchemy URL
+        (a password with `@`, `/`, `:`, `%` or `#` reads back as itself)."""
+        from sqlalchemy.engine import URL
+
+        return URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+            database=self.database,
+            query=self.query,
+        ).render_as_string(hide_password=False)
+
+    @classmethod
+    def from_rlcf_env(cls) -> "TraceStorageConfig":
+        """The database the traces are written to: the one the RLCF async session opens
+        (`RLCF_ASYNC_DATABASE_URL`, see infra/compose.yml), where the API reaches it from.
+
+        `qa_traces` rows are saved through that session, so a reader built on it sees them.
+        The dataclass defaults name a development container (localhost:5433/rlcf_dev) that
+        does not exist inside the compose network."""
+        from sqlalchemy.engine import make_url
+
+        from merlt.rlcf.database import get_async_database_url
+
+        url = make_url(get_async_database_url())
+        return cls(
+            host=url.host or cls.host,
+            port=url.port or 5432,
+            database=url.database or cls.database,
+            user=url.username or cls.user,
+            password=url.password or "",
+            query=dict(url.query),
+        )
 
 
 @dataclass

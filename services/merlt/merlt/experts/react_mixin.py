@@ -36,6 +36,8 @@ from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from merlt.storage.graph.schema import canonical_urn, node_text
+
 log = structlog.get_logger()
 
 
@@ -49,11 +51,11 @@ _CANON_STRATEGY: Dict[str, Dict[str, str]] = {
     },
     "systemic": {
         "canone": "sistematico (collegamento con le altre norme del sistema)",
-        "tools": "graph_search e hierarchy_navigation (relazioni e struttura nel grafo), citation_chain (catena di rinvii)",
+        "tools": "graph_search e hierarchy_navigation (relazioni e struttura nel grafo)",
     },
     "principles": {
         "canone": "teleologico / ratio legis (principî e finalità della norma)",
-        "tools": "fetch_law_article (PRIMA, per il testo della norma), principle_lookup (principî giuridici), constitutional_basis (base costituzionale), cerca_brocardi (dottrina e massime — solo per articoli di codici)",
+        "tools": "fetch_law_article (PRIMA, per il testo della norma), principle_lookup (principî giuridici), cerca_brocardi (dottrina e massime — solo per articoli di codici)",
     },
     "precedent": {
         "canone": "giurisprudenziale (orientamenti e precedenti)",
@@ -134,9 +136,8 @@ _CODICE_MENTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# --- graph_search relation_types guard --------------------------------------
+# --- graph_search relation_types: shaped here, whitelisted by the tool -----------
 _MAX_RELATION_TYPES = 30
-_SAFE_REL_TOKEN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _normalize_article(raw: Any) -> Any:
@@ -395,14 +396,14 @@ class ReActMixin:
     def _repair_graph_tool_params(
         self, tool_name: str, params: Dict[str, Any], context: Any
     ) -> Dict[str, Any]:
-        """W1.5 — guard the ``relation_types`` arg of ``graph_search``.
+        """W1.5 — shape the ``relation_types`` arg of ``graph_search``.
 
         The LLM sometimes hallucinates a huge (300+) relation-type list, sometimes
-        with a corrupted char, which the tool interpolates into a Cypher pattern →
-        "Invalid input". When the list is absurdly long, non-list, or holds a
-        non-identifier token, DROP the key (not ``[]``) so the traversal runs over
-        ALL relations (valid Cypher). A single string is coerced to a list. A
-        well-formed list (all safe tokens, ≤ cap) is passed through unchanged.
+        with a corrupted char. A single string becomes a list of one and a list is
+        cut to ``_MAX_RELATION_TYPES``; nothing is dropped. The tool keeps the names
+        of the graph and drops the rest (``schema.cypher_rel_names``), and a filter
+        that comes out empty answers empty: dropping the key here would run the
+        traversal over ALL relations on one malformed token, the opposite.
         Best-effort: any error returns the params unchanged.
         """
         try:
@@ -418,20 +419,15 @@ class ReActMixin:
             rt = params.get("relation_types")
             if rt is None:
                 return params
-            if isinstance(rt, str):
-                rt = [rt]
-            bad = (
-                not isinstance(rt, list)
-                or len(rt) > _MAX_RELATION_TYPES
-                or any((not isinstance(x, str)) or not _SAFE_REL_TOKEN_RE.match(x) for x in rt)
-            )
-            repaired = dict(params)
-            if bad:
-                repaired.pop("relation_types", None)
-                log.debug("react.dropped_relation_types", tool=tool_name,
-                          count=(len(rt) if isinstance(rt, list) else "n/a"))
+            if isinstance(rt, (list, tuple, set, frozenset)):
+                rt = list(rt)
             else:
-                repaired["relation_types"] = rt
+                rt = [rt]  # a lone string is one name; any other value is one item the tool drops
+            if len(rt) > _MAX_RELATION_TYPES:
+                log.debug("react.cut_relation_types", tool=tool_name, count=len(rt))
+                rt = rt[:_MAX_RELATION_TYPES]
+            repaired = dict(params)
+            repaired["relation_types"] = rt
             return repaired
         except Exception as e:  # noqa: BLE001 - best-effort, never break the call
             log.debug("react.repair_graph_params_failed", tool=tool_name, error=str(e))
@@ -875,7 +871,7 @@ class ReActMixin:
 
     def _format_query_references(self, context: Any) -> str:
         """W2.2: render the analyzer-parsed query references — the human form AND
-        the real graph key (``!vig=`` stripped) — so the LLM passes THESE
+        the real graph key (version marker stripped) — so the LLM passes THESE
         authoritative identifiers to the tools instead of inventing urns."""
         try:
             refs = [
@@ -890,7 +886,7 @@ class ReActMixin:
                 if not disp:
                     continue
                 urn = r.get("urn")
-                key = str(urn).split("!", 1)[0] if urn else None
+                key = canonical_urn(str(urn)) if urn else None
                 lines.append(f"  - {disp}" + (f"   [chiave-grafo: {key}]" if key else ""))
             return "\n".join(lines)
         except Exception:  # noqa: BLE001 - prompt helper, never raise
@@ -912,18 +908,18 @@ class ReActMixin:
         )
 
         # URNs already collected — feed these to URN-keyed tools (graph_search,
-        # citation_chain, giurisprudenza_su_norma, ...) instead of re-searching.
+        # giurisprudenza_su_norma, ...) instead of re-searching.
         urns: List[str] = []
         for s in current_sources:
             # Prefer the real graph node key (urn / metadata.article_urn) over the
-            # chunk_id, and strip the NIR version marker (!vig=) so it matches the
-            # seed keys (the graph is seeded without the marker). Same rule as the
+            # chunk_id, and strip the NIR version marker (!vig=, @originale) so it matches
+            # the seed keys (the graph is seeded without the marker). Same rule as the
             # Slice-B served-URN capture. Guard metadata type — this builder is NOT
             # wrapped in try/except, so a non-dict metadata must not raise.
             md = s.get("metadata")
             u = s.get("urn") or (md.get("article_urn") if isinstance(md, dict) else None) or s.get("chunk_id")
             if u:
-                u = str(u).split("!", 1)[0]
+                u = canonical_urn(str(u))
                 if u and u not in urns:
                     urns.append(u)
         semantic_uses = sum(
@@ -963,7 +959,7 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
         if urns:
             prompt += (
                 "\nURN disponibili (passali agli strumenti che richiedono un URN, "
-                "es. graph_search / citation_chain / giurisprudenza_su_norma):\n  "
+                "es. graph_search / giurisprudenza_su_norma):\n  "
                 + ", ".join(urns[:10]) + "\n"
             )
 
@@ -1005,7 +1001,7 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
 ## REGOLE FORMATO IDENTIFICATORI (rispettale per non far fallire lo strumento)
 - Strumenti su riferimento testuale (cite_law, cerca_brocardi): passa la forma UMANA "art. N <atto>" (es. "art. 2043 codice civile"). NON passare un URL o un urn.
 - Per il TESTO di un articolo usa `fetch_law_article` (act_type + article): gestisce sia i codici sia le leggi/decreti NUMERATI (es. legge 241/1990, D.Lgs. 231/2001). `cite_law` risolve bene solo i codici e i testi unici noti — sugli atti numerati fallisce, quindi NON usarlo per leggi/decreti con un numero.
-- Strumenti sul grafo/nodo (graph_search, constitutional_basis, citation_chain): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
+- Strumenti sul grafo/nodo (graph_search): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
 - Usa SOLO gli identificatori elencati nei RIFERIMENTI/URN qui sopra. (semantic_search, definition_lookup e principle_lookup accettano invece testo libero.)
 - graph_search.relation_types: ometti (esplora tutte le relazioni) oppure indica al massimo 2-3 tipi.
 - `cerca_brocardi` funziona SOLO sugli articoli dei CODICI (es. "art. 2043 codice civile"); su leggi/decreti numerati o alias (es. "Statuto dei lavoratori", "GDPR") dà "atto non riconosciuto". Per quelle norme usa `fetch_law_article` per il testo, NON cerca_brocardi.
@@ -1076,7 +1072,7 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
                 props = node.get("properties", {})
                 sources.append({
                     "urn": node.get("urn", props.get("URN", "")),
-                    "text": props.get("testo_vigente", props.get("testo", "")),
+                    "text": node_text(props),
                     "type": node.get("type", ""),
                     "source": "graph_search"
                 })

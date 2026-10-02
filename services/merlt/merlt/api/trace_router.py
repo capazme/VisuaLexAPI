@@ -136,7 +136,7 @@ async def get_trace_service() -> TraceStorageService:
     """
     global _trace_service
     if _trace_service is None:
-        _trace_service = TraceStorageService(TraceStorageConfig())
+        _trace_service = TraceStorageService(TraceStorageConfig.from_rlcf_env())
         await _trace_service.connect()
     return _trace_service
 
@@ -149,7 +149,7 @@ async def get_bridge_table() -> BridgeTable:
     """
     global _bridge_table
     if _bridge_table is None:
-        _bridge_table = BridgeTable(BridgeTableConfig())
+        _bridge_table = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await _bridge_table.connect()
     return _bridge_table
 

@@ -19,12 +19,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from merlt.api.enrichment_router import (
+    RelationWriteOutcome,
     _write_deferred_relations_for_entity,
     _write_relation_to_graph,
     get_pending,
@@ -94,15 +96,16 @@ async def db():
 
 
 async def _relation(factory, created, source: str, target: str, *, status: str = "approved",
-                    article_urn: str = "user_document", marker: Optional[str] = None) -> str:
-    rid = f"PRESUPPONE:zz{uuid.uuid4().hex[:10]}"
+                    article_urn: str = "user_document", marker: Optional[str] = None,
+                    relation_type: str = "PRESUPPONE") -> str:
+    rid = f"{relation_type}:zz{uuid.uuid4().hex[:10]}"
     async with factory() as session:
         session.add(
             PendingRelation(
                 relation_id=rid,
                 article_urn=article_urn,
                 source_type="manual",
-                relation_type="PRESUPPONE",
+                relation_type=relation_type,
                 source_node_urn=source,
                 target_entity_id=target,
                 relation_description=f"evidenza {marker or ''}",
@@ -190,13 +193,19 @@ async def test_urn_source_and_graph_entity_target_are_written(db):
 
     assert outcome.written is True
     [(cypher, params)] = graph.writes
-    # The NIR URN escape hatch: a missing norm is MERGEd as a stub, keyed
-    # without the version marker; the target is MATCHed, never created.
+    # The NIR URN escape hatch: a missing norm is MERGEd as a stub, keyed by its
+    # full Normattiva URL (the way the graph keys every norm) without the version
+    # marker; the target is MATCHed, never created.
     assert "MERGE (source:Norma {URN: $source_key})" in cypher
     assert "MATCH (target:Entity {id: $target_key})" in cypher
-    assert params["source_key"] == urn
+    assert params["source_key"] == NORMATTIVA_URL_PREFIX + urn
     assert params["target_key"] == "concetto:risoluzione_del_contratto"
-    assert params["source_numero_articolo"] == "3"
+    assert params["source_stub"]["numero_articolo"] == "3"
+    # The stub is the schema's one shape, set only when the Norma is created.
+    assert "ON CREATE SET source += $source_stub, source.created_at = $timestamp" in cypher
+    assert params["source_stub"]["is_stub"] is True
+    assert params["source_stub"]["URN"] == params["source_stub"]["node_id"] == NORMATTIVA_URL_PREFIX + urn
+    assert "target_stub" not in params
     async with factory() as session:
         assert (await _load(session, rid)).written_to_graph_at is not None
 
@@ -256,6 +265,137 @@ async def test_invalid_relation_type_is_refused(db):
         outcome = await _write_relation_to_graph(relation, session, _FakeGraph(entities={"concetto:a", "concetto:b"}))
     assert outcome.written is False
     assert "invalid relation type" in outcome.reason
+
+
+async def test_a_cita_relation_is_written_as_rinvia(db):
+    """The community says CITA; the graph's name for a reference is RINVIA."""
+    factory, created = db
+    rid = await _relation(factory, created, "concetto:a", "concetto:b", relation_type="CITA")
+    graph = _FakeGraph(entities={"concetto:a", "concetto:b"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is True
+    [(cypher, _)] = graph.writes
+    assert "-[r:RINVIA]->" in cypher
+    assert "r:CITA" not in cypher
+    assert "r.fonte = 'community'" in cypher and "community_validation" not in cypher
+    async with factory() as session:
+        row = await _load(session, rid)
+        assert row.written_to_graph_at is not None
+        assert row.relation_type == "CITA"  # the staging row keeps the community's own word
+
+
+async def test_a_name_the_graph_does_not_have_is_refused_before_any_graph_access(db):
+    factory, created = db
+    rid = await _relation(factory, created, "concetto:a", "concetto:b", relation_type="TOTALMENTE_INVENTATA")
+    graph = _FakeGraph(entities={"concetto:a", "concetto:b"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is False and outcome.deferred is False
+    assert "invalid relation type 'TOTALMENTE_INVENTATA'" in outcome.reason
+    assert graph.queries == [], "a refused type must not even look the endpoints up"
+    async with factory() as session:
+        assert (await _load(session, rid)).written_to_graph_at is None
+
+
+async def test_parte_di_is_written_as_the_reversed_contiene(db):
+    """PARTE_DI is the inverse of CONTIENE. "The article is part of the act" is
+    written as the act CONTAINS the article: the endpoints swap, the type is CONTIENE."""
+    factory, created = db
+    marker = uuid.uuid4().hex[:8]
+    act = NORMATTIVA_URL_PREFIX + f"urn:nir:stato:legge:2020-01-01;{marker}"
+    article = f"urn:nir:stato:legge:2020-01-01;{marker}~art3"
+    rid = await _relation(factory, created, article, act, relation_type="PARTE_DI")
+    graph = _FakeGraph(normas={act})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is True
+    [(cypher, params)] = graph.writes
+    assert "MERGE (source)-[r:CONTIENE]->(target)" in cypher and "PARTE_DI" not in cypher
+    # The act, which exists, is the container and is only matched; the article, which
+    # does not, is the part and is MERGEd as a stub keyed by its URL.
+    assert "MATCH (source:Norma {URN: $source_key})" in cypher
+    assert "MERGE (target:Norma {URN: $target_key})" in cypher
+    assert params["source_key"] == act
+    assert params["target_key"] == NORMATTIVA_URL_PREFIX + article
+    assert params["target_stub"]["numero_articolo"] == "3"
+    assert "source_stub" not in params
+    async with factory() as session:
+        row = await _load(session, rid)
+        assert row.written_to_graph_at is not None
+        assert row.relation_type == "PARTE_DI"  # the staging row keeps the community's own word
+
+
+async def test_an_unresolved_parte_di_endpoint_is_reported_in_the_direction_it_was_stated(db):
+    factory, created = db
+    marker = uuid.uuid4().hex[:8]
+    act = NORMATTIVA_URL_PREFIX + f"urn:nir:stato:legge:2020-01-01;{marker}"
+    # a norm reference the graph has not and cannot stub (it is not a NIR URN)
+    rid = await _relation(factory, created, act, f"urn:lex:it:stato:legge:2021-01-01;{marker}", relation_type="PARTE_DI")
+    graph = _FakeGraph(normas={act})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is False
+    assert outcome.reason.startswith("target:"), outcome.reason
+    assert graph.writes == []
+
+
+@pytest.mark.parametrize("source, target", [
+    ("concetto:a", "concetto:b"),  # two entities
+    ("urn:nir:stato:legge:2020-01-01;1~art3", "concetto:b"),  # a norm part of an entity
+    ("concetto:a", "urn:nir:stato:legge:2020-01-01;1"),  # an entity part of a norm
+    ("Una cosa qualunque", "Un'altra cosa"),  # two names no endpoint resolves
+])
+async def test_a_parte_di_that_is_not_between_two_norms_is_refused_and_never_written(db, source, target):
+    """CONTIENE links norms (an act, an article, a comma). Reversing a PARTE_DI between concepts
+    would write `(B)-[:CONTIENE]->(A)` between two Entity nodes: an edge the graph never holds."""
+    factory, created = db
+    rid = await _relation(factory, created, source, target, relation_type="PARTE_DI")
+    graph = _FakeGraph(entities={"concetto:a", "concetto:b"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is False
+    assert outcome.deferred is False  # no entity written later makes it writable
+    assert "PARTE_DI" in outcome.reason and "norms" in outcome.reason
+    assert "yet" not in outcome.reason
+    assert graph.queries == [], "refused before any graph access, as a name the graph does not have is"
+    async with factory() as session:
+        assert (await _load(session, rid)).written_to_graph_at is None
+
+
+def test_the_vote_reply_says_yet_only_of_a_relation_that_can_still_be_written():
+    from merlt.api.enrichment_router import _not_written_message
+
+    waiting = RelationWriteOutcome(written=False, reason="pending entity 'x' is not in the graph yet", deferred=True)
+    refused = RelationWriteOutcome(written=False, reason="PARTE_DI is the inverse of CONTIENE")
+    assert _not_written_message(waiting) == " Not written to the graph yet: pending entity 'x' is not in the graph yet"
+    assert _not_written_message(refused) == " Not written to the graph: PARTE_DI is the inverse of CONTIENE"
+
+
+async def test_a_wrapped_urn_endpoint_is_not_wrapped_twice(db):
+    factory, created = db
+    marker = uuid.uuid4().hex[:8]
+    url = NORMATTIVA_URL_PREFIX + f"urn:nir:stato:legge:2020-01-01;{marker}~art5"
+    rid = await _relation(factory, created, url + "!vig=2020-01-01", "concetto:a")
+    graph = _FakeGraph(entities={"concetto:a"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is True
+    [(_, params)] = graph.writes
+    assert params["source_key"] == url
+    assert params["source_stub"]["URN"] == url and params["source_stub"]["numero_articolo"] == "5"
 
 
 async def test_pending_entity_endpoint_is_deferred_then_written(db):

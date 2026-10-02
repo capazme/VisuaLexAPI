@@ -13,6 +13,7 @@ Features:
 """
 
 import json
+import os
 import structlog
 from typing import List, Optional, Dict, Any, Type
 from uuid import UUID
@@ -45,8 +46,34 @@ class BridgeTableConfig:
     table_name: str = "bridge_table"  # Nome tabella (bridge_table_test, bridge_table_prod)
 
     def get_connection_string(self) -> str:
-        """Get async PostgreSQL connection string."""
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        """Get async PostgreSQL connection string, the credentials escaped for a SQLAlchemy URL
+        (a password with `@`, `/`, `:`, `%` or `#` reads back as itself)."""
+        from sqlalchemy.engine import URL
+
+        return URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+            database=self.database,
+        ).render_as_string(hide_password=False)
+
+    @classmethod
+    def from_enrichment_env(cls) -> "BridgeTableConfig":
+        """The bridge table on the enrichment database, as the deployment names it
+        (`ENRICHMENT_DB_*`, see infra/compose.yml): where the API reaches it from.
+
+        The dataclass defaults name a development container (localhost:5433/rlcf_dev)
+        that does not exist inside the compose network, so a bridge built from them
+        never connects there."""
+        return cls(
+            host=os.getenv("ENRICHMENT_DB_HOST", "localhost"),
+            port=int(os.getenv("ENRICHMENT_DB_PORT", "5432")),
+            database=os.getenv("ENRICHMENT_DB_NAME", "merlt"),
+            user=os.getenv("ENRICHMENT_DB_USER", "merlt"),
+            password=os.getenv("ENRICHMENT_DB_PASSWORD", "merlt"),
+        )
 
     @classmethod
     def from_environment(cls, env_config: "EnvironmentConfig") -> "BridgeTableConfig":

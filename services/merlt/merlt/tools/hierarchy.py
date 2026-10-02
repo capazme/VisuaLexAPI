@@ -8,8 +8,7 @@ Struttura gerarchica tipica:
     Codice → Libro → Titolo → Capo → Sezione → Articolo
 
 Relazioni:
-    - CONTIENE: genitore → figlio
-    - CONTENUTO_IN: figlio → genitore (inversa)
+    - CONTIENE: genitore → figlio (la risalita la percorre a ritroso)
     - PRECEDE/SEGUE: ordine sequenziale
 
 Esempio:
@@ -28,9 +27,36 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import canonical_urn, node_type_cypher
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
+
+# The deepest hierarchy walk: a code has about nine levels (codice, libro, titolo,
+# capo, sezione, articolo, comma, lettera, numero). The depth is interpolated into
+# the Cypher (`*1..N`), so it is always a clamped integer.
+MAX_DEPTH = 10
+
+# The most nodes the descendants or the siblings of a node return; interpolated into the
+# Cypher (`LIMIT N`), so always a clamped integer. The descendants of a code's root are
+# about 2,800 rows once the graph is migrated, and every row goes to the LLM: the rows are
+# ordered by depth, so the cut keeps the nearest levels.
+MAX_NODES = 50
+
+
+def _label(node: Dict[str, Any]) -> str:
+    """How a node reads in a path: its estremi, else its rubrica (an ingested titolo or
+    capo has a rubrica and no estremi), else its URN. The graph answers null for a
+    property a node lacks, so the key is present and `.get(key, default)` is not enough."""
+    return node.get("estremi") or node.get("rubrica") or node.get("urn") or "?"
+
+
+def _tipi(tipo_filter: Optional[List[str]]) -> List[str]:
+    """The `tipo` values a filter asks for, as the parameter list of the query: each
+    as given and in lower case (a partition's type is lower case)."""
+    values = [tipo_filter] if isinstance(tipo_filter, str) else list(tipo_filter or [])
+    asked = [v for v in values if isinstance(v, str)]
+    return list(dict.fromkeys(name for v in asked for name in (v, v.lower())))
 
 
 class NavigationDirection(str, Enum):
@@ -48,7 +74,7 @@ class HierarchyNode:
 
     Attributes:
         urn: URN del nodo
-        tipo: Tipo strutturale (Codice, Libro, Titolo, Capo, Sezione, Articolo)
+        tipo: Tipo strutturale (`tipo_documento` della Norma: codice, libro, titolo, capo, sezione, articolo)
         estremi: Riferimento completo (es. "Art. 1453 c.c.")
         rubrica: Titolo/rubrica del nodo
         depth: Profondità nella gerarchia (0 = radice)
@@ -168,8 +194,9 @@ class HierarchyNavigationTool(BaseTool):
                 name="tipo_filter",
                 param_type=ParameterType.ARRAY,
                 description=(
-                    "Filtra per tipo di nodo. "
-                    "Es: ['Articolo', 'Capo'] per solo questi livelli"
+                    "Filtra per tipo di nodo: libro, titolo, capo, sezione, articolo "
+                    "(le partizioni sono Norma e si distinguono per questo tipo). "
+                    "Es: ['capo', 'articolo'] per solo questi livelli"
                 ),
                 required=False
             )
@@ -206,6 +233,11 @@ class HierarchyNavigationTool(BaseTool):
                 error="FalkorDB client non configurato",
                 tool_name=self.name
             )
+
+        try:
+            max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
 
         try:
             # Find the starting node
@@ -290,7 +322,8 @@ class HierarchyNavigationTool(BaseTool):
         - Estremi (es. "Art. 1453 c.c.")
         - Numero articolo (es. "1453")
         """
-        cypher = """
+        identifier = canonical_urn(identifier)  # the graph's key has no version marker
+        cypher = f"""
             MATCH (n)
             WHERE n.URN = $id
                OR n.estremi = $id
@@ -298,7 +331,7 @@ class HierarchyNavigationTool(BaseTool):
                OR n.nome = $id
             RETURN
                 n.URN AS urn,
-                labels(n)[0] AS tipo,
+                coalesce(n.tipo_documento, {node_type_cypher('n')}) AS tipo,
                 n.estremi AS estremi,
                 n.rubrica AS rubrica,
                 n.numero_articolo AS numero
@@ -306,7 +339,7 @@ class HierarchyNavigationTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"id": identifier})
+            results = await self.graph_db.ro_query(cypher, {"id": identifier})
             if results:
                 return {
                     "urn": results[0].get("urn", ""),
@@ -330,20 +363,22 @@ class HierarchyNavigationTool(BaseTool):
         """
         Risale la gerarchia verso la radice.
 
-        Relazioni seguite: CONTENUTO_IN (child → parent)
+        Relazioni seguite: CONTIENE, a ritroso (child → parent)
         """
-        text_field = ", n.testo_vigente AS testo" if include_text else ""
+        max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
+        text_field = ", coalesce(n.testo, n.testo_vigente) AS testo" if include_text else ""
+        params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_list = "', '".join(tipo_filter)
-            tipo_where = f"AND labels(n)[0] IN ['{tipo_list}']"
+            tipo_where = f"AND coalesce(n.tipo_documento, {node_type_cypher('n')}) IN $tipi"
+            params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
-            MATCH path = (start)-[:CONTENUTO_IN*1..{max_depth}]->(n)
+            MATCH path = (n)-[:CONTIENE*1..{max_depth}]->(start)
             WHERE start.URN = $urn {tipo_where}
             RETURN
                 n.URN AS urn,
-                labels(n)[0] AS tipo,
+                coalesce(n.tipo_documento, {node_type_cypher('n')}) AS tipo,
                 n.estremi AS estremi,
                 n.rubrica AS rubrica,
                 length(path) AS depth
@@ -352,7 +387,7 @@ class HierarchyNavigationTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, params)
             return [
                 {
                     "urn": r.get("urn", ""),
@@ -373,35 +408,41 @@ class HierarchyNavigationTool(BaseTool):
         urn: str,
         max_depth: int,
         include_text: bool,
-        tipo_filter: Optional[List[str]]
+        tipo_filter: Optional[List[str]],
+        limit: int = MAX_NODES
     ) -> List[Dict[str, Any]]:
         """
         Scende la gerarchia verso le foglie.
 
-        Relazioni seguite: CONTIENE (parent → child)
+        Relazioni seguite: CONTIENE (parent → child). At most `limit` nodes (clamped
+        to `MAX_NODES`), the nearest levels first.
         """
-        text_field = ", n.testo_vigente AS testo" if include_text else ""
+        max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
+        limit = bounded_int(limit, "limit", 1, MAX_NODES)
+        text_field = ", coalesce(n.testo, n.testo_vigente) AS testo" if include_text else ""
+        params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_list = "', '".join(tipo_filter)
-            tipo_where = f"AND labels(n)[0] IN ['{tipo_list}']"
+            tipo_where = f"AND coalesce(n.tipo_documento, {node_type_cypher('n')}) IN $tipi"
+            params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
             MATCH path = (start)-[:CONTIENE*1..{max_depth}]->(n)
             WHERE start.URN = $urn {tipo_where}
             RETURN
                 n.URN AS urn,
-                labels(n)[0] AS tipo,
+                coalesce(n.tipo_documento, {node_type_cypher('n')}) AS tipo,
                 n.estremi AS estremi,
                 n.rubrica AS rubrica,
                 n.numero_articolo AS order_num,
                 length(path) AS depth
                 {text_field}
             ORDER BY depth ASC, order_num ASC
+            LIMIT {limit}
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, params)
             return [
                 {
                     "urn": r.get("urn", ""),
@@ -422,32 +463,39 @@ class HierarchyNavigationTool(BaseTool):
         self,
         urn: str,
         include_text: bool,
-        tipo_filter: Optional[List[str]]
+        tipo_filter: Optional[List[str]],
+        limit: int = MAX_NODES
     ) -> List[Dict[str, Any]]:
         """
-        Trova i nodi fratelli (stesso genitore).
+        Trova i nodi fratelli (stesso genitore). At most `limit` (clamped to `MAX_NODES`).
         """
-        text_field = ", sibling.testo_vigente AS testo" if include_text else ""
+        limit = bounded_int(limit, "limit", 1, MAX_NODES)
+        text_field = ", coalesce(sibling.testo, sibling.testo_vigente) AS testo" if include_text else ""
+        params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_list = "', '".join(tipo_filter)
-            tipo_where = f"AND labels(sibling)[0] IN ['{tipo_list}']"
+            tipo_where = f"AND coalesce(sibling.tipo_documento, {node_type_cypher('sibling')}) IN $tipi"
+            params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
-            MATCH (start)-[:CONTENUTO_IN]->(parent)<-[:CONTENUTO_IN]-(sibling)
-            WHERE start.URN = $urn AND sibling.URN <> $urn {tipo_where}
+            MATCH (start)
+            WHERE start.URN = $urn
+            MATCH (parent)-[:CONTIENE]->(start)
+            MATCH (parent)-[:CONTIENE]->(sibling)
+            WHERE sibling.URN <> $urn {tipo_where}
             RETURN
                 sibling.URN AS urn,
-                labels(sibling)[0] AS tipo,
+                coalesce(sibling.tipo_documento, {node_type_cypher('sibling')}) AS tipo,
                 sibling.estremi AS estremi,
                 sibling.rubrica AS rubrica,
                 sibling.numero_articolo AS order_num
                 {text_field}
             ORDER BY order_num ASC
+            LIMIT {limit}
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, params)
             return [
                 {
                     "urn": r.get("urn", ""),
@@ -512,19 +560,19 @@ class HierarchyNavigationTool(BaseTool):
         if direction == "ancestors":
             # Reverse order for ancestor path (leaf to root)
             nodes = sorted(hierarchy, key=lambda x: x.get("depth", 0), reverse=True)
-            path_parts = [n.get("estremi", n.get("urn", "?")) for n in nodes]
+            path_parts = [_label(n) for n in nodes]
             return " → ".join(path_parts)
 
         elif direction == "descendants":
-            # Tree-like structure for descendants
-            nodes = sorted(hierarchy, key=lambda x: (x.get("depth", 0), x.get("order", 0)))
-            path_parts = [n.get("estremi", n.get("urn", "?")) for n in nodes[:10]]
+            # Tree-like structure for descendants (an article number is text, and may be null)
+            nodes = sorted(hierarchy, key=lambda x: (x.get("depth") or 0, str(x.get("order") or "")))
+            path_parts = [_label(n) for n in nodes[:10]]
             if len(hierarchy) > 10:
                 path_parts.append(f"... (+{len(hierarchy) - 10} altri)")
             return ", ".join(path_parts)
 
         elif direction == "siblings":
-            path_parts = [n.get("estremi", n.get("urn", "?")) for n in hierarchy[:10]]
+            path_parts = [_label(n) for n in hierarchy[:10]]
             if len(hierarchy) > 10:
                 path_parts.append(f"... (+{len(hierarchy) - 10} altri)")
             return " | ".join(path_parts)
@@ -536,13 +584,13 @@ class HierarchyNavigationTool(BaseTool):
 
             parts = []
             if ancestors:
-                path = " → ".join(n.get("estremi", "?") for n in sorted(ancestors, key=lambda x: x.get("depth", 0), reverse=True))
+                path = " → ".join(_label(n) for n in sorted(ancestors, key=lambda x: x.get("depth", 0), reverse=True))
                 parts.append(f"Percorso: {path}")
             if siblings:
-                sibs = ", ".join(n.get("estremi", "?") for n in siblings[:5])
+                sibs = ", ".join(_label(n) for n in siblings[:5])
                 parts.append(f"Fratelli: {sibs}")
             if descendants:
-                descs = ", ".join(n.get("estremi", "?") for n in descendants[:5])
+                descs = ", ".join(_label(n) for n in descendants[:5])
                 parts.append(f"Contenuti: {descs}")
 
             return " | ".join(parts)

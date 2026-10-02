@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 
+from merlt.storage.graph.schema import EXPERT_SOURCE_TYPES as _BY_EXPERT
 from merlt.storage.vectors.collection import default_chunks_collection as _default_collection
 
 
@@ -130,8 +131,11 @@ def _load_expert_weights() -> Dict[str, Dict[str, float]]:
             config = yaml.safe_load(f)
             return config.get("expert_traversal_weights", _get_default_weights())
     except FileNotFoundError:
+        # Expected: this YAML is not in the repository (nor in any deployment), so the
+        # defaults below are the normal case. Not a warning: it would print on every
+        # interpreter start.
         import structlog
-        structlog.get_logger().warning(f"Config file not found: {config_path}, using default weights")
+        structlog.get_logger().debug(f"Config file not found: {config_path}, using default weights")
         return _get_default_weights()
     except Exception as e:
         import structlog
@@ -144,6 +148,11 @@ def _get_default_weights() -> Dict[str, Dict[str, float]]:
     Default expert traversal weights (fallback).
 
     These are used if the config file cannot be loaded.
+
+    The keys are the schema's relations in lower case (`_compute_static_relation_bonus`
+    lower-cases an edge's type to look it up). Weights a canon once gave to names the
+    schema does not have (gerarchia_kelseniana, relazione_concettuale, conferma,
+    overrules, distinguishes) never matched an edge and are gone.
     """
     return {
         "LiteralExpert": {
@@ -156,30 +165,24 @@ def _get_default_weights() -> Dict[str, Dict[str, float]]:
             "default": 0.50
         },
         "SystemicExpert": {
-            "gerarchia_kelseniana": 1.0,
-            "attuazione": 0.95,
+            "attua": 0.95,
             "modifica": 0.90,
-            "deroga": 0.90,
+            "deroga_a": 0.90,
             "disciplina": 0.85,
             "contiene": 0.85,
             "default": 0.50
         },
         "PrinciplesExpert": {
-            "relazione_concettuale": 1.0,
-            "attuazione": 0.95,
-            "deroga": 0.95,
-            "bilancia": 0.95,
+            "attua": 0.95,
+            "deroga_a": 0.95,
+            "bilancia_con": 0.95,
             "disciplina": 0.90,
-            "gerarchia_kelseniana": 0.90,
             "default": 0.50
         },
         "PrecedentExpert": {
             "interpreta": 1.0,
-            "applica": 1.0,
-            "conferma": 0.95,
-            "overrules": 0.95,
-            "distinguishes": 0.90,
-            "cita": 0.85,
+            "applica_a": 1.0,
+            "rinvia": 0.85,
             "default": 0.50
         }
     }
@@ -189,24 +192,11 @@ def _get_default_weights() -> Dict[str, Dict[str, float]]:
 EXPERT_TRAVERSAL_WEIGHTS = _load_expert_weights()
 
 
-# Expert-specific source type filters (Art. 12 Preleggi alignment)
-# Ogni Expert cerca SOLO i tipi di fonte rilevanti per il suo canone ermeneutico
+# Each expert searches only the chunks of its canon (art. 12 preleggi). The
+# schema holds the one list; here it is keyed by both the short and the class name.
 EXPERT_SOURCE_TYPES: Dict[str, List[str]] = {
-    # LiteralExpert: "Significato proprio delle parole" - solo norme
-    "LiteralExpert": ["norma"],
-    "literal": ["norma"],
-
-    # SystemicExpert: "Connessione tra norme" - norme + context sistematico
-    "SystemicExpert": ["norma"],
-    "systemic": ["norma"],
-
-    # PrinciplesExpert: "Principi generali" - ratio legis + dottrina
-    "PrinciplesExpert": ["ratio", "spiegazione"],
-    "principles": ["ratio", "spiegazione"],
-
-    # PrecedentExpert: "Diritto vivente" - massime giurisprudenziali
-    "PrecedentExpert": ["massima"],
-    "precedent": ["massima"],
+    **_BY_EXPERT,
+    **{f"{name.capitalize()}Expert": types for name, types in _BY_EXPERT.items()},
 }
 
 
@@ -218,6 +208,6 @@ def get_source_types_for_expert(expert_type: str) -> List[str]:
         expert_type: Nome dell'expert (es: "LiteralExpert", "literal")
 
     Returns:
-        Lista di source_types (es: ["norma"], ["massima"])
+        Lista di source_types (es: ["norma", "comma"], ["massima"])
     """
     return EXPERT_SOURCE_TYPES.get(expert_type, [])

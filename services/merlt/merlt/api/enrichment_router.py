@@ -99,8 +99,9 @@ from merlt.storage.graph.relation_endpoints import (
     is_norm_reference,
     looks_like_entity_id,
     norm_key_candidates,
+    wrapped_norm_key,
 )
-from merlt.utils.urn_labels import derive_article_fields_from_urn
+from merlt.storage.graph.schema import canonical_urn, community_rel_to_graph, node_type_cypher, stub_properties
 from merlt.rlcf.domain_authority import (
     get_user_authority_for_vote,
     recalculate_authorities_after_consensus,
@@ -1610,9 +1611,7 @@ def _relation_write_cypher(rel_type: str, source: _GraphEndpoint, target: _Graph
                 clauses.append("WITH " + ", ".join(bound))
             clauses.append(
                 "MERGE " + ep.pattern.format(var=var, param=f"{var}_key") + "\n"
-                f"ON CREATE SET {var}.created_at = $timestamp, "
-                f"{var}.numero_articolo = ${var}_numero_articolo, "
-                f"{var}.estremi = ${var}_estremi"
+                f"ON CREATE SET {var} += ${var}_stub, {var}.created_at = $timestamp"
             )
             bound.append(var)
     clauses.append("WITH source, target")
@@ -1620,7 +1619,7 @@ def _relation_write_cypher(rel_type: str, source: _GraphEndpoint, target: _Graph
         f"""MERGE (source)-[r:{rel_type}]->(target)
 ON CREATE SET
     r.certezza = $certezza,
-    r.fonte = 'community_validation',
+    r.fonte = 'community',
     r.evidence = $evidence,
     r.community_validated = true,
     r.approval_score = $approval_score,
@@ -1647,7 +1646,11 @@ async def _write_relation_to_graph(
     is a pending entity (or the forward id of one) is retried by
     `_write_deferred_relations_for_entity` once that entity is written.
     `article_urn` stands in for an empty source, never the `user_document`
-    placeholder.
+    placeholder. The community's relation type is written under the graph's
+    name (`community_rel_to_graph`): CITA arrives as RINVIA, and PARTE_DI, the
+    inverse of CONTIENE, as the reversed CONTIENE (the endpoints swap): the
+    graph holds the one direction. That holds between two norms only: a PARTE_DI
+    between anything else is refused for good (not deferred).
     """
     log.info(
         "Writing approved relation to graph",
@@ -1659,6 +1662,41 @@ async def _write_relation_to_graph(
     if not _RELATION_TYPE_RE.match(rel_type):
         log.error(
             "Relation not written to graph: invalid relation type",
+            relation_id=relation.relation_id,
+            relation_type=rel_type,
+        )
+        return RelationWriteOutcome(written=False, reason=f"invalid relation type {rel_type!r}")
+
+    # PARTE_DI is the inverse of CONTIENE and the graph holds the one direction:
+    # "A is part of B" is written as B CONTIENE A, so the endpoints swap below. CONTIENE
+    # links norms (an act, an article, a comma): reversed between concepts it would write
+    # an edge between two Entity nodes that the graph never holds. Only a PARTE_DI between
+    # two norms is written; any other is refused, before any graph access, and no entity
+    # that is written later makes it writable, so it is not deferred.
+    reverse = rel_type == "PARTE_DI"
+    if reverse:
+        if not (
+            is_norm_reference(relation.source_node_urn or relation.article_urn)
+            and is_norm_reference(relation.target_entity_id)
+        ):
+            reason = (
+                "PARTE_DI is the inverse of CONTIENE, which links norms only: "
+                "it is never written between anything else"
+            )
+            log.warning(
+                "Relation not written to graph: PARTE_DI is only written between norms",
+                relation_id=relation.relation_id,
+                source=relation.source_node_urn or relation.article_urn,
+                target=relation.target_entity_id,
+            )
+            return RelationWriteOutcome(written=False, reason=reason)
+        rel_type = "CONTIENE"
+
+    try:
+        rel_type = community_rel_to_graph(rel_type).value
+    except ValueError:
+        log.error(
+            "Relation not written to graph: not a graph relation",
             relation_id=relation.relation_id,
             relation_type=rel_type,
         )
@@ -1689,6 +1727,9 @@ async def _write_relation_to_graph(
             )
             return RelationWriteOutcome(written=False, reason=reason, deferred=deferred)
 
+        if reverse:
+            source, target = target, source
+
         timestamp = datetime.now(timezone.utc).isoformat()
         params: Dict[str, Any] = {
             "source_key": source.key,
@@ -1702,9 +1743,11 @@ async def _write_relation_to_graph(
         }
         for var, ep in (("source", source), ("target", target)):
             if ep.create_norma:
-                numero_articolo, estremi = derive_article_fields_from_urn(ep.key)
-                params[f"{var}_numero_articolo"] = numero_articolo
-                params[f"{var}_estremi"] = estremi
+                # The graph keys a norm by its full Normattiva URL: the stub of a bare
+                # `urn:nir:` endpoint is keyed, and built, from the wrapped form.
+                key = canonical_urn(wrapped_norm_key(ep.key))
+                params[f"{var}_key"] = key
+                params[f"{var}_stub"] = stub_properties(key)
 
         result = await falkordb.query(_relation_write_cypher(rel_type, source, target), params)
 
@@ -1741,6 +1784,12 @@ async def _write_relation_to_graph(
     finally:
         if own_client:
             await falkordb.close()
+
+
+def _not_written_message(outcome: RelationWriteOutcome) -> str:
+    """What the vote reply says of a relation that did not reach the graph: "yet" only
+    when it still can (an endpoint that is a pending entity), never for a refusal."""
+    return f" Not written to the graph{' yet' if outcome.deferred else ''}: {outcome.reason}"
 
 
 async def _write_deferred_relations_for_entity(
@@ -2448,7 +2497,7 @@ CONFIRM_SOURCE_EXCERPT_CHARS = 280
 # pending_entities.article_urn is NOT NULL. A ruling or a commentary is not
 # bound to one norm, so the entity takes the placeholder the graph writer keeps
 # off the graph (entity_writer.PLACEHOLDER_ARTICLE_URNS): it is written
-# stand-alone, and its provenance is the CITA edge to the LiveSource node.
+# stand-alone, and its provenance is the DERIVA_DA edge to the LiveSource node.
 NO_NORM_ARTICLE_URN = "user_document"
 
 # provisional_writer's domain label → entity type of the proposal.
@@ -2467,7 +2516,7 @@ _NORM_ARTICLE_RE = re.compile(r"urn:nir:\S*~art\w", re.IGNORECASE)
 _LOAD_LIVE_SOURCE_CYPHER = f"""
 MATCH (n:{PROVISIONAL_LABEL} {{node_id: $node_id}})
 RETURN n.node_id AS node_id, labels(n) AS labels, n.source_url AS source_url,
-       n.text AS text, n.provenance AS provenance, n.trust AS trust,
+       coalesce(n.testo, n.text) AS text, n.provenance AS provenance, n.trust AS trust,
        n.pending_entity_id AS pending_entity_id
 LIMIT 1
 """
@@ -2605,7 +2654,7 @@ async def confirm_source(
       (quality gate + duplicate check). Its description is a capped excerpt
       plus the source URL, never the full verbatim. The LiveSource node gets
       ``pending_entity_id`` (so the approved entity links back to it with a
-      CITA edge), the user in ``confirmed_by`` and a trust bump; its
+      DERIVA_DA edge), the user in ``confirmed_by`` and a trust bump; its
       provenance stays ``live_unconfirmed`` until community consensus:
       ``promoted_as='pending_entity'``.
 
@@ -2615,7 +2664,7 @@ async def confirm_source(
     node_id = (request.node_id or "").strip()
     if not node_id.startswith("live:"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=422,
             detail="node_id must be a provisional live source id (live:...)",
         )
 
@@ -2639,8 +2688,8 @@ async def confirm_source(
                 detail=f"Fonte provvisoria {node_id} non trovata: potrebbe essere stata rimossa o gia' consolidata",
             )
         node = rows[0]
-        # Graph key form: strip only the NIR version/annex marker (the `!vig=`
-        # trap), keep the URL wrapper.
+        # Graph key form: cut only the NIR version marker (the `!vig=` trap), keep
+        # the URL wrapper and the `:N` annex.
         source_url = _canonical_url((node.get("source_url") or "").strip())
 
         # (c) A Normattiva article enters the graph through the ingestion.
@@ -2682,7 +2731,7 @@ async def confirm_source(
         entity_text = _clean_text(request.entity_text) or _label_from_live_text(node.get("text"))
         if not entity_text:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=422,
                 detail="entity_text mancante e non ricavabile dalla fonte",
             )
         tipo = _confirm_entity_type(request.entity_type, node.get("labels"))
@@ -2710,7 +2759,7 @@ async def confirm_source(
             )
             if not (result.duplicate_action_required and exact is not None):
                 # Quality gate: the name looks like an identifier, not a source.
-                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=result.message)
+                raise HTTPException(status_code=422, detail=result.message)
             # The same source is already a proposal: link the node to it
             # instead of asking the user to create a twin.
             entity_id = exact.entity_id
@@ -2872,7 +2921,7 @@ async def validate_relation(
                 # Then write to FalkorDB (only between existing nodes, B1)
                 outcome = await _write_relation_to_graph(relation, session)
                 if not outcome.written:
-                    merge_message += f" Not written to the graph yet: {outcome.reason}"
+                    merge_message += _not_written_message(outcome)
 
             except Exception as e:
                 log.error(f"Failed to process relation consensus: {e}", exc_info=True)
@@ -3175,11 +3224,11 @@ async def report_issue(
                 else:
                     # Query per trovare il nodo nel grafo (entita' gia' approvate)
                     # In FalkorDB la proprieta' identificativa e' "node_id"
-                    cypher = """
+                    cypher = f"""
                         MATCH (n)
                         WHERE n.node_id = $entity_id
                         RETURN n.node_id as entity_id,
-                               labels(n)[0] as entity_type,
+                               {node_type_cypher('n')} as entity_type,
                                n.domain as domain,
                                n.ambito as ambito
                         LIMIT 1
@@ -3351,11 +3400,11 @@ async def vote_issue(
             graph_client = FalkorDBClient()
             await graph_client.connect()
 
-            cypher = """
+            cypher = f"""
                 MATCH (n)
                 WHERE n.node_id = $entity_id
                 RETURN n.node_id as entity_id,
-                       labels(n)[0] as entity_type,
+                       {node_type_cypher('n')} as entity_type,
                        n.domain as domain,
                        n.ambito as ambito,
                        n.nome as nome,
@@ -3667,11 +3716,11 @@ async def fetch_entity_details_from_graph(
     """
     try:
         # Prima prova come nodo
-        node_query = """
+        node_query = f"""
             MATCH (n)
             WHERE n.node_id = $entity_id
             RETURN
-                labels(n)[0] as node_type,
+                {node_type_cypher('n')} as node_type,
                 n.nome as nome,
                 n.label as label,
                 n.node_id as node_id,
@@ -3710,10 +3759,13 @@ async def fetch_entity_details_from_graph(
         # Se non trovato come nodo, prova come relazione
         # Il formato e': "rel_{source_id}_{rel_type}_{target_id}"
         if entity_id.startswith("rel_"):
-            # Tutti i 65 tipi di relazione del Knowledge Graph (da RelationType enum)
-            # Ordinati per lunghezza decrescente per matchare prima i più specifici
+            # Every relation type of the knowledge graph (the RelationType enum), plus
+            # the names the graph writes in place of the community's (RINVIA,
+            # DERIVA_DA). CITA stays: a proposal's id still carries the community's
+            # name, which the graph writes as RINVIA. Longest first, so the more
+            # specific name matches first.
             known_rel_types = [
-                # Relazioni lunghe (evita match parziali)
+                # Long names (avoid partial matches)
                 "ABROGA_PARZIALMENTE", "ABROGA_TOTALMENTE",
                 "VERSIONE_PRECEDENTE", "VERSIONE_SUCCESSIVA",
                 "HA_COMPETENZA_SU", "GERARCHICAMENTE_SUPERIORE",
@@ -3727,19 +3779,19 @@ async def fetch_entity_details_from_graph(
                 "INCOMPATIBILE_CON", "COMPATIBILE_CON",
                 "BILANCIA_CON", "CONFORMA_A", "CONFORME_A",
                 "CLASSIFICA_IN", "TITOLARE_DI", "RIVESTE_RUOLO",
-                # Relazioni medie
-                "DIPENDE_DA", "PRESUPPONE", "HA_VERSIONE",
+                # Medium names
+                "DIPENDE_DA", "DERIVA_DA", "PRESUPPONE", "HA_VERSIONE",
                 "SOSTITUISCE", "INSERISCE", "SOSPENDE", "PROROGA",
                 "DEROGA_A", "CONSOLIDA", "DISCIPLINA", "APPLICA_A",
                 "DEFINISCE", "PREVEDE", "EMESSO_DA", "RIGUARDA",
                 "IMPLICA", "CONTRADICE", "GIUSTIFICA", "LIMITA",
                 "TUTELA", "VIOLA", "SPECIFICA", "ESEMPLIFICA",
                 "ESTINGUE", "CONFERISCE", "CORRELATO",
-                # Relazioni corte
+                # Short names
                 "CONTIENE", "PARTE_DI", "INTEGRA", "SPECIES",
-                "CITA", "INTERPRETA", "COMMENTA", "ATTUA",
+                "CITA", "RINVIA", "INTERPRETA", "COMMENTA", "ATTUA",
                 "RECEPISCE", "FONTE", "IMPONE", "APPLICA",
-                # Lowercase variants (per compatibilità)
+                # Lowercase variants (for compatibility)
                 "interpreta", "cita", "applica", "disciplina",
                 "definisce", "abroga", "modifica", "deroga",
                 "rinvia", "sostituisce", "integra", "prevede",
@@ -3775,16 +3827,16 @@ async def fetch_entity_details_from_graph(
 
                 # Query per trovare i dettagli di source e target
                 # Prova sia con node_id che con url/urn
-                rel_query = """
+                rel_query = f"""
                     MATCH (s), (t)
                     WHERE (s.node_id = $source_id OR s.url = $source_id OR s.urn = $source_id)
                       AND (t.node_id = $target_id OR t.url = $target_id OR t.urn = $target_id)
                     RETURN
-                        labels(s)[0] as source_type,
+                        {node_type_cypher('s')} as source_type,
                         s.nome as source_nome,
                         s.label as source_label,
                         s.node_id as source_node_id,
-                        labels(t)[0] as target_type,
+                        {node_type_cypher('t')} as target_type,
                         t.nome as target_nome,
                         t.label as target_label,
                         t.node_id as target_node_id

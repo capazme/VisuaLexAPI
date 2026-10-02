@@ -38,10 +38,10 @@ task A.3):
     }
 
 URN canonicalization gotcha (preserved): the FalkorDB graph key is the FULL
-Normattiva URL form; only the NIR version/annex marker after the first ``!`` is
-stripped (see ``pipeline/ingestion.py::_canonical_urn``). The URL wrapper is
-NEVER stripped to the bare ``urn:nir:...`` form, or seeded nodes become
-unreachable and re-trigger the infinite lazy-ingest loop.
+Normattiva URL form; only the NIR version marker (``!vig=…``, ``@originale``) is
+stripped (``schema.canonical_urn``). The URL wrapper is NEVER stripped to the
+bare ``urn:nir:...`` form, or seeded nodes become unreachable and re-trigger the
+infinite lazy-ingest loop.
 
 Public API
 ----------
@@ -58,6 +58,8 @@ import structlog
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from merlt.storage.graph.schema import canonical_urn
+
 log = structlog.get_logger()
 
 # Provisional-node constants (B8: distinct, low-trust write path).
@@ -68,10 +70,6 @@ PROVISIONAL_LABEL = "LiveSource"
 # Deterministic namespace for Qdrant point ids (so a re-run upserts the SAME
 # point instead of creating a duplicate vector).
 _QDRANT_POINT_NAMESPACE = uuid.UUID("6f9619ff-8b86-d011-b42d-00c04fc964ff")
-
-# Same NIR version/annex marker stripped by pipeline/ingestion.py::_canonical_urn.
-# Preserve the URL wrapper — strip ONLY from the first "!".
-_NIR_VERSION_MARKER = "!"
 
 # Best-effort extraction of a Normattiva/EUR-Lex/ECLI URL embedded in the
 # markdown text, used ONLY to populate `article_urn` for back-linkage. We never
@@ -98,16 +96,12 @@ _NORM_TOOL_HINTS = ("cite_law", "law_article", "full_act", "act_index", "norma")
 
 
 def _canonical_url(url: str) -> str:
-    """Strip only the NIR version/annex marker, preserving the URL wrapper.
-
-    Mirrors ``pipeline/ingestion.py::_canonical_urn`` so a provisional norm node
-    keyed by URL matches the seed/lazy-ingest key on exact equality. NEVER
-    reduces the value to the bare ``urn:nir:...`` form.
+    """The key of a source URL: ``schema.canonical_urn``, the one function that keys a
+    norm, so a provisional norm node matches the seed/lazy-ingest key on exact
+    equality. NEVER reduces the value to the bare ``urn:nir:...`` form. A source
+    that is no norm (a case-law URL: an Italgiure id holds ``@``) keeps its whole URL.
     """
-    if not url:
-        return url
-    bang = url.find(_NIR_VERSION_MARKER)
-    return url[:bang] if bang != -1 else url
+    return canonical_urn(url)
 
 
 def _extract_source_url(source: Dict[str, Any]) -> str:
@@ -279,7 +273,7 @@ async def _merge_provisional_node(
         n.source_tool = $source_tool,
         n.source_url = $source_url,
         n.expert_type = $expert_type,
-        n.text = $text,
+        n.testo = $text,
         n.retrieved_at = $timestamp,
         n.created_at = $timestamp,
         n.updated_at = $timestamp,
@@ -289,7 +283,7 @@ async def _merge_provisional_node(
         n.last_used_at = $timestamp
     ON MATCH SET
         n.source_url = CASE WHEN $source_url <> '' THEN $source_url ELSE n.source_url END,
-        n.text = $text,
+        n.testo = $text,
         n.retrieved_at = $timestamp,
         n.updated_at = $timestamp,
         n.provenance = CASE
@@ -333,8 +327,8 @@ async def _link_related_urns(
     confirmed/seed nodes retrieved in the SAME answer.
 
     For every ``related_urn`` (canonicalized the same way as the provisional
-    node's own key — strip everything from the first ``!``, see
-    ``_canonical_url``) that resolves to an existing NON-live node, MERGE a
+    node's own key, see ``_canonical_url``) that resolves to an existing NON-live
+    node, MERGE a
     ``(confirmed)-[:CORRELATO {provenance:'live_unconfirmed'}]->(provisional)``
     edge and flag the provisional ``has_confirmed_citation = true``. Excludes:
 
