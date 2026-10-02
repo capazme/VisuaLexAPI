@@ -239,6 +239,14 @@ class TemporalValidityService:
             node_data["mod_count"] = counted["n"] + remainder
             node_data["mod_undated"] = counted["undated"] + remainder
             node_data["mod_latest"] = counted["latest"]
+            # `last_modified` is the date the warning names: the latest dated amendment in
+            # force at the reference date. The node's own `ultima_modifica` has no date of
+            # its own meaning (on art. 1632 c.c. it is the 1971 abrogation), so it is kept
+            # only when the graph has no dated amendment edge at all to read instead.
+            if counted["latest"]:
+                node_data["last_modified"] = counted["latest"]
+            elif node_data.get("last_modified") and await self._has_dated_amendments(key):
+                node_data["last_modified"] = None
             if node_data["mod_count"] > 0:
                 modifications = await self._query_modifications(key)
 
@@ -422,6 +430,22 @@ class TemporalValidityService:
             return empty
         row = results[0]
         return {"n": int(row.get("n") or 0), "undated": int(row.get("undated") or 0), "latest": row.get("latest") or None}
+
+    async def _has_dated_amendments(self, urn: str) -> bool:
+        """Whether any incoming MODIFICA, INSERISCE, ABROGA or SOSTITUISCE edge carries an
+        effect date (dated as the history tool dates it), whatever the date."""
+        cypher = """
+            MATCH (norma {URN: $urn})<-[r:MODIFICA|INSERISCE|ABROGA|SOSTITUISCE]-(modificante)
+            WITH coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS amendment_date
+            WHERE amendment_date <> ''
+            RETURN count(*) AS dated
+        """
+        try:
+            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
+        except Exception as e:
+            log.error("dated_amendment_check_failed", urn=urn, error=str(e))
+            return False
+        return bool(results and int(results[0].get("dated") or 0) > 0)
 
     async def _unrecorded_amendments(self, urn: str, n_modifiche: Any) -> int:
         """The amendment events `n_modifiche` counts that have no edge in the graph:

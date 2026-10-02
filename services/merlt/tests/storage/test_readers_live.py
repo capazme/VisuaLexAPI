@@ -422,6 +422,9 @@ async def test_a_dated_abrogation_decides_over_the_seeds_string_flag(graph, as_o
     )
     result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
     assert (result.status, [p["type"] for p in result.pending]) == (status, pending)
+    # its ultima_modifica (1971) is the abrogation: the graph has that edge, dated, so the node's
+    # undated date is never last_modified, and no amendment is in force
+    assert result.last_modified is None
 
 
 async def test_the_seeds_string_false_is_not_an_abrogation(graph):
@@ -435,15 +438,18 @@ async def test_the_seeds_string_false_is_not_an_abrogation(graph):
     assert (result.status, result.is_valid, result.pending) == ("vigente", True, [])
 
 
-@pytest.mark.parametrize("effect, as_of, status, count", [
-    ("1980-01-01", "1970-01-01", "vigente", 0),
-    ("1980-01-01", "1990-01-01", "modificato", 1),
-    (None, None, "modificato", 1),  # an undated amendment counts, as before
+@pytest.mark.parametrize("effect, as_of, status, count, last_modified", [
+    ("1980-01-01", "1970-01-01", "vigente", 0, None),  # a dated amendment, not yet in force
+    ("1980-01-01", "1990-01-01", "modificato", 1, "1980-01-01"),
+    (None, None, "modificato", 1, "2014-09-12"),  # an undated amendment counts; no dated one: the node's date
 ])
-async def test_a_norm_is_modified_as_at_a_date_only_by_amendments_in_force_by_then(graph, effect, as_of, status, count):
+async def test_a_norm_is_modified_as_at_a_date_only_by_amendments_in_force_by_then(
+    graph, effect, as_of, status, count, last_modified,
+):
     art = f"urn:test:modified-{effect}-{as_of}"
     await graph.query(
-        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.', n_modifiche: 1}) "
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.', n_modifiche: 1, "
+        "ultima_modifica: '2014-09-12'}) "
         "CREATE (act:Norma {URN: $act, estremi: 'L. 5/1980', tipo_documento: 'legge'}) "
         "CREATE (act)-[r:MODIFICA {disposizione: 'art. 1', certezza: 1.0, fonte: 'Normattiva'}]->(a) "
         "SET r.data_efficacia = $effect",
@@ -451,6 +457,7 @@ async def test_a_norm_is_modified_as_at_a_date_only_by_amendments_in_force_by_th
     )
     result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
     assert (result.status, result.modification_count, result.is_valid) == (status, count, True)
+    assert result.last_modified == last_modified
 
 
 # The four seed articles whose n_modifiche counts more amendment events than they have edges,

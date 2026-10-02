@@ -764,6 +764,24 @@ async def test_more_edges_than_n_modifiche_leave_no_remainder_and_are_logged():
     ]
 
 
+@pytest.mark.parametrize("latest, dated, node_date, expected", [
+    ("1980-01-01", 1, "2014-09-12", "1980-01-01"),  # the latest amendment in force, as the warning names it
+    (None, 1, "1971-02-22", None),                  # dated amendments exist, none in force: no date
+    (None, 0, "2014-09-12", "2014-09-12"),          # the graph has no dated amendment: the node's own date
+])
+async def test_last_modified_is_the_latest_amendment_in_force(latest, dated, node_date, expected):
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    count = {"n": 1 if latest else 0, "undated": 0, "latest": latest}
+    graph = _GraphRecorder(answers=[("count(*) AS n", [count]), ("AS dated", [{"dated": dated}]),
+                                    ("AS is_abrogated", [_validity_row(last_modified=node_date)])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC, "1990-01-01")
+    assert result.last_modified == expected
+    if latest is None:
+        dated_cypher = next(c for c in graph.cyphers if "AS dated" in c)
+        assert "<-[r:MODIFICA|INSERISCE|ABROGA|SOSTITUISCE]-" in dated_cypher and "$as_of" not in dated_cypher
+
+
 def _knowledge_graph_on(graph):
     from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 
