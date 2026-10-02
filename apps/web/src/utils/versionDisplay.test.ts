@@ -6,7 +6,9 @@ import {
   describeVersion,
   historicalItemLabel,
   isEuropeanAct,
+  NOT_YET_REASON,
   requestIsHistorical,
+  UNRELIABLE_REASON,
   versionTabSuffix,
 } from './versionDisplay';
 
@@ -183,7 +185,7 @@ describe('describeVersion — the source could not be read', () => {
   it('claims nothing for the text in force: no chip, and no "Vigente" by default', () => {
     expect(describeVersion(undefined, { versione: 'vigente' })).toEqual({
       chip: null, banner: null, textVisible: true, readOnly: false, doctrineVisible: true, canCite: true,
-      canCopyOrSave: true, updateNotesOpen: false,
+      canCopyOrSave: true, copyBlockedReason: undefined, updateNotesOpen: false,
     });
   });
 
@@ -211,6 +213,41 @@ describe('describeVersion — a version that does not contain the requested day'
     const current = describeVersion(validity({ request_in_window: false }), { versione: 'vigente', data_versione: '2000-01-01' });
     expect(current.readOnly).toBe(true);
     expect(current.banner?.kind).toBe('unreliable');
+  });
+});
+
+describe('describeVersion — what may leave the page', () => {
+  const asked = { versione: 'vigente', data_versione: '2010-01-01' };
+
+  it('does not let a version that does not contain the day be copied, exported or saved: it would travel unlabelled', () => {
+    for (const state of ['historical', 'current'] as const) {
+      const shown = describeVersion(validity({ ...MIDDLE, state, request_in_window: false }), asked);
+      expect(shown.canCopyOrSave).toBe(false);
+      expect(shown.copyBlockedReason).toBe(UNRELIABLE_REASON);
+      expect(shown.canCite).toBe(false);
+      expect(shown.readOnly).toBe(true);
+    }
+  });
+
+  it('names the reason of an article that did not exist yet, first', () => {
+    const shown = describeVersion(NOT_YET, asked);
+    expect(shown.canCopyOrSave).toBe(false);
+    expect(shown.copyBlockedReason).toBe(NOT_YET_REASON);
+    expect(describeVersion({ ...NOT_YET, request_in_window: false }, asked).copyBlockedReason).toBe(NOT_YET_REASON);
+  });
+
+  it('gives the unreliable reason its own words', () => {
+    expect(UNRELIABLE_REASON).toBe('Non disponibile: la versione restituita non comprende la data richiesta');
+  });
+
+  it.each([
+    ['a reliable past text', MIDDLE, asked],
+    ['the text in force', validity(), { versione: 'vigente' }],
+    ['a text with no validity', undefined, asked],
+  ])('lets %s be copied, exported and saved', (_name, given, request) => {
+    const shown = describeVersion(given, request);
+    expect(shown.canCopyOrSave).toBe(true);
+    expect(shown.copyBlockedReason).toBeUndefined();
   });
 });
 

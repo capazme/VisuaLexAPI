@@ -38,6 +38,7 @@ import { ArticleTabContent } from '../ArticleTabContent';
 import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 import { fixtureText } from '../../../../utils/__fixtures__/articleTexts';
+import { NOT_YET_REASON, UNRELIABLE_REASON } from '../../../../utils/versionDisplay';
 
 const TEXT = fixtureText('nrm-cc-1284');
 const NORMA: NormaVisitata = {
@@ -142,6 +143,26 @@ describe('ArticleTabContent — a past text is a reading', () => {
     const root = container.querySelector('.vlx-art');
     expect(root?.textContent).toContain('Il saggio degli interessi legali');
     expect(root).toHaveClass('vlx-updates-open');
+  });
+
+  it('lets the reader fold the update notes it opened, and says so to a screen reader', () => {
+    const { container } = show(article(MIDDLE, PAST));
+    const root = container.querySelector('.vlx-art');
+    const toggle = container.querySelector('.vlx-updates-toggle');
+    expect(toggle).not.toBeNull();
+    expect(root).toHaveClass('vlx-updates-open');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle!);
+    expect(root).not.toHaveClass('vlx-updates-open');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle!);
+    expect(root).toHaveClass('vlx-updates-open');
+  });
+
+  it('leaves the update notes of the text in force folded (the control)', () => {
+    const { container } = show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
+    expect(container.querySelector('.vlx-art')).not.toHaveClass('vlx-updates-open');
+    expect(container.querySelector('.vlx-updates-toggle')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('draws none of the reader’s marks on it: they would sit on the wrong words', () => {
@@ -303,6 +324,41 @@ describe('ArticleTabContent — copying a past text', () => {
     show(article({ ...MIDDLE, request_in_window: false }, { versione: 'vigente', data_versione: '2010-01-01' }));
     expect(screen.getByRole('alert')).toHaveTextContent('non va considerata attendibile');
     expect(screen.queryByRole('button', { name: 'Copia citazione' })).not.toBeInTheDocument();
+  });
+
+  it('does not let that version be copied or put in a dossier: it would leave the page as the article in force', () => {
+    const { container } = show(article({ ...MIDDLE, request_in_window: false }, { versione: 'vigente', data_versione: '2010-01-01' }));
+    for (const name of ['Copia testo', 'Copia', 'Aggiungi a dossier']) {
+      const buttons = screen.getAllByTitle(`${name} — ${UNRELIABLE_REASON}`);
+      expect(buttons.length).toBeGreaterThan(0);
+      buttons.forEach((b) => expect(b).toBeDisabled());
+    }
+    fireEvent.click(screen.getAllByTitle(`Copia testo — ${UNRELIABLE_REASON}`)[0]);
+    expect(writeText).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('non va considerata attendibile');
+    expect(container.querySelector('.vlx-art')).not.toBeNull();
+  });
+
+  it('keeps copying on for a reliable past text (the control)', () => {
+    show(article(MIDDLE, PAST));
+    screen.getAllByTitle('Copia testo').forEach((b) => expect(b).toBeEnabled());
+    screen.getAllByLabelText('Aggiungi a dossier').forEach((b) => expect(b).toBeEnabled());
+  });
+
+  it('does not export a past text, an unreliable one or a missing article either', () => {
+    for (const [given, reason] of [
+      [article(MIDDLE, PAST), 'Non disponibile su un testo storico'],
+      [article({ ...MIDDLE, request_in_window: false }, { versione: 'vigente', data_versione: '2010-01-01' }), UNRELIABLE_REASON],
+      [
+        article(NOT_YET, { versione: 'vigente', data_versione: '2010-01-01' }, { article_text: 'Art. 183-bis\n\nARTICOLO NON ANCORA ESISTENTE O VIGENTE' }),
+        NOT_YET_REASON,
+      ],
+    ] as const) {
+      const { unmount } = show(given);
+      fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+      expect(screen.getByTitle(`Esporta... — ${reason}`)).toBeDisabled();
+      unmount();
+    }
   });
 });
 

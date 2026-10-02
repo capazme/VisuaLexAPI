@@ -22,6 +22,7 @@ export interface VersionRequest {
 
 export const READ_ONLY_REASON = 'Non disponibile su un testo storico';
 export const NOT_YET_REASON = 'Non disponibile: l’articolo non esisteva a quella data';
+export const UNRELIABLE_REASON = 'Non disponibile: la versione restituita non comprende la data richiesta';
 
 const SOURCE_NOTE = 'Testo consolidato di Normattiva, a fini informativi: fa fede la Gazzetta Ufficiale.';
 
@@ -100,8 +101,19 @@ export interface VersionDisplay {
   doctrineVisible: boolean;
   /** Whether a "nel testo in vigore al …" citation may be made. */
   canCite: boolean;
-  /** Whether the text may be copied, exported or added to a dossier. */
+  /**
+   * Whether the text may be copied, exported or added to a dossier. Not an
+   * article that did not exist yet (the served text is a notice), and not a
+   * version that does not contain the requested day: with no citation to lead
+   * it, it would leave the page labelled as the article in force.
+   */
   canCopyOrSave: boolean;
+  /**
+   * Why the text may not be copied, exported or added to a dossier (the
+   * tooltip of those actions); undefined when it may. Callers show it and never
+   * decide which reason applies.
+   */
+  copyBlockedReason: string | undefined;
   /**
    * A past text opens its update notes: the rule that applies (a delegated
    * rate, a date) is often in them, not in the words of the article.
@@ -215,7 +227,8 @@ export function describeVersion(
     readOnly,
     doctrineVisible: !asked && !readOnly,
     canCite,
-    canCopyOrSave: !notYet,
+    canCopyOrSave: !notYet && !unreliable,
+    copyBlockedReason: notYet ? NOT_YET_REASON : unreliable ? UNRELIABLE_REASON : undefined,
     updateNotesOpen: validity?.state === 'historical',
   };
 }

@@ -51,7 +51,6 @@ import { TextAtDateDialog } from './TextAtDateDialog';
 import { formatNormCitation, withCitation } from '../../../utils/citation';
 import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
 import {
-    NOT_YET_REASON,
     READ_ONLY_REASON,
     buildTextAtDateParams,
     describeVersion,
@@ -812,6 +811,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // fold; an annotation sign opens its block's notes and highlights.
     const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
+        updatesOpenByDefault: display.updateNotesOpen,
     });
     const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
@@ -946,7 +946,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 normaData={norma_data}
                 versionChip={display.chip}
                 lockedReason={readOnly ? READ_ONLY_REASON : undefined}
-                copyLockedReason={display.canCopyOrSave ? undefined : NOT_YET_REASON}
+                copyLockedReason={display.copyBlockedReason}
                 url={url}
                 articleText={article_text || ''}
                 isNotesPeekOpen={isPeekOpen}
@@ -1045,7 +1045,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onPopupCopy={handlePopupCopy}
                     onPopupDiscuss={readOnly ? undefined : handlePopupDiscuss}
                     onPopupReportCitation={canContribute && !readOnly ? handlePopupReportCitation : undefined}
-                    updatesOpen={updatesOpen || display.updateNotesOpen}
+                    updatesOpen={updatesOpen}
                     copyOnly={readOnly}
                 />
             )}

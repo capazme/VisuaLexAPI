@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReadingToolbar, type ReadingToolbarProps } from './ReadingToolbar';
-import { READ_ONLY_REASON } from '../../../utils/versionDisplay';
+import { NOT_YET_REASON, READ_ONLY_REASON, UNRELIABLE_REASON } from '../../../utils/versionDisplay';
 
 function setup(over: Partial<ReadingToolbarProps> = {}) {
     const props: ReadingToolbarProps = {
@@ -121,5 +121,32 @@ describe('ReadingToolbar — the menu', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Testo alla data...' }));
         expect(props.onOpenVersionInput).toHaveBeenCalledTimes(1);
         expect(props.onToggleMoreMenu).toHaveBeenCalledWith(false);
+    });
+
+    it('exports the text in force (the control)', () => {
+        const props = setup({ showMoreMenu: true });
+        const entry = screen.getByRole('button', { name: 'Esporta...' });
+        expect(entry).toBeEnabled();
+        fireEvent.click(entry);
+        expect(props.onOpenAdvancedExport).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        ['a past text', { lockedReason: READ_ONLY_REASON }, READ_ONLY_REASON],
+        ['an article that did not exist yet', { copyLockedReason: NOT_YET_REASON }, NOT_YET_REASON],
+        ['an unreliable version', { lockedReason: READ_ONLY_REASON, copyLockedReason: UNRELIABLE_REASON }, UNRELIABLE_REASON],
+    ])('does not export %s, and says why', (_name, over, reason) => {
+        const props = setup({ showMoreMenu: true, ...over });
+        const entry = screen.getByTitle(`Esporta... — ${reason}`);
+        expect(entry).toBeDisabled();
+        fireEvent.click(entry);
+        expect(props.onOpenAdvancedExport).not.toHaveBeenCalled();
+    });
+
+    it('still opens the date dialog and the comparison on a past text', () => {
+        setup({ showMoreMenu: true, lockedReason: READ_ONLY_REASON, copyLockedReason: UNRELIABLE_REASON });
+        expect(screen.getByRole('button', { name: 'Testo alla data...' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Confronta con...' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Condividi link' })).toBeEnabled();
     });
 });

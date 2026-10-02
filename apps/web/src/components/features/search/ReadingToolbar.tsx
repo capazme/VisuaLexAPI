@@ -15,7 +15,11 @@ export interface ReadingToolbarProps {
      * switched off, with this as the reason.
      */
     lockedReason?: string;
-    /** Set when there is no article to copy or save (it did not exist on the day). */
+    /**
+     * Set when the text may not be copied, exported or saved (the article did not exist on the
+     * day, or the version does not contain it): copy, dossier and "Esporta..." are switched off
+     * with this as the reason.
+     */
     copyLockedReason?: string;
     url?: string;
     articleText: string;
@@ -77,6 +81,9 @@ export function ReadingToolbar({
     // A switched-off tool keeps its name and gains the reason in its tooltip.
     const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);
     const lock = (reason?: string) => (reason ? { disabled: true } : {});
+    // Exporting writes the article out like a copy does, and the export header
+    // carries no version: anything that may not be copied, or is a reading, stays in.
+    const exportLockedReason = copyLockedReason ?? lockedReason;
     return (
         <div className={cn('glass-toolbar sticky top-0 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
             {/* Version Info & Annex Source Badge */}
@@ -284,7 +291,9 @@ export function ReadingToolbar({
                                         onOpenAdvancedExport();
                                         onToggleMoreMenu(false);
                                     }}
-                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    title={tip("Esporta...", exportLockedReason)}
+                                    {...lock(exportLockedReason)}
+                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                                 >
                                     <Download size={14} className="text-slate-400" />
                                     Esporta...
