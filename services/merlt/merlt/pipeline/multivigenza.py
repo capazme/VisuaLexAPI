@@ -43,7 +43,7 @@ from merlt.clients import (
     StoriaArticolo,
     NormattivaScraper,
 )
-from merlt.storage.graph.schema import Rel
+from merlt.storage.graph.schema import Rel, canonical_urn, version_urn
 from merlt.utils.urn_labels import derive_article_fields_from_urn
 
 log = structlog.get_logger()
@@ -1231,7 +1231,7 @@ class MultivigenzaPipeline:
             return
 
         base_urn = normavisitata.urn
-        versioned_urn = f"{base_urn}!vig={version_date}"
+        versioned_urn = version_urn(base_urn, version_date)
 
         # A2: derive numero_articolo/estremi from the base article URN so a
         # freshly-created version stub carries a minimal identity instead of a
@@ -1273,7 +1273,7 @@ class MultivigenzaPipeline:
             MERGE (ver)-[r:VERSIONE_DI]->(art)
             ON CREATE SET r.certezza = 1.0
             """,
-            {"ver_urn": versioned_urn, "art_urn": base_urn}
+            {"ver_urn": versioned_urn, "art_urn": canonical_urn(base_urn)}
         )
 
         log.debug(f"Saved version: {versioned_urn}")

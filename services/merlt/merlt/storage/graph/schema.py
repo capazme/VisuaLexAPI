@@ -37,7 +37,10 @@ class Label(_Vocab):
     LETTERA = "Lettera"
     NUMERO = "Numero"  # multivigenza writes the numbers a modification targets
     DOTTRINA = "Dottrina"
-    ATTO_GIUDIZIARIO = "AttoGiudiziario"  # a massima
+    # Today the seed's node is a massima, keyed `massima_<corte>_<numero>`. Phase 2 makes
+    # the node the ruling (the pronuncia), keyed by the shared decision identity, with its
+    # massime as attributes (owner's decision, 1 October; spec 5.1). Phase 1 changes no key.
+    ATTO_GIUDIZIARIO = "AttoGiudiziario"
     LOCUZIONE_LATINA = "LocuzioneLatina"
     CONCETTO_GIURIDICO = "ConcettoGiuridico"
     PRINCIPIO_GIURIDICO = "PrincipioGiuridico"
@@ -579,3 +582,26 @@ def node_type_cypher(variable: str) -> str:
     return (
         f"coalesce([lbl IN labels({variable}) WHERE lbl <> '{Label.ENTITY.value}'][0], labels({variable})[0])"
     )
+
+
+# The keys every MERGE looks a node up by (spec 4.1). FalkorDB has no index
+# until the migration creates these (Task 6b); without them each MERGE scans
+# its whole label, which phase 2's volume cannot afford. A community entity
+# carries `node_id` (the same value as its `id`, Task 6) and is still looked
+# up by `id` by the entity writer: both are indexed.
+GRAPH_INDEXES: tuple[tuple[Label, str], ...] = (
+    *((label, "URN") for label in (Label.NORMA, Label.COMMA, Label.LETTERA, Label.NUMERO)),
+    *((label, "node_id") for label in Label),
+    (Label.ENTITY, "id"),
+)
+
+# Qdrant payload fields every reader filters on.
+QDRANT_PAYLOAD_INDEXES: dict[str, str] = {"article_urn": "keyword", "source_type": "keyword"}
+
+
+def version_urn(urn: str, version_date: str) -> str:
+    """The key of a past version of an article (multivigenza). A writer uses it
+    as it is: `canonical_urn` folds it onto the live article, which is what a
+    reader wants and a writer must not do. How versions are modelled for good
+    is open (spec section 11)."""
+    return f"{canonical_urn(urn)}!vig={version_date}"

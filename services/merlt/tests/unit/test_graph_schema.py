@@ -311,3 +311,23 @@ def test_vocabulary_members_render_as_their_values():
     assert s.point_id(CC, s.SourceType.MASSIMA, 3) == s.point_id(CC, "massima", 3)
     # The namespace keys every point in Qdrant: pin it.
     assert s.point_id(CC, "massima", 3) == "bde5fe78-9f32-5791-a4fa-42dfcc470edf"
+
+
+def test_graph_indexes_cover_every_merge_key():
+    keys = set(s.GRAPH_INDEXES)
+    for label in (s.Label.NORMA, s.Label.COMMA, s.Label.LETTERA, s.Label.NUMERO):
+        assert (label, "URN") in keys
+    for label in s.Label:
+        assert (label, "node_id") in keys  # a community entity carries node_id too (Task 6)
+    assert (s.Label.ENTITY, "id") in keys  # the entity writer still looks it up by id
+    assert len(keys) == len(s.GRAPH_INDEXES)  # no index listed twice
+
+
+def test_qdrant_payload_indexes():
+    assert s.QDRANT_PAYLOAD_INDEXES == {"article_urn": "keyword", "source_type": "keyword"}
+
+
+def test_a_version_has_its_own_key_and_reads_back_to_the_article():
+    key = s.version_urn(CC + "@originale", "2020-01-01")
+    assert key == CC + "!vig=2020-01-01"
+    assert s.canonical_urn(key) == CC  # a reader asking for the version lands on the article
