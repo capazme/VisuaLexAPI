@@ -141,8 +141,9 @@ POST unless noted, JSON bodies.
   index, or an index without fingerprints — the caller must then refetch
   everything, not conclude nothing changed
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
-  resolver already understands. The only GET among these; a POST answers 405
+  resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
 - `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses.
+- `POST /resolve_act_dates {"urns": [...]}` — internal (MERL-T): up to 20 year-only URNs (`urn:nir:stato:legge:1983;184`) → full URNs, through Normattiva's resolver; found dates cached a year.
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
