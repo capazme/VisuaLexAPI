@@ -1,4 +1,5 @@
 """An article is found by its canonical URN, never by its number alone."""
+import time
 from unittest.mock import AsyncMock
 
 import pytest
@@ -131,6 +132,23 @@ def test_a_citation_becomes_a_normattiva_request(query, parsed):
 
 def test_a_query_without_a_citation_has_no_urn():
     assert ExternalSourceTool()._parse_urn_from_query("risoluzione per inadempimento") is None
+
+
+@pytest.mark.parametrize("filler", ["art. 1 ", "art. 1 legge "])
+def test_a_long_query_parses_in_linear_time(filler):
+    # The LLM writes the query and the parser runs inside an async handler, twice per call:
+    # each article scanned the whole rest of the text for a code, so 12 KB took ~2 s.
+    query = (filler * (50_000 // len(filler) + 1))[:50_000]
+    tool = ExternalSourceTool()
+    started = time.perf_counter()
+    tool._parse_normattiva_query(query)
+    tool._parse_urn_from_query(query)
+    assert time.perf_counter() - started < 0.1
+
+
+def test_a_citation_at_the_head_of_a_long_query_is_still_read():
+    query = "art. 1453 c.c. " + "x" * 50_000
+    assert ExternalSourceTool()._parse_normattiva_query(query) == {"tipo_atto": "codice civile", "articolo": "1453"}
 
 
 class _Graph:

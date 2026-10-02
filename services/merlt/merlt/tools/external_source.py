@@ -67,6 +67,10 @@ _ANOTHER_ACT = re.compile(
 )
 # What may stand between a code written first and its article: "c.c. art. 1", "codice civile, art. 1".
 _BETWEEN_CODE_AND_ARTICLE = re.compile(r"[\s,:;.\-\u2013]*")
+# The parser looks at this much of the text and no more. Each article it meets scans the rest of
+# the text for a code, so the work grows with the square of the length; the LLM writes the text,
+# and the parser runs inside an async handler. A citation is short: it sits at the head.
+MAX_CITATION_TEXT = 1_000
 
 
 def _cited_article(text: str) -> Optional[Dict[str, str]]:
@@ -78,8 +82,9 @@ def _cited_article(text: str) -> Optional[Dict[str, str]]:
     written right before it ("c.c. art. 1453", "codice civile, art. 1453"), unless the text after
     the article turns to another act ("c.c. art. 5 del d.lgs. 196/2003"). The implementing
     provisions are never the code, whichever side it stands ("art. 5 disp. att. c.c.",
-    "c.c. disp. att. art. 5"). An article that pairs with nothing gives way to the next."""
-    lower = text.lower()
+    "c.c. disp. att. art. 5"). An article that pairs with nothing gives way to the next.
+    Only the first `MAX_CITATION_TEXT` characters are read."""
+    lower = text[:MAX_CITATION_TEXT].lower()
     articles = list(_ARTICLE.finditer(lower))
     for at, article in enumerate(articles):
         code = _CODES.search(lower, article.end())
