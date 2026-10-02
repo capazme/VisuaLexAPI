@@ -33,6 +33,7 @@ from merlt.benchmark.metrics import (
     LatencyMetrics,
     compute_retrieval_metrics,
     compute_latency_metrics,
+    distinct_in_order,
     recall_at_k,
     mrr,
 )
@@ -351,8 +352,8 @@ class RAGBenchmark:
 
             latency_ms = (time.time() - start) * 1000
 
-            # Estrai URN e score
-            retrieved_urns = [r.get("urn", "") for r in search_results]
+            # Estrai URN (un articolo una volta) e score (per chunk, grezzi)
+            retrieved_urns = distinct_in_order([r.get("urn", "") for r in search_results])
             scores = [r.get("score", 0.0) for r in search_results]
             source_types = [r.get("source_type", "unknown") for r in search_results]
 
