@@ -41,11 +41,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   - `normattiva_validity.py` — what a Normattiva article page says about its own
     validity: the window ("Testo in vigore dal … al …"), the version number, the
     act's last update, and a state (`current`, `historical`, `not_yet`,
-    `abrogated`). Read from the raw page the scraper already keeps in its
-    persistent cache (the key is the URN `get_document` returns), so it costs no
-    request and never touches `article_text` (gotcha 23). Best effort: a page it
-    cannot read yields no `validity` key at all, never a guess. It also holds the
-    two request guards, `reject_future_version_date` and `is_historical_request`.
+    `abrogated`; `historical` means the window ended before today in Rome, a
+    window ending today or later is `current` with its `valid_to` kept). Read
+    from the raw page the scraper already keeps in its persistent cache (the key
+    is the URN `get_document` returns), so it costs no request and never
+    touches `article_text` (gotcha 23). Best effort: a page it cannot read yields
+    no `validity` key at all, never a guess. It also holds the two request
+    guards, `reject_future_version_date` and `is_historical_request`.
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -373,7 +375,10 @@ Breaking one of these breaks the product. Read before editing.
     `reject_future_version_date`), and a date before an article existed with a page
     whose text reads "NON ANCORA ESISTENTE O VIGENTE". Read the window from the page
     (`normattiva_validity.py`), never from the request, and say nothing when the page
-    cannot be read. The window says which text was in force, not which discipline
+    cannot be read. A closed window is `historical` only when its last day is before
+    today (Europe/Rome): a window ending today or later is the text in force, `current`
+    with `valid_to` as stated, and `request_in_window` still judges the request against it.
+    The window says which text was in force, not which discipline
     governs a fact: transitional provisions and retroactive rules are not on the page.
     `tests/test_normattiva_validity_live.py` (`-m live`) re-checks the extraction
     against the portal.

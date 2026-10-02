@@ -190,6 +190,7 @@ def extract_validity(
     *,
     article: Optional[str] = None,
     requested_date: Optional[str] = None,
+    today: Optional[date] = None,
 ) -> Optional[Validity]:
     """The validity a Normattiva article page states for itself, or None.
 
@@ -202,6 +203,13 @@ def extract_validity(
 
     `requested_date` is the day the reader asked for (ISO, or the Italian long
     form); it only feeds `request_in_window`.
+
+    The state follows the window against `today` (default: today in Rome; tests
+    pass a fixed day). `historical` means the window ended before today. A window
+    that ends today or later is the text in force (a later version already
+    published with a deferred start closes it in the future): it is `current`,
+    and `valid_to` is kept as the source stated it. `not_yet` and `abrogated`
+    are decided first and do not depend on the end date.
     """
     if not raw_html:
         return None
@@ -226,7 +234,7 @@ def extract_validity(
         state = "not_yet"
     elif _is_abrogated(body):
         state = "abrogated"
-    elif valid_to is None:
+    elif valid_to is None or valid_to >= (today or _today_in_rome()).isoformat():
         state = "current"
     else:
         state = "historical"
