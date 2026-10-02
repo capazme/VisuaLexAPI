@@ -24,11 +24,12 @@ class FakeItalgiure:
     def __init__(self, decisions=(), start=(2021, "2021-02-17"), down=False):
         self.decisions = {(d.identita.archivio, d.identita.numero, d.identita.anno): d
                           for d in decisions}
+        # down: True for the whole source, or the archives that fail
         self.start, self.down, self.calls, self.start_calls = start, down, [], 0
 
     async def lookup(self, archivio, numero, anno):
         self.calls.append((archivio, numero, anno))
-        if self.down:
+        if self.down is True or (self.down and archivio in self.down):
             raise NetworkError("Exceeded retry budget")
         return self.decisions.get((archivio, numero, anno))
 
@@ -163,6 +164,18 @@ async def test_a_source_that_is_down_is_never_not_found():
     with pytest.raises(SourceUnavailable) as e:
         await _resolver(FakeItalgiure(down=True)).resolve(ref(numero=1, anno=2024))
     assert e.value.fonte == "cassazione"
+
+
+@pytest.mark.parametrize("civil", [[_cass("civile", 1, 2024, "3")], []],
+                         ids=["civil found", "civil absent"])
+async def test_one_archive_down_is_never_a_lone_hit_nor_not_found(civil):
+    # the penal archive could hold a homonym, or the very decision: no answer stands on half
+    # the search
+    italgiure = FakeItalgiure(civil, down={"penale"})
+    with pytest.raises(SourceUnavailable) as e:
+        await _resolver(italgiure).resolve(ref(numero=1, anno=2024))
+    assert e.value.fonte == "cassazione"
+    assert italgiure.calls == [("civile", 1, 2024), ("penale", 1, 2024)]
 
 
 async def test_found_and_absent_are_cached_per_archive_errors_are_not():

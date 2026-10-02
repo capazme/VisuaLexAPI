@@ -164,12 +164,16 @@ def test_a_record_without_text_or_notice_gives_no_cause(monkeypatch):
 
 @pytest.mark.live
 @pytest.mark.asyncio(loop_scope="session")
-async def test_the_homonyms_still_answer():
+async def test_the_fixed_public_cases_still_answer():
+    # the spec's live cases: the homonyms 10787/2024, the Sezioni Unite 41994/2021 and a
+    # number that does not exist
     from tests.conftest import TRANSPORT_ERRORS, skip_if_unreachable
     reader = ItalgiureReader()
     try:
         civ = await reader.lookup("civile", 10787, 2024)
         pen = await reader.lookup("penale", 10787, 2024)
+        su = [await reader.lookup(archivio, 41994, 2021) for archivio in ("civile", "penale")]
+        missing = await reader.lookup("civile", 999999, 2024)
     except TRANSPORT_ERRORS as exc:
         skip_if_unreachable("italgiure", exc)
     assert civ is not None and pen is not None
@@ -177,3 +181,5 @@ async def test_the_homonyms_still_answer():
     assert len(pen.testo["motivazione"]) > 2000  # the whole text, not a cut
     # the civil text was withheld on 2026-10-02 (personal data being removed): absent or whole
     assert not civ.testo or len(civ.testo["motivazione"]) > 2000
+    assert "U" in {d.sezione for d in su if d is not None}  # civil or penal: both are read
+    assert missing is None

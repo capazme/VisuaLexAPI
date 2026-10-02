@@ -254,10 +254,14 @@ def test_the_text_is_decoded_once_and_composed():
 
 @pytest.mark.live
 @pytest.mark.asyncio(loop_scope="session")
-async def test_sentenza_1_2014_from_the_real_bundle(tmp_path):
+async def test_the_fixed_public_cases_from_the_real_bundle(tmp_path):
+    # the spec's live cases 1/2014 and 194/2018: one reader, so one download
     from tests.conftest import TRANSPORT_ERRORS, skip_if_unreachable
+    reader = CorteCostReader(tmp_path)
     try:
-        d = await CorteCostReader(tmp_path).lookup(1, 2014)
+        d = await reader.lookup(1, 2014)
+        d194 = await reader.lookup(194, 2018)
     except TRANSPORT_ERRORS as exc:
         skip_if_unreachable("dati.cortecostituzionale.it", exc)
     assert d.ecli == "ECLI:IT:COST:2014:1" and len(d.testo["motivazione"]) > 25000
+    assert (d194.ecli, d194.tipo) == ("ECLI:IT:COST:2018:194", "sentenza")
