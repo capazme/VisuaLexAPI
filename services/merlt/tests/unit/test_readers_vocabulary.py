@@ -575,6 +575,63 @@ async def test_an_abrogation_is_reported_without_a_modification_count():
     assert (result.status, result.abrogating_norm["urn"]) == ("abrogato", "act2")
 
 
+def _validity_row(**ends):
+    row = {
+        "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
+        "abr_urn": None, "abr_estremi": None, "abr_date": "", "abr_pending": False,
+        "sost_urn": None, "sost_estremi": None, "sost_date": "", "sost_pending": False,
+    }
+    row.update(ends)
+    return row
+
+
+async def test_the_validity_check_reads_the_ends_against_a_reference_date_as_a_parameter():
+    # The reference is the date asked about, else today; never Cypher text.
+    from datetime import date
+
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder()
+    service = TemporalValidityService(graph_db=graph)
+    with patch("merlt.storage.temporal.validity_service.date", SimpleNamespace(today=lambda: date(2026, 10, 2))):
+        await service._query_norm_status(CC)
+    await service._query_norm_status(CC, "2020-01-01")
+    assert graph.params == [{"urn": CC, "as_of": "2026-10-02"}, {"urn": CC, "as_of": "2020-01-01"}]
+    assert set(graph.methods) == {"ro_query"}
+    cypher = graph.cyphers[0]
+    assert "coalesce(r_abr.data_efficacia, abrogante.data_atto, abrogante.data_vigore, '') AS abr_date" in cypher
+    assert "coalesce(r_sost.data_efficacia, sostituto.data_atto, sostituto.data_vigore, '') AS sost_date" in cypher
+    assert "left(abr_date, 10) > $as_of" in cypher and "left(sost_date, 10) > $as_of" in cypher
+    assert "2026" not in cypher and "2020" not in cypher
+
+
+async def test_a_pending_abrogation_leaves_the_norm_in_force_and_is_reported_as_pending():
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    row = _validity_row(abr_urn="act9", abr_estremi="L. 9/2099", abr_date="2099-01-01", abr_pending=True)
+    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [row])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.is_valid, result.abrogating_norm) == ("vigente", True, None)
+    assert result.pending == [{"type": "abroga", "date": "2099-01-01", "by_urn": "act9", "by_estremi": "L. 9/2099"}]
+    assert result.to_dict()["pending"] == result.pending
+
+
+async def test_an_abrogation_in_force_wins_over_a_pending_one_and_a_pending_replacement():
+    # Two rows: the status reads every edge, not only the first row the graph returns.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    rows = [
+        _validity_row(abr_urn="act9", abr_estremi="L. 9/2099", abr_date="2099-01-01", abr_pending=True,
+                      sost_urn="act8", sost_estremi="L. 8/2098", sost_date="2098-01-01", sost_pending=True),
+        _validity_row(abr_urn="act1", abr_estremi="L. 1/2020", abr_date="2020-01-01",
+                      sost_urn="act8", sost_estremi="L. 8/2098", sost_date="2098-01-01", sost_pending=True),
+    ]
+    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", rows)])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.abrogating_norm["urn"]) == ("abrogato", "act1")
+    assert [(p["type"], p["by_urn"]) for p in result.pending] == [("sostituisce", "act8"), ("abroga", "act9")]
+
+
 def _knowledge_graph_on(graph):
     from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 

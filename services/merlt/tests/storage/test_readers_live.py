@@ -379,6 +379,32 @@ async def test_validity_finds_modifications_by_their_edges_without_a_count_prope
     assert (marked.urn, marked.status) == (ART1 + "!vig=2020-01-01", "modificato")
 
 
+@pytest.mark.parametrize("when, as_of, status, pending", [
+    ("tomorrow", None, "vigente", ["abroga"]),
+    ("yesterday", None, "abrogato", []),
+    ("undated", None, "abrogato", []),  # nothing says it is in the future
+    ("2020-06-01", "2020-01-01", "vigente", ["abroga"]),  # in force on the day asked about
+    ("2020-06-01", "2021-01-01", "abrogato", []),
+])
+async def test_the_validity_check_reads_an_abrogation_from_the_day_it_takes_effect(graph, when, as_of, status, pending):
+    days = {"tomorrow": 1, "yesterday": -1}
+    effect = (date.today() + timedelta(days=days[when])).isoformat() if when in days else (None if when == "undated" else when)
+    art = f"urn:test:validity-{when}-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.'}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 7/2026', tipo_documento: 'legge'}) "
+        "CREATE (act)-[r:ABROGA {disposizione: 'art. 1', certezza: 1.0, fonte: 'Normattiva'}]->(a) "
+        "SET r.data_efficacia = $effect",
+        {"art": art, "act": art + "-act", "effect": effect},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert (result.status, [p["type"] for p in result.pending]) == (status, pending)
+    assert result.is_valid is (status == "vigente")
+    if pending:
+        assert result.pending[0]["date"] == effect and result.pending[0]["by_urn"] == art + "-act"
+        assert result.abrogating_norm is None
+
+
 async def test_an_inserted_comma_is_an_amendment(graph):
     history = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=ART6)
     assert history.success, history.error

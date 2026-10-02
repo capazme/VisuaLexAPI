@@ -24,6 +24,8 @@ class ValidityResultResponse(BaseModel):
     replacing_norm: Optional[dict] = None
     recent_modifications: List[dict] = Field(default_factory=list)
     checked_at: str
+    # abrogations and replacements that take effect after the reference date: {type, date, by_urn, by_estremi}
+    pending: List[dict] = Field(default_factory=list)
 
 
 class ValiditySummaryBrief(BaseModel):

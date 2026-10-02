@@ -26,7 +26,7 @@ import time
 import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from merlt.storage.graph.schema import canonical_urn
 
@@ -72,6 +72,9 @@ class ValidityResult:
     replacing_norm: Optional[Dict[str, Any]] = None    # {urn, estremi, date} se sostituito
     recent_modifications: List[Dict[str, Any]] = field(default_factory=list)  # Ultime modifiche
     checked_at: str = ""                     # ISO timestamp del check
+    # Abrogazioni e sostituzioni che entrano in vigore dopo la data di riferimento:
+    # [{type, date, by_urn, by_estremi}]. Non cambiano lo status a quella data.
+    pending: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializza in dizionario."""
@@ -87,6 +90,7 @@ class ValidityResult:
             "replacing_norm": self.replacing_norm,
             "recent_modifications": self.recent_modifications,
             "checked_at": self.checked_at,
+            "pending": self.pending,
         }
 
 
@@ -116,6 +120,34 @@ class ValiditySummary:
             "results": [r.to_dict() for r in self.results],
             "summary_message": self.summary_message,
         }
+
+
+def _fold_status_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """One answer from the status query's rows (one per pair of ends): the node's
+    properties, the earliest abrogation and replacement in force at the reference date
+    (`abr_*`, `sost_*`, None when there is none), and the pending ends, by date."""
+    folded = {key: rows[0].get(key) for key in ("is_abrogated", "is_current", "mod_count", "last_modified", "effective_since")}
+    pending: Dict[tuple, Dict[str, Any]] = {}
+    for prefix, kind in (("abr", "abroga"), ("sost", "sostituisce")):
+        in_force = []
+        for row in rows:
+            by_urn = row.get(f"{prefix}_urn")
+            if by_urn is None:
+                continue
+            end = {"urn": by_urn, "estremi": row.get(f"{prefix}_estremi"), "date": row.get(f"{prefix}_date") or ""}
+            if row.get(f"{prefix}_pending"):
+                pending[(kind, by_urn, end["date"])] = {
+                    "type": kind, "date": end["date"], "by_urn": by_urn, "by_estremi": end["estremi"],
+                }
+            else:
+                in_force.append(end)
+        # an undated end ('') sorts first: it counts now
+        first = min(in_force, key=lambda end: end["date"]) if in_force else None
+        folded[f"{prefix}_urn"] = first["urn"] if first else None
+        folded[f"{prefix}_estremi"] = first["estremi"] if first else None
+        folded[f"{prefix}_date"] = first["date"] if first else None
+    folded["pending"] = sorted(pending.values(), key=lambda change: (change["date"], change["type"], change["by_urn"]))
+    return folded
 
 
 class TemporalValidityService:
@@ -162,8 +194,14 @@ class TemporalValidityService:
 
         Returns:
             ValidityResult con status, warning e dettagli
+
+        The reference date is `as_of_date`, else today: an abrogation or a replacement
+        that takes effect after it does not end the norm at that date and is reported
+        in `pending` (an undated one ends it now: nothing says it is in the future).
         """
-        cache_key = f"{urn}:{as_of_date or 'current'}"
+        reference = (as_of_date or date.today().isoformat())[:10]
+        # keyed by the reference date: a check "as of today" cached yesterday is not today's
+        cache_key = f"{urn}:{reference}"
 
         # Check cache (lock protects concurrent access)
         async with self._cache_lock:
@@ -178,7 +216,7 @@ class TemporalValidityService:
         # with its own key (no `!vig=`, `@originale`); the answer keeps the URN that
         # was asked, so the caller matches it to its own spelling.
         key = canonical_urn(urn)
-        node_data = await self._query_norm_status(key)
+        node_data = await self._query_norm_status(key, reference)
 
         modifications = []
         if node_data is not None:
@@ -287,9 +325,15 @@ class TemporalValidityService:
             summary_message=summary_message,
         )
 
-    async def _query_norm_status(self, urn: str) -> Optional[Dict[str, Any]]:
+    async def _query_norm_status(self, urn: str, as_of: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Query Cypher per ottenere status e proprietà del nodo Norma.
+
+        Every ABROGA and SOSTITUISCE edge is read, each dated as the history tool dates an
+        amendment (on the edge, `data_efficacia`, else the act's own date) and flagged
+        pending when it takes effect after `as_of` (a parameter; default today). The
+        answer keeps the node's properties and, for each kind of end, the earliest one in
+        force at `as_of` (`abr_*`, `sost_*`) and the pending ones (`pending`).
 
         Returns:
             Dict con proprietà del nodo, o None se non trovato
@@ -298,6 +342,9 @@ class TemporalValidityService:
             MATCH (norma {URN: $urn})
             OPTIONAL MATCH (norma)<-[r_abr:ABROGA]-(abrogante)
             OPTIONAL MATCH (norma)<-[r_sost:SOSTITUISCE]-(sostituto)
+            WITH norma, r_abr, abrogante, r_sost, sostituto,
+                coalesce(r_abr.data_efficacia, abrogante.data_atto, abrogante.data_vigore, '') AS abr_date,
+                coalesce(r_sost.data_efficacia, sostituto.data_atto, sostituto.data_vigore, '') AS sost_date
             RETURN
                 norma.abrogato AS is_abrogated,
                 norma.is_versione_vigente AS is_current,
@@ -306,17 +353,21 @@ class TemporalValidityService:
                 norma.data_inizio_vigenza AS effective_since,
                 abrogante.URN AS abr_urn,
                 abrogante.estremi AS abr_estremi,
-                r_abr.data_efficacia AS abr_date,
+                abr_date,
+                (r_abr IS NOT NULL AND abr_date <> '' AND left(abr_date, 10) > $as_of) AS abr_pending,
                 sostituto.URN AS sost_urn,
                 sostituto.estremi AS sost_estremi,
-                r_sost.data_efficacia AS sost_date
+                sost_date,
+                (r_sost IS NOT NULL AND sost_date <> '' AND left(sost_date, 10) > $as_of) AS sost_pending
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
+            results = await self.graph_db.ro_query(
+                cypher, {"urn": canonical_urn(urn), "as_of": (as_of or date.today().isoformat())[:10]}
+            )
             if not results:
                 return None
-            return results[0]
+            return _fold_status_rows(results)
         except Exception as e:
             log.error("validity_query_failed", urn=urn, error=str(e))
             return None
@@ -378,8 +429,9 @@ class TemporalValidityService:
 
         Logic:
         - Se nodo non trovato -> unknown
-        - Se sostituito (e sostituzione <= as_of_date o no as_of_date) -> critical
-        - Se abrogato (e abrogazione <= as_of_date o no as_of_date) -> critical
+        - Se sostituito alla data di riferimento (as_of_date o oggi) -> critical
+        - Se abrogato alla data di riferimento -> critical
+        - Un'abrogazione o sostituzione successiva alla data di riferimento -> pending
         - Se modificato (n_modifiche > 0, post as_of_date) -> warning
         - Altrimenti -> vigente, nessun warning
         """
@@ -409,6 +461,9 @@ class TemporalValidityService:
         sost_estremi = node_data.get("sost_estremi")
         sost_date = node_data.get("sost_date")
 
+        # The ends that take effect after the reference date: reported, never the status
+        pending = list(node_data.get("pending") or [])
+
         # Build recent modifications list
         recent_mods = []
         for mod in modifications:
@@ -430,53 +485,52 @@ class TemporalValidityService:
             ]
             relevant_mod_count = len(post_date_mods)
 
-        # Determine status (priority: sostituito > abrogato > modificato > vigente)
-        # as_of_date logic: if the event happened AFTER as_of_date, the norm
-        # was still valid at that date, so skip the event.
+        # Determine status (priority: sostituito > abrogato > modificato > vigente).
+        # `sost_*` and `abr_*` name only an end in force at the reference date (the query
+        # decides, against `as_of_date` or today): one that takes effect later is in
+        # `pending`, and the norm was still in force at that date.
 
         if sost_urn:
-            # Sostituzione: report only if happened on or before as_of_date (or no date filter)
-            if not as_of_date or not sost_date or sost_date <= as_of_date:
-                replacing_norm = {
-                    "urn": sost_urn,
-                    "estremi": sost_estremi or "",
-                    "date": sost_date or "",
-                }
-                warning_msg = self._format_warning("sostituito", replacing_norm)
-                return ValidityResult(
-                    urn=urn,
-                    status="sostituito",
-                    is_valid=False,
-                    warning_level="critical",
-                    warning_message=warning_msg,
-                    last_modified=str(last_modified) if last_modified else None,
-                    modification_count=mod_count,
-                    replacing_norm=replacing_norm,
-                    recent_modifications=recent_mods,
-                    checked_at=checked_at,
-                )
+            replacing_norm = {
+                "urn": sost_urn,
+                "estremi": sost_estremi or "",
+                "date": sost_date or "",
+            }
+            warning_msg = self._format_warning("sostituito", replacing_norm)
+            return ValidityResult(
+                urn=urn,
+                status="sostituito",
+                is_valid=False,
+                warning_level="critical",
+                warning_message=warning_msg,
+                last_modified=str(last_modified) if last_modified else None,
+                modification_count=mod_count,
+                replacing_norm=replacing_norm,
+                recent_modifications=recent_mods,
+                checked_at=checked_at,
+                pending=pending,
+            )
 
         if is_abrogated or abr_urn:
-            # Abrogazione: report only if happened on or before as_of_date (or no date filter)
-            if not as_of_date or not abr_date or abr_date <= as_of_date:
-                abrogating_norm = {
-                    "urn": abr_urn or "",
-                    "estremi": abr_estremi or "",
-                    "date": abr_date or "",
-                }
-                warning_msg = self._format_warning("abrogato", abrogating_norm)
-                return ValidityResult(
-                    urn=urn,
-                    status="abrogato",
-                    is_valid=False,
-                    warning_level="critical",
-                    warning_message=warning_msg,
-                    last_modified=str(last_modified) if last_modified else None,
-                    modification_count=mod_count,
-                    abrogating_norm=abrogating_norm,
-                    recent_modifications=recent_mods,
-                    checked_at=checked_at,
-                )
+            abrogating_norm = {
+                "urn": abr_urn or "",
+                "estremi": abr_estremi or "",
+                "date": abr_date or "",
+            }
+            warning_msg = self._format_warning("abrogato", abrogating_norm)
+            return ValidityResult(
+                urn=urn,
+                status="abrogato",
+                is_valid=False,
+                warning_level="critical",
+                warning_message=warning_msg,
+                last_modified=str(last_modified) if last_modified else None,
+                modification_count=mod_count,
+                abrogating_norm=abrogating_norm,
+                recent_modifications=recent_mods,
+                checked_at=checked_at,
+                pending=pending,
+            )
 
         if relevant_mod_count > 0:
             last_mod_date = str(last_modified) if last_modified else "data non disponibile"
@@ -491,6 +545,7 @@ class TemporalValidityService:
                 modification_count=mod_count,
                 recent_modifications=recent_mods,
                 checked_at=checked_at,
+                pending=pending,
             )
 
         # Vigente senza modifiche rilevanti
@@ -504,6 +559,7 @@ class TemporalValidityService:
             modification_count=mod_count,
             recent_modifications=recent_mods,
             checked_at=checked_at,
+            pending=pending,
         )
 
     def _format_warning(self, status: str, details: Dict[str, Any]) -> str:

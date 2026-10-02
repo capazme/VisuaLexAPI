@@ -448,6 +448,7 @@ async def get_trace_validity(
                     replacing_norm=r.replacing_norm,
                     recent_modifications=r.recent_modifications,
                     checked_at=r.checked_at,
+                    pending=r.pending,
                 )
                 for r in summary.results
             ],
