@@ -249,8 +249,12 @@ async def rekey_versions(client, apply: bool) -> dict[str, Any]:
                 "v.node_id = CASE WHEN v.node_id IS NULL OR v.node_id = $old THEN $new ELSE v.node_id END",
                 {"id": row["id"], "old": old, "new": new},
             )
+    # Linked under the canonical name or a legacy one: a dry run has not renamed the legacy
+    # edges yet (on --apply none is left), and must not count those versions as unlinked.
+    version_of = "|".join([Rel.VERSIONE_DI.value, *(old for old, new in LEGACY_REL.items() if new is Rel.VERSIONE_DI)])
     for row in await client.query(
-        "MATCH (v:Norma {tipo_documento: 'versione_storica'}) WHERE NOT (v)-[:VERSIONE_DI]->() RETURN v.URN AS urn"
+        "MATCH (v:Norma {tipo_documento: 'versione_storica'}) "
+        f"WHERE NOT (v)-[:{version_of}]->() RETURN v.URN AS urn"
     ):
         article = canonical_urn(row["urn"])
         if not article or article == row["urn"] or not await _norma_holds(client, article):
@@ -274,7 +278,7 @@ async def unify_stubs(
     (`numero_articolo`, `estremi`, `node_id`, a Boolean `is_stub`), the others removed
     (`stub_source`, `created_at`, `fonte`, `trust`...). Its provenance is always
     `ingestion`: a stub carries no seed content, and a `seed` stamp would survive the
-    ingestion that completes it (backfill_provenance_seed stamped every node).
+    ingestion that completes it (the old seed backfill stamped every node).
 
     The estremi are the shape's, except for an act the URN table does not know: there
     the stored estremi ("Art. 5 LEGGE 8 marzo 1975, n. 39") say more than the URN, and
@@ -368,6 +372,44 @@ async def reset_entity_writer_stamps(
                     {"ids": chunk, "p": value},
                 )
     return {value: len(ids) for value, ids in by_value.items()}
+
+
+async def reset_seed_outside_seed(
+    client, apply: bool, batch: int, seed_keys: set[str], shaped: set[int],
+    renames: dict[int, tuple[str, str]] | None = None,
+) -> int:
+    """`seed` on a node the Libro IV seed never brought becomes `ingestion`, without trust.
+    The old seed backfill stamped `seed`, trust 1.0, on every node without a provenance:
+    run after a lazy ingestion, it stamped ingested articles, commi, lettere, doctrine and
+    rulings too, which would then read as seed and never be re-embedded (Task 7).
+
+    The nodes `stamp_provenance` stamps, so neither a community entity nor a live source,
+    whose provenance is their own; nor a stub `unify_stubs` shaped (`shaped`), which has its
+    shape's. A node keeps `seed` when its key is the seed's, or was before `wrap_bare_keys`
+    gave it a new one (`renames`: a dry run has not written the new key, --apply has)."""
+    renamed_from = {node: old for node, (old, _) in (renames or {}).items()}
+    ids: list[int] = []
+    seen: set[int] = set()
+    for label in PROVENANCE_LABELS:
+        rows = await client.query(
+            f"MATCH (n:{label.value}) WHERE n.provenance = $seed AND NOT n:Entity AND NOT id(n) IN $shaped "
+            "RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key",
+            {"seed": Provenance.SEED.value, "shaped": sorted(shaped)},
+        )
+        for row in rows:
+            if row["id"] in seen:
+                continue
+            seen.add(row["id"])
+            if row["key"] in seed_keys or renamed_from.get(row["id"]) in seed_keys:
+                continue
+            ids.append(row["id"])
+    if apply:
+        for chunk in _chunks(ids, batch):
+            await client.query(
+                "UNWIND $ids AS i MATCH (n) WHERE id(n) = i SET n.provenance = $p, n.trust = NULL",
+                {"ids": chunk, "p": Provenance.INGESTION.value},
+            )
+    return len(ids)
 
 
 def plan_estremi(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -543,10 +585,13 @@ async def drop_stale_text(client, apply: bool) -> int:
 
 
 async def stamp_fingerprints(client, apply: bool, batch: int) -> int:
+    """`testo_sha256` on every article with a text. An empty text gets none, as the writers
+    give it none: sha256("") would be a fingerprint of nothing."""
     rows = await client.query(
         "MATCH (n:Norma) WHERE n.testo_sha256 IS NULL AND coalesce(n.testo, n.testo_vigente) IS NOT NULL "
         "RETURN id(n) AS id, coalesce(n.testo, n.testo_vigente) AS testo"
     )
+    rows = [row for row in rows if row["testo"]]
     if apply:
         values = [{"id": row["id"], "sha": text_fingerprint(row["testo"])} for row in rows]
         for chunk in _chunks(values, batch):
@@ -698,6 +743,7 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
         "versions": await rekey_versions(client, apply),
         "stubs": await unify_stubs(client, apply, batch, renames, shaped),
         "provenance_reset": await reset_entity_writer_stamps(client, apply, batch, seed_keys, shaped),
+        "provenance_seed_outside_seed": await reset_seed_outside_seed(client, apply, batch, seed_keys, shaped, renames),
         "estremi": await rewrite_estremi(client, apply, batch, shaped),
         "provenance_legacy": await remap_provenance(client, apply, shaped),
         "provenance": await stamp_provenance(client, apply, batch, seed_keys, shaped),
@@ -723,7 +769,8 @@ def plan_qdrant(points: list[tuple[Any, dict]]) -> dict[str, Any]:
             retype[source_type] = retype.get(source_type, 0) + 1
             source_type = LEGACY_SOURCE_TYPE[source_type].value
         urn = payload.get("article_urn") or ""
-        canonical = canonical_urn(urn) or ""
+        # keyed as the graph keys it: a bare `urn:nir:` URN is wrapped, as `wrap_bare_keys` does
+        canonical = canonical_urn(wrapped_norm_key(urn)) or ""
         if isinstance(pid, int) and not canonical:
             unkeyed.append(pid)  # point_id("", ...) is one id for all of them: reported, never re-keyed
         elif isinstance(pid, int):  # keyed by Python's per-process hash(): lazy ingestion before this round
@@ -822,25 +869,38 @@ def _qdrant_client():
     return QdrantClient(host=os.getenv("QDRANT_HOST", "localhost"), port=int(os.getenv("QDRANT_PORT", "6333")))
 
 
+def _report_half(half: dict[str, Any]) -> None:
+    """One half's report on stderr, on one line, as soon as it is ready: if the other half
+    fails, this one is not lost with the final report."""
+    print(json.dumps(half, ensure_ascii=False), file=sys.stderr, flush=True)
+
+
 async def _run(apply: bool, batch: int) -> dict[str, Any]:
     from merlt.scripts.load_seed_libro_iv import SEED_GRAPH_JSON
     from merlt.storage.vectors.collection import default_chunks_collection
 
     if not SEED_GRAPH_JSON.exists():
         raise SystemExit(f"{SEED_GRAPH_JSON} is missing: provenance cannot tell the seed from ingestion")
+    seed_keys = load_seed_keys(SEED_GRAPH_JSON)
+    # The vectors' store first, before anything is written: a missing collection (or an
+    # unreachable Qdrant) stops the run here, not after the graph has been migrated.
+    qdrant = _qdrant_client()
+    collection = default_chunks_collection()
+    if not qdrant.collection_exists(collection_name=collection):
+        raise SystemExit(f"Qdrant collection {collection!r} is missing: nothing was migrated")
     client = FalkorDBClient()
     await client.connect()
     try:
         # The indexes first: the migration's MERGEs and MATCHes look nodes up by their keys.
         indexes_graph = await ensure_graph_indexes(client, apply)
-        graph_report = await migrate_graph(client, apply=apply, batch=batch, seed_keys=load_seed_keys(SEED_GRAPH_JSON))
+        graph_report = await migrate_graph(client, apply=apply, batch=batch, seed_keys=seed_keys)
         integrity = await integrity_report(client)
     finally:
         await client.close()
-    qdrant = _qdrant_client()
-    collection = default_chunks_collection()
+    _report_half({"half": "graph", "applied": apply, "graph": graph_report, "indexes": indexes_graph, "integrity": integrity})
     indexes_vectors = ensure_payload_indexes(qdrant, collection, apply)
     vectors_report = migrate_qdrant(qdrant, collection, apply=apply)
+    _report_half({"half": "vectors", "applied": apply, "vectors": vectors_report, "indexes": indexes_vectors})
     return {
         "applied": apply, "graph": graph_report, "vectors": vectors_report,
         "indexes": {"graph": indexes_graph, "vectors": indexes_vectors}, "integrity": integrity,
@@ -860,7 +920,8 @@ def main() -> None:
     parser.add_argument("--batch", type=_batch_arg, default=500, help=f"rows per statement, 1 to {MAX_BATCH}")
     args = parser.parse_args()
     # stdout carries the report alone, so that it can be kept as JSON; the log goes to
-    # stderr, without the per-query debug lines.
+    # stderr, without the per-query debug lines, with each half's report as soon as it is
+    # ready (one JSON line each, `"half": "graph"` then `"half": "vectors"`).
     structlog.configure(
         logger_factory=structlog.PrintLoggerFactory(sys.stderr),
         wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),

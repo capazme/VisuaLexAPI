@@ -1,4 +1,7 @@
-"""The migration's pure parts and its vector half (Qdrant in memory)."""
+"""The migration's pure parts, its vector half (Qdrant in memory) and its run."""
+import json
+
+import pytest
 from qdrant_client import QdrantClient, models
 
 from merlt.scripts import migrate_graph_vocabulary as mig
@@ -77,3 +80,101 @@ def test_a_lazy_point_without_an_article_is_reported_never_rekeyed():
     client.upsert("chunks", points=[models.PointStruct(id=11, vector=[1, 0, 0, 0], payload={"source_type": "norma"})])
     assert mig.migrate_qdrant(client, "chunks", apply=True)["unkeyed"] == 1
     assert [p.id for p in client.scroll("chunks", limit=10)[0]] == [11]
+
+
+BARE = "urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043"
+
+
+def test_a_bare_article_urn_is_wrapped_as_the_graph_keys_it():
+    # The graph migration wraps a bare `urn:nir:` key into the Normattiva URL; a point that
+    # names its article bare must name it the same way, or the bridge never meets the node.
+    plan = mig.plan_qdrant([
+        (SEED_ID, {"article_urn": BARE + "!vig=2020-01-01", "source_type": "norma"}),
+        (321, {"article_urn": BARE, "source_type": "norma"}),
+    ])
+    assert plan["urn_fixes"] == [(SEED_ID, CC)]
+    assert [(old, new, payload["article_urn"]) for old, new, payload in plan["rekey"]] == [(321, point_id(CC, "norma"), CC)]
+
+
+# The run: the Qdrant half is checked before the graph is touched, and each half reports at once
+
+
+class _Falkor:
+    def __init__(self):
+        self.connected = False
+
+    async def connect(self):
+        self.connected = True
+
+    async def close(self):
+        pass
+
+
+class _Qdrant:
+    def __init__(self, exists=True):
+        self.exists = exists
+
+    def collection_exists(self, collection_name):
+        return self.exists
+
+
+def _stub_run(monkeypatch, tmp_path, qdrant):
+    import merlt.scripts.load_seed_libro_iv as seed
+
+    seed_file = tmp_path / "seed.json"
+    seed_file.write_text('{"nodes": []}', encoding="utf-8")
+    monkeypatch.setattr(seed, "SEED_GRAPH_JSON", seed_file)
+    falkor = _Falkor()
+    calls = []
+
+    async def migrate_graph(client, **kwargs):
+        calls.append("graph")
+        return {"relations": {"cita": 1}}
+
+    async def ensure_graph_indexes(client, apply):
+        return 0
+
+    async def integrity_report(client):
+        return {"isolated_nodes": 0}
+
+    monkeypatch.setattr(mig, "FalkorDBClient", lambda: falkor)
+    monkeypatch.setattr(mig, "_qdrant_client", lambda: qdrant)
+    monkeypatch.setattr(mig, "migrate_graph", migrate_graph)
+    monkeypatch.setattr(mig, "ensure_graph_indexes", ensure_graph_indexes)
+    monkeypatch.setattr(mig, "integrity_report", integrity_report)
+    monkeypatch.setattr(mig, "ensure_payload_indexes", lambda client, collection, apply: [])
+    return falkor, calls
+
+
+async def test_a_missing_collection_stops_the_run_before_the_graph_is_touched(monkeypatch, tmp_path):
+    falkor, calls = _stub_run(monkeypatch, tmp_path, _Qdrant(exists=False))
+    with pytest.raises(SystemExit, match="collection"):
+        await mig._run(apply=True, batch=10)
+    assert calls == [] and falkor.connected is False
+
+
+async def test_the_graph_report_survives_a_failure_of_the_vector_half(monkeypatch, tmp_path, capsys):
+    _, calls = _stub_run(monkeypatch, tmp_path, _Qdrant())
+
+    def broken(client, collection, *, apply, batch=256):
+        raise RuntimeError("qdrant went away")
+
+    monkeypatch.setattr(mig, "migrate_qdrant", broken)
+    with pytest.raises(RuntimeError):
+        await mig._run(apply=True, batch=10)
+    assert calls == ["graph"]
+    lines = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
+    assert lines == [{
+        "half": "graph", "applied": True, "graph": {"relations": {"cita": 1}},
+        "indexes": 0, "integrity": {"isolated_nodes": 0},
+    }]
+
+
+async def test_each_half_reports_on_stderr_and_the_whole_on_stdout(monkeypatch, tmp_path, capsys):
+    _stub_run(monkeypatch, tmp_path, _Qdrant())
+    monkeypatch.setattr(mig, "migrate_qdrant", lambda client, collection, *, apply, batch=256: {"rekeyed": 0})
+    report = await mig._run(apply=False, batch=10)
+    halves = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
+    assert [half["half"] for half in halves] == ["graph", "vectors"]
+    assert halves[1] == {"half": "vectors", "applied": False, "vectors": {"rekeyed": 0}, "indexes": []}
+    assert report["graph"] == halves[0]["graph"] and report["vectors"] == halves[1]["vectors"]

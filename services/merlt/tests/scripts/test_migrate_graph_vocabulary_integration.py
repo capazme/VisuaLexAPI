@@ -48,7 +48,7 @@ NO_TWINS = {"community": [], "seed_near_duplicates": []}
 NO_STUBS = {"reshaped": 0, "set": {}, "removed": {}, "reported": []}
 NOTHING = {
     "relations_collapsed": {}, "relations": {}, "legacy_entity_labels": {}, "bare_keys": {"wrapped": 0, "reported": []},
-    "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": NO_STUBS, "provenance_reset": {}, "estremi": 0,
+    "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": NO_STUBS, "provenance_reset": {}, "provenance_seed_outside_seed": 0, "estremi": 0,
     "provenance_legacy": {"remapped": {}, "unknown": {}}, "provenance": {}, "fonte": {},
     "certezza": {"converted": 0, "reported": []}, "testo": 0, "stale_text": 0,
     "fingerprint": 0, "entity_labels": {}, "entity_node_id": 0, "twins": NO_TWINS,
@@ -327,7 +327,7 @@ async def test_two_legacy_edges_that_end_in_one_canonical_type_are_reported_as_c
 
 
 async def test_a_stub_stamped_seed_takes_ingestion_and_loses_its_trust(graph):
-    # backfill_provenance_seed stamped every node, stubs too; a stub carries no seed content.
+    # The old seed backfill stamped every node, stubs too; a stub carries no seed content.
     stub = CODE + "~art1499"
     await graph.query("CREATE (:Norma {URN: $u, is_stub: true, provenance: 'seed', trust: 1.0})", {"u": stub})
     await _migrate(graph, SEED_KEYS | {stub})
@@ -478,3 +478,60 @@ async def test_a_certezza_written_as_a_string_becomes_a_number(graph):
     exact = await graph.query("MATCH ()-[r:RINVIA]->() WHERE r.certezza = 0.9 RETURN count(r) AS n")
     assert exact == [{"n": 2}]  # 0.9 as a double, not FalkorDB's single-precision parse of '0.9'
     assert await mig.number_certezza(graph, apply=True, batch=2) == {"converted": 0, "reported": reported}
+
+
+async def test_a_seed_stamp_on_what_the_seed_never_brought_becomes_ingestion(graph):
+    # The old seed backfill stamped `seed`, trust 1.0, on every node without a provenance: run
+    # after a lazy ingestion, it stamped ingested articles, commi, doctrine and rulings too.
+    # Those would read as seed, and Task 7 would never re-embed them.
+    ingested = CODE + "~art1510"
+    comma = ingested + "-com1"
+    await graph.query(
+        "CREATE (:Norma {URN: $art, node_id: $art, tipo_documento: 'articolo', testo: 'Ingerito.', provenance: 'seed', trust: 1.0}), "
+        "(:Comma {URN: $comma, node_id: $comma, testo: 'Un comma.', provenance: 'seed', trust: 1.0}), "
+        "(:Dottrina {node_id: 'dottrina:ingerita', descrizione: 'Nota.', provenance: 'seed', trust: 1.0}), "
+        "(:AttoGiudiziario {node_id: 'massima:ingerita', massima: 'Massima.', provenance: 'seed', trust: 1.0}), "
+        "(:Norma {URN: $seeded, node_id: $seeded, tipo_documento: 'articolo', testo: 'Del seed.', provenance: 'seed', trust: 1.0}), "
+        "(:Entity:ConcettoGiuridico {id: 'concetto:adottato', node_id: 'concetto:adottato', provenance: 'seed'})",
+        {"art": ingested, "comma": comma, "seeded": ART3},
+    )
+    seed_keys = SEED_KEYS | {ART3}
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=seed_keys)
+    report = await _migrate(graph, seed_keys)
+    assert dry == report
+    assert report["provenance_seed_outside_seed"] == 4
+    rows = await graph.query("MATCH (n) WHERE n.provenance IS NOT NULL RETURN coalesce(n.URN, n.node_id) AS k, n.provenance AS p, n.trust AS t")
+    by_key = {row["k"]: (row["p"], row["t"]) for row in rows}
+    for key in (ingested, comma, "dottrina:ingerita", "massima:ingerita"):
+        assert by_key[key] == ("ingestion", None), key
+    assert by_key[ART3] == ("seed", 1.0)  # the seed brought it
+    assert by_key["concetto:adottato"] == ("seed", None)  # a community entity's provenance is its own
+    assert (await _migrate(graph, seed_keys))["provenance_seed_outside_seed"] == 0
+
+
+async def test_a_version_linked_under_the_legacy_name_is_not_counted_as_linked_by_the_dry_run(graph):
+    version = ART + "!vig=2020-01-01"
+    await graph.query(
+        "MATCH (a:Norma {URN: $art}) "
+        "CREATE (:Norma {URN: $v, node_id: $v, tipo_documento: 'versione_storica', testo_storico: 'Vecchio.'})-[:versione_di]->(a)",
+        {"art": ART, "v": version},
+    )
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
+    assert dry == report
+    assert report["versions"] == {"rekeyed": 0, "linked": 0, "reported": []}
+    assert report["relations"]["versione_di"] == 1
+
+
+async def test_an_empty_text_gets_no_fingerprint(graph):
+    # The writers write no fingerprint for an empty text; sha256("") would claim one.
+    empty = CODE + "~art1511"
+    await graph.query(
+        "CREATE (:Norma {URN: $u, node_id: $u, tipo_documento: 'articolo', testo: '', testo_vigente: ''})", {"u": empty}
+    )
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
+    assert dry == report
+    assert report["fingerprint"] == 1  # the fixture's article only
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.testo_sha256 AS h", {"u": empty}) == [{"h": None}]
+    assert (await _migrate(graph))["fingerprint"] == 0
