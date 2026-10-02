@@ -38,6 +38,14 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
     article numbers and needs no network.
+  - `normattiva_validity.py` — what a Normattiva article page says about its own
+    validity: the window ("Testo in vigore dal … al …"), the version number, the
+    act's last update, and a state (`current`, `historical`, `not_yet`,
+    `abrogated`). Read from the raw page the scraper already keeps in its
+    persistent cache (the key is the URN `get_document` returns), so it costs no
+    request and never touches `article_text` (gotcha 23). Best effort: a page it
+    cannot read yields no `validity` key at all, never a guess. It also holds the
+    two request guards, `reject_future_version_date` and `is_historical_request`.
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -139,6 +147,15 @@ POST unless noted, JSON bodies.
   for `HEALTH_DETAILED_TTL` seconds (120) behind an `asyncio.Lock`, so N
   concurrent cold callers run one probe; the body carries `cached` and the
   status stays 503 while a source fails. Never wire it to a tight loop
+
+`validity` rides next to `article_text` in `/stream_article_text`,
+`/fetch_article_text` and `/fetch_all_data` (Normattiva only; absent when the page
+cannot be read): `{state, valid_from, valid_to, version_number, act_updated,
+request_in_window}`, dates in ISO form. It is the source's own statement of which
+version came back; `norma_data.data_versione` is only the date the caller sent. A
+`version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
+current text and say nothing — and a request for a past text (`version: "originale"`
+or a `version_date`) never asks Brocardi, whose commentary carries no date.
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
@@ -349,3 +366,14 @@ Breaking one of these breaks the product. Read before editing.
     `pdf_cache_path(urn, directory)` is the only way a cache path is built: a file
     directly inside `download/`. Any new path derived from a request goes through the
     same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.
+
+31. **The window a page states is the only statement of which version came back.**
+    `NormaVisitata.data_versione` is the date the caller *sent*, echoed. Normattiva
+    answers a date after today with the current text and no sign (hence
+    `reject_future_version_date`), and a date before an article existed with a page
+    whose text reads "NON ANCORA ESISTENTE O VIGENTE". Read the window from the page
+    (`normattiva_validity.py`), never from the request, and say nothing when the page
+    cannot be read. The window says which text was in force, not which discipline
+    governs a fact: transitional provisions and retroactive rules are not on the page.
+    `tests/test_normattiva_validity_live.py` (`-m live`) re-checks the extraction
+    against the portal.
