@@ -14,7 +14,7 @@ import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys
 import { formatCitation } from '../../../utils/normaMeta';
 import { formatNormCitation, withCitation } from '../../../utils/citation';
 import { todayInRome } from '../../../utils/dateUtils';
-import { describeVersion, historicalItemLabel, requestIsHistorical } from '../../../utils/versionDisplay';
+import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
@@ -112,7 +112,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
       norma,
       validity: article?.validity,
       requestedDate: norma.data_versione?.trim() || undefined,
-      original: !norma.data_versione?.trim() && norma.versione === 'originale',
+      original: !norma.data_versione?.trim() && requestIsHistorical(norma),
       consultedAt: todayInRome(),
     })
     : null);
@@ -153,6 +153,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
   const { updatesOpen, openNote, closeNote, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
     enabled: isReady,
     contentKey: markedHtml,
+    // A past text opens its notes (the rule that applies is often in them); the toggle still folds them.
+    updatesOpenByDefault: display?.updateNotesOpen ?? false,
   });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
@@ -197,6 +199,11 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
   };
 
   const handlePopupCopy = async (text: string) => {
+    // The table decides what may leave the page: a text it refuses is not copied under any label.
+    if (display && !display.canCopyOrSave) {
+      showToast(display.copyBlockedReason ?? '', 'info');
+      return;
+    }
     try {
       await navigator.clipboard.writeText(withCitation(text, citationNow(), `\n\n---\nTratto da: ${formatCitation(norma)}`));
       showToast('Testo copiato con citazione', 'success');
@@ -206,10 +213,15 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
   };
 
   const handleCopyCitation = async () => {
+    if (display && !display.canCopyOrSave) {
+      showToast(display.copyBlockedReason ?? '', 'info');
+      return;
+    }
     try {
       // A past text is cited as the version it is; with no honest citation, none is copied.
+      // An act of the Union has none by design (the server ignores the day), and the plain one is true.
       const citation = citationNow();
-      if (historical && !citation) return;
+      if (historical && !citation && !isEuropeanAct(norma.tipo_atto)) return;
       await navigator.clipboard.writeText(citation ? citation.long : formatCitation(norma));
       showToast('Citazione copiata', 'success');
     } catch {
@@ -257,7 +269,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
             setComposer({ rect, anchorText: text, startOffset });
           }}
           onPopupCopy={handlePopupCopy}
-          updatesOpen={updatesOpen || Boolean(display?.updateNotesOpen)}
+          updatesOpen={updatesOpen}
           copyOnly={readOnly}
         />
       )}

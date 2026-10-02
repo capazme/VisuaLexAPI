@@ -1,5 +1,5 @@
-import { beforeEach, describe, it, expect, vi, type Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi, type Mock } from 'vitest';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('../../../utils/articleFetchCache', () => ({ fetchArticleForNorma: vi.fn() }));
 
@@ -8,6 +8,8 @@ import { DossierItemReader } from './DossierItemReader';
 import { appStore } from '../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
+import { formatCitation } from '../../../utils/normaMeta';
+import { UNRELIABLE_REASON } from '../../../utils/versionDisplay';
 import type { ArticleValidity, Highlight, NormaVisitata } from '../../../types';
 
 const RAW = fixtureText('nrm-cc-1284');
@@ -36,9 +38,12 @@ const highlight: Highlight = {
 
 let writeText: Mock<(text: string) => Promise<void>>;
 
-function read(norma: NormaVisitata, validity?: ArticleValidity, text = RAW) {
+function read(
+  norma: NormaVisitata, validity?: ArticleValidity, text = RAW,
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void = () => {},
+) {
   vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: text, norma_data: norma, validity });
-  return render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
+  return render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={showToast} />);
 }
 
 beforeEach(() => {
@@ -72,6 +77,23 @@ describe('DossierItemReader — a past text', () => {
   it('opens the update notes', async () => {
     const { container } = read(PAST_ITEM, MIDDLE);
     await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
+    expect(container.querySelector('.vlx-art')).toHaveClass('vlx-updates-open');
+  });
+
+  it('opens the update notes by default and lets the toggle close and reopen them, saying the truth', async () => {
+    const { container } = read(PAST_ITEM, MIDDLE);
+    await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
+    const toggle = () => container.querySelector('.vlx-updates-toggle') as HTMLElement;
+    expect(toggle()).not.toBeNull();
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('.vlx-art')).toHaveClass('vlx-updates-open');
+
+    fireEvent.click(toggle());
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-expanded', 'false'));
+    expect(container.querySelector('.vlx-art')).not.toHaveClass('vlx-updates-open');
+
+    fireEvent.click(toggle());
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-expanded', 'true'));
     expect(container.querySelector('.vlx-art')).toHaveClass('vlx-updates-open');
   });
 
@@ -115,6 +137,103 @@ describe('DossierItemReader — the citation', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Copia citazione/ }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText).toHaveBeenCalledWith('codice civile n. 262 del 1942-03-16, Art. 1284 (Allegato 2)');
+  });
+});
+
+describe('DossierItemReader — "Original" in any case', () => {
+  it('cites the original text for an item whose version is written " Originale "', async () => {
+    read({ ...CURRENT_ITEM, versione: ' Originale ' }, MIDDLE);
+    fireEvent.click(await screen.findByRole('button', { name: /Copia citazione/ }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\., nel testo originale/);
+  });
+});
+
+describe('DossierItemReader — an act of the Union opened with a stale day', () => {
+  const EU_ITEM: NormaVisitata = {
+    tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', numero_articolo: '5',
+    versione: 'vigente', data_versione: '2007-10-12',
+  };
+
+  it('copies the plain citation of the article: the server ignores the day, so it is the true one', async () => {
+    read(EU_ITEM);
+    const button = await screen.findByRole('button', { name: /Copia citazione/ });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith(formatCitation(EU_ITEM));
+  });
+});
+
+describe('DossierItemReader — a text the table says may not be copied', () => {
+  const RECT = { x: 40, y: 120, width: 90, height: 18 };
+  const originalRect = Range.prototype.getBoundingClientRect;
+  const WORDS = 'Gli interessi superiori alla misura legale';
+
+  beforeEach(() => {
+    // jsdom has no layout: give the range a rect so the popup can position.
+    Range.prototype.getBoundingClientRect = () =>
+      ({ ...RECT, top: RECT.y, left: RECT.x, right: RECT.x + RECT.width, bottom: RECT.y + RECT.height, toJSON: () => ({}) }) as DOMRect;
+  });
+  afterEach(() => {
+    Range.prototype.getBoundingClientRect = originalRect;
+    window.getSelection()?.removeAllRanges();
+  });
+
+  function select(container: HTMLElement, needle: string) {
+    const root = container.querySelector('.vlx-art');
+    if (!root) throw new Error('no text on screen');
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+      const at = node.data.indexOf(needle);
+      if (at < 0) continue;
+      const range = document.createRange();
+      range.setStart(node, at);
+      range.setEnd(node, at + needle.length);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      fireEvent.mouseUp(root);
+      return;
+    }
+    throw new Error(`"${needle}" is not in the text`);
+  }
+
+  it('does not copy the selected words of a version that does not contain the day, and says why', async () => {
+    const showToast = vi.fn();
+    const { container } = read(PAST_ITEM, { ...MIDDLE, request_in_window: false }, RAW, showToast);
+    await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
+    select(container, WORDS);
+    fireEvent.click(await screen.findByTitle(/^Copia \(/));
+    await act(async () => { await Promise.resolve(); }); // the handler is async: let a write, if any, happen
+    expect(writeText).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(UNRELIABLE_REASON, 'info');
+    expect(showToast).not.toHaveBeenCalledWith('Testo copiato con citazione', 'success');
+  });
+
+  it('does not copy the citation either (an item with no day asked, on a version that does not contain today)', async () => {
+    // The button is locked only for a past request; here nothing was asked, so the guard in the handler is what refuses.
+    const showToast = vi.fn();
+    read(CURRENT_ITEM, { ...MIDDLE, request_in_window: false }, RAW, showToast);
+    const button = await screen.findByRole('button', { name: /Copia citazione/ });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await act(async () => { await Promise.resolve(); });
+    expect(writeText).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(UNRELIABLE_REASON, 'info');
+  });
+
+  it('copies the selected words of a reliable past text with the citation first (the control)', async () => {
+    const showToast = vi.fn();
+    const { container } = read(PAST_ITEM, MIDDLE, RAW, showToast);
+    await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
+    select(container, WORDS);
+    fireEvent.click(await screen.findByTitle(/^Copia \(/));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0][0];
+    expect(copied.startsWith('art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 (Normattiva')).toBe(true);
+    expect(copied).toContain(WORDS);
+    expect(showToast).toHaveBeenCalledWith('Testo copiato con citazione', 'success');
   });
 });
 
