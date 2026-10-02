@@ -3030,19 +3030,19 @@ Read the dry-run report before going on: every number must be explainable. `grap
 
 b. **Merge A and B back to back:** mark capazme/VisuaLexAPI#39 ready, merge it with `merge: refactor/merlt-graph-vocabulary — one vocabulary for the graph's writers and readers`, then merge B with `merge: feat/merlt-graph-migration — the graph and its vectors move to the one vocabulary`.
 
-c. **At once**, with the MERL-T containers stopped: between the merge and the rebuild, the running images carry the code from before A, which writes the old relation names and integer Qdrant ids. Stop them, apply, rebuild, start, and apply once more as a check:
+c. **At once**, with the MERL-T containers stopped: between the merge and the rebuild, the running images carry the code from before A, which writes the old relation names and integer Qdrant ids. Update the main checkout first, then stop them, apply, rebuild, start, and apply once more as a check:
 
 ```bash
-docker compose -f infra/compose.yml --profile merlt stop merlt-api merlt-worker
-run merlt.scripts.migrate_graph_vocabulary --apply
-git -C "$MAIN" switch develop && git -C "$MAIN" pull --ff-only
-git -C "$MAIN" merge-base --is-ancestor "$B_HEAD" HEAD   # the images are built from B's code, or not at all
+git -C "$MAIN" switch develop && git -C "$MAIN" pull --ff-only \
+  && git -C "$MAIN" merge-base --is-ancestor "$B_HEAD" HEAD \
+  && docker compose -f infra/compose.yml --profile merlt stop merlt-api merlt-worker \
+  && run merlt.scripts.migrate_graph_vocabulary --apply
 docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
 docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
 run merlt.scripts.migrate_graph_vocabulary --apply     # the check
 ```
 
-The images are built from the main checkout: without the pull they would carry the code from before A, the old writers, and the check would find their writes. If `merge-base --is-ancestor` fails, stop: `develop` there does not hold B. The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `certezza.reported`, `provenance_legacy.unknown`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
+The pull and the ancestry check come before anything is stopped or applied, joined with `&&`: if `B=$MAIN`, `--apply` runs on the pulled code, and the images are built from it. Without the pull both would carry the code from before A, the old writers, and the check would find their writes. If the pull or `merge-base --is-ancestor` fails, the line stops there and so does the round: `develop` there does not hold B. The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `certezza.reported`, `booleans.reported`, `provenance_legacy.unknown`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
 
 d. **Then the gate again:**
 
