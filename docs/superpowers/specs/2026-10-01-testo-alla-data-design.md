@@ -107,8 +107,14 @@ kept outside the repository and none is committed; §7 recaptures trimmed fixtur
 - **Latency.** Normattiva alone answered in 0.18–2.26 s (median 0.66 s), pages from 90 KB to
   1.65 MB. The 15–25 s a reader waited for a historical text in the development stack (an audit run
   on 2026-09-30, not kept in the repository) is therefore not Normattiva's; the stream handler
-  also waits for Brocardi (§1.3). Not yet measured per
-  component; the plan measures it.
+  also waits for Brocardi (§1.3). Measured on 2 October 2026 with the app's own handlers
+  against the real portals, five cold requests each, median: the text in force with Brocardi
+  2.5 s; without it 2.6 s; a past text, Brocardi asked for and not fetched, 2.5 s (four cold
+  reads of 2.4–3.0 s and one answered from the cache in 0.2 s). Brocardi, fetched alongside the
+  text, did not lengthen the read in this sample, so leaving it out of a past text is a
+  correctness guard (doctrine is current and carries no date), not a speed-up, and the 15–25 s
+  of the audit run are not reproduced; the guard is checked by counting the fetches (five in
+  force, none for a past text).
 - **Which act produced a version.** The update table is reachable (needs a Normattiva session;
   0.1–0.6 s) and returns the article's *whole* list of amendments (24 rows for art. 1284,
   identical for versions 7 and 8). Attributing version N to row N−1 held 4 times out of 5
