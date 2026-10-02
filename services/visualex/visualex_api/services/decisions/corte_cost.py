@@ -33,7 +33,8 @@ from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
 
 BASE_URL = "https://dati.cortecostituzionale.it/opendata/distribuzione/pronunce"
-PAGE_URL = "https://www.cortecostituzionale.it/scheda-pronuncia"  # opened by the reader's browser, never fetched
+# opened by the reader's browser, never fetched
+PAGE_URL = "https://www.cortecostituzionale.it/scheda-pronuncia"
 BUNDLES: list[tuple[int, int, str]] = [
     (1956, 1980, "P_json1956_1980.zip"),
     (1981, 2000, "P_json1981_2000.zip"),

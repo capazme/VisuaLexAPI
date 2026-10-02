@@ -27,10 +27,11 @@ Two mechanisms, with different guarantees:
   catch a URL assembled from fragments at runtime, and nothing here claims
   otherwise.
 - **Runtime.** `is_allowed()` is checked in `ThrottledHttpClient.request` before
-  every request made **through the shared HTTP client**, so a host that is not on
-  the list is refused there even if the URL was built dynamically. That client
-  carries the scrapers' document fetches; it is not the only way this process
-  opens a socket.
+  every request made **through a `ThrottledHttpClient`** (the shared one and the
+  court-decision readers' own), so a host that is not on the list is refused
+  there even if the URL was built dynamically. Those clients carry the scrapers'
+  document fetches and the court-decision lookups; they are not the only way this
+  process opens a socket.
 
 ### Not yet covered
 

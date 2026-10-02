@@ -207,7 +207,7 @@ README states the minimum version.
 
 | `esito` | Status | Content |
 |---|---|---|
-| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form) |
+| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form, text withheld by the source) |
 | `ambigua` | 200 | `candidati`: identity and attributes of each |
 | `non_trovata` | 404 | `motivo` (see below), `archivio_dal` when known, `suggerimento` when found |
 | `fonte_non_raggiungibile` | 503 | `fonte` |
@@ -282,6 +282,7 @@ year may be a different decision.
   |---|---|
   | found | 30 days: a deposited decision does not change |
   | not found | 1 hour: indexing lags, and the other series may reach that number later |
+  | found without its text | 24 hours: the source withholds it while personal data are removed |
   | error | never |
 
 - **Behind the login** with the per-user quota (ADR-001). The route is added
@@ -314,7 +315,10 @@ over the reader. From the top:
      actually carries.
    - **Aggiungi al dossier** (§6).
    - **Apri sulla fonte**, only if the plan verifies a stable per-decision
-     address at the source; otherwise it is absent.
+     address at the source; otherwise it is absent. Verified on 2026-10-02 for
+     the Corte costituzionale
+     (`www.cortecostituzionale.it/scheda-pronuncia/<anno>/<numero>`); none for
+     the Cassazione.
 4. **The text**, in the blocks the source gives (epigrafe, motivazione,
    dispositivo), at the reader's 68ch measure. Rendering follows S6: within a
    block, the text nodes spell the received text minus `\n`, as gotcha 23
@@ -431,7 +435,9 @@ repository.
   User-Agent; the egress allowlist; the per-user quota.
 - **Personal data.** A decision is shown as its source publishes it, with the
   anonymisation the source applies, and is held only in caches. The owner
-  confirmed this posture.
+  confirmed this posture. When the source withholds a text while it removes
+  personal data (Italgiure answers with its own notice), the page shows the
+  decision's particulars and says so: the notice is never shown as the text.
 - **Login.** No open redirect (§5).
 - **Imports.** Imported items are untrusted (§6).
 - **Licences.** The README's third-party sentence names the Corte di cassazione

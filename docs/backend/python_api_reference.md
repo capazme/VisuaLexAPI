@@ -252,6 +252,208 @@ Get the hierarchical article structure (tree) for a complete law. Useful for doc
 
 ---
 
+### POST `/fetch_decision`
+
+Read one decision of the Corte di cassazione or of the Corte costituzionale from its
+reference: the court, the number and the year a citation gives. The text comes back whole,
+never cut. Cassazione decisions come from Italgiure's public archive (SentenzeWeb), Corte
+costituzionale decisions from the court's open data. Behind the ingress the route needs a
+login like the other scraping routes, and a call costs two points of the user's quota.
+Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `corte` | string | Yes | `cassazione` or `corte_costituzionale` |
+| `numero` | integer | Yes | The decision's number, 1 to 999999 (a string of digits is accepted) |
+| `anno` | integer | Yes | The year of the number, from 1900 (1956 for the Corte costituzionale) to the current year. For a penal decision of the Cassazione it is the year of deposit |
+| `archivio` | string | No | `civile` or `penale` (Cassazione only). Without it both archives are read |
+| `sezione` | string | No | The section the citation names, a hint and never part of the identity (Cassazione only): `1`-`7` or `I`-`VII`, `SU`, `U` or `unite` (Sezioni Unite), `L` (lavoro), `F` (feriale), `T` (tributaria: civil section 5, and it implies `archivio` `civile` when none is given), in any case and with or without dots (`S.U.`). A form that is not recognised is ignored, with a notice |
+
+**Example Request:**
+```json
+{
+  "corte": "cassazione",
+  "numero": 10787,
+  "anno": 2024,
+  "archivio": "civile"
+}
+```
+
+**Response:** always JSON with `esito`. Unlike the other endpoints, a failure is an `esito`
+body too, not `{"error": ...}`.
+
+| `esito` | Status | Content |
+|---------|--------|---------|
+| `trovata` | 200 | `identita`, `attributi`, `testo`, `fonte`, `avvisi` |
+| `ambigua` | 200 | `candidati`: the identity and attributes of each decision found |
+| `non_trovata` | 404 | `motivo`, `archivio_dal` when known, `suggerimento` when found |
+| `fonte_non_raggiungibile` | 503 | `fonte`: `cassazione` or `corte_costituzionale` |
+| `richiesta_non_valida` | 400 | `errori`: each bad field, with what was expected |
+
+**`trovata`** carries:
+- `identita`: `{corte, numero, anno, archivio?}`, what VisuaLex resolved. `archivio` is always
+  there for the Cassazione. Its key is `cassazione:<archivio>:<numero>:<anno>` or
+  `corte_costituzionale:<numero>:<anno>`.
+- `attributi`: the particulars the source has, and only those: `sezione`, `tipo` (sentenza,
+  ordinanza, ordinanza interlocutoria, decreto), `data_deposito` and `data_decisione` (ISO
+  dates; the second for the Corte costituzionale), `ecli` (Corte costituzionale), `relatore`,
+  `presidente`, `materia`.
+- `testo`: the blocks the source gives, each whole: `epigrafe` (Corte costituzionale),
+  `motivazione`, `dispositivo` (a block the source leaves empty is absent). It is `{}` when
+  the source withholds the text (notice `testo_non_disponibile`).
+- `fonte`: `nome`; `licenza` (Corte costituzionale: CC BY-SA 3.0, credited wherever the text
+  appears); `url` (Corte costituzionale only: the court's page for that decision, for the
+  reader's browser, which this server never contacts). The Cassazione has no `url`.
+- `avvisi`: the notices below.
+
+**Example answers.** The particulars come from the tests; the text blocks and the names are
+elided with `…`.
+
+`trovata`, Cassazione:
+```json
+{
+  "esito": "trovata",
+  "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "civile"},
+  "attributi": {"sezione": "3", "tipo": "sentenza"},
+  "testo": {"motivazione": "…"},
+  "fonte": {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)"},
+  "avvisi": []
+}
+```
+
+`trovata`, Corte costituzionale (`{"corte": "corte_costituzionale", "numero": 1, "anno": 2014}`):
+```json
+{
+  "esito": "trovata",
+  "identita": {"corte": "corte_costituzionale", "numero": 1, "anno": 2014},
+  "attributi": {
+    "tipo": "sentenza",
+    "data_deposito": "2014-01-13",
+    "data_decisione": "2013-12-04",
+    "ecli": "ECLI:IT:COST:2014:1",
+    "relatore": "…",
+    "presidente": "…"
+  },
+  "testo": {"epigrafe": "…", "motivazione": "…", "dispositivo": "…"},
+  "fonte": {
+    "nome": "Corte costituzionale — dati aperti",
+    "licenza": "CC BY-SA 3.0",
+    "url": "https://www.cortecostituzionale.it/scheda-pronuncia/2014/1"
+  },
+  "avvisi": []
+}
+```
+
+`trovata` without its text:
+```json
+{
+  "esito": "trovata",
+  "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "civile"},
+  "attributi": {"sezione": "3", "tipo": "ordinanza"},
+  "testo": {},
+  "fonte": {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)"},
+  "avvisi": [{"tipo": "testo_non_disponibile"}]
+}
+```
+
+`ambigua`, when both archives hold the number and the section does not pick exactly one
+(`{"corte": "cassazione", "numero": 10787, "anno": 2024}`):
+```json
+{
+  "esito": "ambigua",
+  "candidati": [
+    {
+      "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "civile"},
+      "attributi": {"sezione": "3", "tipo": "sentenza"}
+    },
+    {
+      "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "penale"},
+      "attributi": {"sezione": "7", "tipo": "sentenza"}
+    }
+  ]
+}
+```
+
+`non_trovata` (`{"corte": "cassazione", "numero": 1, "anno": 2019, "archivio": "civile"}`):
+```json
+{
+  "esito": "non_trovata",
+  "motivo": "fuori_archivio",
+  "archivio_dal": "2021-02-17"
+}
+```
+
+`non_trovata` with a suggestion (`{"corte": "cassazione", "numero": 1399, "anno": 2023, "archivio": "penale"}`):
+```json
+{
+  "esito": "non_trovata",
+  "motivo": "inesistente",
+  "suggerimento": {"corte": "cassazione", "numero": 1399, "anno": 2024, "archivio": "penale"}
+}
+```
+
+`fonte_non_raggiungibile`:
+```json
+{
+  "esito": "fonte_non_raggiungibile",
+  "fonte": "cassazione"
+}
+```
+
+`richiesta_non_valida` (`{"corte": "tar", "numero": 1, "anno": 2024}`):
+```json
+{
+  "esito": "richiesta_non_valida",
+  "errori": {"corte": "atteso cassazione o corte_costituzionale"}
+}
+```
+A body that is not a JSON object answers `{"body": "atteso un oggetto JSON"}` in `errori`.
+
+**`motivo`** of a `non_trovata`:
+- `inesistente`: the archive covers that year and holds no such number.
+- `fuori_archivio`: the year is before the start of Italgiure's public archive, a moving
+  window; `archivio_dal`, when known, is the day it starts.
+- `anno_parziale`: the first year of that archive, which is only partly covered;
+  `archivio_dal`, when known, is the day it starts.
+
+`suggerimento` is the identity of a penal decision with the same number in the next year
+(a penal number belongs to the year of deposit, so a December hearing is numbered in
+January). It is offered, never followed: a different year may be a different decision.
+
+**Notices (`avvisi`)**, one entry per notice, each with its `tipo`:
+- `sezione_diversa`: the section cited is not the decision's; the decision is returned all the
+  same (`citata`, `effettiva`).
+- `archivio_dedotto`: no archive was given, both held the number, and the section picked one
+  (`archivio`, `sezione`).
+- `sezione_non_riconosciuta`: the section is in none of the accepted forms and was ignored
+  (`citata`).
+- `testo_non_disponibile`: the source withholds the text while it removes personal data;
+  `testo` is `{}`. The source's own notice is never passed on as the text.
+
+**Caches.** Each archive lookup is cached on its own and the answer is composed from them, so a
+homonym deposited later in the other archive is never hidden:
+
+| Lookup result | Kept for |
+|---------------|----------|
+| found | 30 days |
+| not found | 1 hour |
+| found without its text | 24 hours |
+| error | never |
+
+A Corte costituzionale range bundle is kept on disk: 30 days for a closed range, 24 hours for
+the one that holds the current year.
+
+**Status Codes:**
+- `200`: `trovata` or `ambigua`
+- `400`: `richiesta_non_valida`
+- `404`: `non_trovata`
+- `503`: `fonte_non_raggiungibile`. A source that cannot be reached is never reported as
+  `non_trovata`
+
+---
+
 ## History Endpoints
 
 ### GET `/history`
