@@ -231,7 +231,7 @@ async def main():
         [nv] = await controller.create_norma_visitata_from_data(request)
         raw = await normattiva_scraper.request_document(nv.urn, source="normattiva")
         note = (f"Trimmed: div.vigore, the update link, the act line and div.bodyTesto of {nv.urn}, "
-                "as served on 2026-10-01, wrapped in <html><body>. See README.md.")
+                "as served on 2026-10-02, wrapped in <html><body>. See README.md.")
         trimmed = trim(raw, note)
         (OUT / name).write_text(trimmed, encoding="utf-8")
         window = cut(raw, r'<div[^>]*\bclass="[^"]*\bvigore\b[^"]*"[^>]*>.*?</div>', "div.vigore")
@@ -288,7 +288,7 @@ The extractor's output for every file here is frozen (CLAUDE.md gotcha 23:
 with:
 
 ```markdown
-Trimmed captures of 2026-10-01, for the validity reader
+Trimmed captures of 2026-10-02, for the validity reader
 (`normattiva_validity.py`, spec `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`).
 Each keeps the four blocks the reader looks at, as served — `div.vigore` (the window),
 the update link, the "Ultimo aggiornamento" line and `div.bodyTesto` — wrapped in
@@ -521,7 +521,7 @@ class TestCapturedPages:
 
 
 class TestRecapturedPages:
-    """Trimmed pages captured from the portal on 2026-10-01 (`fixtures/normattiva/README.md`).
+    """Trimmed pages captured from the portal on 2026-10-02 (`fixtures/normattiva/README.md`).
 
     They assert what the portal printed, so a change in its markup shows up here first.
     """
@@ -1059,7 +1059,10 @@ import pytest
 from app import NormaController, normattiva_scraper
 from visualex_api.services.normattiva_validity import read_validity
 
-pytestmark = pytest.mark.live
+# The scraper's HTTP client keeps one aiohttp session for the life of the process,
+# so the six cases must share one event loop: with one loop per test the second case
+# finds the first one's loop closed ("Event loop is closed").
+pytestmark = [pytest.mark.live, pytest.mark.asyncio(loop_scope="module")]
 
 PAUSE = 3  # seconds between two requests to the portal
 
@@ -1124,6 +1127,8 @@ Run: `(cd services/visualex && .venv/bin/python -m pytest tests/test_normattiva_
 Expected: `6 tests collected`. Then `(cd services/visualex && .venv/bin/python -m pytest tests/test_normattiva_validity_live.py -q)`, without `-m live`: `6 deselected`.
 
 Running it for real asks the portal for six pages (about thirty seconds). It is a new request to a third party, so ask the owner first, as in Task 1. Expected: `6 passed`. A failure says which key differs: if the reader misreads a real page, fix the module; if the portal legitimately says something else than this plan guessed (the dates of art. 594 c.p., the original text of art. 18), fix the expected value in the live test and tell the owner.
+
+First real run (2 October 2026): the plan's first draft marked the module only `live`, and five of the six cases failed with `Event loop is closed` — pytest-asyncio gives each test its own loop and `ThrottledHttpClient` (`visualex_api/services/http_client.py`) keeps one aiohttp session for the life of the process. With the module-scoped loop above all six passed (`6 passed in 26.35s`), which also confirmed the expected values for art. 594 c.p. and art. 18 of l. 300/1970. Run the file on its own: `http_client` is a process-wide singleton, so a session another live module left bound to a closed loop would still break the first case in a combined `-m live` run.
 
 - [ ] **Step 6: The whole Python suite**
 
