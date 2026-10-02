@@ -33,11 +33,14 @@ from merlt.benchmark.metrics import (
     LatencyMetrics,
     compute_retrieval_metrics,
     compute_latency_metrics,
-    distinct_in_order,
     recall_at_k,
     mrr,
 )
 from merlt.benchmark.gold_standard import GoldStandard, Query, QueryCategory
+
+# A search returns chunks, the benchmark scores articles: ask for this many
+# chunks per article wanted, so that k distinct articles survive deduplication.
+CHUNKS_PER_ARTICLE = 3
 
 log = structlog.get_logger()
 
@@ -50,10 +53,11 @@ class QueryResult:
     Attributes:
         query_id: ID della query
         query_text: Testo della query
-        retrieved_urns: URN recuperati (ordinati per score)
+        retrieved_urns: URN recuperati, uno per articolo (ordinati per score)
         relevant_urns: URN rilevanti (ground truth)
-        scores: Score per ogni URN recuperato
-        source_types: Tipo di source per ogni URN (norma, spiegazione, etc.)
+        scores: Score del miglior chunk di ogni URN (allineato a retrieved_urns)
+        source_types: Tipo di source di quel chunk (norma, spiegazione, etc.),
+            allineato a retrieved_urns
         latency_ms: Latenza totale in millisecondi
         recall_at_5: Recall@5 per questa query
         reciprocal_rank: RR per questa query
@@ -174,6 +178,24 @@ class BenchmarkConfig:
     latency_iterations: int = 100
     latency_warmup: int = 10
     include_hybrid: bool = True
+
+
+def _best_chunk_per_article(
+    search_results: List[Dict[str, Any]], limit: int
+) -> List[Dict[str, Any]]:
+    """The first chunk of each article, up to `limit` articles; a hit without
+    a URN belongs to no article and is skipped."""
+    seen = set()
+    best = []
+    for hit in search_results:
+        urn = hit.get("urn", "")
+        if not urn or urn in seen:
+            continue
+        seen.add(urn)
+        best.append(hit)
+        if len(best) == limit:
+            break
+    return best
 
 
 class RAGBenchmark:
@@ -343,19 +365,22 @@ class RAGBenchmark:
         for query in self.gold_standard:
             start = time.time()
 
-            # Cerca nel knowledge graph
+            # Cerca nel knowledge graph: la ricerca restituisce chunk, il
+            # benchmark misura articoli, quindi se ne chiedono di piu'
             search_results = await self._search_with_source_filter(
                 query.text,
                 source_type=source_type,
-                top_k=self.config.top_k
+                top_k=self.config.top_k * CHUNKS_PER_ARTICLE
             )
 
             latency_ms = (time.time() - start) * 1000
 
-            # Estrai URN (un articolo una volta) e score (per chunk, grezzi)
-            retrieved_urns = distinct_in_order([r.get("urn", "") for r in search_results])
-            scores = [r.get("score", 0.0) for r in search_results]
-            source_types = [r.get("source_type", "unknown") for r in search_results]
+            # Un articolo una volta, col primo chunk (il migliore: i risultati
+            # sono ordinati per score); URN, score e tipo restano allineati
+            best_chunks = _best_chunk_per_article(search_results, self.config.top_k)
+            retrieved_urns = [r["urn"] for r in best_chunks]
+            scores = [r.get("score", 0.0) for r in best_chunks]
+            source_types = [r.get("source_type", "unknown") for r in best_chunks]
 
             # Calcola metriche per questa query
             r_at_5 = recall_at_k(retrieved_urns, query.relevant_urns, k=5)
