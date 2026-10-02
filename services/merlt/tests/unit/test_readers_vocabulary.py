@@ -291,10 +291,18 @@ async def test_the_history_reports_lowercase_events_from_the_graphs_names():
     assert [event["event"] for event in timeline] == ["modifica"]
 
 
-async def test_the_history_leaves_out_future_amendments_unless_asked():
-    # `include_future` was accepted and ignored: a norm's history listed an amendment that
-    # had not yet entered into force as if it had happened. Without the flag, an event dated
-    # after today is out and an undated one stays; today is a parameter, never Cypher text.
+_PAST = {"event_type": "MODIFICA", "by_urn": "past", "by_estremi": "L. 1/2020", "event_date": "2020-02-01", "description": "", "future": False}
+_COMING = {"event_type": "MODIFICA", "by_urn": "coming", "by_estremi": "L. 9/2099", "event_date": "2099-01-01", "description": "", "future": True}
+_UNDATED = {"event_type": "INSERISCE", "by_urn": "undated", "by_estremi": "Atto", "event_date": "", "description": "", "future": False}
+
+
+def _history_graph():
+    return _GraphRecorder(answers=[("RETURN event_type", [_PAST, _COMING, _UNDATED])])
+
+
+async def test_the_history_dates_and_flags_events_in_the_query_with_today_a_parameter():
+    # The date comparison stays in Cypher, against today as a parameter (never Cypher text);
+    # an empty date is never in the future. The filter is applied to the flag, not in Cypher.
     from datetime import date
 
     from merlt.tools.historical_evolution import HistoricalEvolutionTool
@@ -307,10 +315,8 @@ async def test_the_history_leaves_out_future_amendments_unless_asked():
     assert method == "ro_query"
     assert params == {"urn": CC, "today": "2026-10-02"}
     assert "$today" in cypher and "2026" not in cypher
-    # the filter reads the event's date as the query returns it, and an empty date passes
-    assert "WHERE event_date = '' OR left(event_date, 10) <= $today" in cypher
-    assert cypher.index("coalesce(r.data_efficacia") < cypher.index("WHERE event_date")
-    assert cypher.index("WHERE event_date") < cypher.index("RETURN event_type")
+    assert "(event_date <> '' AND left(event_date, 10) > $today) AS future" in cypher
+    assert cypher.index("coalesce(r.data_efficacia") < cypher.index("AS future")
     assert "ORDER BY event_date ASC" in cypher
 
 
@@ -325,54 +331,108 @@ async def test_an_amendment_is_dated_by_its_edge_first():
     assert "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS event_date" in graph.cyphers[0]
 
 
-async def test_the_history_counts_the_future_amendments_it_leaves_out():
+async def test_by_default_the_history_shows_a_future_amendment_flagged():
+    # The model sees only `result.data`: a future amendment left out would be silently
+    # hidden, and "no amendment coming" is what a lawyer must never be told wrongly.
     from merlt.tools.historical_evolution import HistoricalEvolutionTool
 
-    graph = _GraphRecorder(answers=[("RETURN count(*) AS future", [{"future": 2}])])
-    result = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=CC)
+    result = await HistoricalEvolutionTool(graph_db=_history_graph()).execute(article_urn=CC)
     assert result.success, result.error
-    assert result.metadata["future_omitted"] == 2
-    count = next(c for c in graph.cyphers if "AS future" in c)
-    assert "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS event_date" in count
-    assert "left(event_date, 10) > $today" in count and "2026" not in count
-    assert set(graph.methods) == {"ro_query"}
-    # asked for the future, nothing is left out and nothing is counted
-    asked = _GraphRecorder()
-    result = await HistoricalEvolutionTool(graph_db=asked).execute(article_urn=CC, include_future=True)
+    assert [(e["by_urn"], e["future"]) for e in result.data["timeline"]] == [
+        ("past", False), ("coming", True), ("undated", False),
+    ]
+    assert result.data["include_future"] is True
     assert result.metadata["future_omitted"] == 0
-    assert not any("AS future" in c for c in asked.cyphers)
 
 
-def test_the_history_tells_the_model_that_future_amendments_are_left_out():
-    # Without it the model reads "no amendment coming", which is what a lawyer needs to know.
+async def test_an_undated_event_is_not_flagged_future():
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _GraphRecorder(answers=[("RETURN event_type", [{**_UNDATED, "future": None}])])
+    timeline = await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, True, None)
+    assert [(e["by_urn"], e["future"]) for e in timeline] == [("undated", False)]
+
+
+async def test_without_include_future_a_future_amendment_is_left_out_and_counted():
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _history_graph()
+    result = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=CC, include_future=False)
+    assert [e["by_urn"] for e in result.data["timeline"]] == ["past", "undated"]
+    assert result.data["total_events"] == 2
+    assert result.metadata["future_omitted"] == 1
+    assert set(graph.methods) == {"ro_query"}
+
+
+def test_the_history_tells_the_model_that_future_amendments_are_shown_and_flagged():
     from merlt.tools.historical_evolution import HistoricalEvolutionTool
 
     tool = HistoricalEvolutionTool()
     flag = next(p for p in tool.parameters if p.name == "include_future")
-    assert "include_future" in tool.description and "dopo oggi" in tool.description
-    assert "dopo oggi" in flag.description and "default" in flag.description
+    assert "future" in tool.description and "include_future=false" in tool.description
+    assert flag.default is True
+    assert "future" in flag.description and "default" in flag.description
 
 
-async def test_the_history_with_include_future_is_not_filtered_by_date():
+async def test_the_history_tool_defaults_to_include_future():
     from merlt.tools.historical_evolution import HistoricalEvolutionTool
 
-    graph = _GraphRecorder()
-    await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, True, None)
-    assert graph.params[0] == {"urn": CC}
-    assert "today" not in graph.cyphers[0] and "WHERE" not in graph.cyphers[0]
-    assert "<-[r:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]-" in graph.cyphers[0]
-    assert graph.methods == ["ro_query"]
+    tool = HistoricalEvolutionTool(graph_db=_history_graph())
+    assert len((await tool.execute(article_urn=CC)).data["timeline"]) == 3
+    assert len((await tool.execute(article_urn=CC, include_future=True)).data["timeline"]) == 3
+    assert len((await tool.execute(article_urn=CC, include_future=False)).data["timeline"]) == 2
 
 
-async def test_the_history_tool_passes_include_future_down_to_the_timeline():
+# The status: an abrogation or a replacement that has not taken effect yet leaves the norm in force
+
+
+def _status_graph(*ends):
+    rows = [
+        {"is_vigente": True, "end_type": end_type, "event_date": event_date, "future": future,
+         "by_urn": f"act:{end_type}", "by_estremi": f"L. {end_type}"}
+        for end_type, event_date, future in ends
+    ] or [{"is_vigente": True, "end_type": None, "event_date": "", "future": False, "by_urn": None, "by_estremi": None}]
+    return _GraphRecorder(answers=[("AS end_type", rows)])
+
+
+async def test_a_pending_abrogation_leaves_the_norm_in_force_and_is_reported():
     from merlt.tools.historical_evolution import HistoricalEvolutionTool
 
-    graph = _GraphRecorder()
+    graph = _status_graph(("ABROGA", "2099-01-01", True))
     tool = HistoricalEvolutionTool(graph_db=graph)
-    await tool.execute(article_urn=CC)  # the default is no future
-    await tool.execute(article_urn=CC, include_future=True)
-    timeline_params = [p for c, p in zip(graph.cyphers, graph.params) if "RETURN event_type" in c]
-    assert "today" in timeline_params[0] and "today" not in timeline_params[1]
+    assert await tool._get_status(CC) == ("vigente", [
+        {"type": "abroga", "date": "2099-01-01", "by_urn": "act:ABROGA", "by_estremi": "L. ABROGA"},
+    ])
+    cypher, params = graph.cyphers[0], graph.params[0]
+    assert graph.methods == ["ro_query"]
+    assert set(params) == {"urn", "today"} and "$today" in cypher
+    assert "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '')" in cypher
+    assert "<-[r:ABROGA|SOSTITUISCE]-" in cypher
+
+
+@pytest.mark.parametrize("ends, status, pending", [
+    ((("ABROGA", "2020-01-01", False),), "abrogato", []),
+    ((("ABROGA", "", False),), "abrogato", []),  # undated: nothing says it is in the future
+    ((("SOSTITUISCE", "2020-01-01", False), ("ABROGA", "2020-01-01", False)), "sostituito", []),
+    ((("SOSTITUISCE", "2099-01-01", True), ("ABROGA", "2020-01-01", False)), "abrogato", ["sostituisce"]),
+    ((), "vigente", []),
+])
+async def test_the_status_reads_only_the_ends_that_have_taken_effect(ends, status, pending):
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    found, coming = await HistoricalEvolutionTool(graph_db=_status_graph(*ends))._get_status(CC)
+    assert (found, [p["type"] for p in coming]) == (status, pending)
+
+
+async def test_the_history_reports_the_pending_ends_in_its_data():
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _status_graph(("ABROGA", "2099-01-01", True))
+    result = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=CC)
+    assert result.data["current_status"] == "vigente"
+    assert result.data["pending"] == [
+        {"type": "abroga", "date": "2099-01-01", "by_urn": "act:ABROGA", "by_estremi": "L. ABROGA"},
+    ]
 
 
 async def test_textual_references_follow_the_graphs_relations():

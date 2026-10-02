@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import importlib
 import uuid
+from datetime import date, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -303,11 +304,11 @@ async def test_history_lists_the_events_and_the_status(graph):
     assert [await tool._get_current_status(urn) for urn in (ART1, ART2, ART3)] == ["vigente", "abrogato", "sostituito"]
 
 
-async def test_the_history_leaves_out_future_amendments_unless_asked(graph):
+async def test_the_history_shows_future_amendments_flagged_unless_told_otherwise(graph):
     # Four amendments of one article, dated on the edge as multivigenza writes them: one in the
     # past, two that take effect years ahead (a MODIFICA and a SOSTITUISCE), one with no date at
-    # all. The future ones are out by default, counted in `future_omitted`, and in with
-    # `include_future`; the undated one is never dropped.
+    # all. By default every one is shown, the future ones flagged; with include_future=False the
+    # future ones are left out and counted in `future_omitted`. The undated one is never future.
     art = "urn:test:future-art"
     await graph.query(
         """
@@ -326,17 +327,44 @@ async def test_the_history_leaves_out_future_amendments_unless_asked(graph):
     tool = HistoricalEvolutionTool(graph_db=graph)
     default = await tool.execute(article_urn=art)
     assert default.success, default.error
-    assert sorted(e["by_urn"] for e in default.data["timeline"]) == ["urn:test:past", "urn:test:undated"]
-    assert default.data["total_events"] == 2
-    assert default.metadata["future_omitted"] == 2
-    assert [e["date"] for e in default.data["timeline"] if e["by_urn"] == "urn:test:past"] == ["2020-02-01"]
-    everything = await tool.execute(article_urn=art, include_future=True)
-    assert sorted(e["by_urn"] for e in everything.data["timeline"]) == [
-        "urn:test:future", "urn:test:later", "urn:test:past", "urn:test:undated",
+    assert sorted((e["by_urn"], e["future"]) for e in default.data["timeline"]) == [
+        ("urn:test:future", True), ("urn:test:later", True), ("urn:test:past", False), ("urn:test:undated", False),
     ]
-    assert everything.metadata["future_omitted"] == 0
+    assert default.metadata["future_omitted"] == 0
+    assert [e["date"] for e in default.data["timeline"] if e["by_urn"] == "urn:test:past"] == ["2020-02-01"]
+    # the replacement has not taken effect: the article is in force, with one pending change
+    assert default.data["current_status"] == "vigente"
+    assert default.data["pending"] == [
+        {"type": "sostituisce", "date": "2098-06-01", "by_urn": "urn:test:later", "by_estremi": "L. 8/2025"},
+    ]
+    today_only = await tool.execute(article_urn=art, include_future=False)
+    assert sorted(e["by_urn"] for e in today_only.data["timeline"]) == ["urn:test:past", "urn:test:undated"]
+    assert today_only.data["total_events"] == 2
+    assert today_only.metadata["future_omitted"] == 2
     no_future_replacement = await tool._get_timeline(art, False, ["sostituisce"])
     assert no_future_replacement == []
+
+
+@pytest.mark.parametrize("when, status, pending", [
+    ("tomorrow", "vigente", ["abroga"]),
+    ("yesterday", "abrogato", []),
+    ("undated", "abrogato", []),  # nothing says it is in the future
+])
+async def test_an_abrogation_counts_from_the_day_it_takes_effect(graph, when, status, pending):
+    days = {"tomorrow": 1, "yesterday": -1}
+    effect = (date.today() + timedelta(days=days[when])).isoformat() if when in days else None
+    art = f"urn:test:abrogated-{when}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.'}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 7/2026', tipo_documento: 'legge'}) "
+        "CREATE (act)-[r:ABROGA {disposizione: 'art. 1', certezza: 1.0, fonte: 'Normattiva'}]->(a) "
+        "SET r.data_efficacia = $effect",
+        {"art": art, "act": art + "-act", "effect": effect},
+    )
+    found, coming = await HistoricalEvolutionTool(graph_db=graph)._get_status(art)
+    assert (found, [p["type"] for p in coming]) == (status, pending)
+    if pending:
+        assert coming[0]["date"] == effect and coming[0]["by_urn"] == art + "-act"
 
 
 async def test_validity_finds_modifications_by_their_edges_without_a_count_property(graph):
