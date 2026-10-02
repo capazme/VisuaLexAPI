@@ -780,6 +780,8 @@ def version_urn(urn: str, version_date: str) -> str:
 
 In `pipeline/multivigenza.py`, import `canonical_urn` and `version_urn` from `merlt.storage.graph.schema`; in `_save_version` replace `versioned_urn = f"{base_urn}!vig={version_date}"` with `versioned_urn = version_urn(base_urn, version_date)`, and the link query's `"art_urn": base_urn` with `"art_urn": canonical_urn(base_urn)`.
 
+In `schema.py`, the comment on `Label.ATTO_GIUDIZIARIO` says only "a massima". Make it say what is true now and what changes: today the seed's node is a massima, keyed `massima_<corte>_<numero>`; phase 2 makes the node the ruling (the pronuncia), keyed by the shared decision identity, with its massime as attributes (the owner decided, 1 October; spec §5.1). A comment only: phase 1 changes no key.
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run the command of Step 2. Expected: PASS.
@@ -1978,7 +1980,8 @@ Besides the spec's list, the migration repairs what pull request A's reviews fou
 
 - **The old entity writer's stamps.** Before Task 4 it ran `SET art.provenance = coalesce(art.provenance, 'community_validated'), art.trust = coalesce(art.trust, 1.0)` on every article it linked an entity to. The community validated the link, which carries its own provenance; the article gets back `seed` or `ingestion`, and no `trust`.
 - **Twins, both ways.** The seed key comes from the name by the writer's rule (`seed_twin_slugs`: `seed_twin_slug` as spelt, then without a leading article), never from the community id, which drops accents and hyphens. A seed name may keep its article where the proposal drops it (13 of the seed's 19 article-bearing names have no article-less node), so seed names are indexed under both their keys too. Seed nodes whose names give one community id ("La reticenza", "reticenza": 8 nodes on the development graph) are reported as near-duplicates.
-- **Community entity labels.** The writer before Task 4 labelled a community entity `:Entity:<tipo.capitalize()>` (`Concetto`, `Principio`). Each gains the label of its kind from `schema.ENTITY_LABEL_BY_TYPE` (`entity_label`), idempotently; the label is taken from the map, never from the node. The old label stays: removing it would take a label from data, and the development graph has no such node.
+- **Community entity labels.** The writer before Task 4 labelled a community entity `:Entity:<tipo.capitalize()>` (`Concetto`, `Principio`). Each gains the label of its kind from `schema.ENTITY_LABEL_BY_TYPE` (`entity_label`), idempotently; the label is taken from the map, never from the node. The old label goes (controller's ruling): `LEGACY_ENTITY_LABELS` is a fixed set the script builds from `EntityType` (`tipo.capitalize()` for every type), and every name in it is removed from an `:Entity` node unless it is the label `entity_label(tipo)` gives that node. A reader takes a node's type from its first label that is not `Entity`, and FalkorDB orders labels by creation, so a left-over `Concetto` would read as the type in a graph where it was created before the seed's labels; and a community `norma` entity written `:Entity:Norma` would be matched as a norm by every `(n:Norma)` step. This step runs first, before any step that matches `Norma`. The names come from the code's set, never from the node; `tipo` goes in as a parameter. The development graph has no such node; another graph may.
+- **Provenance outside the schema.** The ingestion before this round stamped `lazy_ingest` (trust 0.6, see `merlt/scripts/backfill_provenance_seed.py`): it becomes `ingestion`. Any other value outside `Provenance` is reported and left alone. The comment in `merlt/storage/graph/entity_writer.py` (~426) that names `lazy_ingest` is corrected to `ingestion`.
 - **Community entity key.** Community entities carry `id` only, so `get_article_relations` answers a null `target_urn` and `get_article_entities` FalkorDB's internal id. Every community entity also carries `node_id = id` (controller's ruling): the entity writer writes it, the migration sets `node_id = coalesce(e.node_id, e.id)`, and the readers that return a node's key read `coalesce(URN, node_id)`. Task 1b indexes `(Entity, node_id)`.
 - **Doubled version keys** (Task 1b). The versions multivigenza keyed `…!vig=!vig=<date>` get `version_urn`'s key and their `VERSIONE_DI` edge to the article.
 - **Stale live-source text.** A `LiveSource` the provisional writer refreshed after Task 4 has `testo` and still its old `text`: the old one goes.
@@ -1993,7 +1996,7 @@ Besides the spec's list, the migration repairs what pull request A's reviews fou
 
 **Interfaces:**
 - Consumes: `LEGACY_REL`, `LEGACY_SOURCE_TYPE`, `Label`, `Provenance`, `Rel`, `SEED_TWIN`, `canonical_urn`, `act_name_from_urn`, `estremi_from_urn`, `normalize_fonte`, `point_id`, `text_fingerprint` (Task 1); `entity_label` (pull request A); `version_urn` (Task 1b); `normalize_entity_name`, `seed_twin_slugs` (`merlt.storage.graph.entity_writer`); `wrapped_norm_key` (`merlt.storage.graph.relation_endpoints`); `FalkorDBClient`; `qdrant_client`; `merlt.scripts.load_seed_libro_iv.SEED_GRAPH_JSON`; `merlt.storage.vectors.collection.default_chunks_collection`.
-- Produces: `python -m merlt.scripts.migrate_graph_vocabulary [--apply] [--batch N]` printing `{"applied", "graph": {"relations", "bare_keys", "versions", "stubs", "provenance_reset", "estremi", "provenance", "fonte", "testo", "stale_text", "fingerprint", "entity_labels", "entity_node_id", "twins"}, "vectors": {"rekeyed", "duplicates_dropped", "retyped", "urns_canonicalized"}}`; `async migrate_graph(client, *, apply, batch, seed_keys) -> dict`; `migrate_qdrant(client, collection, *, apply, batch=256) -> dict`; `plan_estremi(rows) -> list[dict]`; `plan_qdrant(points) -> dict`. A community entity carries `node_id` equal to its `id`.
+- Produces: `python -m merlt.scripts.migrate_graph_vocabulary [--apply] [--batch N]` printing `{"applied", "graph": {"relations", "legacy_entity_labels", "bare_keys", "versions", "stubs", "provenance_reset", "estremi", "provenance_legacy", "provenance", "fonte", "testo", "stale_text", "fingerprint", "entity_labels", "entity_node_id", "twins"}, "vectors": {"rekeyed", "duplicates_dropped", "retyped", "urns_canonicalized"}}`; `async migrate_graph(client, *, apply, batch, seed_keys) -> dict`; `migrate_qdrant(client, collection, *, apply, batch=256) -> dict`; `plan_estremi(rows) -> list[dict]`; `plan_qdrant(points) -> dict`. A community entity carries `node_id` equal to its `id`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2111,8 +2114,9 @@ NO_TWINS = {"community": [], "seed_near_duplicates": []}
 
 # What a run reports when it has nothing to change.
 NOTHING = {
-    "relations": {}, "bare_keys": {"wrapped": 0, "reported": []}, "versions": {"rekeyed": 0, "linked": 0, "reported": []},
-    "stubs": 0, "provenance_reset": {}, "estremi": 0, "provenance": {}, "fonte": {}, "testo": 0, "stale_text": 0,
+    "relations": {}, "legacy_entity_labels": {}, "bare_keys": {"wrapped": 0, "reported": []},
+    "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": 0, "provenance_reset": {}, "estremi": 0,
+    "provenance_legacy": {"remapped": {}, "unknown": {}}, "provenance": {}, "fonte": {}, "testo": 0, "stale_text": 0,
     "fingerprint": 0, "entity_labels": {}, "entity_node_id": 0, "twins": NO_TWINS,
 }
 
@@ -2246,13 +2250,45 @@ async def test_community_entities_get_the_label_of_their_kind_and_a_node_id(grap
     assert report["entity_node_id"] == 4
     rows = await graph.query("MATCH (e:Entity) RETURN e.id AS id, labels(e) AS labels, e.node_id AS nid")
     assert {row["id"]: (set(row["labels"]), row["nid"]) for row in rows} == {
-        "concetto:accordo": ({"Entity", "Concetto", "ConcettoGiuridico"}, "concetto:accordo"),
+        "concetto:accordo": ({"Entity", "ConcettoGiuridico"}, "concetto:accordo"),
         "principio:buona_fede": ({"Entity", "PrincipioGiuridico"}, "principio:buona_fede"),
         "norma:x": ({"Entity"}, "norma:x"),
         "x:y": ({"Entity"}, "x:y"),
     }
     again = await _migrate(graph)
     assert (again["entity_labels"], again["entity_node_id"]) == ({}, 0)
+
+
+async def test_a_community_entity_loses_the_label_the_old_writer_gave_it(graph):
+    await graph.query(
+        "CREATE (:Entity:Norma {id: 'norma:y', tipo: 'norma'}), "
+        "(:Entity:Sanzione {id: 'sanzione:z', tipo: 'sanzione'}), "
+        "(:Entity:Concetto {id: 'concetto:w', tipo: 'concetto'})"
+    )
+    report = await _migrate(graph)
+    # Norma and Concetto came from tipo.capitalize(); Sanzione is the schema label of its kind
+    assert report["legacy_entity_labels"] == {"Norma": 1, "Concetto": 1}
+    rows = await graph.query("MATCH (e:Entity) WHERE e.id IN ['norma:y', 'sanzione:z', 'concetto:w'] RETURN e.id AS id, labels(e) AS labels")
+    assert {row["id"]: set(row["labels"]) for row in rows} == {
+        "norma:y": {"Entity"},
+        "sanzione:z": {"Entity", "Sanzione"},
+        "concetto:w": {"Entity", "ConcettoGiuridico"},
+    }
+    # a community norma entity was never a norm: no Norma step touched it
+    assert await graph.query("MATCH (n:Norma) WHERE n.id = 'norma:y' RETURN n") == []
+    assert (await _migrate(graph))["legacy_entity_labels"] == {}
+
+
+async def test_a_provenance_from_before_this_round_becomes_the_schema_value(graph):
+    await graph.query(
+        "CREATE (:Norma {URN: $a, provenance: 'lazy_ingest'}), (:Norma {URN: $b, provenance: 'handmade'})",
+        {"a": ART + "-legacy-a", "b": ART + "-legacy-b"},
+    )
+    report = await _migrate(graph)
+    assert report["provenance_legacy"] == {"remapped": {"lazy_ingest": 1}, "unknown": {"handmade": 1}}
+    rows = await graph.query("MATCH (n:Norma) WHERE n.URN IN [$a, $b] RETURN n.URN AS u, n.provenance AS p", {"a": ART + "-legacy-a", "b": ART + "-legacy-b"})
+    assert {row["u"]: row["p"] for row in rows} == {ART + "-legacy-a": "ingestion", ART + "-legacy-b": "handmade"}
+    assert (await _migrate(graph))["provenance_legacy"] == {"remapped": {}, "unknown": {"handmade": 1}}
 
 
 async def test_a_doubled_version_key_is_rekeyed_and_linked_to_its_article(graph):
@@ -2397,6 +2433,7 @@ from typing import Any, Iterable
 import structlog
 
 from merlt.storage.graph import FalkorDBClient
+from merlt.pipeline.enrichment.models import EntityType
 from merlt.storage.graph.entity_writer import normalize_entity_name, seed_twin_slugs
 from merlt.storage.graph.relation_endpoints import wrapped_norm_key
 from merlt.storage.graph.schema import (
@@ -2594,6 +2631,60 @@ async def rewrite_estremi(client, apply: bool, batch: int) -> int:
     return len(changes)
 
 
+# Every label the writer before Task 4 could give a community entity: `tipo.capitalize()`.
+# A fixed set from the code; a label name is never read from a node.
+LEGACY_ENTITY_LABELS: tuple[str, ...] = tuple(sorted({t.value.capitalize() for t in EntityType}))
+
+# Provenance values written before this round, and the schema value each one means.
+LEGACY_PROVENANCE: dict[str, Provenance] = {"lazy_ingest": Provenance.INGESTION}
+
+
+async def drop_legacy_entity_labels(client, apply: bool) -> dict[str, int]:
+    """A community entity loses the `tipo.capitalize()` label the old writer gave it,
+    unless that is the schema label of its kind (`Sanzione`, `Caso`, `Dottrina`...).
+    Runs before every step that matches `Norma`: a community `norma` entity written
+    `:Entity:Norma` is no norm."""
+    report: dict[str, int] = {}
+    for row in await client.query("MATCH (e:Entity) WHERE e.tipo IS NOT NULL RETURN DISTINCT e.tipo AS tipo"):
+        tipo = row["tipo"]
+        if not isinstance(tipo, str):
+            continue
+        keep = entity_label(tipo)
+        for legacy in LEGACY_ENTITY_LABELS:
+            if keep is not None and legacy == keep.value:
+                continue
+            match = f"MATCH (e:Entity:`{legacy}`) WHERE e.tipo = $tipo"
+            count = await _count(client, f"{match} RETURN count(e) AS n", {"tipo": tipo})
+            if not count:
+                continue
+            report[legacy] = report.get(legacy, 0) + count
+            if apply:
+                await client.query(f"{match} REMOVE e:`{legacy}`", {"tipo": tipo})
+    return report
+
+
+async def remap_provenance(client, apply: bool) -> dict[str, dict[str, int]]:
+    """A provenance written before this round becomes the schema value it means
+    (`LEGACY_PROVENANCE`); any other value outside `Provenance` is reported, unchanged."""
+    known = {p.value for p in Provenance}
+    report: dict[str, dict[str, int]] = {"remapped": {}, "unknown": {}}
+    for row in await client.query("MATCH (n) WHERE n.provenance IS NOT NULL RETURN DISTINCT n.provenance AS p"):
+        value = row["p"]
+        if value in known:
+            continue
+        count = await _count(client, "MATCH (n) WHERE n.provenance = $p RETURN count(n) AS n", {"p": value})
+        if value in LEGACY_PROVENANCE:
+            report["remapped"][value] = count
+            if apply:
+                await client.query(
+                    "MATCH (n) WHERE n.provenance = $p SET n.provenance = $new",
+                    {"p": value, "new": LEGACY_PROVENANCE[value].value},
+                )
+        else:
+            report["unknown"][str(value)] = count
+    return report
+
+
 async def stamp_provenance(client, apply: bool, batch: int, seed_keys: set[str]) -> dict[str, int]:
     """`seed` for what the Libro IV seed brought, `ingestion` for the rest. A community
     entity is never stamped here, whatever label it carries: its provenance is its own."""
@@ -2675,7 +2766,7 @@ async def label_entities(client, apply: bool) -> dict[str, int]:
     `tipo.capitalize()`) gain the schema label of their kind, as a new one gets it
     (`entity_label`, `schema.ENTITY_LABEL_BY_TYPE`). The label is the map's, never the
     node's: `tipo` only picks the entry, and a type the map does not name gets none.
-    The old label stays: removing it would take a label from data."""
+    The old label is removed first, by `drop_legacy_entity_labels`."""
     report: dict[str, int] = {}
     for row in await client.query("MATCH (e:Entity) WHERE e.tipo IS NOT NULL RETURN DISTINCT e.tipo AS tipo"):
         label = entity_label(row["tipo"]) if isinstance(row["tipo"], str) else None
@@ -2748,11 +2839,13 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
     # then the community entities, whose provenance is their own, then the report.
     return {
         "relations": await rename_relations(client, apply, batch),
+        "legacy_entity_labels": await drop_legacy_entity_labels(client, apply),
         "bare_keys": await wrap_bare_keys(client, apply),
         "versions": await rekey_versions(client, apply),
         "stubs": await unify_stubs(client, apply),
         "provenance_reset": await reset_entity_writer_stamps(client, apply, batch, seed_keys),
         "estremi": await rewrite_estremi(client, apply, batch),
+        "provenance_legacy": await remap_provenance(client, apply),
         "provenance": await stamp_provenance(client, apply, batch, seed_keys),
         "fonte": await normalize_fonti(client, apply),
         "testo": await copy_text(client, apply, batch),
