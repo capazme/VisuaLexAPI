@@ -109,7 +109,7 @@ disagree, **this file wins** (the spec carried assumptions the code contradicts 
 | id | title | files | deps | eff | accept |
 |---|---|---|---|---|---|
 | **B.1** | provenance/trust on all write surfaces | `storage/graph/entity_writer.py`, `pipeline/ingestion.py` (36 MERGE/SET blocks), schema doc | — | M | A lazy-ingested Normattiva node carries `provenance`; seed node shows `provenance` absent-or-`seed`. |
-| **B.2** | one-time seed backfill `provenance=seed, trust=1.0` | `merlt/merlt/scripts/backfill_provenance_seed.py` (new) | B.1 | S | `MATCH (n) WHERE n.provenance='seed' RETURN count(n)` ≈ 27.7k; no null-provenance nodes. |
+| **B.2** | one-time seed backfill `provenance=seed, trust=1.0` | `merlt/merlt/scripts/backfill_provenance_seed.py` (new; removed in the graph vocabulary round: it stamped `seed` on every node without a provenance, ingested ones too, and `merlt.scripts.migrate_graph_vocabulary` now owns provenance) | B.1 | S | `MATCH (n) WHERE n.provenance='seed' RETURN count(n)` ≈ 27.7k; no null-provenance nodes. |
 | **B.3** | provenance-aware traversal (M1) + API surface (M6) | `storage/retriever/retriever.py` (trust factor in `_compute_graph_score`/`_score_path`; isolated-node default at :331), `api/experts_router.py` (`SourceReference`+provenance/trust; stop hardcoding expert/relevance :474-480) | B.1,B.2 | M | `sources[].provenance` populated; a `live_unconfirmed` node still returned (flagged) and ranks below an equivalent `seed` node (verify in `include_trace`). |
 
 ## Phase C — Reasoning→Enrichment bridge
