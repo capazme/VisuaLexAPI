@@ -209,6 +209,48 @@ async def test_a_failed_refresh_never_serves_the_current_year_from_an_old_copy(m
         await _reader(tmp_path).lookup(1, 2026)
 
 
+async def test_a_stale_copy_confirms_a_decision_it_holds_and_never_denies_one(monkeypatch,
+                                                                              tmp_path):
+    _copy_aged(tmp_path, hours=25)
+    _source_down(monkeypatch)
+    reader = _reader(tmp_path)
+    # the copy cannot say that a number does not exist: it may predate the decision, and a
+    # source that cannot be reached is never reported as "not found"
+    with pytest.raises(ValueError):
+        await reader.lookup(9999, 2014)
+    assert (await reader.lookup(1, 2014)).ecli == "ECLI:IT:COST:2014:1"
+
+
+async def test_a_copy_written_during_a_year_cannot_deny_that_years_later_decisions(monkeypatch,
+                                                                                   tmp_path):
+    # written during 2026, when only decisions 1 and 2 were out; it is now January 2027, so
+    # 2026 is a past year the copy would be served for, and the refresh fails
+    records = [dict(SAMPLE[0], numero_pronuncia="1", anno_pronuncia="2026"),
+               dict(SAMPLE[1], numero_pronuncia="2", anno_pronuncia="2026")]
+    path = tmp_path / "P_json2001_oggi.zip"
+    path.write_bytes(make_bundle({2026: records}))
+    expired = time.time() - 25 * 3600
+    os.utime(path, (expired, expired))
+    _source_down(monkeypatch)
+    reader = _reader(tmp_path, today=date(2027, 1, 3))
+    with pytest.raises(ValueError):  # n. 250 of 2026 may have been deposited after the copy
+        await reader.lookup(250, 2026)
+    assert (await reader.lookup(1, 2026)).identita.key() == "corte_costituzionale:1:2026"
+
+
+async def test_a_copy_is_judged_stale_at_every_lookup_not_when_its_year_was_read(monkeypatch,
+                                                                                 tmp_path):
+    _copy_aged(tmp_path, hours=1)  # within the 24 hours: it may deny a number
+    reader = _reader(tmp_path)
+    assert (await reader.lookup(1, 2014)).ecli == "ECLI:IT:COST:2014:1"  # 2014 now in memory
+    assert await reader.lookup(9999, 2014) is None
+    monkeypatch.setattr(corte_cost, "OPEN_TTL", 0)  # the same copy expires, still in memory
+    _source_down(monkeypatch)
+    with pytest.raises(ValueError):  # the records in memory do not carry the old verdict
+        await reader.lookup(9999, 2014)
+    assert (await reader.lookup(1, 2014)).ecli == "ECLI:IT:COST:2014:1"
+
+
 async def test_a_failed_refresh_without_a_copy_is_still_an_error(monkeypatch, tmp_path):
     _source_down(monkeypatch)
     with pytest.raises(NetworkError):

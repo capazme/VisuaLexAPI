@@ -6,8 +6,11 @@ which the reader's browser opens. The complete source is the open-data distribut
 dati.cortecostituzionale.it: three range bundles of per-year JSON (latin-1), the last one
 regenerated daily. A bundle is kept on disk (closed ranges for 30 days, the current one for 24
 hours: D3 of the 2026-08-29 design) and only the requested year is read out of it. When a
-refresh fails, a year before the current one is read from the copy on disk, however old; the
-current year never is. A failed refresh of the 2001-today bundle hides no closed year.
+refresh fails, the copy on disk still confirms a decision it holds for a year before the
+current one, however old; a number it does not hold may have been deposited after the copy was
+written, so it cannot be verified: `lookup` raises ValueError (the resolver answers 503), never
+"not found". The current year is never read from such a copy. A failed refresh of the
+2001-today bundle hides no closed year.
 
 Ported from mcp-legal-it 2.15's open-data client (same author, relicensed MIT): the bundle
 names and the nested layout are its findings. Here the text is never cut.
@@ -172,15 +175,18 @@ class CorteCostReader:
                 return name, (OPEN_TTL if high >= self.today().year else CLOSED_TTL)
         return None
 
-    async def _bundle_path(self, name: str, ttl: int, allow_stale: bool = False) -> Path:
-        """The bundle on disk, downloaded again once older than `ttl`. When that refresh
-        fails and an older copy will do (`allow_stale`: a year before the current one), the
-        copy on disk is served; otherwise the failure propagates."""
+    async def _bundle_path(self, name: str, ttl: int,
+                           allow_stale: bool = False) -> tuple[Path, bool]:
+        """The bundle on disk, downloaded again once older than `ttl`, and whether it is a
+        stale copy. When that refresh fails and an older copy will do (`allow_stale`: a year
+        before the current one), the copy on disk is served and `stale` is True; otherwise the
+        failure propagates. A stale copy was written at some earlier time, so it can hold the
+        decisions deposited by then and no others: it confirms, it never denies."""
         path = self.cache_dir / name
         lock = self._locks.setdefault(name, asyncio.Lock())
         async with lock:  # concurrent misses wait for the same download
             if path.exists() and time.time() - path.stat().st_mtime < ttl:
-                return path
+                return path, False
             try:
                 result = await decisions_http_client.request(
                     "GET", f"{BASE_URL}/{name}", source="corte_cost", text_encoding="latin-1",
@@ -191,13 +197,17 @@ class CorteCostReader:
                     raise
                 log.warning("Corte costituzionale bundle refresh failed; serving the copy on disk",
                             bundle=name, error=str(exc))
-            return path
+                return path, True
+            return path, False
 
-    async def _records(self, year: int) -> list[dict]:
+    async def _records(self, year: int) -> tuple[list[dict], bool]:
+        """The records of one year and whether they come from a stale copy of its bundle. The
+        parsed years kept in memory hold records only: whether the copy is stale is decided
+        again at every call, since the same copy goes stale while the process runs."""
         found = self._bundle(year)
         if found is None:
-            return []
-        path = await self._bundle_path(*found, allow_stale=year < self.today().year)
+            return [], False
+        path, stale = await self._bundle_path(*found, allow_stale=year < self.today().year)
         key = (found[0], path.stat().st_mtime, year)
         if key not in self._years:
             try:
@@ -214,11 +224,15 @@ class CorteCostReader:
             while len(self._years) > self._max_years:
                 self._years.popitem(last=False)
         self._years.move_to_end(key)
-        return self._years[key]
+        return self._years[key], stale
 
     async def lookup(self, numero: int, anno: int) -> Decision | None:
-        for rec in await self._records(anno):
+        records, stale = await self._records(anno)
+        for rec in records:
             if (str(rec.get("numero_pronuncia", "")).strip() == str(numero)
                     and str(rec.get("anno_pronuncia", "")).strip() == str(anno)):
                 return to_decision(rec)
+        if stale:
+            # a copy that could not be refreshed confirms what it holds, never denies the rest
+            raise ValueError(f"{anno}: dati aperti non aggiornabili, n. {numero} non verificabile")
         return None

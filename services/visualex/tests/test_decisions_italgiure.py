@@ -174,6 +174,9 @@ async def test_the_fixed_public_cases_still_answer():
         pen = await reader.lookup("penale", 10787, 2024)
         su = [await reader.lookup(archivio, 41994, 2021) for archivio in ("civile", "penale")]
         missing = await reader.lookup("civile", 999999, 2024)
+        # the public archive is a moving window: once it starts after 2021, the Sezioni Unite
+        # case is out of reach, not broken
+        start = None if any(d is not None for d in su) else await reader.archive_start("civile")
     except TRANSPORT_ERRORS as exc:
         skip_if_unreachable("italgiure", exc)
     assert civ is not None and pen is not None
@@ -181,5 +184,7 @@ async def test_the_fixed_public_cases_still_answer():
     assert len(pen.testo["motivazione"]) > 2000  # the whole text, not a cut
     # the civil text was withheld on 2026-10-02 (personal data being removed): absent or whole
     assert not civ.testo or len(civ.testo["motivazione"]) > 2000
-    assert "U" in {d.sezione for d in su if d is not None}  # civil or penal: both are read
     assert missing is None
+    if start is not None and start[0] > 2021:
+        pytest.skip("the archive window has passed 2021")
+    assert "U" in {d.sezione for d in su if d is not None}  # civil or penal: both are read
