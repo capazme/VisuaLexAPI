@@ -3023,7 +3023,7 @@ docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt
 run merlt.scripts.migrate_graph_vocabulary --apply     # the check
 ```
 
-The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
+The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `certezza.reported`, `provenance_legacy.unknown`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
 
 d. **Then the gate again:**
 
