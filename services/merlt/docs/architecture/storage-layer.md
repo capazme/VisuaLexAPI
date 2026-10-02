@@ -1,5 +1,11 @@
 # Storage Layer Architecture (v2)
 
+> **Superseded vocabulary (October 2026).** The relation names, labels, URN form and Qdrant
+> payload below predate the graph round. The vocabulary in force is defined in
+> `docs/superpowers/specs/2026-09-30-merlt-graph-structure-design.md` §4 and, once phase 1
+> lands, in `merlt/storage/graph/schema.py`. This page stays as the record of the v2 design
+> and of the bridge table (§3).
+
 **Version**: 2.0
 **Status**: IN RIPROGETTAZIONE
 **Last Updated**: Dicembre 2025

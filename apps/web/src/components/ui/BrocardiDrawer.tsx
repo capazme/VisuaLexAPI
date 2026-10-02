@@ -83,7 +83,7 @@ export function BrocardiDrawer({ isOpen, onClose, children, title = "Approfondim
                     {title}
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Annotazioni Brocardi
+                    Annotazioni di dottrina
                   </p>
                 </div>
               </div>

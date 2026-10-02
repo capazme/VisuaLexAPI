@@ -7,7 +7,7 @@ import os
 import asyncio
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
 from visualex_api.tools.config import DOSSIER_FILE, DOSSIER_LIMIT
@@ -87,7 +87,7 @@ class DossierManager:
             'id': str(uuid.uuid4()),
             'title': title,
             'description': description,
-            'createdAt': datetime.utcnow().isoformat() + 'Z',
+            'createdAt': datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + 'Z',
             'items': [],
             'tags': [],
             'isPinned': False
@@ -166,7 +166,7 @@ class DossierManager:
                         'id': str(uuid.uuid4()),
                         'type': item_type,
                         'data': item_data,
-                        'addedAt': datetime.utcnow().isoformat() + 'Z',
+                        'addedAt': datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + 'Z',
                         'status': 'unread'
                     }
                     dossier['items'].append(new_item)
@@ -236,7 +236,7 @@ class DossierManager:
             'id': str(uuid.uuid4()),
             'title': dossier_data.get('title', 'Dossier Importato'),
             'description': dossier_data.get('description', ''),
-            'createdAt': datetime.utcnow().isoformat() + 'Z',
+            'createdAt': datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + 'Z',
             'items': [],
             'tags': dossier_data.get('tags', []),
             'isPinned': False
@@ -248,7 +248,7 @@ class DossierManager:
                 'id': str(uuid.uuid4()),
                 'type': item.get('type', 'norma'),
                 'data': item.get('data'),
-                'addedAt': item.get('addedAt', datetime.utcnow().isoformat() + 'Z'),
+                'addedAt': item.get('addedAt', datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + 'Z'),
                 'status': item.get('status', 'unread')
             }
             new_dossier['items'].append(new_item)

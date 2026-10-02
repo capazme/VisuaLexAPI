@@ -1,0 +1,37 @@
+{
+  "query_id": "q_0003",
+  "query_text": "Come funziona la diffida ad adempiere secondo l'art. 1454?",
+  "synthesis": "La diffida ad adempiere, disciplinata dall'art. 1454 del Codice Civile, \u00e8 uno strumento giuridico che consente alla parte non inadempiente di risolvere di diritto un contratto a seguito dell'inadempimento dell'altra parte.\n\n**Natura e Requisiti:**\nSi tratta di un'intimazione scritta, di natura recettizia, rivolta alla parte inadempiente, con la quale le si richiede di adempiere entro un termine congruo. \u00c8 essenziale che la diffida contenga l'espressa dichiarazione che, decorso inutilmente tale t",
+  "confidence": 0.9000000000000001,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "La diffida ad adempiere \u00e8 un atto mediante il quale la parte non inadempiente pu\u00f2 intimare per iscritto all'altra parte, che \u00e8 inadempiente, di adempiere entro un termine congruo. Questa intimazione deve contenere la dichiarazione che, se il termine decorre inutilmente, il contratto si intender\u00e0 senz'altro risoluto. Il termine per l'adempimento non pu\u00f2 essere inferiore a quindici giorni, a meno che le parti abbiano pattuito diversamente o che, per la natura del contratto o secondo gli usi, un termine minore risulti congruo. Se il termine assegnato decorre senza che il contratto sia stato adempiuto, il contratto \u00e8 risoluto di diritto. Il termine di quindici giorni decorre dal momento in cui la diffida, che \u00e8 un atto recettizio, giunge nella sfera di conoscenza del destinatario.",
+      "confidence": 0.9,
+      "weight": 0.6268656716417911,
+      "weighted_confidence": 0.564179104477612
+    },
+    "systemic": {
+      "interpretation": "La diffida ad adempiere, disciplinata dall'art. 1454 del Codice Civile, \u00e8 uno strumento che consente alla parte non inadempiente di risolvere di diritto un contratto in caso di inadempimento dell'altra parte. Essa consiste in un'intimazione scritta rivolta alla parte inadempiente, con la quale le si chiede di adempiere entro un termine congruo. Contestualmente, deve essere espressamente dichiarato che, decorso inutilmente tale termine, il contratto si intender\u00e0 risolto. Il termine minimo per l'adempimento \u00e8 di quindici giorni, salvo che le parti abbiano pattuito diversamente, o che la natura del contratto o gli usi consentano un termine inferiore. La risoluzione del contratto avviene di diritto una volta che il termine assegnato sia decorso senza che l'adempimento sia avvenuto. La diffida \u00e8 un atto recettizio, pertanto il termine decorre dal momento in cui giunge a conoscenza del destinatario.",
+      "confidence": 0.9,
+      "weight": 0.373134328358209,
+      "weighted_confidence": 0.3358208955223881
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 12351.983,
+  "routing_decision": {
+    "query_type": "general",
+    "expert_weights": {
+      "literal": 0.35,
+      "systemic": 0.25,
+      "principles": 0.2,
+      "precedent": 0.2
+    },
+    "confidence": 0.5,
+    "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+  },
+  "feedback": 0.34405507107458705,
+  "reward": 0.10322212563542886,
+  "user_id": "user_004",
+  "error": null
+}

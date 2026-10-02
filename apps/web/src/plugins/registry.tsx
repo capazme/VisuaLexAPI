@@ -53,7 +53,12 @@ function isFlagEnabled(flag: string | undefined): boolean {
 
 export function getSlotComponents(slot: PluginSlotName): SlotComponent<Record<string, unknown>>[] {
     return slotComponents.filter(
-        (entry) => entry.slot === slot && isFlagEnabled(entry.requiredFlag)
+        (entry) =>
+            entry.slot === slot &&
+            isFlagEnabled(entry.requiredFlag) &&
+            // Every MERL-T slot also needs the master switch: the graph side
+            // rail has its own flag, but its routes die with MERL-T's.
+            (entry.pluginId !== 'visualex-merlt' || isFlagEnabled('VITE_FEATURE_MERLT'))
     );
 }
 

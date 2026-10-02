@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-12-07T01:10:11.017671",
+  "duration_seconds": 18.284729719161987,
+  "stats": {
+    "processed": 5,
+    "with_modifications": 2,
+    "total_modifiche": 2,
+    "atti_creati": 2,
+    "relazioni_create": 2,
+    "errors": []
+  }
+}

@@ -6,7 +6,7 @@ import json
 import os
 import asyncio
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import deque
 from typing import Optional
 
@@ -63,7 +63,7 @@ class HistoryManager:
             'act_number': data.get('act_number'),
             'article': str(data.get('article', '')),
             'date': data.get('date'),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'timestamp': datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + 'Z'
         }
 
         # Evita duplicati consecutivi

@@ -36,6 +36,10 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     req.user = user;
     next();
   } catch (error) {
-    res.status(401).json({ detail: 'Authentication failed' });
+    // Only the checks above prove a session is over. A throw here is our fault
+    // (the database could not answer), and a 401 would make the web client log
+    // the user out at every hiccup: 503, so it keeps the session and retries.
+    console.error('authenticate: could not load the user:', error);
+    res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
   }
 };

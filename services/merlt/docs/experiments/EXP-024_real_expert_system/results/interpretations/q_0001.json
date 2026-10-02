@@ -1,0 +1,37 @@
+{
+  "query_id": "q_0001",
+  "query_text": "Cos'\u00e8 la risoluzione del contratto per inadempimento?",
+  "synthesis": "La risoluzione del contratto per inadempimento, disciplinata principalmente dagli artt. 1453, 1458 e 1564 c.c., rappresenta un rimedio fondamentale nell'ordinamento giuridico italiano per i contratti a prestazioni corrispettive, ovvero quelli in cui le obbligazioni delle parti sono legate da un vincolo di reciprocit\u00e0.\n\n**Natura e Scelta del Rimedio:**\nQuando uno dei contraenti non adempie le proprie obbligazioni, l'altro contraente ha la facolt\u00e0 di scegliere tra due opzioni alternative:\n1.  **Ch",
+  "confidence": 0.8999999999999999,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "La risoluzione del contratto per inadempimento \u00e8 l'opzione che uno dei contraenti, in un contratto con prestazioni corrispettive, pu\u00f2 scegliere quando l'altro contraente non adempie le sue obbligazioni. Questa scelta \u00e8 alternativa alla richiesta di adempimento e comporta in ogni caso il risarcimento del danno. La risoluzione pu\u00f2 essere domandata anche se inizialmente era stato chiesto l'adempimento, ma non \u00e8 pi\u00f9 possibile chiedere l'adempimento una volta domandata la risoluzione. Dalla data della domanda di risoluzione, l'inadempiente non pu\u00f2 pi\u00f9 adempiere la propria obbligazione. Tale risoluzione ha effetto retroattivo tra le parti, salvo per i contratti ad esecuzione continuata o periodica, per i quali l'effetto non si estende alle prestazioni gi\u00e0 eseguite. Non pregiudica i diritti acquistati dai terzi, salvi gli effetti della trascrizione della domanda di risoluzione. In specifici casi, come nel contratto di somministrazione, la risoluzione pu\u00f2 essere chiesta se l'inadempimento ha notevole importanza e menoma la fiducia nei successivi adempimenti.",
+      "confidence": 0.9,
+      "weight": 0.7499999999999999,
+      "weighted_confidence": 0.6749999999999999
+    },
+    "systemic": {
+      "interpretation": "La risoluzione del contratto per inadempimento \u00e8 un rimedio previsto dall'ordinamento giuridico italiano per i contratti a prestazioni corrispettive, ovvero quei contratti in cui le prestazioni sono legate da un vincolo di reciprocit\u00e0. Quando uno dei contraenti non adempie le proprie obbligazioni, l'altro contraente ha la facolt\u00e0 di scegliere tra chiedere l'adempimento forzato del contratto o la sua risoluzione, fermo restando il diritto al risarcimento del danno in entrambi i casi. La risoluzione ha effetto retroattivo tra le parti, salvo per i contratti ad esecuzione continuata o periodica, per i quali non si estende alle prestazioni gi\u00e0 eseguite. Non pregiudica i diritti acquisiti dai terzi, fatti salvi gli effetti della trascrizione della domanda di risoluzione. In alcuni casi specifici, come nel contratto di somministrazione, l'inadempimento deve avere una notevole importanza e menomare la fiducia nei successivi adempimenti per giustificare la risoluzione.",
+      "confidence": 0.9,
+      "weight": 0.25,
+      "weighted_confidence": 0.225
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 25486.201999999997,
+  "routing_decision": {
+    "query_type": "definitional",
+    "expert_weights": {
+      "literal": 0.6,
+      "systemic": 0.2,
+      "principles": 0.1,
+      "precedent": 0.1
+    },
+    "confidence": 0.4,
+    "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+  },
+  "feedback": 0.042795483521103586,
+  "reward": 0.003851593516899323,
+  "user_id": "user_001",
+  "error": null
+}

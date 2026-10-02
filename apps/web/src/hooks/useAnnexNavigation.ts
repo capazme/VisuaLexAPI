@@ -4,6 +4,7 @@ import { extractArticleIdsFromTree, normalizeArticleId, type TreeNode } from '..
 import { getUniqueArticleId } from '../utils/articleIds';
 import type { Norma, ArticleData, TreeMetadata } from '../types';
 import { legalFetch } from '../services/legalFetch';
+import { fetchActRubriche, fetchActTree, type RubrichePart } from '../utils/actStructureCache';
 
 interface UseAnnexNavigationProps {
   /** The norma being displayed */
@@ -18,13 +19,7 @@ interface UseAnnexNavigationProps {
   activeArticle?: ArticleData | null;
 }
 
-/** One annex's worth of article titles, as served by /fetch_rubriche. */
-export interface RubrichePart {
-  name: string;
-  keys: string[];
-  rubriche: Record<string, string>;
-  abrogati: string[];
-}
+export type { RubrichePart };
 
 interface UseAnnexNavigationReturn {
   // Tree state
@@ -152,23 +147,10 @@ export function useAnnexNavigation({
       setRubriche({});
       setAbrogati([]);
       setRubricheParts([]);
-      const res = await legalFetch('/fetch_tree', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          urn: norma.urn,
-          link: false,
-          details: true,
-          return_metadata: true
-        })
-      });
+      const payload = await fetchActTree(urn);
+      setTreeData(Array.isArray(payload) ? payload : payload.articles || []);
 
-      if (!res.ok) throw new Error('Impossibile caricare la struttura');
-
-      const payload = await res.json();
-      setTreeData(payload.articles || payload);
-
-      if (payload.metadata) {
+      if (!Array.isArray(payload) && payload.metadata) {
         setTreeMetadata(payload.metadata);
       }
 
@@ -176,15 +158,7 @@ export function useAnnexNavigation({
       // codice civile, 20ms warm) because they come from the Akoma Ntoso export
       // rather than the HTML tree. Deliberately NOT awaited: the index paints
       // immediately with bare numbers and the titles merge in when they land.
-      legalFetch('/fetch_rubriche', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urn })
-      })
-        .then(rubricheRes => {
-          if (!rubricheRes.ok) throw new Error(`HTTP ${rubricheRes.status}`);
-          return rubricheRes.json();
-        })
+      fetchActRubriche(urn)
         .then(rubrichePayload => {
           setRubriche(rubrichePayload?.rubriche ?? {});
           setAbrogati(rubrichePayload?.abrogati ?? []);
