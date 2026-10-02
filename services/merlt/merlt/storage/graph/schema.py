@@ -262,6 +262,7 @@ class SourceType(_Vocab):
     MASSIMA = "massima"
     CONCETTO = "concetto"
     TEXT = "text"  # a live source of no known kind: no expert searches it
+    RASSEGNA = "rassegna"  # a paragraph of the Massimario's annual reviews
 
 
 LEGACY_SOURCE_TYPE: dict[str, SourceType] = {
@@ -304,6 +305,7 @@ class Fonte(_Vocab):
     COMMUNITY = "community"
     MCP_LEGAL_IT = "mcp-legal-it"
     ITALIA_CORPUS = "italia_corpus"
+    MASSIMARIO = "Ufficio del Massimario"  # the Corte di cassazione's annual reviews
 
 
 _FONTE_ALIASES: dict[str, Fonte] = {
@@ -316,6 +318,8 @@ _FONTE_ALIASES: dict[str, Fonte] = {
     "community_validation": Fonte.COMMUNITY,
     "mcp-legal-it": Fonte.MCP_LEGAL_IT,
     "italia_corpus": Fonte.ITALIA_CORPUS,
+    "massimario": Fonte.MASSIMARIO,
+    "ufficio del massimario": Fonte.MASSIMARIO,
 }
 
 
