@@ -16,7 +16,7 @@ Pattern follows BridgeTable service architecture.
 
 import structlog
 from typing import List, Optional, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text, select, func, update
@@ -41,6 +41,8 @@ class TraceStorageConfig:
     password: str = "devpassword"
     pool_size: int = 10
     max_overflow: int = 20
+    # The URL's query (`?ssl=require`): the writer opens the URL as it is, a reader must too.
+    query: Dict[str, Any] = field(default_factory=dict)
 
     def get_connection_string(self) -> str:
         """Get async PostgreSQL connection string, the credentials escaped for a SQLAlchemy URL
@@ -54,6 +56,7 @@ class TraceStorageConfig:
             host=self.host,
             port=self.port,
             database=self.database,
+            query=self.query,
         ).render_as_string(hide_password=False)
 
     @classmethod
@@ -75,6 +78,7 @@ class TraceStorageConfig:
             database=url.database or cls.database,
             user=url.username or cls.user,
             password=url.password or "",
+            query=dict(url.query),
         )
 
 

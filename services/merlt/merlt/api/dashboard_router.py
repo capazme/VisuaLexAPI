@@ -108,8 +108,16 @@ async def _check_falkordb_health() -> ServiceHealth:
         return ServiceHealth(
             name="FalkorDB",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
+
+
+def _without_userinfo(url: str) -> str:
+    """`url` without a `user:password@` in front of the host: a response must not carry one."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    return urlunsplit(parts._replace(netloc=parts.netloc.rpartition("@")[2]))
 
 
 def _qdrant_target() -> dict:
@@ -149,7 +157,9 @@ async def _check_qdrant_health() -> ServiceHealth:
             latency_ms=latency,
             details={
                 "collections_count": len(collections.collections),
-                "url": qdrant_target.get("url") or f"http://{qdrant_target['host']}:{qdrant_target['port']}",
+                "url": _without_userinfo(
+                    qdrant_target.get("url") or f"http://{qdrant_target['host']}:{qdrant_target['port']}"
+                ),
             }
         )
     except Exception as e:
@@ -157,7 +167,7 @@ async def _check_qdrant_health() -> ServiceHealth:
         return ServiceHealth(
             name="Qdrant",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
 
 
@@ -191,7 +201,7 @@ async def _check_postgres_health() -> ServiceHealth:
         return ServiceHealth(
             name="PostgreSQL",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
 
 
@@ -213,7 +223,7 @@ async def _check_redis_health() -> ServiceHealth:
 
             info = await client.info("memory")
         finally:
-            await client.close()
+            await client.aclose()
 
         return ServiceHealth(
             name="Redis",
@@ -228,7 +238,7 @@ async def _check_redis_health() -> ServiceHealth:
         return ServiceHealth(
             name="Redis",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
 
 
