@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { useMemo, useRef } from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { createRoot } from 'react-dom/client';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { useArticleTextInteractions } from './useArticleTextInteractions';
 import { UpdateNotePopover } from '../components/features/search/UpdateNotePopover';
 
@@ -183,6 +184,36 @@ describe('useArticleTextInteractions', () => {
     sign(0).removeAttribute('data-block');
     fireEvent.click(screen.getByTestId('body').querySelector('.vlx-sign')!);
     expect(block()).toBe('');
+  });
+
+  it('answers a press on a sign from the moment the sign is on screen', async () => {
+    // Outside act, as when a fetch settles in the app: React commits the markup
+    // and runs passive effects in a later task. Pressing the sign in between —
+    // a busy runner reaching the click before that task — must still open it.
+    const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const previous = actEnvironment.IS_REACT_ACT_ENVIRONMENT;
+    actEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
+    const host = document.body.appendChild(document.createElement('div'));
+    const root = createRoot(host);
+    try {
+      const pressed = new Promise<void>((resolve) => {
+        const observer = new MutationObserver(() => {
+          const target = host.querySelector('.vlx-sign[data-block="0"]');
+          if (!target) return;
+          observer.disconnect();
+          target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          resolve();
+        });
+        observer.observe(host, { childList: true, subtree: true });
+      });
+      root.render(<Harness resetKey="a" />);
+      await pressed;
+      await waitFor(() => expect(block()).toBe('0'));
+    } finally {
+      root.unmount();
+      host.remove();
+      actEnvironment.IS_REACT_ACT_ENVIRONMENT = previous;
+    }
   });
 
   it('ignores other keys and other elements', () => {

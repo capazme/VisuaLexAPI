@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 
 export interface OpenUpdateNote {
   id: string;
@@ -84,7 +84,10 @@ export function useArticleTextInteractions(
     setState((s) => ({ ...(s.key === resetKey ? s : fresh(resetKey)), updatesOpen: true }));
   }, [resetKey]);
 
-  useEffect(() => {
+  // A layout effect, not a passive one: the signs and chips are focusable
+  // buttons from the commit that draws them, and a passive effect runs in a
+  // later task — a press in between (a busy main thread) was silently lost.
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container || !enabled) return;
     const base = (s: State): State => (s.key === resetKey ? s : fresh(resetKey));
