@@ -204,11 +204,19 @@ page, no `validity`: the field is simply absent. No network, no change to the ex
 
 1. `not_yet` — the window has only `al`, and the body says "NON ANCORA ESISTENTE O VIGENTE".
    `valid_from` is `None`; `valid_to` is the last day before the article exists.
-2. `abrogated` — `div.ins-akn.art_abrogato-akn` is inside `div.bodyTesto` **and nothing else of
-   substance is**: remove the label ("Art. N", "Codice Penale-art. N"), the abrogation div and
-   punctuation, and nothing remains. A partial notice ("COMMA ABROGATO…") leaves text behind
-   and is *not* this state. `valid_from` is the day the abrogation takes effect; `valid_to` may
-   be set if the article came back later.
+2. `abrogated` — a `div.ins-akn` inside `div.bodyTesto` states in so many words that the whole
+   article is repealed ("ARTICOLO ABROGATO …", or "SOPPRESSO") or, for a whole act,
+   "PROVVEDIMENTO ABROGATO …" (the portal gives the whole-act notice, and some whole-article
+   notices, no special class: the words decide, not the class), **or** the
+   `div.ins-akn.art_abrogato-akn` notice is all that is left: remove the label ("Art. N",
+   "Codice Penale-art. N"), the abrogation div, the update notes (`div.art_aggiornamento-akn`),
+   their markers ("((178))") and punctuation, and nothing remains. A partial notice ("COMMA
+   ABROGATO…") leaves text behind and is *not* this state. The first version of the rule
+   counted the notes as text and showed "In vigore" over art. 183-bis c.p.c., repealed by
+   D.Lgs. 164/2024; the first two versions also missed the notices that carry no
+   `art_abrogato-akn` class (art. 155-ter c.c., every article of d.lgs. 163/2006) and showed
+   "In vigore" there too (found on the real portal, 2 October 2026). `valid_from` is the day the
+   abrogation takes effect; `valid_to` may be set if the article came back later.
 3. `current` — an open-ended window (`al` absent), or one that ends today or later (today in
    Rome): on the last day of its window the text is still the one in force.
 4. `historical` — a window that ended before today (in Rome).
