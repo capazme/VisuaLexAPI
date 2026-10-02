@@ -215,8 +215,8 @@ page, no `validity`: the field is simply absent. No network, no change to the ex
    counted the notes as text and showed "In vigore" over art. 183-bis c.p.c., repealed by
    D.Lgs. 164/2024; the first two versions also missed the notices that carry no
    `art_abrogato-akn` class (art. 155-ter c.c., every article of d.lgs. 163/2006) and showed
-   "In vigore" there too (found on the real portal, 2 October 2026). `valid_from` is the day the abrogation takes effect; `valid_to` may
-   be set if the article came back later.
+   "In vigore" there too (found on the real portal, 2 October 2026). `valid_from` is the day the
+   abrogation takes effect; `valid_to` may be set if the article came back later.
 3. `current` — an open-ended window (`al` absent), or one that ends today or later (today in
    Rome): on the last day of its window the text is still the one in force.
 4. `historical` — a window that ended before today (in Rome).

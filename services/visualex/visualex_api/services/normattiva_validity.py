@@ -81,6 +81,19 @@ _UP_TO_LABEL = re.compile(r"^.*?" + _LABEL.pattern, re.I | re.S)
 _WHOLE_ARTICLE_NOTICE = re.compile(r"\W*(?:ARTICOLO|PROVVEDIMENTO)\s+(?:ABROGAT[OA]|SOPPRESS[OA])\b", re.I)
 # The note markers the portal leaves in the text: "((178))", "(129a)".
 _NOTE_REFERENCE = re.compile(r"\(\(?\s*\d+\s*[a-z]?\s*\)\)?", re.I)
+_NOTICE_HEAD = 200  # characters that decide a notice: its first words
+
+
+def _head(node: Tag, limit: int = _NOTICE_HEAD) -> str:
+    """The first `limit` characters of a node's text, whitespace collapsed, without reading the rest."""
+    parts: list[str] = []
+    size = 0
+    for piece in node.stripped_strings:  # lazy: stops as soon as there is enough
+        parts.append(piece)
+        size += len(piece) + 1
+        if size >= limit:
+            break
+    return " ".join(" ".join(parts).split())[:limit]
 
 
 class Validity(TypedDict):
@@ -172,24 +185,35 @@ def _read_body(raw: str) -> Optional[Tag]:
 def _is_abrogated(body: Tag) -> bool:
     """The article is repealed as a whole.
 
-    Two ways, in this order. Any `ins-akn` notice that says "ARTICOLO ABROGATO" (or
-    "SOPPRESSO") or, for a whole act, "PROVVEDIMENTO ABROGATO" is decisive, whatever its
-    class (the portal gives the whole-act notice and some whole-article notices no
-    `art_abrogato-akn`) and whatever else sits in the body (a kept heading, note
-    markers, the update notes). Otherwise the `art_abrogato-akn` notice must be all that
-    is left once the label, the update notes (`art_aggiornamento-akn`), their markers
-    ("((178))") and punctuation are removed: a repealed article keeps its notes on the
-    page, and they are not its text. A partial notice ("COMMA ABROGATO") leaves the
-    other commi behind, so it is not this state. Consumes the notices and the notes:
-    call it last.
+    The update notes (`art_aggiornamento-akn`) are taken out first: they are never a
+    source of notices. Then two ways, in this order. The head of any outermost `ins-akn`
+    that says "ARTICOLO ABROGATO" (or "SOPPRESSO") or, for a whole act, "PROVVEDIMENTO
+    ABROGATO" is decisive, whatever its class (the portal gives the whole-act notice and
+    some whole-article notices no `art_abrogato-akn`) and whatever else sits in the body
+    (a kept heading, note markers). Each outermost `ins-akn` is read once, by its first
+    200 characters, so the cost stays linear on a page that nests them; an `ins-akn` inside
+    another is covered by it, and a notice that starts after other text inside a bigger
+    `ins-akn` is a shape the pattern never claimed to read. Otherwise the `art_abrogato-akn`
+    notice must be all that is left once the label, the note markers ("((178))") and
+    punctuation are removed: a repealed article keeps its notes on the page, and they are
+    not its text. "(1)"-style markers are removed from the text as well, so a lone "(1)"
+    beside a partial `art_abrogato-akn` notice would read as repealed; never seen on the
+    portal. A partial notice ("COMMA ABROGATO") leaves the other commi behind, so it is not
+    this state. Consumes the notes and the notices: call it last.
     """
+    for notes in body.find_all(class_="art_aggiornamento-akn"):
+        notes.extract()
+    covered: set[int] = set()
     for notice in body.find_all(class_="ins-akn"):
-        if _WHOLE_ARTICLE_NOTICE.match(" ".join(notice.get_text(" ", strip=True).split())):
+        if id(notice) in covered:
+            continue
+        covered.update(id(inner) for inner in notice.find_all(class_="ins-akn"))
+        if _WHOLE_ARTICLE_NOTICE.match(_head(notice)):
             return True
     notices = body.find_all(class_="art_abrogato-akn")
     if not notices:
         return False
-    for node in notices + body.find_all(class_="art_aggiornamento-akn"):
+    for node in notices:
         node.extract()
     # Blanks are collapsed first: a long run of them is quadratic for the label pattern.
     text = " ".join(body.get_text(" ", strip=True).split())

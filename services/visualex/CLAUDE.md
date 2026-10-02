@@ -51,9 +51,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     and their markers on the page and they are not its text (art. 183-bis c.p.c.),
     so `abrogated` does not require an empty body; a whole-article or whole-act notice
     ("ARTICOLO ABROGATO", "PROVVEDIMENTO ABROGATO") is recognised by its words in any
-    `ins-akn`, not by the `art_abrogato-akn` class. Best effort: a page it cannot read yields
-    no `validity` key at all, never a guess. It also holds the two request
-    guards, `reject_future_version_date` and `is_historical_request`.
+    `ins-akn`, not by the `art_abrogato-akn` class (the class only matters to the structural
+    fallback). Best effort: a page it cannot read yields no `validity` key at all, never a
+    guess. It also holds the two request guards, `reject_future_version_date` and
+    `is_historical_request`.
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
     portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
     down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).

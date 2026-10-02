@@ -313,8 +313,11 @@ class TestAbrogationWithNotes:
         v = extract_validity(synthetic(dal="1-1-2000", label="Art. 183", content=content), article="183")
         assert v["state"] == "current"
 
-    def test_notes_that_say_the_article_is_repealed_are_not_a_notice(self):
-        """No `art_abrogato-akn` div: the words in the notes decide nothing."""
+    def test_notes_that_say_the_article_is_repealed_are_not_a_notice_without_an_ins_akn(self):
+        """The notes hold no `ins-akn` here: the bare words in them decide nothing.
+
+        (Notes that wrap the words in an `ins-akn` are `TestAbrogationHostile`'s case.)
+        """
         content = (
             '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
             + _notes(3, "ARTICOLO ABROGATO DALLA L. 1 GENNAIO 2000, N. 1")
@@ -333,7 +336,7 @@ class TestAbrogationWithNotes:
         assert found["state"] == "abrogated"
         assert elapsed < TestHostilePages.BOUND
 
-    def test_one_block_of_fifty_thousand_markers_beside_real_text(self):
+    def test_one_block_of_fifty_thousand_markers_in_an_update_notes_block_beside_real_text_is_current(self):
         content = (
             '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
             '<div class="art_aggiornamento-akn">' + "((1))" * 50_000 + "</div>"
@@ -435,7 +438,8 @@ class TestAbrogationWhateverTheNoticeClass:
         assert v["state"] == "current"
 
     @pytest.mark.parametrize("words", ["PROVVEDIMENTO ABROGATO", "ARTICOLO ABROGATO"])
-    def test_the_words_in_the_update_notes_are_not_a_notice(self, words):
+    def test_the_bare_words_in_the_update_notes_are_not_a_notice(self, words):
+        """The notes hold no `ins-akn` here: the bare words in them decide nothing."""
         content = (
             '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
             + _notes(3, f"{words} DAL D.LGS. 1 GENNAIO 2000, N. 1")
@@ -465,6 +469,69 @@ class TestAbrogationWhateverTheNoticeClass:
         )
         assert found["state"] == "abrogated"
         assert elapsed < TestHostilePages.BOUND
+
+
+class TestAbrogationHostile:
+    """The abrogation rule stays linear whatever the page nests, and reads the notice's head.
+
+    Nested `ins-akn` nodes used to cost the square of their depth (each one's text was
+    read in full); the update notes are taken out before anything is read.
+    """
+
+    @staticmethod
+    def _run(content):
+        return TestHostilePages._timed(
+            lambda: extract_validity(synthetic(dal="1-1-2000", content=content), article="7")
+        )
+
+    def test_a_chain_of_nested_ins_akn_divs_with_no_repeal_words(self):
+        found, elapsed = self._run('<div class="ins-akn">' * 9_000 + "x" + "</div>" * 9_000)
+        assert found["state"] == "current"
+        assert elapsed < TestHostilePages.BOUND
+
+    def test_a_chain_of_nested_ins_akn_divs_with_the_notice_at_the_bottom(self):
+        found, elapsed = self._run(
+            '<div class="ins-akn">' * 9_000
+            + "((ARTICOLO ABROGATO DALLA L. 1 GENNAIO 2000, N. 1))"
+            + "</div>" * 9_000
+        )
+        assert found["state"] == "abrogated"
+        assert elapsed < TestHostilePages.BOUND
+
+    def test_a_chain_of_nested_ins_akn_with_text_at_every_level(self):
+        found, elapsed = self._run('<i class="ins-akn">a ' * 9_000 + "x" + "</i>" * 9_000)
+        assert found["state"] == "current"
+        assert elapsed < TestHostilePages.BOUND
+
+    def test_fifty_thousand_markers_beside_a_partial_structural_notice_leave_nothing(self):
+        """Not "ARTICOLO ABROGATO": the structural rule runs and removes every marker."""
+        content = (
+            '<div class="ins-akn art_abrogato-akn">((DISPOSIZIONE SOPPRESSA DALLA L. 1 GENNAIO 2000, N. 1))</div>'
+            "<span>" + "((1))" * 50_000 + "</span>"
+        )
+        found, elapsed = self._run(content)
+        assert found["state"] == "abrogated"
+        assert elapsed < TestHostilePages.BOUND
+
+    def test_an_ins_akn_inside_the_update_notes_is_not_a_notice(self):
+        content = (
+            '<span class="art-just-text-akn">Il testo dell\'articolo.</span>'
+            + _notes(3, '<div class="ins-akn">((ARTICOLO ABROGATO DALLA L. 1 GENNAIO 2000, N. 1))</div>')
+        )
+        found, _ = self._run(content)
+        assert found["state"] == "current"
+
+    def test_repeal_words_in_the_middle_of_a_partial_notice_are_not_a_whole_article_notice(self):
+        content = (
+            '<div class="art-commi-div-akn">'
+            '<div class="art-comma-div-akn"><span class="comma-num-akn">1. </span>'
+            '<span class="art_text_in_comma">Il debitore paga.</span></div>'
+            '<div class="art-comma-div-akn"><div class="ins-akn">'
+            "((COMMA ABROGATO DALLA L. 1 GENNAIO 2000, N. 1; ARTICOLO ABROGATO DAL D.LGS. 1 GENNAIO 2001, N. 2))"
+            "</div></div></div>"
+        )
+        found, _ = self._run(content)
+        assert found["state"] == "current"
 
 
 class TestTheArticleAskedFor:
