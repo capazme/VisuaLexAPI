@@ -121,10 +121,14 @@ export interface ArticleData {
     queue_position?: number;
     /** What the source's own page says about the text it served; absent when it cannot be read. */
     validity?: ArticleValidity;
+    /**
+     * What was ASKED for, not what came back: `isHistorical` is true for a date or for the
+     * original text, even when the answer turns out to be the text in force. What came back is
+     * `validity`.
+     */
     versionInfo?: {
         isHistorical: boolean;
         requestedDate?: string;
-        effectiveDate?: string;
     };
 }
 

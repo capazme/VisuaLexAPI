@@ -24,6 +24,7 @@ import { buildNormaKey } from '../../../utils/normaKeys';
 import { resolveAct } from '../../../utils/actUrn';
 import { ReadingBackControl } from './ReadingBackControl';
 import { matchesSearchFilters } from '../../../utils/searchFilters';
+import { deriveVersionInfo, requestIsHistorical, versionTabSuffix } from '../../../utils/versionDisplay';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
 
@@ -132,7 +133,7 @@ export function SearchPanel() {
   // over a stale label captured when the memoized callback was created — the
   // second search would end up landing in a default-label tab. See the drain
   // effect below for the flow.
-  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false, tabLabel?: string, targetTabId?: string, filters?: SearchParams['filters']) => {
+  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false, tabLabel?: string, targetTabId?: string, filters?: SearchParams['filters'], version?: SearchParams['version']) => {
     if (result.error) {
       console.error("Backend Error for item:", result.error);
       const article = result.norma_data?.numero_articolo || 'richiesto';
@@ -147,14 +148,9 @@ export function SearchPanel() {
       return;
     }
 
-    // Mark as historical if version_date was provided
-    if (versionDate) {
-      result.versionInfo = {
-        isHistorical: true,
-        requestedDate: versionDate,
-        effectiveDate: normaData.data_versione || normaData.data
-      };
-    }
+    // What was ASKED for: a date, or the original text. What came back is
+    // `result.validity`, the window the source states; never an echo of the date.
+    result.versionInfo = deriveVersionInfo({ version, version_date: versionDate });
 
     if (!matchesSearchFilters(result, filters)) {
       filteredOutRef.current += 1;
@@ -234,7 +230,7 @@ export function SearchPanel() {
           addNormaToTab(mergeTarget.id, norma, [result]);
           streamingTabRef.current = { normaKey: key, tabId: mergeTarget.id };
         } else {
-          const versionSuffix = isHistorical && versionDate ? ` - Ver. ${versionDate}` : '';
+          const versionSuffix = isHistorical ? versionTabSuffix({ version, versionDate }) : '';
           const label = tabLabel || `${norma.tipo_atto}${norma.numero_atto ? ` ${norma.numero_atto}` : ''}${versionSuffix}`;
           const newTabId = addWorkspaceTab(label, norma, [result], { isCustom: !!tabLabel });
           streamingTabRef.current = { normaKey: key, tabId: newTabId };
@@ -338,7 +334,7 @@ export function SearchPanel() {
           if (line.trim()) {
             try {
               const result = JSON.parse(line);
-              processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters);
+              processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters, params.version);
             } catch (e) {
               parseFailures += 1;
               console.error("Error parsing line", line, e);
@@ -351,7 +347,7 @@ export function SearchPanel() {
       if (buffer.trim()) {
         try {
           const result = JSON.parse(buffer);
-          processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters);
+          processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters, params.version);
         } catch (e) {
           parseFailures += 1;
           console.error("Error parsing final buffer", e);
@@ -435,10 +431,13 @@ export function SearchPanel() {
 
         if (isHistorical) {
           // Create new tab with version date in label
-          const versionDate = group.versionDate ? ` - Ver. ${group.versionDate}` : ' - Storico';
+          const versionSuffix = versionTabSuffix({
+            version: group.articles[0]?.norma_data.versione,
+            versionDate: group.versionDate,
+          }) || ' — testo storico';
           const label = isCustomForThisGroup
             ? customTabLabel!
-            : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionDate}`;
+            : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionSuffix}`;
           addWorkspaceTab(label, group.norma, group.articles, { isCustom: isCustomForThisGroup });
         } else {
           // R3 (streaming-ux): merge into an existing tab that holds the
@@ -591,7 +590,7 @@ export function SearchPanel() {
       article: articleNumber,
       version: (normaData.versione as 'vigente' | 'originale') || 'vigente',
       version_date: normaData.data_versione || '',
-      show_brocardi_info: true,
+      show_brocardi_info: !requestIsHistorical(normaData),
       annex: normaData.allegato || undefined  // Preserve annex when navigating via cross-reference
     };
     handleSearch(params);
