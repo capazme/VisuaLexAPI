@@ -440,3 +440,19 @@ async def test_a_stub_keeps_the_estremi_its_urn_cannot_give(graph):
     assert rows == [{"p": {**stub_properties(law, Provenance.INGESTION), "estremi": "Art. 5 LEGGE 8 marzo 1975, n. 39"}}]
     # a code's stub still takes the derived estremi (the fixture's 'Art. 1322')
     assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.estremi AS e", {"u": STUB}) == [{"e": "Art. 1322 c.c."}]
+
+
+async def test_a_reported_stub_without_provenance_is_stamped_ingestion_even_with_a_seed_key(graph):
+    # A stub carries no seed content (controller's ruling); spec 4.1 wants a provenance on every node.
+    candidate = CODE + "~art1505"
+    seed_keys = SEED_KEYS | {candidate}
+    await graph.query("CREATE (:Norma {URN: $u, rubrica: 'Della permuta'})", {"u": candidate})
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=seed_keys)
+    report = await _migrate(graph, seed_keys)
+    assert dry == report
+    assert report["stubs"]["reported"] == [candidate]
+    assert report["provenance"] == {"seed": 2, "ingestion": 2}  # the fixture's code, and this stub
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.provenance AS p", {"u": candidate}) == [
+        {"p": "ingestion"}
+    ]
+    assert (await _migrate(graph, seed_keys))["provenance"] == {}

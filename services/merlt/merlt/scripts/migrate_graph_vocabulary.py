@@ -61,8 +61,6 @@ PROVENANCE_LABELS = [label for label in Label if label not in (Label.ENTITY, Lab
 _STUB_FLAG = "coalesce(n.is_stub IN [true, 'true'], false)"
 _PLACEHOLDER = "(n.tipo_documento IS NULL AND n.testo IS NULL AND n.testo_vigente IS NULL)"
 _STUB_WHERE = f"({_STUB_FLAG} OR {_PLACEHOLDER})"
-# The same test, negated: an article or an act, not a placeholder.
-_NOT_STUB_WHERE = f"NOT {_STUB_WHERE}"
 # A stub among nodes of any label: a Norma that is no community entity and passes the test.
 _STUB_NODE = f"(n:Norma AND NOT n:Entity AND {_STUB_WHERE})"
 # What a stub candidate may carry that its shape would drop and nothing can rebuild: such
@@ -330,21 +328,32 @@ async def unify_stubs(
     return report
 
 
-async def reset_entity_writer_stamps(client, apply: bool, batch: int, seed_keys: set[str]) -> dict[str, int]:
+def _stamp_value(row: dict[str, Any], seed_keys: set[str]) -> str:
+    """`seed` for what the Libro IV seed brought, `ingestion` for the rest, and always
+    `ingestion` for a stub: a stub carries no seed content (controller's ruling)."""
+    if row.get("stub") or row["key"] not in seed_keys:
+        return Provenance.INGESTION.value
+    return Provenance.SEED.value
+
+
+async def reset_entity_writer_stamps(
+    client, apply: bool, batch: int, seed_keys: set[str], shaped: set[int],
+) -> dict[str, int]:
     """Before Task 4 the entity writer stamped the article it linked an entity to:
     `provenance = coalesce(provenance, 'community_validated')`, `trust = coalesce(trust,
     1.0)`. The community validated the link, which carries its own provenance, not the
-    article. Stubs are unify_stubs' job; an article or an act gets what stamp_provenance
-    would give it (`seed` or `ingestion`) and no trust. Written here, not left to
-    stamp_provenance, so that a dry run reports what --apply does."""
+    article. The stubs unify_stubs shaped (`shaped`) are its job; an article or an act
+    gets what stamp_provenance would give it (`seed` or `ingestion`) and no trust, a
+    stub it reported `ingestion`. Written here, not left to stamp_provenance, so that a
+    dry run reports what --apply does."""
     rows = await client.query(
-        f"MATCH (n:Norma) WHERE n.provenance = 'community_validated' AND {_NOT_STUB_WHERE} "
-        "RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key"
+        "MATCH (n:Norma) WHERE n.provenance = 'community_validated' AND NOT n:Entity AND NOT id(n) IN $shaped "
+        f"RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key, {_STUB_WHERE} AS stub",
+        {"shaped": sorted(shaped)},
     )
     by_value: dict[str, list[int]] = {}
     for row in rows:
-        value = Provenance.SEED.value if row["key"] in seed_keys else Provenance.INGESTION.value
-        by_value.setdefault(value, []).append(row["id"])
+        by_value.setdefault(_stamp_value(row, seed_keys), []).append(row["id"])
     if apply:
         for value, ids in by_value.items():
             for chunk in _chunks(ids, batch):
@@ -415,27 +424,32 @@ async def remap_provenance(client, apply: bool, shaped: set[int]) -> dict[str, d
     return report
 
 
-async def stamp_provenance(client, apply: bool, batch: int, seed_keys: set[str]) -> dict[str, int]:
-    """`seed` for what the Libro IV seed brought, `ingestion` for the rest. A community
-    entity is never stamped here, whatever label it carries: its provenance is its own.
-    Nor is a stub: `unify_stubs` gives it `ingestion`, and on a dry run, which has not
-    written that, this step must not count it as what it would stamp. A node with two
-    content labels is counted once, in a dry run as on --apply."""
+async def stamp_provenance(
+    client, apply: bool, batch: int, seed_keys: set[str], shaped: set[int],
+) -> dict[str, int]:
+    """`seed` for what the Libro IV seed brought, `ingestion` for the rest, and
+    `ingestion` for every stub, even one keyed in the seed (spec 4.1: every node has a
+    provenance). A community entity is never stamped here, whatever label it carries:
+    its provenance is its own. Nor is a stub `unify_stubs` shaped (`shaped`): it gives
+    it `ingestion`, and on a dry run, which has not written that, this step must not
+    count it; a stub it reported is stamped here. A node with two content labels is
+    counted once, in a dry run as on --apply."""
     report: dict[str, int] = {}
     seen: set[int] = set()
+    shaped_ids = {"shaped": sorted(shaped)}
     for label in PROVENANCE_LABELS:
-        not_stub = f" AND {_NOT_STUB_WHERE}" if label is Label.NORMA else ""
+        is_stub = _STUB_WHERE if label is Label.NORMA else "false"
         rows = await client.query(
-            f"MATCH (n:{label.value}) WHERE n.provenance IS NULL AND NOT n:Entity{not_stub} "
-            "RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key"
+            f"MATCH (n:{label.value}) WHERE n.provenance IS NULL AND NOT n:Entity AND NOT id(n) IN $shaped "
+            f"RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key, {is_stub} AS stub",
+            shaped_ids,
         )
         by_value: dict[str, list[int]] = {}
         for row in rows:
             if row["id"] in seen:
                 continue
             seen.add(row["id"])
-            value = Provenance.SEED.value if row["key"] in seed_keys else Provenance.INGESTION.value
-            by_value.setdefault(value, []).append(row["id"])
+            by_value.setdefault(_stamp_value(row, seed_keys), []).append(row["id"])
         for value, ids in by_value.items():
             report[value] = report.get(value, 0) + len(ids)
             if apply:
@@ -588,10 +602,10 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
         "bare_keys": await wrap_bare_keys(client, apply, renames),
         "versions": await rekey_versions(client, apply),
         "stubs": await unify_stubs(client, apply, batch, renames, shaped),
-        "provenance_reset": await reset_entity_writer_stamps(client, apply, batch, seed_keys),
+        "provenance_reset": await reset_entity_writer_stamps(client, apply, batch, seed_keys, shaped),
         "estremi": await rewrite_estremi(client, apply, batch, shaped),
         "provenance_legacy": await remap_provenance(client, apply, shaped),
-        "provenance": await stamp_provenance(client, apply, batch, seed_keys),
+        "provenance": await stamp_provenance(client, apply, batch, seed_keys, shaped),
         "fonte": await normalize_fonti(client, apply, shaped),
         "testo": await copy_text(client, apply, batch),
         "stale_text": await drop_stale_text(client, apply),
