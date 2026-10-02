@@ -31,7 +31,7 @@ from typing import Optional, Dict, Any, Iterable, List, Tuple
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from merlt.api.auth import verify_api_key, require_role
+from merlt.api.auth import verify_api_key
 from merlt.experts.models import ApiKey
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.schema import node_type_cypher, node_type_from_labels, resolve_rel, resolve_rels
@@ -41,7 +41,7 @@ from merlt.pipeline.enrichment.models import EntityType
 
 # Import mapping from local utilities
 from merlt.utils import NORMATTIVA_URN_CODICI
-from merlt.utils.urn_labels import build_node_label, article_label_from_urn
+from merlt.utils.urn_labels import build_node_label
 from merlt.utils.urngenerator import generate_urn
 
 log = structlog.get_logger()
@@ -1048,7 +1048,6 @@ async def resolve_norm(
 # ====================================================
 
 from pydantic import BaseModel, Field
-from typing import Literal
 
 
 class SubgraphNode(BaseModel):

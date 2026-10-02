@@ -55,7 +55,7 @@ Pull requests:
 - **A stored, dated completeness record** (spec 4.3). Phase 1 derives completeness from the graph itself, which cannot go stale; the dated record comes with phase 2, together with the two parts above.
 - **Massime and rulings** (spec 5.1) and the full doctrine layer: phase 2. `AttoGiudiziario` is the ruling (the pronuncia) and its massime are attributes of it, as the owner decided (1 October); a ruling is keyed by the identity it shares with the sentenze and massimario rounds (`cassazione:<archivio>:<numero>:<anno>`), and a massima by its ruling's key plus a fingerprint of its text.
 - **A massima's point key**: phase 1 keeps the massima's index (Global Constraints); the spec (5.1) keys it on the ruling plus a fingerprint of its text, and phase 2 re-keys those points with a migration of its own.
-- **Existing concept twins**: the migration reports them, never merges them (Task 6, `report_twins`); the entity writer merges new ones (Task 4). The development graph has no community twin, and 8 seed nodes that are near-duplicates of each other ("La reticenza" / "reticenza").
+- **Existing concept twins**: the migration reports them, never merges them (Task 6, `report_twins`); the entity writer merges new ones (Task 4). The development graph has no community twin, and 8 pairs (16 nodes) of seed nodes that are near-duplicates of each other ("La reticenza" / "reticenza").
 - **`Dottrina.descrizione`, `AttoGiudiziario.massima`** keep their names; `node_text()` reads them.
 - **`RINVIA` in the systemic floor**: it stays a policy-chosen extra until phase 2 writes the references and they can be measured.
 - **`ConstitutionalBasisTool`, `CitationChainTool`**: unwired (Task 5); phase 2 can rewire the first on `RINVIA` edges to the Constitution.
@@ -1979,7 +1979,7 @@ The window this task closes: code from A on a graph not yet migrated. The reader
 Besides the spec's list, the migration repairs what pull request A's reviews found in the data the old writers left:
 
 - **The old entity writer's stamps.** Before Task 4 it ran `SET art.provenance = coalesce(art.provenance, 'community_validated'), art.trust = coalesce(art.trust, 1.0)` on every article it linked an entity to. The community validated the link, which carries its own provenance; the article gets back `seed` or `ingestion`, and no `trust`.
-- **Twins, both ways.** The seed key comes from the name by the writer's rule (`seed_twin_slugs`: `seed_twin_slug` as spelt, then without a leading article), never from the community id, which drops accents and hyphens. A seed name may keep its article where the proposal drops it (13 of the seed's 19 article-bearing names have no article-less node), so seed names are indexed under both their keys too. Seed nodes whose names give one community id ("La reticenza", "reticenza": 8 nodes on the development graph) are reported as near-duplicates.
+- **Twins, both ways.** The seed key comes from the name by the writer's rule (`seed_twin_slugs`: `seed_twin_slug` as spelt, then without a leading article), never from the community id, which drops accents and hyphens. A seed name may keep its article where the proposal drops it (13 of the seed's 19 article-bearing names have no article-less node), so seed names are indexed under both their keys too. Seed nodes whose names give one community id ("La reticenza", "reticenza": 8 pairs, 16 nodes, on the Libro IV seed) are reported as near-duplicates.
 - **Community entity labels.** The writer before Task 4 labelled a community entity `:Entity:<tipo.capitalize()>` (`Concetto`, `Principio`). Each gains the label of its kind from `schema.ENTITY_LABEL_BY_TYPE` (`entity_label`), idempotently; the label is taken from the map, never from the node. The old label goes (controller's ruling): `LEGACY_ENTITY_LABELS` is a fixed set the script builds from `EntityType` (`tipo.capitalize()` for every type), and every name in it is removed from an `:Entity` node unless it is the label `entity_label(tipo)` gives that node. A reader takes a node's type from its first label that is not `Entity`, and FalkorDB orders labels by creation, so a left-over `Concetto` would read as the type in a graph where it was created before the seed's labels; and a community `norma` entity written `:Entity:Norma` would be matched as a norm by every `(n:Norma)` step. This step runs first, before any step that matches `Norma`. The names come from the code's set, never from the node; `tipo` goes in as a parameter. The development graph has no such node; another graph may.
 - **Provenance outside the schema.** The ingestion before this round stamped `lazy_ingest` (trust 0.6, see `merlt/scripts/backfill_provenance_seed.py`): it becomes `ingestion`. Any other value outside `Provenance` is reported and left alone. The comment in `merlt/storage/graph/entity_writer.py` (~426) that names `lazy_ingest` is corrected to `ingestion`.
 - **Community entity key.** Community entities carry `id` only, so `get_article_relations` answers a null `target_urn` and `get_article_entities` FalkorDB's internal id. Every community entity also carries `node_id = id` (controller's ruling): the entity writer writes it, the migration sets `node_id = coalesce(e.node_id, e.id)`, and the readers that return a node's key read `coalesce(URN, node_id)`. Task 1b indexes `(Entity, node_id)`.
@@ -1996,7 +1996,7 @@ Besides the spec's list, the migration repairs what pull request A's reviews fou
 
 **Interfaces:**
 - Consumes: `LEGACY_REL`, `LEGACY_SOURCE_TYPE`, `Label`, `Provenance`, `Rel`, `SEED_TWIN`, `canonical_urn`, `act_name_from_urn`, `estremi_from_urn`, `normalize_fonte`, `point_id`, `text_fingerprint` (Task 1); `entity_label` (pull request A); `version_urn` (Task 1b); `normalize_entity_name`, `seed_twin_slugs` (`merlt.storage.graph.entity_writer`); `wrapped_norm_key` (`merlt.storage.graph.relation_endpoints`); `FalkorDBClient`; `qdrant_client`; `merlt.scripts.load_seed_libro_iv.SEED_GRAPH_JSON`; `merlt.storage.vectors.collection.default_chunks_collection`.
-- Produces: `python -m merlt.scripts.migrate_graph_vocabulary [--apply] [--batch N]` printing `{"applied", "graph": {"relations", "legacy_entity_labels", "bare_keys", "versions", "stubs", "provenance_reset", "estremi", "provenance_legacy", "provenance", "fonte", "testo", "stale_text", "fingerprint", "entity_labels", "entity_node_id", "twins"}, "vectors": {"rekeyed", "duplicates_dropped", "retyped", "urns_canonicalized"}}`; `async migrate_graph(client, *, apply, batch, seed_keys) -> dict`; `migrate_qdrant(client, collection, *, apply, batch=256) -> dict`; `plan_estremi(rows) -> list[dict]`; `plan_qdrant(points) -> dict`. A community entity carries `node_id` equal to its `id`.
+- Produces: `python -m merlt.scripts.migrate_graph_vocabulary [--apply] [--batch N]` printing `{"applied", "graph": {"relations_collapsed", "relations", "legacy_entity_labels", "bare_keys", "versions", "stubs", "provenance_reset", "estremi", "provenance_legacy", "provenance", "fonte", "testo", "stale_text", "fingerprint", "entity_labels", "entity_node_id", "twins"}, "vectors": {"rekeyed", "duplicates_dropped", "retyped", "urns_canonicalized", "unkeyed"}}` (`stubs` is `{"reshaped", "set", "removed", "reported"}`); `async migrate_graph(client, *, apply, batch, seed_keys) -> dict`; `migrate_qdrant(client, collection, *, apply, batch=256) -> dict`; `plan_estremi(rows) -> list[dict]`; `plan_qdrant(points) -> dict`. A community entity carries `node_id` equal to its `id`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3009,28 +3009,29 @@ run merlt.scripts.retrieval_gate                  # before
 run merlt.scripts.migrate_graph_vocabulary        # dry run
 ```
 
-Read the dry-run report before going on: every number must be explainable. Record in pull request B the backup folder, the dry-run report, the first gate and the label and relation counts before (`MATCH (n) RETURN labels(n)[0], count(*)`, `MATCH ()-[r]->() RETURN type(r), count(*)`).
+Read the dry-run report before going on: every number must be explainable. `graph.relations_collapsed` counts, per canonical type, the pairs of nodes where the rename leaves one edge for several (two legacy edges, or a legacy and a canonical one, between the same two nodes): the `MERGE` keeps the first edge's properties only. If it is not empty, decide before `--apply` whether the lost properties matter; the script never merges them. `graph.stubs.removed` names the properties the stub shape drops: check that none of them is content. Record in pull request B the backup folder, the dry-run report, the first gate and the label and relation counts before (`MATCH (n) RETURN labels(n)[0], count(*)`, `MATCH ()-[r]->() RETURN type(r), count(*)`).
 
 b. **Merge A and B back to back:** mark capazme/VisuaLexAPI#39 ready, merge it with `merge: refactor/merlt-graph-vocabulary — one vocabulary for the graph's writers and readers`, then merge B with `merge: feat/merlt-graph-migration — the graph and its vectors move to the one vocabulary`.
 
-c. **At once**, `--apply`, then the dry run again:
+c. **At once**, with the MERL-T containers stopped: between the merge and the rebuild, the running images carry the code from before A, which writes the old relation names and integer Qdrant ids. Stop them, apply, rebuild, start, and apply once more as a check:
 
 ```bash
+docker compose -f infra/compose.yml --profile merlt stop merlt-api merlt-worker
 run merlt.scripts.migrate_graph_vocabulary --apply
-run merlt.scripts.migrate_graph_vocabulary
+docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
+run merlt.scripts.migrate_graph_vocabulary --apply     # the check
 ```
 
-The second run changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until this `--apply`, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task).
+The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
 
-d. **Then the gate again, and the images rebuilt:**
+d. **Then the gate again:**
 
 ```bash
 run merlt.scripts.retrieval_gate                  # after
-docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
-docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
 ```
 
-Between b and d the running images still carry the code from before A, which writes the old names: c and d run back to back. **Retrieval gate:** no metric of the second `retrieval_gate` run is more than 0.02 below the first; a larger drop stops the round until it is explained. Record in pull request B, as a comment, the `--apply` report, the last dry run, the second gate and the label and relation counts after.
+**Retrieval gate:** no metric of the second `retrieval_gate` run is more than 0.02 below the first; a larger drop stops the round until it is explained. Record in pull request B, as a comment, the `--apply` report, the check's report, the second gate and the label and relation counts after.
 
 ---
 

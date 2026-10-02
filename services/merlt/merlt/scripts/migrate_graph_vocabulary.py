@@ -44,6 +44,7 @@ from merlt.storage.graph.schema import (
     estremi_from_urn,
     normalize_fonte,
     point_id,
+    stub_properties,
     text_fingerprint,
     version_urn,
 )
@@ -62,6 +63,8 @@ _PLACEHOLDER = "(n.tipo_documento IS NULL AND n.testo IS NULL AND n.testo_vigent
 _STUB_WHERE = f"({_STUB_FLAG} OR {_PLACEHOLDER})"
 # The same test, negated: an article or an act, not a placeholder.
 _NOT_STUB_WHERE = f"NOT {_STUB_WHERE}"
+# A stub among nodes of any label: a Norma that is no community entity and passes the test.
+_STUB_NODE = f"(n:Norma AND NOT n:Entity AND {_STUB_WHERE})"
 
 # Every label the writer before Task 4 could give a community entity: `tipo.capitalize()`.
 # A fixed set from the code; a label name is never read from a node.
@@ -91,6 +94,40 @@ async def _norma_holds(client, key: str) -> bool:
     return bool(await _count(client, "MATCH (m:Norma {URN: $u}) RETURN count(m) AS n", {"u": key}))
 
 
+# A community entity's link to its live source was written CITA; it is DERIVA_DA.
+_LIVE_SOURCE_LINK = "a:Entity AND b:LiveSource"
+
+
+async def collapsed_relations(client) -> dict[str, dict[str, int]]:
+    """Pairs of nodes where the rename leaves one edge for several: two legacy edges
+    of one name, or of two names that end in one canonical type (`cita` and `richiama`
+    are both RINVIA), or a legacy edge next to one already written under the canonical
+    name. MERGE keeps the properties of the first edge only. Read before the rename,
+    in a dry run as on --apply, and never merged here: the controller reads the
+    count and decides. A pair counts only while it still has a legacy edge, so a
+    second run reports nothing."""
+    groups: dict[Rel, list[str]] = {}
+    for old, new in LEGACY_REL.items():
+        groups.setdefault(new, []).append(old)
+    plans = [(Rel.DERIVA_DA, ["CITA"], f"WHERE {_LIVE_SOURCE_LINK}")]
+    plans += [
+        (new, olds, f"WHERE NOT ({_LIVE_SOURCE_LINK} AND type(r) = 'CITA')" if "CITA" in olds else "WHERE true")
+        for new, olds in groups.items()
+    ]
+    report: dict[str, dict[str, int]] = {}
+    for new, olds, where in plans:
+        rows = await client.query(
+            f"MATCH (a)-[r]->(b) {where} AND type(r) IN $names "
+            "WITH a, b, count(r) AS n, sum(CASE WHEN type(r) IN $legacy THEN 1 ELSE 0 END) AS old "
+            "WHERE n > 1 AND old > 0 RETURN count(*) AS pairs, sum(n) AS edges",
+            {"names": [new.value, *olds], "legacy": olds},
+        )
+        pairs = int(rows[0]["pairs"] or 0) if rows else 0
+        if pairs:
+            report[new.value] = {"pairs": pairs, "edges": int(rows[0]["edges"])}
+    return report
+
+
 async def rename_relations(client, apply: bool, batch: int) -> dict[str, int]:
     """FalkorDB cannot rename a relation type: each legacy edge is merged into its
     canonical type, then deleted — in batches, one statement each (atomic per batch).
@@ -100,11 +137,10 @@ async def rename_relations(client, apply: bool, batch: int) -> dict[str, int]:
     That edge stays as it is, with its own properties; a new edge takes the legacy
     edge's properties; the legacy edge goes in every case. Two legacy edges of one
     type between the same two nodes leave one: the second meets the edge the first
-    merged."""
-    # A community entity's link to its live source was written CITA; it is DERIVA_DA.
-    plans = [("CITA", Rel.DERIVA_DA, "WHERE a:Entity AND b:LiveSource", "CITA→DERIVA_DA")]
+    merged (`collapsed_relations` counts those pairs first)."""
+    plans = [("CITA", Rel.DERIVA_DA, f"WHERE {_LIVE_SOURCE_LINK}", "CITA→DERIVA_DA")]
     plans += [
-        (old, new, "WHERE NOT (a:Entity AND b:LiveSource)" if old == "CITA" else "", old)
+        (old, new, f"WHERE NOT ({_LIVE_SOURCE_LINK})" if old == "CITA" else "", old)
         for old, new in LEGACY_REL.items()
     ]
     report: dict[str, int] = {}
@@ -150,23 +186,32 @@ async def drop_legacy_entity_labels(client, apply: bool) -> dict[str, int]:
     return report
 
 
-async def wrap_bare_keys(client, apply: bool) -> dict[str, Any]:
+async def wrap_bare_keys(client, apply: bool, renames: dict[int, tuple[str, str]] | None = None) -> dict[str, Any]:
     """A Norma keyed by a bare `urn:nir:` URN is unreachable: the graph keys a norm by
     its full Normattiva URL (the seed does). The key becomes that URL when no node
     holds it; when one does, the bare key is reported (two nodes for one norm:
-    merging them is a decision, and FalkorDB has no APOC). Versions are
-    `rekey_versions`' job."""
+    merging them is a decision, and FalkorDB has no APOC). So is a bare key with a
+    version marker: cut, it would take the article's key, and the node is no article.
+    Two bare keys that wrap to one URL: the first takes it, the second is reported,
+    in a dry run as on --apply. Versions are `rekey_versions`' job. Each key it gives
+    is recorded in `renames` (node id -> (old, new)), for `unify_stubs` to see in a dry
+    run the key --apply will have written."""
     rows = await client.query(
         "MATCH (n:Norma) WHERE n.URN STARTS WITH 'urn:nir:' "
-        "AND coalesce(n.tipo_documento, '') <> 'versione_storica' RETURN id(n) AS id, n.URN AS urn"
+        "AND coalesce(n.tipo_documento, '') <> 'versione_storica' RETURN id(n) AS id, n.URN AS urn ORDER BY id"
     )
     wrapped, reported = 0, []
+    taken: set[str] = set()
     for row in rows:
-        new = canonical_urn(wrapped_norm_key(row["urn"]))
-        if await _norma_holds(client, new):
+        url = wrapped_norm_key(row["urn"])
+        new = canonical_urn(url)
+        if new != url or new in taken or await _norma_holds(client, new):
             reported.append(row["urn"])
             continue
+        taken.add(new)
         wrapped += 1
+        if renames is not None:
+            renames[row["id"]] = (row["urn"], new)
         if apply:
             await client.query(
                 "MATCH (n) WHERE id(n) = $id SET n.URN = $new, "
@@ -213,23 +258,58 @@ async def rekey_versions(client, apply: bool) -> dict[str, Any]:
     return {"rekeyed": rekeyed, "linked": linked, "reported": sorted(reported)}
 
 
-async def unify_stubs(client, apply: bool) -> int:
-    """One stub shape: `is_stub` true (a boolean), `node_id`, `provenance` ingestion,
-    no `trust`. A community entity still carrying a legacy `Norma` label is no stub: on
-    --apply `drop_legacy_entity_labels` has removed it already, and a dry run must not
-    count it."""
-    match = (
-        f"MATCH (n:Norma) WHERE NOT n:Entity AND {_STUB_WHERE} AND (n.is_stub IS NULL OR n.is_stub <> true "
-        "OR n.trust IS NOT NULL OR n.node_id IS NULL OR n.provenance IS NULL OR n.provenance = 'community_validated')"
+async def unify_stubs(
+    client, apply: bool, batch: int, renames: dict[int, tuple[str, str]] | None = None,
+) -> dict[str, Any]:
+    """Every stub ends with exactly the properties `schema.stub_properties` gives it:
+    the one definition of the shape (spec 4.1). The missing ones are set
+    (`numero_articolo`, `estremi`, `node_id`, a Boolean `is_stub`), the others removed
+    (`stub_source`, `created_at`, `fonte`, `trust`...). Its provenance is always
+    `ingestion`: a stub carries no seed content, and a `seed` stamp would survive the
+    ingestion that completes it (backfill_provenance_seed stamped every node).
+
+    Reported, never reshaped: a stub without a URN; a flagged stub that carries text
+    (reshaping would delete it, and the two signals disagree); a stub whose canonical
+    key another node holds. A community entity still carrying a legacy `Norma` label
+    is no stub: on --apply `drop_legacy_entity_labels` has removed it already. A dry
+    run reads a bare key `wrap_bare_keys` would have wrapped (`renames`) as wrapped."""
+    rows = await client.query(
+        f"MATCH (n) WHERE {_STUB_NODE} RETURN id(n) AS id, properties(n) AS props ORDER BY id"
     )
-    count = await _count(client, f"{match} RETURN count(n) AS n")
-    if apply and count:
-        await client.query(
-            f"{match} SET n.is_stub = true, n.node_id = coalesce(n.node_id, n.URN), n.trust = NULL, "
-            "n.provenance = CASE WHEN n.provenance IS NULL OR n.provenance = 'community_validated' "
-            "THEN 'ingestion' ELSE n.provenance END"
-        )
-    return count
+    report: dict[str, Any] = {"reshaped": 0, "set": {}, "removed": {}, "reported": []}
+    writes: list[dict[str, Any]] = []
+    taken: set[str] = set()
+    for row in rows:
+        props = dict(row["props"] or {})
+        if not apply and row["id"] in (renames or {}) and props.get("URN") == renames[row["id"]][0]:
+            old, new = renames[row["id"]]
+            props["URN"] = new
+            if props.get("node_id") is None or props.get("node_id") == old:
+                props["node_id"] = new
+        urn = props.get("URN")
+        if not isinstance(urn, str) or not urn.strip() or props.get("testo") is not None \
+                or props.get("testo_vigente") is not None:
+            report["reported"].append(str(urn or props.get("node_id") or f"id:{row['id']}"))
+            continue
+        shape = stub_properties(urn, Provenance.INGESTION)
+        if shape["URN"] != urn and (shape["URN"] in taken or await _norma_holds(client, shape["URN"])):
+            report["reported"].append(urn)
+            continue
+        taken.add(shape["URN"])
+        if props == shape:
+            continue
+        report["reshaped"] += 1
+        for key, value in shape.items():
+            if props.get(key) != value or type(props.get(key)) is not type(value):
+                report["set"][key] = report["set"].get(key, 0) + 1
+        for key in props.keys() - shape.keys():
+            report["removed"][key] = report["removed"].get(key, 0) + 1
+        writes.append({"id": row["id"], "props": shape})
+    if apply:
+        for chunk in _chunks(writes, batch):
+            await client.query("UNWIND $rows AS row MATCH (n) WHERE id(n) = row.id SET n = row.props", {"rows": chunk})
+    report["reported"].sort()
+    return report
 
 
 async def reset_entity_writer_stamps(client, apply: bool, batch: int, seed_keys: set[str]) -> dict[str, int]:
@@ -273,8 +353,10 @@ def plan_estremi(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 async def rewrite_estremi(client, apply: bool, batch: int) -> int:
+    """The estremi of the articles. A stub's are `unify_stubs`' (its shape includes
+    them): counted here too, a dry run, which has not reshaped it, would count it twice."""
     rows = await client.query(
-        f"MATCH (n:Norma) WHERE n.numero_articolo IS NOT NULL OR {_STUB_FLAG} "
+        f"MATCH (n:Norma) WHERE n.numero_articolo IS NOT NULL AND NOT {_STUB_NODE} "
         "RETURN id(n) AS id, n.URN AS urn, n.estremi AS estremi"
     )
     changes = plan_estremi(rows)
@@ -286,19 +368,25 @@ async def rewrite_estremi(client, apply: bool, batch: int) -> int:
 
 async def remap_provenance(client, apply: bool) -> dict[str, dict[str, int]]:
     """A provenance written before this round becomes the schema value it means
-    (`LEGACY_PROVENANCE`); any other value outside `Provenance` is reported, unchanged."""
+    (`LEGACY_PROVENANCE`); any other value outside `Provenance` is reported, unchanged.
+    A stub's is `unify_stubs`' (always `ingestion`)."""
     known = {p.value for p in Provenance}
     report: dict[str, dict[str, int]] = {"remapped": {}, "unknown": {}}
-    for row in await client.query("MATCH (n) WHERE n.provenance IS NOT NULL RETURN DISTINCT n.provenance AS p"):
+    not_stub = f"NOT {_STUB_NODE}"
+    for row in await client.query(
+        f"MATCH (n) WHERE n.provenance IS NOT NULL AND {not_stub} RETURN DISTINCT n.provenance AS p"
+    ):
         value = row["p"]
         if value in known:
             continue
-        count = await _count(client, "MATCH (n) WHERE n.provenance = $p RETURN count(n) AS n", {"p": value})
+        count = await _count(
+            client, f"MATCH (n) WHERE n.provenance = $p AND {not_stub} RETURN count(n) AS n", {"p": value}
+        )
         if value in LEGACY_PROVENANCE:
             report["remapped"][value] = count
             if apply:
                 await client.query(
-                    "MATCH (n) WHERE n.provenance = $p SET n.provenance = $new",
+                    f"MATCH (n) WHERE n.provenance = $p AND {not_stub} SET n.provenance = $new",
                     {"p": value, "new": LEGACY_PROVENANCE[value].value},
                 )
         else:
@@ -336,19 +424,19 @@ async def stamp_provenance(client, apply: bool, batch: int, seed_keys: set[str])
 
 
 async def normalize_fonti(client, apply: bool) -> dict[str, int]:
+    """The canonical `fonte` on nodes and edges. A stub has none: `unify_stubs` removes it."""
     report: dict[str, int] = {}
-    for pattern in ("(n)", "()-[n]->()"):
-        rows = await client.query(f"MATCH {pattern} WHERE n.fonte IS NOT NULL RETURN DISTINCT n.fonte AS fonte")
+    for pattern, where in (("(n)", f"n.fonte IS NOT NULL AND NOT {_STUB_NODE}"), ("()-[n]->()", "n.fonte IS NOT NULL")):
+        rows = await client.query(f"MATCH {pattern} WHERE {where} RETURN DISTINCT n.fonte AS fonte")
         for row in rows:
             old = row["fonte"]
             new = normalize_fonte(old) if isinstance(old, str) else old
             if new == old:
                 continue
-            report[old] = report.get(old, 0) + await _count(
-                client, f"MATCH {pattern} WHERE n.fonte = $old RETURN count(n) AS n", {"old": old}
-            )
+            match = f"MATCH {pattern} WHERE {where} AND n.fonte = $old"
+            report[old] = report.get(old, 0) + await _count(client, f"{match} RETURN count(n) AS n", {"old": old})
             if apply:
-                await client.query(f"MATCH {pattern} WHERE n.fonte = $old SET n.fonte = $new", {"old": old, "new": new})
+                await client.query(f"{match} SET n.fonte = $new", {"old": old, "new": new})
     return report
 
 
@@ -468,12 +556,14 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
     # the keys (the steps after them read URN and node_id), then shapes and stamps, then
     # the community entities, whose provenance is their own, then the report.
     batch = _batch_size(batch)
+    renames: dict[int, tuple[str, str]] = {}
     return {
+        "relations_collapsed": await collapsed_relations(client),
         "relations": await rename_relations(client, apply, batch),
         "legacy_entity_labels": await drop_legacy_entity_labels(client, apply),
-        "bare_keys": await wrap_bare_keys(client, apply),
+        "bare_keys": await wrap_bare_keys(client, apply, renames),
         "versions": await rekey_versions(client, apply),
-        "stubs": await unify_stubs(client, apply),
+        "stubs": await unify_stubs(client, apply, batch, renames),
         "provenance_reset": await reset_entity_writer_stamps(client, apply, batch, seed_keys),
         "estremi": await rewrite_estremi(client, apply, batch),
         "provenance_legacy": await remap_provenance(client, apply),
@@ -491,7 +581,7 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
 def plan_qdrant(points: list[tuple[Any, dict]]) -> dict[str, Any]:
     """What the vector migration changes, from (id, payload) pairs. Pure."""
     existing = {pid for pid, _ in points if not isinstance(pid, int)}
-    rekey, drop, urn_fixes = [], [], []
+    rekey, drop, urn_fixes, unkeyed = [], [], [], []
     retype: dict[str, int] = {}
     for pid, payload in points:
         source_type = payload.get("source_type") or ""
@@ -500,7 +590,9 @@ def plan_qdrant(points: list[tuple[Any, dict]]) -> dict[str, Any]:
             source_type = LEGACY_SOURCE_TYPE[source_type].value
         urn = payload.get("article_urn") or ""
         canonical = canonical_urn(urn) or ""
-        if isinstance(pid, int):  # keyed by Python's per-process hash(): lazy ingestion before this round
+        if isinstance(pid, int) and not canonical:
+            unkeyed.append(pid)  # point_id("", ...) is one id for all of them: reported, never re-keyed
+        elif isinstance(pid, int):  # keyed by Python's per-process hash(): lazy ingestion before this round
             key = payload.get("massima_index", 0) if source_type == "massima" else 0
             new_id = point_id(canonical, source_type, key)
             if new_id in existing:
@@ -510,7 +602,7 @@ def plan_qdrant(points: list[tuple[Any, dict]]) -> dict[str, Any]:
                 rekey.append((pid, new_id, {**payload, "source_type": source_type, "article_urn": canonical}))
         elif canonical != urn:
             urn_fixes.append((pid, canonical))
-    return {"rekey": rekey, "drop": drop, "urn_fixes": urn_fixes, "retype": retype}
+    return {"rekey": rekey, "drop": drop, "urn_fixes": urn_fixes, "retype": retype, "unkeyed": unkeyed}
 
 
 def migrate_qdrant(client, collection: str, *, apply: bool, batch: int = 256) -> dict[str, Any]:
@@ -554,6 +646,7 @@ def migrate_qdrant(client, collection: str, *, apply: bool, batch: int = 256) ->
         "duplicates_dropped": len(plan["drop"]),
         "retyped": plan["retype"],
         "urns_canonicalized": len(plan["urn_fixes"]),
+        "unkeyed": len(plan["unkeyed"]),
     }
 
 

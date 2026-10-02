@@ -56,7 +56,7 @@ import re
 import structlog
 import unicodedata
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
@@ -64,8 +64,7 @@ from merlt.storage.graph.relation_endpoints import wrapped_norm_key
 from merlt.storage.graph.schema import (
     Fonte, Label, Provenance, Rel, SEED_TWIN, canonical_urn, entity_label, stub_properties,
 )
-from merlt.storage.enrichment.models import PendingEntity, PendingRelation
-from merlt.pipeline.enrichment.models import EntityType, RelationType
+from merlt.storage.enrichment.models import PendingEntity
 
 log = structlog.get_logger()
 

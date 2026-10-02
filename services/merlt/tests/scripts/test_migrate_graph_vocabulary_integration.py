@@ -15,7 +15,7 @@ from falkordb import FalkorDB
 
 from merlt.scripts import migrate_graph_vocabulary as mig
 from merlt.storage.graph import FalkorDBClient
-from merlt.storage.graph.schema import text_fingerprint
+from merlt.storage.graph.schema import Provenance, stub_properties, text_fingerprint
 
 pytestmark = pytest.mark.integration
 
@@ -45,9 +45,10 @@ CREATE (codice:Norma {URN: $code, tipo_documento: 'codice', fonte: 'VisualexAPI'
 NO_TWINS = {"community": [], "seed_near_duplicates": []}
 
 # What a run reports when it has nothing to change.
+NO_STUBS = {"reshaped": 0, "set": {}, "removed": {}, "reported": []}
 NOTHING = {
-    "relations": {}, "legacy_entity_labels": {}, "bare_keys": {"wrapped": 0, "reported": []},
-    "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": 0, "provenance_reset": {}, "estremi": 0,
+    "relations_collapsed": {}, "relations": {}, "legacy_entity_labels": {}, "bare_keys": {"wrapped": 0, "reported": []},
+    "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": NO_STUBS, "provenance_reset": {}, "estremi": 0,
     "provenance_legacy": {"remapped": {}, "unknown": {}}, "provenance": {}, "fonte": {}, "testo": 0, "stale_text": 0,
     "fingerprint": 0, "entity_labels": {}, "entity_node_id": 0, "twins": NO_TWINS,
 }
@@ -84,8 +85,14 @@ async def test_the_migration_converges_on_the_schema(graph):
         **NOTHING,
         "relations": {"CITA→DERIVA_DA": 1, "contiene": 1, "commenta": 1, "CITA": 1},
         "legacy_entity_labels": {"Concetto": 1},  # the fixture's :Entity:Concetto
-        "stubs": 1,
-        "estremi": 2,
+        # the stub takes schema.stub_properties' shape: its estremi are that step's, not rewrite_estremi's
+        "stubs": {
+            "reshaped": 1,
+            "set": {"node_id": 1, "estremi": 1, "is_stub": 1, "provenance": 1},
+            "removed": {"trust": 1},
+            "reported": [],
+        },
+        "estremi": 1,
         "provenance": {"seed": 2, "ingestion": 1},
         "fonte": {"VisualexAPI": 2, "Brocardi": 1, "community_validation": 1},
         "testo": 2,
@@ -236,7 +243,8 @@ async def test_a_community_entity_loses_the_label_the_old_writer_gave_it(graph):
 
 async def test_a_provenance_from_before_this_round_becomes_the_schema_value(graph):
     await graph.query(
-        "CREATE (:Norma {URN: $a, provenance: 'lazy_ingest'}), (:Norma {URN: $b, provenance: 'handmade'})",
+        "CREATE (:Norma {URN: $a, tipo_documento: 'articolo', testo: 'a', provenance: 'lazy_ingest'}), "
+        "(:Norma {URN: $b, tipo_documento: 'articolo', testo: 'b', provenance: 'handmade'})",
         {"a": ART + "-legacy-a", "b": ART + "-legacy-b"},
     )
     report = await _migrate(graph)
@@ -291,9 +299,90 @@ async def test_a_stub_the_seed_flagged_with_a_string_gets_the_one_shape(graph):
     dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS | {seed_stub})
     report = await _migrate(graph, SEED_KEYS | {seed_stub})
     assert dry == report
-    assert (report["stubs"], report["estremi"]) == (2, 3)  # the fixture's stub, and this one
+    assert (report["stubs"]["reshaped"], report["estremi"]) == (2, 1)  # the fixture's stub, and this one
+    assert report["stubs"]["removed"] == {"trust": 1, "stub_source": 1}
     assert await graph.query(
         "MATCH (n:Norma {URN: $u}) RETURN n.is_stub AS s, n.node_id AS id, n.estremi AS e, n.provenance AS p",
         {"u": seed_stub},
     ) == [{"s": True, "id": seed_stub, "e": "Art. 771 c.c.", "p": "ingestion"}]
     assert await _migrate(graph, SEED_KEYS | {seed_stub}) == NOTHING
+
+
+async def test_two_legacy_edges_that_end_in_one_canonical_type_are_reported_as_collapsed(graph):
+    # Only the first edge's properties survive the MERGE: the controller reads the count first.
+    await graph.query(
+        "MATCH (c:Norma {URN: $code}), (a:Norma {URN: $art}) "
+        "CREATE (c)-[:contiene {copia: 2}]->(a), (a)-[:cita {n: 1}]->(c), (a)-[:richiama {n: 2}]->(c)",
+        {"code": CODE, "art": ART},
+    )
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
+    assert dry == report
+    assert report["relations_collapsed"] == {
+        "CONTIENE": {"pairs": 1, "edges": 2},
+        "RINVIA": {"pairs": 1, "edges": 2},  # cita + richiama between the same two nodes
+    }
+    assert (await _migrate(graph))["relations_collapsed"] == {}
+
+
+async def test_a_stub_stamped_seed_takes_ingestion_and_loses_its_trust(graph):
+    # backfill_provenance_seed stamped every node, stubs too; a stub carries no seed content.
+    stub = CODE + "~art1499"
+    await graph.query("CREATE (:Norma {URN: $u, is_stub: true, provenance: 'seed', trust: 1.0})", {"u": stub})
+    await _migrate(graph, SEED_KEYS | {stub})
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.provenance AS p, n.trust AS t", {"u": stub}) == [
+        {"p": "ingestion", "t": None}
+    ]
+
+
+async def test_a_placeholder_without_flag_or_number_is_counted_alike_by_the_dry_run(graph):
+    await graph.query("CREATE (:Norma {URN: $u, estremi: 'Art. 1500'})", {"u": CODE + "~art1500"})
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
+    assert dry == report
+    assert report["stubs"]["set"]["estremi"] == 2  # the fixture's stub, and this one
+
+
+async def test_a_stub_ends_with_the_schema_shape_and_nothing_else(graph):
+    stub = CODE + "~art1501"
+    await graph.query(
+        "CREATE (:Norma {URN: $u, is_stub: 'true', stub_source: 'enrichment_pipeline', created_at: 1773613998967, "
+        "fonte: 'VisualexAPI', trust: 0.5})",
+        {"u": stub},
+    )
+    report = await _migrate(graph)
+    rows = await graph.query("MATCH (n:Norma {URN: $u}) RETURN properties(n) AS p", {"u": stub})
+    assert rows == [{"p": stub_properties(stub, Provenance.INGESTION)}]
+    assert report["stubs"]["removed"] == {"trust": 2, "stub_source": 1, "created_at": 1, "fonte": 1}
+    assert report["stubs"]["set"]["numero_articolo"] == 1  # the fixture's stub had its number
+
+
+async def test_a_flagged_stub_that_carries_text_is_reported_and_kept(graph):
+    # Reshaping it would delete its text: two signals disagree, and that needs a decision.
+    flagged = CODE + "~art1502"
+    await graph.query("CREATE (:Norma {URN: $u, is_stub: true, testo: 'Un testo.'})", {"u": flagged})
+    assert (await _migrate(graph))["stubs"]["reported"] == [flagged]
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.testo AS t", {"u": flagged}) == [{"t": "Un testo."}]
+    assert (await _migrate(graph))["stubs"]["reported"] == [flagged]
+
+
+async def test_a_stub_whose_canonical_key_is_taken_is_reported(graph):
+    versioned = ART + "@originale"
+    await graph.query("CREATE (:Norma {URN: $u, is_stub: true})", {"u": versioned})
+    assert (await _migrate(graph))["stubs"]["reported"] == [versioned]
+    assert (await _migrate(graph))["stubs"]["reported"] == [versioned]
+
+
+async def test_two_bare_keys_that_wrap_to_one_url_are_counted_alike_by_the_dry_run(graph):
+    await graph.query("CREATE (:Norma {URN: $a}), (:Norma {URN: $b})", {"a": BARE_CP, "b": BARE_CP + " "})
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
+    assert dry == report
+    assert report["bare_keys"]["wrapped"] == 1 and len(report["bare_keys"]["reported"]) == 1
+
+
+async def test_a_bare_key_with_a_version_marker_is_reported_never_wrapped(graph):
+    versioned = BARE_CP + "!vig=2020-01-01"
+    await graph.query("CREATE (:Norma {URN: $u, tipo_documento: 'articolo', testo: 'x'})", {"u": versioned})
+    assert (await _migrate(graph))["bare_keys"] == {"wrapped": 0, "reported": [versioned]}
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN count(n) AS c", {"u": versioned}) == [{"c": 1}]

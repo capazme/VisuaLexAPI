@@ -34,7 +34,9 @@ def _collection() -> QdrantClient:
 def test_lazy_points_get_stable_ids_and_duplicates_go():
     client = _collection()
     report = mig.migrate_qdrant(client, "chunks", apply=True)
-    assert report == {"rekeyed": 2, "duplicates_dropped": 1, "retyped": {"concettogiuridico": 1}, "urns_canonicalized": 0}
+    assert report == {
+        "rekeyed": 2, "duplicates_dropped": 1, "retyped": {"concettogiuridico": 1}, "urns_canonicalized": 0, "unkeyed": 0,
+    }
     ids = {str(p.id) for p in client.scroll("chunks", limit=10)[0]}
     assert ids == {point_id(CC, "norma"), point_id(CC, "massima", 2), SEED_ID}
     assert client.retrieve("chunks", ids=[SEED_ID])[0].payload["source_type"] == "concetto"
@@ -44,7 +46,7 @@ def test_a_second_run_changes_nothing():
     client = _collection()
     mig.migrate_qdrant(client, "chunks", apply=True)
     assert mig.migrate_qdrant(client, "chunks", apply=True) == {
-        "rekeyed": 0, "duplicates_dropped": 0, "retyped": {}, "urns_canonicalized": 0,
+        "rekeyed": 0, "duplicates_dropped": 0, "retyped": {}, "urns_canonicalized": 0, "unkeyed": 0,
     }
 
 
@@ -61,3 +63,17 @@ def test_a_crash_between_upsert_and_delete_converges():
         (point_id(CC, "norma"), {"article_urn": CC, "source_type": "norma"}),
     ])
     assert plan["rekey"] == [] and plan["drop"] == [123]
+
+
+def test_a_lazy_point_without_an_article_is_reported_never_rekeyed():
+    # point_id("", ...) is one id for every such point: re-keyed, all but one would be dropped.
+    plan = mig.plan_qdrant([
+        (11, {"source_type": "norma", "text": "a"}),
+        (12, {"article_urn": "", "source_type": "norma", "text": "b"}),
+    ])
+    assert (plan["rekey"], plan["drop"], plan["unkeyed"]) == ([], [], [11, 12])
+    client = QdrantClient(":memory:")
+    client.create_collection("chunks", vectors_config=models.VectorParams(size=4, distance=models.Distance.COSINE))
+    client.upsert("chunks", points=[models.PointStruct(id=11, vector=[1, 0, 0, 0], payload={"source_type": "norma"})])
+    assert mig.migrate_qdrant(client, "chunks", apply=True)["unkeyed"] == 1
+    assert [p.id for p in client.scroll("chunks", limit=10)[0]] == [11]
