@@ -126,12 +126,13 @@ Non-goals:
   stops the run and reports it. Re-runs resume.
 - **The raw archive** (JSON as served, PDFs, the dated legal notes) is kept outside the
   repository, as the evidence of what was taken and when. Production does not read it.
-- **Who fetches.** A VisuaLex route fetches a volume for MERL-T, as `VisualexTreeAdapter` already
-  does for Normattiva: `GET /fetch_massimario_volume?id=<volume>` returns the index and every
-  chapter, part, loose section and volume field, raw. It goes through `ThrottledHttpClient`; the
-  portal's host is added to `egress.ALLOWED_HOSTS` and to `services/visualex/SECURITY.md`. The
-  route is internal: it is not in the web's `legalFetch` list, the Vite proxy or the ingress's
-  `@legal` list, and the ingress does not route it.
+- **Who fetches.** A VisuaLex route fetches one portal element at a time for MERL-T, as
+  `VisualexTreeAdapter` already asks VisuaLex for Normattiva: `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>`
+  returns the element's `objectData`, raw. It goes through `ThrottledHttpClient` with its own
+  pacing (one request at a time, at least 1.5 s apart); the portal's host is added to
+  `egress.ALLOWED_HOSTS` and to the root `SECURITY.md`. The route is internal: it is not in the
+  web's `legalFetch` list, the Vite proxy or the ingress's `@legal` list, and the ingress does not
+  route it. The adapter walks the volume element by element.
 - **Quirks the fetch handles:** sections outside any chapter (fetched one by one); the mixed
   2019 volume (no civil/criminal from the volume); volume titles without a number.
 
@@ -187,12 +188,14 @@ relation names — in `Rel` if they ever appear as graph edges). Its contract te
 - The portal's URN is converted to the canonical form of the schema module. The codes differ:
   `codice.civile:1942-03-16;262` is `regio.decreto:1942-03-16;262:2` in VisuaLex and the graph,
   `codice.procedura.civile:1940-10-28;1443` is `regio.decreto:1940-10-28;1443:1`, and so on
-  (`services/visualex/visualex_api/tools/map.py`, `NORMATTIVA_URN_CODICI`). Acts cited without
-  a date (`legge:1983;184`) are resolved once per act through the VisuaLex API and cached.
+  (`services/visualex/visualex_api/tools/map.py`, `NORMATTIVA_URN_CODICI`). Acts cited
+  with the year only (`legge:1983;184`, ~27,700 links) are completed by an internal
+  VisuaLex route, `POST /resolve_act_dates`: one plain request per act to Normattiva's resolver,
+  whose page title carries the date ("LEGGE 4 maggio 1983, n. 184"), cached for a year.
 - The article is the join level; the comma, number or letter (`com2-num2`) is kept on the link.
 - A norm not yet in the graph becomes a stub in the schema module's stub shape, completed when
-  its act is ingested. A URN that cannot be resolved keeps the portal's form as an alias and is
-  reported.
+  its act is ingested. A URN that cannot be resolved is counted and sampled in the report,
+  and not linked: a stub keyed by a year-only URN would never meet the act's real node.
 
 ### 5.4 Links
 
@@ -230,17 +233,19 @@ changes (orphans become stubs, completeness, promotion through the schema module
 4. **Report**: paragraphs; citations recognised per form and coverage, with samples of the
    unrecognised; norms linked to existing nodes, stubs created, URNs unresolved; decisions new
    and already in the graph; keys seen with more than one section; references without identity.
-5. **Promote**, on the administrator's approval: graph, then bridge, then Qdrant with the
-   vectors computed in the job (~7 minutes a volume on the development Mac's CPU at the measured
-   4 passages a second; where the vectors run is the graph round's open point 3).
+5. **Promote**, on the administrator's approval: the graph, then a chained job that embeds 100
+   paragraphs at a time and writes their Qdrant points and bridge rows together, so the reader
+   never meets a bridge row without its point. Progress is on the batch (`stats.vectors`).
 
 **Idempotence.** Same ids on every run; a corrected text replaces its point; links are merged,
 not duplicated. **Failure.** A fetch that fails marks the batch `failed` with its reason; a
 promotion that stops half-way is re-run and converges, because every write is an upsert.
 
-**Sizes.** Qdrant from ~35,000 to ~135,000 points (~550 MB more); ~35,000 decision nodes and
-~80,000 weak edges; ~140,000 bridge rows. The whole corpus: 63 batches, ~7–8 hours of vectors,
-run at night.
+**Sizes**, measured on 1 October with the plan's code on the whole archive: 98,840 paragraphs →
+100,920 points (Qdrant from ~35,000 to ~136,000); ~160,000 bridge rows; ~47,000 co-citation
+edges; ~55,000 decisions counted volume by volume (fewer once merged across volumes); 7,354
+distinct acts cited by year only (one request each to Normattiva's resolver, once). The whole
+corpus: 63 batches; the vectors' time is measured on the pilot.
 
 ## 7. The reader
 
