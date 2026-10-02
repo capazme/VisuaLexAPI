@@ -1,0 +1,37 @@
+{
+  "query_id": "q_0002",
+  "query_text": "Quali sono i presupposti della risoluzione ex art. 1453 c.c.?",
+  "synthesis": "In qualit\u00e0 di giurista esperto, sintetizzo le interpretazioni dei presupposti della risoluzione del contratto per inadempimento ex art. 1453 c.c., integrando le diverse prospettive ermeneutiche.\n\n**Sintesi dei Presupposti della Risoluzione ex art. 1453 c.c.**\n\nL'articolo 1453 del Codice Civile disciplina la risoluzione del contratto a prestazioni corrispettive per inadempimento di una delle parti. I presupposti fondamentali per l'operativit\u00e0 di tale rimedio, come emerge dall'interpretazione sist",
+  "confidence": 0.4865671641791045,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "Sulla base delle fonti recuperate, non \u00e8 possibile identificare direttamente i presupposti della risoluzione ex art. 1453 c.c. Le fonti menzionano l'art. 1453 c.c. in relazione alla risoluzione per mancanza di qualit\u00e0 promesse o essenziali nel bene, e in riferimento alla risoluzione del contratto in assenza di una clausola risolutiva espressa, ma non ne specificano i presupposti generali. Una fonte fa riferimento all'art. 1455 c.c. per la valutazione della scarsa importanza dell'inadempimento ai fini della risoluzione, ma non \u00e8 l'art. 1453 c.c. stesso.",
+      "confidence": 0.3,
+      "weight": 0.6268656716417911,
+      "weighted_confidence": 0.1880597014925373
+    },
+    "systemic": {
+      "interpretation": "L'articolo 1453 del Codice Civile disciplina la risoluzione del contratto per inadempimento. I presupposti per la risoluzione sono l'inadempimento di una delle parti e la sua non scarsa importanza, valutata dal giudice. La risoluzione pu\u00f2 essere richiesta anche quando \u00e8 stato domandato l'adempimento, ma non viceversa. In caso di clausola risolutiva espressa (art. 1456 c.c.), non \u00e8 richiesta la gravit\u00e0 dell'inadempimento, purch\u00e9 siano specificate le prestazioni la cui mancata esecuzione d\u00e0 luogo alla risoluzione e sia chiara la volont\u00e0 delle parti di far operare la risoluzione senza l'intervento del giudice.",
+      "confidence": 0.8,
+      "weight": 0.373134328358209,
+      "weighted_confidence": 0.2985074626865672
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 17080.113,
+  "routing_decision": {
+    "query_type": "general",
+    "expert_weights": {
+      "literal": 0.35,
+      "systemic": 0.25,
+      "principles": 0.2,
+      "precedent": 0.2
+    },
+    "confidence": 0.5,
+    "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+  },
+  "feedback": 0.1327096399668481,
+  "reward": 0.009289674797679367,
+  "user_id": "user_009",
+  "error": null
+}

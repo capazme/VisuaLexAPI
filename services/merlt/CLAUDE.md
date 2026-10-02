@@ -211,10 +211,17 @@ into it) is the reference run. On Python 3.11 it:
 1. installs CPU torch, then `pip install -e ".[dev]"`;
 2. bootstraps a Postgres service with `init_db()`, `create_tables()` and
    `ensure_schema_additions()`;
-3. runs `python -m pytest tests/ -q`.
+3. runs `python -m pytest tests/ -q`;
+4. runs `python -m pytest tests/ -q -m integration` against a FalkorDB service
+   (the image `infra/compose.yml` pins), with `FALKORDB_HOST` and
+   `FALKORDB_PORT` set for that step only.
 
-Tests marked `integration` (live FalkorDB) are excluded by `pyproject.toml`
-`addopts`. Run them with `-m integration`.
+Tests marked `integration` need a live FalkorDB: `pyproject.toml` `addopts`
+excludes them from a plain run. Run them with `-m integration` against a
+disposable FalkorDB (`FALKORDB_HOST`, `FALKORDB_PORT`; the client's default
+is `localhost:6380`), never the development graph. CI has only Postgres and
+FalkorDB, so a test that needs another live service (Qdrant, Normattiva,
+Brocardi) needs a marker of its own, kept out of CI.
 
 Locally, from the venv. The DB-backed tests write rows, so point them at a
 disposable database, never at the dev stack's data:

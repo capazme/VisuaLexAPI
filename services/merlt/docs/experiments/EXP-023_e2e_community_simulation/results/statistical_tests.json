@@ -1,0 +1,19 @@
+{
+  "reward_improvement": {
+    "baseline": 0.21765085979466012,
+    "evaluation": 0.22062844019015349,
+    "improvement_pct": 1.3680535874301287,
+    "hypothesis_passed": false
+  },
+  "load_balance": {
+    "baseline": 0.6258342614722722,
+    "evaluation": 0.6258342614722722,
+    "target": 0.75,
+    "hypothesis_passed": false
+  },
+  "entropy_stability": {
+    "final_entropy": 1.3596901677385191,
+    "target_min": 1.0,
+    "hypothesis_passed": true
+  }
+}

@@ -1,0 +1,369 @@
+{
+  "timestamp": "2025-12-05T01:02:40.600133",
+  "queries": 10,
+  "avg_latency_ms": 161.72068119049072,
+  "avg_enrichment_rate": 1.0,
+  "type_distribution": {
+    "AttoGiudiziario": 68,
+    "Norma": 32
+  },
+  "results": [
+    {
+      "query": "Cos'\u00e8 la risoluzione del contratto per inadempimento?",
+      "latency_ms": 726.3751029968262,
+      "type_breakdown": {
+        "AttoGiudiziario": 2,
+        "Norma": 8
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 3539/1976",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8924578
+        },
+        {
+          "identifier": "Cass. civ. n. 15070/2016",
+          "node_type": "AttoGiudiziario",
+          "score": 0.89000547
+        },
+        {
+          "identifier": "art1453",
+          "node_type": "Norma",
+          "score": 0.8835639
+        },
+        {
+          "identifier": "art1453",
+          "node_type": "Norma",
+          "score": 0.8835639
+        },
+        {
+          "identifier": "art1453",
+          "node_type": "Norma",
+          "score": 0.8835639
+        }
+      ]
+    },
+    {
+      "query": "Sentenze sulla clausola risolutiva espressa",
+      "latency_ms": 271.104097366333,
+      "type_breakdown": {
+        "AttoGiudiziario": 9,
+        "Norma": 1
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 167/2005",
+          "node_type": "AttoGiudiziario",
+          "score": 0.90133464
+        },
+        {
+          "identifier": "Cass. civ. n. 2553/2007",
+          "node_type": "AttoGiudiziario",
+          "score": 0.89356756
+        },
+        {
+          "identifier": "Cass. civ. n. 4369/1997",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8926971
+        },
+        {
+          "identifier": "Cass. civ. n. 2828/1973",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8897556
+        },
+        {
+          "identifier": "Cass. civ. n. 1275/1973",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8883555
+        }
+      ]
+    },
+    {
+      "query": "Responsabilit\u00e0 del medico per danni al paziente",
+      "latency_ms": 51.90134048461914,
+      "type_breakdown": {
+        "AttoGiudiziario": 10
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 15993/2011",
+          "node_type": "AttoGiudiziario",
+          "score": 0.87741584
+        },
+        {
+          "identifier": "Cass. civ. n. 18497/2015",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8763572
+        },
+        {
+          "identifier": "Cass. civ. n. 15081/2025",
+          "node_type": "AttoGiudiziario",
+          "score": 0.87070906
+        },
+        {
+          "identifier": "Cass. civ. n. 4792/2013",
+          "node_type": "AttoGiudiziario",
+          "score": 0.87043023
+        },
+        {
+          "identifier": "Cass. civ. n. 23918/2006",
+          "node_type": "AttoGiudiziario",
+          "score": 0.86930466
+        }
+      ]
+    },
+    {
+      "query": "Obblighi del venditore nella compravendita",
+      "latency_ms": 162.6908779144287,
+      "type_breakdown": {
+        "Norma": 9,
+        "AttoGiudiziario": 1
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "art1476",
+          "node_type": "Norma",
+          "score": 0.8916639
+        },
+        {
+          "identifier": "art1476",
+          "node_type": "Norma",
+          "score": 0.8916639
+        },
+        {
+          "identifier": "art1476",
+          "node_type": "Norma",
+          "score": 0.8916639
+        },
+        {
+          "identifier": "art1476",
+          "node_type": "Norma",
+          "score": 0.8916639
+        },
+        {
+          "identifier": "art1476",
+          "node_type": "Norma",
+          "score": 0.8916639
+        }
+      ]
+    },
+    {
+      "query": "Giurisprudenza sulla diffida ad adempiere",
+      "latency_ms": 70.01304626464844,
+      "type_breakdown": {
+        "AttoGiudiziario": 10
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 3851/1978",
+          "node_type": "AttoGiudiziario",
+          "score": 0.90854174
+        },
+        {
+          "identifier": "Cass. civ. n. 2089/1982",
+          "node_type": "AttoGiudiziario",
+          "score": 0.88933796
+        },
+        {
+          "identifier": "Cass. civ. n. 3742/2006",
+          "node_type": "AttoGiudiziario",
+          "score": 0.88902605
+        },
+        {
+          "identifier": "Cass. civ. n. 3867/1985",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8890206
+        },
+        {
+          "identifier": "Cass. civ. n. 9317/2016",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8795298
+        }
+      ]
+    },
+    {
+      "query": "Cosa dice la Cassazione sul risarcimento del danno?",
+      "latency_ms": 44.47507858276367,
+      "type_breakdown": {
+        "AttoGiudiziario": 10
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 2154/2001",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8669583
+        },
+        {
+          "identifier": "Cass. civ. n. 23654/2025",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8656938
+        },
+        {
+          "identifier": "Cass. civ. n. 12382/2006",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8639086
+        },
+        {
+          "identifier": "Cass. civ. n. 2402/1998",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8633405
+        },
+        {
+          "identifier": "Cass. civ. n. 5684/2001",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8632693
+        }
+      ]
+    },
+    {
+      "query": "Eccezione di inadempimento nel contratto",
+      "latency_ms": 49.3311882019043,
+      "type_breakdown": {
+        "AttoGiudiziario": 7,
+        "Norma": 3
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 4529/2001",
+          "node_type": "AttoGiudiziario",
+          "score": 0.88902223
+        },
+        {
+          "identifier": "Cass. civ. n. 5933/2011",
+          "node_type": "AttoGiudiziario",
+          "score": 0.888901
+        },
+        {
+          "identifier": "Cass. civ. n. 7480/1997",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8840736
+        },
+        {
+          "identifier": "art1460",
+          "node_type": "Norma",
+          "score": 0.8840164
+        },
+        {
+          "identifier": "art1460",
+          "node_type": "Norma",
+          "score": 0.8840164
+        }
+      ]
+    },
+    {
+      "query": "Risoluzione di diritto del contratto",
+      "latency_ms": 153.98001670837402,
+      "type_breakdown": {
+        "Norma": 7,
+        "AttoGiudiziario": 3
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "art1517",
+          "node_type": "Norma",
+          "score": 0.882253
+        },
+        {
+          "identifier": "art1517",
+          "node_type": "Norma",
+          "score": 0.882253
+        },
+        {
+          "identifier": "art1517",
+          "node_type": "Norma",
+          "score": 0.882253
+        },
+        {
+          "identifier": "art1517",
+          "node_type": "Norma",
+          "score": 0.882253
+        },
+        
+        {
+          "identifier": "Cass. civ. n. 17463/2021",
+          "node_type": "AttoGiudiziario",
+          "score": 0.87468624
+        }
+      ]
+    },
+    {
+      "query": "Sentenze recenti sulla caparra confirmatoria",
+      "latency_ms": 42.999982833862305,
+      "type_breakdown": {
+        "AttoGiudiziario": 10
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 2870/1978",
+          "node_type": "AttoGiudiziario",
+          "score": 0.88146067
+        },
+        {
+          "identifier": "Cass. civ. n. 14776/2014",
+          "node_type": "AttoGiudiziario",
+          "score": 0.87813985
+        },
+        {
+          "identifier": "Cass. civ. n. 5644/1995",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8693466
+        },
+        {
+          "identifier": "Cass. civ. n. 8488/2000",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8679066
+        },
+        {
+          "identifier": "Cass. civ. n. 4241/1983",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8662984
+        }
+      ]
+    },
+    {
+      "query": "Impossibilit\u00e0 sopravvenuta della prestazione",
+      "latency_ms": 44.33608055114746,
+      "type_breakdown": {
+        "AttoGiudiziario": 6,
+        "Norma": 4
+      },
+      "enrichment_rate": 1.0,
+      "top_results": [
+        {
+          "identifier": "Cass. civ. n. 4140/1975",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8911694
+        },
+        {
+          "identifier": "Cass. civ. n. 8766/2019",
+          "node_type": "AttoGiudiziario",
+          "score": 0.87526023
+        },
+        {
+          "identifier": "Cass. civ. n. 1037/1995",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8738235
+        },
+        {
+          "identifier": "Cass. civ. n. 36329/2021",
+          "node_type": "AttoGiudiziario",
+          "score": 0.87163484
+        },
+        {
+          "identifier": "Cass. civ. n. 3505/2024",
+          "node_type": "AttoGiudiziario",
+          "score": 0.8673384
+        }
+      ]
+    }
+  ]
+}

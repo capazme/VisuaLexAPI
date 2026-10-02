@@ -3,7 +3,10 @@
 **Date:** 2026-09-30
 **Status:** accepted by the owner on 30 September (the interview answers are in section 2).
 Phase 1 is planned in `docs/superpowers/plans/2026-09-30-merlt-graph-vocabulary.md`; section 11
-keeps what is still open.
+keeps what is still open. Amended on 1 October with what the December 2025 experiments
+(`services/merlt/docs/experiments/`) measured and got wrong, with the owner's decision that a
+ruling is one node with its massime as attributes, and with the two text fingerprints kept
+apart: sections 1, 4.1–4.5, 5.1, 5.4, 5.7 (new), 6.1, 9 and 11.
 **Round:** the MERL-T graph. It comes **before** the MCP spike, by the owner's choice (the
 Gate 0 date is at risk, and the owner accepted that).
 **Supersedes:** filling the graph with the mechanical ingestion as it stands
@@ -69,6 +72,18 @@ worker waiting up to 120 s (`fda072b`, `b40f34a`). Embeddings (multilingual-e5-l
 Docker on the development Mac): **4 passages a second**. Store memory today: FalkorDB 111 MB,
 Qdrant 150 MB, Postgres 490 MB.
 
+**What the December 2025 experiments measured** (`services/merlt/docs/experiments/`, imported
+from the earlier monorepo; same embedding model, older scrapers):
+
+- Codice penale, Libro I (EXP-006): 263 articles, **6,195 massime — 23.6 an article**, almost
+  twice Libro IV's 12.8 (and those 12.8 count `interpreta` edges: one node per judgment is ~13%
+  fewer). Normattiva plus the doctrine source, sequential and cold: ~4 s an article.
+- Fetch alone: 2.0–2.8 s an article; the full pipeline with vectors 7–8.4 s; multivigenza adds
+  ~3.7 s (EXP-001, EXP-006, EXP-014). For ~15,000 articles: 17–35 hours.
+- Embeddings with Apple's MPS outside Docker: ~7 passages a second (batch 32), ~9 for massime
+  (batch 64), plus ~2 minutes to load the model (EXP-001).
+- No memory figures exist: section 5.5 still has to measure them.
+
 ## 2. The owner's decisions (30 September)
 
 1. **The graph comes before the MCP spike.** Phases 1 and 2 now; the spike after.
@@ -112,11 +127,11 @@ Non-goals:
 
 - **Labels**: `Norma` (with `tipo_documento`: `articolo`, `codice`, `legge`, …, and the
   partitions `parte`, `libro`, `titolo`, `capo`, `sezione`, as the seed already does), `Comma`,
-  `Lettera`, `Dottrina`, `AttoGiudiziario` (a massima), `LocuzioneLatina` (new),
+  `Lettera`, `Dottrina`, `AttoGiudiziario` (a ruling, its massime as attributes: 5.1), `LocuzioneLatina` (new),
   `ConcettoGiuridico` and the rest of the seed's concept labels, `LiveSource`.
 - **Relation types, all upper case**: `CONTIENE` (partition→partition→article→comma→lettera),
   `RINVIA` (article→article or act; replaces `CITA` and `rinvia`), `MODIFICA`, `ABROGA`,
-  `INSERISCE`, `SOSTITUISCE`, `INTERPRETA` (massima→article), `COMMENTA` (dottrina→article),
+  `INSERISCE`, `SOSTITUISCE`, `INTERPRETA` (ruling→article), `COMMENTA` (dottrina→article),
   `ESPRIME` (article→Latin maxim), `MENZIONA` (article→glossary concept), `CORRELATO`, and the
   seed's concept relations (`DISCIPLINA`, `APPLICA_A`, `IMPONE`, `ESPRIME_PRINCIPIO`,
   `DEFINISCE`, `PREVEDE`, `PREVEDE_SANZIONE`, `ATTRIBUISCE_RESPONSABILITA`,
@@ -132,6 +147,17 @@ Non-goals:
   `community`, `mcp-legal-it`).
 - **The stub shape** (`URN`, `node_id`, `numero_articolo`, `estremi`, `is_stub: true`,
   `provenance`, nothing else) and the **completeness flags** of an article (section 4.3).
+- **The indexes**: FalkorDB has none today (`pipeline/enrichment/writers/graph_writer.py`
+  `ensure_indexes` has no caller and speaks Neo4j's syntax), so every `MERGE` scans its whole
+  label. The module lists the keys to index — `URN` and `node_id` on every label that has them —
+  and the Qdrant payload fields to index (`article_urn`, `source_type`). Phase 2's volume needs
+  them.
+- **Historical versions keep their own key.** Multivigenza writes a past version as a `Norma`
+  with `tipo_documento: 'versione_storica'`, keyed `<URN>!vig=<date>`
+  (`pipeline/multivigenza.py:1208`), and links it `VERSIONE_DI` to the article. `canonical_urn`
+  maps that key to the live article, which is right for readers and wrong for a writer: the
+  module builds a version's key with its own function and no writer passes it through
+  `canonical_urn`. How versions are modelled for good is open (section 11).
 
 Every writer imports its names from here; every reader builds its Cypher and its Qdrant
 filters from here. A contract test fails when a writer emits, or a reader asks for, a name the
@@ -143,7 +169,7 @@ module does not define.
 - **Deterministic point ids**: `uuid5(namespace, "<canonical URN>|<source_type>|<index>")`.
   Re-ingesting replaces, never duplicates.
 - Payload: `article_urn` (canonical), `source_type`, `text`, `numero_articolo`, `tipo_atto`,
-  `fonte`; massime also carry `autorita`, `numero`, `anno`.
+  `fonte`; a massima's point also carries its ruling's identity (5.1).
 - `source_type` values: `norma`, `comma`, `ratio`, `spiegazione`, `dottrina`, `massima`,
   `concetto`. The retriever maps experts to types in the schema module: literal and systemic
   read `norma` **and** `comma`; principles read `ratio`, `spiegazione`, `dottrina`, `concetto`;
@@ -159,7 +185,7 @@ vectors. `Norma.completeness` records each part with the date it was written. Th
 someone reads it.
 
 Phase 1 checks four parts, derived from the graph itself: text, commi, a parent through
-`CONTIENE`, and the text's fingerprint. Rubrica is left out (many articles have none). The
+`CONTIENE`, and the text's fingerprint (`testo_sha256`). Rubrica is left out (many articles have none). The
 doctrine layer, the vectors and the dated record join in phase 2: checking them sooner would
 re-ingest every seed article on its first view and duplicate its vectors, because seed and lazy
 vectors are keyed differently until phase 2 re-ingests. An article that stays incomplete after
@@ -177,7 +203,11 @@ One script, idempotent, with a dry run that prints what it would change and a re
 - merge the seed's concept twins with the community's `Entity` nodes on one key;
 - copy `testo_vigente` into `testo` on `Norma`;
 - Qdrant: re-key the lazy points to deterministic ids and drop the duplicates, re-type
-  `concettogiuridico` → `concetto`.
+  `concettogiuridico` → `concetto`;
+- create the indexes of section 4.1, in FalkorDB and Qdrant;
+- the dry run and the report include integrity checks: duplicate `URN`, `Norma` without `URN`,
+  an article without text, isolated nodes, `certezza` outside 0–1 (from the December 2025
+  schema notes).
 
 It runs after a backup (`scripts/backup.sh`; section 9 checks that the backup covers FalkorDB
 and Qdrant).
@@ -187,11 +217,16 @@ and Qdrant).
 - Systemic: its relation set comes from the schema and includes `RINVIA`, `CONTIENE`,
   `MODIFICA`, `ABROGA`.
 - Every expert reads text through one accessor (`testo`, then `testo_vigente`, then `text`).
-- Precedent: `AttoGiudiziario` is a massima.
+- Precedent: `AttoGiudiziario` is the ruling, and its massime are what the expert quotes (5.1).
 - Tools (`tools/hierarchy.py`, `historical_evolution.py`, `definition.py`,
   `textual_reference.py`): canonical names; a tool whose relation nobody writes is fixed or
   removed, never left returning empty.
 - RLCF `GRAPH_TO_POLICY_RELATION` covers every canonical relation.
+- The retriever's graph enrichment finds an article by its canonical URN, not by
+  `numero_articolo` (`storage/graph/client.py:307`, `get_related_nodes_for_article`): with two
+  codes in the graph, art. 52 c.p. would get art. 52 c.c.'s neighbours, and `bis` articles none.
+- `tools/external_source.py:363-370` builds c.c. and c.p. URNs without the URL wrapper and
+  without the annex (`;262:2`, `;1398:1`): it builds them through the schema module.
 - Web (`apps/web/src/features/merlt/graph/shared/graphStyles.ts`): styles for `RINVIA`,
   `CORRELATO`, `ESPRIME`, `MENZIONA`, since validators see them.
 
@@ -207,11 +242,30 @@ section 4, from:
 | text, rubrica, vigenza | Normattiva via the VisuaLex API (`/fetch_article_text`) | `article_text` is taken as the scraper returns it: its formatting is a data contract (root `CLAUDE.md`, rule 23) |
 | partitions | `/fetch_tree` section headings, parsed with `tools/archivio-normativo/archivio_normativo/hierarchy.py` (`walk_tree`), checked against the doctrine source's `position` (`Codice Penale>LIBRO SECONDO…>Titolo XII…>Capo I…>Articolo 575`) | a heading line can carry two levels ("LIBRO PRIMO … TITOLO PRIMO …"): the parser must split it |
 | commi, lettere | the article text, the way the lazy path already cuts them | |
-| fingerprint | `/fetch_act_fingerprints` (sha256 per article, one call per act) | the anchor LingoLex stores |
+| fingerprints | `testo_sha256`: SHA-256 of `article_text`, the HTML-derived text VisuaLex serves; `akn_sha256`: `/fetch_act_fingerprints` (sha256 of the AKN text, one call per act) | two properties, never one overwriting the other: AKN and HTML text match 0 times in 19 (root `CLAUDE.md`, rule 23). Which one LingoLex anchors on is decided in phase 3 (6.1) |
 | modifications | the update notes in the text (`AGGIORNAMENTO (n)`) and multivigenza | fixes `NormaVisitata.urn` (`core/legal_knowledge_graph.py:488`) |
 | references | the text (same act and other acts), plus the doctrine source's CrossReferences | a target not in the graph becomes a stub, completed when its act is ingested |
-| doctrine | `/fetch_brocardi_info`: Ratio, Spiegazione, Relazioni, Footnotes → `Dottrina`; Massime → `AttoGiudiziario {autorita, numero, anno, testo}`; Brocardi → `LocuzioneLatina`; Glossario → `ConcettoGiuridico` + `MENZIONA` | `fonte: Brocardi.it` on every node; ids qualified by act (today they collide across acts, `pipeline/ingestion.py:883,919`) |
+| doctrine | `/fetch_brocardi_info`: Ratio, Spiegazione, Relazioni, Footnotes → `Dottrina`; Massime → `AttoGiudiziario` (the ruling) with its massime as attributes; Brocardi → `LocuzioneLatina`; Glossario → `ConcettoGiuridico` + `MENZIONA` | `fonte: Brocardi.it` on every node; ids qualified by act (today they collide across acts, `pipeline/ingestion.py:883,919`) |
 | vectors | section 5.4 | |
+
+Two identities the table implies, settled here because the old ones collided:
+
+- **A ruling** (`AttoGiudiziario`) is the pronuncia, and its massime are attributes of it —
+  **decided by the owner on 1 October**. Its key is the identity shared with the sentenze and
+  massimario rounds: `cassazione:<archivio>:<numero>:<anno>` and
+  `corte_costituzionale:<numero>:<anno>`, with the year of filing for the criminal archive.
+  `(autorita, numero, anno)` alone is not enough: the civil and criminal archives of the
+  Cassazione number their rulings independently, so the same number and year can name two
+  rulings. The December 2025 run gave 827 massime an `unknown_<n>` id when parsing failed, so
+  the same ruling cited by several articles became several nodes (EXP-001, Run 5).
+- **A massima** is a Qdrant point keyed on its ruling's identity **plus a fingerprint of its
+  text**, since one ruling carries several massime — not on its position in the source's list.
+  A re-ingest deletes the article's massima points it no longer writes.
+- **A comma or a lettera** is keyed from the canonical article URN by one schema function, so
+  a non-canonical article URN cannot leak into it.
+
+A reference keeps its kind when the text tells it (`tipo_rinvio`: `richiamo`, `rinvio_recettizio`,
+…) and the words it was read from (`testo_riferimento`), as properties of `RINVIA`.
 
 ### 5.2 Governance
 
@@ -232,7 +286,14 @@ in scope make **roughly a day of fetching**, spread over nights, resumable per b
 A separate job, resumable, in priority order: `norma` and `comma`, then `ratio`/`spiegazione`/
 `dottrina`, then `massima`. At the measured 4 passages a second, the massime alone could take
 **days** on the Mac's Docker CPU: the job runs where it is fastest (the host's GPU, or Apple's
-MPS outside Docker), and the plan measures both before committing.
+MPS outside Docker, ~7–9 passages a second in December 2025), and the plan measures both before
+committing, cold and with one method.
+
+multilingual-e5-large reads **512 tokens** and silently drops the rest; nothing in
+`storage/vectors/embeddings.py` splits a long text today. A Spiegazione of 44,000 characters
+is split into passages that fit, each its own point (the `key` of `point_id` numbers them).
+Every payload records `embedding_model`, since vectors may be computed on more than one
+machine.
 
 ### 5.5 Size
 
@@ -246,13 +307,38 @@ full text moves to Postgres and Qdrant, and the graph keeps their metadata and a
 2. Codice civile (six books), c.p.c., c.p.p., Costituzione, c.p.a.
 3. Sector codes (6.6).
 
+### 5.7 Known pitfalls
+
+Most were paid for once in the December 2025 experiments; each gets a test in the phase 2 plan.
+
+- **The rubrica stored as comma 1**: 802 of Libro IV's 2,546 commi were a rubrica (EXP-014
+  backbone validation).
+- **Lettere cut into commi**: Normattiva separates lettere with a blank line; art. 117 Cost.
+  became 26 commi instead of 3 (EXP-009).
+- **Update notes are not commi**: the text carries its `AGGIORNAMENTO (n)` notes (5.1); the
+  cutter stops before them.
+- **The promulgation decree's own articles**: the codice penale's tree lists R.D. 1398/1930's
+  arts. 1–3, which collide with c.p. arts. 1–3 unless the annex is kept (`;1398:1`); filter on
+  the code's partitions.
+- **The annex suffix** (`;262:2`, `;1398:1`) has failed both ways: doubled (`262:2:2`) and lost.
+- **Multivigenza**: matching an article by prefix (art. 1 matched art. 14); a whole article
+  marked repealed when one comma was; targets like "del comma 2 dell'art. 2-bis" not parsed
+  (EXP-005).
+- **A warm cache hides the cost**: the doctrine source's one-day cache cut a run from 41 to 7
+  minutes. The pilot is measured cold.
+- **Costituzione**: arts. 115, 124, 128–130 are repealed and have no commentary; the
+  disposizioni transitorie e finali (I–XVIII) were never ingested (section 11).
+
 ## 6. Phase 3 — LingoLex
 
 ### 6.1 Anchors
 
-Every article carries `URN` (canonical) and `fingerprint` + `fingerprint_date`. A nightly job
-compares each act's fingerprints with `/fetch_act_fingerprints` and marks changed articles
-(`completeness` reset, a `changed_at` date): the "da rivedere" signal a card needs.
+Every article carries `URN` (canonical) and two fingerprints with their dates (5.1):
+`testo_sha256`, of the `article_text` readers see and annotate, and `akn_sha256`, from
+`/fetch_act_fingerprints`. They are different texts (rule 23) and never overwrite each other.
+Which one LingoLex anchors a card on is decided here, in phase 3. A nightly job compares each
+act's fingerprints with the source and marks changed articles (`completeness` reset, a
+`changed_at` date): the "da rivedere" signal a card needs.
 
 ### 6.2 Coverage map
 
@@ -305,11 +391,20 @@ a list. The reading surface does not change: its text contract (rule 23) is unto
 
 - Phase 1: contract tests (writers and readers against the schema); the migration's dry run and
   report on a copy of the development graph first; a before/after count of every label and
-  relation type; the MERL-T suite green.
+  relation type; the MERL-T suite green; **retrieval does not get worse**: the semantic gold
+  standard already in code (`merlt/benchmark/gold_standard.py`, Libro IV, URNs in canonical
+  form) run before and after the migration — Recall@5, MRR, hit rate — once NDCG stops counting
+  several chunks of one article as several hits (`merlt/benchmark/metrics.py`; EXP-016 reports
+  1.02).
 - Phase 2: the pilot measured and reviewed; for a sample of articles, the complete shape checked
   node by node; a re-ingest that changes nothing (idempotence); the backup restores FalkorDB and
-  Qdrant.
-- Phase 3: fingerprints match `/fetch_act_fingerprints`; coverage numbers match counts in the
+  Qdrant. The shape checks start from EXP-014's `validation/validation_framework.py` (article
+  and comma counts, rubrica not stored as a comma, `CONTIENE` per comma, numbering from 1, URN
+  form), moved to the canonical names with expected counts from `/fetch_tree`; the pilot's
+  article list is checked against EXP-006's `ground_truth.json` (its `position` field is wrong
+  and is not used); multivigenza against EXP-005's five articles of L. 241/1990.
+- Phase 3: `akn_sha256` matches `/fetch_act_fingerprints` and `testo_sha256` matches the SHA-256
+  of `/fetch_article_text`'s `article_text`; coverage numbers match counts in the
   graph; the graph hidden for a non-admin account in the browser.
 
 ## 10. Risks
@@ -328,3 +423,8 @@ a list. The reading surface does not change: its text contract (rule 23) is unto
 2. The validators' role (6.5): administrators only until the nucleus exists.
 3. Where the vectors are computed (5.4): measured in the plan.
 4. The massime's full text in FalkorDB or outside (5.5): decided by the pilot.
+5. How historical versions are modelled (4.1): a `Norma` with `tipo_documento:
+   'versione_storica'` and its own key, as today, or a label of its own (`Versione`, with
+   validity dates, as the December 2025 ontology proposed). Phase 2, which writes multivigenza.
+6. Whether the Costituzione's disposizioni transitorie e finali are in scope (5.7).
+7. Which fingerprint LingoLex anchors on, `testo_sha256` or `akn_sha256` (6.1): phase 3.

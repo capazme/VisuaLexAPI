@@ -1,0 +1,47 @@
+# EXP-019: Query Dataset per E2E Pipeline Test
+# 20 query distribuite in 5 scenari
+
+definitional:
+  description: "Query che attivano principalmente LiteralExpert"
+  expected_scenario: "single_expert_dominance"
+  queries:
+    - "Cos'è la legittima difesa secondo l'art. 52 c.p.?"
+    - "Definizione di responsabilità contrattuale"
+    - "Cosa si intende per buona fede oggettiva?"
+    - "Nozione di danno ingiusto nel 2043 c.c."
+
+constitutional:
+  description: "Query che attivano principalmente PrinciplesExpert"
+  expected_scenario: "single_expert_dominance"
+  queries:
+    - "Qual è la ratio dell'art. 3 Cost. sull'uguaglianza?"
+    - "Principi costituzionali sulla tutela della salute"
+    - "Bilanciamento tra libertà economica e diritti sociali"
+    - "Fondamento costituzionale del diritto al risarcimento"
+
+jurisprudential:
+  description: "Query che attivano principalmente PrecedentExpert"
+  expected_scenario: "single_expert_dominance"
+  queries:
+    - "Come la Cassazione interpreta il danno biologico?"
+    - "Orientamento giurisprudenziale sulla responsabilità medica"
+    - "Massime delle Sezioni Unite sulla causalità"
+    - "Evoluzione della giurisprudenza sul danno esistenziale"
+
+systemic:
+  description: "Query che attivano principalmente SystemicExpert"
+  expected_scenario: "single_expert_dominance"
+  queries:
+    - "Relazione tra art. 1453 e 1455 c.c. nel sistema"
+    - "Evoluzione storica della responsabilità civile"
+    - "Connessione sistematica tra colpa e danno"
+    - "Coordinamento tra norme sul risarcimento"
+
+complex:
+  description: "Query che richiedono più expert"
+  expected_scenario: "multi_expert_balance"
+  queries:
+    - "Come si applica l'art. 2043 alla luce della giurisprudenza?"
+    - "Interpretazione teleologica del contratto secondo la Cassazione"
+    - "Limiti costituzionali alla responsabilità oggettiva"
+    - "Evoluzione storica e giurisprudenziale della legittima difesa"
