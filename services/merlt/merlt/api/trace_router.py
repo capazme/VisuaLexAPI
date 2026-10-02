@@ -22,7 +22,7 @@ Usage:
 """
 
 import structlog
-from typing import Optional, List, Literal
+from typing import Optional, List
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 from merlt.api.auth import verify_api_key, require_role
 from merlt.experts.models import ApiKey
 from merlt.storage.trace import TraceStorageService, TraceStorageConfig
-from merlt.storage.trace.trace_service import TraceFilter, TraceSummary, SourceResolution
+from merlt.storage.trace.trace_service import TraceFilter
 from merlt.storage.bridge import BridgeTable, BridgeTableConfig
 from merlt.storage.graph import FalkorDBClient, FalkorDBConfig
 from merlt.storage.temporal import TemporalValidityService
@@ -448,6 +448,7 @@ async def get_trace_validity(
                     replacing_norm=r.replacing_norm,
                     recent_modifications=r.recent_modifications,
                     checked_at=r.checked_at,
+                    pending=r.pending,
                 )
                 for r in summary.results
             ],

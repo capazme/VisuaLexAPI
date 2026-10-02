@@ -19,8 +19,15 @@ Uso:
 """
 
 from typing import List, Set, Union, Dict, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import statistics
+
+
+def distinct_in_order(urns: List[str]) -> List[str]:
+    """Each article once, at its best rank: a search returns chunks, the
+    benchmark scores articles."""
+    seen: Set[str] = set()
+    return [u for u in urns if not (u in seen or seen.add(u))]
 
 
 @dataclass
@@ -431,6 +438,8 @@ def compute_retrieval_metrics(
         >>> print(metrics.recall_at_5)
         0.5
     """
+    all_retrieved = [distinct_in_order(r) for r in all_retrieved]
+
     # Metriche globali
     recall_1 = statistics.mean([
         recall_at_k(ret, rel, k=1)
@@ -586,6 +595,8 @@ def compute_graded_relevance_metrics(
         >>> print(metrics.mean_relevance_at_5)
         1.25
     """
+    all_retrieved = [distinct_in_order(r) for r in all_retrieved]
+
     if not all_retrieved:
         return GradedRelevanceMetrics(
             mean_relevance_at_5=0.0,

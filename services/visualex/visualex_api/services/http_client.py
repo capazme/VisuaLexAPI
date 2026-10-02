@@ -56,8 +56,11 @@ class ThrottledHttpClient:
         url: str,
         *,
         source: str = "generic",
+        max_retries: Optional[int] = None,
         **kwargs,
     ) -> HttpResult:
+        """`max_retries` bounds the retries after the first attempt; None is the configured HTTP_MAX_RETRIES."""
+        retries = HTTP_MAX_RETRIES if max_retries is None else max_retries
         if not is_allowed(url):
             log.error("Blocked request to undeclared host", url=url[:120], source=source)
             raise NetworkError(
@@ -66,8 +69,9 @@ class ThrottledHttpClient:
             )
 
         attempt = 0
+        last_status: Optional[int] = None
         async with self._semaphore:
-            while attempt <= HTTP_MAX_RETRIES:
+            while attempt <= retries:
                 await self._respect_min_interval()
                 session = await self._get_session()
                 try:
@@ -85,6 +89,7 @@ class ThrottledHttpClient:
                             )
 
                         if status in self.RATE_LIMIT_STATUSES:
+                            last_status = status
                             wait_time = self._retry_delay(attempt, headers)
                             log.warning(
                                 "Rate limit signal detected",
@@ -102,6 +107,8 @@ class ThrottledHttpClient:
                         response.raise_for_status()
                         return HttpResult(text=text, status=status, headers=headers)
                 except aiohttp.ClientError as exc:
+                    if isinstance(exc, aiohttp.ClientResponseError):
+                        last_status = exc.status
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request failed; retrying",
@@ -117,7 +124,10 @@ class ThrottledHttpClient:
                     )
                     await asyncio.sleep(wait_time)
                     attempt += 1
-            raise NetworkError(f"Exceeded retry budget for {url} after {HTTP_MAX_RETRIES + 1} attempts")
+            raise NetworkError(
+                f"Exceeded retry budget for {url} after {retries + 1} attempts",
+                status_code=last_status,
+            )
 
     async def _respect_min_interval(self) -> None:
         async with self._request_lock:

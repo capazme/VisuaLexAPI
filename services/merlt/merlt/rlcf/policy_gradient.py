@@ -48,7 +48,7 @@ import os
 import warnings
 import structlog
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 

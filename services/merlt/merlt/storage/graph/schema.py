@@ -10,6 +10,7 @@ section 4.
 from __future__ import annotations
 
 import hashlib
+import math
 import uuid
 from enum import Enum
 from typing import Any, Iterable, Mapping, Optional, Union
@@ -37,7 +38,10 @@ class Label(_Vocab):
     LETTERA = "Lettera"
     NUMERO = "Numero"  # multivigenza writes the numbers a modification targets
     DOTTRINA = "Dottrina"
-    ATTO_GIUDIZIARIO = "AttoGiudiziario"  # a massima
+    # Today the seed's node is a massima, keyed `massima_<corte>_<numero>`. Phase 2 makes
+    # the node the ruling (the pronuncia), keyed by the shared decision identity, with its
+    # massime as attributes (owner's decision, 1 October; spec 5.1). Phase 1 changes no key.
+    ATTO_GIUDIZIARIO = "AttoGiudiziario"
     LOCUZIONE_LATINA = "LocuzioneLatina"
     CONCETTO_GIURIDICO = "ConcettoGiuridico"
     PRINCIPIO_GIURIDICO = "PrincipioGiuridico"
@@ -323,6 +327,45 @@ _FONTE_ALIASES: dict[str, Fonte] = {
 }
 
 
+# The node properties that are flags. The Libro IV seed writes them as the strings 'true' and
+# 'false' (abrogato 34, is_versione_vigente 34, multivigenza_enabled 34, community_validated 1;
+# no edge carries one), and in Python the string 'false' is truthy. `is_stub` is a flag too,
+# and the stub shape (`stub_properties`) owns it.
+BOOLEAN_PROPERTIES: tuple[str, ...] = ("abrogato", "community_validated", "is_versione_vigente", "multivigenza_enabled")
+
+
+def boolean_flag(value: Any) -> Optional[bool]:
+    """A flag as the boolean it means: a boolean as it is, the string 'true' or 'false' in
+    any case and with any surrounding space; None for anything else (a number included),
+    which is no flag."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return {"true": True, "false": False}.get(value.strip().lower())
+    return None
+
+
+def certezza_number(value: Any) -> Optional[float]:
+    """A relation's `certezza` as the number it is written as, or None when it is none.
+
+    The seed wrote it as a string ("0.9", "1"); a string never compares with a number,
+    so edges ordered by it fell apart. Parsed in Python: FalkorDB's `toFloat` reads a
+    string in single precision ('0.9' becomes 0.899999976…), which would set a seed
+    edge just below a community edge of the same value."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+    elif isinstance(value, str) and "_" not in value:  # float() reads '1_0' as 10.0
+        try:
+            number = float(value)
+        except ValueError:
+            return None
+    else:
+        return None
+    return number if math.isfinite(number) else None
+
+
 def normalize_fonte(value: Optional[str]) -> Optional[str]:
     """The canonical fonte. An unknown value passes through: never lost."""
     if value is None:
@@ -583,3 +626,31 @@ def node_type_cypher(variable: str) -> str:
     return (
         f"coalesce([lbl IN labels({variable}) WHERE lbl <> '{Label.ENTITY.value}'][0], labels({variable})[0])"
     )
+
+
+# The keys every MERGE looks a node up by (spec 4.1). FalkorDB has no index
+# until the migration creates these (Task 6b); without them each MERGE scans
+# its whole label, which phase 2's volume cannot afford. A community entity
+# carries `node_id` (the same value as its `id`, Task 6) and is still looked
+# up by `id` by the entity writer: both are indexed.
+GRAPH_INDEXES: tuple[tuple[Label, str], ...] = (
+    *((label, "URN") for label in (Label.NORMA, Label.COMMA, Label.LETTERA, Label.NUMERO)),
+    *((label, "node_id") for label in Label),
+    (Label.ENTITY, "id"),
+)
+
+# Qdrant payload fields every reader filters on.
+QDRANT_PAYLOAD_INDEXES: dict[str, str] = {"article_urn": "keyword", "source_type": "keyword"}
+
+
+def version_urn(urn: str, version_date: str) -> str:
+    """The key of a past version of an article (multivigenza). A writer uses it
+    as it is: `canonical_urn` folds it onto the live article, which is what a
+    reader wants and a writer must not do. How versions are modelled for good
+    is open (spec section 11).
+
+    A version has a date: `<URL>!vig=` with nothing after it is the marker of the
+    live article, so an empty or missing date raises instead of building it."""
+    if not version_date or not isinstance(version_date, str):
+        raise ValueError(f"a version key needs a date, got {version_date!r}")
+    return f"{canonical_urn(urn)}!vig={version_date}"

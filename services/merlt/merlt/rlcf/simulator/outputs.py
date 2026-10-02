@@ -15,9 +15,8 @@ Tutte le figure sono ottimizzate per stampa accademica
 import json
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Any, Optional
+from typing import List, Any, Optional
 from datetime import datetime
-from pathlib import Path
 import logging
 
 # Import opzionali per visualizzazione
@@ -439,7 +438,7 @@ class ThesisOutputGenerator:
         colors = [self.COLORS.get(p, "#333333") for p in profiles]
 
         x = range(len(profiles))
-        bars = ax.bar(x, means, yerr=stds, color=colors, capsize=5, alpha=0.8)
+        ax.bar(x, means, yerr=stds, color=colors, capsize=5, alpha=0.8)
 
         ax.set_xlabel("Profilo Utente")
         ax.set_ylabel("Authority Score (media ± std)")

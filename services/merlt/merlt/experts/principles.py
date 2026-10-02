@@ -155,7 +155,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
         self._init_trace(context)
 
         log.info(
-            f"PrinciplesExpert analyzing",
+            "PrinciplesExpert analyzing",
             query=context.query_text[:50],
             trace_id=context.trace_id,
             use_react=self.use_react,
@@ -171,7 +171,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                 novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
             )
             log.info(
-                f"PrinciplesExpert ReAct completed",
+                "PrinciplesExpert ReAct completed",
                 sources=len(all_sources),
                 react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
             )
@@ -215,7 +215,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
             response.metadata["execution_trace"] = self.get_trace_dict()
 
         log.info(
-            f"PrinciplesExpert completed",
+            "PrinciplesExpert completed",
             confidence=response.confidence,
             sources=len(response.legal_basis),
             time_ms=response.execution_time_ms,
@@ -282,7 +282,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                         self._extracted_urns.add(urn)
 
         log.debug(
-            f"PrinciplesExpert sources retrieved",
+            "PrinciplesExpert sources retrieved",
             total=len(sources),
             extracted_urns=len(self._extracted_urns)
         )
@@ -329,7 +329,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
         graph_tool = self._tool_registry.get("graph_search")
         if graph_tool and urns_to_explore:
             log.debug(
-                f"PrinciplesExpert graph expansion",
+                "PrinciplesExpert graph expansion",
                 urns_count=len(urns_to_explore),
                 urns=list(urns_to_explore)[:3]
             )
@@ -361,7 +361,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                     log.warning(f"Graph principle search failed: {e}")
 
         log.info(
-            f"PrinciplesExpert principles found",
+            "PrinciplesExpert principles found",
             total=len(principles)
         )
 
@@ -459,10 +459,10 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
         ]
 
         if context.norm_references:
-            sections.append(f"\n## NORME CITATE\n" + ", ".join(context.norm_references))
+            sections.append("\n## NORME CITATE\n" + ", ".join(context.norm_references))
 
         if context.legal_concepts:
-            sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
+            sections.append("\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
             sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")

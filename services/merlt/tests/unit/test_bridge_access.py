@@ -24,6 +24,16 @@ BRIDGE_CLASS = "merlt.storage.bridge.bridge_table.BridgeTable"
 # The configuration ------------------------------------------------------------------------------------
 
 
+def test_the_bridge_config_follows_the_environment_that_exists():
+    # from_environment read `bridge_table_suffix` and was typed with an `EnvironmentConfig`: neither
+    # exists, `merlt.config.environments.Environment` has a name. The tables are the ones for_test and
+    # for_prod name.
+    from merlt.config import PROD_ENV, TEST_ENV
+
+    assert BridgeTableConfig.from_environment(TEST_ENV).table_name == BridgeTableConfig.for_test().table_name
+    assert BridgeTableConfig.from_environment(PROD_ENV).table_name == BridgeTableConfig.for_prod().table_name
+
+
 def test_the_bridge_is_reached_where_the_deployment_puts_it(monkeypatch):
     for name, value in {
         "ENRICHMENT_DB_HOST": "postgres", "ENRICHMENT_DB_PORT": "5433", "ENRICHMENT_DB_NAME": "enrich",

@@ -157,6 +157,37 @@ def test_one_hop_scores_above_two_hops_with_the_same_edges():
     assert s1 > s2
 
 
+# ---------------------------------------------------------------------------
+# FalkorDBClient.shortest_path: a reader, and a failure is said, never swallowed
+# ---------------------------------------------------------------------------
+
+def _path_client(ro_query):
+    from merlt.storage.graph.client import FalkorDBClient
+
+    client = FalkorDBClient.__new__(FalkorDBClient)  # no connection: the calls are replaced
+    client.ro_query = ro_query
+    client.query = AsyncMock(side_effect=AssertionError("shortest_path is a reader: it never calls query"))
+    return client
+
+
+def test_shortest_path_reads_with_ro_query():
+    client = _path_client(AsyncMock(return_value=[{"rel_type": "RINVIA"}]))
+    assert asyncio.run(client.shortest_path("a", "b")) == {"path": {"edges": ["RINVIA"]}, "length": 1}
+    client.query.assert_not_awaited()
+
+
+def test_shortest_path_logs_a_failure_with_its_type_and_message():
+    # A node that is not found gives no rows, not an exception: any exception is a real failure.
+    from structlog.testing import capture_logs
+
+    client = _path_client(AsyncMock(side_effect=ConnectionError("graph unreachable")))
+    with capture_logs() as logs:
+        assert asyncio.run(client.shortest_path("a", "b")) is None
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert len(warnings) == 1
+    assert warnings[0]["error_type"] == "ConnectionError" and warnings[0]["error"] == "graph unreachable"
+
+
 def test_a_real_path_is_never_a_self_loop():
     r = _retriever({"path": {"edges": ["cita"]}})  # no length anywhere
     path = asyncio.run(r._find_shortest_path("a", "b", 3))

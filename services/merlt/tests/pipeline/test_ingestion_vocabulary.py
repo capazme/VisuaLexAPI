@@ -106,6 +106,18 @@ async def test_seed_edges_are_written_with_canonical_names():
     assert "[r:INTERPRETA " in written and "[r:CONTIENE " in written
 
 
+async def test_seed_edges_carry_certezza_as_a_number():
+    # The seed file holds certezza as a string ("0.9", "1"); one that is not a number stays.
+    client = _Recorder()
+    id_to_key = {1: {"key": "a", "label": "Norma", "key_field": "URN"}, 2: {"key": "b", "label": "Norma", "key_field": "URN"}}
+    edges = [{"start": 1, "end": 2, "type": "interpreta", "properties": {"certezza": "0.9"}},
+             {"start": 2, "end": 1, "type": "interpreta", "properties": {"certezza": "1"}},
+             {"start": 1, "end": 2, "type": "contiene", "properties": {"certezza": "alta"}}]
+    await seed._merge_edges(client, edges, id_to_key)
+    assert [params["props"]["certezza"] for _, params in client.calls] == [0.9, 1.0, "alta"]
+    assert edges[0]["properties"]["certezza"] == "0.9"  # the seed's own data is not rewritten
+
+
 async def test_seed_nodes_carry_text_fingerprint_fonte_and_provenance():
     client = _Recorder()
     nodes = [{"id": 1, "labels": ["Norma"], "properties": {"URN": "a", "testo_vigente": "T", "fonte": "VisualexAPI"}}]
@@ -113,6 +125,25 @@ async def test_seed_nodes_carry_text_fingerprint_fonte_and_provenance():
     props = client.calls[0][1]["props"]
     assert props["testo"] == "T" and props["testo_sha256"] == text_fingerprint("T")
     assert props["fonte"] == "Normattiva" and props["provenance"] == "seed"
+
+
+async def test_seed_nodes_carry_their_flags_as_booleans():
+    # The seed writes abrogato and its other flags as the strings 'true'/'false'; the
+    # stub flag is the stub shape's, and a value that is no flag stays as it is.
+    client = _Recorder()
+    flags = {"abrogato": "false", "is_versione_vigente": "true", "multivigenza_enabled": " TRUE ",
+             "community_validated": "true", "is_stub": "true", "vigenza": "vigente"}
+    nodes = [{"id": 1, "labels": ["Norma"], "properties": {"URN": "a", **flags}},
+             {"id": 2, "labels": ["Norma"], "properties": {"URN": "b", "abrogato": "forse"}}]
+    ids = {1: {"key": "a", "label": "Norma", "key_field": "URN"}, 2: {"key": "b", "label": "Norma", "key_field": "URN"}}
+    await seed._merge_nodes(client, nodes, ids)
+    first, second = (params["props"] for _, params in client.calls)
+    assert {key: first[key] for key in flags} == {
+        "abrogato": False, "is_versione_vigente": True, "multivigenza_enabled": True,
+        "community_validated": True, "is_stub": "true", "vigenza": "vigente",
+    }
+    assert second["abrogato"] == "forse"
+    assert nodes[0]["properties"]["abrogato"] == "false"  # the seed's own data is not rewritten
 
 
 def test_seed_source_types_are_canonical():

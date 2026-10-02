@@ -6,7 +6,7 @@ Dataclasses for retrieval results and configuration.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from uuid import UUID
 
 
@@ -133,9 +133,11 @@ def _load_expert_weights() -> Dict[str, Dict[str, float]]:
     except FileNotFoundError:
         # Expected: this YAML is not in the repository (nor in any deployment), so the
         # defaults below are the normal case. Not a warning: it would print on every
-        # interpreter start.
-        import structlog
-        structlog.get_logger().debug(f"Config file not found: {config_path}, using default weights")
+        # interpreter start. The standard library's logger, not structlog's: this runs
+        # at import, before any script configures structlog, whose default prints every
+        # level to stdout, where the scripts print their JSON.
+        import logging
+        logging.getLogger(__name__).debug("Config file not found: %s, using default weights", config_path)
         return _get_default_weights()
     except Exception as e:
         import structlog

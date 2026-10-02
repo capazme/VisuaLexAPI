@@ -7,7 +7,6 @@ Cypher text and its parameters. Every reader query goes through `ro_query`, the
 read-only call, so even a slip could not write.
 """
 import importlib
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

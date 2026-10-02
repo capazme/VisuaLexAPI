@@ -20,6 +20,7 @@ Esempio:
 """
 
 import structlog
+from datetime import date
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
@@ -27,6 +28,15 @@ from merlt.storage.graph.schema import Rel, canonical_urn, cypher_rel_names
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
 
 log = structlog.get_logger()
+
+# The date an amendment takes effect: on the edge, where multivigenza and the seed write it
+# (`data_efficacia`); the amending act's own date only as a fallback, which no writer sets
+# today. The dates are ISO strings, so they compare as text; the first ten characters are
+# compared, so a date that carries a time still reads as a day. An undated event is ''.
+_EVENT_DATE = "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '')"
+# An event is in the future when it takes effect after today (a parameter, never Cypher text).
+# An undated one is not: nothing says it is.
+_IS_FUTURE = "(event_date <> '' AND left(event_date, 10) > $today)"
 
 
 @dataclass
@@ -40,12 +50,14 @@ class HistoricalEvent:
         by_urn: URN della norma modificante
         by_estremi: Estremi della norma modificante (es. "L. 123/2020")
         description: Descrizione testuale dell'evento
+        future: True se l'evento entra in vigore dopo oggi (mai per un evento senza data)
     """
     date: str
     event: str
     by_urn: str
     by_estremi: str
     description: Optional[str] = None
+    future: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Converte in dizionario per serializzazione."""
@@ -54,7 +66,8 @@ class HistoricalEvent:
             "event": self.event,
             "by_urn": self.by_urn,
             "by_estremi": self.by_estremi,
-            "description": self.description
+            "description": self.description,
+            "future": self.future,
         }
 
 
@@ -93,7 +106,11 @@ class HistoricalEvolutionTool(BaseTool):
         "Ricostruisce l'evoluzione storica di una norma. "
         "Trova tutte le modifiche, gli inserimenti, le abrogazioni e le sostituzioni nel tempo. "
         "Determina lo status corrente (vigente/abrogato/sostituito). "
-        "Utile per applicare 'tempus regit actum' (art. 14 c.c.)."
+        "Utile per applicare 'tempus regit actum' (art. 14 c.c.). "
+        "Mostra anche le modifiche che entrano in vigore dopo oggi, segnate con future=true. "
+        "Un'abrogazione o una sostituzione non ancora in vigore non cambia lo status di oggi: "
+        "e' elencata in 'pending' (tipo e data). "
+        "Passa include_future=false per vedere solo cio' che e' in vigore oggi."
     )
 
     def __init__(
@@ -125,11 +142,12 @@ class HistoricalEvolutionTool(BaseTool):
                 name="include_future",
                 param_type=ParameterType.BOOLEAN,
                 description=(
-                    "Se True, include anche modifiche future (entrata in vigore differita). "
-                    "Utile per pianificazione normativa."
+                    "Con True (il default) la storia include anche le modifiche che entrano "
+                    "in vigore dopo oggi, segnate con future=true. Con False sono escluse e "
+                    "la storia mostra solo cio' che e' in vigore oggi."
                 ),
                 required=False,
-                default=False
+                default=True
             ),
             ToolParameter(
                 name="event_types",
@@ -146,7 +164,7 @@ class HistoricalEvolutionTool(BaseTool):
     async def execute(
         self,
         article_urn: str,
-        include_future: bool = False,
+        include_future: bool = True,
         event_types: Optional[List[str]] = None
     ) -> ToolResult:
         """
@@ -154,7 +172,7 @@ class HistoricalEvolutionTool(BaseTool):
 
         Args:
             article_urn: URN della norma
-            include_future: Includi eventi futuri
+            include_future: Includi gli eventi futuri, segnati `future` (default True)
             event_types: Filtra per tipo evento
 
         Returns:
@@ -172,13 +190,14 @@ class HistoricalEvolutionTool(BaseTool):
             )
 
         try:
-            # Get historical events
-            timeline = await self._get_timeline(
-                article_urn, include_future, event_types
-            )
+            # Get historical events, each flagged `future`; without include_future the
+            # future ones are left out, and how many is said in the metadata.
+            events = await self._read_timeline(article_urn, event_types)
+            timeline = events if include_future else [evt for evt in events if not evt["future"]]
+            future_omitted = len(events) - len(timeline)
 
-            # Get current status
-            status = await self._get_current_status(article_urn)
+            # The status today, and the abrogations or replacements still to take effect
+            status, pending = await self._get_status(article_urn)
 
             # Count versions (modifica events)
             version_count = sum(
@@ -195,6 +214,7 @@ class HistoricalEvolutionTool(BaseTool):
                     "article_urn": article_urn,
                     "timeline": timeline,
                     "current_status": status,
+                    "pending": pending,
                     "version_count": version_count,
                     "total_events": len(timeline),
                     "include_future": include_future
@@ -202,7 +222,8 @@ class HistoricalEvolutionTool(BaseTool):
                 tool_name=self.name,
                 article_urn=article_urn,
                 events_found=len(timeline),
-                status=status
+                status=status,
+                future_omitted=future_omitted
             )
 
         except Exception as e:
@@ -212,6 +233,18 @@ class HistoricalEvolutionTool(BaseTool):
                 tool_name=self.name
             )
 
+    @staticmethod
+    def _event_rel_types(event_types: Optional[List[str]]) -> str:
+        """The graph's names (the schema's) of the events asked for, whatever case the
+        caller used, joined for a relation pattern. A name the graph does not have is
+        dropped; '' when none is left, and the caller then queries nothing: a filter is
+        never run unfiltered. By default every amendment: an inserted comma or letter
+        (INSERISCE) is one too."""
+        names = cypher_rel_names(
+            event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value, Rel.INSERISCE.value]
+        )
+        return "|".join(names)
+
     async def _get_timeline(
         self,
         urn: str,
@@ -219,43 +252,38 @@ class HistoricalEvolutionTool(BaseTool):
         event_types: Optional[List[str]]
     ) -> List[Dict[str, Any]]:
         """
-        Recupera la timeline degli eventi storici.
+        Recupera la timeline degli eventi storici, ciascuno segnato `future`.
 
-        Query per trovare tutte le relazioni temporali in entrata.
+        Senza `include_future` gli eventi che entrano in vigore dopo oggi sono esclusi;
+        un evento senza data resta (non si sa che sia futuro).
         """
+        events = await self._read_timeline(urn, event_types)
+        return events if include_future else [evt for evt in events if not evt["future"]]
+
+    async def _read_timeline(self, urn: str, event_types: Optional[List[str]]) -> List[Dict[str, Any]]:
+        """Every event the graph has for the norm, flagged `future` by the query."""
         urn = canonical_urn(urn)  # the graph's key has no version marker
 
-        # Build event type filter: the graph's names (the schema's), whatever
-        # case the caller used. A name the graph does not have is dropped, and a
-        # filter that comes out empty finds no events: it is never run unfiltered.
-        # By default every amendment: an inserted comma or letter (INSERISCE) is one too.
-        names = cypher_rel_names(
-            event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value, Rel.INSERISCE.value]
-        )
-        if not names:
+        rel_types = self._event_rel_types(event_types)
+        if not rel_types:
             return []
-        rel_types = "|".join(names)
 
-        # Date filter for future events
-        date_filter = ""
-        if not include_future:
-            # TODO: Filter by data_vigore < today
-            # For now, include all events
-            pass
-
+        # An event is dated by `_EVENT_DATE` and flagged by `_IS_FUTURE`, against today as
+        # a parameter.
         cypher = f"""
             MATCH (norma {{URN: $urn}})<-[r:{rel_types}]-(modificante)
-            RETURN
+            WITH
                 type(r) AS event_type,
                 modificante.URN AS by_urn,
                 modificante.estremi AS by_estremi,
-                COALESCE(modificante.data_atto, modificante.data_vigore, '') AS event_date,
+                {_EVENT_DATE} AS event_date,
                 COALESCE(r.descrizione, '') AS description
+            RETURN event_type, by_urn, by_estremi, event_date, description, {_IS_FUTURE} AS future
             ORDER BY event_date ASC
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": urn, "today": date.today().isoformat()})
 
             timeline = []
             for r in results:
@@ -264,7 +292,8 @@ class HistoricalEvolutionTool(BaseTool):
                     event=r.get("event_type", "").lower(),
                     by_urn=r.get("by_urn", ""),
                     by_estremi=r.get("by_estremi", "atto non specificato"),
-                    description=r.get("description") or None
+                    description=r.get("description") or None,
+                    future=bool(r.get("future")),
                 )
                 timeline.append(event.to_dict())
 
@@ -279,40 +308,68 @@ class HistoricalEvolutionTool(BaseTool):
         Determina lo status corrente della norma.
 
         Returns:
-            "vigente" | "abrogato" | "sostituito"
+            "vigente" | "abrogato" | "sostituito" | "unknown"
+        """
+        status, _ = await self._get_status(urn)
+        return status
+
+    async def _get_status(self, urn: str) -> tuple[str, List[Dict[str, Any]]]:
+        """
+        Lo status di oggi e i cambiamenti di status ancora da entrare in vigore.
+
+        An ABROGA or SOSTITUISCE edge counts from the day it takes effect (`_EVENT_DATE`):
+        one dated after today leaves the norm as it is today and is listed in `pending`
+        (type, date, the act). An undated one counts now: nothing says it is in the future.
+
+        Returns:
+            ("vigente" | "abrogato" | "sostituito" | "unknown", pending)
         """
         urn = canonical_urn(urn)  # the graph's key has no version marker
 
-        cypher = """
-            MATCH (norma {URN: $urn})
-            OPTIONAL MATCH (norma)<-[:ABROGA]-(abrogante)
-            OPTIONAL MATCH (norma)<-[:SOSTITUISCE]-(sostituto)
+        cypher = f"""
+            MATCH (norma {{URN: $urn}})
+            OPTIONAL MATCH (norma)<-[r:{Rel.ABROGA.value}|{Rel.SOSTITUISCE.value}]-(modificante)
+            WITH norma, r, modificante, {_EVENT_DATE} AS event_date
             RETURN
                 COALESCE(norma.vigente, true) AS is_vigente,
-                abrogante IS NOT NULL AS is_abrogato,
-                sostituto IS NOT NULL AS is_sostituito
+                CASE WHEN r IS NULL THEN null ELSE type(r) END AS end_type,
+                event_date,
+                (r IS NOT NULL AND {_IS_FUTURE}) AS future,
+                modificante.URN AS by_urn,
+                modificante.estremi AS by_estremi
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": urn})
-
-            if not results:
-                return "unknown"
-
-            r = results[0]
-            is_vigente = r.get("is_vigente", True)
-            is_abrogato = r.get("is_abrogato", False)
-            is_sostituito = r.get("is_sostituito", False)
-
-            # Priority: sostituito > abrogato > vigente
-            if is_sostituito:
-                return "sostituito"
-            if is_abrogato:
-                return "abrogato"
-            if is_vigente:
-                return "vigente"
-            return "unknown"
-
+            results = await self.graph_db.ro_query(cypher, {"urn": urn, "today": date.today().isoformat()})
         except Exception as e:
             log.debug(f"Status query failed: {e}")
-            return "unknown"
+            return "unknown", []
+
+        if not results:
+            return "unknown", []
+
+        in_force: set[str] = set()
+        pending: List[Dict[str, Any]] = []
+        for r in results:
+            end_type = r.get("end_type")
+            if not end_type:
+                continue
+            if r.get("future"):
+                pending.append({
+                    "type": end_type.lower(),
+                    "date": r.get("event_date") or "",
+                    "by_urn": r.get("by_urn"),
+                    "by_estremi": r.get("by_estremi"),
+                })
+            else:
+                in_force.add(end_type)
+        pending.sort(key=lambda change: (change["date"], change["type"]))
+
+        # Priority: sostituito > abrogato > vigente
+        if Rel.SOSTITUISCE.value in in_force:
+            return "sostituito", pending
+        if Rel.ABROGA.value in in_force:
+            return "abrogato", pending
+        if results[0].get("is_vigente", True):
+            return "vigente", pending
+        return "unknown", pending

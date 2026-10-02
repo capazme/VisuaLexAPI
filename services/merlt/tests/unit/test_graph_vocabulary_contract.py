@@ -11,23 +11,11 @@ The KNOWN_* sets are a ratchet: they list what is still old, and a name must
 leave them as soon as the code stops using it. They are empty now: a name outside
 the schema fails the day it appears.
 """
-import ast
 import re
-from pathlib import Path
 
+from cypher_scan import cypher_texts
 from merlt.storage.graph.schema import Fonte, Label, Provenance, Rel
 
-ROOT = Path(__file__).resolve().parents[2] / "merlt"
-EXEMPT = {
-    # The disagreement companion's offline collector reads relations between
-    # decisions that no writer produces; it is not wired to the live graph.
-    ROOT / "disagreement" / "data" / "collector.py",
-    # ConstitutionalBasisTool (ATTUA/RECEPISCE/DERIVA) and CitationChainTool
-    # (cita/conferma/supera between decisions) are not wired (api/engine_bootstrap.py):
-    # no writer produces those relations, so every call returned nothing.
-    ROOT / "tools" / "constitutional_basis.py",
-    ROOT / "tools" / "citation_chain.py",
-}
 REL_RE = re.compile(r"-\[\w*:([A-Za-z_]+(?:\|:?[A-Za-z_]+)*)")
 LABEL_RE = re.compile(r"\(\w*:([A-Z][A-Za-z]+)")
 # `x.fonte = 'Normattiva'`, `{fonte: 'community'}` and the non-destructive
@@ -43,65 +31,9 @@ KNOWN_UNKNOWN_LABELS: set[str] = set()
 KNOWN_LEGACY_FONTI: set[str] = set()
 
 
-def _units(tree: ast.AST) -> list[tuple[int, str]]:
-    docstrings, inside = set(), set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
-            first = node.body[0]
-            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
-                docstrings.add(id(first.value))
-    units = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.JoinedStr):
-            parts = []
-            for value in node.values:
-                if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                    parts.append(value.value)
-                    inside.add(id(value))
-                else:
-                    parts.append("{}")
-            units.append((node.lineno, "".join(parts)))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in inside | docstrings:
-            units.append((node.lineno, node.value))
-    return units
-
-
 def _found() -> dict[str, dict[str, list[str]]]:
     found: dict[str, dict[str, list[str]]] = {"rel": {}, "label": {}, "fonte": {}, "provenance": {}}
-    # Scan Python files
-    for path in sorted(ROOT.rglob("*.py")):
-        if path in EXEMPT:
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for line, text in _units(tree):
-            where = f"{path.relative_to(ROOT)}:{line}"
-            for match in REL_RE.finditer(text):
-                for name in match.group(1).split("|"):
-                    name = name.lstrip(":")  # strip leading colon from alternation
-                    found["rel"].setdefault(name, []).append(where)
-            for match in LABEL_RE.finditer(text):
-                found["label"].setdefault(match.group(1), []).append(where)
-            if CYPHER_RE.search(text):
-                for match in FONTE_RE.finditer(text):
-                    found["fonte"].setdefault(match.group(1), []).append(where)
-                for match in PROVENANCE_RE.finditer(text):
-                    found["provenance"].setdefault(match.group(1), []).append(where)
-    # Scan YAML templates
-    yaml_paths = sorted(set(ROOT.rglob("*.yaml")) | set(ROOT.rglob("*.yml")))
-    for path in yaml_paths:
-        if path in EXEMPT:
-            continue
-        text = path.read_text(encoding="utf-8")
-        # Blank out comment lines
-        lines = []
-        for line in text.split("\n"):
-            if line.lstrip().startswith("#"):
-                lines.append("")
-            else:
-                lines.append(line)
-        text = "\n".join(lines)
-        where = f"{path.relative_to(ROOT)}:1"
+    for where, text in cypher_texts():
         for match in REL_RE.finditer(text):
             for name in match.group(1).split("|"):
                 name = name.lstrip(":")  # strip leading colon from alternation
@@ -155,10 +87,39 @@ FIRST_LABEL_RE = re.compile(r"labels\(\w+\)\[0\]")
 
 def test_no_cypher_reads_a_nodes_type_as_its_first_label():
     offenders = {}
-    for path in sorted(ROOT.rglob("*.py")):
-        if path in EXEMPT:
-            continue
-        for line, text in _units(ast.parse(path.read_text(encoding="utf-8"))):
-            if FIRST_LABEL_RE.search(text):
-                offenders.setdefault(str(path.relative_to(ROOT)), []).append(line)
+    for where, text in cypher_texts(include_yaml=False):
+        if FIRST_LABEL_RE.search(text):
+            offenders.setdefault(where.rsplit(":", 1)[0], []).append(int(where.rsplit(":", 1)[1]))
     assert not offenders, f"read a node's type with schema.node_type_cypher: {offenders}"
+
+
+# `MERGE (x:Norma {URN: $urn})`, also with a second label (`MERGE (x:Entity:Principio {…`) and
+# with the braces doubled of a `.format` template. It reads the first key of the map, the one a
+# lookup is by. A label or a key built at runtime (`MERGE (x:{label} {{{key}: $k}})`, an f-string
+# placeholder) is invisible here: the writers that build them (the seed loader, the entity
+# writer) are covered by the schema tests of their own.
+MERGE_KEY_RE = re.compile(r"\bMERGE\s*\(\w*:([A-Z]\w*)(?::\w+)*\s*\{\{?\s*(\w+)\s*:")
+
+
+def test_every_merge_key_has_an_index():
+    """A new `MERGE (x:Label {key: …})` on a key `GRAPH_INDEXES` does not list scans its whole
+    label on every write: add the index, or the writer, in the same change."""
+    from merlt.storage.graph.schema import GRAPH_INDEXES
+
+    found: dict[tuple[str, str], list[str]] = {}
+    for where, text in cypher_texts():
+        for match in MERGE_KEY_RE.finditer(text):
+            found.setdefault((match.group(1), match.group(2)), []).append(where)
+    # Not vacuous: the scan sees the known writers' keys.
+    assert {("Norma", "URN"), ("Comma", "URN"), ("Lettera", "URN"), ("Numero", "URN"), ("Dottrina", "node_id")} <= found.keys()
+    indexed = {(label.value, key) for label, key in GRAPH_INDEXES}
+    missing = {key: where for key, where in found.items() if key not in indexed}
+    assert not missing, f"MERGE on a key with no index in schema.GRAPH_INDEXES: {missing}"
+
+
+def test_the_merge_scan_reads_the_shapes_it_claims():
+    assert MERGE_KEY_RE.search("MERGE (x:Norma {URN: $u})").groups() == ("Norma", "URN")
+    assert MERGE_KEY_RE.search("MERGE (:Norma {URN: $u})").groups() == ("Norma", "URN")
+    assert MERGE_KEY_RE.search("MERGE (x:Entity:Principio {node_id: $i})").groups() == ("Entity", "node_id")
+    assert MERGE_KEY_RE.search("MERGE (x:Norma {{URN: $u}})").groups() == ("Norma", "URN")
+    assert not MERGE_KEY_RE.search("MERGE (x:{} {{node_id: $i}})")

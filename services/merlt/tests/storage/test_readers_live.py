@@ -18,14 +18,11 @@ from __future__ import annotations
 
 import importlib
 import uuid
+from datetime import date, timedelta
 from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-
-# Needs a live FalkorDB (the compose falkordb service): excluded by default through
-# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
-pytestmark = pytest.mark.integration
 
 from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 from merlt.experts.base import ExpertContext
@@ -42,6 +39,10 @@ from merlt.tools.principle_lookup import PrincipleLookupTool
 from merlt.tools.search import GraphSearchTool, SemanticSearchTool
 from merlt.tools.textual_reference import TextualReferenceTool
 from merlt.tools.verification import VerificationTool
+
+# Needs a live FalkorDB (the compose falkordb service): excluded by default through
+# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
+pytestmark = pytest.mark.integration
 
 TEST_GRAPH = "merlt_test_readers"
 ACT = "urn:nir:stato:regio.decreto:1942-03-16;262:2"
@@ -77,7 +78,9 @@ async def graph():
 async def _seed(client):
     """What this graph holds, node by node (hand-written Cypher, not the writers' output):
     partitions with a rubrica and no estremi; articles with `testo`, `testo_vigente` or both;
-    the acts that modify, repeal or replace three of them, and one that INSERISCE a comma into art. 6;
+    the acts that modify, repeal or replace three of them, and one that INSERISCE a comma into art. 6,
+    as multivigenza writes them (the act carries no date of its own that a reader takes: the date
+    the amendment takes effect sits on the edge, `data_efficacia`);
     concepts, principles, massime and doctrine keyed by node_id only; the seed's definitions
     (`Norma -[DEFINISCE]-> DefinizioneLegale {node_id, nome, descrizione}`, never to a
     ConcettoGiuridico) and one community definition that carries the old `:Entity:Definizione`
@@ -95,19 +98,19 @@ async def _seed(client):
         CREATE (a4:Norma {URN: $art4, tipo_documento: 'articolo', testo: 'Modificato dal rinvio.'})
         CREATE (a5:Norma {URN: $art5, tipo_documento: 'articolo', testo: 'Mai toccato.'})
         CREATE (a6:Norma {URN: $art6, tipo_documento: 'articolo', testo: 'Con un comma inserito.'})
-        CREATE (m4:Norma {URN: 'urn:test:act4', estremi: 'L. 4/2023', data_atto: '2023-01-01'})
-        CREATE (m4)-[:INSERISCE {data_efficacia: '2023-02-01'}]->(a6)
-        CREATE (m1:Norma {URN: 'urn:test:act1', estremi: 'L. 1/2020', data_atto: '2020-01-01'})
-        CREATE (m2:Norma {URN: 'urn:test:act2', estremi: 'L. 2/2021', data_atto: '2021-01-01'})
-        CREATE (m3:Norma {URN: 'urn:test:act3', estremi: 'L. 3/2022', data_atto: '2022-01-01'})
+        CREATE (m4:Norma {URN: 'urn:test:act4', node_id: 'urn:test:act4', estremi: 'L. 4/2023', tipo_documento: 'legge', data_pubblicazione: '2023-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
+        CREATE (m4)-[:INSERISCE {disposizione: 'art. 1', data_efficacia: '2023-02-01', data_pubblicazione_gu: '2023-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 4/2023', data_decorrenza: '2023-02-01'}]->(a6)
+        CREATE (m1:Norma {URN: 'urn:test:act1', node_id: 'urn:test:act1', estremi: 'L. 1/2020', tipo_documento: 'legge', data_pubblicazione: '2020-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
+        CREATE (m2:Norma {URN: 'urn:test:act2', node_id: 'urn:test:act2', estremi: 'L. 2/2021', tipo_documento: 'legge', data_pubblicazione: '2021-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
+        CREATE (m3:Norma {URN: 'urn:test:act3', node_id: 'urn:test:act3', estremi: 'L. 3/2022', tipo_documento: 'legge', data_pubblicazione: '2022-01-01', fonte: 'Normattiva', provenance: 'ingestion'})
         CREATE (cod)-[:CONTIENE]->(libro)
         CREATE (libro)-[:CONTIENE]->(titolo)
         CREATE (titolo)-[:CONTIENE]->(a1)
         CREATE (titolo)-[:CONTIENE]->(a2)
         CREATE (titolo)-[:CONTIENE]->(a3)
-        CREATE (m1)-[:MODIFICA {data_efficacia: '2020-02-01'}]->(a1)
-        CREATE (m2)-[:ABROGA {data_efficacia: '2021-02-01'}]->(a2)
-        CREATE (m3)-[:SOSTITUISCE {data_efficacia: '2022-02-01'}]->(a3)
+        CREATE (m1)-[:MODIFICA {disposizione: 'art. 1', data_efficacia: '2020-02-01', data_pubblicazione_gu: '2020-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 1/2020', data_decorrenza: '2020-02-01'}]->(a1)
+        CREATE (m2)-[:ABROGA {disposizione: 'art. 1', data_efficacia: '2021-02-01', data_pubblicazione_gu: '2021-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 2/2021', data_decorrenza: '2021-02-01'}]->(a2)
+        CREATE (m3)-[:SOSTITUISCE {disposizione: 'art. 1', data_efficacia: '2022-02-01', data_pubblicazione_gu: '2022-01-01', certezza: 1.0, fonte: 'Normattiva', fonte_relazione: 'L. 3/2022', data_decorrenza: '2022-02-01'}]->(a3)
         CREATE (a1)-[:RINVIA]->(a2)
         CREATE (a1)-[:MODIFICA]->(a4)
         CREATE (k:ConcettoGiuridico {node_id: 'concetto:buona_fede', nome: 'Buona fede', descrizione: 'La buona fede e correttezza.'})
@@ -301,6 +304,69 @@ async def test_history_lists_the_events_and_the_status(graph):
     assert [await tool._get_current_status(urn) for urn in (ART1, ART2, ART3)] == ["vigente", "abrogato", "sostituito"]
 
 
+async def test_the_history_shows_future_amendments_flagged_unless_told_otherwise(graph):
+    # Four amendments of one article, dated on the edge as multivigenza writes them: one in the
+    # past, two that take effect years ahead (a MODIFICA and a SOSTITUISCE), one with no date at
+    # all. By default every one is shown, the future ones flagged; with include_future=False the
+    # future ones are left out and counted in `future_omitted`. The undated one is never future.
+    art = "urn:test:future-art"
+    await graph.query(
+        """
+        CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.'})
+        CREATE (past:Norma {URN: 'urn:test:past', estremi: 'L. 1/2020', tipo_documento: 'legge', data_pubblicazione: '2020-01-01'})
+        CREATE (future:Norma {URN: 'urn:test:future', estremi: 'L. 9/2025', tipo_documento: 'legge', data_pubblicazione: '2025-01-01'})
+        CREATE (undated:Norma {URN: 'urn:test:undated', estremi: 'Atto senza data', tipo_documento: 'legge'})
+        CREATE (later:Norma {URN: 'urn:test:later', estremi: 'L. 8/2025', tipo_documento: 'legge', data_pubblicazione: '2025-06-01'})
+        CREATE (past)-[:MODIFICA {disposizione: 'art. 1', data_efficacia: '2020-02-01', certezza: 1.0, fonte: 'Normattiva'}]->(a)
+        CREATE (future)-[:MODIFICA {disposizione: 'art. 2', data_efficacia: '2099-01-01', certezza: 1.0, fonte: 'Normattiva'}]->(a)
+        CREATE (undated)-[:INSERISCE {disposizione: 'art. 3', certezza: 1.0, fonte: 'Normattiva'}]->(a)
+        CREATE (later)-[:SOSTITUISCE {disposizione: 'art. 4', data_efficacia: '2098-06-01', certezza: 1.0, fonte: 'Normattiva'}]->(a)
+        """,
+        {"art": art},
+    )
+    tool = HistoricalEvolutionTool(graph_db=graph)
+    default = await tool.execute(article_urn=art)
+    assert default.success, default.error
+    assert sorted((e["by_urn"], e["future"]) for e in default.data["timeline"]) == [
+        ("urn:test:future", True), ("urn:test:later", True), ("urn:test:past", False), ("urn:test:undated", False),
+    ]
+    assert default.metadata["future_omitted"] == 0
+    assert [e["date"] for e in default.data["timeline"] if e["by_urn"] == "urn:test:past"] == ["2020-02-01"]
+    # the replacement has not taken effect: the article is in force, with one pending change
+    assert default.data["current_status"] == "vigente"
+    assert default.data["pending"] == [
+        {"type": "sostituisce", "date": "2098-06-01", "by_urn": "urn:test:later", "by_estremi": "L. 8/2025"},
+    ]
+    today_only = await tool.execute(article_urn=art, include_future=False)
+    assert sorted(e["by_urn"] for e in today_only.data["timeline"]) == ["urn:test:past", "urn:test:undated"]
+    assert today_only.data["total_events"] == 2
+    assert today_only.metadata["future_omitted"] == 2
+    no_future_replacement = await tool._get_timeline(art, False, ["sostituisce"])
+    assert no_future_replacement == []
+
+
+@pytest.mark.parametrize("when, status, pending", [
+    ("tomorrow", "vigente", ["abroga"]),
+    ("yesterday", "abrogato", []),
+    ("undated", "abrogato", []),  # nothing says it is in the future
+])
+async def test_an_abrogation_counts_from_the_day_it_takes_effect(graph, when, status, pending):
+    days = {"tomorrow": 1, "yesterday": -1}
+    effect = (date.today() + timedelta(days=days[when])).isoformat() if when in days else None
+    art = f"urn:test:abrogated-{when}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.'}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 7/2026', tipo_documento: 'legge'}) "
+        "CREATE (act)-[r:ABROGA {disposizione: 'art. 1', certezza: 1.0, fonte: 'Normattiva'}]->(a) "
+        "SET r.data_efficacia = $effect",
+        {"art": art, "act": art + "-act", "effect": effect},
+    )
+    found, coming = await HistoricalEvolutionTool(graph_db=graph)._get_status(art)
+    assert (found, [p["type"] for p in coming]) == (status, pending)
+    if pending:
+        assert coming[0]["date"] == effect and coming[0]["by_urn"] == art + "-act"
+
+
 async def test_validity_finds_modifications_by_their_edges_without_a_count_property(graph):
     service = TemporalValidityService(graph_db=graph)
     results = {urn: await service.check_validity(urn) for urn in (ART1, ART2, ART3, ART5)}
@@ -311,6 +377,147 @@ async def test_validity_finds_modifications_by_their_edges_without_a_count_prope
     assert [m["type"] for m in results[ART1].recent_modifications] == ["modifica"]
     marked = await service.check_validity(ART1 + "!vig=2020-01-01")
     assert (marked.urn, marked.status) == (ART1 + "!vig=2020-01-01", "modificato")
+
+
+@pytest.mark.parametrize("when, as_of, status, pending", [
+    ("tomorrow", None, "vigente", ["abroga"]),
+    ("yesterday", None, "abrogato", []),
+    ("undated", None, "abrogato", []),  # nothing says it is in the future
+    ("2020-06-01", "2020-01-01", "vigente", ["abroga"]),  # in force on the day asked about
+    ("2020-06-01", "2021-01-01", "abrogato", []),
+])
+async def test_the_validity_check_reads_an_abrogation_from_the_day_it_takes_effect(graph, when, as_of, status, pending):
+    days = {"tomorrow": 1, "yesterday": -1}
+    effect = (date.today() + timedelta(days=days[when])).isoformat() if when in days else (None if when == "undated" else when)
+    art = f"urn:test:validity-{when}-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.'}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 7/2026', tipo_documento: 'legge'}) "
+        "CREATE (act)-[r:ABROGA {disposizione: 'art. 1', certezza: 1.0, fonte: 'Normattiva'}]->(a) "
+        "SET r.data_efficacia = $effect",
+        {"art": art, "act": art + "-act", "effect": effect},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert (result.status, [p["type"] for p in result.pending]) == (status, pending)
+    assert result.is_valid is (status == "vigente")
+    if pending:
+        assert result.pending[0]["date"] == effect and result.pending[0]["by_urn"] == art + "-act"
+        assert result.abrogating_norm is None
+
+
+@pytest.mark.parametrize("as_of, status, pending", [
+    ("1960-01-01", "vigente", ["abroga"]),
+    ("1972-01-01", "abrogato", []),
+    (None, "abrogato", []),
+])
+async def test_a_dated_abrogation_decides_over_the_seeds_string_flag(graph, as_of, status, pending):
+    # Art. 1632 c.c. as the seed has it: abrogato 'true', and an ABROGA dated 1971-02-22.
+    art = f"urn:test:art1632-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', abrogato: 'true', is_versione_vigente: 'true', "
+        "n_modifiche: 1, ultima_modifica: '1971-02-22'}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 11/1971', tipo_documento: 'legge'}) "
+        "CREATE (act)-[:ABROGA {disposizione: 'art. 29, comma 2', data_efficacia: '1971-02-22', certezza: 1.0}]->(a)",
+        {"art": art, "act": art + "-act"},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert (result.status, [p["type"] for p in result.pending]) == (status, pending)
+    # its ultima_modifica (1971) is the abrogation: the graph has that edge, dated, so the node's
+    # undated date is never last_modified, and no amendment is in force
+    assert result.last_modified is None
+
+
+async def test_the_seeds_string_false_is_not_an_abrogation(graph):
+    # Art. 1284 c.c. as the seed has it: abrogato 'false', and no ABROGA edge.
+    art = "urn:test:art1284"
+    await graph.query(
+        "CREATE (:Norma {URN: $art, tipo_documento: 'articolo', abrogato: 'false', is_versione_vigente: 'true'})",
+        {"art": art},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art)
+    assert (result.status, result.is_valid, result.pending) == ("vigente", True, [])
+
+
+@pytest.mark.parametrize("effect, as_of, status, count, last_modified", [
+    ("1980-01-01", "1970-01-01", "vigente", 0, None),  # a dated amendment, not yet in force
+    ("1980-01-01", "1990-01-01", "modificato", 1, "1980-01-01"),
+    (None, None, "modificato", 1, "2014-09-12"),  # an undated amendment counts; no dated one: the node's date
+])
+async def test_a_norm_is_modified_as_at_a_date_only_by_amendments_in_force_by_then(
+    graph, effect, as_of, status, count, last_modified,
+):
+    art = f"urn:test:modified-{effect}-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.', n_modifiche: 1, "
+        "ultima_modifica: '2014-09-12'}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 5/1980', tipo_documento: 'legge'}) "
+        "CREATE (act)-[r:MODIFICA {disposizione: 'art. 1', certezza: 1.0, fonte: 'Normattiva'}]->(a) "
+        "SET r.data_efficacia = $effect",
+        {"art": art, "act": art + "-act", "effect": effect},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert (result.status, result.modification_count, result.is_valid) == (status, count, True)
+    assert result.last_modified == last_modified
+
+
+# The four seed articles whose n_modifiche counts more amendment events than they have edges,
+# with their real edges (type, data_efficacia).
+_SEED_SHAPES = {
+    "1469": (13, [("MODIFICA", "2005-10-08"), ("MODIFICA", "2003-02-07"), ("MODIFICA", "2000-01-18"),
+                  ("MODIFICA", "2000-01-18"), ("INSERISCE", "1996-02-10")]),
+    "1519": (24, [("ABROGA", "2005-10-08"), ("MODIFICA", "2002-03-08"), ("INSERISCE", "2002-03-08")]),
+    "1751": (7, [("INSERISCE", "2001-01-20"), ("MODIFICA", "1999-03-19"), ("INSERISCE", "1991-09-20"),
+                 ("MODIFICA", "1991-09-20"), ("MODIFICA", "1971-11-16"), ("MODIFICA", "1991-09-20")]),
+    "1785": (5, [("INSERISCE", "1978-07-03"), ("MODIFICA", "1978-07-03")]),
+}
+
+
+@pytest.mark.parametrize("art, as_of, status, count, latest", [
+    ("1469", None, "modificato", 13, "2005-10-08"),  # 5 edges in force + 8 without an edge
+    ("1469", "1960-01-01", "modificato", 8, None),   # only the undated remainder
+    ("1519", None, "abrogato", 23, None),            # its 2005 ABROGA decides; 2 + 21
+    ("1519", "1960-01-01", "modificato", 21, None),  # the abrogation is pending, never a modification
+    ("1751", None, "modificato", 7, "2001-01-20"),
+    ("1785", None, "modificato", 5, "1978-07-03"),
+])
+async def test_the_seeds_unrecorded_amendments_count_as_undated(graph, art, as_of, status, count, latest):
+    events, edges = _SEED_SHAPES[art]
+    urn = f"urn:test:seed-{art}-{as_of}"
+    await graph.query(
+        "CREATE (:Norma {URN: $urn, tipo_documento: 'articolo', n_modifiche: $events, abrogato: false})",
+        {"urn": urn, "events": events},
+    )
+    for i, (rel, effect) in enumerate(edges):
+        await graph.query(
+            f"MATCH (a:Norma {{URN: $urn}}) CREATE (:Norma {{URN: $act, tipo_documento: 'legge'}})"
+            f"-[:{rel} {{data_efficacia: $effect, certezza: 1.0}}]->(a)",
+            {"urn": urn, "act": f"{urn}-act{i}", "effect": effect},
+        )
+    result = await TemporalValidityService(graph_db=graph).check_validity(urn, as_of)
+    assert (result.status, result.modification_count) == (status, count)
+    if status == "modificato":
+        assert "prive di data" in result.warning_message
+        if latest:
+            assert f"ultima modifica datata: {latest}" in result.warning_message
+        else:
+            assert "datata" not in result.warning_message
+
+
+@pytest.mark.parametrize("as_of, listed", [("1970-01-01", []), ("1990-01-01", ["1980-01-01"])])
+async def test_the_recent_modifications_are_those_in_force_at_the_date(graph, as_of, listed):
+    # n_modifiche 2 and one 1980 MODIFICA edge: one undated amendment the graph lacks, so the
+    # norm reads modified at both dates, and the list is read at each.
+    art = f"urn:test:recent-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', n_modifiche: 2}) "
+        "CREATE (:Norma {URN: $act, estremi: 'L. 5/1980', tipo_documento: 'legge'})"
+        "-[:MODIFICA {data_efficacia: '1980-01-01', certezza: 1.0}]->(a)",
+        {"art": art, "act": art + "-act"},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert result.status == "modificato"
+    assert [m["date"] for m in result.recent_modifications] == listed
+    assert all(m["undated"] is False for m in result.recent_modifications)
 
 
 async def test_an_inserted_comma_is_an_amendment(graph):

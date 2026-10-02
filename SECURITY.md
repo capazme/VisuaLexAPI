@@ -12,6 +12,7 @@ is actually enforced today:
 | `eur-lex.europa.eu` | EUR-Lex — Ufficio delle pubblicazioni UE |
 | `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
+| `www.portaledelmassimario.ipzs.it` | Portale del Massimario — Corte di cassazione (realizzazione Istituto Poligrafico e Zecca dello Stato) |
 
 The list lives as data in `visualex_api/tools/egress.py`.
 
