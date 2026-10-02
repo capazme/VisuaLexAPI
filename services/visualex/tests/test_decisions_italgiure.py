@@ -1,6 +1,7 @@
 """The Cassazione reader (design 2026-10-01 §3)."""
 import json
 import pathlib
+import ssl
 
 import pytest
 
@@ -12,6 +13,7 @@ from visualex_api.services.decisions.italgiure import (
 )
 from visualex_api.services.http_client import HttpResult
 from visualex_api.tools.exceptions import NetworkError
+from visualex_api.tools.tls import italgiure_ssl_context
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "decisions"
 # Measured live on 2026-09-30 (n. 10787/2024 civile and penale) and checked again by the
@@ -53,7 +55,10 @@ async def test_a_civil_decision(monkeypatch):
     get, post = calls[0], calls[1]
     assert get[0] == "GET" and post[0] == "POST"
     assert post[2]["data"]["q"] == 'kind:"snciv" AND numdec:10787 AND anno:2024'
-    assert post[2]["ssl"] is not None
+    for call in (get, post):
+        ctx = call[2]["ssl"]
+        assert ctx is italgiure_ssl_context()
+        assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
     assert post[2]["headers"]["User-Agent"].startswith("VisuaLex/")
 
 
@@ -62,6 +67,9 @@ async def test_the_penal_decision_with_the_same_number(monkeypatch):
     d = await ItalgiureReader().lookup("penale", 10787, 2024)
     assert d.identita.archivio == "penale" and d.sezione == EXPECTED["penale"]["sezione"]
     assert d.testo["motivazione"]
+    assert d.tipo == "ordinanza"  # the source's label "Ordinanza"
+    assert d.testo["dispositivo"] == "P. Q. M."
+    assert d.relatore and d.presidente
 
 
 async def test_a_number_below_10000_is_tried_padded_then_bare(monkeypatch):
@@ -80,6 +88,20 @@ async def test_not_found_is_none(monkeypatch):
 
 async def test_an_anti_bot_page_is_a_source_error(monkeypatch):
     _serve(monkeypatch, ["<html><body>Verifica di sicurezza</body></html>"])
+    with pytest.raises(SourceAnswerError):
+        await ItalgiureReader().lookup("civile", 10787, 2024)
+
+
+@pytest.mark.parametrize("body", ["{}", '{"error": {"msg": "x"}}', "null", "[]", '"x"',
+                                  '{"response": []}', '{"response": {"docs": ["x"]}}'])
+async def test_an_answer_that_is_not_solrs_is_a_source_error(monkeypatch, body):
+    _serve(monkeypatch, [body])
+    with pytest.raises(SourceAnswerError):
+        await ItalgiureReader().lookup("civile", 10787, 2024)
+
+
+async def test_a_record_without_a_number_is_a_source_error(monkeypatch):
+    _serve(monkeypatch, [json.dumps({"response": {"docs": [{"numdec": "", "anno": "2024"}]}})])
     with pytest.raises(SourceAnswerError):
         await ItalgiureReader().lookup("civile", 10787, 2024)
 
@@ -118,6 +140,8 @@ def test_the_source_notice_is_never_the_text():
     quoted = "Motivi della decisione. " * 20 + "il ricorrente afferma che l'atto era in fase di oscuramento"
     assert to_decision({"numdec": "1", "anno": "2024", "ocr": quoted}, "civile").testo == {
         "motivazione": quoted}
+    split = {"numdec": "1", "anno": "2024", "ocr": ["La sentenza richiesta è in fase", "di  oscuramento"]}
+    assert to_decision(split, "civile").testo == {}
 
 
 @pytest.mark.live
@@ -130,6 +154,7 @@ async def test_the_homonyms_still_answer():
         pen = await reader.lookup("penale", 10787, 2024)
     except TRANSPORT_ERRORS as exc:
         skip_if_unreachable("italgiure", exc)
+    assert civ is not None and pen is not None
     assert (civ.sezione, pen.sezione) == ("3", "7")
     assert len(pen.testo["motivazione"]) > 2000  # the whole text, not a cut
     # the civil text was withheld on 2026-10-02 (personal data being removed): absent or whole

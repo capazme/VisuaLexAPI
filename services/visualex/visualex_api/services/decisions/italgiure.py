@@ -7,7 +7,7 @@ the lookup of one decision:
 - the number is tried zero-padded, as the index stores it, then bare;
 - the text comes back whole: `ocr` is the reasons, `ocrdis` the dispositivo (often empty at the
   source, which then leaves it at the end of the reasons).
-- a decision the source has not released yet comes back with the source's own notice as its
+- a decision whose text the source withholds comes back with the source's own notice as its
   text ("La sentenza richiesta è in fase di oscuramento": personal data are being removed).
   The notice is not the court's text: the decision is returned without one.
 
@@ -64,7 +64,8 @@ def _iso(raw: str) -> str | None:
 
 def to_decision(doc: dict, archivio: str) -> Decision:
     motivazione = _text(doc.get("ocr")).strip()
-    if len(motivazione) <= _WITHHELD_MAX and _WITHHELD in motivazione.lower():
+    flat = " ".join(motivazione.lower().split())
+    if len(flat) <= _WITHHELD_MAX and _WITHHELD in flat:
         testo: dict[str, str] = {}  # the source's notice, not the court's text
     else:
         testo = {key: value for key, value in (("motivazione", motivazione),
@@ -94,9 +95,15 @@ class ItalgiureReader:
             "POST", SELECT, source="italgiure", ssl=ctx, data={**params, "wt": "json"},
             headers=http_headers({"Referer": f"{BASE}/", "X-Requested-With": "XMLHttpRequest"}))
         try:
-            return json.loads(result.text)
+            data = json.loads(result.text)
         except json.JSONDecodeError as exc:
             raise SourceAnswerError("Italgiure non ha risposto con i suoi dati") from exc
+        response = data.get("response") if isinstance(data, dict) else None
+        docs = response.get("docs") if isinstance(response, dict) else None
+        if not isinstance(docs, list) or not all(isinstance(doc, dict) for doc in docs):
+            # a 200 that is not Solr's answer (an error object, null, a list): never "absent"
+            raise SourceAnswerError("Italgiure non ha risposto con i suoi dati")
+        return data
 
     async def lookup(self, archivio: str, numero: int, anno: int) -> Decision | None:
         kind = KINDS[archivio]
@@ -107,7 +114,11 @@ class ItalgiureReader:
                 "rows": "1", "fl": FIELDS})
             docs = data.get("response", {}).get("docs", [])
             if docs:
-                return to_decision(docs[0], archivio)
+                try:
+                    return to_decision(docs[0], archivio)
+                except ValueError as exc:  # a record without a readable number or year
+                    raise SourceAnswerError(
+                        "Italgiure ha risposto con una decisione illeggibile") from exc
         return None
 
     async def archive_start(self, archivio: str) -> tuple[int, str] | None:
