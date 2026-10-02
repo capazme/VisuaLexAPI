@@ -101,3 +101,12 @@ async def test_a_nested_body_is_400_and_never_reaches_a_source(client, monkeypat
     assert resp.status_code == 400
     assert (await resp.get_json())["esito"] == "richiesta_non_valida"
     assert resolver.refs == []
+
+
+async def test_a_body_that_is_not_utf8_is_400(client, monkeypatch):
+    resolver = _use(monkeypatch, FakeResolver(Outcome("trovata", decisione=D)))
+    resp = await client.post("/fetch_decision", data=b"\xff",
+                             headers={"Content-Type": "application/json"})
+    assert resp.status_code == 400
+    assert (await resp.get_json())["esito"] == "richiesta_non_valida"
+    assert resolver.refs == []

@@ -181,9 +181,10 @@ or a `version_date`) never asks Brocardi, whose commentary carries no date.
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
 input), `ResourceNotFoundError` → 404 (the article is not in the act),
-`RateLimitExceededError` → 429, everything else 500. Before, every failure was a
-500 — and `stream_article_text` raised through to Quart and answered an HTML
-error page instead of NDJSON.
+`RateLimitExceededError` → 429, everything else 500, except `/fetch_decision`,
+which answers every failure with `esito` and never with the exception's text.
+Before, every failure was a 500 — and `stream_article_text` raised through to
+Quart and answered an HTML error page instead of NDJSON.
 
 ```json
 {

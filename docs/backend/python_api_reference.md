@@ -281,8 +281,9 @@ Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.
 }
 ```
 
-**Response:** always JSON with `esito`. Unlike the other endpoints, a failure is an `esito`
-body too, not `{"error": ...}`.
+**Response:** always JSON with `esito`. Only the framework's own pages are not: a body over
+16 MB, or a method other than POST, gets the server's generic error page. Unlike the other
+endpoints, a failure is an `esito` body too, not `{"error": ...}`.
 
 | `esito` | Status | Content |
 |---------|--------|---------|

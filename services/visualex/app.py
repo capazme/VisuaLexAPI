@@ -1033,7 +1033,8 @@ class NormaController:
         cannot be reached is never "non trovata"."""
         try:
             body = await request.get_json(silent=True)
-        except RecursionError:  # a nesting bomb: the caller's fault, refused before any source
+        except (RecursionError, UnicodeDecodeError):
+            # a nesting bomb or bytes that are not UTF-8: the caller's fault
             body = None
         try:
             reference = parse_reference(body)
@@ -1047,7 +1048,8 @@ class NormaController:
             return jsonify({'esito': 'fonte_non_raggiungibile', 'fonte': exc.fonte}), 503
         except Exception:
             # a bug, never the caller's or the source's fault: a fixed body, the details in the log
-            log.exception("Decision lookup failed")
+            log.exception("Decision lookup failed", corte=reference.corte,
+                          numero=reference.numero, anno=reference.anno)
             return jsonify({'esito': 'errore_interno'}), 500
         status = 404 if outcome.esito == 'non_trovata' else 200
         return jsonify(payload), status
