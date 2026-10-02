@@ -127,7 +127,7 @@ class TestCapturedPages:
 
 
 class TestRecapturedPages:
-    """Trimmed pages captured from the portal on 2026-10-01 (`fixtures/normattiva/README.md`).
+    """Trimmed pages captured from the portal on 2026-10-02 (`fixtures/normattiva/README.md`).
 
     They assert what the portal printed, so a change in its markup shows up here first.
     """

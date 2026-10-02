@@ -26,7 +26,7 @@ wrapped in `<html><body>`), taken 2026-09-19 from
   the text reads `Art. 544. \n\n((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981,
   N. 442))`.
 
-Trimmed captures of 2026-10-01, for the validity reader
+Trimmed captures of 2026-10-02, for the validity reader
 (`normattiva_validity.py`, spec `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`).
 Each keeps the four blocks the reader looks at, as served — `div.vigore` (the window),
 the update link, the "Ultimo aggiornamento" line and `div.bodyTesto` — wrapped in
