@@ -277,7 +277,7 @@ Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.
   "corte": "cassazione",
   "numero": 10787,
   "anno": 2024,
-  "archivio": "civile"
+  "archivio": "penale"
 }
 ```
 
@@ -291,6 +291,7 @@ body too, not `{"error": ...}`.
 | `non_trovata` | 404 | `motivo`, `archivio_dal` when known, `suggerimento` when found |
 | `fonte_non_raggiungibile` | 503 | `fonte`: `cassazione` or `corte_costituzionale` |
 | `richiesta_non_valida` | 400 | `errori`: each bad field, with what was expected |
+| `errore_interno` | 500 | nothing else: an unexpected failure, whose details stay in the log |
 
 **`trovata`** carries:
 - `identita`: `{corte, numero, anno, archivio?}`, what VisuaLex resolved. `archivio` is always
@@ -308,16 +309,23 @@ body too, not `{"error": ...}`.
   reader's browser, which this server never contacts). The Cassazione has no `url`.
 - `avvisi`: the notices below.
 
-**Example answers.** The particulars come from the tests; the text blocks and the names are
-elided with `…`.
+**Example answers.** The particulars are those of three recorded decisions (Cass. civ.
+10787/2024, Cass. pen. 10787/2024, Corte cost. 1/2014); the text blocks, the subject matter
+and the magistrates' names are elided with `…`.
 
-`trovata`, Cassazione:
+`trovata`, Cassazione (the request above):
 ```json
 {
   "esito": "trovata",
-  "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "civile"},
-  "attributi": {"sezione": "3", "tipo": "sentenza"},
-  "testo": {"motivazione": "…"},
+  "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "penale"},
+  "attributi": {
+    "sezione": "7",
+    "tipo": "ordinanza",
+    "data_deposito": "2024-03-14",
+    "relatore": "…",
+    "presidente": "…"
+  },
+  "testo": {"motivazione": "…", "dispositivo": "…"},
   "fonte": {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)"},
   "avvisi": []
 }
@@ -346,12 +354,20 @@ elided with `…`.
 }
 ```
 
-`trovata` without its text:
+`trovata` without its text (Cass. civ. 10787/2024, `"archivio": "civile"`, as recorded on
+2026-10-02, while Italgiure withheld its text):
 ```json
 {
   "esito": "trovata",
   "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "civile"},
-  "attributi": {"sezione": "3", "tipo": "ordinanza"},
+  "attributi": {
+    "sezione": "3",
+    "tipo": "ordinanza",
+    "data_deposito": "2024-04-22",
+    "relatore": "…",
+    "presidente": "…",
+    "materia": "…"
+  },
   "testo": {},
   "fonte": {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)"},
   "avvisi": [{"tipo": "testo_non_disponibile"}]
@@ -366,11 +382,24 @@ elided with `…`.
   "candidati": [
     {
       "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "civile"},
-      "attributi": {"sezione": "3", "tipo": "sentenza"}
+      "attributi": {
+        "sezione": "3",
+        "tipo": "ordinanza",
+        "data_deposito": "2024-04-22",
+        "relatore": "…",
+        "presidente": "…",
+        "materia": "…"
+      }
     },
     {
       "identita": {"corte": "cassazione", "numero": 10787, "anno": 2024, "archivio": "penale"},
-      "attributi": {"sezione": "7", "tipo": "sentenza"}
+      "attributi": {
+        "sezione": "7",
+        "tipo": "ordinanza",
+        "data_deposito": "2024-03-14",
+        "relatore": "…",
+        "presidente": "…"
+      }
     }
   ]
 }
@@ -382,15 +411,6 @@ elided with `…`.
   "esito": "non_trovata",
   "motivo": "fuori_archivio",
   "archivio_dal": "2021-02-17"
-}
-```
-
-`non_trovata` with a suggestion (`{"corte": "cassazione", "numero": 1399, "anno": 2023, "archivio": "penale"}`):
-```json
-{
-  "esito": "non_trovata",
-  "motivo": "inesistente",
-  "suggerimento": {"corte": "cassazione", "numero": 1399, "anno": 2024, "archivio": "penale"}
 }
 ```
 
@@ -411,6 +431,14 @@ elided with `…`.
 ```
 A body that is not a JSON object answers `{"body": "atteso un oggetto JSON"}` in `errori`.
 
+`errore_interno`, an unexpected failure (a bug, never the caller's or a source's fault). The
+body is fixed and carries no detail: that stays in the server's log:
+```json
+{
+  "esito": "errore_interno"
+}
+```
+
 **`motivo`** of a `non_trovata`:
 - `inesistente`: the archive covers that year and holds no such number.
 - `fuori_archivio`: the year is before the start of Italgiure's public archive, a moving
@@ -418,9 +446,10 @@ A body that is not a JSON object answers `{"body": "atteso un oggetto JSON"}` in
 - `anno_parziale`: the first year of that archive, which is only partly covered;
   `archivio_dal`, when known, is the day it starts.
 
-`suggerimento` is the identity of a penal decision with the same number in the next year
-(a penal number belongs to the year of deposit, so a December hearing is numbered in
-January). It is offered, never followed: a different year may be a different decision.
+`suggerimento` is the identity (`{corte, numero, anno, archivio}`) of a penal decision with
+the same number in the next year (a penal number belongs to the year of deposit, so a
+December hearing is numbered in January). It is offered, never followed: a different year
+may be a different decision.
 
 **Notices (`avvisi`)**, one entry per notice, each with its `tipo`:
 - `sezione_diversa`: the section cited is not the decision's; the decision is returned all the
@@ -449,6 +478,7 @@ the one that holds the current year.
 - `200`: `trovata` or `ambigua`
 - `400`: `richiesta_non_valida`
 - `404`: `non_trovata`
+- `500`: `errore_interno`, an unexpected failure: the body is fixed and carries no detail
 - `503`: `fonte_non_raggiungibile`. A source that cannot be reached is never reported as
   `non_trovata`
 
@@ -830,7 +860,7 @@ interface BrocardiInfo {
 
 ## Error Responses
 
-All errors return JSON with a consistent structure:
+All errors return JSON with a consistent structure, except `/fetch_decision`, which always answers with `esito` (see its section):
 
 ```json
 {

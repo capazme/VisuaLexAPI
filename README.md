@@ -85,7 +85,7 @@ third parties: please respect the Terms of Service of Normattiva, EUR-Lex,
 Brocardi and the Corte di cassazione's SentenzeWeb; the Corte costituzionale's
 open data are licensed CC BY-SA 3.0 and are credited wherever they appear.
 
-Portions of the act-resolution tables and the Akoma Ntoso parser derive from
+Portions of the act-resolution tables, the Akoma Ntoso parser and the Corte
+costituzionale open-data reader derive from
 [mcp-legal-it](https://github.com/capazme/mcp-legal-it), by the same author,
-relicensed MIT by the copyright holder, and so does the Corte costituzionale
-open-data reader.
+relicensed MIT by the copyright holder.

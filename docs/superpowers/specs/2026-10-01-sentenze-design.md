@@ -212,6 +212,7 @@ README states the minimum version.
 | `non_trovata` | 404 | `motivo` (see below), `archivio_dal` when known, `suggerimento` when found |
 | `fonte_non_raggiungibile` | 503 | `fonte` |
 | invalid request | 400 | the field errors |
+| `errore_interno` | 500 | nothing else: an unexpected failure, whose details stay in the log |
 
 `motivo` is one of:
 - `inesistente`;

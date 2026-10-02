@@ -48,6 +48,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     touches `article_text` (gotcha 23). Best effort: a page it cannot read yields
     no `validity` key at all, never a guess. It also holds the two request
     guards, `reject_future_version_date` and `is_historical_request`.
+  - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
+    `model.py` (identity and reference), `italgiure.py` (Cassazione, Italgiure's Solr),
+    `corte_cost.py` (Corte costituzionale open data, range bundles on disk), `resolver.py`
+    (one outcome, lookups cached per archive), `http.py` (the readers' own
+    `ThrottledHttpClient` and honest User-Agent).
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -97,15 +102,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
     and nothing else — `SECURITY.md` lists the three paths it does not cover
     (treextractor's own session, Playwright, redirect targets).
-  - `decisions/` — court decisions behind `POST /fetch_decision`: `model.py` (identity and
-    reference), `italgiure.py` (Cassazione, Italgiure's Solr), `corte_cost.py` (Corte
-    costituzionale open data, range bundles on disk), `resolver.py` (one outcome, lookups
-    cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
-    User-Agent).
-  - `tools/tls.py` — the verifying SSL context for Italgiure, which serves an incomplete
-    chain: the missing intermediate ships in `tools/certs/` and is trusted only under its
-    SHA-256 pin. Never "simplify" it into turning verification off
-    (`tests/test_tls_italgiure.py` fails).
+  - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
+    the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
+    pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
+    fails).
   - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
     exposed at `POST /parse_query`
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
@@ -153,10 +153,11 @@ POST unless noted, JSON bodies.
 - `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale,
   numero, anno, archivio?, sezione?}` → `esito` trovata (identity, attributes, whole text,
   source) and ambigua 200, non_trovata 404 (with the reason and the archive's start),
-  fonte_non_raggiungibile 503, richiesta_non_valida 400. Italgiure (TLS pinned, own client)
-  and the Corte costituzionale open data (bundle on disk) linked to the court's page for
-  each decision. Lookups cached per archive: found 30 days, absent 1 hour, a decision found
-  without its text 24 hours (with the notice `testo_non_disponibile`), errors never.
+  fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a fixed
+  body). Italgiure (TLS pinned, own client) and the Corte costituzionale open data (bundle
+  on disk). The Corte costituzionale's decisions link to the court's page; the Cassazione's
+  have no source link. Lookups cached per archive: found 30 days, absent 1 hour, a decision
+  found without its text 24 hours (with the notice `testo_non_disponibile`), errors never.
   Design: docs/superpowers/specs/2026-10-01-sentenze-design.md
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
@@ -270,7 +271,7 @@ Duplicating any of these is a defect, not a shortcut.
 `get_document(normavisitata) -> Tuple[str, str]`, register the act type in
 `NormaController.get_scraper_for_norma()`, extend `tools/map.py` if needed.
 
-**New API endpoint** — route in `NormaController._setup_routes()`, async handler,
+**New API endpoint** — route in `NormaController.setup_routes()`, async handler,
 `await request.get_json()`, return `jsonify()`, log with structlog.
 
 **Playwright work** —
