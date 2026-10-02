@@ -150,13 +150,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   that decides which anchor is the primary one.
   `lingo/cards.ts` `createLingoCard(authorId, input)` is one nested write that
   starts the card as `BOZZA_PERSONALE`; `lingo/cardStates.ts` holds the
-  lifecycle (`canTransition`). Deleting a user cascades to their cards and
-  anchors, and a test pins it: whether a validated card should survive its
-  author is an open decision (plan, decision 14), and `GET /auth/export` must
-  include the user's cards as soon as any exist.
+  lifecycle (`canTransition`). The author is optional: when an account goes
+  (`deleteUserAccount`, used by `DELETE /auth/account` and by the administrator's
+  `DELETE /admin/users/:id`; never delete the user row by hand) the cards the
+  community has taken up (proposed, validated, to review) stay without an author,
+  and the person's drafts and archived cards are deleted with them, in one
+  transaction (plan, decision 14). `GET /auth/export` includes the user's cards
+  as `data.lingoCards`.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
-  `User` cascades). Reached from the Settings modal.
+  `User` cascades, except the community's study cards, which stay without an
+  author: see LingoLex cards). Reached from the Settings modal.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
   (see Key API Endpoints).

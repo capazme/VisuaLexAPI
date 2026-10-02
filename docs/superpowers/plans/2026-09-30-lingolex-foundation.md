@@ -47,8 +47,8 @@ To decide with the other developer:
 
 5. Whether provenance is stored (decision 2).
 6. Where the read routes for traces live. The specification puts them under `/api/lingo/simulazioni`; Task 5 follows it unless told otherwise.
-14. **What deleting an account does to its cards**, before any route writes one. The specification gives `LingoCard.autore` `onDelete: Cascade`, which matches "every relation to `User` cascades" in `DELETE /auth/account`. But a validated card belongs to the community pool: deleting its author's account would delete it for everyone. The alternative is `SetNull` with the card kept anonymous, which needs `autoreId` nullable. Nothing writes cards yet, so either is cheap now and costly later. Task 7 builds the specification's cascade and pins it with a test, so that changing it is a visible act. The same cascade runs when an administrator deletes a user (`adminController`), not only on self-service deletion.
-15. **The account export** (`GET /auth/export`) has to include the user's cards as soon as any exist.
+14. **Settled by the owner on 2 October: what deleting an account does to its cards.** Validation is kept and personal data goes. The cards the community has taken up (proposed, validated, to review) stay with their state and anchors and lose only their author (`autoreId` becomes NULL; the foreign key is `SET NULL`, where the specification had `CASCADE`). The cards that belong to the person alone, drafts and archived, are deleted with the account. The same holds when an administrator deletes the user. The second half is done by the application (`lingo/deleteUserAccount.ts`, one transaction with the user's deletion), because the database cannot tell a draft from a validated card: deleting the user row by hand leaves the drafts behind, anonymous. Two readings to confirm: *proposed* cards count as taken up by the community (validators may already have voted), and *archived* ones, turned down by the validators, count as personal; each is one word in `PERSONAL_STATES`. Anonymity here is of the account: the text of a kept card is the author's writing, and if it names someone it still does.
+15. **The account export** (`GET /auth/export`) includes the user's cards, in every state, with their anchors (`data.lingoCards`). The payload stays at `schemaVersion` 1: a key was added and none changed.
 
 **Noticed, not part of this change:** `prisma migrate diff` between the migrated test database and `schema.prisma` reports one difference, in `merlt_qa_jobs.updated_at` (the migration gives it `DEFAULT now()`; the schema, with `@updatedAt`, says no default). Harmless in practice, since Prisma sets the value itself, and it predates this work. A separate `ALTER TABLE … DROP DEFAULT` migration would clear it.
 
@@ -64,7 +64,7 @@ To decide with the other developer:
 8. **Numeric garbage into the engine.** A rating outside 1–4 or not an integer, negative or non-finite elapsed days, a retention outside (0, 1): `RangeError`. A ten-year gap, or an extreme stability, still gives a finite result; the interval is never under 1 day nor over the maximum. Task 6.
 9. **A card without a norm.** Zero anchors, a fingerprint that is not 64 hexadecimal characters, two primaries: refused, and nothing is written (one nested write). Task 7.
 10. **Skipping validation.** Draft → validated is refused, and nothing leaves archived. Task 7, `canTransition`.
-11. **Deleting an author.** The account's cards and anchors go with it, until decision 14 says otherwise. Task 7.
+11. **Deleting an author.** Drafts and archived cards go with the account; proposed, validated and to-review cards stay, without an author (decision 14). Task 7b.
 
 ---
 
@@ -178,7 +178,7 @@ export function canTransition(from: LingoCardStato, to: LingoCardStato): boolean
 export async function createLingoCard(authorId: string, input: unknown): Promise<LingoCard & { ancore: LingoCardAncora[] }>;
 ```
 
-Models as in the specification: `LingoCard` (`lingo_cards`: author, subject, institute, kind, question, answer, explanation, state `BOZZA_PERSONALE` by default, `authorityScore` 0, `isControversa` false) and `LingoCardAncora` (`lingo_card_ancore`: norm key, article id, URN, fingerprint, primary flag, last check), the anchors cascading from the card and the card from its author.
+Models as in the specification: `LingoCard` (`lingo_cards`: author, subject, institute, kind, question, answer, explanation, state `BOZZA_PERSONALE` by default, `authorityScore` 0, `isControversa` false) and `LingoCardAncora` (`lingo_card_ancore`: norm key, article id, URN, fingerprint, primary flag, last check), the anchors cascading from the card, and the author optional (`SET NULL`, see decision 14 and Task 7b).
 
 **Done (30 September): Steps 1–6, tests in the three files.** The schema diff is additive only (118 lines added, none changed: the schema was deliberately *not* run through `prisma format`, which would have realigned 86 untouched lines of a file the other developer reads). The migration's only contact with an existing table is the foreign key from `lingo_cards` to `users`. After the migrations the drift check shows the one known difference, in `merlt_qa_jobs`, and nothing on the Lingo tables.
 
@@ -188,6 +188,16 @@ Models as in the specification: `LingoCard` (`lingo_cards`: author, subject, ins
 - [x] **Step 4:** implement the contract, the state machine and the service.
 - [x] **Step 5:** run them, see them pass; `npm --prefix apps/server run build`; the drift check (`prisma migrate diff` from the migrated test database to the schema shows only the known `merlt_qa_jobs` difference).
 - [x] **Step 6:** update `apps/server/CLAUDE.md`.
+
+### Task 7b: Deleting an account (a separate change, stacked on this one)
+
+**Files:** modify `apps/server/prisma/schema.prisma` (the author optional, `SET NULL`), `apps/server/src/controllers/authController.ts` (deletion and export), `apps/server/src/controllers/adminController.ts` (deletion), `apps/server/tests/lingoCards.test.ts`, `apps/server/CLAUDE.md`; create `apps/server/prisma/migrations/20261002100000_lingo_card_author_set_null/migration.sql`, `apps/server/src/lingo/deleteUserAccount.ts`, `apps/server/tests/lingoAccountErasure.test.ts`.
+
+**Interfaces** (produces): `deleteUserAccount(userId: string): Promise<void>` — one transaction: delete the user's drafts and archived cards (their anchors cascade), then the user (the foreign key anonymises the rest); `GET /api/auth/export` gains `data.lingoCards`.
+
+- [x] Tests first: both ways of deleting (the user's own and the administrator's) keep the proposed, validated and to-review cards without an author and with their anchors, remove drafts and archived ones, touch nobody else's card, and leave no trace of the person in what remains; a refused deletion leaves the cards alone; the export has the user's own cards in every state and nobody else's.
+- [x] Schema, migration (generated offline, three statements on a table with no rows), the shared function, both controllers, the export.
+- [x] The earlier pin of the cascade in `lingoCards.test.ts` now says the opposite: the database alone never takes a card with it.
 
 ### Closing gates
 

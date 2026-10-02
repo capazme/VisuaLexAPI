@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
+import { deleteUserAccount } from '../lingo/deleteUserAccount';
 
 // Password validation regex: min 8 chars, at least 1 uppercase, 1 lowercase, 1 number
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -208,7 +209,7 @@ export const changePassword = async (req: Request, res: Response) => {
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -221,19 +222,22 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.customAlias.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.articleThread.findMany({ where: { userId }, include: { comments: true }, orderBy: { createdAt: 'asc' } }),
     prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.lingoCard.findMany({ where: { autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } }),
   ]);
 
   res.json({
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
     user,
-    data: { folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments },
+    data: { folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards },
   });
 };
 
 /**
  * Permanently delete the authenticated account after explicit confirmation.
- * Prisma relations are configured with cascading ownership deletes.
+ * Prisma relations are configured with cascading ownership deletes, with one
+ * exception: the study cards the community has taken up stay, without their
+ * author (see `deleteUserAccount`).
  */
 export const deleteAccount = async (req: Request, res: Response) => {
   const { password, confirmation } = deleteAccountSchema.parse(req.body);
@@ -245,6 +249,6 @@ export const deleteAccount = async (req: Request, res: Response) => {
     throw new AppError(400, 'La password non è corretta');
   }
 
-  await prisma.user.delete({ where: { id: user.id } });
+  await deleteUserAccount(user.id);
   res.status(204).send();
 };
