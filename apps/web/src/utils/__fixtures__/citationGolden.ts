@@ -127,6 +127,58 @@ export const CITATION_GOLDEN: CitationCase[] = [
     },
   },
   {
+    name: 'an act dated on the first of a month: the day is written with the ordinal, as the Gazzetta Ufficiale does',
+    context: {
+      norma: { tipo_atto: 'decreto legislativo', numero_atto: '385', data: '1993-09-01', numero_articolo: '127' },
+      validity: { state: 'historical', valid_from: '2015-01-01', valid_to: '2016-12-31', version_number: 3, act_updated: null, request_in_window: true },
+      requestedDate: '2015-03-15',
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 127, d.lgs. 1° settembre 1993, n. 385, nel testo in vigore al 15 marzo 2015',
+      long: 'art. 127, d.lgs. 1° settembre 1993, n. 385, nel testo in vigore dal 1° gennaio 2015 al 31 dicembre 2016 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
+  },
+  {
+    name: 'a decreto del presidente della repubblica: the abbreviation is written in lower case like every other (the owner decides whether it should be d.P.R.)',
+    context: {
+      norma: { tipo_atto: 'decreto del presidente della repubblica', numero_atto: '445', data: '2000-12-28', numero_articolo: '38' },
+      validity: { state: 'historical', valid_from: '2012-01-01', valid_to: '2013-12-31', version_number: 2, act_updated: null, request_in_window: true },
+      requestedDate: '2012-06-20',
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 38, d.p.r. 28 dicembre 2000, n. 445, nel testo in vigore al 20 giugno 2012',
+      long: 'art. 38, d.p.r. 28 dicembre 2000, n. 445, nel testo in vigore dal 1° gennaio 2012 al 31 dicembre 2013 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
+  },
+  {
+    name: 'a decreto-legge',
+    context: {
+      norma: { tipo_atto: 'decreto legge', numero_atto: '32', data: '2019-04-18', numero_articolo: '1' },
+      validity: { state: 'historical', valid_from: '2019-06-18', valid_to: '2019-12-31', version_number: 2, act_updated: null, request_in_window: true },
+      requestedDate: '2019-08-01',
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 1, d.l. 18 aprile 2019, n. 32, nel testo in vigore al 1° agosto 2019',
+      long: 'art. 1, d.l. 18 aprile 2019, n. 32, nel testo in vigore dal 18 giugno 2019 al 31 dicembre 2019 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
+  },
+  {
+    name: 'a type of act the app has no abbreviation for is written in full, in lower case',
+    context: {
+      norma: { tipo_atto: 'decreto ministeriale', numero_atto: '5', data: '2000-02-15', numero_articolo: '3' },
+      validity: { state: 'historical', valid_from: '2003-01-01', valid_to: '2008-12-31', version_number: 2, act_updated: null, request_in_window: true },
+      requestedDate: '2005-03-10',
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 3, decreto ministeriale 15 febbraio 2000, n. 5, nel testo in vigore al 10 marzo 2005',
+      long: 'art. 3, decreto ministeriale 15 febbraio 2000, n. 5, nel testo in vigore dal 1° gennaio 2003 al 31 dicembre 2008 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
+  },
+  {
     name: 'the preleggi are cited by their own name: they share the decree of the codice civile, whose own articles are other ones',
     context: {
       norma: { tipo_atto: 'preleggi', tipo_atto_reale: 'regio decreto', numero_atto: '262', data: '1942-03-16', numero_articolo: '12' },
@@ -214,6 +266,19 @@ export const CITATION_GOLDEN: CitationCase[] = [
       consultedAt: CONSULTED,
     },
     expected: null,
+  },
+  {
+    name: 'a repealed article asked for a day after the repeal: the citation says what the page says, the text in force from the repeal (the owner confirms)',
+    context: {
+      norma: { tipo_atto: 'codice penale', numero_articolo: '594', allegato: '1' },
+      validity: { state: 'abrogated', valid_from: '2016-02-06', valid_to: null, version_number: 2, act_updated: null, request_in_window: true },
+      requestedDate: '2016-03-01',
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: 'art. 594 c.p., nel testo in vigore al 1° marzo 2016',
+      long: 'art. 594 c.p., nel testo in vigore dal 6 febbraio 2016 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+    },
   },
   {
     name: 'the version returned does not contain the day: nothing is cited',

@@ -1,5 +1,5 @@
 import type { ArticleValidity, NormaVisitata } from '../types';
-import { abbreviateActType, formatDateForCitation, formatDateItalianLong } from './dateUtils';
+import { abbreviateActType, formatDateForCitation } from './dateUtils';
 
 /**
  * How a lawyer cites a norm "in the text in force at …".
@@ -59,7 +59,7 @@ function actDesignation(norma: CitedNorma): { text: string; isCode: boolean } {
   // An aliased act ("codice in materia di protezione dei dati personali") is
   // cited by the act it is: "d.lgs. 30 giugno 2003, n. 196".
   const type = abbreviateActType(norma.tipo_atto_reale || norma.tipo_atto).toLowerCase();
-  const date = norma.data ? ` ${formatDateItalianLong(norma.data)}` : '';
+  const date = norma.data ? ` ${formatDateForCitation(norma.data)}` : '';
   const number = norma.numero_atto ? `, n. ${norma.numero_atto}` : '';
   return { text: `${type}${date}${number}`, isCode: false };
 }
