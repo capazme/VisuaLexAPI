@@ -1598,7 +1598,9 @@ def _relation_write_cypher(rel_type: str, source: _GraphEndpoint, target: _Graph
                 clauses.append("WITH " + ", ".join(bound))
             clauses.append(
                 "MERGE " + ep.pattern.format(var=var, param=f"{var}_key") + "\n"
-                f"ON CREATE SET {var} += ${var}_stub, {var}.created_at = $timestamp"
+                # the schema's one stub shape and nothing else: the migration reshapes
+                # any stub that differs from `stub_properties`
+                f"ON CREATE SET {var} += ${var}_stub"
             )
             bound.append(var)
     clauses.append("WITH source, target")

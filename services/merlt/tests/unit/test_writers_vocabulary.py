@@ -47,7 +47,9 @@ async def test_the_norm_stub_has_the_one_shape_and_the_existing_node_is_not_touc
     entity = SimpleNamespace(entity_type="sanzione", article_urn=CC + "@originale")
     await writer._create_entity_relation(entity, "sanzione:multa")
     cypher, params = client.query.await_args.args
-    assert "ON CREATE SET art += $stub" in cypher
+    assert "ON CREATE SET art += $stub\n" in cypher
+    # the stub is the shape and nothing else: a property the migration would remove is not written
+    assert "art.created_at" not in cypher
     assert "coalesce(art.provenance" not in cypher and "art.trust" not in cypher
     assert params["stub"] == {
         "URN": CC, "node_id": CC, "numero_articolo": "1322", "estremi": "Art. 1322 c.c.",

@@ -561,15 +561,16 @@ class EntityGraphWriter:
             return
 
         # Create relation (create Norma node if it doesn't exist). A Norma this
-        # writer creates is the schema's one stub shape (`stub_properties`),
-        # set ON CREATE only: an existing (seed/ingested) node is never touched.
+        # writer creates is the schema's one stub shape (`stub_properties`) and
+        # nothing else (the migration reshapes any stub that differs from it), set
+        # ON CREATE only: an existing (seed/ingested) node is never touched.
         # The graph keys a norm by its full Normattiva URL, so a bare `urn:nir:`
         # URN is keyed so too, or its stub would sit next to the article the seed
         # has. The relation itself carries the community's provenance.
         article_key = canonical_urn(wrapped_norm_key(entity.article_urn))
         query = f"""
         MERGE (art:Norma {{URN: $article_urn}})
-        ON CREATE SET art += $stub, art.created_at = $timestamp
+        ON CREATE SET art += $stub
         WITH art
         MATCH (e:Entity {{id: $entity_id}})
         MERGE (art)-[r:{relation_type}]->(e)
