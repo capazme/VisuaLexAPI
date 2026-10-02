@@ -1,0 +1,48 @@
+{
+  "baseline": {
+    "phase": "baseline",
+    "num_queries": 20,
+    "avg_reward": 0.21765085979466012,
+    "std_reward": 0.09966407263918019,
+    "expert_usage": {
+      "literal": 0.3,
+      "precedent": 0.35,
+      "systemic": 0.1,
+      "principles": 0.25
+    },
+    "load_balance_score": 0.6258342614722722,
+    "policy_entropy": 1.384753002010286,
+    "avg_confidence": 0.0,
+    "avg_graph_score": 0.0,
+    "timestamp": "2025-12-29T14:37:14.172937"
+  },
+  "training": {
+    "phase": "training",
+    "num_queries": 750,
+    "avg_reward": 0.14959676479718423,
+    "std_reward": 0.10257121264097208,
+    "expert_usage": {},
+    "load_balance_score": 1.0,
+    "policy_entropy": 1.3596901677385191,
+    "avg_confidence": 0.0,
+    "avg_graph_score": 0.0,
+    "timestamp": "2025-12-29T14:37:14.188711"
+  },
+  "evaluation": {
+    "phase": "evaluation",
+    "num_queries": 20,
+    "avg_reward": 0.22062844019015349,
+    "std_reward": 0.06303409933541652,
+    "expert_usage": {
+      "precedent": 0.25,
+      "systemic": 0.35,
+      "literal": 0.3,
+      "principles": 0.1
+    },
+    "load_balance_score": 0.6258342614722722,
+    "policy_entropy": 1.3596901677385191,
+    "avg_confidence": 0.0,
+    "avg_graph_score": 0.0,
+    "timestamp": "2025-12-29T14:37:14.189039"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "query_id": "q_0004",
+  "query_text": "Cos'\u00e8 il termine essenziale nell'art. 1457 c.c.?",
+  "synthesis": "Mi scuso, ma non sono in grado di produrre la sintesi richiesta. L'interpretazione \"LITERAL\" ha restituito un errore (\"Errore nell'analisi: [Errno 65] No route to host\") e non ho quindi alcun contenuto da analizzare da quella prospettiva.\n\nPer poter procedere con la sintesi, avrei bisogno di un'interpretazione valida e significativa anche per l'approccio \"LITERAL\", oltre a quelle che eventualmente mi fornirai per gli altri approcci ermeneutici.\n\nSe mi fornirai le interpretazioni complete e valid",
+  "confidence": 0.0,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "Errore nell'analisi: [Errno 65] No route to host",
+      "confidence": 0.0,
+      "weight": 1.0,
+      "weighted_confidence": 0.0
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 21851.811999999998,
+  "routing_decision": {
+    "query_type": "definitional",
+    "expert_weights": {
+      "literal": 0.6,
+      "systemic": 0.2,
+      "principles": 0.1,
+      "precedent": 0.1
+    },
+    "confidence": 0.4,
+    "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+  },
+  "feedback": 0.3552975587648295,
+  "reward": 0.008882438969120738,
+  "user_id": "user_014",
+  "error": null
+}

@@ -1,0 +1,37 @@
+{
+  "query_id": "q_0008",
+  "query_text": "Come si applica l'art. 1461 sulla mutatio creditoria?",
+  "synthesis": "Mi dispiace, ma non sono riuscito a elaborare una sintesi delle interpretazioni fornite. Entrambi gli approcci ermeneutici (letterale e sistemico) hanno generato un \"Timeout durante l'analisi\", il che significa che non ho ricevuto alcun contenuto da analizzare per ciascuna prospettiva.\n\nPer poterti fornire una sintesi coerente e completa, avrei bisogno delle interpretazioni effettive generate da ciascun approccio.\n\nSe puoi fornirmi le interpretazioni specifiche per l'approccio letterale e per l'",
+  "confidence": 0.0,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "Timeout durante l'analisi",
+      "confidence": 0.0,
+      "weight": 0.6268656716417911,
+      "weighted_confidence": 0.0
+    },
+    "systemic": {
+      "interpretation": "Timeout durante l'analisi",
+      "confidence": 0.0,
+      "weight": 0.373134328358209,
+      "weighted_confidence": 0.0
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 36267.433,
+  "routing_decision": {
+    "query_type": "general",
+    "expert_weights": {
+      "literal": 0.35,
+      "systemic": 0.25,
+      "principles": 0.2,
+      "precedent": 0.2
+    },
+    "confidence": 0.5,
+    "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+  },
+  "feedback": 0.01979875645084954,
+  "reward": 0.00019798756450849542,
+  "user_id": "user_019",
+  "error": null
+}

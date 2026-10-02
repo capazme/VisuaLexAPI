@@ -1,0 +1,37 @@
+{
+  "query_id": "q_0010",
+  "query_text": "Quando il giudice pu\u00f2 ridurre la penale ex art. 1384?",
+  "synthesis": "Il potere del giudice di ridurre equamente la penale, ai sensi dell'art. 1384 c.c., \u00e8 un principio consolidato nel nostro ordinamento giuridico, volto a ripristinare l'equilibrio contrattuale e a prevenire abusi.\n\n**Casi di Applicabilit\u00e0 della Riduzione:**\n\nLa riduzione della penale \u00e8 ammessa in due ipotesi principali:\n1.  **Esecuzione parziale dell'obbligazione principale:** Quando il debitore ha adempiuto solo in parte all'obbligazione per la quale era stata prevista la penale.\n2.  **Ammontare",
+  "confidence": 0.9000000000000001,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "Il giudice pu\u00f2 ridurre equamente la penale in due casi specifici: se l'obbligazione principale \u00e8 stata eseguita in parte, oppure se l'ammontare della penale \u00e8 manifestamente eccessivo. In entrambi i casi, la riduzione deve tenere conto dell'interesse che il creditore aveva all'adempimento. Il potere di riduzione della penale pu\u00f2 essere esercitato d'ufficio dal giudice, anche se la penale \u00e8 prevista a favore della Pubblica Amministrazione, e non \u00e8 limitato alla valutazione dell'interesse del creditore al momento della stipulazione, ma pu\u00f2 considerare anche le circostanze manifestatesi durante lo svolgimento del rapporto. Tale potere non si applica alla caparra confirmatoria.",
+      "confidence": 0.9,
+      "weight": 0.6268656716417911,
+      "weighted_confidence": 0.564179104477612
+    },
+    "systemic": {
+      "interpretation": "Il giudice pu\u00f2 ridurre equamente la penale in due casi principali: se l'obbligazione principale \u00e8 stata eseguita in parte, oppure se l'ammontare della penale \u00e8 manifestamente eccessivo. Questa valutazione deve sempre tenere conto dell'interesse che il creditore aveva all'adempimento. Il potere di riduzione \u00e8 esercitabile d'ufficio dal giudice, anche per tutelare l'equilibrio contrattuale, e non si limita alla valutazione dell'interesse del creditore al momento della stipulazione, ma considera anche le circostanze manifestatesi durante lo svolgimento del rapporto, in ossequio ai principi di solidariet\u00e0, correttezza e buona fede. Tuttavia, questo potere non si estende alla caparra confirmatoria, data la natura eccezionale dell'articolo e le differenze strutturali tra i due istituti.",
+      "confidence": 0.9,
+      "weight": 0.373134328358209,
+      "weighted_confidence": 0.3358208955223881
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 14639.873,
+  "routing_decision": {
+    "query_type": "general",
+    "expert_weights": {
+      "literal": 0.35,
+      "systemic": 0.25,
+      "principles": 0.2,
+      "precedent": 0.2
+    },
+    "confidence": 0.5,
+    "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+  },
+  "feedback": 0.3419679760102566,
+  "reward": 0.04905880961779477,
+  "user_id": "user_019",
+  "error": null
+}
