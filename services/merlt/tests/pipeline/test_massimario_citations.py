@@ -1,5 +1,7 @@
 # services/merlt/tests/pipeline/test_massimario_citations.py
 """The citation grammar, one test per form (spec §5.5). Synthetic citations only."""
+import time
+
 import pytest
 
 from merlt.pipeline.massimario.citations import parse_citations
@@ -159,6 +161,77 @@ class TestOtherForms:
             "corte_costituzionale:1:2014", "corte_costituzionale:238:2014",
         ]
         assert result.decisions[0].label == "Corte cost., n. 1/2014"
+
+    def test_corte_costituzionale_number_zero_has_no_identity(self):
+        d = only("Corte cost., ord. n. 0/2014 ha")
+        assert d.identity is None and d.motivo_senza_identita == "numero_non_valido"
+
+
+ACT_FORMS = [
+    "L. n. 89 del 2001",
+    "Reg. UE n. 1215/2012",
+    "reg. (CE) n. 44/2001",
+    "R.D. n. 267 del 1942",
+    "T.U. n. 380 del 2001",
+    "D.M. 10 marzo 2014, n. 55",
+    "d.m. n. 55 del 2014",
+    "d.P.C.M. n. 5 del 2020",
+    "dir. 2000/31/CE, n. 5",
+    "art. 2 bis, comma 3, n. 5",
+]
+
+
+class TestActForms:
+    @pytest.mark.parametrize("form", ACT_FORMS)
+    def test_act_number_is_not_a_decision(self, form):
+        result = scan(f"ai sensi del {form} (Rv. 621670-01)", year=2012)
+        assert result.decisions == []
+        assert result.rv_recognized == 0
+
+    @pytest.mark.parametrize("text, key, year", [
+        ("Sez. L., n. 28928 del 2019, Rv. 655701-01", "cassazione:civile:28928:2019", 2024),
+        ("Sez. L, 09136/2024, Bianchi, Rv. 670602-01", "cassazione:civile:9136:2024", 2024),
+        ("(Sez. U, n. 13319/2024, Rossi, Rv. 671516-02)", "cassazione:civile:13319:2024", 2024),
+        ("come affermato da Sez. U, n. 123/2020, le spese", "cassazione:civile:123:2020", 2024),
+        ("la sentenza n. 11633 (Rv. 626925)", "cassazione:civile:11633:2012", 2012),
+    ])
+    def test_a_real_citation_is_still_a_decision(self, text, key, year):
+        assert only(text, year=year).identity.key == key
+
+
+HOSTILE = [
+    pytest.param("Corte cost." + " " * 1_000_000, id="consulta_then_spaces"),
+    pytest.param("Corte costituzionale" + " " * 1_000_000, id="consulta_long_then_spaces"),
+    pytest.param("n" + " " * 1_000_000, id="n_then_spaces"),
+    pytest.param("Sez. U" + " " * 1_000_000, id="sezione_then_spaces"),
+    pytest.param("Rv. " * 250_000, id="rv_repeated"),
+    pytest.param("Sez. 1, n. " * 100_000, id="sezione_n_repeated"),
+    pytest.param("del " * 250_000, id="del_repeated"),
+    pytest.param("Corte cost., " * 80_000, id="consulta_repeated"),
+    pytest.param("n, " * 300_000, id="n_comma_repeated"),
+]
+
+
+class TestHostileText:
+    """About 1 MB of text built to make a backtracking pattern quadratic or worse."""
+
+    @pytest.mark.parametrize("text", HOSTILE)
+    def test_the_scan_stays_linear(self, text):
+        started = time.perf_counter()
+        result = scan(text)
+        elapsed = time.perf_counter() - started
+        assert elapsed < 2.0, f"{elapsed:.1f} s"
+        assert result.decisions == []
+
+    def test_an_act_word_before_a_long_word_stays_linear(self):
+        # The act guard reads up to six words after an act word; a long word that the guard
+        # cannot finish on (the colon) must not be split in every possible way.
+        text = ("legge " + "a" * 40 + ": n. 5 (Rv. 621670-01) ") * 200
+        started = time.perf_counter()
+        result = scan(text)
+        elapsed = time.perf_counter() - started
+        assert elapsed < 2.0, f"{elapsed:.1f} s"
+        assert len(result.decisions) <= 200
 
 
 def test_identity_is_validated():

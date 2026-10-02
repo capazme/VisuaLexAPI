@@ -35,21 +35,25 @@ _SEZ = re.compile(
     r"(?![A-Za-z0-9])(?:\s*(civ|pen)\.?)?"
 )
 _NUM = re.compile(
-    r"(?:\bn\.?\s*,?\s*|(?:sentenza|ordinanza|sent\.|ord\.)\s+(?:n\.\s*)?)"
+    r"(?:\bn\.?[\s,]*|(?:sentenza|ordinanza|sent\.|ord\.)\s+(?:n\.\s*)?)"
     r"0*(\d{1,6})(?:\s*/\s*(\d{4}|\d{2})(?!\d))?",
     re.IGNORECASE,
 )
 _BARE = re.compile(r"\s*,\s*0*(\d{1,6})\s*/\s*(\d{4}|\d{2})(?!\d)")
-_DEL = re.compile(r"\s*,?\s*del\s*", re.IGNORECASE)
+_DEL = re.compile(r"[\s,]*del\s*", re.IGNORECASE)
 _DEP = re.compile(r"dep(?:\.|osit\w*)\s*(?:il\s*)?", re.IGNORECASE)
 _DEP_BEFORE = re.compile(r"dep(?:\.|osit\w*)\s*(?:il\s*)?$", re.IGNORECASE)
 _ACT_BEFORE = re.compile(
-    r"(?:\blegge|(?-i:\bl\.)|d\.\s*lgs\.?|d\.\s*l\.|\bdecreto|d\.\s*P\.\s*R\.|\bartt?\.|\bregolamento|\bdirettiva)"
-    r"\s*(?:[\w.(),]+\s*){0,3}$",
+    r"(?:\blegge|(?-i:\bl\.)|(?-i:\bL\.)|d\.\s*lgs\.?|d\.\s*l\.|\bdecreto|d\.\s*P\.\s*R\.|\bartt?\."
+    r"|\bregolamento|\bdirettiva|\breg\.|R\.\s*D\.|T\.\s*U\.|D\.\s*M\.|d\.\s*P\.\s*C\.\s*M\."
+    r"|\bdir\.|\bcirc\.|\bdelib\.)"
+    # Up to six words after the act word, a word being a run of these characters: written
+    # so that no run can be split in two ways (`(?:X+\s*){0,6}` is exponential in the run).
+    r"\s*(?:[\w.(),/]+(?:\s+[\w.(),/]+){0,5}\s*)?$",
     re.IGNORECASE,
 )
 _CONSULTA = re.compile(
-    r"(?:Corte\s+cost(?:ituzionale)?\.?|C\.\s*cost\.)\s*,?\s*(?:(?:sent(?:enza)?|ord(?:inanza)?)\.?\s*)?"
+    r"(?:Corte\s+cost(?:ituzionale)?\.?|C\.\s*cost\.)[\s,]*(?:(?:sent(?:enza)?|ord(?:inanza)?)\.?\s*)?"
     r"n\.\s*0*(\d{1,4})\s*(?:/\s*(\d{4})|del\s+(\d{4}))",
     re.IGNORECASE,
 )
@@ -102,9 +106,10 @@ def _read_citation(window: str) -> Optional[dict]:
         return None
     start, end, numero, slash = max(candidates, key=lambda c: c[0])
     before = window[:start]
-    tail40 = before[-40:]
-    act = _ACT_BEFORE.search(tail40)
-    if act and not any(s.start() > act.start() for s in _SEZ.finditer(tail40)):
+    tail60 = before[-60:]
+    act = _ACT_BEFORE.search(tail60)
+    # A section label that reaches past the act word ("Sez. L." holds an "L.") is no act's number.
+    if act and not any(s.end() > act.start() for s in _SEZ.finditer(tail60)):
         return {"act_number": True}  # "legge n. 89 del 2001", "art. 360, n. 5": not a decision
 
     anno: Optional[int] = None
@@ -254,7 +259,9 @@ def parse_citations(text: str, *, review_year: int, archivio: Optional[str],
         anno = int(match.group(2) or match.group(3))
         numero = int(match.group(1))
         decision = CitedDecision(corte=CORTE_COSTITUZIONALE, numero=numero, anno=anno, archivio=None, forma="consulta")
-        if numero > 0 and 1956 <= anno <= review_year + 1:
+        if numero <= 0:
+            decision.motivo_senza_identita = "numero_non_valido"
+        elif 1956 <= anno <= review_year + 1:
             decision.identity = DecisionIdentity(CORTE_COSTITUZIONALE, numero, anno)
         else:
             decision.motivo_senza_identita = "anno_fuori_intervallo"
