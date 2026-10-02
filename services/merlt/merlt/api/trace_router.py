@@ -149,7 +149,7 @@ async def get_bridge_table() -> BridgeTable:
     """
     global _bridge_table
     if _bridge_table is None:
-        _bridge_table = BridgeTable(BridgeTableConfig())
+        _bridge_table = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await _bridge_table.connect()
     return _bridge_table
 

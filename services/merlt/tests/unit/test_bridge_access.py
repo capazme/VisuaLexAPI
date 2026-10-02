@@ -75,6 +75,78 @@ async def test_the_bridge_is_closed_when_the_count_fails():
     bridge.close.assert_awaited_once()
 
 
+# The dashboard and the trace router ------------------------------------------------------------------
+
+
+async def test_the_dashboard_health_check_reaches_the_bridge_where_the_deployment_puts_it():
+    dashboard_router = importlib.import_module("merlt.api.dashboard_router")
+    with patch(BRIDGE_CLASS, autospec=True) as bridge_class:
+        bridge = bridge_class.return_value
+        bridge.count.return_value = 27114
+        health = await dashboard_router._check_postgres_health()
+    assert health.details["bridge_mappings"] == 27114
+    (config,), _ = bridge_class.call_args  # not the dataclass defaults: localhost:5433/rlcf_dev
+    assert isinstance(config, BridgeTableConfig)
+    bridge.connect.assert_awaited_once()
+    bridge.close.assert_awaited_once()
+
+
+async def test_the_dashboard_health_check_closes_the_bridge_when_the_count_fails():
+    dashboard_router = importlib.import_module("merlt.api.dashboard_router")
+    with patch(BRIDGE_CLASS, autospec=True) as bridge_class:
+        bridge = bridge_class.return_value
+        bridge.count.side_effect = RuntimeError("the table is not there")
+        health = await dashboard_router._check_postgres_health()
+    assert health.status.value == "offline"
+    bridge.close.assert_awaited_once()
+
+
+async def _knowledge_graph_kpis(arrange):
+    dashboard_router = importlib.import_module("merlt.api.dashboard_router")
+    # the graph and the vector store are down in these tests: each section of the KPIs is optional
+    with patch("merlt.storage.graph.client.FalkorDBClient", side_effect=RuntimeError("no graph")), \
+            patch("qdrant_client.QdrantClient", side_effect=RuntimeError("no vector store")), \
+            patch(BRIDGE_CLASS, autospec=True) as bridge_class:
+        bridge = bridge_class.return_value
+        arrange(bridge)
+        kpis = await dashboard_router._get_knowledge_graph_kpis()
+    return kpis, bridge_class, bridge
+
+
+async def test_the_knowledge_graph_kpis_read_the_bridge_where_the_deployment_puts_it():
+    def arrange(bridge):
+        bridge.count.return_value = 27114
+
+    kpis, bridge_class, bridge = await _knowledge_graph_kpis(arrange)
+    assert kpis.bridge_mappings == 27114
+    (config,), _ = bridge_class.call_args
+    assert isinstance(config, BridgeTableConfig)
+    bridge.connect.assert_awaited_once()
+    bridge.close.assert_awaited_once()
+
+
+async def test_the_knowledge_graph_kpis_close_the_bridge_when_the_count_fails():
+    def arrange(bridge):
+        bridge.count.side_effect = RuntimeError("the table is not there")
+
+    kpis, _, bridge = await _knowledge_graph_kpis(arrange)
+    assert kpis.bridge_mappings == 0  # a section that fails reads as 0, the others still answer
+    bridge.close.assert_awaited_once()
+
+
+async def test_the_trace_routers_lazy_bridge_is_built_from_the_deployment_environment(monkeypatch):
+    trace_router = importlib.import_module("merlt.api.trace_router")
+    monkeypatch.setattr(trace_router, "_bridge_table", None)
+    with patch("merlt.api.trace_router.BridgeTable", autospec=True) as bridge_class:
+        bridge = await trace_router.get_bridge_table()
+        again = await trace_router.get_bridge_table()
+    (config,), _ = bridge_class.call_args  # not BridgeTableConfig(): the dataclass defaults
+    assert isinstance(config, BridgeTableConfig)
+    assert config == BridgeTableConfig.from_enrichment_env()
+    assert bridge is bridge_class.return_value and again is bridge  # one bridge, connected once
+    bridge.connect.assert_awaited_once()
+
+
 # POST /graph/search -----------------------------------------------------------------------------------
 
 

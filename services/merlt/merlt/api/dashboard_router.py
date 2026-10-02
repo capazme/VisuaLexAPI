@@ -146,12 +146,15 @@ async def _check_postgres_health() -> ServiceHealth:
     """Check PostgreSQL connection."""
     start = time.time()
     try:
-        from merlt.storage.bridge.bridge_table import BridgeTable
-        bridge = BridgeTable()
+        from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
+        bridge = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await bridge.connect()
 
         # Test connection with count method
-        count = await bridge.count()
+        try:
+            count = await bridge.count()
+        finally:
+            await bridge.close()
         latency = (time.time() - start) * 1000
 
         return ServiceHealth(
@@ -273,10 +276,13 @@ async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
 
     # Bridge mappings from PostgreSQL
     try:
-        from merlt.storage.bridge.bridge_table import BridgeTable
-        bridge = BridgeTable()
+        from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
+        bridge = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await bridge.connect()
-        bridge_mappings = await bridge.count()
+        try:
+            bridge_mappings = await bridge.count()
+        finally:
+            await bridge.close()
     except Exception as e:
         log.warning("Failed to get Bridge KPIs", error=str(e))
 
