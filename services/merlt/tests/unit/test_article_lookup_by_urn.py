@@ -51,6 +51,35 @@ async def test_related_nodes_are_looked_up_by_the_canonical_urn():
     # an implementing provision is not the code
     ("art. 52 disp. att. c.c.", None),
     ("art. 52 disposizioni attuative c.c.", None),
+    # the code written before the article
+    ("c.c. art. 1453", CC1453),
+    ("codice civile, art. 1453", CC1453),
+    ("Codice civile - art. 1453", CC1453),
+    ("c.p.c.: art. 52", CPC52),
+    ("codice di procedura civile, art. 52", CPC52),
+    ("codice di procedura penale art. 52", CPP52),
+    ("codice penale, art. 52", CP52),
+    ("c.p. c.c. art. 1453", CC1453),
+    # a code that follows still wins over one that comes before
+    ("c.p. art. 1453 c.c.", CC1453),
+    ("c.c. art. 1453 e art. 52 c.p.", CC1453),
+    # the Costituzione has no pinned graph key
+    ("Cost. art. 2", None),
+    ("art. 2 Cost.", None),
+    # the implementing provisions are never the code, whichever side the code stands
+    ("c.c. disp. att. art. 5", None),
+    ("c.c. disp. trans. art. 5", None),
+    ("c.c. art. 52 disp. att. c.p.", None),
+    # a code that belongs to another act
+    ("art. 2 della legge 241/1990, art. 3 c.c.", BASE + "regio.decreto:1942-03-16;262:2~art3"),
+    ("art. 2 della legge 241/1990 c.c.", None),
+    ("art. 2 d.lgs. 231 c.c.", None),
+    ("art. 2 dlgs 231/2001 c.p.", None),
+    ("art. 2 del d.p.r. 447 c.p.p.", None),
+    ("art. 2 dpr c.c.", None),
+    ("art. 2 del decreto ministeriale c.c.", None),
+    ("art. 2 l. 241 c.c.", None),
+    ("art. 2 e art. 3 c.c.", BASE + "regio.decreto:1942-03-16;262:2~art3"),
     # the article token
     ("part 5 c.c.", None),
     ("art. 2 - bis c.c.", CC2BIS),
@@ -69,6 +98,12 @@ def test_a_citation_becomes_the_graph_key(query, urn):
     ("art. 1453 c.c. e c.p.c.", {"tipo_atto": "codice civile", "articolo": "1453"}),
     ("art. 52 disp. att. c.c.", None),
     ("art. 2 Cost.", {"tipo_atto": "costituzione", "articolo": "2"}),
+    ("Cost. art. 2", {"tipo_atto": "costituzione", "articolo": "2"}),
+    ("c.c. art. 1453", {"tipo_atto": "codice civile", "articolo": "1453"}),
+    ("codice civile, art. 1453", {"tipo_atto": "codice civile", "articolo": "1453"}),
+    ("c.c. disp. att. art. 5", None),
+    ("art. 2 della legge 241/1990, art. 3 c.c.", {"tipo_atto": "codice civile", "articolo": "3"}),
+    ("art. 2 della legge 241/1990 c.c.", None),
     ("articolo 2 della Costituzione", {"tipo_atto": "costituzione", "articolo": "2"}),
     ("risoluzione per inadempimento", None),
 ])

@@ -56,18 +56,48 @@ _ACTS = {
 }
 # "art. 52 disp. att. c.c." cites the implementing provisions, not the code.
 _IMPLEMENTING = re.compile(r"\bdisp(?:\.|osizioni)?\s*(?:att|trans)")
+# Another article, or another act, between an article and a code: the code is not the article's.
+_ANOTHER_ARTICLE = re.compile(r"\bartt?(?:\.|icoli?)?(?![a-z])")
+_ANOTHER_ACT = re.compile(
+    r"\b(?:legge|decreto|d\.?\s?lgs|dlgs|d\.?\s?p\.?\s?r|dpr)\b|(?<![a-z.])l\.|\d+\s*/\s*\d+"
+)
+# What may stand between a code written first and its article: "c.c. art. 1", "codice civile, art. 1".
+_BETWEEN_CODE_AND_ARTICLE = re.compile(r"[\s,:;.\-\u2013]*")
 
 
 def _cited_article(text: str) -> Optional[Dict[str, str]]:
-    """The act and the article a citation names, or None. The code is the first one that
-    follows the article ("art. 1453 c.c. e c.p.c." is the civil code's)."""
+    """The act and the article a citation names, or None.
+
+    An article takes the first code that follows it ("art. 1453 c.c. e c.p.c." is the civil
+    code's), as long as no other article and no other act stands between them ("art. 2 della
+    legge 241/1990, art. 3 c.c." is art. 3 of the code). With no such code, it takes the one
+    written right before it ("c.c. art. 1453", "codice civile, art. 1453"). The implementing
+    provisions are never the code, whichever side it stands ("art. 5 disp. att. c.c.",
+    "c.c. disp. att. art. 5"). An article that pairs with nothing gives way to the next."""
     lower = text.lower()
-    article = _ARTICLE.search(lower)
-    if not article:
-        return None
-    code = _CODES.search(lower, article.end())
-    if not code or _IMPLEMENTING.search(lower, article.end(), code.start()):
-        return None
+    for article in _ARTICLE.finditer(lower):
+        code = _CODES.search(lower, article.end())
+        if code:
+            between = lower[article.end():code.start()]
+            if _IMPLEMENTING.search(between):
+                continue  # the article is of the implementing provisions: no code is its own
+            if not (_ANOTHER_ARTICLE.search(between) or _ANOTHER_ACT.search(between)):
+                return _citation(article, code)
+        code = _last_code_before(lower, article)
+        if code:
+            return _citation(article, code)
+    return None
+
+
+def _last_code_before(lower: str, article: "re.Match[str]") -> Optional["re.Match[str]"]:
+    """The code written right before the article, with nothing but punctuation between."""
+    codes = list(_CODES.finditer(lower, 0, article.start()))
+    if codes and _BETWEEN_CODE_AND_ARTICLE.fullmatch(lower, codes[-1].end(), article.start()):
+        return codes[-1]
+    return None
+
+
+def _citation(article: "re.Match[str]", code: "re.Match[str]") -> Dict[str, str]:
     return {
         "tipo_atto": _ACTS[code.lastgroup],
         # "2-bis", "2 bis" and "2 - bis" are all "2bis", the form the lazy path writes
