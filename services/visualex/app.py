@@ -1029,19 +1029,28 @@ class NormaController:
     async def fetch_decision(self):
         """One court decision by its reference (design 2026-10-01 §3). Always JSON with
         `esito`: trovata and ambigua 200, non_trovata 404, fonte_non_raggiungibile 503,
-        richiesta_non_valida 400. A source that cannot be reached is never "non trovata"."""
-        body = await request.get_json(silent=True)
+        richiesta_non_valida 400, errore_interno 500 (a bug: a fixed body). A source that
+        cannot be reached is never "non trovata"."""
+        try:
+            body = await request.get_json(silent=True)
+        except RecursionError:  # a nesting bomb: the caller's fault, refused before any source
+            body = None
         try:
             reference = parse_reference(body)
         except InvalidReference as exc:
             return jsonify({'esito': 'richiesta_non_valida', 'errori': exc.errors}), 400
         try:
             outcome = await get_resolver().resolve(reference)
+            payload = outcome.to_dict()
         except SourceUnavailable as exc:
             log.warning("Decision source unreachable", fonte=exc.fonte, error=str(exc))
             return jsonify({'esito': 'fonte_non_raggiungibile', 'fonte': exc.fonte}), 503
+        except Exception:
+            # a bug, never the caller's or the source's fault: a fixed body, the details in the log
+            log.exception("Decision lookup failed")
+            return jsonify({'esito': 'errore_interno'}), 500
         status = 404 if outcome.esito == 'non_trovata' else 200
-        return jsonify(outcome.to_dict()), status
+        return jsonify(payload), status
 
     async def fetch_act_fingerprints(self):
         """Per-article change detectors for a Normattiva act.

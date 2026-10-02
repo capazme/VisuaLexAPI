@@ -8,7 +8,8 @@ import { createLimiter, getClientIp, sendTooManyRequests } from './rateLimiter';
  * What one scraping request costs against a user's quota, by route. Anything not listed
  * costs 1. The export starts a Chromium; the stream and the whole-act fetch carry many
  * articles in one request; the detailed health page reaches the three sources for real;
- * a decision lookup reads two archives.
+ * a decision lookup can query both Cassazione archives or download a Corte
+ * costituzionale bundle.
  */
 export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/export_pdf': 20,

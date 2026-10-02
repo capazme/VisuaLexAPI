@@ -84,3 +84,20 @@ async def test_a_body_that_is_not_json_is_400(client, monkeypatch):
     resp = await client.post("/fetch_decision", data="corte=cassazione",
                              headers={"Content-Type": "application/json"})
     assert resp.status_code == 400
+
+
+async def test_a_bug_is_a_json_500_without_its_text(client, monkeypatch):
+    _use(monkeypatch, FakeResolver(error=RuntimeError("/srv/somewhere exploded")))
+    resp = await client.post("/fetch_decision", json={"corte": "cassazione", "numero": 1,
+                                                       "anno": 2024})
+    assert resp.status_code == 500
+    assert await resp.get_json() == {"esito": "errore_interno"}
+
+
+async def test_a_nested_body_is_400_and_never_reaches_a_source(client, monkeypatch):
+    resolver = _use(monkeypatch, FakeResolver(Outcome("trovata", decisione=D)))
+    resp = await client.post("/fetch_decision", data="[" * 100_000 + "]" * 100_000,
+                             headers={"Content-Type": "application/json"})
+    assert resp.status_code == 400
+    assert (await resp.get_json())["esito"] == "richiesta_non_valida"
+    assert resolver.refs == []
