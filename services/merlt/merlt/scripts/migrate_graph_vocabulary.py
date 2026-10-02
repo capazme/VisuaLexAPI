@@ -1,15 +1,18 @@
 """Migrate the MERL-T graph and its vectors to the schema's vocabulary.
 
 Dry run by default: it reads and reports. `--apply` writes. Idempotent: a second
-run changes nothing; what it only reports (twins, a key two nodes would share)
-it reports again. Run `scripts/backup.sh` first.
+run changes nothing; what it only reports (twins, a key two nodes would share, the
+integrity checks) it reports again. It creates the schema's indexes, in FalkorDB
+and Qdrant, before it migrates. Run `scripts/backup.sh` first, and
+`merlt.scripts.retrieval_gate` before and after `--apply`.
 Design: docs/superpowers/specs/2026-09-30-merlt-graph-structure-design.md, §4.4.
 
     python -m merlt.scripts.migrate_graph_vocabulary            # report
     python -m merlt.scripts.migrate_graph_vocabulary --apply    # write
 
-Every label and relation name in the Cypher text below comes from the code's own
-sets (`Label`, `Rel`, `LEGACY_REL`, `LEGACY_ENTITY_LABELS`), never from the data;
+Every label, relation and indexed property name in the Cypher text below comes from
+the code's own sets (`Label`, `Rel`, `LEGACY_REL`, `LEGACY_ENTITY_LABELS`,
+`GRAPH_INDEXES`), never from the data;
 every value read from the graph goes back in as a parameter; the one number in the
 text, the batch size, is an integer checked against `MAX_BATCH`.
 """
@@ -32,8 +35,10 @@ from merlt.storage.graph import FalkorDBClient
 from merlt.storage.graph.entity_writer import normalize_entity_name, seed_twin_slugs
 from merlt.storage.graph.relation_endpoints import wrapped_norm_key
 from merlt.storage.graph.schema import (
+    GRAPH_INDEXES,
     LEGACY_REL,
     LEGACY_SOURCE_TYPE,
+    QDRANT_PAYLOAD_INDEXES,
     SEED_TWIN,
     Label,
     Provenance,
@@ -588,6 +593,59 @@ async def report_twins(client) -> dict[str, list]:
     return {"community": sorted(twins, key=lambda t: t["id"]), "seed_near_duplicates": sorted(near)}
 
 
+# Only a node range index answers a `MERGE` or `MATCH` on the key: a full-text index on
+# the same property, or a relationship index whose type is spelt like the label, does not.
+_LIST_INDEXES = "CALL db.indexes() YIELD label, properties, types, entitytype RETURN label, properties, types, entitytype"
+
+
+async def ensure_graph_indexes(client, apply: bool) -> int:
+    """Create the schema's FalkorDB range indexes that are missing; return how many
+    were missing before the call. FalkorDB refuses to index an attribute twice
+    ("already indexed"), so the existing indexes are listed first."""
+    present = set()
+    for row in await client.query(_LIST_INDEXES):
+        if row["entitytype"] != "NODE":
+            continue
+        types = row["types"] or {}
+        present.update((row["label"], prop) for prop in row["properties"] or [] if "RANGE" in (types.get(prop) or []))
+    missing = [(label.value, prop) for label, prop in GRAPH_INDEXES if (label.value, prop) not in present]
+    if apply:
+        for label, prop in missing:
+            await client.query(f"CREATE INDEX FOR (n:{label}) ON (n.{prop})")
+            log.info("graph index created", label=label, property=prop)
+    return len(missing)
+
+
+# Reported, never fixed: the numbers go into the pull request (spec 4.4). A stub is an
+# article without text by design, so it is not counted as one.
+INTEGRITY_CHECKS: dict[str, str] = {
+    "duplicate_urn": (
+        "MATCH (n:Norma) WHERE n.URN IS NOT NULL WITH n.URN AS urn, count(*) AS c WHERE c > 1 RETURN count(urn) AS n"
+    ),
+    "norma_without_urn": "MATCH (n:Norma) WHERE n.URN IS NULL RETURN count(n) AS n",
+    "article_without_text": (
+        f"MATCH (n:Norma) WHERE n.tipo_documento = $article AND NOT {_STUB_FLAG} "
+        "AND n.testo IS NULL AND n.testo_vigente IS NULL RETURN count(n) AS n"
+    ),
+    "isolated_nodes": "MATCH (n) WHERE NOT (n)--() RETURN count(n) AS n",
+    "certezza_out_of_range": (
+        "MATCH ()-[r]->() WHERE r.certezza IS NOT NULL AND (r.certezza < 0 OR r.certezza > 1) RETURN count(r) AS n"
+    ),
+}
+
+
+_INTEGRITY_PARAMS = {"article": "articolo"}
+
+
+async def integrity_report(client) -> dict[str, int]:
+    """The counts of INTEGRITY_CHECKS, read with GRAPH.RO_QUERY: the server refuses a write."""
+    report = {}
+    for name, cypher in INTEGRITY_CHECKS.items():
+        rows = await client.ro_query(cypher, _INTEGRITY_PARAMS)
+        report[name] = int(rows[0]["n"]) if rows else 0
+    return report
+
+
 async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set[str]) -> dict[str, Any]:
     # The old entity labels first (no community entity may answer a `Norma` step), then
     # the keys (the steps after them read URN and node_id), then shapes and stamps, then
@@ -641,6 +699,23 @@ def plan_qdrant(points: list[tuple[Any, dict]]) -> dict[str, Any]:
         elif canonical != urn:
             urn_fixes.append((pid, canonical))
     return {"rekey": rekey, "drop": drop, "urn_fixes": urn_fixes, "retype": retype, "unkeyed": unkeyed}
+
+
+def ensure_payload_indexes(client, collection: str, apply: bool) -> list[str]:
+    """Create the schema's Qdrant payload indexes that are missing; return the
+    fields that were missing before the call."""
+    from qdrant_client import models
+
+    present = set((client.get_collection(collection).payload_schema or {}).keys())
+    missing = [field for field in QDRANT_PAYLOAD_INDEXES if field not in present]
+    if apply:
+        for field in missing:
+            client.create_payload_index(
+                collection_name=collection,
+                field_name=field,
+                field_schema=models.PayloadSchemaType(QDRANT_PAYLOAD_INDEXES[field]),
+            )
+    return missing
 
 
 def migrate_qdrant(client, collection: str, *, apply: bool, batch: int = 256) -> dict[str, Any]:
@@ -718,11 +793,20 @@ async def _run(apply: bool, batch: int) -> dict[str, Any]:
     client = FalkorDBClient()
     await client.connect()
     try:
+        # The indexes first: the migration's MERGEs and MATCHes look nodes up by their keys.
+        indexes_graph = await ensure_graph_indexes(client, apply)
         graph_report = await migrate_graph(client, apply=apply, batch=batch, seed_keys=load_seed_keys(SEED_GRAPH_JSON))
+        integrity = await integrity_report(client)
     finally:
         await client.close()
-    vectors_report = migrate_qdrant(_qdrant_client(), default_chunks_collection(), apply=apply)
-    return {"applied": apply, "graph": graph_report, "vectors": vectors_report}
+    qdrant = _qdrant_client()
+    collection = default_chunks_collection()
+    indexes_vectors = ensure_payload_indexes(qdrant, collection, apply)
+    vectors_report = migrate_qdrant(qdrant, collection, apply=apply)
+    return {
+        "applied": apply, "graph": graph_report, "vectors": vectors_report,
+        "indexes": {"graph": indexes_graph, "vectors": indexes_vectors}, "integrity": integrity,
+    }
 
 
 def _batch_arg(value: str) -> int:
