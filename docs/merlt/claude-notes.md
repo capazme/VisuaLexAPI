@@ -992,7 +992,8 @@ the worker share.
   `merlt` job, on `develop` and on pull requests into it, runs the MERL-T suite on Python 3.11
   against a Postgres service, after `create_tables()` and
   `ensure_schema_additions()`. Tests marked `integration` (live FalkorDB) are
-  excluded by `pyproject.toml` `addopts`.
+  excluded from that run by `pyproject.toml` `addopts`, and run next against a
+  FalkorDB service.
 - **The MERL-T suite locally.** Commands are in `services/merlt/CLAUDE.md`. Use a venv
   in `services/merlt/`, with `ENRICHMENT_DATABASE_URL` pointing at a disposable
   Postgres: the DB-backed tests write rows.
