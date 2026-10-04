@@ -274,6 +274,20 @@ class TestPresentableTitle:
     def test_an_elision_is_not_an_accent(self):
         assert presentable_title("Norme sull'attivita' dell'ente.") == "Norme sull'attività dell'ente"
 
+    def test_the_older_gazzetta_code_goes_too(self):
+        # The shape of the older acts' code, from the codice penale's own AKN fixture.
+        raw = "Approvazione del testo definitivo del Codice Penale. (030U1398)"
+        assert presentable_title(raw) == "Approvazione del testo definitivo del Codice Penale"
+
+    def test_brackets_closing_after_a_parenthesis_leave_no_space(self):
+        raw = "Recepimento ((della direttiva 2014/24/UE (Testo rilevante ai fini del SEE)))."
+        assert presentable_title(raw) == "Recepimento della direttiva 2014/24/UE (Testo rilevante ai fini del SEE)"
+
+    def test_only_the_final_full_stop_goes_never_an_abbreviation(self):
+        assert presentable_title("Modifiche al c.p.c.") == "Modifiche al c.p.c."
+        assert presentable_title("Norme sulle S.p.A.") == "Norme sulle S.p.A."
+        assert presentable_title("Norme generali..") == "Norme generali."
+
     def test_nothing_gives_nothing(self):
         assert presentable_title(None) == ""
         assert presentable_title("   ") == ""

@@ -124,27 +124,30 @@ def _restore_accents(text: str) -> str:
     return _TRANSLITTERATED_WORD.sub(replace, text)
 
 
-# "… professione forense. (13G00018)": the Gazzetta's code for the act, which a
-# heading does not need.
-_GAZZETTA_CODE = re.compile(r"\s*\.?\s*\(\d{2}[A-Z]\d{5}\)\s*$")
+# "… professione forense. (13G00018)", and the older acts' "(030U1398)": the
+# Gazzetta's code for the act, which a heading does not need.
+_GAZZETTA_CODE = re.compile(r"\s*\.?\s*\((?:\d{2}[A-Z]\d{5}|\d{3}[A-Z]\d{4})\)\s*$")
+# A final full stop, unless it closes an abbreviation ("c.p.c.", "S.p.A.").
+_FINAL_STOP = re.compile(r"(?<!\.[A-Za-z])\.$")
 
 
 def presentable_title(raw: str | None) -> str:
     """An act's AKN title as a heading (the dossier names each act once, with it).
 
     Three repairs, each measured on Normattiva's export: the Gazzetta code at the
-    end goes; the amendment brackets "((…))" are unwrapped and the space they
-    leave before a comma closed up; transliterated accents are restored as in a
-    rubrica ("nonche'" -> "nonché"). The final full stop goes too. Only for the
-    title: never used on article text (root rule 23).
+    end goes (both of its shapes); the amendment brackets "((…))" are unwrapped
+    and the space they leave before a comma or a closing parenthesis closed up;
+    transliterated accents are restored as in a rubrica ("nonche'" -> "nonché").
+    One final full stop goes too, never one that closes an abbreviation. Only for
+    the title: never used on article text (root rule 23).
     """
     if not raw:
         return ""
     text = " ".join(raw.split())
     text = _GAZZETTA_CODE.sub("", text)
     text = text.replace("((", " ").replace("))", " ")
-    text = re.sub(r"\s+([,.;:])", r"\1", text)
-    text = " ".join(text.split()).rstrip(".").strip()
+    text = re.sub(r"\s+([,.;:)])", r"\1", text)
+    text = _FINAL_STOP.sub("", " ".join(text.split())).strip()
     return _restore_accents(text)
 
 
