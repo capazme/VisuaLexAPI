@@ -2,6 +2,7 @@ import express from 'express';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createApp } from '../src/server.js';
+import { SessionStore } from '../src/sessions.js';
 import type { McpConfig } from '../src/config.js';
 
 export const RESOURCE = 'http://localhost:3002/mcp';
@@ -13,6 +14,7 @@ export interface StubToken {
   aud?: string;
   scope?: string;
   sub?: string;
+  grant?: string;
 }
 
 export interface Stub {
@@ -51,7 +53,7 @@ export async function startStubs() {
     if (!basicOk(req.headers.authorization)) return void res.status(401).json({ error: 'invalid_client' });
     const token = stub.tokens[req.body.token];
     if (!token?.active) return void res.json({ active: false });
-    res.json({ active: true, aud: token.aud ?? RESOURCE, scope: token.scope ?? 'dossier:read dossier:write', sub: token.sub ?? 'user-1', client_id: 'client-1', grant: 'grant-1' });
+    res.json({ active: true, aud: token.aud ?? RESOURCE, scope: token.scope ?? 'dossier:read dossier:write', sub: token.sub ?? 'user-1', client_id: 'client-1', grant: token.grant ?? 'grant-1' });
   });
   as.post('/oauth/token', (req, res) => {
     if (!basicOk(req.headers.authorization)) return void res.status(401).json({ error: 'invalid_client' });
@@ -108,19 +110,30 @@ export async function startStubs() {
     clientSecret: SECRET,
     allowedOrigins: ['http://localhost:5173'],
   };
+  const store = new SessionStore();
   const mcpServer: Server = await new Promise((resolve) => {
-    const s = createApp(config).listen(0, '127.0.0.1', () => resolve(s));
+    const s = createApp(config, { store }).listen(0, '127.0.0.1', () => resolve(s));
   });
   const mcpUrl = `http://127.0.0.1:${(mcpServer.address() as AddressInfo).port}/mcp`;
   return {
     stub,
     config,
     mcpUrl,
+    store,
     close: async () => {
+      await store.closeAll();
       await new Promise((r) => mcpServer.close(r));
       await new Promise((r) => asServer.close(r));
     },
   };
+}
+
+/** The JSON-RPC message of a response, whether the server answered JSON or an SSE stream. */
+export async function rpcBody(response: Response): Promise<Record<string, unknown>> {
+  const text = await response.text();
+  if (!(response.headers.get('content-type') ?? '').includes('text/event-stream')) return JSON.parse(text);
+  const data = text.split('\n').filter((line) => line.startsWith('data: ')).map((line) => line.slice(6));
+  return JSON.parse(data[data.length - 1]);
 }
 
 /** A raw JSON-RPC POST to the endpoint, as a client would send it. */

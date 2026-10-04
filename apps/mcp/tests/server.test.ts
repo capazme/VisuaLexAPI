@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { RESOURCE, rpc, startStubs } from './stubs.js';
+import { RESOURCE, rpc, rpcBody, startStubs } from './stubs.js';
 
 let env: Awaited<ReturnType<typeof startStubs>>;
 beforeAll(async () => {
@@ -94,9 +94,10 @@ describe('discovery and authentication', () => {
     expect(native.status).toBe(200);
   });
 
-  it('answers 405 to GET and DELETE on the endpoint: it is stateless', async () => {
-    expect((await fetch(env.mcpUrl, { headers: { authorization: 'Bearer good' } })).status).toBe(405);
-    expect((await fetch(env.mcpUrl, { method: 'DELETE', headers: { authorization: 'Bearer good' } })).status).toBe(405);
+  it('asks GET and DELETE for a session, and answers 405 to any other method', async () => {
+    expect((await fetch(env.mcpUrl, { headers: { authorization: 'Bearer good' } })).status).toBe(400);
+    expect((await fetch(env.mcpUrl, { method: 'DELETE', headers: { authorization: 'Bearer good' } })).status).toBe(400);
+    expect((await fetch(env.mcpUrl, { method: 'PUT', headers: { authorization: 'Bearer good' } })).status).toBe(405);
   });
 });
 
@@ -107,7 +108,7 @@ describe('the protocol', () => {
       'mcp-protocol-version': '2026-07-28',
     });
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { result: { protocolVersion: string } };
+    const body = (await rpcBody(response)) as { result: { protocolVersion: string } };
     expect(body.result.protocolVersion).toBe('2025-11-25');
   });
 

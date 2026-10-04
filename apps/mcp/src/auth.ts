@@ -1,3 +1,4 @@
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { McpConfig } from './config.js';
 
 /** Who is calling: what the authorization server says of the client's token. */
@@ -55,3 +56,19 @@ export async function authenticate(config: McpConfig, authorization: string | un
 }
 
 export { basic as basicAuthorization };
+
+/** The request's AuthInfo for the SDK, carrying the caller to the tools (sessions outlive tokens). */
+export function authInfoFor(caller: Caller): AuthInfo {
+  return { token: caller.token, clientId: caller.clientId, scopes: caller.scopes, extra: { caller } };
+}
+
+/**
+ * Who is calling in this tool call: the caller introspected for this very
+ * request, not the one that opened the session (a client refreshes its token
+ * and carries on in the same session).
+ */
+export function callerOf(extra: { authInfo?: AuthInfo }): Caller {
+  const caller = extra.authInfo?.extra?.caller as Caller | undefined;
+  if (!caller) throw new Error('tool call without an authenticated caller');
+  return caller;
+}

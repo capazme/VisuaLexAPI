@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { Caller } from '../auth.js';
 import type { McpConfig } from '../config.js';
 import { ToolError } from '../errors.js';
@@ -61,10 +62,11 @@ async function findDossier(config: McpConfig, caller: Caller, dossier: string): 
 }
 
 /**
- * The dossier tools (spec section 6). Each acts for `caller` through a token
- * exchanged per call; there is no tool that updates, moves or deletes.
+ * The dossier tools (spec section 6). Each acts for the caller of its own
+ * request (the session may outlive a token) through a token exchanged per
+ * call; there is no tool that updates, moves or deletes.
  */
-export function registerDossierTools(server: McpServer, config: McpConfig, caller: Caller, run: RunTool): void {
+export function registerDossierTools(server: McpServer, config: McpConfig, run: RunTool): void {
   server.registerTool(
     'omnilex_elenca_dossier',
     {
@@ -73,8 +75,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    () =>
-      run('omnilex_elenca_dossier', async () => {
+    (_args, extra) =>
+      run('omnilex_elenca_dossier', extra, async (caller) => {
         const dossiers = await callApi<ApiDossier[]>(config, caller, 'dossier:read', '/dossiers');
         return data(dossiers.map((d) => ({ id: d.id, nome: d.name, voci: d.items?.length ?? 0 })));
       }),
@@ -89,8 +91,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    ({ dossier }) =>
-      run('omnilex_leggi_dossier', async () => {
+    ({ dossier }, extra) =>
+      run('omnilex_leggi_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
         return data({
           id: found.id,
@@ -120,8 +122,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ nome, descrizione }) =>
-      run('omnilex_crea_dossier', async () => {
+    ({ nome, descrizione }, extra) =>
+      run('omnilex_crea_dossier', extra, async (caller) => {
         const created = await callApi<ApiDossier>(config, caller, 'dossier:write', '/dossiers', {
           method: 'POST',
           body: { name: nome, ...(descrizione ? { description: descrizione } : {}) },
@@ -147,8 +149,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
-    ({ dossier, riferimenti }) =>
-      run('omnilex_aggiungi_norme_dossier', async () => {
+    ({ dossier, riferimenti }, extra) =>
+      run('omnilex_aggiungi_norme_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
         const answer = await callApi<{ results: Record<string, unknown>[] }>(
           config,
@@ -175,8 +177,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ dossier, testo, voce }) =>
-      run('omnilex_aggiungi_nota_dossier', async () => {
+    ({ dossier, testo, voce }, extra) =>
+      run('omnilex_aggiungi_nota_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
         const created = await callApi<ApiDossierItem>(
           config,
@@ -197,12 +199,17 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    () =>
-      run('omnilex_stato_account', async () => {
+    (_args, extra) =>
+      run('omnilex_stato_account', extra, async (caller) => {
         const quota = await callApi<Record<string, unknown>>(config, caller, 'dossier:read', '/oauth/quota');
         return data(quota);
       }),
   );
 }
 
-export type RunTool = (tool: string, body: () => Promise<CallToolResult>) => Promise<CallToolResult>;
+/** Runs a tool for the caller of this request (from the SDK's `extra`), logging the outcome. */
+export type RunTool = (
+  tool: string,
+  extra: { authInfo?: AuthInfo },
+  body: (caller: Caller) => Promise<CallToolResult>,
+) => Promise<CallToolResult>;
