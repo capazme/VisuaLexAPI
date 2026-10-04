@@ -16,6 +16,7 @@ from visualex_api.services.decisions import corte_cost
 from visualex_api.services.decisions.corte_cost import (
     CorteCostReader,
     clean,
+    line_paragraphs,
     split_epigrafe,
     to_decision,
 )
@@ -69,9 +70,12 @@ async def test_a_sentenza_with_its_particulars(monkeypatch, tmp_path):
     assert d.fonte == {"nome": "Corte costituzionale — dati aperti", "licenza": "CC BY-SA 3.0",
                        "url": "https://www.cortecostituzionale.it/scheda-pronuncia/2014/1"}
     assert (d.relatore, d.presidente) == ("Giuseppe Tesauro", "SILVESTRI")
+    # the recorded epigrafe is cut to two lines, too few to measure a block: its break stays one
     assert d.testo["epigrafe"].startswith("ha pronunciato la seguente\nnel giudizio di legittimità")
     assert d.testo["motivazione"].startswith("1.- Con ordinanza del 17 maggio 2013")
-    assert d.testo["dispositivo"].startswith("per questi motivi\n LA CORTE COSTITUZIONALE")
+    # each short line of the dispositivo is a paragraph (its lines are long: not a typewriter wrap)
+    assert d.testo["dispositivo"].startswith(
+        "per questi motivi\n\n LA CORTE COSTITUZIONALE\n\n 1) dichiara l'illegittimità")
 
 
 async def test_an_ordinanza(monkeypatch, tmp_path):
@@ -350,20 +354,95 @@ def _record(**fields):
             "testo": "", **fields}
 
 
+def _said(testo):
+    """What each block says, without its line breaks: where they fall is `line_paragraphs`'
+    business, tested on its own, and these tests are about which block each part goes to."""
+    return {key: value.replace("\n", "") for key, value in testo.items()}
+
+
 def test_the_reader_splits_only_an_epigrafe_whose_testo_the_source_left_empty():
     epigrafe = f"{HEAD}\nRitenuto che il giudice dubita"
-    assert to_decision(_record(epigrafe=epigrafe, dispositivo="per questi motivi")).testo == {
-        "epigrafe": HEAD, "motivazione": "Ritenuto che il giudice dubita",
-        "dispositivo": "per questi motivi"}
+    split = to_decision(_record(epigrafe=epigrafe, dispositivo="per questi motivi"))
+    assert _said(split.testo) == _said({"epigrafe": HEAD, "motivazione": "Ritenuto che il giudice dubita",
+                                        "dispositivo": "per questi motivi"})
     # the rule is by shape, not by type: a sentenza without its testo is split too
     sentenza = to_decision(_record(epigrafe=epigrafe, tipologia_pronuncia="S"))
     assert sentenza.testo["motivazione"] == "Ritenuto che il giudice dubita"
     # a decision with its testo is never split
-    assert to_decision(_record(epigrafe=epigrafe, testo="1.- Con ordinanza del 2010")).testo == {
-        "epigrafe": epigrafe, "motivazione": "1.- Con ordinanza del 2010"}
+    whole = to_decision(_record(epigrafe=epigrafe, testo="1.- Con ordinanza del 2010"))
+    assert _said(whole.testo) == _said({"epigrafe": epigrafe, "motivazione": "1.- Con ordinanza del 2010"})
     # nothing before the reasoning: no epigrafe block, only the motivazione
     assert to_decision(_record(epigrafe="Ritenuto che il giudice dubita")).testo == {
         "motivazione": "Ritenuto che il giudice dubita"}
+
+
+# The open data break lines two ways (measured on 2026-10-04 over the three bundles): since about
+# 2001 each line is a paragraph or a heading; before, a typewriter wrap at a measure of at most
+# 80 characters. A line break is a paragraph break unless it is such a wrap.
+LONG_FIRST = ("1.- Il giudice rimettente dubita della legittimità costituzionale della norma "
+              "censurata, in riferimento all'art. 3 Cost.")
+LONG_SECOND = ("2.- La questione non è fondata, perché la norma non introduce alcuna disparità "
+               "di trattamento tra situazioni omogenee.")
+
+
+@pytest.mark.parametrize("text,expected", [
+    # long lines: each line is a paragraph
+    (f"{LONG_FIRST}\n{LONG_SECOND}", f"{LONG_FIRST}\n\n{LONG_SECOND}"),
+    # typewritten: a wrap stays a line break, and a paragraph ends where a line stops short
+    ("Il Tribunale di Roma ha sollevato questione di legittimita'\n"
+     "costituzionale dell'art. 1 della legge, in riferimento agli\n"
+     "artt. 3 e 24 della Costituzione.\n"
+     "La questione e' manifestamente infondata, come la Corte ha\n"
+     "gia' deciso con la sentenza n. 1 del 1960.",
+     "Il Tribunale di Roma ha sollevato questione di legittimita'\n"
+     "costituzionale dell'art. 1 della legge, in riferimento agli\n"
+     "artt. 3 e 24 della Costituzione.\n\n"
+     "La questione e' manifestamente infondata, come la Corte ha\n"
+     "gia' deciso con la sentenza n. 1 del 1960."),
+    # an old dispositivo: its short lines are paragraphs, its wrapped lines are not
+    ("PER QUESTI MOTIVI\n"
+     "LA CORTE COSTITUZIONALE\n"
+     "dichiara non fondata la questione di legittimita' costituzionale\n"
+     "dell'art. 1 della legge, sollevata dal Tribunale di Roma con\n"
+     "l'ordinanza indicata in epigrafe.\n"
+     "Cosi' deciso in Roma, il 10 gennaio 1960.\n"
+     "Il Presidente\n"
+     "Il Redattore",
+     "PER QUESTI MOTIVI\n\n"
+     "LA CORTE COSTITUZIONALE\n\n"
+     "dichiara non fondata la questione di legittimita' costituzionale\n"
+     "dell'art. 1 della legge, sollevata dal Tribunale di Roma con\n"
+     "l'ordinanza indicata in epigrafe.\n\n"
+     "Cosi' deciso in Roma, il 10 gennaio 1960.\n\n"
+     "Il Presidente\n\n"
+     "Il Redattore"),
+    # blank lines stay as they are
+    ("Premessa breve.\n\nSeconda parte breve.", "Premessa breve.\n\nSeconda parte breve."),
+    # one line: nothing to break
+    ("Una sola riga.", "Una sola riga."),
+], ids=["long lines", "typewritten", "an old dispositivo", "blank lines kept", "one line"])
+def test_a_line_break_is_a_paragraph_break_unless_it_is_a_typewriter_wrap(text, expected):
+    out = line_paragraphs(text)
+    assert out == expected
+    assert out.replace("\n", "") == text.replace("\n", "")  # only line breaks are added
+    assert "\n\n\n" not in out
+
+
+def test_every_block_of_a_decision_comes_in_paragraphs():
+    block = f"{LONG_FIRST}\n{LONG_SECOND}"
+    expected = f"{LONG_FIRST}\n\n{LONG_SECOND}"
+    d = to_decision(_record(epigrafe=block, testo=block, dispositivo=block))
+    assert d.testo == {"epigrafe": expected, "motivazione": expected, "dispositivo": expected}
+
+
+def test_a_reasoning_left_in_the_epigrafe_is_split_first_and_then_comes_in_paragraphs():
+    first = ("Ritenuto che il giudice rimettente dubita della legittimità costituzionale della "
+             "norma censurata;")
+    second = ("Considerato che la questione non è fondata, perché la norma non introduce alcuna "
+              "disparità di trattamento.")
+    d = to_decision(_record(epigrafe=f"ha pronunciato la seguente\n{first}\n{second}"))
+    assert d.testo == {"epigrafe": "ha pronunciato la seguente",
+                       "motivazione": f"{first}\n\n{second}"}
 
 
 @pytest.mark.live

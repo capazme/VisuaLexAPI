@@ -481,6 +481,13 @@ Breaking one of these breaks the product. Read before editing.
     heading, «RITENUTO IN FATTO E CONSIDERATO IN DIRITTO», stays one; a point keeps the words
     it opens, so there is no break between «3.» and a «P.Q.M.» right after it), and line
     breaks are invisible to anchors (root rule 23), so a note never moves when the rule is
-    refined. Whatever changes the shape of what a reader returns must raise the version in
-    its cache key (`italgiure:v2:…`, `corte_cost:v2:…`), or the entries cached before are
-    served for up to 30 days.
+    refined. Italgiure's `ocr` already ends with the dispositivo that `ocrdis` repeats (36 of
+    the 36 sampled texts that have one): `split_dispositivo` cuts it off, so a decision reads
+    it once. The Corte costituzionale's open data break lines two ways, and `line_paragraphs`
+    turns a line break into a paragraph break unless it is a typewriter wrap of at most 80
+    characters (the texts before about 2001): the page draws a paragraph only between blank
+    lines, so without it a block is one paragraph. Both add line breaks and nothing else.
+    Whatever changes the shape of what a reader returns must raise the version in its cache
+    key (`italgiure:v2:…`, `corte_cost:v2:…`), or the entries cached before are served for up
+    to 30 days. The `v2` keys cover the readers of Tasks 7a to 7c, none of which had shipped,
+    so Task 7c raised no version of its own.

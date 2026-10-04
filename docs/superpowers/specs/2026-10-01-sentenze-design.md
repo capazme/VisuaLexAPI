@@ -241,9 +241,11 @@ year may be a different decision.
   query**: the section is compared after reading, so a wrong section is
   reported instead of silently dropped.
 - **Fields.** `numdec`, `anno`, `szdec`, `datdep`, `tipoprov`, `materia`,
-  `relatore`, `presidente`, `kind`, `ocr` (the motivazione), `ocrdis` (the
-  dispositivo, often empty at the source) and the document id.
-- **Text.** Never truncated.
+  `relatore`, `presidente`, `kind`, `ocr` (the motivazione, which already ends
+  with the dispositivo), `ocrdis` (the dispositivo, which repeats the end of
+  `ocr`; often empty at the source) and the document id.
+- **Text.** Never truncated: the dispositivo is cut off the end of the
+  motivazione, not dropped (§4).
 - **Archive start.** Read from the archive itself (the earliest date of deposit
   per archive), cached for a day, and used in `fuori_archivio` and
   `anno_parziale`.
@@ -356,12 +358,23 @@ over the reader. From the top:
    starts a sentence, and changes nothing else (decided by the owner on
    2026-10-04). A combined heading («RITENUTO IN FATTO E CONSIDERATO IN
    DIRITTO») stays one, and a numbered point keeps the words it opens, with no
-   break between «3.» and a «P.Q.M.» or a heading right after it. The page
-   draws each group of lines between blank lines as a paragraph. Text is
-   rendered as React text, never as HTML. The blocks are labelled «Epigrafe»,
-   «Motivazione» and «Dispositivo»; an epigrafe without a motivazione holds the
-   reasoning too and is labelled «Testo» (decided by the owner on 2026-10-04).
-   A decision without its text shows no block.
+   break between «3.» and a «P.Q.M.» or a heading right after it. Italgiure's
+   reasons already end with the dispositivo, which its separate field repeats
+   (36 of the 36 sampled texts that have one): the data route cuts it off the
+   end of the reasons, so a decision reads it once, in «Dispositivo». The Corte
+   costituzionale's open data break lines two ways (measured on 2026-10-04 over
+   the three bundles): since about 2001 each line is a paragraph or a heading;
+   before, the text is typewritten at a measure of at most 80 characters, and a
+   paragraph ends where a line stops short. The data route turns a line break
+   into a paragraph break (a blank line) unless it is such a wrap (the lines of
+   the block fill a measure of at most 80, the line before fills at least three
+   quarters of it, and it does not end a sentence where the next word would
+   still have fit), and adds nothing else. The page draws each group of lines
+   between blank lines as a paragraph. Text is rendered as React text, never as
+   HTML. The blocks are labelled «Epigrafe», «Motivazione» and «Dispositivo»; an
+   epigrafe without a motivazione holds the reasoning too and is labelled
+   «Testo» (decided by the owner on 2026-10-04). A decision without its text
+   shows no block.
 5. **The source**, at the foot: "Fonte: Corte di cassazione — archivio pubblico
    SentenzeWeb (Italgiure)" or "Fonte: Corte costituzionale — dati aperti". A
    dossier's PDF names it too. Neither shows the licence (the owner's decisions

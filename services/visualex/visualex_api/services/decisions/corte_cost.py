@@ -16,7 +16,9 @@ Ported from mcp-legal-it 2.15's open-data client (same author, relicensed MIT): 
 names and the nested layout are its findings. Here the text is never cut.
 Most ordinanze (3,592 of 4,056 in 2001-2026) leave `testo` empty and carry their reasoning in
 the epigrafe: `split_epigrafe` splits it where the reasoning starts (the owner's rule of
-2026-10-04).
+2026-10-04). The open data break lines two ways (a paragraph or a heading per line since about
+2001, a typewriter wrap before), so `line_paragraphs` turns each line break into a paragraph
+break unless it is such a wrap; it runs on each block after the split.
 """
 from __future__ import annotations
 
@@ -115,6 +117,34 @@ def split_epigrafe(epigrafe: str) -> tuple[str, str]:
     return epigrafe[:match.start()].rstrip(), epigrafe[match.start(1):]
 
 
+# The open data break lines two ways (measured on 2026-10-04 over the three bundles): since about
+# 2001 each line is a paragraph or a heading; before, a typewriter wrap at a measure of at most 80
+# characters, a paragraph ending where a line stops short. A line break becomes a paragraph break
+# (a blank line) unless it is such a wrap: the block's lines fill a measure of at most 80, the
+# line before fills at least three quarters of it, and it does not end a sentence where the next
+# word would still have fit. Only line breaks are added: a note anchored to the text never moves
+# (gotcha 23), and the rule can be refined later.
+_TYPEWRITER_MEASURE = 80
+
+
+def line_paragraphs(text: str) -> str:
+    lines = text.split("\n")
+    lengths = sorted(len(line) for line in lines if line.strip())
+    if len(lengths) < 2:
+        return text
+    width = lengths[int(0.9 * (len(lengths) - 1))]
+    typewritten = width <= _TYPEWRITER_MEASURE
+    out = [lines[0]]
+    for before, line in zip(lines, lines[1:]):
+        if not before.strip() or not line.strip():
+            out.append("\n" + line)  # an existing blank line stays as it is
+            continue
+        filled = len(before) >= 0.75 * width
+        ends_sentence = before[-1] in ".:;" and len(before) + 1 + len(line.split()[0]) <= width
+        out.append(("\n" if typewritten and filled and not ends_sentence else "\n\n") + line)
+    return "".join(out)
+
+
 def to_decision(rec: dict) -> Decision:
     numero = int(str(rec["numero_pronuncia"]).strip())
     anno = int(str(rec["anno_pronuncia"]).strip())
@@ -122,10 +152,9 @@ def to_decision(rec: dict) -> Decision:
     if epigrafe and not motivazione:
         # most ordinanze: the open data leave `testo` empty and the reasoning in the epigrafe
         epigrafe, motivazione = split_epigrafe(epigrafe)
-    testo = {key: value for key, value in (("epigrafe", epigrafe),
-                                            ("motivazione", motivazione),
-                                            ("dispositivo", clean(rec.get("dispositivo"))))
-             if value}
+    testo = {key: line_paragraphs(value) for key, value in (
+        ("epigrafe", epigrafe), ("motivazione", motivazione),
+        ("dispositivo", clean(rec.get("dispositivo")))) if value}
     return Decision(
         identita=Identity("corte_costituzionale", numero, anno),
         tipo=_TIPI.get(str(rec.get("tipologia_pronuncia", "")).strip().upper()),

@@ -333,6 +333,15 @@ limit is 1 MB, and the ingress's own page answers).
   every character is the source's. A combined heading («RITENUTO IN FATTO E CONSIDERATO IN
   DIRITTO») gets one break, before its first word, and a numbered point keeps the words it
   opens: there is no break between «3.» and a «P.Q.M.», lead or heading right after it.
+  Italgiure's reasons already end with the dispositivo, which its separate field repeats (36 of
+  the 36 sampled texts that have one): the reader cuts it off the end of the reasons, so
+  `dispositivo` is the end of the text itself (the same characters, whitespace aside) and the
+  decision reads once; a dispositivo that the text holds elsewhere is dropped, and one it does
+  not hold stays as the source gave it. The Corte costituzionale's open data break lines two
+  ways (a paragraph or a heading per line since about 2001; before, a typewriter wrap at a
+  measure of at most 80 characters, a paragraph ending where a line stops short), so the reader
+  turns a line break into a paragraph break (a blank line) unless it is such a wrap, in each
+  block and after the epigrafe split, and adds nothing else.
 - `fonte`: `nome`; `licenza` (Corte costituzionale: CC BY-SA 3.0, credited wherever the text
   appears); `url` (Corte costituzionale only: the court's page for that decision, for the
   reader's browser, which this server never contacts). The Cassazione has no `url`.

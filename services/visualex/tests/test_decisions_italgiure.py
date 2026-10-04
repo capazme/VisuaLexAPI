@@ -10,6 +10,7 @@ from visualex_api.services.decisions.italgiure import (
     ItalgiureReader,
     SourceAnswerError,
     paragraphs,
+    split_dispositivo,
     to_decision,
 )
 from visualex_api.services.http_client import HttpResult
@@ -221,6 +222,50 @@ def test_a_decision_comes_with_its_paragraphs():
                      "ocrdis": "Visto il ricorso. P.Q.M. Rigetta."}, "civile")
     assert d.testo["motivazione"] == "Premessa. \n\nFATTI DI CAUSA Il fatto. \n\nP.Q.M. Rigetta."
     assert d.testo["dispositivo"] == "Visto il ricorso. \n\nP.Q.M. Rigetta."
+
+
+def test_a_long_word_before_a_number_is_still_read_by_its_last_part():
+    # the look-back for the word before a number is a window, not the whole text before it: a
+    # citation after a word longer than the window («dell'art.» is «art.») is still skipped
+    text = "x" * 100 + "'art. 5. Il motivo."
+    assert paragraphs(text) == text
+
+
+@pytest.mark.parametrize("text,dispositivo,expected,from_the_text", [
+    # the text ends with the dispositivo: it is cut off, so the decision reads once
+    ("Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta il ricorso.", "P.Q.M. Rigetta il ricorso.",
+     ("Premessa. FATTI DI CAUSA Il fatto.", "P.Q.M. Rigetta il ricorso."), True),
+    # whitespace aside: the dispositivo returned is the text's own, with its own spacing
+    ("Premessa. Il fatto. P.Q.M. Rigetta  il ricorso.", "P.Q.M.\nRigetta il ricorso.",
+     ("Premessa. Il fatto.", "P.Q.M. Rigetta  il ricorso."), True),
+    # held elsewhere than at the end: dropped, and the text stays whole
+    ("Premessa. P.Q.M. Rigetta. Così deciso in Roma.", "P.Q.M. Rigetta.",
+     ("Premessa. P.Q.M. Rigetta. Così deciso in Roma.", ""), True),
+    # not held at all: it stays as the source gave it
+    ("Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta.", "Visto il ricorso. P.Q.M. Rigetta.",
+     ("Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta.", "Visto il ricorso. P.Q.M. Rigetta."),
+     False),
+    # the text is the dispositivo and nothing else
+    ("P.Q.M. Rigetta.", "P.Q.M. Rigetta.", ("P.Q.M. Rigetta.", ""), True),
+    # no dispositivo
+    ("Premessa. Il fatto.", "", ("Premessa. Il fatto.", ""), True),
+], ids=["the text ends with it", "whitespace aside", "held elsewhere", "not held",
+        "the text is the dispositivo", "no dispositivo"])
+def test_the_dispositivo_the_text_ends_with_is_read_once(text, dispositivo, expected,
+                                                         from_the_text):
+    motivazione, cut = split_dispositivo(text, dispositivo)
+    assert (motivazione, cut) == expected
+    if from_the_text:
+        # nothing is added, dropped or changed but whitespace: every character is the text's own
+        assert "".join((motivazione + cut).split()) == "".join(text.split())
+
+
+def test_a_decision_reads_its_dispositivo_once():
+    d = to_decision({"numdec": "1", "anno": "2024",
+                     "ocr": "Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta il ricorso.",
+                     "ocrdis": "P.Q.M. Rigetta il ricorso."}, "civile")
+    assert d.testo == {"motivazione": "Premessa. \n\nFATTI DI CAUSA Il fatto.",
+                       "dispositivo": "P.Q.M. Rigetta il ricorso."}
 
 
 @pytest.mark.live

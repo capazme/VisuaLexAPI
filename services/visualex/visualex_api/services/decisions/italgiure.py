@@ -6,8 +6,11 @@ the lookup of one decision:
   (n. 10787/2024 is Sez. III civile and Sez. VII penale);
 - the number is queried zero-padded to five digits, as the index stores it: the bare form
   never matched (measured on 2026-10-02), so a lookup is one query per archive;
-- the text comes back whole: `ocr` is the reasons, `ocrdis` the dispositivo (often empty at the
-  source, which then leaves it at the end of the reasons).
+- the text comes back whole: `ocr` is the reasons and already ends with the dispositivo, which
+  `ocrdis` repeats when the source has one (36 of the 36 sampled texts that have one, measured
+  on 2026-10-04): `split_dispositivo` cuts it off the end of the reasons, so the decision reads
+  once. A dispositivo that the text holds elsewhere is dropped, one it does not hold stays as
+  the source gave it, and without an `ocrdis` the dispositivo stays at the end of the reasons.
 - a decision whose text the source withholds comes back with the source's own notice as its
   text, while personal data are being removed: "La sentenza richiesta è in fase di
   oscuramento" (`testo_assente` "oscuramento"), "in fase di valutazione oscuramento"
@@ -82,7 +85,9 @@ def paragraphs(text: str) -> str:
     cuts = {m.start() for regex in (_HEADING, _LEAD, _PQM) for m in regex.finditer(text)}
     points = []
     for m in _POINT.finditer(text):
-        word = text[:m.start()].rstrip().rsplit(" ", 1)[-1].rstrip(".").lower()
+        # only the last word before the number matters, so look back over a window: copying all
+        # the text before each candidate was quadratic (1 MB of candidates took about 4 s)
+        word = text[max(0, m.start() - 60):m.start()].rstrip().rsplit(" ", 1)[-1].rstrip(".").lower()
         if re.split(r"['’]", word)[-1] not in _BEFORE_NUMBER:  # «dell'art.» is «art.»
             points.append(m)
     cuts |= {m.start() for m in points}
@@ -94,6 +99,25 @@ def paragraphs(text: str) -> str:
         last = cut
     pieces.append(text[last:])
     return "".join(pieces)
+
+
+def split_dispositivo(text: str, dispositivo: str) -> tuple[str, str]:
+    """`ocr` already ends with the dispositivo that `ocrdis` repeats: it is cut off the text, so
+    the decision reads once. Whitespace aside, the end of the text must equal the dispositivo; the
+    dispositivo returned is that end of the text, so every character comes from one source. A
+    dispositivo the text holds elsewhere is dropped; one it does not hold stays as given."""
+    tail = "".join(dispositivo.split())
+    if not tail:
+        return text, ""
+    flat = "".join(text.split())
+    if flat.endswith(tail) and len(flat) > len(tail):
+        left, cut = len(tail), len(text)
+        while left:
+            cut -= 1
+            if not text[cut].isspace():
+                left -= 1
+        return text[:cut].rstrip(), text[cut:]
+    return (text, "") if tail in flat else (text, dispositivo)
 
 
 class SourceAnswerError(Exception):
@@ -127,9 +151,9 @@ def to_decision(doc: dict, archivio: str) -> Decision:
         testo: dict[str, str] = {}  # the source's notice, not the court's text
         testo_assente = next((cause for phrase, cause in _WITHHELD_CAUSES if phrase in flat), None)
     else:
+        motivazione, dispositivo = split_dispositivo(motivazione, _text(doc.get("ocrdis")).strip())
         testo = {key: paragraphs(value) for key, value in (
-            ("motivazione", motivazione), ("dispositivo", _text(doc.get("ocrdis")).strip()))
-            if value}
+            ("motivazione", motivazione), ("dispositivo", dispositivo)) if value}
     decision = Decision(
         identita=Identity("cassazione", int(_scalar(doc.get("numdec"))),
                           int(_scalar(doc.get("anno"))), archivio),
