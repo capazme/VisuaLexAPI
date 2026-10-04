@@ -191,10 +191,14 @@ export function showUndoToast<T>({
   // Execute action first, then drive the toast countdown synchronously.
   return Promise.resolve(action()).then((result) => new Promise<boolean>((resolve) => {
     let resolved = false;
+    // Declared before the handlers: once the toast is resolved, its countdown must stop, or the
+    // next tick would show it again as a ghost.
+    let interval: ReturnType<typeof setInterval> | undefined;
 
     const handleUndo = async () => {
       if (resolved) return;
       resolved = true;
+      clearInterval(interval);
       await undo(result);
       toastListener?.(null);
       resolve(false);
@@ -203,6 +207,7 @@ export function showUndoToast<T>({
     const handleDismiss = () => {
       if (resolved) return;
       resolved = true;
+      clearInterval(interval);
       toastListener?.(null);
       resolve(true);
     };
@@ -222,7 +227,7 @@ export function showUndoToast<T>({
     updateToast();
 
     // Update countdown
-    const interval = setInterval(() => {
+    interval = setInterval(() => {
       timeRemaining -= 100;
       if (timeRemaining <= 0) {
         clearInterval(interval);
