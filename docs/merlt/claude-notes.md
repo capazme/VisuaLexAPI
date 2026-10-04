@@ -363,6 +363,7 @@ calls the BFF back at `/api/merlt/internal/job-callback`.
   - `searchEntities(q, limit)`, a fuzzy name autocomplete. The semantic
     `POST /api/v1/graph/search` is not proxied.
   - `listProvisionalReview` and `adjudicateProvisional`.
+  - `rassegneByNorma(query)`, for the reader's panel (below).
 - `services/merlt/lazyIngest.ts`: `ensureIngestionJob(prisma, graphClient, urn,
   userId)`. The explicit `POST /graph/ingest` and the `article:viewed` trigger
   both use it; do not duplicate it.
@@ -835,7 +836,7 @@ though that doc's header still says DRAFT.
 
 - `routes/merlt/opsIngestion.ts` and `opsIngestionClient.ts` →
   `/api/v1/ingestion/mechanical/*` (`require_role("admin")`):
-  - `POST /ops/ingestion/run`, with `{source: visualex_tree|italia_corpus,
+  - `POST /ops/ingestion/run`, with `{source: visualex_tree|italia_corpus|massimario,
     source_ref, …}`. It enqueues on `merlt_bulk`, the worker's last queue,
     with `job_timeout=1800`: a reader's lazy ingestion (`merlt_ingest`) goes
     before the next batch instead of queuing behind hours of codes.
@@ -860,6 +861,21 @@ though that doc's header still says DRAFT.
   initials. An unknown act keeps its name.
 - FE: `ops/ingestion/IngestionAdminPanel`, under the `/admin` tab
   "Ingestione".
+
+**The Massimario's annual reviews.** Spec
+`docs/superpowers/specs/2026-10-01-rassegne-massimario-design.md`, plan
+`docs/superpowers/plans/2026-10-01-rassegne-massimario.md`.
+
+- Ingestion: source `massimario`, `source_ref` `{"volume": <portal id>}`, one
+  volume per batch. The batch carries its own report
+  (`conflict_report.massimario`) and its paragraphs in `extras`; promotion
+  writes the graph, then a chained job (`merlt_bulk`) writes vectors and bridge
+  rows 100 paragraphs at a time, with progress in `stats.vectors`.
+- Reader: `GET /api/merlt/rassegne?urn&anno&archivio&cursor` (authenticated,
+  no sub-flag, no consent) → MERL-T `GET /api/v1/rassegne/by-norma`. The BFF
+  strips the URN's version marker; any MERL-T failure, an upstream 401
+  included, is `503 merlt_unavailable`. The web panel
+  (`features/merlt/rassegne`) sits in the `article_content_after` slot.
 
 **Graph co-evolution.** The design is
 `docs/superpowers/specs/2026-07-16-merlt-graph-coevolution-design.md`; see

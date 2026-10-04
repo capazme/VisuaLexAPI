@@ -18,6 +18,9 @@ vi.mock('../../features/merlt/ArticleMerltSlot', () => ({
 vi.mock('../../features/merlt/graph/side-rail/ArticleGraphSideRail', () => ({
   ArticleGraphSideRail: () => null,
 }));
+vi.mock('../../features/merlt/rassegne/RassegnePanel', () => ({
+  RassegnePanel: () => null,
+}));
 
 import { getSlotComponents } from '../registry';
 import { PluginSlot } from '../PluginSlot';
@@ -31,17 +34,17 @@ afterEach(() => {
 });
 
 describe('getSlotComponents', () => {
-  it('returns the merlt-article-tracker entry by default (flag unset)', () => {
+  it('returns the tracker and the reviews panel by default (flag unset)', () => {
     const components = getSlotComponents('article_content_after');
-    expect(components).toHaveLength(1);
-    expect(components[0].id).toBe('merlt-article-tracker');
+    expect(components.map((c) => c.id)).toEqual(['merlt-article-tracker', 'merlt-article-rassegne']);
+    expect(components[1].requiredFlag).toBe('VITE_FEATURE_MERLT');
     expect(components[0].pluginId).toBe('visualex-merlt');
     expect(components[0].requiredFlag).toBe('VITE_FEATURE_MERLT');
   });
 
   it('includes the entry when VITE_FEATURE_MERLT=true', () => {
     vi.stubEnv('VITE_FEATURE_MERLT', 'true');
-    expect(getSlotComponents('article_content_after')).toHaveLength(1);
+    expect(getSlotComponents('article_content_after')).toHaveLength(2);
   });
 
   it('excludes the entry when VITE_FEATURE_MERLT=false', () => {
@@ -103,7 +106,7 @@ describe('PluginSlot', () => {
     // ArticleMerltSlot is mocked to render null — the slot still resolves,
     // we just check it didn't throw and that getSlotComponents agrees.
     const components = getSlotComponents('article_content_after');
-    expect(components).toHaveLength(1);
+    expect(components).toHaveLength(2);
     const { container } = render(
       <PluginSlot
         slot="article_content_after"
