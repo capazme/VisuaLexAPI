@@ -37,6 +37,7 @@ TEST_GRAPH = "merlt_test_lazy_ingest_identity"
 PORTAL_ARTICLE = "/uri-res/N2Ls?urn:nir:stato:legge:2012-12-31;247~art18"
 PORTAL_ACT = "/uri-res/N2Ls?urn:nir:stato:legge:2012-12-31;247"
 DECISION = "cass:test:1"
+CODE_CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2"
 TEXT = (
     "Art. 18\n\n(Rubrica di prova).\n\n"
     "Primo comma del testo di prova.\n\n"
@@ -63,6 +64,11 @@ async def _massimario_stubs(graph) -> tuple[str, str]:
     await graph.query(_MERGE_DECISIONS, {"rows": [{"k": DECISION, "props": {"node_id": DECISION}}]})
     await graph.query(_MERGE_EDGES, {"rows": [{"s": DECISION, "t": article, "k": "k1", "props": {"volumi": [96]}}]})
     return article, act
+
+
+async def _properties(graph, urn: str) -> list[dict]:
+    rows = await graph.query("MATCH (n:Norma {URN: $u}) RETURN properties(n) AS p", {"u": urn})
+    return [row["p"] for row in rows]
 
 
 async def _lazy_ingest(graph, urn: str):
@@ -115,3 +121,30 @@ async def test_the_ingested_article_lands_on_the_massimario_stub(graph):
         {"act": act, "art": article},
     )
     assert contains[0]["n"] == 1
+
+
+async def test_an_ordinary_act_not_yet_in_the_graph_is_born_a_stub_never_a_code(graph):
+    # 4 Oct 2026, live: the act node of l. 247/2012 was created with
+    # tipo_documento 'codice', titolo 'Legge', autorita 'Parlamento'.
+    article = to_canonical(parse_portal_urn(PORTAL_ARTICLE), {})
+    act = to_canonical(parse_portal_urn(PORTAL_ACT), {})
+
+    result = await _lazy_ingest(graph, article)
+
+    assert result.fatal_error is None
+    assert await _properties(graph, act) == [stub_properties(act)]
+    contains = await graph.query(
+        "MATCH (:Norma {URN: $act})-[:CONTIENE]->(:Norma {URN: $art}) RETURN count(*) AS n",
+        {"act": act, "art": article},
+    )
+    assert contains[0]["n"] == 1
+
+
+async def test_a_code_keeps_its_code_node(graph):
+    result = await _lazy_ingest(graph, CODE_CC + "~art2043")
+
+    assert result.fatal_error is None
+    (code,) = await _properties(graph, CODE_CC)
+    assert code["tipo_documento"] == "codice"
+    assert code["titolo"] == "Codice Civile"
+    assert "is_stub" not in code
