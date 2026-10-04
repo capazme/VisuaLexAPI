@@ -10,3 +10,6 @@ redis>=5.0
 pyyaml>=6.0
 lxml>=5.0
 hypercorn
+# Imported by visualex_api/tools/tls.py (the bundle the Italgiure context is built on).
+# The floor drops the compromised GLOBALTRUST root (CVE-2024-39689).
+certifi>=2024.7.4

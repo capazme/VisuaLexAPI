@@ -67,3 +67,30 @@ class PersistentCache:
         with path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle)
 
+    def sweep_expired(self) -> int:
+        """Delete every entry older than the TTL, or that cannot be read as
+        `{"timestamp": …}`, and return how many went. `get` deletes an expired entry only
+        when its key is read again, so without a sweep a key nobody asks for stays on disk.
+
+        Synchronous: it reads every file, so call it through `asyncio.to_thread`. An entry
+        caught while it is being written reads as unreadable and goes: a cache miss later,
+        nothing worse.
+        """
+        now = time.time()
+        removed = 0
+        for path in self.directory.glob("*.json"):
+            try:
+                with path.open("r", encoding="utf-8") as handle:
+                    payload = json.load(handle)
+                timestamp = payload.get("timestamp") if isinstance(payload, dict) else None
+                expired = (not isinstance(timestamp, (int, float))
+                           or now - timestamp > self.ttl)
+            except (ValueError, OSError):  # not JSON, not UTF-8, unreadable
+                expired = True
+            if expired:
+                try:
+                    path.unlink()
+                except OSError:  # gone already, or not ours to delete
+                    continue
+                removed += 1
+        return removed
