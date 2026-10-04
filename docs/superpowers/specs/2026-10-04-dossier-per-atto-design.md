@@ -164,9 +164,12 @@ function layoutDossier(items: DossierItem[]): DossierLayout;
   holds the title (`AktIndex.title`, from `docTitle`). It is added to the route's answer as
   `title` (empty string when the index has none or is unavailable). One call per act thus
   brings the title and the rubriche; the server caches the index, the web caches the answer for
-  the session (`utils/actStructureCache.ts`). The plan's first task checks a real title for
-  accents and amendment markers before the field is shown; if the AKN title is not
-  presentable, the block shows no title rather than a mangled one.
+  the session (`utils/actStructureCache.ts`). Measured on 4 Oct, the raw title needs three
+  repairs before it is shown, done on the server: the Gazzetta code at the end is dropped
+  («… professione forense. (13G00018)»), the amendment brackets are unwrapped and their
+  stray punctuation closed up («dati personali ((, recante … ))» → «dati personali, recante
+  …»), and transliterated accents are restored («nonche'» → «nonché», with the rubriche's own
+  `_restore_accents`). A title that is still empty after this is not shown.
   The codes and the Constitution show no title (their heading already is one).
 
 ### 4. The act block (`DossierActBlock.tsx`, new)
@@ -197,12 +200,16 @@ The row is no longer sortable; the file is renamed for what it is.
   count when the article has attached notes, with Claude's mark when one of them is his; the
   star (44px target); remove on hover (always visible on mobile). No icon, no date, no
   «Aggiunto il».
-- **The rubrica**: from the act's `/fetch_rubriche` answer (above). For an article without an
-  annex, the top-level map. For an annexed article, the part whose article set matches the
-  annex's (the same majority match the index window makes, moved from `TreeViewPanel` into a
-  shared `utils/actRubriche.ts` that both use; it needs the act's tree, `fetchActTree`, which
-  is cached and fetched only when the act has annexed articles). No match, no rubrica: never a
-  rubrica from another annex. Once the article's text is fetched (the row opened), its own
+- **The rubrica**: from the act's `/fetch_rubriche` answer (above). For an act with no parts
+  (`parts` empty), the top-level map. For an act made of parts, the part whose article set
+  matches the article's annex — the body when it has none — by the same majority match the
+  index window makes, moved from `TreeViewPanel` into a shared `utils/actRubriche.ts` that both
+  use; it needs the act's tree (`fetchActTree`, cached), fetched only for an act with parts.
+  No match, no rubrica: never a rubrica from another part. Measured on 4 Oct: the top-level
+  map of d.lgs. 196/2003 is the one of an annex of «Regole deontologiche» («Delibera del
+  Garante n. 515…» as the rubrica of art. 1), while its body is the part «Dispositivo»; the
+  shared function therefore never falls back to the top-level map for an act with parts,
+  which also fixes the index window's fallback. Once the article's text is fetched (the row opened), its own
   rubrica (`getRubricText`) fills a row that had none. Lookups go through
   `normalizeArticleId` (gotcha 9). While the rubriche load, the row shows «art. 3» alone.
 - **Expanded**: the article's attached notes first (author mark, date, the text), then
