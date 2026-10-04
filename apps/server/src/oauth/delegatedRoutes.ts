@@ -1,9 +1,12 @@
 import type { Request } from 'express';
+import { DELETE_SCOPE } from './config';
 
 /**
  * The only API routes an exchanged token may reach (spec section 5, default
  * deny): method, path under `/api`, the scope it needs, and what it costs
- * against the user's daily quota. Nothing here updates, moves or deletes.
+ * against the user's daily quota. Nothing here updates or moves, and nothing
+ * deletes for good: the two trash routes move rows to a trash the user's
+ * session alone restores or empties (second round, spec §4.3).
  * Adding a route is a security decision: every entry is reachable by any
  * MCP client the user connected.
  */
@@ -35,6 +38,9 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   { method: 'POST', path: '/dossiers/:id/norms', scope: 'dossier:write', weight: referencesWeight },
   // A note in the dossier, or about one of its articles: a write like any other, and at most 100 a day.
   { method: 'POST', path: '/dossiers/:id/notes', scope: 'dossier:write', weight: 2, counter: 'note' },
+  // Into the trash, never deleted for good; content:delete is also read live from the grant (delegated.ts).
+  { method: 'POST', path: '/dossiers/:id/trash', scope: DELETE_SCOPE, weight: 1, counter: 'trash' },
+  { method: 'POST', path: '/dossiers/:id/trash-items', scope: DELETE_SCOPE, weight: 1, counter: 'trash' },
   // Reading the quota costs nothing: the MCP server asks it to tell the user what is left.
   { method: 'GET', path: '/oauth/quota', scope: 'dossier:read', weight: 0 },
 ];
