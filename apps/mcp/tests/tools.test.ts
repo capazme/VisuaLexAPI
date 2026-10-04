@@ -2,7 +2,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startStubs } from './stubs.js';
-import { referenceOf } from '../src/tools/dossier.js';
 
 let env: Awaited<ReturnType<typeof startStubs>>;
 let client: Client;
@@ -24,9 +23,10 @@ beforeEach(async () => {
           id: 'i1',
           item_type: 'norm',
           title: 'codice civile',
+          citation: 'art. 2043 c.c.',
           content: { tipo_atto: 'codice civile', numero_articolo: '2043', numero_atto: '262', data: '1942-03-16', article_text: 'NON DEVE USCIRE' },
         },
-        { id: 'i2', item_type: 'note', title: 'Nota', content: 'appunto' },
+        { id: 'i2', item_type: 'note', title: 'Nota', citation: null, content: 'appunto' },
       ],
     },
     { id: 'd2', name: 'Doppio', items: [] },
@@ -78,7 +78,7 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
         id: 'd1',
         nome: 'Prova',
         voci: [
-          { id: 'i1', tipo: 'norm', titolo: 'codice civile', riferimento: 'art. 2043 codice civile' },
+          { id: 'i1', tipo: 'norm', titolo: 'codice civile', riferimento: 'art. 2043 c.c.' },
           { id: 'i2', tipo: 'note', titolo: 'Nota', riferimento: null },
         ],
       });
@@ -159,9 +159,20 @@ describe('omnilex_stato_account', () => {
   });
 });
 
-describe('referenceOf', () => {
-  it('reads a stored norm without its text', () => {
-    expect(referenceOf({ tipo_atto: 'legge', numero_articolo: '2', numero_atto: '241', data: '1990-08-07' })).toBe('art. 2 legge n. 241 del 1990-08-07');
-    expect(referenceOf('nota')).toBeNull();
+describe('two acts of the same type in one dossier', () => {
+  it('names each article with its act, in the app\'s citation style, as the server gives it', async () => {
+    env.stub.dossiers.push({
+      id: 'd9',
+      name: 'Equo compenso',
+      items: [
+        { id: 'a', item_type: 'norm', title: 'legge', citation: 'art. 3, l. 31 dicembre 2012, n. 247', content: { tipo_atto: 'legge', numero_articolo: '3' } },
+        { id: 'b', item_type: 'norm', title: 'legge', citation: 'art. 3, l. 21 aprile 2023, n. 49', content: { tipo_atto: 'legge', numero_articolo: '3' } },
+      ],
+    });
+    const result = await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'Equo compenso' } });
+    expect(json(result).voci.map((v: { riferimento: string }) => v.riferimento)).toEqual([
+      'art. 3, l. 31 dicembre 2012, n. 247',
+      'art. 3, l. 21 aprile 2023, n. 49',
+    ]);
   });
 });

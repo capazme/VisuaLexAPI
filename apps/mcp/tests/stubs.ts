@@ -22,7 +22,7 @@ export interface Stub {
   exchanges: { subject: string; scope: string; audience: string }[];
   /** Override an API answer: return [status, body] or undefined for the default. */
   apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | undefined;
-  dossiers: { id: string; name: string; items: { id: string; item_type: string; title: string; content: unknown }[] }[];
+  dossiers: { id: string; name: string; items: { id: string; item_type: string; title: string; citation?: string | null; content: unknown }[] }[];
   introspectionDown?: boolean;
 }
 

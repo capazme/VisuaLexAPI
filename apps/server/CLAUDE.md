@@ -97,7 +97,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   art. 1 and a 200. A source that fails or answers 429 makes the reference
   `unavailable`, never "missing". Outcomes: `added`, `already_present`,
   `not_recognised`, `does_not_exist`, `ambiguous`, `unavailable`; the added
-  ones in one transaction, after the dossier's last item.
+  ones in one transaction, after the dossier's last item. Each resolved
+  reference's `display` is its citation (below), never Python's own label
+  («Art. 3 — legge» named no act).
+- **`norms/citation.ts`** — `citeArticle`, how a lawyer cites an article in the
+  owner's style: «art. 3, l. 31 dicembre 2012, n. 247», «art. 1284 c.c.», «art. 81
+  Cost.». Dossier items carry it as `citation` (null for anything but a norm) in
+  `GET /dossiers` and `GET /dossiers/:id`, and the MCP tools pass it on. It is a
+  second implementation of the web app's `utils/citation.ts`, pinned to the web's
+  golden file: `tests/norms/citation.test.ts` imports
+  `apps/web/src/utils/__fixtures__/citationGolden.ts` and fails when the two
+  disagree. Change the wording in both.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore

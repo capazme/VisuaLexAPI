@@ -25,6 +25,8 @@
  * "missing" or "not recognised".
  */
 
+import { citeArticle } from './citation';
+
 export type ReferenceOutcome = 'resolved' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
 
 /** The norm as `fetch_norma_data` returns it and the reader stores it. */
@@ -106,7 +108,10 @@ async function identify(reference: string): Promise<Resolution> {
   if (!parsed.data.recognized || !params?.act_type) {
     return { outcome: 'not_recognised', detail: 'Riferimento non riconosciuto: indica articolo e atto (es. «art. 2043 c.c.»).' };
   }
-  const display = typeof parsed.data.display === 'string' ? parsed.data.display : undefined;
+  // Python's own label ("Art. 3 — legge") does not name the act: a reference
+  // that is not resolved to a norm is answered with no label, and its own text
+  // (the `reference` the caller sent) says what was asked.
+  const display = undefined;
   if (!params.article) {
     return { outcome: 'ambiguous', display, detail: 'Manca l’articolo: indica un solo articolo per riferimento.' };
   }
@@ -132,7 +137,7 @@ async function identify(reference: string): Promise<Resolution> {
   if (!norm.url || /None/.test(norm.url)) {
     return { outcome: 'ambiguous', display, detail: 'Indica numero e data dell’atto (es. «art. 2 l. 241/1990»).' };
   }
-  return { outcome: 'resolved', norm, display };
+  return { outcome: 'resolved', norm, display: citeArticle(norm) };
 }
 
 type Verdict = 'exists' | 'missing' | 'unknown';
