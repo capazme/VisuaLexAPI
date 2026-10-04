@@ -462,7 +462,9 @@ Breaking one of these breaks the product. Read before editing.
     start and every six hours, since the filesystem cache deletes one only when its key is
     read again.
     Italgiure's text is one line (45 of 45 sampled texts): `paragraphs` inserts blank lines
-    before the headings, «P.Q.M.» and the numbered points and changes nothing else, and line
+    before the headings, «P.Q.M.» and the numbered points and changes nothing else (a combined
+    heading, «RITENUTO IN FATTO E CONSIDERATO IN DIRITTO», stays one; a point keeps the words
+    it opens, so there is no break between «3.» and a «P.Q.M.» right after it), and line
     breaks are invisible to anchors (root rule 23), so a note never moves when the rule is
     refined. Whatever changes the shape of what a reader returns must raise the version in
     its cache key (`italgiure:v2:…`, `corte_cost:v2:…`), or the entries cached before are

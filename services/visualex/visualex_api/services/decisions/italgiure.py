@@ -62,7 +62,8 @@ _WITHHELD_CAUSES = (("in fase di valutazione oscuramento", "valutazione_oscurame
 _HEADINGS = ("RITENUTO IN FATTO", "CONSIDERATO IN DIRITTO", "FATTI DI CAUSA", "RAGIONI DELLA DECISIONE",
              "MOTIVI DELLA DECISIONE", "SVOLGIMENTO DEL PROCESSO", "RILEVATO CHE", "CONSIDERATO CHE",
              "RITENUTO CHE", "PREMESSO CHE", "OSSERVA")
-_HEADING = re.compile(r"(?<![A-Za-zÀ-ÿ])(?:" + "|".join(re.escape(h) for h in _HEADINGS)
+# «RITENUTO IN FATTO E CONSIDERATO IN DIRITTO» is one heading: no break after its «E» (or «e»)
+_HEADING = re.compile(r"(?<![A-Za-zÀ-ÿ])(?<!\b[Ee] )(?:" + "|".join(re.escape(h) for h in _HEADINGS)
                       + r")(?![A-Za-zÀ-ÿ])")
 _LEAD = re.compile(r"(?<=[.;:!?»”\"] )(?:Rilevato che|Considerato che|Ritenuto che|Premesso che|"
                    r"Osserva|Rileva)\s?[:,]")
@@ -76,12 +77,16 @@ _BEFORE_NUMBER = frozenset({"art", "artt", "n", "nn", "co", "comma", "lett", "pa
 def paragraphs(text: str) -> str:
     """The text with a blank line before each heading, «P.Q.M.» and numbered point that starts a
     sentence; nothing else changes: without its line breaks it is the text without its line
-    breaks."""
+    breaks. A combined heading («… E CONSIDERATO IN DIRITTO») stays one, and a numbered point
+    keeps the words it opens: no break between «3.» and the «P.Q.M.» or heading right after it."""
     cuts = {m.start() for regex in (_HEADING, _LEAD, _PQM) for m in regex.finditer(text)}
+    points = []
     for m in _POINT.finditer(text):
         word = text[:m.start()].rstrip().rsplit(" ", 1)[-1].rstrip(".").lower()
         if re.split(r"['’]", word)[-1] not in _BEFORE_NUMBER:  # «dell'art.» is «art.»
-            cuts.add(m.start())
+            points.append(m)
+    cuts |= {m.start() for m in points}
+    cuts -= {m.end() for m in points}  # a point's label stays with its words: «3. P.Q.M.»
     cuts.discard(0)
     pieces, last = [], 0
     for cut in sorted(cuts):

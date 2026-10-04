@@ -354,11 +354,14 @@ over the reader. From the top:
    line before each heading («FATTI DI CAUSA», «RAGIONI DELLA DECISIONE»,
    «Rilevato che:» …), before «P.Q.M.» and before each numbered point that
    starts a sentence, and changes nothing else (decided by the owner on
-   2026-10-04); the page draws each group of lines between blank lines as a
-   paragraph. Text is rendered as React text, never as HTML. The blocks are
-   labelled «Epigrafe», «Motivazione» and «Dispositivo»; an epigrafe without a
-   motivazione holds the reasoning too and is labelled «Testo» (decided by the
-   owner on 2026-10-04). A decision without its text shows no block.
+   2026-10-04). A combined heading («RITENUTO IN FATTO E CONSIDERATO IN
+   DIRITTO») stays one, and a numbered point keeps the words it opens, with no
+   break between «3.» and a «P.Q.M.» or a heading right after it. The page
+   draws each group of lines between blank lines as a paragraph. Text is
+   rendered as React text, never as HTML. The blocks are labelled «Epigrafe»,
+   «Motivazione» and «Dispositivo»; an epigrafe without a motivazione holds the
+   reasoning too and is labelled «Testo» (decided by the owner on 2026-10-04).
+   A decision without its text shows no block.
 5. **The source**, at the foot: "Fonte: Corte di cassazione — archivio pubblico
    SentenzeWeb (Italgiure)" or "Fonte: Corte costituzionale — dati aperti". A
    dossier's PDF names it too. Neither shows the licence (the owner's decisions

@@ -196,6 +196,19 @@ def test_a_short_stub_about_obscuring_is_never_the_text():
      "Così deciso. \n\n4 - La Corte. \n\nP. Q. M. rigetta."),
     # nothing to mark
     ("Il ricorso è inammissibile per tardività.", "Il ricorso è inammissibile per tardività."),
+    # a combined heading stays one, whatever the case of its connective
+    ("Premessa. RITENUTO IN FATTO E CONSIDERATO IN DIRITTO Il ricorso.",
+     "Premessa. \n\nRITENUTO IN FATTO E CONSIDERATO IN DIRITTO Il ricorso."),
+    ("Premessa. FATTI DI CAUSA e RAGIONI DELLA DECISIONE La Corte.",
+     "Premessa. \n\nFATTI DI CAUSA e RAGIONI DELLA DECISIONE La Corte."),
+    # a numbered point keeps the words it opens: no break between its label and a lead, a
+    # «P.Q.M.» or a heading right after it
+    ("Fine. 1.2. Rileva, poi, la Corte che il motivo.",
+     "Fine. \n\n1.2. Rileva, poi, la Corte che il motivo."),
+    ("Fine. 3. P.Q.M. La Corte rigetta.", "Fine. \n\n3. P.Q.M. La Corte rigetta."),
+    ("Fine. 3. RITENUTO CHE il ricorso.", "Fine. \n\n3. RITENUTO CHE il ricorso."),
+    # a point skipped after «art.» does not take away the lead's own break
+    ("Visto l'art. 5. Considerato che, il ricorso.", "Visto l'art. 5. \n\nConsiderato che, il ricorso."),
 ])
 def test_paragraphs_are_restored_with_blank_lines_only(text, expected):
     assert paragraphs(text) == expected
@@ -204,8 +217,10 @@ def test_paragraphs_are_restored_with_blank_lines_only(text, expected):
 
 def test_a_decision_comes_with_its_paragraphs():
     d = to_decision({"numdec": "1", "anno": "2024",
-                     "ocr": "Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta."}, "civile")
+                     "ocr": "Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta.",
+                     "ocrdis": "Visto il ricorso. P.Q.M. Rigetta."}, "civile")
     assert d.testo["motivazione"] == "Premessa. \n\nFATTI DI CAUSA Il fatto. \n\nP.Q.M. Rigetta."
+    assert d.testo["dispositivo"] == "Visto il ricorso. \n\nP.Q.M. Rigetta."
 
 
 @pytest.mark.live
