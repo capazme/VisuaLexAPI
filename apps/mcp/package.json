@@ -1,0 +1,31 @@
+{
+  "name": "visualex-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VisuaLex's MCP server: the dossier tools for a user's connected applications (MCP spike)",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "dotenv": "^16.3.1",
+    "express": "^5.2.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^20.10.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.5"
+  }
+}

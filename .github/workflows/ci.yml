@@ -48,6 +48,24 @@ jobs:
       - run: npm run build
       - run: npm run lint
 
+  mcp:
+    name: MCP server build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/mcp/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # Against stub servers: no database, no other service.
+      - run: npm test
+
   server:
     name: Server tests
     runs-on: ubuntu-latest
