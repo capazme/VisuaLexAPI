@@ -180,3 +180,35 @@ describe('sessions', () => {
     });
   });
 });
+
+describe('the process cap under pressure (security review of 8482fe66)', () => {
+  it('concurrent initialize requests never open more sessions than the cap', async () => {
+    const { createApp } = await import('../src/server.js');
+    const store = new SessionStore({ maxSessions: 2 });
+    const server = await new Promise<import('node:http').Server>((resolve) => {
+      const s = createApp(env.config, { store }).listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const url = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}/mcp`;
+    const answers = await Promise.all(Array.from({ length: 8 }, () => rpc(url, initialize(), bearer('a'))));
+    await Promise.all(answers.map((r) => r.text()));
+    expect(answers.filter((r) => r.status === 200).length).toBeLessThanOrEqual(2);
+    expect(store.size()).toBeLessThanOrEqual(2);
+    await store.closeAll();
+    await new Promise((r) => server.close(r));
+  });
+
+  it('an initialize that fails leaves no server behind', async () => {
+    const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
+    const close = vi.spyOn(McpServer.prototype, 'close');
+    // An initialize the transport refuses: no Accept header for SSE.
+    const refused = await fetch(env.mcpUrl, {
+      method: 'POST',
+      headers: { ...bearer('a'), 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(initialize()),
+    });
+    expect(refused.status).toBeGreaterThanOrEqual(400);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(env.store.size()).toBe(0);
+    close.mockRestore();
+  });
+});

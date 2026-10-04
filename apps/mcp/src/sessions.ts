@@ -31,6 +31,8 @@ export interface Session {
 export class SessionStore {
   private readonly sessions = new Map<string, Session>();
   private readonly maxSessions: number;
+  /** Sessions being opened: counted against the cap before they exist, so concurrent opens cannot pass it together. */
+  private pending = 0;
 
   constructor(options: { maxSessions?: number } = {}) {
     this.maxSessions = options.maxSessions ?? MAX_SESSIONS;
@@ -38,7 +40,19 @@ export class SessionStore {
 
   /** Whether a new session may open: the process cap is never met by closing someone else's. */
   hasRoom(): boolean {
-    return this.sessions.size < this.maxSessions;
+    return this.sessions.size + this.pending < this.maxSessions;
+  }
+
+  /** Takes a place for a session about to open; false when the process is full. Pair with release(). */
+  reserve(): boolean {
+    if (!this.hasRoom()) return false;
+    this.pending += 1;
+    return true;
+  }
+
+  /** Gives the place back once the open has finished, whether the session now exists or not. */
+  release(): void {
+    this.pending = Math.max(0, this.pending - 1);
   }
 
   /** The session for this id if it belongs to this caller's user and grant; otherwise undefined (answer 404). */

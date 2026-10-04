@@ -151,7 +151,7 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
         return;
       }
       await store.sweep();
-      if (!store.hasRoom()) {
+      if (!store.reserve()) {
         res.status(503).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Too many open sessions: retry later' }, id: null });
         return;
       }
@@ -167,8 +167,17 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
       transport.onclose = () => {
         if (transport.sessionId) void store.close(transport.sessionId);
       };
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
+      try {
+        await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+      } finally {
+        store.release();
+        // An initialize the transport refused never became a session: nothing may keep it alive.
+        if (!transport.sessionId) {
+          await transport.close();
+          await server.close();
+        }
+      }
     } catch (error) {
       console.error('[mcp] request failed:', error instanceof Error ? error.message : 'unknown error');
       if (!res.headersSent) {
