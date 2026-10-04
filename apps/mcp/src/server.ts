@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js';
@@ -100,10 +100,19 @@ export function createApp(config: McpConfig) {
       res.status(401).json({ error: auth.error ?? 'unauthorized' });
       return;
     }
+    // 2025-11-25 has no JSON-RPC batching; a batch would also carry tool
+    // calls past the scope check below, which reads one message.
+    if (Array.isArray(req.body) || !req.body || typeof req.body !== 'object') {
+      res.status(400).json({ jsonrpc: '2.0', error: { code: -32600, message: 'Invalid Request: one JSON-RPC message per request' }, id: null });
+      return;
+    }
     const needed = scopesNeeded(req.body);
     const missing = needed.filter((scope) => !auth.caller.scopes.includes(scope));
     if (missing.length > 0) {
-      res.setHeader('WWW-Authenticate', challenge(config, { error: 'insufficient_scope', scope: needed.join(' ') }));
+      // The scopes the token has plus the ones it lacks: a client that signs in
+      // again with exactly this list keeps what it had (MCP 2025-11-25, step-up).
+      const scope = [...new Set([...auth.caller.scopes, ...needed])].join(' ');
+      res.setHeader('WWW-Authenticate', challenge(config, { error: 'insufficient_scope', scope }));
       res.status(403).json({ error: 'insufficient_scope' });
       return;
     }
@@ -130,6 +139,20 @@ export function createApp(config: McpConfig) {
   app.all(endpoint, (_req, res) => {
     res.setHeader('Allow', 'POST');
     res.status(405).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed' }, id: null });
+  });
+
+  // A body that is not JSON (or too large): a JSON-RPC error, never Express's
+  // HTML page with its stack, and nothing of the body in the logs (the
+  // parser's message quotes it).
+  app.use((error: { type?: string; status?: number }, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) return next(error);
+    if (error.type === 'entity.parse.failed') {
+      res.status(400).json({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null });
+      return;
+    }
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500;
+    if (status === 500) console.error(`[mcp] unhandled ${error.type ?? 'error'}`);
+    res.status(status).json({ jsonrpc: '2.0', error: { code: status === 500 ? -32603 : -32600, message: status === 500 ? 'Internal error' : 'Invalid Request' }, id: null });
   });
 
   return app;

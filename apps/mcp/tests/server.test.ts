@@ -83,7 +83,7 @@ describe('discovery and authentication', () => {
     expect(response.status).toBe(403);
     const header = response.headers.get('www-authenticate') ?? '';
     expect(header).toContain('error="insufficient_scope"');
-    expect(header).toContain('scope="dossier:write"');
+    expect(header).toContain('scope="dossier:read dossier:write"');
     expect(env.stub.apiCalls).toHaveLength(0);
   });
 
@@ -171,5 +171,42 @@ describe('logs', () => {
     expect(log).toContain('user=user-1 client=client-1 tool=omnilex_crea_dossier outcome=ok');
     for (const secret of ['good', 'api-token-for', 'stub-mcp-secret', 'Pratica riservata']) expect(log).not.toContain(secret);
     await client.close();
+  });
+});
+
+describe('review findings on PR #60', () => {
+  it('M-1. refuses a JSON-RPC batch before the tools: 2025-11-25 has no batching, and a batch would dodge the scope check', async () => {
+    const response = await rpc(env.mcpUrl, [callTool('omnilex_crea_dossier', { nome: 'X' })], { authorization: 'Bearer readonly' });
+    expect(response.status).toBe(400);
+    expect(env.stub.apiCalls).toHaveLength(0);
+    expect(env.stub.exchanges).toHaveLength(0);
+  });
+
+  it('M-2. the insufficient_scope challenge keeps the scopes the token already has', async () => {
+    const response = await rpc(env.mcpUrl, callTool('omnilex_crea_dossier', { nome: 'X' }), { authorization: 'Bearer readonly' });
+    expect(response.status).toBe(403);
+    expect(response.headers.get('www-authenticate')).toContain('scope="dossier:read dossier:write"');
+  });
+
+  it('M-3. a malformed body is a JSON-RPC parse error, with no stack and nothing of the body in the logs', async () => {
+    const lines: string[] = [];
+    const spies = (['log', 'info', 'warn', 'error'] as const).map((m) =>
+      vi.spyOn(console, m).mockImplementation((...args: unknown[]) => void lines.push(args.map(String).join(' '))),
+    );
+    try {
+      const response = await fetch(env.mcpUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer good' },
+        body: '{"Pratica Rossi": tru',
+      });
+      expect(response.status).toBe(400);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      const body = (await response.json()) as { error: { code: number } };
+      expect(body.error.code).toBe(-32700);
+      expect(JSON.stringify(body)).not.toMatch(/node_modules|at .*\.js/);
+      expect(lines.join('\n')).not.toContain('Pratica');
+    } finally {
+      spies.forEach((spy) => spy.mockRestore());
+    }
   });
 });
