@@ -124,9 +124,14 @@ async def _run_promote(batch_id: str, force: bool) -> dict:
         await falkordb.connect()
         try:
             try:
-                result = await promote_batch(
-                    falkordb, batch.nodes or [], batch.edges or [], force=force
-                )
+                if batch.source == "massimario":
+                    from merlt.pipeline.massimario.promote import promote_massimario_graph
+
+                    result = await promote_massimario_graph(falkordb, batch.nodes or [], batch.edges or [])
+                else:
+                    result = await promote_batch(
+                        falkordb, batch.nodes or [], batch.edges or [], force=force
+                    )
             except PromotionBlockedError as e:
                 # The router already pre-checked this before enqueueing; only
                 # reachable if the graph changed between that check and the

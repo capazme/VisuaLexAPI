@@ -271,14 +271,20 @@ class _Volume:
                 pair = (d.identity.key, urn)
                 edge = self.edges.get(pair)
                 if edge is None:
-                    mass_key = hashlib.sha1(f"{pair[0]}|{urn}|{self.meta.volume_id}".encode()).hexdigest()
+                    # one edge per (decision, norm) across every volume (spec 5.4): the
+                    # years and volumes are unions and the paragraphs are counted per
+                    # volume, so promote.py merges a volume's share and a re-run
+                    # rewrites it instead of adding a parallel edge
+                    mass_key = hashlib.sha1(f"{pair[0]}|{urn}".encode()).hexdigest()
                     edge = self.edges[pair] = {"start": pair[0], "end": urn, "type": Rel.INTERPRETA.value, "properties": {
                         "tipo": "co-citazione", "confidenza": COCITATION_CONFIDENCE,
                         "fonte": Fonte.MASSIMARIO.value, "provenance": Provenance.INGESTION.value,
-                        "anno_rassegna": self.meta.anno, "volume": self.meta.volume_id,
+                        "anni_rassegna": [self.meta.anno], "volumi": [self.meta.volume_id],
                         "paragrafi": 0, "_mass_key": mass_key,
                     }}
-                edge["properties"]["paragrafi"] += 1
+                props = edge["properties"]
+                props["paragrafi"] += 1
+                props["paragrafi_per_volume"] = [f"{self.meta.volume_id}:{props['paragrafi']}"]
 
     def add_chunks(self, ctx: ParagraphContext, norms: list[dict], decisions: list[CitedDecision]) -> None:
         text = ctx.paragraph.text

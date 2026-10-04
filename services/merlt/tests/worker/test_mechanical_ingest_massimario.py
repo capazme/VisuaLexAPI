@@ -60,3 +60,25 @@ async def test_add_graph_counts():
     assert report["massimario"]["norme"]["gia_nel_grafo"] == 1
     assert report["massimario"]["pronunce"]["gia_nel_grafo"] == 2
     assert (report["stats"]["nodes_update"], report["stats"]["nodes_new"]) == (3, 1)
+
+
+async def test_massimario_promotion_uses_its_own_writer():
+    batch = fake_batch()
+    batch.status, batch.nodes, batch.edges = "promoting", [{"id": "x", "labels": ["Norma"], "properties": {}}], []
+    batch.extras = {"chunks": []}
+
+    @asynccontextmanager
+    async def session():
+        yield FakeSession(batch)
+
+    graph = MagicMock(connect=AsyncMock(), close=AsyncMock())
+    with patch("merlt.storage.enrichment.database.init_db", new=AsyncMock()), \
+         patch("merlt.storage.enrichment.database.get_db_session", new=session), \
+         patch("merlt.storage.graph.client.FalkorDBClient", return_value=graph), \
+         patch("merlt.pipeline.massimario.promote.promote_massimario_graph",
+               new=AsyncMock(return_value={"nodes_merged": 1, "edges_merged": 0, "edges_skipped": 0})) as own, \
+         patch("merlt.pipeline.mechanical_ingestion.promote.promote_batch", new=AsyncMock()) as generic:
+        result = await tasks._run_promote("b1", False)
+    assert result["status"] == "promoted"
+    own.assert_awaited_once()
+    generic.assert_not_awaited()

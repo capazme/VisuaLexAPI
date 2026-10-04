@@ -50,7 +50,8 @@ def test_weak_edges_only_inside_a_paragraph():
     assert edge["type"] == "INTERPRETA"
     props = edge["properties"]
     assert (props["tipo"], props["confidenza"], props["paragrafi"]) == ("co-citazione", 0.5, 2)
-    assert props["anno_rassegna"] == 2024 and props["volume"] == 9001 and props["_mass_key"]
+    assert props["anni_rassegna"] == [2024] and props["volumi"] == [9001] and props["_mass_key"]
+    assert props["paragrafi_per_volume"] == ["9001:2"]
     assert ("cassazione:civile:567:2023", CC_2043) not in edges  # different paragraphs
 
 
