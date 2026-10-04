@@ -159,3 +159,10 @@ export function dossierItemOrder(items: DossierItem[], layout: DossierLayout, ac
   const placed = new Set(ordered);
   return [...ordered, ...items.filter((i) => !placed.has(i.id)).map((i) => i.id)];
 }
+
+/** A dossier card's line: its acts by heading, in order, then «e altri N» past `max`. */
+export function actsSummary(layout: DossierLayout, max = 3): string {
+  const names = layout.acts.map((a) => a.heading);
+  if (names.length <= max) return names.join(' · ');
+  return `${names.slice(0, max).join(' · ')} e altri ${names.length - max}`;
+}

@@ -27,6 +27,7 @@ import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import type { Dossier } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { actsSummary, layoutDossier } from './dossierLayout';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -346,6 +347,8 @@ export function DossierListView({ onSelect, showToast }: Props) {
           filteredDossiers.map((dossier, idx) => {
             const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
             const counts = computeItemCounts(dossier.items);
+            // The acts it holds, named as the dossier names them (spec §10).
+            const acts = actsSummary(layoutDossier(dossier.items));
             return (
               <div
                 key={dossier.id}
@@ -432,9 +435,12 @@ export function DossierListView({ onSelect, showToast }: Props) {
                     )}
                   </div>
                 )}
-                <p className="mt-2 md:mt-3 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                {acts && (
+                  <p className="mt-2 md:mt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{acts}</p>
+                )}
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
                   <span>
-                    {counts.norme} {counts.norme === 1 ? 'norma' : 'norme'} · {counts.note} {counts.note === 1 ? 'nota' : 'note'}
+                    {counts.note} {counts.note === 1 ? 'nota' : 'note'}
                   </span>
                   {counts.important > 0 && (
                     <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400"

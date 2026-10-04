@@ -91,3 +91,19 @@ describe('DossierListView — the menu of a card', () => {
     expect(screen.getByText('Eliminare questo dossier?')).toBeInTheDocument();
   });
 });
+
+describe('DossierListView — a card names its acts', () => {
+  it('lists the acts a dossier holds, and its notes', () => {
+    appStore.setState({ dossiers: [{
+      id: 'd1', title: 'Pratica Rossi', createdAt: '2026-08-01T10:00:00.000Z',
+      items: [
+        { id: 'a', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z', actCitation: 'l. 31 dicembre 2012, n. 247', data: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' } },
+        { id: 'b', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z', data: CIVIL },
+        { id: 'n', type: 'note', addedAt: '2026-08-01T10:00:00.000Z', data: 'appunto' },
+      ],
+    }], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByText('l. 31 dicembre 2012, n. 247 · Codice civile')).toBeInTheDocument();
+    expect(screen.getByText('1 nota')).toBeInTheDocument();
+  });
+});

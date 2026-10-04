@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DossierItem, NormaVisitata } from '../../../types';
-import { actKeyOf, articleLabel, codeName, compareArticles, dossierItemOrder, foldedArticleList, layoutDossier } from './dossierLayout';
+import { actKeyOf, actsSummary, articleLabel, codeName, compareArticles, dossierItemOrder, foldedArticleList, layoutDossier } from './dossierLayout';
 
 let n = 0;
 function art(data: Partial<NormaVisitata> & { numero_articolo: string }, actCitation?: string | null): DossierItem {
@@ -130,5 +130,14 @@ describe('the smaller helpers', () => {
       art({ numero_articolo: '1', allegato: 'A' }, L247),
     ]);
     expect(foldedArticleList(acts[0])).toBe('artt. 3, All. A art. 1');
+  });
+});
+
+describe('actsSummary', () => {
+  it('names the acts in order, then counts the rest', () => {
+    const items = ['1', '2', '3', '4'].map((k, i) => art({ numero_atto: k, data: `200${i}-01-01`, numero_articolo: '1' }, `l. ${k}`));
+    expect(actsSummary(layoutDossier(items))).toBe('l. 1 · l. 2 · l. 3 e altri 1');
+    expect(actsSummary(layoutDossier(items.slice(0, 3)))).toBe('l. 1 · l. 2 · l. 3');
+    expect(actsSummary(layoutDossier([note('x')]))).toBe('');
   });
 });
