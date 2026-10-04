@@ -191,9 +191,20 @@ export function showUndoToast<T>({
   // Execute action first, then drive the toast countdown synchronously.
   return Promise.resolve(action()).then((result) => new Promise<boolean>((resolve) => {
     let resolved = false;
-    // Declared before the handlers: once the toast is resolved, its countdown must stop, or the
-    // next tick would show it again as a ghost.
-    let interval: ReturnType<typeof setInterval> | undefined;
+    let timeRemaining = duration;
+
+    // Declared before the handlers, which stop it: once the toast is resolved its countdown must
+    // end, or the next tick would show it again as a ghost. The tick runs after this scope has
+    // finished, so the handlers it calls exist by then.
+    const interval = setInterval(() => {
+      timeRemaining -= 100;
+      if (timeRemaining <= 0) {
+        clearInterval(interval);
+        handleDismiss();
+      } else {
+        updateToast();
+      }
+    }, 100);
 
     const handleUndo = async () => {
       if (resolved) return;
@@ -212,9 +223,6 @@ export function showUndoToast<T>({
       resolve(true);
     };
 
-    // Start countdown
-    let timeRemaining = duration;
-
     const updateToast = () => {
       toastListener?.({
         message,
@@ -225,16 +233,5 @@ export function showUndoToast<T>({
     };
 
     updateToast();
-
-    // Update countdown
-    interval = setInterval(() => {
-      timeRemaining -= 100;
-      if (timeRemaining <= 0) {
-        clearInterval(interval);
-        handleDismiss();
-      } else {
-        updateToast();
-      }
-    }, 100);
   }));
 }
