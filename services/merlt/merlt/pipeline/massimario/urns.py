@@ -50,9 +50,10 @@ _ACT = re.compile(r"([a-z.]{1,60}):([a-z.]{1,60}):(\d{4}(?:-\d{2}-\d{2})?)(?:;([
 _ARTICLE = re.compile(r"art(\d{1,5}[a-z]*(?:\.\d{1,2})?)(?:-(.+))?")
 # The portal links some Sezione lavoro citations as laws: in "Sez. 6 - L, n. 09952/2022"
 # the anchor is "L, n. 09952/2022" and the href `stato:legge:2022;9522`. The anchor is
-# the section's letter, with a comma after it, or after a section label.
+# the section's letter, with a comma after it, or after a section label; lower case only
+# after a label ("conv. in l, n. 27 del 2012" is a law).
 _SECTION_LETTER = re.compile(r"L\.?\s*,")
-_SECTION_LETTER_AFTER_LABEL = re.compile(r"L\.?\s")
+_SECTION_LETTER_AFTER_LABEL = re.compile(r"[Ll]\.?[\s,]")
 _SECTION_LABEL_BEFORE = re.compile(r"\bSez(?:ione|\.)?\s*,?\s*(?:[0-9]{1,2}\s*[-–]?\s*)?$", re.IGNORECASE)
 
 

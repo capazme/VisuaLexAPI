@@ -60,3 +60,11 @@ def test_quotes_written_as_angle_brackets_are_text():
     )
     (link,) = p.links
     assert p.text[link.start:link.end] == "art. 2043 c.c."
+
+
+def test_hostile_unquoted_attributes_stay_linear():
+    import time
+
+    start = time.monotonic()
+    extract_paragraphs("<a x=" * 20_000)
+    assert time.monotonic() - start < 2

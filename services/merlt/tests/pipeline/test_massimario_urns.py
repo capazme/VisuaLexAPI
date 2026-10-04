@@ -101,6 +101,7 @@ def test_an_act_number_never_starts_with_zero():
     ("e Sez. ", "L, n. 687 del 2014"),
     ("qui anche Sez. ", "L. n. 24474/2024"),
     ("così ", "L, n. 1234/2020"),
+    ("da ultimo Sez. ", "l, n. 13941 del 08/01/2015"),
 ])
 def test_a_section_label_linked_as_a_law_is_a_decision(before, text):
     assert is_decision_link(text, before)
@@ -111,6 +112,8 @@ def test_a_section_label_linked_as_a_law_is_a_decision(before, text):
     ("in attuazione della ", "L. 146/90"),
     ("della ", "legge n. 89 del 2001"),
     ("il ", "L. n. 67 del 1939"),
+    ("conv. in ", "l, n. 27 del 2012"),
+    ("dalla ", "l., n. 109 del 1994"),
 ])
 def test_a_law_is_not_a_decision(before, text):
     assert not is_decision_link(text, before)

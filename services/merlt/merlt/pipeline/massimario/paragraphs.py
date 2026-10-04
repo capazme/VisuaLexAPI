@@ -18,8 +18,9 @@ _SKIP = {"script", "style"}
 # is the author's text (`<<i fatti>>` is not an <i> tag).
 _TAG = re.compile(
     r"</?(?:p|a|br|b|i|u|em|strong|sup|sub|span|div|li|ul|ol|blockquote|tr|td|th|table|tbody|thead"
-    r"|h[1-6]|img|script|style|font)"
-    r"(?:\s+[\w:-]{1,40}\s*=\s*(?:\"[^\"]{0,2000}\"|'[^']{0,2000}'|[^\s\"'>]{1,2000}))*\s*/?>"
+    r"|h[1-6]|img|script|style|font|center|iframe|object|embed|svg|math|link|meta|form|input|button"
+    r"|textarea|select|option|label|o:p)"
+    r"(?:\s+[\w:-]{1,40}\s*=\s*(?:\"[^\"]{0,2000}\"|'[^']{0,2000}'|[^\s\"'<>]{1,2000}))*\s*/?>"
     r"|<!--",
     re.IGNORECASE,
 )

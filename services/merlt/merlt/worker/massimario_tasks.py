@@ -69,10 +69,11 @@ async def _run_index_slice(batch_id: str, start: int) -> dict:
             await index_chunks(part, embeddings=_embeddings(), qdrant=build_qdrant_client(),
                                bridge=bridge, collection=default_chunks_collection())
         except Exception as e:  # noqa: BLE001 — recorded on the batch, the chain stops
-            log.error("massimario.index_slice.failed", batch_id=batch_id, start=start, error=str(e))
-            batch.stats = {**(batch.stats or {}), "vectors": {"done": start, "total": len(chunks), "error": str(e)}}
+            error = str(e) or type(e).__name__  # a timeout's message is empty
+            log.error("massimario.index_slice.failed", batch_id=batch_id, start=start, error=error)
+            batch.stats = {**(batch.stats or {}), "vectors": {"done": start, "total": len(chunks), "error": error}}
             await session.commit()
-            return {"batch_id": batch_id, "status": "failed", "error": str(e)}
+            return {"batch_id": batch_id, "status": "failed", "error": error}
         finally:
             await bridge.close()
         batch.stats = {**(batch.stats or {}), "vectors": {"done": done, "total": len(chunks)}}

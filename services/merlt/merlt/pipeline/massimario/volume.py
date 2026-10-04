@@ -233,7 +233,7 @@ class _Volume:
                 continue
             if d.identity.key in unique:
                 kept = unique[d.identity.key]
-                kept.rv += [rv for rv in d.rv if rv not in kept.rv]
+                kept.rv += [rv for rv in dict.fromkeys(d.rv) if rv not in kept.rv]
             else:
                 unique[d.identity.key] = d
         for d in unique.values():
@@ -256,7 +256,7 @@ class _Volume:
             props["sezioni"].append(d.sezione)
             if len(props["sezioni"]) > 1:
                 self.multi_section[key] = set(props["sezioni"])
-        props["rv"] += [rv for rv in d.rv if rv not in props["rv"]]
+        props["rv"] += [rv for rv in dict.fromkeys(d.rv) if rv not in props["rv"]]
         for name, value in (("relatore", d.relatore), ("data_udienza", d.data_udienza)):
             if value and not props.get(name):
                 props[name] = value

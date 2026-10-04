@@ -116,3 +116,10 @@ def test_a_decision_linked_as_a_law_is_no_norm():
     assert not any("9522" in n["id"] for n in out["nodes"])
     assert out["report"]["massimario"]["norme"]["link_a_pronunce"] == 1
     assert "cassazione:civile:9952:2022" in {n["id"] for n in out["nodes"]}
+
+
+def test_a_repeated_rv_is_stored_once():
+    raw = volume_9001()
+    raw["sezioni"][9201]["testo"] += "<p>Sez. 3, n. 777/2024, Rv. 670200-01, Rv. 670200-01.</p>"
+    nodes = nodes_by_id(build_volume(raw, resolved=RESOLVED, bands=BANDS))
+    assert nodes["cassazione:civile:777:2024"]["properties"]["rv"] == ["670200-01"]

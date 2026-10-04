@@ -85,3 +85,21 @@ async def test_massimario_promotion_uses_its_own_writer():
     generic.assert_not_awaited()
     enqueue.assert_called_once_with("b1", 0)
     assert batch.stats["vectors"] == {"done": 0, "total": 0}
+
+
+async def test_a_visualex_timeout_fails_the_batch_with_a_reason():
+    import httpx
+
+    batch = fake_batch()
+
+    @asynccontextmanager
+    async def session():
+        yield FakeSession(batch)
+
+    adapter = SimpleNamespace(parse=AsyncMock(side_effect=httpx.ReadTimeout("")))
+    with patch("merlt.storage.enrichment.database.init_db", new=AsyncMock()), \
+         patch("merlt.storage.enrichment.database.get_db_session", new=session), \
+         patch("merlt.pipeline.mechanical_ingestion.parser.get_adapter", return_value=adapter):
+        result = await tasks._run_parse_and_stage("b1")
+    assert result["status"] == "failed" and batch.status == "failed"
+    assert batch.error == "ReadTimeout"

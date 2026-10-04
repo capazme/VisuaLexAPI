@@ -72,11 +72,13 @@ async def _run_parse_and_stage(batch_id: str) -> dict:
             batch.status = "pending_review"
             batch.error = None
         except Exception as e:  # noqa: BLE001 — surface every parse/report failure on the batch row
-            log.error("mechanical_ingest.parse_and_stage.failed", batch_id=batch_id, error=str(e))
+            # a timeout's message is empty: the batch row names at least its kind
+            error = str(e) or type(e).__name__
+            log.error("mechanical_ingest.parse_and_stage.failed", batch_id=batch_id, error=error)
             batch.status = "failed"
-            batch.error = str(e)
+            batch.error = error
             await session.commit()
-            return {"batch_id": batch_id, "status": "failed", "error": str(e)}
+            return {"batch_id": batch_id, "status": "failed", "error": error}
 
         await session.commit()
 
@@ -148,11 +150,12 @@ async def _run_promote(batch_id: str, force: bool) -> dict:
             # unexpected bug) must not leave the batch stuck "promoting" forever with no
             # job behind it. `_merge_nodes`/`_merge_edges` are idempotent MERGEs, so the
             # router allows a `failed` batch to be re-promoted (see design doc §10).
-            log.error("mechanical_ingest.promote.failed", batch_id=batch_id, error=str(e))
+            error = str(e) or type(e).__name__  # a timeout's message is empty
+            log.error("mechanical_ingest.promote.failed", batch_id=batch_id, error=error)
             batch.status = "failed"
-            batch.error = str(e)
+            batch.error = error
             await session.commit()
-            return {"batch_id": batch_id, "status": "failed", "error": str(e)}
+            return {"batch_id": batch_id, "status": "failed", "error": error}
         finally:
             await falkordb.close()
 
