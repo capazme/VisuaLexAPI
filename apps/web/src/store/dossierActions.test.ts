@@ -11,6 +11,7 @@ vi.mock('../services/dossierService', () => ({
     updateItem: vi.fn(async () => ({})),
     deleteItem: vi.fn(async () => {}),
     reorderItems: vi.fn(async () => {}),
+    addNote: vi.fn(async () => ({})),
   },
 }));
 
@@ -285,5 +286,40 @@ describe('the order after a refusal, and after a restore', () => {
     await vi.waitFor(() => expect(appStore.getState().dossiers[0].items).toHaveLength(0));
     expect(appStore.getState().lastSyncError?.message).toMatch(/ripristinare/);
     error.mockRestore();
+  });
+});
+
+describe('notes through the notes route', () => {
+  it('adds a note about an article once the server has it', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.addNote).mockResolvedValueOnce({
+      id: 'srv-n', item_type: 'note', title: 'Nota', content: 'Sul danno.', position: 1, status: 'unread', created_at: '2026-10-04',
+      about_item_id: 'a', created_by: null,
+    });
+    expect(await appStore.getState().addNoteToDossier('d1', 'Sul danno.', 'a')).toBe(true);
+    expect(dossierService.addNote).toHaveBeenCalledWith('d1', { text: 'Sul danno.', aboutItemId: 'a' });
+    expect(appStore.getState().dossiers[0].items).toEqual([
+      expect.objectContaining({ id: 'srv-n', type: 'note', data: 'Sul danno.', aboutItemId: 'a', createdBy: null }),
+    ]);
+  });
+
+  it('adds nothing and says so when the server refuses', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }] });
+    vi.mocked(dossierService.addNote).mockRejectedValueOnce(new Error('400'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await appStore.getState().addNoteToDossier('d1', 'x')).toBe(false);
+    expect(appStore.getState().dossiers[0].items).toHaveLength(0);
+    expect(appStore.getState().lastSyncError?.message).toMatch(/nota/);
+    error.mockRestore();
+  });
+
+  it("reattaches an article's notes to the id the article comes back with", async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'n1', type: 'note', data: 'Sul danno.', addedAt: '', aboutItemId: 'old' },
+    ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('new'));
+    appStore.getState().restoreDossierItem('d1', { id: 'old', type: 'norma', data: norma, addedAt: '' }, 0);
+    await vi.waitFor(() => expect(dossierService.updateItem).toHaveBeenCalledWith('d1', 'n1', { aboutItemId: 'new' }));
+    expect(appStore.getState().dossiers[0].items.find((i) => i.id === 'n1')?.aboutItemId).toBe('new');
   });
 });

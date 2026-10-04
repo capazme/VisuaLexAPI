@@ -262,6 +262,15 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   temporary id, while an added or restored item is pending
   (`pendingDossierOrders`). Articles do not drag. The header has three actions
   and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
+- **Notes**: every note a dossier gets from the web takes the notes route
+  (`addNoteToDossier` → `POST /dossiers/:id/notes`), the one Claude's notes take
+  through MCP. A note about an article (`aboutItemId`) sits with it: a count on
+  the closed row, the notes above the text when open, «Aggiungi una nota
+  all'articolo»; a note whose article is no longer in the dossier shows among
+  the free notes. An entry an application wrote carries `ClaudeMark` («scritta
+  da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
+  gives the article a new id: `restoreDossierItem` reattaches its notes
+  (`PUT …/items/:noteId {aboutItemId}`).
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
@@ -409,8 +418,8 @@ Duplicating any of these is a defect, not a shortcut.
   (exact → whitespace-tolerant search → the occurrence whose context agrees;
   never guesses: ambiguous or missing = `detached`).
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
-  `packItemContent`/`unpackItemContent`, `dossierItemFromApi`/`citationsFromApi`
-  (a server item as the store holds it), `computeItemCounts`, `dossierRecency`,
+  `packItemContent`/`unpackItemContent`, `dossierItemFromApi`/`serverFieldsFromApi`
+  (a server item as the store holds it: citations, `aboutItemId`, `createdBy`), `computeItemCounts`, `dossierRecency`,
   `dossierContainsArticle`, `normaForDossier`, `computeNormaGroups`,
   `formatTimestampLong`.
 - `components/features/dossier/dossierLayout.ts` — `layoutDossier`, `actKeyOf`,

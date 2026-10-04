@@ -13,6 +13,8 @@ import { articleLabel, layoutDossier } from './dossierLayout';
 
 export interface PdfArticle {
   label: string;
+  /** The notes about this article, each with who wrote it when an application did. */
+  notes: string[];
   rubrica: string | null;
   versionLabel: string | null;
   text: string;
@@ -30,6 +32,12 @@ export interface LoadedText {
 }
 
 export const PDF_TEXT_UNAVAILABLE = 'Testo non disponibile al momento';
+
+// A note as the PDF prints it: its text, then who wrote it when an application did.
+function noteLine(note: DossierItem): string {
+  const by = note.createdBy ? ` (scritta da ${note.createdBy.clientName?.trim() || "un'applicazione collegata"})` : '';
+  return `${String(note.data)}${by}`;
+}
 
 function plain(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -72,7 +80,7 @@ export function buildPdfBlocks(
 ): PdfBlock[] {
   const layout = layoutDossier(items);
   const blocks: PdfBlock[] = [];
-  if (layout.notes.length > 0) blocks.push({ kind: 'notes', notes: layout.notes.map((n) => String(n.data)) });
+  if (layout.notes.length > 0) blocks.push({ kind: 'notes', notes: layout.notes.map(noteLine) });
   for (const act of layout.acts) {
     blocks.push({
       kind: 'act',
@@ -82,6 +90,7 @@ export function buildPdfBlocks(
         const loaded = texts.get(item.id);
         const base = {
           label: articleLabel(item.data),
+          notes: (layout.attached.get(item.id) ?? []).map(noteLine),
           rubrica: loaded?.rubrica ?? null,
           versionLabel: historicalItemLabel(item.data),
         };

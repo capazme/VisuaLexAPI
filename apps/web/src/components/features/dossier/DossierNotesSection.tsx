@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { DossierItem } from '../../../types';
 import { formatTimestampLong } from './dossierUtils';
+import { ClaudeMark } from './ClaudeMark';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -35,7 +36,10 @@ function NoteRow({ note, onRemove }: { note: NoteItem; onRemove: () => void }) {
           </button>
         )}
       </div>
-      <span className="flex-shrink-0 pt-0.5 text-xs text-slate-500 dark:text-slate-400">{formatTimestampLong(note.addedAt)}</span>
+      <span className="flex flex-shrink-0 flex-col items-end gap-1 pt-0.5 text-xs text-slate-500 dark:text-slate-400">
+        {formatTimestampLong(note.addedAt)}
+        <ClaudeMark createdBy={note.createdBy ?? null} />
+      </span>
       <button
         type="button"
         onClick={onRemove}

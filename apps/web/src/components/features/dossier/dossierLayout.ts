@@ -10,6 +10,7 @@ import { computeNormaGroups, type NormaGroup } from './dossierUtils';
  */
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
+type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
 export interface ActBlock {
   key: string;
@@ -24,7 +25,10 @@ export interface ActBlock {
 }
 
 export interface DossierLayout {
+  /** Free notes, and notes whose article is no longer in the dossier. */
   notes: DossierItem[];
+  /** Article item id → the notes about it (MCP second round, `about_item_id`). */
+  attached: Map<string, NoteItem[]>;
   acts: ActBlock[];
 }
 
@@ -132,12 +136,17 @@ function fallbackHeading(norma: NormaVisitata): string {
 
 export function layoutDossier(items: DossierItem[]): DossierLayout {
   const notes: DossierItem[] = [];
+  const attached = new Map<string, NoteItem[]>();
   const byKey = new Map<string, NormaItem[]>();
+  const articleIds = new Set(items.filter((i) => i.type === 'norma').map((i) => i.id));
   for (const item of items) {
     if (item.type === 'norma') {
       const key = actKeyOf(item.data);
       const list = byKey.get(key);
       if (list) list.push(item); else byKey.set(key, [item]);
+    } else if (item.aboutItemId && articleIds.has(item.aboutItemId)) {
+      const list = attached.get(item.aboutItemId);
+      if (list) list.push(item); else attached.set(item.aboutItemId, [item]);
     } else {
       notes.push(item);
     }
@@ -155,7 +164,7 @@ export function layoutDossier(items: DossierItem[]): DossierLayout {
       groups: computeNormaGroups(sorted),
     };
   });
-  return { notes, acts };
+  return { notes, attached, acts };
 }
 
 /**

@@ -1,15 +1,19 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { StickyNote, X } from 'lucide-react';
+import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../../constants/zIndex';
 
 interface Props {
   onClose: () => void;
   onSave: (text: string) => void;
+  /** What the note is about, as the dialog's title; the dossier itself by default. */
+  heading?: string;
 }
 
 // The cap the MCP round sets for Claude's notes too (S11): one cap for every note of a dossier.
 const MAX_NOTE_LENGTH = 4000;
 
-export function AddNoteModal({ onClose, onSave }: Props) {
+export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al dossier' }: Props) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -41,13 +45,18 @@ export function AddNoteModal({ onClose, onSave }: Props) {
   const remaining = MAX_NOTE_LENGTH - text.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-note-heading"
+      className={cn(Z_INDEX.modal, 'fixed inset-0 flex items-center justify-center p-4')}
+    >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-800 flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h3 className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
-            <StickyNote size={20} className="text-yellow-500" />
-            Aggiungi una nota al dossier
+          <h3 id="add-note-heading" className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+            <StickyNote size={20} className="text-yellow-500 flex-shrink-0" />
+            {heading}
           </h3>
           <button
             type="button"

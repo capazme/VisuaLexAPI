@@ -91,6 +91,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     triggerSearch,
     triggerMultiSearch,
     addToDossier,
+    addNoteToDossier,
     addWorkspaceTab,
   } = useAppStore();
   const navigate = useNavigate();
@@ -107,7 +108,8 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [openPickerGroups, setOpenPickerGroups] = useState<NormaGroup[] | null>(null);
-  const [addNoteOpen, setAddNoteOpen] = useState(false);
+  // The note being written: about the dossier (no article), or about one article.
+  const [noteTarget, setNoteTarget] = useState<{ aboutItemId?: string; heading: string } | null>(null);
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
@@ -343,9 +345,11 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     }
   };
 
-  const handleAddNote = (text: string) => {
-    addToDossier(dossier.id, text, 'note');
-    showToast('Nota aggiunta al dossier', 'success');
+  // Every note of a dossier takes the notes route, the one Claude's notes take too.
+  const handleAddNote = async (text: string) => {
+    if (!noteTarget) return;
+    const saved = await addNoteToDossier(dossier.id, text, noteTarget.aboutItemId);
+    if (saved) showToast(noteTarget.aboutItemId ? "Nota aggiunta all'articolo" : 'Nota aggiunta al dossier', 'success');
   };
 
   const handleTreeImport = (
@@ -458,6 +462,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           ensureSpace(32);
           const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
           write(head, 11, 'bold', 15);
+          article.notes.forEach((text) => write(`Nota: ${text}`, 9, 'italic', 12));
           write(article.text, 9, article.missing === 'none' ? 'normal' : 'italic', 12, article.missing !== 'none');
           y += 10;
         });
@@ -562,7 +567,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               triggerClassName={SECONDARY_BUTTON}
               items={[
                 { label: 'Articoli da una norma', icon: TreeDeciduous, onSelect: () => setTreeNavigatorAct(null) },
-                { label: 'Nota', icon: StickyNote, onSelect: () => setAddNoteOpen(true) },
+                { label: 'Nota', icon: StickyNote, onSelect: () => setNoteTarget({ heading: 'Aggiungi una nota al dossier' }) },
                 { label: 'Cerca un articolo', icon: Search, onSelect: () => navigate('/') },
               ]}
             >
@@ -751,6 +756,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                       onRemoveItem={handleRemoveSingle}
                       onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
                       showToast={showToast}
+                      attachedNotes={layout.attached}
+                      onAddNote={(item) => setNoteTarget({
+                        aboutItemId: item.id,
+                        heading: `Nota su ${item.citation ?? (item.type === 'norma' ? `art. ${item.data.numero_articolo}` : 'questo articolo')}`,
+                      })}
+                      onRemoveNote={handleRemoveSingle}
                     />
                   ))}
                 </div>
@@ -785,10 +796,11 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         />
       )}
 
-      {addNoteOpen && (
+      {noteTarget && (
         <AddNoteModal
-          onClose={() => setAddNoteOpen(false)}
-          onSave={handleAddNote}
+          heading={noteTarget.heading}
+          onClose={() => setNoteTarget(null)}
+          onSave={(text) => void handleAddNote(text)}
         />
       )}
 
