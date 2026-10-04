@@ -198,3 +198,57 @@ describe('addToDossier reads the citations of the answer', () => {
     expect(appStore.getState().dossiers[0].items[0]).toMatchObject({ citation: 'art. 2043 c.c.', actCitation: 'c.c.' });
   });
 });
+
+describe('setDossierItemOrder', () => {
+  const two = () => [
+    { id: 'a', type: 'note' as const, data: 'a', addedAt: '' },
+    { id: 'b', type: 'note' as const, data: 'b', addedAt: '' },
+  ];
+
+  it('reorders locally and saves the whole order', () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: two() }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().setDossierItemOrder('d1', ['b', 'a']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b', 'a']);
+    expect(dossierService.reorderItems).toHaveBeenCalledWith('d1', ['b', 'a']);
+  });
+
+  it('never sends a temporary id: the save waits while an item is pending', () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'tmp', type: 'note', data: 'a', addedAt: '' }, { id: 'b', type: 'note', data: 'b', addedAt: '' },
+    ] }], pendingDossierItemIds: { tmp: true }, pendingDossierOrders: {} });
+    appStore.getState().setDossierItemOrder('d1', ['b', 'tmp']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b', 'tmp']);
+    expect(dossierService.reorderItems).not.toHaveBeenCalled();
+    expect(appStore.getState().pendingDossierOrders).toEqual({ d1: true });
+  });
+
+  it('reverts and says so when the server refuses', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: two() }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.reorderItems).mockRejectedValueOnce(new Error('500'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.getState().setDossierItemOrder('d1', ['b', 'a']);
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a', 'b']));
+    error.mockRestore();
+  });
+
+  it('keeps the items the order does not name, after the named ones', () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: two() }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().setDossierItemOrder('d1', ['b']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b', 'a']);
+  });
+
+  it('replays a waiting order with the server ids once the pending item settles', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'b', type: 'note', data: 'b', addedAt: '' },
+    ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    let settle: (value: DossierItemApi) => void = () => {};
+    vi.mocked(dossierService.addItem).mockReturnValueOnce(new Promise((resolve) => { settle = resolve; }));
+    appStore.getState().addToDossier('d1', norma, 'norma');
+    const tempId = appStore.getState().dossiers[0].items[1].id;
+    appStore.getState().setDossierItemOrder('d1', [tempId, 'b']);
+    expect(dossierService.reorderItems).not.toHaveBeenCalled();
+    settle(fakeDossierItemApi('srv-7'));
+    await vi.waitFor(() => expect(dossierService.reorderItems).toHaveBeenCalledWith('d1', ['srv-7', 'b']));
+    expect(appStore.getState().pendingDossierOrders).toEqual({});
+  });
+});

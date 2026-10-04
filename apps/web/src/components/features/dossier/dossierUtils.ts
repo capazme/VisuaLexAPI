@@ -8,7 +8,7 @@ import type { DossierItemApi } from '../../../services/dossierService';
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
 // The UI now only ever writes/reads 'unread' | 'important' (see the amber
-// star in SortableDossierItem) — 'reading' and 'done' are inert leftovers.
+// star in DossierArticleRow) — 'reading' and 'done' are inert leftovers.
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
 
 // Turn a stored timestamp (ISO string or epoch ms) into the Italian long format

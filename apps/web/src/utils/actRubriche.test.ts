@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { matchRubrichePart, rubricheFor } from './actRubriche';
-import type { ActRubricheResponse } from './actStructureCache';
+import type { ActRubricheResponse, RubrichePart } from './actStructureCache';
 
 // The shape measured on 4 Oct 2026 for d.lgs. 196/2003: the top-level map is an annex's.
 const DLGS_196: ActRubricheResponse & { parts: NonNullable<ActRubricheResponse['parts']> } = {
@@ -29,7 +29,7 @@ describe('rubricheFor', () => {
 describe('matchRubrichePart', () => {
   // The server's order: the code body first, the Dispositivo last (akn_parser.py),
   // as measured on the codice penale's fixture.
-  const CODE_THEN_DISPOSITIVO = [
+  const CODE_THEN_DISPOSITIVO: RubrichePart[] = [
     { name: 'Codice Penale', keys: Array.from({ length: 40 }, (_, i) => String(i + 1)), rubriche: { '1': 'Reati e pene: disposizione espressa di legge' }, abrogati: [] },
     { name: 'Dispositivo', keys: ['1', '2', '3'], rubriche: {}, abrogati: [] },
   ];
@@ -38,7 +38,7 @@ describe('matchRubrichePart', () => {
     expect(matchRubrichePart(CODE_THEN_DISPOSITIVO, Array.from({ length: 40 }, (_, i) => String(i + 1)))?.name).toBe('Codice Penale');
   });
   it('gives nothing when two parts of the same size share the numbers', () => {
-    const twoAnnexes = [
+    const twoAnnexes: RubrichePart[] = [
       { name: 'Allegato A.1', keys: ['1', '2', '3'], rubriche: { '1': 'Uno' }, abrogati: [] },
       { name: 'Allegato A.2', keys: ['1', '2', '3'], rubriche: { '1': 'Altro' }, abrogati: [] },
     ];

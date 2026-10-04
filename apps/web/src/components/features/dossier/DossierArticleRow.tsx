@@ -1,122 +1,78 @@
-import {
-  FileText,
-  Trash2,
-  GripVertical,
-  CheckSquare,
-  Square,
-  Star,
-  ChevronDown,
-} from 'lucide-react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { useCallback, useState } from 'react';
+import { CheckSquare, ChevronDown, Square, Star, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { formatDateItalianLong } from '../../../utils/dateUtils';
-import { formatTimestampLong } from './dossierUtils';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
+import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
+import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
-import type { DossierItem } from '../../../types';
 
-interface Props {
-  item: DossierItem;
+type NormaItem = Extract<DossierItem, { type: 'norma' }>;
+
+export interface DossierArticleRowProps {
+  item: NormaItem;
+  /** From the act's index (`useActDetails`); the row fills it from the text when absent. */
+  rubrica: string | null;
   isSelected: boolean;
+  showCheckbox: boolean;
   onToggleSelect: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onOpenOnDashboard: () => void;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   onRemove: () => void;
   onToggleImportant: () => void;
-  showCheckbox: boolean;
-  // When true, drag-reorder is disabled (typically because the list is
-  // filtered — dragging against absolute indexes under a filtered view is
-  // semantically fine but visually confusing for the user).
-  dragDisabled?: boolean;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-export function SortableDossierItem({
-  item,
-  isSelected,
-  onToggleSelect,
-  isExpanded,
-  onToggleExpand,
-  onOpenOnDashboard,
-  showToast,
-  onRemove,
-  onToggleImportant,
-  showCheckbox,
-  dragDisabled,
-}: Props) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: dragDisabled });
+/**
+ * One article inside its act's block: "art. 3 — rubrica", the star, the text read
+ * in place (spec §5). The act is named once by the block, so the row never repeats it.
+ */
+export function DossierArticleRow({
+  item, rubrica, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand,
+  onOpenOnDashboard, onRemove, onToggleImportant, showToast,
+}: DossierArticleRowProps) {
+  const [textRubrica, setTextRubrica] = useState<string | null>(null);
+  const onArticle = useCallback((article: ArticleData) => {
+    const raw = article.article_text || '';
+    setTextRubrica(raw ? getRubricText(raw, parseArticleStructure(raw)) : null);
+  }, []);
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
+  const shownRubrica = rubrica ?? textRubrica;
   const isImportant = item.status === 'important';
-
-  const expandVerb = isExpanded ? 'Comprimi' : 'Espandi';
   // "Testo al 29/12/2007": a row that holds a past text says so.
-  const historicalLabel = item.type === 'norma' ? historicalItemLabel(item.data) : null;
-  // The accessible name replaces the row's content, so the version has to be in it
-  // (two versions of one article must not read alike).
-  const rowLabel = item.type === 'norma'
-    ? `${expandVerb} ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
-      + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '')
-    : `${expandVerb} nota`;
+  const historicalLabel = historicalItemLabel(item.data);
+  const verb = isExpanded ? 'Comprimi' : 'Espandi';
+  // The accessible name replaces the row's content, so it names the act (two
+  // laws' art. 3 must never read alike) and the version (two versions of one
+  // article neither).
+  const named = item.citation
+    ?? `${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`;
+  const rowLabel = `${verb} ${named}`
+    + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '');
   const regionId = `dossier-item-content-${item.id}`;
 
   return (
-    // Plain container: the expand affordance is the header sub-div below.
-    // ARIA treats every descendant of a button as presentational, so the
-    // reader (article body, note composer, action buttons) and the star /
-    // trash controls must stay OUTSIDE it. The root keeps only the layout
-    // so the amber "important" stripe still spans the expanded height.
     <div
-      ref={setNodeRef}
-      style={style}
       className={cn(
-        'relative bg-white dark:bg-slate-800 p-3 md:p-4 pl-4 md:pl-5 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors',
-        isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700',
+        'group relative rounded-lg py-1 pl-3 pr-1 transition-colors',
+        isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
       )}
     >
-      {isImportant && (
-        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-amber-400" />
-      )}
-      <div className="flex items-center gap-2 md:gap-3">
+      {isImportant && <span aria-hidden className="absolute bottom-1 left-0 top-1 w-1 rounded bg-amber-400" />}
+      <div className="flex items-center gap-1 md:gap-2">
         {showCheckbox && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+            onClick={onToggleSelect}
             aria-label={isSelected ? 'Deseleziona elemento' : 'Seleziona elemento'}
             aria-pressed={isSelected}
-            className="text-slate-400 hover:text-blue-500 p-2 -m-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 md:p-0 md:m-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-400 hover:text-blue-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            {isSelected ? <CheckSquare size={20} className="text-blue-500" /> : <Square size={20} />}
+            {isSelected ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} />}
           </button>
         )}
-        <div
-          {...(dragDisabled ? {} : attributes)}
-          {...(dragDisabled ? {} : listeners)}
-          onClick={(e) => e.stopPropagation()}
-          aria-hidden={dragDisabled}
-          title={dragDisabled ? 'Riordina disabilitato con filtri attivi' : undefined}
-          className={cn(
-            'hidden md:block',
-            dragDisabled
-              ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed opacity-50'
-              : 'text-slate-300 dark:text-slate-600 cursor-grab hover:text-slate-500',
-          )}
-        >
-          <GripVertical size={20} />
-        </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-blue-600 flex-shrink-0">
-          <FileText size={18} />
-        </div>
-        {/* The expand toggle wraps ONLY non-interactive content (title text
-            plus the decorative chevron), so nothing focusable is buried
-            inside a role="button" subtree. */}
+        {/* The expand toggle wraps only text: the star and the remove button stay
+            outside it, since ARIA makes a role="button"'s descendants presentational. */}
         <div
           role="button"
           tabIndex={0}
@@ -131,78 +87,65 @@ export function SortableDossierItem({
               onToggleExpand();
             }
           }}
-          className="flex-1 min-w-0 flex items-center gap-2 py-1 rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+          className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
-          <div className="flex-1 min-w-0">
-            {item.type === 'norma' ? (
-              <>
-                <h4 className="font-medium text-sm md:text-base text-slate-900 dark:text-white truncate">
-                  {item.data.tipo_atto} {item.data.numero_atto}
-                </h4>
-                <p className="text-xs md:text-sm text-slate-500 truncate">Art. {item.data.numero_articolo} • {formatDateItalianLong(item.data.data || '')}</p>
-                {historicalLabel && (
-                  <span className="mt-0.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                    {historicalLabel}
-                  </span>
-                )}
-              </>
-            ) : (
-              // Hidden while expanded: the full note is rendered below, and
-              // the truncated preview would repeat its first line.
-              !isExpanded && (
-                <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 italic truncate">"{item.data}"</p>
-              )
-            )}
-            <div className="text-xs text-slate-400 mt-1 hidden md:block">
-              Aggiunto il {formatTimestampLong(item.addedAt)}
-            </div>
-          </div>
           <ChevronDown
-            size={18} aria-hidden
-            className={cn('text-slate-400 transition-transform flex-shrink-0', isExpanded && 'rotate-180')}
+            size={16}
+            aria-hidden
+            className={cn('flex-shrink-0 text-slate-400 transition-transform', !isExpanded && '-rotate-90')}
           />
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {item.type === 'norma' && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onToggleImportant(); }}
-              aria-pressed={isImportant}
-              aria-label={isImportant ? 'Rimuovi da importanti' : 'Segna come importante'}
-              title={isImportant ? 'Importante' : 'Segna come importante'}
-              className={cn(
-                'p-1.5 rounded-md transition-colors min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500',
-                isImportant
-                  ? 'text-amber-500'
-                  : 'text-slate-300 dark:text-slate-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20',
-              )}
-            >
-              <Star size={18} className={cn(isImportant && 'fill-amber-400')} />
-            </button>
+          <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">
+            <span className="font-medium text-slate-900 dark:text-white">art. {item.data.numero_articolo}</span>
+            {shownRubrica && (
+              <span className="text-slate-500 dark:text-slate-400">
+                {' — '}
+                <span>{shownRubrica}</span>
+              </span>
+            )}
+          </span>
+          {item.data.allegato && (
+            <span className="flex-shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+              All. {item.data.allegato}
+            </span>
           )}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            aria-label="Rimuovi elemento dal dossier"
-            className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-          >
-            <Trash2 size={18} />
-          </button>
+          {historicalLabel && (
+            <span className="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              {historicalLabel}
+            </span>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={onToggleImportant}
+          aria-pressed={isImportant}
+          aria-label={isImportant ? 'Rimuovi da importanti' : 'Segna come importante'}
+          title={isImportant ? 'Importante' : 'Segna come importante'}
+          className={cn(
+            'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-1.5 transition-colors md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500',
+            isImportant
+              ? 'text-amber-500'
+              : 'text-slate-300 hover:bg-amber-50 hover:text-amber-500 dark:text-slate-600 dark:hover:bg-amber-900/20',
+          )}
+        >
+          <Star size={16} className={cn(isImportant && 'fill-amber-400')} />
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Rimuovi articolo dal dossier"
+          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-1.5 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500 md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20"
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
       {isExpanded && (
-        <div id={regionId}>
-          {item.type === 'norma' ? (
-            <DossierItemReader
-              norma={item.data}
-              onOpenOnDashboard={onOpenOnDashboard}
-              showToast={showToast}
-            />
-          ) : (
-            <p className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-sm md:text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-              {item.data}
-            </p>
-          )}
+        <div id={regionId} className="pb-2 pl-6 pr-2">
+          <DossierItemReader
+            norma={item.data}
+            onOpenOnDashboard={onOpenOnDashboard}
+            showToast={showToast}
+            onArticle={onArticle}
+          />
         </div>
       )}
     </div>

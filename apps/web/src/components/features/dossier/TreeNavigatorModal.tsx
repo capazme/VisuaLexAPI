@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, CheckSquare, Square, Loader2, TreeDeciduous } from 'lucide-react';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { resolveAct } from '../../../utils/actUrn';
@@ -11,20 +11,39 @@ import { legalFetch } from '../../../services/legalFetch';
 // misclick and floods the dossier.
 const BULK_IMPORT_CONFIRM_THRESHOLD = 100;
 
+interface ActIdentity { tipo_atto: string; data: string; numero_atto: string }
+
 interface Props {
   onClose: () => void;
-  onImport: (
-    articles: { numero: string; urn?: string }[],
-    normInfo: { tipo_atto: string; data: string; numero_atto: string }
-  ) => void;
+  onImport: (articles: { numero: string; urn?: string }[], normInfo: ActIdentity) => void;
+  /** Open on this act's index at once ("+ articoli" of a dossier's act block). */
+  initialAct?: ActIdentity;
 }
+
+// The act types the form offers; an act opened from a dossier may be another.
+const ACT_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'codice civile', label: 'Codice Civile' },
+  { value: 'codice penale', label: 'Codice Penale' },
+  { value: 'codice procedura civile', label: 'Codice Procedura Civile' },
+  { value: 'codice procedura penale', label: 'Codice Procedura Penale' },
+  { value: 'costituzione', label: 'Costituzione' },
+  { value: 'legge', label: 'Legge' },
+  { value: 'decreto legislativo', label: 'Decreto Legislativo' },
+  { value: 'decreto legge', label: 'Decreto Legge' },
+  { value: 'd.p.r.', label: 'D.P.R.' },
+];
 
 type TreeEntry = string | Record<string, string>;
 
-export function TreeNavigatorModal({ onClose, onImport }: Props) {
-  const [actType, setActType] = useState('codice civile');
-  const [actNumber, setActNumber] = useState('');
-  const [actDate, setActDate] = useState('');
+export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
+  const [actType, setActType] = useState(initialAct?.tipo_atto ?? 'codice civile');
+  const [actNumber, setActNumber] = useState(initialAct?.numero_atto ?? '');
+  const [actDate, setActDate] = useState(initialAct?.data ?? '');
+  // The act as the source resolved it: its day and number are what the items
+  // store, never the date as typed ("31-12-2012"), or one act becomes two.
+  // The act of the tree on screen, kept as it was searched: editing the form
+  // without searching again must not relabel the articles of the tree shown.
+  const [resolvedAct, setResolvedAct] = useState<ActIdentity | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<TreeEntry[]>([]);
@@ -36,10 +55,15 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
     setError(null);
     try {
       // Derive the URN the tree endpoint needs, without fetching article text.
-      const { urn: urnToUse } = await resolveAct({
+      const { urn: urnToUse, norma } = await resolveAct({
         act_type: actType,
         act_number: actNumber || undefined,
         date: actDate ? parseItalianDate(actDate) : undefined,
+      });
+      setResolvedAct({
+        tipo_atto: actType,
+        data: norma?.data || parseItalianDate(actDate),
+        numero_atto: norma?.numero_atto || actNumber,
       });
 
       const treeRes = await legalFetch('/fetch_tree', {
@@ -65,6 +89,12 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
       setLoading(false);
     }
   };
+
+  // Opened on an act: its index straight away. Once, on mount; the form stays editable.
+  useEffect(() => {
+    if (initialAct) void fetchTree();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleArticle = (articleNum: string) => {
     setSelectedArticles((prev) => {
@@ -93,7 +123,7 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
         urn: typeof entry === 'object' ? Object.values(entry)[0] : undefined,
       };
     });
-    onImport(articles, { tipo_atto: actType, data: actDate, numero_atto: actNumber });
+    onImport(articles, resolvedAct ?? { tipo_atto: actType, data: parseItalianDate(actDate), numero_atto: actNumber });
     onClose();
   };
 
@@ -125,15 +155,12 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
                 onChange={(e) => setActType(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
-                <option value="codice civile">Codice Civile</option>
-                <option value="codice penale">Codice Penale</option>
-                <option value="codice procedura civile">Codice Procedura Civile</option>
-                <option value="codice procedura penale">Codice Procedura Penale</option>
-                <option value="costituzione">Costituzione</option>
-                <option value="legge">Legge</option>
-                <option value="decreto legislativo">Decreto Legislativo</option>
-                <option value="decreto legge">Decreto Legge</option>
-                <option value="d.p.r.">D.P.R.</option>
+                {!ACT_TYPE_OPTIONS.some((o) => o.value === actType) && (
+                  <option value={actType}>{actType}</option>
+                )}
+                {ACT_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
             <div>

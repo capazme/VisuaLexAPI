@@ -211,6 +211,12 @@ interface AppState {
      * the star itself once the id swap to the real server id happens.
      */
     pendingDossierItemIds: Record<string, true>;
+    /**
+     * Dossiers whose new order (a drag of the acts) waits for an item that still
+     * has a temporary id: the order is saved once every item has a server id.
+     * Session-only, absent from `partialize`, like `pendingDossierItemIds`.
+     */
+    pendingDossierOrders: Record<string, true>;
     quickNorms: QuickNorm[];
     customAliases: CustomAlias[];
     environments: Environment[];
@@ -353,7 +359,9 @@ interface AppState {
     addToDossier: (dossierId: string, item: DossierNormaData | string, type: 'norma' | 'note') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
-    reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
+    setDossierItemOrder: (dossierId: string, itemIds: string[]) => void;
+    /** Saves a dossier's waiting order once none of its items is pending (see `pendingDossierOrders`). */
+    flushDossierOrder: (dossierId: string) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
     importDossier: (dossier: Dossier) => Promise<string | null>; // returns new server-side dossier ID, null on failure
@@ -458,6 +466,7 @@ const appStore = createStore<AppState>()(
             loadedHighlightKeys: {},
             loadedAnnotationKeys: {},
             pendingDossierItemIds: {},
+            pendingDossierOrders: {},
             quickNorms: [],
             customAliases: [],
             environments: [],
@@ -825,7 +834,7 @@ const appStore = createStore<AppState>()(
             }),
 
             // Workspace tabs are UI-only (persisted via localStorage, not the
-            // server), so unlike reorderDossierItems this is a pure local
+            // server), so unlike setDossierItemOrder this is a pure local
             // splice with no API call.
             reorderWorkspaceTabs: (fromIndex, toIndex) => set((state) => {
                 if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
@@ -1483,6 +1492,8 @@ const appStore = createStore<AppState>()(
                             });
                         });
                     }
+                    // An order set while this item was pending is saved now.
+                    get().flushDossierOrder(dossierId);
                     // MERLT-1.8: emit dossier_item_add when a norma is filed
                     // into a dossier. Notes have no article_urn and are skipped
                     // here. Only on server confirmation — RLCF must never
@@ -1507,6 +1518,7 @@ const appStore = createStore<AppState>()(
                         }
                         delete state.pendingDossierItemIds[tempId];
                     });
+                    get().flushDossierOrder(dossierId);
                 });
             },
 
@@ -1556,6 +1568,9 @@ const appStore = createStore<AppState>()(
                     if (!dossier) return;
                     const clamped = Math.max(0, Math.min(atIndex, dossier.items.length));
                     dossier.items.splice(clamped, 0, item);
+                    // Its old id is gone on the server until addItem answers: a
+                    // reorder in that window waits (setDossierItemOrder).
+                    state.pendingDossierItemIds[localId] = true;
                 });
                 dossierService.addItem(dossierId, {
                     itemType: item.type === 'norma' ? 'norm' : 'note',
@@ -1569,38 +1584,59 @@ const appStore = createStore<AppState>()(
                             restored.id = created.id;
                             Object.assign(restored, citationsFromApi(created));
                         }
+                        delete state.pendingDossierItemIds[localId];
                     });
+                    get().flushDossierOrder(dossierId);
                 }).catch(err => {
                     console.error('Failed to restore item on server:', err);
+                    set((state) => { delete state.pendingDossierItemIds[localId]; });
+                    get().flushDossierOrder(dossierId);
                 });
             },
 
-            reorderDossierItems: (dossierId, fromIndex, toIndex) => {
-                const state = get();
-                const dossier = state.dossiers.find(d => d.id === dossierId);
-                if (!dossier || fromIndex === toIndex) return;
-
-                // Optimistic update
+            // The order of a whole dossier after a drag of its acts (spec §4): the
+            // given ids first, then any item they do not name. Optimistic, reverted
+            // with a sync error when the server refuses (gotcha 17). While an item
+            // still has a temporary id nothing is sent: addToDossier and
+            // restoreDossierItem flush the order once every id is settled.
+            setDossierItemOrder: (dossierId, itemIds) => {
+                const dossier = get().dossiers.find(d => d.id === dossierId);
+                if (!dossier) return;
+                const before = dossier.items;
+                const byId = new Map(before.map(i => [i.id, i]));
+                const named = new Set(itemIds);
+                const next = [
+                    ...itemIds.map(id => byId.get(id)).filter((i): i is DossierItem => !!i),
+                    ...before.filter(i => !named.has(i.id)),
+                ];
+                const waiting = next.some(i => get().pendingDossierItemIds[i.id]);
                 set((state) => {
-                    const d = state.dossiers.find(d => d.id === dossierId);
-                    if (d) {
-                        const items = [...d.items];
-                        const [removed] = items.splice(fromIndex, 1);
-                        items.splice(toIndex, 0, removed);
-                        d.items = items;
-                    }
+                    const d = state.dossiers.find(x => x.id === dossierId);
+                    if (d) d.items = next;
+                    if (waiting) state.pendingDossierOrders[dossierId] = true;
+                    else delete state.pendingDossierOrders[dossierId];
                 });
-
-                // API call - send new order
-                const newOrder = [...dossier.items];
-                const [removed] = newOrder.splice(fromIndex, 1);
-                newOrder.splice(toIndex, 0, removed);
-                const itemIds = newOrder.map(i => i.id);
-
-                dossierService.reorderItems(dossierId, itemIds).catch(err => {
-                    console.error('Failed to reorder dossier items:', err);
-                    get().pushSyncError('Impossibile salvare il nuovo ordine degli elementi. Riprova.');
+                if (waiting) return;
+                dossierService.reorderItems(dossierId, next.map(i => i.id)).catch(err => {
+                    console.error('Failed to save the order of the dossier:', err);
+                    set((state) => {
+                        const d = state.dossiers.find(x => x.id === dossierId);
+                        if (d) d.items = before;
+                    });
+                    get().pushSyncError('Impossibile salvare il nuovo ordine degli atti. Riprova.');
                 });
+            },
+
+            flushDossierOrder: (dossierId) => {
+                const state = get();
+                if (!state.pendingDossierOrders[dossierId]) return;
+                const dossier = state.dossiers.find(d => d.id === dossierId);
+                if (!dossier) {
+                    set((s) => { delete s.pendingDossierOrders[dossierId]; });
+                    return;
+                }
+                if (dossier.items.some(i => state.pendingDossierItemIds[i.id])) return;
+                state.setDossierItemOrder(dossierId, dossier.items.map(i => i.id));
             },
 
             updateDossierItemStatus: (dossierId, itemId, status) => {

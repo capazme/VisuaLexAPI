@@ -25,6 +25,8 @@ interface Props {
   norma: NormaVisitata;
   onOpenOnDashboard: () => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  /** The fetched article, for a row that takes its rubrica from the text when the act's index gave none. */
+  onArticle?: (article: ArticleData) => void;
 }
 
 type FetchState =
@@ -46,7 +48,7 @@ const NO_ANNOTATIONS: Annotation[] = [];
  * `buildItemKey` / `uniqueArticleIdFromNorma` pair so notes and highlights
  * created here and on the dashboard land on the same store rows.
  */
-export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props) {
+export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArticle }: Props) {
   const [result, setResult] = useState<FetchResult | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -103,6 +105,9 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
   // A past text is a reading here too: the keys of notes and highlights carry no
   // version, so whatever was made on it would appear on the text in force.
   const article = state.phase === 'ready' ? state.article : undefined;
+  useEffect(() => {
+    if (article) onArticle?.(article);
+  }, [article, onArticle]);
   const display = article ? describeVersion(article.validity, norma) : null;
   const readOnly = display?.readOnly ?? false;
   const historical = requestIsHistorical(norma);
