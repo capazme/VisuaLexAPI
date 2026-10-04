@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
@@ -66,5 +66,28 @@ describe('DossierListView — the quick-open of a card', () => {
     expect(appStore.getState().searchTrigger).toMatchObject({
       version_date: '2007-12-29', show_brocardi_info: false, tabLabel: 'Pratica Rossi — testo al 29/12/2007',
     });
+  });
+});
+
+describe('DossierListView — the menu of a card', () => {
+  it('opens, closes on Escape, and never opens the dossier', () => {
+    const onSelect = vi.fn();
+    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={onSelect} showToast={() => {}} /></MemoryRouter>);
+    const trigger = screen.getByRole('button', { name: 'Azioni su Pratica Rossi' });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Rinomina / Modifica' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('deletes through the confirmation', () => {
+    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su Pratica Rossi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
+    expect(screen.getByText('Eliminare questo dossier?')).toBeInTheDocument();
   });
 });
