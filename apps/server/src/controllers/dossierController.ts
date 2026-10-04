@@ -7,6 +7,55 @@ import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
 import { citeStoredAct, citeStoredNorm } from '../norms/citation';
 
+/** Who created a row: the connected application when the request is delegated, else nobody (the user). */
+export function provenanceFromRequest(req: Request) {
+  return req.delegation
+    ? { createdByClientId: req.delegation.clientId, createdByClientName: req.delegation.clientName }
+    : { createdByClientId: null, createdByClientName: null };
+}
+
+/** The mark the API shows: the connection that created the row, or null for the user's own. */
+const createdBy = (row: { createdByClientId: string | null; createdByClientName: string | null }) =>
+  row.createdByClientId ? { clientName: row.createdByClientName } : null;
+
+type ItemRow = Prisma.DossierItemGetPayload<object>;
+
+/** A dossier entry as every route answers it. */
+function serializeItem(i: ItemRow) {
+  return {
+    id: i.id,
+    item_type: i.itemType,
+    title: i.title,
+    // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
+    citation: citeStoredNorm(i.itemType, i.content),
+    // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
+    act_citation: citeStoredAct(i.itemType, i.content),
+    content: i.content,
+    position: i.position,
+    status: i.status,
+    created_at: i.createdAt,
+    created_by: createdBy(i),
+    // The entry a note is about (an article of the same dossier), or null.
+    about_item_id: i.aboutItemId,
+  };
+}
+
+/** A dossier as every route answers it. */
+function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[] }) {
+  return {
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    color: d.color,
+    tags: d.tags,
+    is_pinned: d.isPinned,
+    created_at: d.createdAt,
+    updated_at: d.updatedAt,
+    created_by: createdBy(d),
+    items: d.items.map(serializeItem),
+  };
+}
+
 // Validation schemas
 const createDossierSchema = z.object({
   name: z.string().min(1).max(200),
@@ -56,29 +105,7 @@ export const listDossiers = async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  res.json(dossiers.map(d => ({
-    id: d.id,
-    name: d.name,
-    description: d.description,
-    color: d.color,
-    tags: d.tags,
-    is_pinned: d.isPinned,
-    created_at: d.createdAt,
-    updated_at: d.updatedAt,
-    items: d.items.map(i => ({
-      id: i.id,
-      item_type: i.itemType,
-      title: i.title,
-      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
-      citation: citeStoredNorm(i.itemType, i.content),
-      // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
-      act_citation: citeStoredAct(i.itemType, i.content),
-      content: i.content,
-      position: i.position,
-      status: i.status,
-      created_at: i.createdAt,
-    })),
-  })));
+  res.json(dossiers.map(serializeDossier));
 };
 
 /**
@@ -100,29 +127,7 @@ export const getDossier = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  res.json({
-    id: dossier.id,
-    name: dossier.name,
-    description: dossier.description,
-    color: dossier.color,
-    tags: dossier.tags,
-    is_pinned: dossier.isPinned,
-    created_at: dossier.createdAt,
-    updated_at: dossier.updatedAt,
-    items: dossier.items.map(i => ({
-      id: i.id,
-      item_type: i.itemType,
-      title: i.title,
-      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
-      citation: citeStoredNorm(i.itemType, i.content),
-      // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
-      act_citation: citeStoredAct(i.itemType, i.content),
-      content: i.content,
-      position: i.position,
-      status: i.status,
-      created_at: i.createdAt,
-    })),
-  });
+  res.json(serializeDossier(dossier));
 };
 
 /**
@@ -138,23 +143,14 @@ export const createDossier = async (req: Request, res: Response) => {
       color: data.color,
       tags: data.tags ?? [],
       userId: req.user!.id,
+      ...provenanceFromRequest(req),
     },
     include: {
       items: true,
     },
   });
 
-  res.status(201).json({
-    id: dossier.id,
-    name: dossier.name,
-    description: dossier.description,
-    color: dossier.color,
-    tags: dossier.tags,
-    is_pinned: dossier.isPinned,
-    created_at: dossier.createdAt,
-    updated_at: dossier.updatedAt,
-    items: [],
-  });
+  res.status(201).json(serializeDossier(dossier));
 };
 
 /**
@@ -189,29 +185,7 @@ export const updateDossier = async (req: Request, res: Response) => {
     },
   });
 
-  res.json({
-    id: dossier.id,
-    name: dossier.name,
-    description: dossier.description,
-    color: dossier.color,
-    tags: dossier.tags,
-    is_pinned: dossier.isPinned,
-    created_at: dossier.createdAt,
-    updated_at: dossier.updatedAt,
-    items: dossier.items.map(i => ({
-      id: i.id,
-      item_type: i.itemType,
-      title: i.title,
-      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
-      citation: citeStoredNorm(i.itemType, i.content),
-      // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
-      act_citation: citeStoredAct(i.itemType, i.content),
-      content: i.content,
-      position: i.position,
-      status: i.status,
-      created_at: i.createdAt,
-    })),
-  });
+  res.json(serializeDossier(dossier));
 };
 
 /**
@@ -266,21 +240,64 @@ export const addDossierItem = async (req: Request, res: Response) => {
       content: data.content || null,
       position: data.position ?? (maxPos._max.position ?? -1) + 1,
       ...(data.status !== undefined && { status: data.status }),
+      ...provenanceFromRequest(req),
     },
   });
 
-  res.status(201).json({
-    id: item.id,
-    item_type: item.itemType,
-    title: item.title,
-    // The same names as GET /dossiers/:id, so the web heads a new act's block at once.
-    citation: citeStoredNorm(item.itemType, item.content),
-    act_citation: citeStoredAct(item.itemType, item.content),
-    content: item.content,
-    position: item.position,
-    status: item.status,
-    created_at: item.createdAt,
+  res.status(201).json(serializeItem(item));
+};
+
+export const MAX_NOTE_LENGTH = 4000;
+// Plain text: new lines and tabs, nothing else below U+0020.
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+const noteSchema = z
+  .object({
+    text: z
+      .string()
+      .trim()
+      .min(1)
+      .max(MAX_NOTE_LENGTH)
+      .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.'),
+    // Not `.uuid()`: any id that is not a norm of this dossier gets the same answer below.
+    aboutItemId: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+/**
+ * A note in a dossier, or about one of its articles as a whole (MCP second
+ * round, spec §5): never about a passage of the article's text, whose anchors
+ * need exact offsets (root rule 23). Open to the user's session and to an
+ * exchanged token; through one, the note carries the connection's mark.
+ */
+export const addDossierNote = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { text, aboutItemId } = noteSchema.parse(req.body);
+
+  const dossier = await prisma.dossier.findFirst({ where: { id, userId: req.user!.id } });
+  if (!dossier) throw new AppError(404, 'Dossier not found');
+
+  if (aboutItemId) {
+    const article = await prisma.dossierItem.findFirst({ where: { id: aboutItemId, dossierId: id, itemType: 'norm' } });
+    if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questo dossier.');
+  }
+
+  const item = await prisma.$transaction(async (tx) => {
+    const last = await tx.dossierItem.aggregate({ where: { dossierId: id }, _max: { position: true } });
+    return tx.dossierItem.create({
+      data: {
+        dossierId: id,
+        itemType: 'note',
+        // As the web app titles a note it adds (`addToDossier`).
+        title: 'Nota',
+        content: text,
+        position: (last._max.position ?? -1) + 1,
+        aboutItemId: aboutItemId ?? null,
+        ...provenanceFromRequest(req),
+      },
+    });
   });
+
+  res.status(201).json(serializeItem(item));
 };
 
 /**
@@ -321,15 +338,7 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     throw err;
   }
 
-  res.json({
-    id: item.id,
-    item_type: item.itemType,
-    title: item.title,
-    content: item.content,
-    position: item.position,
-    status: item.status,
-    created_at: item.createdAt,
-  });
+  res.json(serializeItem(item));
 };
 
 /**
@@ -412,19 +421,13 @@ export const moveDossierItem = async (req: Request, res: Response) => {
         data: {
           dossierId: target.id,
           position: (maxPos._max.position ?? -1) + 1,
+          // A note is about an article of its own dossier: the one it leaves stays behind.
+          aboutItemId: null,
         },
       });
     });
 
-    res.json({
-      id: item.id,
-      item_type: item.itemType,
-      title: item.title,
-      content: item.content,
-      position: item.position,
-      status: item.status,
-      created_at: item.createdAt,
-    });
+    res.json(serializeItem(item));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       throw new AppError(404, 'Dossier item not found');
@@ -572,6 +575,7 @@ export const addDossierNorms = async (req: Request, res: Response) => {
               title: norm.tipo_atto,
               content: norm as unknown as Prisma.InputJsonValue,
               position: position++,
+              ...provenanceFromRequest(req),
             },
           }),
         );

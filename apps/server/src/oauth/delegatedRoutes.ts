@@ -7,6 +7,9 @@ import type { Request } from 'express';
  * Adding a route is a security decision: every entry is reachable by any
  * MCP client the user connected.
  */
+/** The named daily counters a route may also spend (middleware/delegated.ts sets their limits). */
+export type DelegatedCounter = 'dossier_create' | 'note' | 'trash' | 'card';
+
 export interface DelegatedRoute {
   method: 'GET' | 'POST';
   /** Matched against the path under /api; `:id` is one path segment. */
@@ -15,7 +18,7 @@ export interface DelegatedRoute {
   /** Points charged; a function when the cost depends on the body. */
   weight: number | ((req: Request) => number);
   /** A named daily counter beside the points, if any. */
-  counter?: 'dossier_create';
+  counter?: DelegatedCounter;
 }
 
 function referencesWeight(req: Request): number {
@@ -30,6 +33,8 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   { method: 'POST', path: '/dossiers', scope: 'dossier:write', weight: 2, counter: 'dossier_create' },
   // Each reference is checked against the sources: two points apiece (1 to 50).
   { method: 'POST', path: '/dossiers/:id/norms', scope: 'dossier:write', weight: referencesWeight },
+  // A note in the dossier, or about one of its articles: a write like any other, and at most 100 a day.
+  { method: 'POST', path: '/dossiers/:id/notes', scope: 'dossier:write', weight: 2, counter: 'note' },
   // Reading the quota costs nothing: the MCP server asks it to tell the user what is left.
   { method: 'GET', path: '/oauth/quota', scope: 'dossier:read', weight: 0 },
 ];

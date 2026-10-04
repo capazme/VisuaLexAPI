@@ -22,7 +22,19 @@ export interface Stub {
   exchanges: { subject: string; scope: string; audience: string }[];
   /** Override an API answer: return [status, body] or undefined for the default. */
   apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | undefined;
-  dossiers: { id: string; name: string; items: { id: string; item_type: string; title: string; citation?: string | null; content: unknown }[] }[];
+  dossiers: {
+    id: string;
+    name: string;
+    items: {
+      id: string;
+      item_type: string;
+      title: string;
+      citation?: string | null;
+      content: unknown;
+      created_by?: { clientName: string | null } | null;
+      about_item_id?: string | null;
+    }[];
+  }[];
   introspectionDown?: boolean;
 }
 
@@ -63,8 +75,20 @@ export async function startStubs() {
     if (req.method === 'POST' && norms) {
       return void res.json({ results: (req.body.references as string[]).map((reference) => ({ reference, outcome: 'added' })) });
     }
+    const notes = path.match(/^\/dossiers\/([^/]+)\/notes$/);
+    if (req.method === 'POST' && notes) {
+      const item = {
+        id: 'n-new',
+        item_type: 'note',
+        title: 'Nota',
+        content: req.body.text,
+        about_item_id: req.body.aboutItemId ?? null,
+        created_by: { clientName: 'Claude Code' },
+      };
+      return void res.status(201).json(item);
+    }
     if (req.method === 'GET' && path === '/oauth/quota') {
-      return void res.json({ points: { limit: 500, remaining: 480, resetsAt: '2026-10-05T10:00:00.000Z' }, dossierCreations: { limit: 10, remaining: 9, resetsAt: null } });
+      return void res.json({ points: { limit: 500, remaining: 480, resetsAt: '2026-10-05T10:00:00.000Z' }, counters: { dossier_create: { limit: 10, remaining: 9, resetsAt: null }, note: { limit: 100, remaining: 100, resetsAt: null } } });
     }
     res.status(404).json({ detail: 'Not Found' });
   });

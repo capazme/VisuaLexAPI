@@ -31,7 +31,11 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
   `omnilex_leggi_dossier`, `omnilex_crea_dossier`,
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_stato_account`. A norm is named by the
+  checked by `apps/server`), `omnilex_aggiungi_nota_dossier` (one plain-text
+  note up to 4,000 characters, in a dossier or about one of its articles with
+  `voce`; add-only), `omnilex_stato_account`. `omnilex_leggi_dossier` says which
+  entries a connected application added (`aggiunta_da`, from the server's
+  `created_by`) and which article a note is about (`nota_su`). A norm is named by the
   server's citation (`citation` on dossier items, `display` on the norms
   route's results: «art. 3, l. 31 dicembre 2012, n. 247»), never rebuilt here, so
   two acts of the same type always read apart. Results are data (JSON
