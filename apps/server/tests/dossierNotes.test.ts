@@ -75,6 +75,23 @@ describe('POST /api/dossiers/:id/notes', () => {
     expect(await prisma.dossierItem.count({ where: { dossierId, itemType: 'note' } })).toBe(1);
   });
 
+  it('answers an id that is not even a uuid with the same Italian sentence', async () => {
+    const response = await note(authHeader(alice), { text: 'Sul danno.', aboutItemId: 'art-2043' });
+    expect(response.status).toBe(400);
+    expect(response.body.detail).toBe('La voce indicata non è un articolo di questo dossier.');
+  });
+
+  it('a note moved to another dossier stops pointing at an article it left behind', async () => {
+    const attached = (await note(authHeader(alice), { text: 'Sul danno.', aboutItemId: normId })).body.id;
+    const other = (await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Altro' })).body.id;
+    const moved = await request(app)
+      .post(`/api/dossiers/${dossierId}/items/${attached}/move`)
+      .set(authHeader(alice))
+      .send({ targetDossierId: other });
+    expect(moved.status).toBe(200);
+    expect(moved.body.about_item_id).toBeNull();
+  });
+
   it("answers 404 for another user's dossier", async () => {
     const bob = await createTestUser('notes-bob');
     expect((await note(authHeader(bob), { text: 'intrusa' })).status).toBe(404);

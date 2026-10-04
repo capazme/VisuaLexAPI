@@ -101,7 +101,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
             titolo: item.title,
             // The server names the act in full: two laws in one dossier must never read alike.
             riferimento: item.citation ?? null,
-            aggiunta_da: item.created_by?.clientName ?? null,
+            // An application that registered without a name is still not the user.
+            aggiunta_da: item.created_by ? (item.created_by.clientName ?? 'applicazione collegata') : null,
             nota_su: item.about_item_id ?? null,
           })),
         });

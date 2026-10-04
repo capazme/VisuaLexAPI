@@ -89,6 +89,13 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
     }
   });
 
+  it('never reads an entry added by an unnamed application as the user\'s own', async () => {
+    env.stub.dossiers[0].items[0].created_by = { clientName: null };
+    const result = await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } });
+    expect(json(result).voci[0].aggiunta_da).toBe('applicazione collegata');
+    expect(json(result).voci[1].aggiunta_da).toBeNull();
+  });
+
   it('calls an ambiguous or unknown name an error', async () => {
     const ambiguous = await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'Doppio' } });
     expect(ambiguous.isError).toBe(true);

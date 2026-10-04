@@ -258,7 +258,8 @@ const noteSchema = z
       .min(1)
       .max(MAX_NOTE_LENGTH)
       .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.'),
-    aboutItemId: z.string().uuid().optional(),
+    // Not `.uuid()`: any id that is not a norm of this dossier gets the same answer below.
+    aboutItemId: z.string().min(1).max(64).optional(),
   })
   .strict();
 
@@ -420,6 +421,8 @@ export const moveDossierItem = async (req: Request, res: Response) => {
         data: {
           dossierId: target.id,
           position: (maxPos._max.position ?? -1) + 1,
+          // A note is about an article of its own dossier: the one it leaves stays behind.
+          aboutItemId: null,
         },
       });
     });
