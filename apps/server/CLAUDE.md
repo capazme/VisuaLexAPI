@@ -69,6 +69,35 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   applications. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
   at most every ten minutes: never fire-and-forget it, a background sweep
   deadlocked the test suite's TRUNCATE.
+- **Exchanged tokens: how the MCP server acts for a user** (spec section 5).
+  `grant_type=urn:ietf:params:oauth:grant-type:token-exchange` on
+  `/oauth/token` (`oauth/exchange.ts`), for `mcp-omnilex` only: the client's
+  access token becomes a two-minute HS256 JWT (audience the API, `act` =
+  `mcp-omnilex`, the grant, a scope within the subject's) signed with
+  `OAUTH_DELEGATION_SECRET`, which must differ from `JWT_SECRET`.
+  `middleware/delegated.ts` (`delegatedAuth`, on `/api` **before** the general
+  limiter, so the MCP server's calls count per user) recognises it by its
+  `act` claim, verifies it strictly, and holds it to `oauth/delegatedRoutes.ts`
+  — default deny: any route outside the table is 403, a missing scope 403
+  `insufficient_scope` — to a live grant and an active user, and to the daily
+  quota (points by route, `OAUTH_DAILY_POINTS`; at most ten dossiers created a
+  day). A delegated POST must be JSON (415): the weight is read from the body
+  before the app's parsers run. A refused call (4xx/5xx) gives its points
+  back. Then it sets `req.user` and `req.delegation`, and `authenticate` lets
+  the request through; nothing else sets `req.delegation`. **Adding a route to
+  the table is a security decision**: every entry is reachable by any MCP
+  client the user connected, and none may update, move or delete.
+  `GET /api/oauth/quota` reports what is left.
+- **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
+  (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
+  norm as the reader stores it), then existence once per act: the
+  fingerprints for a single-part Normattiva act, the tree's (annex, article)
+  pairs for an act with annexes, the article's own text for an EU act. Never
+  the text alone for Normattiva: it answers a missing article with the act's
+  art. 1 and a 200. A source that fails or answers 429 makes the reference
+  `unavailable`, never "missing". Outcomes: `added`, `already_present`,
+  `not_recognised`, `does_not_exist`, `ambiguous`, `unavailable`; the added
+  ones in one transaction, after the dossier's last item.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore

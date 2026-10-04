@@ -22,7 +22,8 @@ security risk.
 | Path | What | Read first |
 | --- | --- | --- |
 | `apps/web/` | React 19 + Vite + TypeScript: reader, workspace, dossier, forum, graph | `apps/web/CLAUDE.md` |
-| `apps/server/` | Express + Prisma: accounts, dossier, community, the MERL-T gateway | `apps/server/CLAUDE.md` |
+| `apps/server/` | Express + Prisma: accounts, dossier, community, the MERL-T gateway, the OAuth authorization server for MCP clients | `apps/server/CLAUDE.md` |
+| `apps/mcp/` | the MCP server (Streamable HTTP, :3002): dossier tools for Claude Code and LibreLex, no database | `apps/mcp/CLAUDE.md` |
 | `services/visualex/` | Quart: sources, reading text, URNs, citations, AKN | `services/visualex/CLAUDE.md` |
 | `services/merlt/` | MERL-T and RLCF — its own licence (Apache-2.0) | `services/merlt/CLAUDE.md` |
 | `tools/archivio-normativo/` | CLI: a local archive of acts | `tools/archivio-normativo/CLAUDE.md` |
@@ -46,6 +47,7 @@ npm --prefix apps/web run build              # tsc -b + vite: the real type-chec
 npm --prefix apps/web run lint
 npm --prefix apps/server run build
 npm --prefix apps/server test                # only this way: the setup refuses a non-test database
+npm --prefix apps/mcp run build && npm --prefix apps/mcp test   # stub servers, no database
 (cd services/visualex && .venv/bin/python -m pytest tests/ -q)
 (cd tools/archivio-normativo && ../../services/visualex/.venv/bin/python -m pytest tests/ -q)
 node --test '.claude/hooks/*.test.mjs'

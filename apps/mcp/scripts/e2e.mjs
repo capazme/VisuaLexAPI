@@ -1,0 +1,154 @@
+#!/usr/bin/env node
+/**
+ * The MCP spike's end-to-end proof, headless (plan Task 11): against a running
+ * stack (apps/server, apps/mcp, the Python API), it does what Claude Code does,
+ * except that the consent is given through the API with a user session instead
+ * of a browser click.
+ *
+ *   E2E_EMAIL=… E2E_PASSWORD=… node scripts/e2e.mjs
+ *
+ * Optional: VISUALEX_URL (default http://localhost:3001), MCP_URL (default
+ * http://localhost:3002/mcp). The user must exist and be active. The script
+ * creates one dossier, which it deletes at the end, and one connection, which
+ * it revokes. Tokens are never printed.
+ */
+import { createHash, randomBytes } from 'node:crypto';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+
+const VISUALEX = (process.env.VISUALEX_URL || 'http://localhost:3001').replace(/\/+$/, '');
+const MCP = process.env.MCP_URL || 'http://localhost:3002/mcp';
+const EMAIL = process.env.E2E_EMAIL;
+const PASSWORD = process.env.E2E_PASSWORD;
+const REDIRECT = 'http://127.0.0.1:53682/callback';
+
+if (!EMAIL || !PASSWORD) {
+  console.error('E2E_EMAIL and E2E_PASSWORD are required (an active VisuaLex user).');
+  process.exit(2);
+}
+
+let failures = 0;
+const check = (label, ok, detail = '') => {
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${detail ? ` — ${detail}` : ''}`);
+  if (!ok) failures += 1;
+  return ok;
+};
+const must = (label, ok, detail) => {
+  if (!check(label, ok, detail)) {
+    console.error('Stopping: the next steps depend on this one.');
+    process.exit(1);
+  }
+};
+const json = async (response) => response.json().catch(() => ({}));
+const form = (fields) => new URLSearchParams(Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)));
+
+// 1. Discovery, as a client finds the server's requirements.
+const unauth = await fetch(MCP, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: '{}' });
+const challenge = unauth.headers.get('www-authenticate') ?? '';
+must('401 without a token, with the discovery header', unauth.status === 401 && challenge.includes('resource_metadata='));
+const prmUrl = challenge.match(/resource_metadata="([^"]+)"/)[1];
+const prm = await json(await fetch(prmUrl));
+must('protected resource metadata names the resource and the authorization server', prm.resource === MCP && prm.authorization_servers?.length === 1, prmUrl);
+const issuer = prm.authorization_servers[0];
+const as = await json(await fetch(`${issuer}/.well-known/oauth-authorization-server`));
+must('authorization server metadata', as.issuer === issuer && as.code_challenge_methods_supported?.includes('S256'));
+
+// 2. Dynamic registration: a public client.
+const registration = await json(
+  await fetch(as.registration_endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ client_name: 'VisuaLex e2e', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'client_secret_post' }),
+  }),
+);
+must('registered as a public client, without a secret', registration.client_id && registration.token_endpoint_auth_method === 'none' && !registration.client_secret);
+const clientId = registration.client_id;
+
+// 3. Authorization request (PKCE S256, resource), twice: the first is what LibreLex's library does before opening the browser.
+const verifier = randomBytes(32).toString('base64url');
+const challengeS256 = createHash('sha256').update(verifier).digest('base64url');
+const state = randomBytes(8).toString('hex');
+const authorizeUrl = new URL(as.authorization_endpoint);
+for (const [k, v] of Object.entries({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challengeS256, code_challenge_method: 'S256', scope: 'dossier:read dossier:write', state, resource: MCP })) {
+  authorizeUrl.searchParams.set(k, v);
+}
+await fetch(authorizeUrl, { redirect: 'manual' });
+const authorize = await fetch(authorizeUrl, { redirect: 'manual' });
+const consent = new URL(authorize.headers.get('location') ?? 'about:blank');
+const requestId = consent.searchParams.get('request');
+must('authorize redirects to the consent page, without a code', authorize.status === 302 && requestId && !consent.searchParams.get('code'), `${consent.origin}${consent.pathname}`);
+
+// 4. The user signs in and approves (what the consent page does).
+const login = await json(await fetch(`${VISUALEX}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: EMAIL, password: PASSWORD }) }));
+must('user session', typeof login.access_token === 'string');
+const session = { authorization: `Bearer ${login.access_token}`, 'content-type': 'application/json' };
+const shown = await json(await fetch(`${VISUALEX}/api/oauth/requests/${requestId}`, { headers: session }));
+check('the consent page reads the request', shown.client?.name === 'VisuaLex e2e' && shown.client?.registeredAutomatically === true);
+const decision = await json(await fetch(`${VISUALEX}/api/oauth/requests/${requestId}/decision`, { method: 'POST', headers: session, body: JSON.stringify({ approve: true }) }));
+const callback = new URL(decision.redirectTo);
+must('the decision returns to the client with code, state and iss', callback.searchParams.get('code') && callback.searchParams.get('state') === state && callback.searchParams.get('iss') === as.issuer);
+
+// 5. Code → tokens.
+const tokenResponse = await fetch(as.token_endpoint, { method: 'POST', body: form({ grant_type: 'authorization_code', client_id: clientId, code: callback.searchParams.get('code'), code_verifier: verifier, redirect_uri: REDIRECT, resource: MCP }) });
+let tokens = await json(tokenResponse);
+must('access and refresh token', tokenResponse.status === 200 && tokens.access_token && tokens.refresh_token, `expires_in ${tokens.expires_in}`);
+
+// 6. The tools, through the SDK's own client.
+const connect = async (token) => {
+  const client = new Client({ name: 'visualex-e2e', version: '1.0.0' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(MCP), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+  return client;
+};
+const call = async (client, name, args = {}) => {
+  const result = await client.callTool({ name, arguments: args });
+  const text = result.content?.[0]?.text ?? '';
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* an error message */ }
+  return { isError: Boolean(result.isError), text, data };
+};
+let client = await connect(tokens.access_token);
+const { tools } = await client.listTools();
+check('five tools, none destructive', tools.length === 5 && tools.every((t) => t.annotations?.destructiveHint === false), tools.map((t) => t.name).join(', '));
+const name = `E2E MCP ${new Date().toISOString().slice(0, 19)}`;
+const created = await call(client, 'omnilex_crea_dossier', { nome: name });
+must('omnilex_crea_dossier', !created.isError && created.data?.id, created.isError ? created.text : name);
+const added = await call(client, 'omnilex_aggiungi_norme_dossier', { dossier: name, riferimenti: ['art. 2043 c.c.', 'art 2059 cc', 'art. 99999 c.c.'] });
+const outcomes = added.data?.esiti?.map((e) => e.outcome) ?? [];
+check('omnilex_aggiungi_norme_dossier: two added, the made-up one refused', JSON.stringify(outcomes) === JSON.stringify(['added', 'added', 'does_not_exist']), added.isError ? added.text : outcomes.join(', '));
+const read = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
+check('omnilex_leggi_dossier: the two articles, no text', read.data?.voci?.length === 2 && !read.text.includes('article_text'), read.data?.voci?.map((v) => v.riferimento).join('; '));
+const fifty1 = await client.callTool({ name: 'omnilex_aggiungi_norme_dossier', arguments: { dossier: created.data.id, riferimenti: Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`) } }).catch((e) => ({ isError: true, content: [{ text: String(e) }] }));
+check('51 references refused', Boolean(fifty1.isError));
+const quota = await call(client, 'omnilex_stato_account');
+check('omnilex_stato_account', typeof quota.data?.points?.remaining === 'number', `points left ${quota.data?.points?.remaining}`);
+await client.close();
+
+// 7. Refresh with rotation, then the old refresh token is dead.
+const refreshed = await json(await fetch(as.token_endpoint, { method: 'POST', body: form({ grant_type: 'refresh_token', client_id: clientId, refresh_token: tokens.refresh_token, resource: MCP }) }));
+check('refresh rotates the pair', refreshed.access_token && refreshed.refresh_token && refreshed.refresh_token !== tokens.refresh_token);
+tokens = refreshed;
+client = await connect(tokens.access_token);
+check('a tool works with the refreshed token', !(await call(client, 'omnilex_elenca_dossier')).isError);
+await client.close();
+
+// 8. The user revokes the connection: the next call fails at once.
+const grants = await json(await fetch(`${VISUALEX}/api/oauth/grants`, { headers: session }));
+const grant = grants.find?.((g) => g.clientName === 'VisuaLex e2e');
+const revoked = await fetch(`${VISUALEX}/api/oauth/grants/${grant?.id}`, { method: 'DELETE', headers: session });
+check('the connection is listed and revoked', revoked.status === 204);
+let afterRevoke;
+try {
+  client = await connect(tokens.access_token);
+  afterRevoke = await call(client, 'omnilex_elenca_dossier');
+  await client.close();
+} catch (error) {
+  afterRevoke = { isError: true, text: String(error.message ?? error) };
+}
+check('after the revocation the next call fails', afterRevoke.isError, afterRevoke.text.slice(0, 80));
+
+// 9. Clean up: the dossier goes (through the user session; MCP cannot delete).
+const deleted = await fetch(`${VISUALEX}/api/dossiers/${created.data.id}`, { method: 'DELETE', headers: session });
+check('cleanup: the e2e dossier deleted through the user session', deleted.status === 204 || deleted.status === 200);
+
+console.log(failures === 0 ? '\nEnd to end: all checks passed.' : `\nEnd to end: ${failures} check(s) failed.`);
+process.exit(failures === 0 ? 0 : 1);
