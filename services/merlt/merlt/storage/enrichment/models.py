@@ -356,13 +356,17 @@ class MerltIngestionBatch(Base):
     read-only against the live graph before staging (see
     pipeline/mechanical_ingestion/conflict_report.py) and re-checked at
     promote time since the graph may have moved during the review window.
+
+    Sources: `visualex_tree`, `italia_corpus`, `massimario` (the Massimario's
+    annual reviews: one volume per batch, its own report, and `extras` for the
+    paragraphs the vector job writes after promotion).
     """
 
     __tablename__ = "merlt_ingestion_batches"
 
     id = Column(String(36), primary_key=True, default=_default_batch_id)
 
-    source = Column(String(50), nullable=False, index=True)  # visualex_tree | italia_corpus
+    source = Column(String(50), nullable=False, index=True)  # visualex_tree | italia_corpus | massimario
     source_ref = Column(Text, nullable=False)
     scope_label = Column(String(300), nullable=False)
 
@@ -372,6 +376,9 @@ class MerltIngestionBatch(Base):
     edges = Column(JSON, default=list)
     conflict_report = Column(JSON)
     stats = Column(JSON)
+    # Massimario batches: {"chunks": [...]} — paragraphs with their payload and
+    # bridge rows, written by the chained vector job after promotion.
+    extras = Column(JSON)
 
     created_at = Column(DateTime, default=func.now(), index=True)
     created_by = Column(String(100))
@@ -383,7 +390,7 @@ class MerltIngestionBatch(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "source IN ('visualex_tree','italia_corpus')",
+            "source IN ('visualex_tree','italia_corpus','massimario')",
             name="check_batch_source",
         ),
         CheckConstraint(
