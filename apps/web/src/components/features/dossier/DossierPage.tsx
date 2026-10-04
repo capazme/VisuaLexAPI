@@ -3,17 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import { Toast } from '../../ui/Toast';
-import type { Dossier } from '../../../types';
 import { DossierListView } from './DossierListView';
 import { DossierDetailView } from './DossierDetailView';
 import { ImportDossierModal } from './ImportDossierModal';
+import { importReport, validateImportedDossier, type ImportCheck } from './dossierUtils';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null;
 
 export function DossierPage() {
   const { dossiers, importDossier } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [importingDossier, setImportingDossier] = useState<Dossier | null>(null);
+  const [importing, setImporting] = useState<ImportCheck | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const { tryStartTour } = useTour();
 
@@ -36,16 +36,16 @@ export function DossierPage() {
   }, [tryStartTour]);
 
   // Syncs URL param `?import=` into internal state AND clears the external
-  // signal in the same transaction — the justified case for silencing
-  // set-state-in-effect (see CLAUDE.md gotcha #11).
+  // signal in the same transaction (see CLAUDE.md gotcha #11).
   useEffect(() => {
     const importData = searchParams.get('import');
     if (!importData) return;
     try {
       const decoded = atob(decodeURIComponent(importData));
-      const dossier = JSON.parse(decoded) as Dossier;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL→state sync: reads `?import=` and immediately clears it below so the effect won't re-fire
-      setImportingDossier(dossier);
+      // A share link is untrusted: its decision items are checked, and what cannot be imported is listed.
+      const check = validateImportedDossier(JSON.parse(decoded));
+      if (!check) throw new Error('not a dossier');
+      setImporting(check);
     } catch (e) {
       console.error('Failed to parse import data:', e);
       setToast({ message: 'Link di importazione non valido', type: 'error' });
@@ -54,16 +54,17 @@ export function DossierPage() {
   }, [searchParams, setSearchParams]);
 
   const handleConfirmImport = async () => {
-    if (!importingDossier) return;
-    const snapshot = importingDossier;
-    setImportingDossier(null);
-    const outcome = await importDossier(snapshot);
-    if (outcome) {
-      setSelectedDossierId(outcome.id);
-      showToast('Dossier importato', 'success');
-    } else {
+    if (!importing) return;
+    const { dossier, discarded } = importing;
+    setImporting(null);
+    const outcome = await importDossier(dossier);
+    if (!outcome) {
       showToast('Impossibile importare il dossier: errore server', 'error');
+      return;
     }
+    setSelectedDossierId(outcome.id);
+    const lost = outcome.failed + discarded.length;
+    showToast(importReport(outcome.imported, lost), lost === 0 ? 'success' : 'info');
   };
 
   const selectedDossier = dossiers.find((d) => d.id === selectedDossierId) ?? null;
@@ -83,10 +84,11 @@ export function DossierPage() {
         />
       )}
 
-      {importingDossier && (
+      {importing && (
         <ImportDossierModal
-          dossier={importingDossier}
-          onClose={() => setImportingDossier(null)}
+          dossier={importing.dossier}
+          discarded={importing.discarded}
+          onClose={() => setImporting(null)}
           onConfirm={handleConfirmImport}
         />
       )}

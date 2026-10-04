@@ -5,6 +5,7 @@ import {
   computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
   dossierItemFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
+  validateImportedDossier, dossierSuggestionPayload, importReport,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -415,5 +416,42 @@ describe('decision items', () => {
       { data_deposito: '2022-01-10T00:00:00Z' });
     expect(kept).not.toHaveProperty('data_deposito');
     expect(parseSentenzaContent(kept)).not.toBeNull();
+  });
+});
+
+describe('an imported dossier', () => {
+  it('keeps valid items, and lists what it cannot import with the reason', () => {
+    const check = validateImportedDossier({ title: 'Da link', items: [
+      { id: '1', type: 'norma', data: { tipo_atto: 'codice civile' }, addedAt: '' },
+      { id: '2', type: 'sentenza', data: { ...SENTENZA }, addedAt: '' },
+      { id: '3', type: 'sentenza', data: { ...SENTENZA, etichetta: '<img src=x onerror=alert(1)>', corte: 'tar' }, addedAt: '' },
+      { id: '4', type: 'script', data: 'x', addedAt: '' },
+    ] });
+    expect(check?.dossier.items.map((i) => i.id)).toEqual(['1', '2']);
+    expect(check?.discarded).toEqual([
+      { index: 2, reason: 'sentenza con dati non validi' }, { index: 3, reason: 'tipo di voce sconosciuto' }]);
+  });
+
+  it('refuses what is not a dossier', () => {
+    expect(validateImportedDossier({ items: [] })).toBeNull();
+    expect(validateImportedDossier({ title: 'x', items: 'no' })).toBeNull();
+    expect(validateImportedDossier('x')).toBeNull();
+  });
+
+  it('says whether everything came in', () => {
+    expect(importReport(3, 0)).toBe('Dossier importato');
+    expect(importReport(1, 1)).toBe('Dossier importato in parte: 1 voce importata, 1 scartata');
+    expect(importReport(4, 2)).toBe('Dossier importato in parte: 4 voci importate, 2 scartate');
+  });
+
+  it('a Forum suggestion carries decisions as sentenzaRef, with the citation recomputed', () => {
+    const payload = dossierSuggestionPayload({ id: 'd', title: 'D', createdAt: '', items: [
+      { id: '1', type: 'sentenza', data: { ...SENTENZA, etichetta: 'Cass. pen. 10787/2024' }, addedAt: '', status: 'important' },
+      { id: '2', type: 'note', data: 'n', addedAt: '' },
+    ] });
+    expect(payload.entries).toEqual([
+      { articleRef: undefined, sentenzaRef: SENTENZA, note: undefined, status: 'important' },
+      { articleRef: undefined, sentenzaRef: undefined, note: 'n', status: undefined },
+    ]);
   });
 });

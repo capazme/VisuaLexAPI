@@ -20,7 +20,8 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, searchParamsFromGroup, searchesForGroups,
+  tabLabelForGroup, validateImportedDossier, type ImportCheck, type NormaGroup,
 } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
@@ -50,7 +51,7 @@ export function DossierListView({ onSelect, showToast }: Props) {
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [deletingDossier, setDeletingDossier] = useState<Dossier | null>(null);
   const [openPickerGroups, setOpenPickerGroups] = useState<{ dossier: Dossier; groups: NormaGroup[] } | null>(null);
-  const [importingDossier, setImportingDossier] = useState<Dossier | null>(null);
+  const [importing, setImporting] = useState<ImportCheck | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,7 +168,7 @@ export function DossierListView({ onSelect, showToast }: Props) {
       isModalOpen ||
       editingDossier !== null ||
       deletingDossier !== null ||
-      importingDossier !== null ||
+      importing !== null ||
       openPickerGroups !== null;
 
     const onKey = (e: KeyboardEvent) => {
@@ -193,7 +194,7 @@ export function DossierListView({ onSelect, showToast }: Props) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isModalOpen, editingDossier, deletingDossier, importingDossier, openPickerGroups]);
+  }, [isModalOpen, editingDossier, deletingDossier, importing, openPickerGroups]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -201,11 +202,12 @@ export function DossierListView({ onSelect, showToast }: Props) {
     if (!file) return;
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text) as Dossier;
-      if (!parsed || typeof parsed !== 'object' || !parsed.title || !Array.isArray(parsed.items)) {
+      // A file is untrusted: its decision items are checked, and what cannot be imported is listed.
+      const check = validateImportedDossier(JSON.parse(text));
+      if (!check) {
         throw new Error('Struttura non riconosciuta');
       }
-      setImportingDossier(parsed);
+      setImporting(check);
     } catch (err) {
       console.error('JSON import failed:', err);
       showToast(`File JSON non valido${err instanceof Error && err.message ? `: ${err.message}` : ''}`, 'error');
@@ -213,16 +215,17 @@ export function DossierListView({ onSelect, showToast }: Props) {
   };
 
   const handleConfirmJsonImport = async () => {
-    if (!importingDossier) return;
-    const snapshot = importingDossier;
-    setImportingDossier(null);
-    const outcome = await importDossier(snapshot);
-    if (outcome) {
-      showToast('Dossier importato', 'success');
-      onSelect(outcome.id);
-    } else {
+    if (!importing) return;
+    const { dossier, discarded } = importing;
+    setImporting(null);
+    const outcome = await importDossier(dossier);
+    if (!outcome) {
       showToast('Impossibile importare il dossier: errore server', 'error');
+      return;
     }
+    const lost = outcome.failed + discarded.length;
+    showToast(importReport(outcome.imported, lost), lost === 0 ? 'success' : 'info');
+    onSelect(outcome.id);
   };
 
   return (
@@ -502,10 +505,11 @@ export function DossierListView({ onSelect, showToast }: Props) {
         />
       )}
 
-      {importingDossier && (
+      {importing && (
         <ImportDossierModal
-          dossier={importingDossier}
-          onClose={() => setImportingDossier(null)}
+          dossier={importing.dossier}
+          discarded={importing.discarded}
+          onClose={() => setImporting(null)}
           onConfirm={handleConfirmJsonImport}
         />
       )}

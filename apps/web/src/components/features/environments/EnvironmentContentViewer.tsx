@@ -213,7 +213,7 @@ export function EnvironmentContentViewer({
                     )}
                     {/* Would need to access actual dossier items from environment */}
                     <p className="text-xs text-slate-400">
-                      Contiene {dossier.articleCount} norme
+                      Contiene {dossier.articleCount} norme{dossier.decisionCount > 0 ? ` e ${dossier.decisionCount} ${dossier.decisionCount === 1 ? 'sentenza' : 'sentenze'}` : ''}
                     </p>
                   </div>
                 </motion.div>

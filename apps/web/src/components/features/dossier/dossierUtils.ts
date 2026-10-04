@@ -288,6 +288,59 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
   return { ...base, type: 'note', data: text };
 }
 
+export interface ImportCheck {
+  dossier: Dossier;
+  discarded: Array<{ index: number; reason: string }>;
+}
+
+/**
+ * A dossier from a share link or a JSON file, its decision items checked (design 2026-10-01 §6).
+ * An item that cannot be imported is listed with the reason, never dropped in silence. Norm and
+ * note items are not checked in depth yet (spec, "Later"); the server checks every decision again.
+ */
+export function validateImportedDossier(raw: unknown): ImportCheck | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const candidate = raw as { title?: unknown; items?: unknown };
+  if (typeof candidate.title !== 'string' || !Array.isArray(candidate.items)) return null;
+  const items: DossierItem[] = [];
+  const discarded: ImportCheck['discarded'] = [];
+  candidate.items.forEach((entry, index) => {
+    const item = entry as { type?: unknown; data?: unknown } | null;
+    if (item?.type === 'sentenza') {
+      const data = parseSentenzaContent(item.data);
+      if (data) items.push({ ...(entry as DossierItem), type: 'sentenza', data } as DossierItem);
+      else discarded.push({ index, reason: 'sentenza con dati non validi' });
+    } else if (item?.type === 'norma' || item?.type === 'note') {
+      items.push(entry as DossierItem);
+    } else {
+      discarded.push({ index, reason: 'tipo di voce sconosciuto' });
+    }
+  });
+  return { dossier: { ...(raw as Dossier), items }, discarded };
+}
+
+/** The toast after an import: whole, or how many items were left out (not importable, or refused by the server). */
+export function importReport(imported: number, lost: number): string {
+  if (lost === 0) return 'Dossier importato';
+  return `Dossier importato in parte: ${imported} ${imported === 1 ? 'voce importata' : 'voci importate'}, ${lost} ${lost === 1 ? 'scartata' : 'scartate'}`;
+}
+
+/** A dossier as a Forum suggestion carries it; the server makes each entry the item it stands for.
+ *  A decision travels with its citation recomputed (source convention, Q9). */
+export function dossierSuggestionPayload(d: Dossier) {
+  return {
+    title: d.title,
+    description: d.description,
+    tags: d.tags ?? [],
+    entries: d.items.map((it) => ({
+      articleRef: it.type === 'norma' ? it.data : undefined,
+      sentenzaRef: it.type === 'sentenza' ? { ...it.data, etichetta: decisionCitationOf(it.data) } : undefined,
+      note: it.type === 'note' ? it.data : undefined,
+      status: it.status,
+    })),
+  };
+}
+
 export function dossierContainsDecision(dossier: Dossier, identity: DecisionIdentity): boolean {
   const key = decisionKey(identity);
   return dossier.items.some((i) => i.type === 'sentenza' && decisionKey(i.data) === key);
