@@ -291,14 +291,22 @@ describe('POST /api/dossiers/:id/norms', () => {
       'art. 3, l. 21 aprile 2023, n. 49',
       'art. 2043 c.c.',
     ]);
+    // And the act alone, so a reader can name each act once above its articles.
+    expect(dossier.body.items.map((i: { act_citation?: string | null }) => i.act_citation)).toEqual([
+      'l. 31 dicembre 2012, n. 247',
+      'l. 21 aprile 2023, n. 49',
+      'c.c.',
+    ]);
     const list = await request(app).get('/api/dossiers').set(authHeader(alice));
     expect(list.body[0].items[0].citation).toBe('art. 3, l. 31 dicembre 2012, n. 247');
+    expect(list.body[0].items[0].act_citation).toBe('l. 31 dicembre 2012, n. 247');
   });
 
   it('gives a note no citation', async () => {
     await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({ itemType: 'note', title: 'Nota', content: 'appunto' });
     const dossier = await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice));
     expect(dossier.body.items[0].citation).toBeNull();
+    expect(dossier.body.items[0].act_citation).toBeNull();
   });
 
   it('takes 1 to 50 references, each a short string', async () => {
