@@ -1,9 +1,10 @@
 """RQ tasks: parse+stage and promote a mechanical-ingestion batch.
 
-Enqueued by `merlt.api.ingestion_mechanical_router` on the existing
-`merlt_ingest` queue (no new queue name — the worker already listens on it,
-see `infra/compose.yml`'s worker `command`). Both entrypoints are sync
-(RQ requirement) wrapping the async pipeline.
+Enqueued by `merlt.api.ingestion_mechanical_router` on the `merlt_bulk`
+queue (the router's `_QUEUE_NAME`), which the worker names last so that a
+reader's lazy ingestion on `merlt_ingest` is served first (see
+`infra/compose.yml`'s worker `command`). Both entrypoints are sync (RQ
+requirement) wrapping the async pipeline.
 
 GOTCHA (CLAUDE.md #6): the RQ worker has no FastAPI lifespan, so the
 enrichment DB engine is never auto-initialized — every task here calls
@@ -49,12 +50,23 @@ async def _run_parse_and_stage(batch_id: str) -> dict:
             falkordb = FalkorDBClient()
             await falkordb.connect()
             try:
-                report = await build_conflict_report(falkordb, nodes, edges)
+                if batch.source == "massimario":
+                    # Stubs are created only if missing and decision lists are
+                    # unions (pipeline/massimario/promote.py): there is nothing
+                    # to conflict with. The adapter brings its own report; add
+                    # what the graph already holds.
+                    from merlt.pipeline.massimario.report import add_graph_counts
+
+                    report = parsed["report"]
+                    await add_graph_counts(falkordb, nodes, report)
+                else:
+                    report = await build_conflict_report(falkordb, nodes, edges)
             finally:
                 await falkordb.close()
 
             batch.nodes = nodes
             batch.edges = edges
+            batch.extras = parsed.get("extras")
             batch.conflict_report = report
             batch.stats = report["stats"]
             batch.status = "pending_review"

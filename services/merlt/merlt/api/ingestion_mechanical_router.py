@@ -61,7 +61,7 @@ def _get_queue():
 
 
 class RunIngestionRequest(BaseModel):
-    source: str = Field(..., pattern="^(visualex_tree|italia_corpus)$")
+    source: str = Field(..., pattern="^(visualex_tree|italia_corpus|massimario)$")
     source_ref: str = Field(..., min_length=1)
     scope_label: str = Field(..., min_length=1, max_length=300)
     created_by: Optional[str] = Field(None, max_length=100)

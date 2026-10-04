@@ -60,6 +60,16 @@ _STATEMENTS = (
     "ALTER TABLE user_documents DROP CONSTRAINT IF EXISTS user_documents_file_hash_key",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_documents_hash_owner "
     "ON user_documents (file_hash, uploaded_by)",
+    # 006_massimario_ingestion.sql: Massimario batches stage chunks next to
+    # nodes/edges, and `massimario` is a batch source.
+    "ALTER TABLE merlt_ingestion_batches ADD COLUMN IF NOT EXISTS extras JSON",
+    "DO $$ BEGIN "
+    "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'check_batch_source' "
+    "AND pg_get_constraintdef(oid) LIKE '%massimario%') THEN "
+    "ALTER TABLE merlt_ingestion_batches DROP CONSTRAINT IF EXISTS check_batch_source; "
+    "ALTER TABLE merlt_ingestion_batches ADD CONSTRAINT check_batch_source "
+    "CHECK (source IN ('visualex_tree','italia_corpus','massimario')); "
+    "END IF; END $$",
 )
 
 

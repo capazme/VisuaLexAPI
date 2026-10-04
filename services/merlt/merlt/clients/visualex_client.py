@@ -497,6 +497,31 @@ class VisuaLexClient:
             log.error("fetch_tree failed", error=str(e), payload=payload)
             raise
 
+    async def fetch_massimario(self, kind: str, element_id: int) -> Dict[str, Any]:
+        """One element of the Massimario portal, through VisuaLex's internal route (raw objectData)."""
+        client = await self._get_client()
+        response = await client.get(
+            "/fetch_massimario",
+            params={"kind": kind, "id": str(element_id)},
+            timeout=httpx.Timeout(120.0),
+        )
+        if response.status_code == 429:
+            raise RuntimeError("Portale del Massimario: il firewall ha rifiutato la richiesta; riprovare più tardi")
+        response.raise_for_status()
+        return response.json()["data"]
+
+    async def resolve_act_dates(self, urns: List[str]) -> Dict[str, Optional[str]]:
+        """Full URNs for acts cited by year only (at most 20 per call), through VisuaLex.
+
+        240 s: VisuaLex bounds the start of its requests to Normattiva at 120 s, and
+        one slow answer can carry a batch to about 183 s."""
+        client = await self._get_client()
+        response = await client.post(
+            "/resolve_act_dates", json={"urns": urns}, timeout=httpx.Timeout(240.0)
+        )
+        response.raise_for_status()
+        return response.json().get("resolved", {})
+
     # ========================================
     # Compatibility methods for scraper interface
     # ========================================
