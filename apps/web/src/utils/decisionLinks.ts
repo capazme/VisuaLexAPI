@@ -11,7 +11,7 @@ import type {
 import { formatDateForCitation, formatDateItalianLong, withPreposition } from './dateUtils';
 
 /** False until App.tsx routes /sentenze/:corte/:numero/:anno; the decision-page PR sets it true. */
-export const DECISION_PAGE_AVAILABLE = false;
+export const DECISION_PAGE_AVAILABLE = true;
 
 /** A decision as other data names it (graph nodes, imports): loose, possibly incomplete. */
 export interface LooseDecisionRef {

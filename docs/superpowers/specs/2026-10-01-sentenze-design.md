@@ -344,24 +344,35 @@ over the reader. From the top:
      (`www.cortecostituzionale.it/scheda-pronuncia/<anno>/<numero>`); none for
      the Cassazione.
 4. **The text**, in the blocks the source gives (epigrafe, motivazione,
-   dispositivo), at the reader's 68ch measure. Rendering follows S6: within a
-   block, the text nodes spell the received text minus `\n`, as gotcha 23
-   prescribes for articles. The plan measures the line breaks of Italgiure's
-   OCR and chooses the CSS that reflows them without touching a character. Text
-   is rendered as React text, never as HTML.
+   dispositivo), at the reader's 68ch measure. Where the Corte costituzionale's
+   open data leave the reasoning in the epigrafe, the data route splits it
+   (§3), so the page shows the blocks as the route divides them. Rendering
+   follows S6: within a block, the text nodes spell the received text minus
+   `\n`, as gotcha 23 prescribes for articles. The plan measures the line
+   breaks of Italgiure's OCR and chooses the CSS that reflows them without
+   touching a character. Text is rendered as React text, never as HTML. The
+   blocks are labelled «Epigrafe», «Motivazione» and «Dispositivo»; an epigrafe
+   without a motivazione holds the reasoning too and is labelled «Testo»
+   (decided by the owner on 2026-10-04). A decision without its text shows no
+   block.
 5. **The source**, at the foot: "Fonte: Corte di cassazione — archivio pubblico
-   SentenzeWeb (Italgiure)" or "Fonte: Corte costituzionale — dati aperti,
-   licenza CC BY-SA 3.0". The attribution appears in exports too.
+   SentenzeWeb (Italgiure)" or "Fonte: Corte costituzionale — dati aperti". A
+   dossier's PDF names it too. Neither shows the licence (the owner's decisions
+   of 2026-10-04); the data keep `fonte.licenza`.
 
 **Each outcome has its own screen:**
 - loading;
 - the decision;
+- the decision without its text: its particulars and the notice (§3), no text
+  block;
 - the choice between two candidates;
 - not found, with the reason, the form filled in and, for a penal decision, the
   suggested next year;
 - outside the archive, with the date it starts;
 - partly covered year;
 - source unreachable, with "Riprova";
+- an unexpected failure (`errore_interno`), with "Riprova", never
+  "non trovata";
 - invalid address, with the form and the message.
 
 **The lookup form** (`/sentenze`, "Apri una sentenza") asks for:

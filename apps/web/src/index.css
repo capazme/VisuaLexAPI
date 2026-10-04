@@ -779,6 +779,30 @@
   }
 }
 
+/* Court decisions (design 2026-10-01 §4): the received text, one span per line. The space
+   between two lines and each block's label come from CSS, never from a text node (S6). */
+.vlx-decision .vlx-dec-block {
+  margin-bottom: 1.5em;
+}
+
+.vlx-decision .vlx-dec-block::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: 0.4em;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  @apply font-sans text-slate-500 dark:text-slate-400;
+}
+
+.vlx-decision .vlx-dec-para {
+  margin-bottom: 0.75em;
+}
+
+.vlx-decision .vlx-dec-line + .vlx-dec-line::before {
+  content: " ";
+}
+
 /* ═══════════════════════════════════════════════════════════
    CITATION HOVER — Subtle recognition of norm references
    ═══════════════════════════════════════════════════════════ */
