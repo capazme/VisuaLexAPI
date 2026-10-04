@@ -50,12 +50,14 @@ describe('useActDetails', () => {
   });
 
   it('resolves the act when no item carries a urn', async () => {
-    resolveAct.mockResolvedValue({ urn: URN, norma: {} });
+    resolveAct.mockResolvedValue({ urn: `${URN}~art1`, norma: {} });
     fetchActRubriche.mockResolvedValue({ title: 'Nuova disciplina', rubriche: {}, parts: [] });
     const [block] = layoutDossier([item('3', { urn: undefined })]).acts;
     const { result } = renderHook(() => useActDetails(block));
     await waitFor(() => expect(result.current.title).toBe('Nuova disciplina'));
     expect(resolveAct).toHaveBeenCalledWith({ act_type: 'legge', act_number: '247', date: '2012-12-31' });
+    // The act's URN, the same key the reader caches the act under: one call, not two.
+    expect(fetchActRubriche).toHaveBeenCalledWith(URN);
   });
 
   it('logs a failure and shows nothing', async () => {

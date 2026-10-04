@@ -15,18 +15,24 @@ import { normalizeArticleId } from './treeUtils';
 export function matchRubrichePart(parts: RubrichePart[], articleNumbers: string[]): RubrichePart | null {
   if (parts.length === 0 || articleNumbers.length === 0) return null;
   const wanted = new Set(articleNumbers.map(normalizeArticleId));
-  let best: RubrichePart | null = null;
-  let bestScore = 0;
-  for (const part of parts) {
-    const overlap = part.keys.reduce((n, k) => (wanted.has(normalizeArticleId(k)) ? n + 1 : n), 0);
-    if (overlap > bestScore) {
-      bestScore = overlap;
-      best = part;
-    }
-  }
+  const scored = parts.map((part) => ({
+    part,
+    overlap: part.keys.reduce((n, k) => (wanted.has(normalizeArticleId(k)) ? n + 1 : n), 0),
+    // How far the part's size is from the annex's: on a tie, the part of the
+    // same size is the annex (the Dispositivo's arts. 1-3 are also arts. 1-3 of
+    // the code body, which the server lists first).
+    gap: Math.abs(part.keys.length - wanted.size),
+  }));
+  const top = Math.max(...scored.map((x) => x.overlap));
+  const tied = scored.filter((x) => x.overlap === top);
+  const closest = Math.min(...tied.map((x) => x.gap));
+  const best = tied.filter((x) => x.gap === closest);
+  // Still two candidates: nothing, rather than another part's titles.
+  if (top === 0 || best.length !== 1) return null;
+  const part = best[0].part;
   // A real majority: a couple of shared numbers is coincidence (every annex has
   // an article 1), a matching set is identification.
-  return bestScore >= Math.max(1, Math.min(wanted.size, best?.keys.length ?? 0) * 0.5) ? best : null;
+  return top >= Math.max(1, Math.min(wanted.size, part.keys.length) * 0.5) ? part : null;
 }
 
 /** The part of an act in view: none for an act with no parts, the matched part (or none) otherwise. */

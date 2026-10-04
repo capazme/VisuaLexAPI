@@ -27,6 +27,23 @@ describe('rubricheFor', () => {
 });
 
 describe('matchRubrichePart', () => {
+  // The server's order: the code body first, the Dispositivo last (akn_parser.py),
+  // as measured on the codice penale's fixture.
+  const CODE_THEN_DISPOSITIVO = [
+    { name: 'Codice Penale', keys: Array.from({ length: 40 }, (_, i) => String(i + 1)), rubriche: { '1': 'Reati e pene: disposizione espressa di legge' }, abrogati: [] },
+    { name: 'Dispositivo', keys: ['1', '2', '3'], rubriche: {}, abrogati: [] },
+  ];
+  it('tells the Dispositivo from the code body it shares its numbers with', () => {
+    expect(matchRubrichePart(CODE_THEN_DISPOSITIVO, ['1', '2', '3'])?.name).toBe('Dispositivo');
+    expect(matchRubrichePart(CODE_THEN_DISPOSITIVO, Array.from({ length: 40 }, (_, i) => String(i + 1)))?.name).toBe('Codice Penale');
+  });
+  it('gives nothing when two parts of the same size share the numbers', () => {
+    const twoAnnexes = [
+      { name: 'Allegato A.1', keys: ['1', '2', '3'], rubriche: { '1': 'Uno' }, abrogati: [] },
+      { name: 'Allegato A.2', keys: ['1', '2', '3'], rubriche: { '1': 'Altro' }, abrogati: [] },
+    ];
+    expect(matchRubrichePart(twoAnnexes, ['1', '2', '3'])).toBeNull();
+  });
   it('needs a real majority: a shared article 1 is a coincidence', () => {
     expect(matchRubrichePart(DLGS_196.parts, ['1', '50', '51', '52'])).toBeNull();
   });

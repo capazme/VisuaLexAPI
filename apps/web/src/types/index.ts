@@ -183,7 +183,7 @@ export interface AnnexMetadata {
     number: string | null;  // null for main text, "1"/"2"/"A" for annexes
     label: string;          // Display label (e.g., "Allegato A", "Legge di Emanazione")
     article_count: number;  // Number of articles in this annex
-    article_numbers: string[];  // List of article numbers (limited to first 50)
+    article_numbers: string[];  // The annex's article numbers
 }
 
 export interface TreeMetadata {

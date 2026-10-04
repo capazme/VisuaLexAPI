@@ -40,13 +40,17 @@ export function useActDetails(block: ActBlock): ActDetails {
   const isCode = block.isCode;
 
   useEffect(() => {
+    // Another act: nothing of the previous one stays on screen while this one loads.
+    setTitle(null);
+    setByAnnex({});
     if (!actType) return;
     let cancelled = false;
     const annexes = annexesKey.split('|');
     (async () => {
       let urn = knownUrn;
       try {
-        urn ??= (await resolveAct({ act_type: actType, act_number: actNumber, date: actDate })).urn;
+        // resolveAct probes article 1: the act's URN is the part before "~".
+        urn ??= (await resolveAct({ act_type: actType, act_number: actNumber, date: actDate })).urn.split('~')[0];
         const answer = await fetchActRubriche(urn);
         let maps: RubricheByAnnex;
         if ((answer.parts ?? []).length === 0) {
