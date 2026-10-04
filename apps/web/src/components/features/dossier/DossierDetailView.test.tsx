@@ -7,7 +7,8 @@ vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
     getSnapshots: vi.fn(async () => []),
-    addItem: vi.fn(async () => ({ id: 'srv-new', item_type: 'norm', title: '', content: {}, position: 0, status: 'unread', created_at: '' })),
+    // A fresh id per call, as the server gives.
+    addItem: vi.fn(async () => ({ id: `srv-${Math.random().toString(36).slice(2)}`, item_type: 'norm', title: '', content: {}, position: 0, status: 'unread', created_at: '' })),
     deleteItem: vi.fn(async () => {}),
     updateItem: vi.fn(async () => ({})),
     reorderItems: vi.fn(async () => {}),
@@ -60,9 +61,9 @@ afterEach(() => unregister());
 describe('DossierDetailView — the page by act', () => {
   it('names each act once, in the order the acts entered, with its articles by number', () => {
     renderView();
-    expect(screen.getAllByRole('heading', { name: L247 })).toHaveLength(1);
-    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(headings.filter((h) => h === L247 || h === L49)).toEqual([L247, L49]);
+    expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent ?? '');
+    expect(headings.filter((h) => h.startsWith('l. '))).toEqual([`${L247}2 articoli`, `${L49}1 articolo`]);
     const block = screen.getByRole('region', { name: L247 });
     expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);
   });

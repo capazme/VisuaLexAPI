@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, CheckSquare, Square, Loader2, TreeDeciduous } from 'lucide-react';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { resolveAct } from '../../../utils/actUrn';
@@ -50,9 +50,19 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [confirmBulkImportOpen, setConfirmBulkImportOpen] = useState(false);
 
+  // Only the latest search may fill the list: an older answer arriving late
+  // would otherwise label one act's articles with another's identity.
+  const searchRef = useRef(0);
+
   const fetchTree = async () => {
+    const search = ++searchRef.current;
     setLoading(true);
     setError(null);
+    // A new search empties the old act's index, so «Importa» never takes its
+    // articles under the new act's identity, even if this search fails.
+    setTree([]);
+    setSelectedArticles(new Set());
+    setResolvedAct(null);
     try {
       // Derive the URN the tree endpoint needs, without fetching article text.
       const { urn: urnToUse, norma } = await resolveAct({
@@ -60,11 +70,11 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
         act_number: actNumber || undefined,
         date: actDate ? parseItalianDate(actDate) : undefined,
       });
-      setResolvedAct({
+      const identity = {
         tipo_atto: actType,
         data: norma?.data || parseItalianDate(actDate),
         numero_atto: norma?.numero_atto || actNumber,
-      });
+      };
 
       const treeRes = await legalFetch('/fetch_tree', {
         method: 'POST',
@@ -81,12 +91,15 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
         (node: unknown): node is TreeNode =>
           typeof node === 'string' || (typeof node === 'object' && node !== null)
       );
+      if (search !== searchRef.current) return;
+      // The tree and the act it belongs to arrive together, or not at all.
       setTree(extractArticleIdsFromTree(treeData));
-      setSelectedArticles(new Set());
+      setResolvedAct(identity);
     } catch (err) {
+      if (search !== searchRef.current) return;
       setError(err instanceof Error ? err.message : 'Errore nel recupero della struttura');
     } finally {
-      setLoading(false);
+      if (search === searchRef.current) setLoading(false);
     }
   };
 
@@ -123,7 +136,8 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
         urn: typeof entry === 'object' ? Object.values(entry)[0] : undefined,
       };
     });
-    onImport(articles, resolvedAct ?? { tipo_atto: actType, data: parseItalianDate(actDate), numero_atto: actNumber });
+    if (!resolvedAct) return;
+    onImport(articles, resolvedAct);
     onClose();
   };
 

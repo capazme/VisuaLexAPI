@@ -39,7 +39,6 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
@@ -148,6 +147,19 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   // The page's sections: notes first, then one block per act (spec §1-2).
   const layout = useMemo(() => layoutDossier(visibleItems), [visibleItems]);
   const fullLayout = useMemo(() => layoutDossier(dossier.items), [dossier.items]);
+  const fullBlocks = useMemo(() => new Map(fullLayout.acts.map((a) => [a.key, a])), [fullLayout]);
+  // What a screen reader hears while an act is dragged: its heading, never its key.
+  const dragAnnouncements = useMemo(() => {
+    const heading = (id: string | number) => fullBlocks.get(String(id))?.heading ?? '';
+    return {
+      onDragStart: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} iniziato.`,
+      onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
+        over ? `${heading(active.id)} sopra ${heading(over.id)}.` : `${heading(active.id)} fuori dall'elenco degli atti.`,
+      onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
+        over ? `${heading(active.id)} spostato al posto di ${heading(over.id)}.` : `${heading(active.id)} lasciato dov'era.`,
+      onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
+    };
+  }, [fullBlocks]);
   const countsLine = [
     plural(fullLayout.acts.length, 'atto', 'atti'),
     plural(fullLayout.acts.reduce((n, a) => n + a.articles.length, 0), 'articolo', 'articoli'),
@@ -558,7 +570,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
             <MenuButton
               label="Esporta"
               align="left"
-              triggerClassName={cn(SECONDARY_BUTTON, 'dossier-export')}
+              triggerClassName={SECONDARY_BUTTON}
               items={[
                 { label: 'PDF', icon: Download, onSelect: () => void handleExportPdf(), disabled: !!pdfProgress },
                 { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
@@ -702,7 +714,15 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         ) : (
           <>
             <DossierNotesSection notes={layout.notes as NoteItem[]} onRemove={handleRemoveSingle} />
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleActDragEnd}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleActDragEnd}
+              accessibility={{
+                announcements: dragAnnouncements,
+                screenReaderInstructions: { draggable: "Per spostare l'atto premi Spazio, poi le frecce su e giù, e di nuovo Spazio per lasciarlo; Esc annulla." },
+              }}
+            >
               <SortableContext items={layout.acts.map((a) => a.key)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-3">
                   {layout.acts.map((block) => (
@@ -717,13 +737,14 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                       selectedIds={selectedItems}
                       showCheckbox={showBulkActions}
                       onToggleSelect={toggleItemSelection}
-                      onOpenAct={() => openGroupsOnDashboard(block.groups)}
+                      // The whole act, even while the search shows only some of its articles.
+                      onOpenAct={() => openGroupsOnDashboard((fullBlocks.get(block.key) ?? block).groups)}
                       onAddArticles={() => setTreeNavigatorAct({
                         tipo_atto: block.articles[0].data.tipo_atto,
                         numero_atto: block.articles[0].data.numero_atto || '',
                         data: block.articles[0].data.data || '',
                       })}
-                      onRemoveAct={() => handleRemoveAct(block)}
+                      onRemoveAct={() => handleRemoveAct(fullBlocks.get(block.key) ?? block)}
                       onOpenItem={openItemOnDashboard}
                       onRemoveItem={handleRemoveSingle}
                       onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}

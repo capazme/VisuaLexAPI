@@ -29,7 +29,7 @@ function NoteRow({ note, onRemove }: { note: NoteItem; onRemove: () => void }) {
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="mt-0.5 rounded text-xs font-medium text-amber-800 hover:underline dark:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="mt-0.5 min-h-[44px] rounded text-xs font-medium text-amber-800 hover:underline md:min-h-0 dark:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
           >
             {open ? 'Mostra meno' : 'Mostra tutto'}
           </button>

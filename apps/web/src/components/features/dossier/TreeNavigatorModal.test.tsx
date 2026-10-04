@@ -50,3 +50,20 @@ describe('TreeNavigatorModal', () => {
     await screen.findByText('Art. 1');
   });
 });
+
+describe('TreeNavigatorModal — a second search', () => {
+  it("empties the first act's index, so a failed second search imports nothing under the wrong act", async () => {
+    const onImport = vi.fn();
+    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport}
+      initialAct={{ tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31' }} />);
+    await screen.findByText('Art. 3');
+    fireEvent.click(screen.getByText('Art. 3'));
+    resolveAct.mockResolvedValueOnce({ urn: 'urn:l49', norma: { tipo_atto: 'legge', numero_atto: '49', data: '2023-04-21' } });
+    legalFetch.mockResolvedValueOnce({ json: async () => ({ error: 'non trovato' }) });
+    fireEvent.change(screen.getByPlaceholderText('241'), { target: { value: '49' } });
+    fireEvent.click(screen.getByRole('button', { name: /Cerca articoli/ }));
+    await screen.findByText('non trovato');
+    expect(screen.queryByText('Art. 3')).toBeNull();
+    expect(screen.getByRole('button', { name: /Importa/ })).toBeDisabled();
+  });
+});

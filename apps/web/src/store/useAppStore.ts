@@ -1569,8 +1569,11 @@ const appStore = createStore<AppState>()(
                     const clamped = Math.max(0, Math.min(atIndex, dossier.items.length));
                     dossier.items.splice(clamped, 0, item);
                     // Its old id is gone on the server until addItem answers: a
-                    // reorder in that window waits (setDossierItemOrder).
+                    // reorder in that window waits (setDossierItemOrder). And
+                    // addItem appends it on the server, so once it settles the
+                    // local order — where it was — is saved too.
                     state.pendingDossierItemIds[localId] = true;
+                    state.pendingDossierOrders[dossierId] = true;
                 });
                 dossierService.addItem(dossierId, {
                     itemType: item.type === 'norma' ? 'norm' : 'note',
@@ -1586,10 +1589,25 @@ const appStore = createStore<AppState>()(
                         }
                         delete state.pendingDossierItemIds[localId];
                     });
+                    // A star set while the item was pending was applied locally
+                    // only (updateDossierItemStatus): persist what it is now.
+                    const settled = get().dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
+                    if (settled && settled.status !== item.status) {
+                        dossierService.updateItem(dossierId, created.id, {
+                            content: packItemContent(settled.data, settled.status),
+                        }).catch(err => console.error('Failed to persist the star of a restored item:', err));
+                    }
                     get().flushDossierOrder(dossierId);
                 }).catch(err => {
                     console.error('Failed to restore item on server:', err);
-                    set((state) => { delete state.pendingDossierItemIds[localId]; });
+                    // Not on the server: it must not stay on screen as if it were
+                    // (gotcha 17), nor be named in a saved order.
+                    set((state) => {
+                        const dossier = state.dossiers.find(d => d.id === dossierId);
+                        if (dossier) dossier.items = dossier.items.filter(i => i.id !== localId);
+                        delete state.pendingDossierItemIds[localId];
+                    });
+                    get().pushSyncError('Impossibile ripristinare l’elemento. Riprova.');
                     get().flushDossierOrder(dossierId);
                 });
             },
@@ -1619,9 +1637,15 @@ const appStore = createStore<AppState>()(
                 if (waiting) return;
                 dossierService.reorderItems(dossierId, next.map(i => i.id)).catch(err => {
                     console.error('Failed to save the order of the dossier:', err);
+                    // Back to the previous ORDER, on the items there are now: an
+                    // item removed or starred meanwhile must not come back as it was.
+                    const rank = new Map(before.map((i, index) => [i.id, index]));
                     set((state) => {
                         const d = state.dossiers.find(x => x.id === dossierId);
-                        if (d) d.items = before;
+                        if (d) {
+                            d.items = [...d.items].sort((a, b) =>
+                                (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+                        }
                     });
                     get().pushSyncError('Impossibile salvare il nuovo ordine degli atti. Riprova.');
                 });

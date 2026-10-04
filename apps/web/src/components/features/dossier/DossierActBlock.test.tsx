@@ -43,7 +43,7 @@ function renderBlock(items: DossierItem[], over: Partial<DossierActBlockProps> =
 describe('DossierActBlock', () => {
   it('names the act once, with its title and count, and its articles by number and rubrica', () => {
     renderBlock([item('3'), item('1')]);
-    expect(screen.getAllByRole('heading', { name: L247 })).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
     expect(screen.getByText("Nuova disciplina dell'ordinamento della professione forense")).toBeInTheDocument();
     expect(screen.getByText('2 articoli')).toBeInTheDocument();
     expect(screen.getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);
@@ -52,20 +52,20 @@ describe('DossierActBlock', () => {
 
   it('heads an act the server has not named yet with the muted fallback', () => {
     renderBlock([item('3', null)]);
-    const heading = screen.getByRole('heading', { name: 'legge n. 247' });
-    expect(heading.className).toMatch(/text-slate-500/);
+    const toggle = screen.getByRole('button', { name: 'legge n. 247' });
+    expect(toggle.className).toMatch(/text-slate-500/);
   });
 
   it('folds into the line of its numbers', () => {
     renderBlock([item('3'), item('1')], { isFolded: true });
     expect(screen.getByText('artt. 1, 3')).toBeInTheDocument();
     expect(screen.queryByText(/^art\. 1$/)).toBeNull();
-    expect(screen.getByRole('button', { name: `Apri ${L247}` })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: L247 })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('toggles the fold from its heading', () => {
     const props = renderBlock([item('3')]);
-    fireEvent.click(screen.getByRole('button', { name: `Chiudi ${L247}` }));
+    fireEvent.click(screen.getByRole('button', { name: L247 }));
     expect(props.onToggleFold).toHaveBeenCalledTimes(1);
   });
 

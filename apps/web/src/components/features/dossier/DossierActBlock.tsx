@@ -61,39 +61,39 @@ export function DossierActBlock(props: DossierActBlockProps) {
             <GripVertical size={18} />
           </button>
         )}
-        <div
-          role="button"
-          tabIndex={0}
-          aria-expanded={!isFolded}
-          aria-label={`${isFolded ? 'Apri' : 'Chiudi'} ${block.heading}`}
-          onClick={onToggleFold}
-          onKeyDown={(e) => {
-            if (e.target !== e.currentTarget) return;
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onToggleFold();
-            }
-          }}
-          className="min-w-0 flex-1 cursor-pointer rounded-md px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-        >
-          <div className="flex items-center gap-2">
-            <ChevronDown
-              size={16}
-              aria-hidden
-              className={cn('flex-shrink-0 text-slate-400 transition-transform', isFolded && '-rotate-90')}
-            />
-            <h3
+        <div className="min-w-0 flex-1 px-1 py-1">
+          {/* The accordion pattern: the heading holds the toggle, so the act is a
+              heading to a screen reader and its name is the act's own words. */}
+          <h3 className="flex min-w-0 items-center gap-2">
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={!isFolded}
+              onClick={onToggleFold}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onToggleFold();
+                }
+              }}
               className={cn(
-                'min-w-0 truncate text-base font-semibold',
+                'flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md text-base font-semibold md:min-h-0',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
                 block.headingIsFallback ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white',
               )}
             >
-              {block.heading}
-            </h3>
-            <span className="flex-shrink-0 text-xs text-slate-400">
+              <ChevronDown
+                size={16}
+                aria-hidden
+                className={cn('flex-shrink-0 text-slate-400 transition-transform', isFolded && '-rotate-90')}
+              />
+              <span className="truncate">{block.heading}</span>
+            </div>
+            <span className="flex-shrink-0 text-xs font-normal text-slate-400">
               {count === 1 ? '1 articolo' : `${count} articoli`}
             </span>
-          </div>
+          </h3>
           {title && (
             <p className="ml-6 truncate text-sm text-slate-500 dark:text-slate-400" title={title}>{title}</p>
           )}
