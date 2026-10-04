@@ -51,6 +51,15 @@ export async function delegatedQuotaStatus(userId: string) {
   };
 }
 
+async function refund(userId: string, points: number, creation: boolean): Promise<void> {
+  try {
+    if (points > 0) await pointsLimiter().reward(userId, points);
+    if (creation) await creationsLimiter().reward(userId, 1);
+  } catch (error) {
+    console.error('delegatedAuth: refund failed:', error instanceof Error ? error.message : error);
+  }
+}
+
 function refuse(res: Response, status: 401 | 403, detail: string, error: string): void {
   if (status === 401) res.setHeader('WWW-Authenticate', `Bearer error="${error}"`);
   res.status(status).json({ detail, error });
@@ -75,8 +84,14 @@ function overQuota(res: Response, quota: 'points' | 'dossier_create', limit: Rat
  * delegated path then verifies it strictly, and nothing else ever trusts it.
  */
 function looksDelegated(token: string): boolean {
-  const decoded = jwt.decode(token);
-  return typeof decoded === 'object' && decoded !== null && 'act' in decoded;
+  try {
+    const decoded = jwt.decode(token);
+    return typeof decoded === 'object' && decoded !== null && 'act' in decoded;
+  } catch {
+    // A header that says JWT over a payload that is not JSON: not ours, and
+    // the session path answers it with a 401.
+    return false;
+  }
 }
 
 const parseJson = express.json({ limit: '2mb' });
@@ -137,28 +152,48 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   }
 
   // The weight of some routes depends on the body: parse it here (the app's
-  // parser, later, sees it parsed and skips).
-  await new Promise<void>((resolve) => parseJson(req, res, () => resolve()));
-  if (res.headersSent) return;
+  // parser, later, sees it parsed and skips). Only JSON: a form body would be
+  // parsed after the weight was set and could carry 50 references for the
+  // price of none.
+  if (req.method === 'POST') {
+    if (!req.is('application/json')) {
+      res.status(415).json({ detail: 'Le applicazioni collegate inviano JSON.', error: 'unsupported_media_type' });
+      return;
+    }
+    await new Promise<void>((resolve) => parseJson(req, res, () => resolve()));
+    if (res.headersSent) return;
+  }
   const weight = typeof route.weight === 'function' ? route.weight(req) : route.weight;
 
+  let charged = 0;
   try {
-    if (weight > 0) await pointsLimiter().consume(user.id, weight);
+    if (weight > 0) {
+      await pointsLimiter().consume(user.id, weight);
+      charged = weight;
+    }
   } catch (error) {
     if (error instanceof RateLimiterRes) return overQuota(res, 'points', error);
     console.error('delegatedAuth: quota limiter error (fail-open):', error instanceof Error ? error.message : error);
   }
+  let counted = false;
   if (route.counter === 'dossier_create') {
     try {
       await creationsLimiter().consume(user.id, 1);
+      counted = true;
     } catch (error) {
       if (error instanceof RateLimiterRes) {
-        if (weight > 0) await pointsLimiter().reward(user.id, weight).catch(() => undefined);
+        await refund(user.id, charged, false);
         return overQuota(res, 'dossier_create', error);
       }
       console.error('delegatedAuth: counter limiter error (fail-open):', error instanceof Error ? error.message : error);
     }
   }
+  // A call that ends refused (4xx, 5xx) costs nothing; a route may also hand
+  // back part of the charge (the norms route, for references it could not check).
+  res.on('finish', () => {
+    const back = res.statusCode >= 400 ? charged : Math.min(charged, Number(res.locals.delegatedRefund) || 0);
+    if (back > 0 || (counted && res.statusCode >= 400)) void refund(user.id, back, counted && res.statusCode >= 400);
+  });
 
   req.user = user;
   req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: claims.scope.split(' ') };

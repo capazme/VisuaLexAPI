@@ -30,11 +30,18 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   'art. 2645-bis c.c.': { parsed: { act_type: 'codice civile', article: '2645-bis' }, recognized: true },
   'art. 99999 c.c.': { parsed: { act_type: 'codice civile', article: '99999' }, recognized: true },
   'art. 3000 c.c.': { parsed: { act_type: 'codice civile', article: '3000' }, recognized: true },
+  'art. 99 c.c.': { parsed: { act_type: 'codice civile', article: '99' }, recognized: true },
   'artt. 2043 e 2059 c.c.': { parsed: { act_type: 'codice civile', article: '2043,2059' }, recognized: true },
   'art. 2 legge': { parsed: { act_type: 'legge', article: '2' }, recognized: true },
   'art. 5 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', article: '5' }, recognized: true },
   'dossier su contratti': { parsed: null, recognized: false },
+  'art. 40 preleggi': { parsed: { act_type: 'preleggi', article: '40' }, recognized: true },
+  'art. 12 preleggi': { parsed: { act_type: 'preleggi', article: '12' }, recognized: true },
+  'art. 99 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', article: '99' }, recognized: true },
+  'art. 3 l. 241/1990': { parsed: { act_type: 'legge', act_number: '241', date: '1990', article: '3' }, recognized: true },
 };
+
+const L241 = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241';
 
 const GDPR_5 = {
   allegato: null, data: '2016-04-27', data_versione: null, numero_articolo: '5', numero_atto: '679',
@@ -46,33 +53,75 @@ const calls: Record<string, number> = {};
 let fingerprintsAvailable = true;
 let parseQueryDown = false;
 let articleText = 'Qualunque fatto doloso o colposo…';
+/** Force a status on a path (429: the Python API's per-address limit). */
+let forcedStatus: Record<string, number> = {};
+let treeDown = false;
+let eurlexDown = false;
+// Normattiva answers a request for a missing article with the act's art. 1, and 200.
+const ART_1 = 'La capacità giuridica si acquista dal momento della nascita.';
+// The codice civile's tree: the preleggi (annex 1, 31 articles) and the code (annex 2).
+const CC_TREE = [
+  ...Array.from({ length: 31 }, (_, i) => ({ allegato: '1', numero: String(i + 1) })),
+  ...['2043', '2059', '2645 bis'].map((numero) => ({ allegato: '2', numero })),
+  ...Array.from({ length: 60 }, (_, i) => ({ allegato: '2', numero: String(i + 1) })),
+];
 
 function stubPythonApi() {
   for (const key of Object.keys(calls)) delete calls[key];
   const count = (path: string) => (calls[path] = (calls[path] ?? 0) + 1);
+  const forced = (path: string): [number, unknown] | undefined =>
+    forcedStatus[path] ? [forcedStatus[path], { error: 'Too Many Requests' }] : undefined;
   nock(API).post('/parse_query').times(500).reply((_uri: string, body: { query: string }) => {
     count('/parse_query');
     if (parseQueryDown) return [503, { error: 'down' }];
-    return [200, PARSED[body.query] ?? { parsed: null, recognized: false }];
+    return forced('/parse_query') ?? [200, PARSED[body.query] ?? { parsed: null, recognized: false }];
   });
   nock(API).post('/fetch_norma_data').times(500).reply((_uri: string, body: Record<string, string>) => {
     count('/fetch_norma_data');
-    if (body.act_type === 'regolamento UE') return [200, { norma_data: [GDPR_5] }];
-    if (body.act_type === 'legge') {
+    const f = forced('/fetch_norma_data');
+    if (f) return f;
+    if (body.act_type === 'regolamento UE') return [200, { norma_data: [{ ...GDPR_5, numero_articolo: body.article, urn: `${GDPR_5.url}~art${body.article}` }] }];
+    if (body.act_type === 'legge' && !body.act_number) {
       return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: null, numero_atto: null, allegato: null,
         url: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None', urn: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None~art2' }] }];
+    }
+    if (body.act_type === 'legge') {
+      return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: '1990-08-07', numero_atto: '241', allegato: null, tipo_atto_reale: null,
+        numero_articolo: body.article, url: L241, urn: `${L241}~art${body.article}` }] }];
+    }
+    if (body.act_type === 'preleggi') {
+      return [200, { norma_data: [{ ...ccArticle(body.article), tipo_atto: 'preleggi', allegato: '1', urn: `${CC_ACT}:1~art${body.article}` }] }];
     }
     if (body.article === '99999') return [404, { error: 'Articolo 99999 non presente in codice civile 1942-03-16, n. 262' }];
     return [200, { norma_data: [ccArticle(body.article)] }];
   });
-  nock(API).post('/fetch_act_fingerprints').times(500).reply(() => {
+  nock(API).post('/fetch_act_fingerprints').times(500).reply((_uri: string, body: { urn: string }) => {
     count('/fetch_act_fingerprints');
+    const f = forced('/fetch_act_fingerprints');
+    if (f) return f;
     if (!fingerprintsAvailable) return [200, { available: false, fingerprints: {}, parts: [], count: 0 }];
-    return [200, { available: true, fingerprints: { '2043': 'a'.repeat(64), '2059': 'b'.repeat(64), '2645-bis': 'c'.repeat(64) }, parts: [], count: 3 }];
+    if (body.urn === L241) return [200, { available: true, fingerprints: { '1': 'x', '2': 'y', '3': 'z' }, parts: [{ name: 'Legge', fingerprints: {} }], count: 3 }];
+    // The codice civile has three parts; `fingerprints` is the dominant one (the code), which has an art. 40.
+    return [200, {
+      available: true,
+      fingerprints: { '40': 'd'.repeat(64), '2043': 'a'.repeat(64), '2059': 'b'.repeat(64), '2645-bis': 'c'.repeat(64) },
+      parts: [{ name: 'Disposizioni sulla legge in generale', fingerprints: {} }, { name: 'CODICE CIVILE', fingerprints: {} }, { name: 'Dispositivo', fingerprints: {} }],
+      count: 4,
+    }];
+  });
+  nock(API).post('/fetch_tree').times(500).reply(() => {
+    count('/fetch_tree');
+    const f = forced('/fetch_tree');
+    if (f) return f;
+    if (treeDown) return [500, { error: 'Normattiva non raggiungibile' }];
+    return [200, { articles: CC_TREE, count: CC_TREE.length }];
   });
   nock(API).post('/fetch_article_text').times(500).reply((_uri: string, body: Record<string, string>) => {
     count('/fetch_article_text');
-    return [200, [{ article_text: body.article === '3000' ? '' : articleText, norma_data: {} }]];
+    if (eurlexDown) return [200, [{ error: 'Network error: EUR-Lex unreachable' }]];
+    if (body.act_type === 'regolamento UE' && body.article === '99') return [200, [{ error: 'Article 99 not found in the document' }]];
+    // Normattiva: a missing article comes back as art. 1, with 200.
+    return [200, [{ article_text: body.article === '3000' ? ART_1 : articleText, norma_data: {} }]];
   });
 }
 
@@ -88,6 +137,9 @@ describe('POST /api/dossiers/:id/norms', () => {
   let dossierId: string;
   beforeEach(async () => {
     process.env.LEGAL_API_URL = API;
+    forcedStatus = {};
+    treeDown = false;
+    eurlexDown = false;
     fingerprintsAvailable = true;
     parseQueryDown = false;
     articleText = 'Qualunque fatto doloso o colposo…';
@@ -119,22 +171,67 @@ describe('POST /api/dossiers/:id/norms', () => {
   it('never saves an article that does not exist', async () => {
     const response = await addNorms(alice, dossierId, ['art. 99999 c.c.', 'art. 3000 c.c.']);
     expect(response.status).toBe(200);
+    // 99999: fetch_norma_data says so; 3000: not among the code's fingerprints.
     expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['does_not_exist', 'does_not_exist']);
     expect(await prisma.dossierItem.count()).toBe(0);
   });
 
-  it('falls back to the article itself when the act has no index', async () => {
+  it('checks a multi-part act on its tree, annex by annex', async () => {
+    // Art. 40 exists in the codice civile (annex 2) but not in the preleggi
+    // (annex 1, 31 articles): the dominant part's fingerprints cannot tell.
+    const response = await addNorms(alice, dossierId, ['art. 40 preleggi', 'art. 12 preleggi', 'art. 2043 c.c.', 'art. 2645-bis c.c.']);
+    expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['does_not_exist', 'added', 'added', 'added']);
+    expect(calls['/fetch_tree']).toBe(1);
+  });
+
+  it('decides a single-part act on its fingerprints alone', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 3 l. 241/1990']);
+    expect(response.body.results[0].outcome).toBe('added');
+    expect(calls['/fetch_tree'] ?? 0).toBe(0);
+  });
+
+  it('without an index, decides on the tree, and never on the text alone', async () => {
     fingerprintsAvailable = false;
-    const response = await addNorms(alice, dossierId, ['art. 2043 c.c.', 'art. 3000 c.c.']);
+    const response = await addNorms(alice, dossierId, ['art. 2043 c.c.', 'art. 99 c.c.']);
     expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'does_not_exist']);
-    expect(calls['/fetch_article_text']).toBe(2);
+    expect(calls['/fetch_article_text'] ?? 0).toBe(0);
+  });
+
+  it('without an index or a tree, says it cannot verify: Normattiva answers a missing article with art. 1', async () => {
+    fingerprintsAvailable = false;
+    treeDown = true;
+    const response = await addNorms(alice, dossierId, ['art. 3000 c.c.', 'art. 2043 c.c.']);
+    expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['unavailable', 'unavailable']);
+    expect(await prisma.dossierItem.count()).toBe(0);
+  });
+
+  it('reads a source at its limit (429) as unavailable, never as missing or unrecognised', async () => {
+    for (const path of ['/parse_query', '/fetch_norma_data', '/fetch_act_fingerprints']) {
+      forcedStatus = { [path]: 429 };
+      if (path === '/fetch_act_fingerprints') forcedStatus['/fetch_tree'] = 429;
+      const response = await addNorms(alice, dossierId, ['art. 2043 c.c.']);
+      expect([path, response.body.results[0].outcome]).toEqual([path, 'unavailable']);
+    }
+    expect(await prisma.dossierItem.count()).toBe(0);
+  });
+
+  it('a failure on one act does not take the other acts with it', async () => {
+    forcedStatus = { '/fetch_act_fingerprints': 429, '/fetch_tree': 429 };
+    const response = await addNorms(alice, dossierId, ['art. 5 gdpr', 'art. 2043 c.c.']);
+    expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'unavailable']);
   });
 
   it('checks an EU act through its article, which has no AKN index', async () => {
-    const response = await addNorms(alice, dossierId, ['art. 5 gdpr']);
-    expect(response.body.results[0].outcome).toBe('added');
+    const response = await addNorms(alice, dossierId, ['art. 5 gdpr', 'art. 99 gdpr']);
+    expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'does_not_exist']);
     expect(calls['/fetch_act_fingerprints'] ?? 0).toBe(0);
-    expect(calls['/fetch_article_text']).toBe(1);
+    expect(calls['/fetch_article_text']).toBe(2);
+  });
+
+  it('reads an EUR-Lex outage inside a 200 as unavailable, not as missing', async () => {
+    eurlexDown = true;
+    const response = await addNorms(alice, dossierId, ['art. 5 gdpr']);
+    expect(response.body.results[0].outcome).toBe('unavailable');
   });
 
   it('reports what is ambiguous or unrecognised and saves the others', async () => {
@@ -196,6 +293,16 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(response.status).toBe(200);
     const after = (await request(app).get('/api/oauth/quota').set(bearer)).body.points.remaining;
     expect(before - after).toBe(6);
+    // References the sources could not check are not charged (review of PR #57, M3).
+    forcedStatus = { '/parse_query': 429 };
+    const unchecked = await request(app)
+      .post(`/api/dossiers/${dossierId}/norms`)
+      .set(bearer)
+      .send({ references: ['art. 2043 c.c.', 'art 2059 cc'] });
+    expect(unchecked.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['unavailable', 'unavailable']);
+    const afterUnchecked = (await request(app).get('/api/oauth/quota').set(bearer)).body.points.remaining;
+    expect(afterUnchecked).toBe(after);
+    forcedStatus = {};
     const readOnly = await delegatedToken(alice, 'dossier:read');
     const refused = await request(app)
       .post(`/api/dossiers/${dossierId}/norms`)

@@ -568,5 +568,8 @@ export const addDossierNorms = async (req: Request, res: Response) => {
     });
   }
 
+  // Under an exchanged token each reference is charged two points; one the
+  // sources could not check is handed back (middleware/delegated.ts).
+  res.locals.delegatedRefund = results.filter((r) => r.outcome === 'unavailable').length * 2;
   res.json({ results });
 };
