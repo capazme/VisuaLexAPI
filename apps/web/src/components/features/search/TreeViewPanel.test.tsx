@@ -670,7 +670,7 @@ describe('TreeViewPanel — titles follow the annex', () => {
     expect(screen.getByText('Abrogato')).toBeInTheDocument();
   });
 
-  it('falls back to the flat map when no part matches the annex', () => {
+  it('uses the flat map for an act with no parts', () => {
     render(
       <TreeViewPanel
         variant="drawer"
@@ -684,5 +684,28 @@ describe('TreeViewPanel — titles follow the annex', () => {
     );
 
     expect(screen.getByText('Risarcimento per fatto illecito')).toBeInTheDocument();
+  });
+
+  // Measured on d.lgs. 196/2003: its top-level map is the one of an annex of
+  // «Regole deontologiche», so an act in parts whose annex cannot be matched
+  // shows no titles rather than another part's.
+  it('never falls back to the flat map for an act in parts', () => {
+    render(
+      <TreeViewPanel
+        variant="drawer"
+        isOpen
+        onClose={vi.fn()}
+        treeData={['1', '2']}
+        urn="urn:test"
+        currentAnnex={null}
+        rubriche={{ '1': 'Delibera del Garante n. 515 del 19 dicembre 2018' }}
+        rubricheParts={[
+          { name: 'Allegato A.4 Regole deontologiche', keys: ['1', '2', '3'], rubriche: { '1': 'Delibera del Garante n. 515 del 19 dicembre 2018' }, abrogati: [] },
+          { name: 'Dispositivo', keys: ['1', '2', '2-bis'], rubriche: { '1': 'Oggetto' }, abrogati: [] },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText(/Delibera del Garante/)).not.toBeInTheDocument();
   });
 });

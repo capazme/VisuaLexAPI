@@ -7,6 +7,9 @@ export interface DossierItemApi {
   id: string;
   item_type: 'norm' | 'note' | 'section';
   title: string;
+  // The server's names for a norm and its act; null for anything else.
+  citation?: string | null;
+  act_citation?: string | null;
   content: unknown;
   position: number;
   status: DossierItemStatus;

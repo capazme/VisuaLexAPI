@@ -10,6 +10,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { cleanSectionTitle } from '../../../utils/sectionTitle';
+import { abrogatiFor, rubricheFor } from '../../../utils/actRubriche';
 
 /** Window geometry, also used to keep the parked position inside the viewport. */
 const WINDOW_WIDTH = 420;
@@ -74,8 +75,8 @@ export interface TreeViewPanelProps {
   /** Keys of the articles the act declares repealed (fallback for flat acts). */
   abrogati?: string[];
   /**
-   * Per-annex titles. Preferred over the flat `rubriche` map when a part can
-   * be matched to the annex on screen — see `activePart`.
+   * Per-annex titles. For an act in parts they replace the flat `rubriche`
+   * map: the part matched to the annex on screen, or none (`utils/actRubriche.ts`).
    */
   rubricheParts?: RubrichePart[];
   /**
@@ -348,63 +349,29 @@ export function TreeViewPanel({
   const uniqueIdForContext = (articleNum: string) =>
     effectiveAnnex ? `all${effectiveAnnex}:${articleNum}` : articleNum;
 
-  // Which set of titles belongs to the annex on screen.
-  //
-  // Every annex has its own article 1: "Capacità giuridica" in the codice
-  // civile, "Indicazione delle fonti" in the preleggi, and no rubrica at all in
-  // the Dispositivo, whose art. 1 is the enacting provision. A single flat map
-  // therefore labels two annexes out of three with the third's titles — which
-  // is exactly what the Dispositivo showed before this.
-  //
-  // Matched by ARTICLE NUMBERS rather than by name: the AKN part names
-  // ("CODICE CIVILE") and the annex labels are only sometimes the same string,
-  // while the article sets always coincide.
-  const activePart = useMemo(() => {
-    if (!rubricheParts || rubricheParts.length === 0) return null;
-
-    const annexNumbers = annexes?.find(
+  // Which titles belong to the annex on screen: the rule, and why an act in
+  // parts never borrows the top-level map, is `utils/actRubriche.ts`.
+  const annexArticleNumbers = useMemo(
+    () => annexes?.find(
       a => a.number === effectiveAnnex || (a.number === null && effectiveAnnex === null)
-    )?.article_numbers;
-    if (!annexNumbers || annexNumbers.length === 0) return null;
-
-    const wanted = new Set(annexNumbers.map(normalizeArticleId));
-    let best: typeof rubricheParts[number] | null = null;
-    let bestScore = 0;
-    for (const part of rubricheParts) {
-      const overlap = part.keys.reduce(
-        (n: number, k: string) => (wanted.has(normalizeArticleId(k)) ? n + 1 : n), 0
-      );
-      if (overlap > bestScore) {
-        bestScore = overlap;
-        best = part;
-      }
-    }
-    // Require a real majority: a couple of shared numbers is coincidence
-    // (every annex has an article 1), a matching set is identification.
-    return bestScore >= Math.max(1, Math.min(wanted.size, best?.keys.length ?? 0) * 0.5)
-      ? best
-      : null;
-  }, [rubricheParts, annexes, effectiveAnnex]);
-
+    )?.article_numbers ?? null,
+    [annexes, effectiveAnnex],
+  );
   // Rubriche keyed the same way article numbers are compared, so a tree
   // emitting "1-bis" still finds a rubrica stored under "1 bis" (gotcha 9).
-  const rubricheNormalized = useMemo(() => {
-    const source: Record<string, string> = activePart ? activePart.rubriche : (rubriche ?? {});
-    const map: Record<string, string> = {};
-    for (const [key, value] of Object.entries(source)) {
-      if (value) map[normalizeArticleId(key)] = value;
-    }
-    return map;
-  }, [rubriche, activePart]);
+  const rubricheNormalized = useMemo(
+    () => rubricheFor({ rubriche, parts: rubricheParts }, annexArticleNumbers),
+    [rubriche, rubricheParts, annexArticleNumbers],
+  );
   const rubricaFor = (articleNum: string) => rubricheNormalized[normalizeArticleId(articleNum)] ?? '';
 
   // An abrogated article has no rubrica because it has no content. Saying so
   // beats a blank row: the reader cannot otherwise tell "repealed" from "we
   // could not find the title".
-  const abrogatiNormalized = useMemo(() => {
-    const source = activePart ? activePart.abrogati : (abrogati ?? []);
-    return new Set(source.map(normalizeArticleId));
-  }, [abrogati, activePart]);
+  const abrogatiNormalized = useMemo(
+    () => abrogatiFor({ abrogati, parts: rubricheParts }, annexArticleNumbers),
+    [abrogati, rubricheParts, annexArticleNumbers],
+  );
   const isAbrogato = (articleNum: string) => abrogatiNormalized.has(normalizeArticleId(articleNum));
 
   // One shape for both display modes: the flat per-annex list becomes a single

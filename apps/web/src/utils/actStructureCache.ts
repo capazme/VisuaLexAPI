@@ -14,6 +14,8 @@ export interface RubrichePart {
 }
 
 export interface ActRubricheResponse {
+  /** The act's title, made presentable by the server (`presentable_title`); '' or absent when there is none. */
+  title?: string;
   rubriche?: Record<string, string>;
   abrogati?: string[];
   parts?: RubrichePart[];

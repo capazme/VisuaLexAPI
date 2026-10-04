@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
-  computeNormaGroups, searchParamsFromGroup, dossierItemPdfTitle, tabLabelForGroup, searchesForGroups,
+  computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
+  dossierItemFromApi,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -247,24 +248,6 @@ describe('searchParamsFromGroup', () => {
   });
 });
 
-describe('dossierItemPdfTitle', () => {
-  it('keeps the title of the text in force byte for byte', () => {
-    expect(dossierItemPdfTitle(item({}), 0)).toBe('1. codice civile n. 262 · Art. 2043');
-    expect(dossierItemPdfTitle(item({ data: { ...norma, numero_atto: '' } }), 2)).toBe('3. codice civile · Art. 2043');
-  });
-  it('keeps the title of a note', () => {
-    expect(dossierItemPdfTitle({ id: 'n1', type: 'note', data: 'appunto', addedAt: '2026-08-01' } as DossierItem, 1)).toBe('2. Nota personale');
-  });
-  it('says which day a past item holds', () => {
-    expect(dossierItemPdfTitle(item({ data: { ...norma, versione: 'vigente', data_versione: '2007-12-29' } }), 0))
-      .toBe('1. codice civile n. 262 · Art. 2043 · Testo al 29/12/2007');
-  });
-  it('says it is the original text', () => {
-    expect(dossierItemPdfTitle(item({ data: { ...norma, versione: 'originale' } }), 0))
-      .toBe('1. codice civile n. 262 · Art. 2043 · Testo originale');
-  });
-});
-
 describe('tabLabelForGroup', () => {
   const group = (over: Partial<ReturnType<typeof computeNormaGroups>[number]> = {}) => ({
     key: 'k', tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
@@ -316,5 +299,25 @@ describe('searchesForGroups', () => {
   it('creates no shared tab when every group asks for a past text', () => {
     const { created } = run([g(PAST), g({ versione: 'originale' })]);
     expect(created).toEqual(['Pratica — testo al 29/12/2007', 'Pratica — testo originale']);
+  });
+});
+
+describe('dossierItemFromApi', () => {
+  const base = { title: 'x', position: 0, status: 'unread' as const, created_at: '2026-10-04T10:00:00Z' };
+  it("keeps the server's citations on a norm", () => {
+    const item = dossierItemFromApi({
+      ...base, id: 'a', item_type: 'norm',
+      content: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3', _dossierMeta: { important: true } },
+      citation: 'art. 3, l. 31 dicembre 2012, n. 247', act_citation: 'l. 31 dicembre 2012, n. 247',
+    });
+    expect(item).toMatchObject({
+      id: 'a', type: 'norma', status: 'important', addedAt: base.created_at,
+      citation: 'art. 3, l. 31 dicembre 2012, n. 247', actCitation: 'l. 31 dicembre 2012, n. 247',
+    });
+    expect(item.data).not.toHaveProperty('_dossierMeta');
+  });
+  it('reads a note, and an answer from a server without the fields', () => {
+    const note = dossierItemFromApi({ ...base, id: 'n', item_type: 'note', content: 'appunto' });
+    expect(note).toEqual({ id: 'n', type: 'note', data: 'appunto', addedAt: base.created_at });
   });
 });

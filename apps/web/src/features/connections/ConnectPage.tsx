@@ -34,6 +34,7 @@ export function ConnectPage() {
   const [params] = useSearchParams();
   const requestId = params.get('request');
   const [state, setState] = useState<PageState>({ status: 'loading' });
+  const [allowDelete, setAllowDelete] = useState(false);
 
   useEffect(() => {
     if (!requestId) {
@@ -57,7 +58,7 @@ export function ConnectPage() {
     if (state.status !== 'ready' || !requestId) return;
     setState({ status: 'deciding', request: state.request });
     try {
-      const { redirectTo } = await connectionsService.decide(requestId, approve);
+      const { redirectTo } = await connectionsService.decide(requestId, approve, approve && allowDelete);
       if (!isWebAddress(redirectTo)) throw new Error('Indirizzo di ritorno non valido.');
       setState({ status: 'redirecting' });
       window.location.assign(redirectTo);
@@ -123,8 +124,21 @@ export function ConnectPage() {
               </ul>
             </div>
 
+            {state.request.deletion && (
+              <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={allowDelete}
+                  onChange={(event) => setAllowDelete(event.target.checked)}
+                  disabled={state.status === 'deciding'}
+                />
+                <span>{state.request.deletion.label}</span>
+              </label>
+            )}
+
             <p className="text-xs text-slate-500">
-              Puoi revocare il collegamento in qualsiasi momento da Impostazioni → Applicazioni collegate.
+              Puoi revocare il collegamento, o togliergli il permesso di eliminare, in qualsiasi momento da Impostazioni → Applicazioni collegate.
             </p>
 
             <div className="flex justify-end gap-2">
