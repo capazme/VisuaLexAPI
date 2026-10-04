@@ -171,7 +171,8 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     }
     // Deletion is read live from the grant (spec §4.2): a token exchanged before the
     // user switched it off must not delete after.
-    if (route.scope === DELETE_SCOPE && !grant.scopes.includes(DELETE_SCOPE)) {
+    // And deleting needs reading what is deleted: a connection granted write and delete only cannot.
+    if (route.scope === DELETE_SCOPE && (!grant.scopes.includes(DELETE_SCOPE) || (route.readScope && !grant.scopes.includes(route.readScope)))) {
       return refuse(res, 403, 'Il collegamento non autorizza più le eliminazioni.', 'insufficient_scope');
     }
     user = grant.user;

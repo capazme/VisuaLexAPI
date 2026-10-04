@@ -69,6 +69,20 @@ describe('ConnectedAppsSection', () => {
     await waitFor(() => expect(toggle).toBeChecked());
   });
 
+  it('cannot be switched again while a change is on its way (review of PR 3, M4)', async () => {
+    listConnectedApps.mockResolvedValue([APP]);
+    let finish: () => void = () => undefined;
+    setCanDelete.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+    render(<ConnectedAppsSection />);
+    const toggle = await screen.findByRole('switch', { name: /può eliminare/i });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).toBeDisabled());
+    fireEvent.click(toggle);
+    expect(setCanDelete).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+  });
+
   it('puts the switch back and says why when the change fails', async () => {
     listConnectedApps.mockResolvedValue([{ ...APP, canDelete: true }]);
     setCanDelete.mockRejectedValue({ status: 500, message: 'Errore del server' });

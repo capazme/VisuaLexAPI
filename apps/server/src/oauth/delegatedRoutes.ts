@@ -20,6 +20,8 @@ export interface DelegatedRoute {
   scope: string;
   /** Points charged; a function when the cost depends on the body. */
   weight: number | ((req: Request) => number);
+  /** For a deletion: the read scope of what it deletes, which the grant must also hold (spec §4.2). */
+  readScope?: string;
   /** A named daily counter beside the points, if any. */
   counter?: DelegatedCounter;
 }
@@ -39,8 +41,8 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   // A note in the dossier, or about one of its articles: a write like any other, and at most 100 a day.
   { method: 'POST', path: '/dossiers/:id/notes', scope: 'dossier:write', weight: 2, counter: 'note' },
   // Into the trash, never deleted for good; content:delete is also read live from the grant (delegated.ts).
-  { method: 'POST', path: '/dossiers/:id/trash', scope: DELETE_SCOPE, weight: 1, counter: 'trash' },
-  { method: 'POST', path: '/dossiers/:id/trash-items', scope: DELETE_SCOPE, weight: 1, counter: 'trash' },
+  { method: 'POST', path: '/dossiers/:id/trash', scope: DELETE_SCOPE, readScope: 'dossier:read', weight: 1, counter: 'trash' },
+  { method: 'POST', path: '/dossiers/:id/trash-items', scope: DELETE_SCOPE, readScope: 'dossier:read', weight: 1, counter: 'trash' },
   // Reading the quota costs nothing: the MCP server asks it to tell the user what is left.
   { method: 'GET', path: '/oauth/quota', scope: 'dossier:read', weight: 0 },
 ];

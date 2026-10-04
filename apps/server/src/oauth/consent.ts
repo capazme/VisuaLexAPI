@@ -8,7 +8,7 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 /** What each scope lets an application do, as the consent page says it. */
 export const SCOPE_LABELS: Record<string, string> = {
   'dossier:read': 'Leggere i tuoi dossier: i nomi e le norme che contengono',
-  'dossier:write': 'Creare dossier e aggiungervi norme e note (non può modificare né cancellare nulla)',
+  'dossier:write': 'Creare dossier e aggiungervi norme e note (non può modificare nulla; per eliminare serve il permesso qui sotto)',
   [DELETE_SCOPE]: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
 };
 

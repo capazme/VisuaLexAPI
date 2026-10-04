@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from '../helpers';
-import { exchangeCode, introspect, startAuthorization, tokenExchange } from './oauthHelpers';
+import { exchangeCode, introspect, refresh, startAuthorization, tokenExchange } from './oauthHelpers';
 
 // The separate permission to delete through a connected application (MCP
 // second round, spec §4.2): off unless the user ticks it, switchable per
@@ -83,6 +83,30 @@ describe('the permission to delete', () => {
     const exchanged = await tokenExchange(access, { scope: DELETE });
     expect(exchanged.status).toBe(200);
     expect(exchanged.body.scope).toBe(DELETE);
+  });
+
+  it('the write permission no longer claims nothing can be deleted, since deletion sits next to it (review of PR 3, M3)', async () => {
+    const flow = await startAuthorization({ scope: 'dossier:read dossier:write content:delete' });
+    const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
+    const write = shown.body.scopes.find((s: { scope: string }) => s.scope === 'dossier:write');
+    expect(write.label).not.toMatch(/cancellare/);
+  });
+
+  it('a refresh that asks again for every scope, deletion included, is not refused when the user left it unticked (M5)', async () => {
+    const flow = await startAuthorization({ scope: 'dossier:read dossier:write content:delete' });
+    await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
+    const decision = await request(app).post(`/api/oauth/requests/${flow.requestId}/decision`).set(authHeader(alice)).send({ approve: true });
+    const code = new URL(decision.body.redirectTo).searchParams.get('code')!;
+    const tokens = (await exchangeCode(flow.clientId, code, flow.verifier)).body;
+    const refreshed = await refresh(flow.clientId, tokens.refresh_token, { scope: 'dossier:read dossier:write content:delete' });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.scope.split(' ')).not.toContain('content:delete');
+  });
+
+  it('a request for deletion alone asks for read and write too, since deleting needs them (M6)', async () => {
+    const flow = await startAuthorization({ scope: 'content:delete' });
+    const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
+    expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write']);
   });
 
   it("PATCH on another user's grant or a revoked one is a 404, and the body is strict", async () => {

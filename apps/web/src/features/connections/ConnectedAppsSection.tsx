@@ -23,6 +23,8 @@ export function ConnectedAppsSection() {
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [pending, setPending] = useState<ConnectedApp | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // The connection whose permission is being changed: its switch waits, so what it shows is what the server holds.
+  const [switching, setSwitching] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +40,7 @@ export function ConnectedAppsSection() {
   }, []);
 
   const toggleDelete = async (app: ConnectedApp) => {
+    if (switching) return;
     const canDelete = !app.canDelete;
     const set = (value: boolean) =>
       setState((current) =>
@@ -46,6 +49,7 @@ export function ConnectedAppsSection() {
           : current,
       );
     set(canDelete);
+    setSwitching(app.id);
     try {
       await connectionsService.setCanDelete(app.id, canDelete);
       setMessage(
@@ -56,6 +60,8 @@ export function ConnectedAppsSection() {
     } catch (error: unknown) {
       set(app.canDelete);
       setMessage(getErrorMessage(error) ?? 'Impossibile cambiare il permesso.');
+    } finally {
+      setSwitching(null);
     }
   };
 
@@ -100,6 +106,7 @@ export function ConnectedAppsSection() {
                       type="checkbox"
                       role="switch"
                       checked={app.canDelete}
+                      disabled={switching === app.id}
                       onChange={() => void toggleDelete(app)}
                     />
                     Può eliminare dossier, voci e schede

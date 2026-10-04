@@ -51,6 +51,17 @@ const itemSummary = (item: { itemType: string; content: unknown }): ItemSummary 
 
 const expiry = (from: Date) => new Date(from.getTime() + TRASH_RETENTION_MS);
 
+/**
+ * Locks the user's dossier row for the rest of the transaction: an entry or a
+ * snapshot added meanwhile (web, or a parallel tool call) waits, so it can
+ * neither be deleted without reaching the payload nor slip between the read
+ * and the delete. False when the dossier is not the user's.
+ */
+async function lockDossier(tx: Prisma.TransactionClient, userId: string, dossierId: string): Promise<boolean> {
+  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM dossiers WHERE id = ${dossierId} AND user_id = ${userId} FOR UPDATE`;
+  return rows.length === 1;
+}
+
 let lastSweep = 0;
 
 /** Removes the entries past their 30 days; returns how many. */
@@ -75,6 +86,7 @@ async function maybeSweep(): Promise<void> {
 export async function trashDossier(userId: string, dossierId: string, by: DeletedBy): Promise<{ trashId: string; itemCount: number }> {
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
+    if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
       include: { items: { orderBy: { position: 'asc' } }, snapshots: { orderBy: { version: 'asc' } } },
@@ -116,6 +128,7 @@ export async function trashDossierItems(
 ): Promise<{ trashId: string; moved: string[]; notFound: string[] }> {
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
+    if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
     const dossier = await tx.dossier.findFirst({ where: { id: dossierId, userId } });
     if (!dossier) throw new AppError(404, 'Dossier not found');
     const wanted = [...new Set(itemIds)];
@@ -138,7 +151,9 @@ export async function trashDossierItems(
         expiresAt: expiry(now),
       },
     });
-    await tx.dossierItem.deleteMany({ where: { id: { in: moved }, dossierId } });
+    const deleted = await tx.dossierItem.deleteMany({ where: { id: { in: moved }, dossierId } });
+    // An entry moved away by a concurrent request between the read and the delete: undo it all.
+    if (deleted.count !== moved.length) throw new AppError(409, 'Il dossier è cambiato nel frattempo: riprova.');
     await tx.dossier.update({ where: { id: dossierId }, data: { updatedAt: now } });
     return { trashId: entry.id, moved, notFound: wanted.filter((id) => !moved.includes(id)) };
   });
@@ -180,6 +195,12 @@ type StoredItem = {
   createdByClientName: string | null;
   aboutItemId: string | null;
 };
+
+/** The id when its row still exists, else null (a foreign key to a deleted row would fail the restore). */
+async function existingId(value: unknown, count: (id: string) => Promise<number>): Promise<string | null> {
+  if (typeof value !== 'string' || !value) return null;
+  return (await count(value)) > 0 ? value : null;
+}
 
 const jsonOrNull = (value: unknown) => (value === null || value === undefined ? Prisma.JsonNull : (value as Prisma.InputJsonValue));
 
@@ -227,6 +248,9 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             createdAt: new Date(dossier.createdAt),
             createdByClientId: (dossier.createdByClientId as string | null) ?? null,
             createdByClientName: (dossier.createdByClientName as string | null) ?? null,
+            // The forum attribution comes back when what it points to still exists.
+            sourceSuggestionId: await existingId(dossier.sourceSuggestionId, (id) => tx.environmentSuggestion.count({ where: { id } })),
+            originalAuthorId: await existingId(dossier.originalAuthorId, (id) => tx.user.count({ where: { id } })),
           },
         });
         if (items.length > 0) {
@@ -259,10 +283,14 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
         }
         const last = await tx.dossierItem.aggregate({ where: { dossierId: target.id }, _max: { position: true } });
         const start = (last._max.position ?? -1) + 1;
-        // A note is about an article of its own dossier: restored elsewhere, it is a plain note.
+        // A note is about an article of its own dossier: restored elsewhere it keeps only an
+        // article restored with it, and is otherwise a plain note.
         const sameDossier = target.id === entry.dossierId;
+        const restoredIds = new Set(items.map((item) => item.id));
+        const about = (item: StoredItem) =>
+          item.aboutItemId && (sameDossier || restoredIds.has(item.aboutItemId)) ? item.aboutItemId : null;
         await tx.dossierItem.createMany({
-          data: items.map((item, i) => itemRow(item, target.id, start + i, sameDossier ? item.aboutItemId : null)),
+          data: items.map((item, i) => itemRow(item, target.id, start + i, about(item))),
         });
         await tx.dossier.update({ where: { id: target.id }, data: { updatedAt: new Date() } });
         await tx.trashEntry.delete({ where: { id: entry.id } });
