@@ -174,14 +174,21 @@ async def _run_promote(batch_id: str, force: bool) -> dict:
         # decided while the session is open; the job is enqueued once the row is committed
         massimario = batch.source == "massimario"
         if massimario:
+            from merlt.worker.massimario_tasks import vector_progress
+
             total = len((batch.extras or {}).get("chunks") or [])
-            batch.stats = {**batch.stats, "vectors": {"done": 0, "total": total}}
+            batch.stats = {**batch.stats, "vectors": vector_progress(0, total)}
         await session.commit()
 
     if massimario:
-        from merlt.worker.massimario_tasks import enqueue_index_slice
+        from merlt.worker.massimario_tasks import enqueue_index_slice, record_vectors_error
 
-        enqueue_index_slice(batch_id, 0)
+        try:
+            enqueue_index_slice(batch_id, 0)
+        except Exception as e:  # noqa: BLE001 — the graph is promoted; the vectors wait for a resume
+            error = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+            log.error("mechanical_ingest.promote.vectors_not_enqueued", batch_id=batch_id, error=error)
+            await record_vectors_error(batch_id, 0, error)
     log.info("mechanical_ingest.promote.done", batch_id=batch_id, **result)
     return {"batch_id": batch_id, "status": "promoted", **result}
 

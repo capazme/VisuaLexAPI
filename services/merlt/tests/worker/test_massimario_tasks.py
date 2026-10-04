@@ -38,14 +38,16 @@ async def test_a_slice_writes_and_chains_the_next():
     b = batch()
     result, index, enqueue = await run(b, 0)
     assert len(index.await_args.args[0]) == massimario_tasks.SLICE == 100
-    assert b.stats["vectors"] == {"done": 100, "total": 250}
+    progress = dict(b.stats["vectors"])
+    assert progress.pop("updated_at")  # every progress write is dated: the router tells a stopped chain by it
+    assert progress == {"done": 100, "total": 250}
     enqueue.assert_called_once_with("b1", 100)
 
 
 async def test_the_last_slice_stops_the_chain():
     b = batch()
     await run(b, 200)
-    assert b.stats["vectors"] == {"done": 250, "total": 250}
+    assert {k: v for k, v in b.stats["vectors"].items() if k != "updated_at"} == {"done": 250, "total": 250}
 
 
 async def test_a_batch_not_promoted_is_skipped():
@@ -75,4 +77,7 @@ async def test_record_vectors_error_keeps_the_progress():
     with patch("merlt.storage.enrichment.database.init_db", new=AsyncMock()), \
          patch("merlt.storage.enrichment.database.get_db_session", new=session_for(b)):
         await massimario_tasks.record_vectors_error("b1", 200, "boom")
-    assert b.stats == {"vectors": {"done": 200, "total": 250, "error": "boom"}, "promotion": {"nodes_merged": 3}}
+    assert b.stats["promotion"] == {"nodes_merged": 3}
+    progress = dict(b.stats["vectors"])
+    assert progress.pop("updated_at")
+    assert progress == {"done": 200, "total": 250, "error": "boom"}
