@@ -79,11 +79,24 @@ describe('RassegnePanel', () => {
     expect(mark.tagName).toBe('MARK');
   });
 
-  it('shows decisions as plain labels while the decision page does not exist', async () => {
+  it('links a decision with an identity to its page', async () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel();
     await openPanel();
     const chip = await screen.findByText('Sez. U, n. 1234/2024 · Rv. 670001-01');
+    expect(chip.closest('a')).toHaveAttribute('href', '/sentenze/cassazione-civile/1234/2024');
+  });
+
+  it('leaves a decision without a year a plain label', async () => {
+    const withoutYear = {
+      ...passo('a', 2024),
+      pronunce: [{ key: null, label: 'Sez. U, n. 1234 · Rv. 670001-01', corte: 'cassazione', archivio: 'civile',
+                   numero: 1234, anno: null, sezione: 'U', rv: ['670001-01'] }],
+    };
+    fetchRassegne.mockResolvedValue({ ...SUMMARY, items: [withoutYear] });
+    renderPanel();
+    await openPanel();
+    const chip = await screen.findByText('Sez. U, n. 1234 · Rv. 670001-01');
     expect(chip.closest('a')).toBeNull();
   });
 

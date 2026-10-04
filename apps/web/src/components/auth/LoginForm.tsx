@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getErrorMessage } from '../../utils/errors';
+import { locationToPath, takeReturnTo } from '../../utils/returnTo';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -20,10 +21,9 @@ export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Back where the user was sent from, query included: the consent page carries
-  // its request there (/connect?request=…).
-  const fromLocation = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
-  const from = fromLocation?.pathname ? `${fromLocation.pathname}${fromLocation.search ?? ''}` : '/';
+  // Back where the user was sent from, query and fragment included: the consent page carries
+  // its request there (/connect?request=…). Only paths of the app (utils/returnTo).
+  const fromState = locationToPath((location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +42,8 @@ export function LoginForm() {
 
     try {
       await login(email, password);
-      navigate(from, { replace: true });
+      const stashed = takeReturnTo(); // always spent, so a stale address never returns later
+      navigate(fromState ?? stashed ?? '/', { replace: true });
     } catch (error) {
       setFormError(getErrorMessage(error) || 'Login failed. Please check your credentials.');
     }

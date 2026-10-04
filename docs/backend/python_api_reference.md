@@ -259,10 +259,12 @@ reference: the court, the number and the year a citation gives. The text comes b
 never cut. Cassazione decisions come from Italgiure's public archive (SentenzeWeb), Corte
 costituzionale decisions from the court's open data. Behind the ingress the route needs a
 login like the other scraping routes, and a call costs two points of the user's quota,
-whatever it sends upstream. A Cassazione lookup sends a homepage `GET` and a Solr `POST` per
-query: a number below 10000 is queried in two forms, a reference without the archive queries
-both archives, and a miss adds the query for the archive's start (once a day per archive) and,
-for the penal archive, the next year's lookup. A Corte costituzionale call makes at most one
+whatever it sends upstream.
+A Cassazione lookup sends a homepage `GET` and a Solr `POST` per query, at most 10 requests
+in all: a reference without the archive queries both archives (4), a miss adds the query for
+each archive's start, once a day (4), and, for the penal archive, the next year's lookup (2).
+A later miss the same day sends at most 6, a hit in a named archive 2; retries of a failed
+request come on top. A Corte costituzionale call makes at most one
 download, shared by concurrent callers.
 Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.
 
@@ -311,15 +313,35 @@ limit is 1 MB, and the ingress's own page answers).
   ordinanza, ordinanza interlocutoria, decreto), `data_deposito` and `data_decisione` (ISO
   dates; the second for the Corte costituzionale), `ecli` (Corte costituzionale), `relatore`,
   `presidente`, `materia`; and `testo_assente`, why there is no text, present only when the
-  source said why: `oscuramento` (the source withholds the text while it removes personal
-  data).
-- `testo`: the blocks the source gives, each whole: `epigrafe` (Corte costituzionale),
-  `motivazione`, `dispositivo` (a block the source leaves empty is absent). It is `{}` when
-  the decision comes without its text (notice `testo_non_disponibile`). Most Corte
-  costituzionale ordinanze have no `motivazione`: measured on the 2001–today bundle, the
-  source's `testo` field is empty in 3,592 of 4,056 ordinanze (2001–2026), and in 3,579 of
-  them the "Ritenuto… / Considerato…" reasoning is inside `epigrafe`. The blocks are passed
-  on as the source gives them; how the page labels them is decided with the page.
+  source said why (the source withholds the text while it removes personal data): `oscuramento`
+  (it answers that the text is in the process of being obscured) or `valutazione_oscuramento`
+  (it answers that the obscuring is being evaluated).
+- `testo`: the whole text, never cut, in blocks: `epigrafe` (Corte costituzionale),
+  `motivazione`, `dispositivo` (a block left empty is absent). It is `{}` when the decision
+  comes without its text (notice `testo_non_disponibile`). The Cassazione's blocks are the
+  source's. When the Corte costituzionale's open data leave their `testo` field empty (3,592 of
+  4,056 ordinanze, 2001–2026), the reasoning is inside the epigrafe, and the reader splits it at
+  the first line whose first word is "Ritenuto" or "Considerato", in any case, searched after
+  "ha pronunciato la seguente" when the epigrafe has it (3,577 of those 3,592): what comes
+  before is `epigrafe`, the rest `motivazione`, and only the whitespace at the boundary is
+  dropped. Without such a line nothing is split, and the reasoning stays in `epigrafe`.
+  Italgiure gives a Cassazione block as one line (45 of 45 texts measured on 2026-10-04, up to
+  82,322 characters), so the reader restores its paragraphs by inserting a blank line (`\n\n`)
+  before each heading («FATTI DI CAUSA», «RAGIONI DELLA DECISIONE», «RITENUTO IN FATTO» … in
+  capitals; «Rilevato che:», «Considerato che,» … in mixed case), before «P.Q.M.» and before
+  each numbered point that starts a sentence («1.», «2.1.», «3 -»), and changes nothing else:
+  every character is the source's. A combined heading («RITENUTO IN FATTO E CONSIDERATO IN
+  DIRITTO») gets one break, before its first word, and a numbered point keeps the words it
+  opens: there is no break between «3.» and a «P.Q.M.», lead or heading right after it.
+  Italgiure's reasons already end with the dispositivo, which its separate field repeats (36 of
+  the 36 sampled texts that have one): the reader cuts it off the end of the reasons, so
+  `dispositivo` is the end of the text itself (the same characters, whitespace aside) and the
+  decision reads once; a dispositivo that the text holds elsewhere is dropped, and one it does
+  not hold stays as the source gave it. The Corte costituzionale's open data break lines two
+  ways (a paragraph or a heading per line since about 2001; before, a typewriter wrap at a
+  measure of at most 80 characters, a paragraph ending where a line stops short), so the reader
+  turns a line break into a paragraph break (a blank line) unless it is such a wrap, in each
+  block and after the epigrafe split, and adds nothing else.
 - `fonte`: `nome`; `licenza` (Corte costituzionale: CC BY-SA 3.0, credited wherever the text
   appears); `url` (Corte costituzionale only: the court's page for that decision, for the
   reader's browser, which this server never contacts). The Cassazione has no `url`.
@@ -483,8 +505,12 @@ may be a different decision.
   (`citata`, optional).
 - `testo_non_disponibile`: the decision comes without its text; `testo` is `{}`. The reason,
   when the source gives one, is in `attributi.testo_assente`: `oscuramento` when the source
-  withholds the text while it removes personal data (its own notice is never passed on as
-  the text). Without it, the source said nothing about why.
+  answers that the text is in the process of being obscured, `valutazione_oscuramento` when it
+  answers that the obscuring is being evaluated (both withhold the text while it removes
+  personal data, and the source's own notice is never passed on as the text: a text of at most
+  300 characters that mentions «oscuramento» is never the court's). Without it, the source said
+  nothing about why: a rare stub such as «Oscuramento disposto Numero registro generale …» is
+  withheld the same way, with no cause.
 
 `citata` is the section as the caller wrote it, and it is present only when that is a short
 plain form: at most 20 characters, all of them letters, digits, `_`, spaces, `.`, `-` or `/`.

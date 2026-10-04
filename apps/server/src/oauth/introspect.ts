@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { isMcpClient } from './mcpClient';
 import { findActiveAccessToken } from './tokens';
+import { effectiveScopes } from './config';
 import { prisma } from '../lib/prisma';
 
 /**
@@ -26,7 +27,8 @@ export async function introspectionHandler(req: Request, res: Response): Promise
   await prisma.oAuthGrant.update({ where: { id: active.grant.id }, data: { lastUsedAt: new Date() } });
   res.json({
     active: true,
-    scope: active.token.scopes.join(' '),
+    // Deletion is read live from the grant (spec §4.2): switching it takes effect on the next call.
+    scope: effectiveScopes(active.token.scopes, active.grant.scopes).join(' '),
     client_id: active.grant.clientId,
     sub: active.grant.userId,
     aud: active.token.resource,

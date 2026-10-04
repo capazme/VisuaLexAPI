@@ -50,4 +50,12 @@ describe('the reading surface', () => {
     expect(css).toContain('.vlx-thread-focus');
     expect(css).toContain('.vlx-flash');
   }, 30000);
+
+  it('gives the labels of a decision their colour in the light theme and in the dark one', async () => {
+    // A `dark:` utility inside a `::before` rule is dropped by the compiler without a word (its
+    // selector would end `::before:where(...)`), so the dark colour is a rule of its own.
+    const css = await compile(['block']);
+    expect(css).toMatch(/\.vlx-decision \.vlx-dec-block::?before\s*\{[^}]*\bcolor:\s*var\(--color-slate-500\)/);
+    expect(css).toMatch(/\.dark \.vlx-decision \.vlx-dec-block::?before\s*\{[^}]*\bcolor:\s*var\(--color-slate-400\)/);
+  }, 30000);
 });

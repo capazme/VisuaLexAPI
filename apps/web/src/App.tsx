@@ -28,6 +28,9 @@ const ContribPage = lazy(() =>
 const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
 );
+const DecisionPage = lazy(() =>
+  import('./components/features/decisions/DecisionPage').then(m => ({ default: m.DecisionPage })),
+);
 
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
 function NotFoundPage() {
@@ -115,6 +118,22 @@ function App() {
             element={
               <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
                 <GraphExplorerPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="sentenze"
+            element={
+              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                <DecisionPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="sentenze/:corte/:numero/:anno"
+            element={
+              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                <DecisionPage />
               </Suspense>
             }
           />

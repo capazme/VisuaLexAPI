@@ -89,7 +89,7 @@ class Decision:
     relatore: str | None = None
     presidente: str | None = None
     materia: str | None = None
-    # why the source gives no text: "oscuramento" when it said so; None otherwise
+    # why the source gives no text: "oscuramento" or "valutazione_oscuramento" when it said so; None otherwise
     testo_assente: str | None = None
     testo: dict[str, str] = field(default_factory=dict)  # epigrafe?, motivazione, dispositivo?
     fonte: dict[str, str] = field(default_factory=dict)  # nome, licenza?, url?

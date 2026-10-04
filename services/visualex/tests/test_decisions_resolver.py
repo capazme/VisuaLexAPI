@@ -1,15 +1,19 @@
 """One reference in, one outcome out (design 2026-10-01 §2-§3)."""
+import json
 import threading
 from datetime import date
 
 import pytest
 
+from visualex_api.services.decisions.http import decisions_http_client
+from visualex_api.services.decisions.italgiure import ItalgiureReader
 from visualex_api.services.decisions.model import Decision, Identity, parse_reference
 from visualex_api.services.decisions.resolver import (
     Resolver,
     SourceUnavailable,
     sweep_decision_caches,
 )
+from visualex_api.services.http_client import HttpResult
 from visualex_api.tools.exceptions import NetworkError
 
 TODAY = date(2026, 10, 1)
@@ -186,12 +190,12 @@ async def test_found_and_absent_are_cached_per_archive_errors_are_not():
     await resolver.resolve(ref(numero=2, anno=2024, archivio="civile"))
     await resolver.resolve(ref(numero=2, anno=2024, archivio="civile"))
     assert italgiure.calls == [("civile", 10787, 2024), ("civile", 2, 2024)]
-    assert "italgiure:civile:10787:2024" in cache.stores["decisions_found"]
-    assert "italgiure:civile:2:2024" in cache.stores["decisions_absent"]
+    assert "italgiure:v2:civile:10787:2024" in cache.stores["decisions_found"]
+    assert "italgiure:v2:civile:2:2024" in cache.stores["decisions_absent"]
     italgiure.down = True
     with pytest.raises(SourceUnavailable):
         await resolver.resolve(ref(numero=3, anno=2024, archivio="civile"))
-    assert "italgiure:civile:3:2024" not in cache.stores["decisions_absent"]
+    assert "italgiure:v2:civile:3:2024" not in cache.stores["decisions_absent"]
 
 
 async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
@@ -201,8 +205,8 @@ async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
     resolver = _resolver(italgiure, cache=cache)
     out = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
     assert out.esito == "trovata" and out.avvisi == [{"tipo": "testo_non_disponibile"}]
-    assert "italgiure:civile:10787:2024" in cache.stores["decisions_pending"]
-    assert "italgiure:civile:10787:2024" not in cache.stores["decisions_found"]
+    assert "italgiure:v2:civile:10787:2024" in cache.stores["decisions_pending"]
+    assert "italgiure:v2:civile:10787:2024" not in cache.stores["decisions_found"]
     again = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
     assert again.avvisi == [{"tipo": "testo_non_disponibile"}]
     assert italgiure.calls == [("civile", 10787, 2024)]
@@ -229,6 +233,65 @@ async def test_the_corte_costituzionale():
         {"corte": "corte_costituzionale", "numero": 999, "anno": 2014}, TODAY))
     assert found.esito == "trovata" and (missing.esito, missing.motivo) == ("non_trovata",
                                                                             "inesistente")
+
+
+async def test_a_search_sends_at_most_ten_requests_to_italgiure(monkeypatch):
+    # the owner's ceiling (2026-10-04), through the real reader: the worst case is no archive
+    # named, a number below 10000, a miss, the first of the day, and the penal next year. The
+    # client's own retries of a failed request are not counted.
+    methods = []
+    start = json.dumps({"response": {"docs": [{"datdep": "20210217"}]}})
+    empty = json.dumps({"response": {"numFound": 0, "docs": []}})
+
+    async def fake_request(method, url, **kwargs):
+        methods.append(method)
+        if method == "GET":
+            return HttpResult(text="", status=200, headers={})
+        return HttpResult(text=start if "sort" in kwargs["data"] else empty, status=200,
+                          headers={})
+
+    monkeypatch.setattr(decisions_http_client, "request", fake_request)
+    resolver = _resolver(ItalgiureReader())
+    out = await resolver.resolve(ref(numero=123, anno=2023))
+    assert (out.esito, out.motivo) == ("non_trovata", "inesistente")
+    assert len(methods) == 10
+    methods.clear()
+    await resolver.resolve(ref(numero=124, anno=2023))  # each archive's start: once a day
+    assert len(methods) == 6
+
+
+async def test_a_corte_costituzionale_decision_cached_before_the_split_is_never_served():
+    # pull request A cached what its reader returned, the epigrafe unsplit, for up to 30 days:
+    # the key carries a version, so this reader never meets those entries
+    unsplit = Decision(identita=Identity("corte_costituzionale", 3, 2014), tipo="ordinanza",
+                       testo={"epigrafe": "ha pronunciato la seguente\nRitenuto che"})
+    split = Decision(identita=Identity("corte_costituzionale", 3, 2014), tipo="ordinanza",
+                     testo={"epigrafe": "ha pronunciato la seguente", "motivazione": "Ritenuto che"})
+    cache = FakeCache()
+    cache.get_persistent("decisions_found")["corte_cost:3:2014"] = unsplit.to_dict()
+    out = await _resolver(corte_cost=FakeCorteCost([split]), cache=cache).resolve(
+        parse_reference({"corte": "corte_costituzionale", "numero": 3, "anno": 2014}, TODAY))
+    assert out.decisione.testo == split.testo
+    assert "corte_cost:v2:3:2014" in cache.stores["decisions_found"]
+
+
+async def test_a_cassazione_decision_cached_before_the_paragraphs_is_never_served():
+    # pull request A cached what its reader returned for up to 30 days: a notice of the source
+    # as the court's reasons, and texts of one line. The key carries a version, so this reader
+    # never meets those entries.
+    notice = Decision(identita=Identity("cassazione", 10787, 2024, "civile"), sezione="3",
+                      tipo="sentenza", testo={"motivazione": "in fase di valutazione oscuramento"},
+                      fonte={"nome": "f"})
+    text = Decision(identita=Identity("cassazione", 10787, 2024, "civile"), sezione="3",
+                    tipo="sentenza", testo={"motivazione": "Premessa. \n\nFATTI DI CAUSA Il fatto."},
+                    fonte={"nome": "f"})
+    cache, italgiure = FakeCache(), FakeItalgiure([text])
+    cache.get_persistent("decisions_found")["italgiure:civile:10787:2024"] = notice.to_dict()
+    out = await _resolver(italgiure, cache=cache).resolve(
+        ref(numero=10787, anno=2024, archivio="civile"))
+    assert out.decisione.testo == text.testo
+    assert italgiure.calls == [("civile", 10787, 2024)]  # the reader was asked, not the old entry
+    assert "italgiure:v2:civile:10787:2024" in cache.stores["decisions_found"]
 
 
 def test_the_outcomes_as_json():

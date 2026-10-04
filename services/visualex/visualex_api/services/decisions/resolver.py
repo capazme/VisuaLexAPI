@@ -125,7 +125,13 @@ class Resolver:
         return decision
 
     def _cass(self, archivio: str, numero: int, anno: int) -> Awaitable[Decision | None]:
-        return self._lookup(f"italgiure:{archivio}:{numero}:{anno}", "cassazione",
+        # v2 since the reader recognises every notice Italgiure gives in place of a text and
+        # restores paragraphs (2026-10-04): the entries cached before, under
+        # "italgiure:<archivio>:<numero>:<anno>", may hold a notice as the court's reasons, and
+        # a text without paragraphs, for up to 30 days; a new key never serves them (the sweep
+        # deletes them once expired). Raise the version whenever the reader changes the shape of
+        # what it returns.
+        return self._lookup(f"italgiure:v2:{archivio}:{numero}:{anno}", "cassazione",
                             ITALGIURE_TIMEOUT,
                             lambda: self.italgiure.lookup(archivio, numero, anno))
 
@@ -146,8 +152,12 @@ class Resolver:
 
     async def resolve(self, ref: Reference) -> Outcome:
         if ref.corte == "corte_costituzionale":
+            # v2 since the reader splits an epigrafe that holds the reasoning (2026-10-04): the
+            # entries cached before, under "corte_cost:<numero>:<anno>", keep it unsplit for up
+            # to 30 days, and a new key never serves them (the sweep deletes them once expired).
+            # Raise the version whenever the reader changes the shape of what it returns.
             decision = await self._lookup(
-                f"corte_cost:{ref.numero}:{ref.anno}", "corte_costituzionale",
+                f"corte_cost:v2:{ref.numero}:{ref.anno}", "corte_costituzionale",
                 CORTE_COST_TIMEOUT, lambda: self.corte_cost.lookup(ref.numero, ref.anno))
             if decision is None:
                 return Outcome("non_trovata", motivo="inesistente")

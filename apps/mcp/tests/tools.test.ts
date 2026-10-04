@@ -44,20 +44,22 @@ const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.conten
 const json = (result: Awaited<ReturnType<Client['callTool']>>) => JSON.parse(text(result));
 
 describe('the tool list', () => {
-  it('has the six dossier tools, the read-only ones marked, and nothing that updates, moves or deletes', async () => {
+  it('has the eight dossier tools, the read-only ones marked, and only the two deletions destructive', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       'omnilex_aggiungi_norme_dossier',
       'omnilex_aggiungi_nota_dossier',
       'omnilex_crea_dossier',
       'omnilex_elenca_dossier',
+      'omnilex_elimina_dossier',
+      'omnilex_elimina_voci_dossier',
       'omnilex_leggi_dossier',
       'omnilex_stato_account',
     ]);
-    for (const tool of tools) {
-      expect(tool.annotations?.destructiveHint).toBe(false);
-      expect(tool.name).not.toMatch(/elimin|cancell|rimuov|spost|modific|aggiorn|delete|remove|update|move/);
-    }
+    // Deleting goes to the trash after the user's confirmation (second round, spec §4); nothing updates or moves.
+    const destructive = tools.filter((t) => t.annotations?.destructiveHint !== false).map((t) => t.name).sort();
+    expect(destructive).toEqual(['omnilex_elimina_dossier', 'omnilex_elimina_voci_dossier']);
+    for (const tool of tools) expect(tool.name).not.toMatch(/spost|modific|aggiorn|update|move/);
     const readOnly = tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort();
     expect(readOnly).toEqual(['omnilex_elenca_dossier', 'omnilex_leggi_dossier', 'omnilex_stato_account']);
   });
