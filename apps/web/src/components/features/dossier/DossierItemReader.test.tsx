@@ -62,3 +62,13 @@ describe('DossierItemReader — annotations on the text', () => {
     expect(removeHighlight).toHaveBeenCalledWith('gone');
   });
 });
+
+describe('DossierItemReader — onArticle', () => {
+  it('hands the fetched article to the row, so a row with no rubrica can take it from the text', async () => {
+    vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
+    appStore.setState({ highlights: [], annotations: [] });
+    const onArticle = vi.fn();
+    render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} onArticle={onArticle} />);
+    await waitFor(() => expect(onArticle).toHaveBeenCalledWith(expect.objectContaining({ article_text: RAW })));
+  });
+});

@@ -17,6 +17,10 @@ import {
   StickyNote,
   ChevronsUpDown,
   ChevronsDownUp,
+  Plus,
+  MoreHorizontal,
+  CheckSquare,
+  History,
 } from 'lucide-react';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { useNavigate } from 'react-router-dom';
@@ -35,25 +39,37 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
-import { SortableDossierItem } from './SortableDossierItem';
 import {
-  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, dossierItemPdfTitle, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchesForGroups, type NormaGroup,
 } from './dossierUtils';
+import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
+import { DossierActBlock } from './DossierActBlock';
+import { DossierNotesSection } from './DossierNotesSection';
+import { buildPdfBlocks, loadDossierTexts } from './dossierPdf';
+import { resolveBlockUrn } from './useActDetails';
+import { fetchActRubriche } from '../../../utils/actStructureCache';
+import { MenuButton } from '../../ui/MenuButton';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
-import { ToolbarButton } from './ToolbarButton';
 import { AddNoteModal } from './AddNoteModal';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
 
 type ToastType = 'success' | 'error' | 'info';
+type NoteItem = Extract<DossierItem, { type: 'note' }>;
+
+const SECONDARY_BUTTON =
+  'min-h-[44px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:min-h-0 md:py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
+const ICON_BUTTON =
+  'min-h-[44px] min-w-[44px] justify-center border border-slate-300 bg-white px-2 text-slate-600 hover:bg-slate-50 md:min-h-0 md:min-w-0 md:py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700';
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 interface Props {
   dossier: Dossier;
@@ -69,7 +85,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     restoreDossierItem,
     updateDossier,
     toggleDossierPin,
-    reorderDossierItems,
+    setDossierItemOrder,
     updateDossierItemStatus,
     moveToDossier,
     triggerSearch,
@@ -84,7 +100,9 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [moveToModalOpen, setMoveToModalOpen] = useState(false);
-  const [treeNavigatorOpen, setTreeNavigatorOpen] = useState(false);
+  // undefined = closed; null = open on a blank form; an act = open on that act's index.
+  const [treeNavigatorAct, setTreeNavigatorAct] = useState<{ tipo_atto: string; numero_atto: string; data: string } | null | undefined>(undefined);
+  const [foldedActs, setFoldedActs] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
@@ -92,6 +110,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Hydrate the snapshot list, or the "• N snapshot" counter reads 0 after a
   // reload even when rows exist. Logged on failure, never hidden (gotcha 18).
@@ -115,7 +134,9 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           d.tipo_atto?.toLowerCase().includes(q) ||
           d.numero_articolo?.toString().toLowerCase().includes(q) ||
           d.numero_atto?.toString().toLowerCase().includes(q) ||
-          d.data?.toString().toLowerCase().includes(q)
+          d.data?.toString().toLowerCase().includes(q) ||
+          !!item.citation?.toLowerCase().includes(q) ||
+          !!item.actCitation?.toLowerCase().includes(q)
         );
       }
       return typeof item.data === 'string' && item.data.toLowerCase().includes(q);
@@ -123,26 +144,66 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   }, [dossier.items, itemSearchQuery]);
 
   const hasFilter = itemSearchQuery.trim().length > 0;
+  // The page's sections: notes first, then one block per act (spec §1-2).
+  const layout = useMemo(() => layoutDossier(visibleItems), [visibleItems]);
+  const fullLayout = useMemo(() => layoutDossier(dossier.items), [dossier.items]);
+  const fullBlocks = useMemo(() => new Map(fullLayout.acts.map((a) => [a.key, a])), [fullLayout]);
+  // What a screen reader hears while an act is dragged: its heading, never its key.
+  const dragAnnouncements = useMemo(() => {
+    const heading = (id: string | number) => fullBlocks.get(String(id))?.heading ?? '';
+    return {
+      onDragStart: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} iniziato.`,
+      onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
+        over ? `${heading(active.id)} sopra ${heading(over.id)}.` : `${heading(active.id)} fuori dall'elenco degli atti.`,
+      onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
+        over ? `${heading(active.id)} spostato al posto di ${heading(over.id)}.` : `${heading(active.id)} lasciato dov'era.`,
+      onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
+    };
+  }, [fullBlocks]);
+  const countsLine = [
+    plural(fullLayout.acts.length, 'atto', 'atti'),
+    plural(fullLayout.acts.reduce((n, a) => n + a.articles.length, 0), 'articolo', 'articoli'),
+    ...(fullLayout.notes.length > 0 ? [plural(fullLayout.notes.length, 'nota', 'note')] : []),
+  ].join(' · ');
+  const visibleArticleIds = useMemo(() => layout.acts.flatMap((a) => a.articles.map((i) => i.id)), [layout]);
 
   const toggleExpanded = (id: string) => setExpandedIds((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const allExpanded = visibleItems.length > 0 && visibleItems.every(i => expandedIds.has(i.id));
+  const toggleFolded = (key: string) => setFoldedActs((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const allExpanded = visibleArticleIds.length > 0 && visibleArticleIds.every(id => expandedIds.has(id));
+  // "Espandi tutto" opens every block and every article; "Comprimi tutto" closes the articles only.
+  const toggleExpandAll = () => {
+    if (allExpanded) {
+      setExpandedIds(new Set());
+    } else {
+      setFoldedActs(new Set());
+      setExpandedIds(new Set(visibleArticleIds));
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  // Acts reorder; their articles follow them, in display order (spec §4).
+  const handleActDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = dossier.items.findIndex((item) => item.id === active.id);
-      const newIndex = dossier.items.findIndex((item) => item.id === over.id);
-      reorderDossierItems(dossier.id, oldIndex, newIndex);
-    }
+    if (!over || active.id === over.id) return;
+    const keys = fullLayout.acts.map((a) => a.key);
+    const from = keys.indexOf(String(active.id));
+    const to = keys.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    const moved = [...keys];
+    moved.splice(to, 0, moved.splice(from, 1)[0]);
+    setDossierItemOrder(dossier.id, dossierItemOrder(dossier.items, fullLayout, moved));
   };
 
   const toggleItemSelection = (itemId: string) => {
@@ -154,8 +215,9 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     });
   };
 
+  // The articles on screen: notes carry no checkbox, so selecting "all" must not take them.
   const selectAllItems = () => {
-    setSelectedItems(new Set(dossier.items.map((i) => i.id)));
+    setSelectedItems(new Set(visibleArticleIds));
   };
 
   const clearSelection = () => setSelectedItems(new Set());
@@ -219,24 +281,14 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
 
   const normaGroups = useMemo<NormaGroup[]>(() => computeNormaGroups(dossier.items), [dossier.items]);
 
-  // Single-group open also pre-creates the dossier tab so results never leak
-  // into pre-existing custom tabs with the same label (e.g. orphans from past
-  // sessions, workspaceTabs is persisted in localStorage).
-  const openGroupOnDashboard = (group: NormaGroup) => {
-    const tabLabel = tabLabelForGroup(dossier.title, group);
-    const tabId = addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
-    navigate('/');
-    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
-  };
-
-  // Queue one search per norma-group. The tabs are created up front (the texts
-  // in force share the dossier's, each past group has its own) and their ids
-  // passed as `targetTabId` — this avoids any label-match timing races inside
-  // SearchPanel (each search knows exactly where to write).
-  const openAllGroupsOnDashboard = () => {
-    if (normaGroups.length === 0) return;
+  // Queue one search per norma-group (one act's, or the dossier's). The tabs are
+  // created up front (the texts in force share the dossier's, each past group has
+  // its own) and their ids passed as `targetTabId`, so results never leak into a
+  // pre-existing custom tab with the same label (gotcha 15).
+  const openGroupsOnDashboard = (groups: NormaGroup[]) => {
+    if (groups.length === 0) return;
     const paramsList = searchesForGroups(
-      dossier.title, normaGroups,
+      dossier.title, groups,
       (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
     );
     navigate('/');
@@ -246,10 +298,27 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const handleOpenAllOnDashboard = () => {
     if (normaGroups.length === 0) return;
     if (normaGroups.length === 1) {
-      openGroupOnDashboard(normaGroups[0]);
+      openGroupsOnDashboard(normaGroups);
       return;
     }
     setOpenPickerGroups(normaGroups);
+  };
+
+  // All the act's articles, behind one undo toast that puts them back where they were.
+  const handleRemoveAct = (block: ActBlock) => {
+    const snapshots = block.articles
+      .map((item) => ({ item: item as DossierItem, atIndex: dossier.items.findIndex((i) => i.id === item.id) }))
+      .filter((s) => s.atIndex >= 0)
+      .sort((a, b) => a.atIndex - b.atIndex);
+    if (snapshots.length === 0) return;
+    void showUndoToast({
+      action: () => {
+        snapshots.forEach((s) => removeFromDossier(dossier.id, s.item.id));
+        return snapshots;
+      },
+      undo: (snaps) => snaps.forEach((s) => restoreDossierItem(dossier.id, s.item, s.atIndex)),
+      message: snapshots.length === 1 ? 'Articolo rimosso' : `${snapshots.length} articoli rimossi`,
+    });
   };
 
   const exportDossierJSON = () => {
@@ -302,88 +371,111 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     }
   };
 
-  const handleExportPdf = () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    const margin = 44;
-    const bottom = 770;
-    let y = 54;
+  // The PDF as the page is: notes, then each act once with its articles and
+  // every text, fetched like the reader's (spec §9). Titles come from the
+  // session cache the act blocks already filled.
+  const handleExportPdf = async () => {
+    if (pdfProgress) return;
+    setPdfProgress({ done: 0, total: 0 });
+    try {
+      const texts = await loadDossierTexts(dossier.items, (done, total) => setPdfProgress({ done, total }));
+      const titles = new Map<string, string | null>();
+      await Promise.all(fullLayout.acts.map(async (block) => {
+        if (block.isCode) return;
+        // The same act as the block on screen, resolved when no item has a URN.
+        const answer = await resolveBlockUrn(block)
+          .then((urn) => fetchActRubriche(urn))
+          .catch((err: unknown) => {
+            console.error('PDF: act title unavailable for', block.heading, err);
+            return null;
+          });
+        titles.set(block.key, answer?.title?.trim() || null);
+      }));
+      const blocks = buildPdfBlocks(dossier.items, texts, titles);
 
-    const footer = () => {
-      const page = doc.getNumberOfPages();
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(120);
-      doc.text(`${dossier.title} · VisuaLex`, margin, 810);
-      doc.text(`Pagina ${page}`, 555, 810, { align: 'right' });
-      doc.setTextColor(0);
-    };
-    const ensureSpace = (height: number) => {
-      if (y + height <= bottom) return;
-      footer();
-      doc.addPage();
-      y = 54;
-    };
-    const writeLines = (lines: string[], lineHeight: number) => {
-      lines.forEach(line => {
-        ensureSpace(lineHeight);
-        doc.text(line, margin, y);
-        y += lineHeight;
-      });
-    };
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const margin = 44;
+      const bottom = 770;
+      const width = 507;
+      let y = 54;
 
-    doc.setFillColor(30, 64, 175);
-    doc.rect(0, 0, 595, 12, 'F');
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text(dossier.title, margin, y);
-    y += 28;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    doc.text(`Fascicolo normativo · ${dossier.items.length} elementi · Esportato il ${new Date().toLocaleDateString('it-IT')}`, margin, y);
-    y += 18;
-    if (dossier.description) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'italic');
-      writeLines(doc.splitTextToSize(dossier.description, 507) as string[], 14);
-      y += 6;
-    }
-    if (dossier.tags?.length) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      writeLines([`Tag: ${dossier.tags.join(' · ')}`], 13);
-    }
-    doc.setTextColor(0);
-    doc.setDrawColor(190);
-    doc.line(margin, y + 4, 551, y + 4);
-    y += 22;
-
-    dossier.items.forEach((item, idx) => {
-      const title = dossierItemPdfTitle(item, idx);
-      ensureSpace(32);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text(title, margin, y);
-      y += 17;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      const rawContent = item.type === 'norma'
-        ? String(item.data.article_text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-        : String(item.data || '');
-      const content = rawContent || '(Nessun testo disponibile)';
-      writeLines(doc.splitTextToSize(content, 507) as string[], 12);
-      if (item.type === 'norma') {
+      const footer = () => {
+        const page = doc.getNumberOfPages();
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.setTextColor(100);
-        writeLines([`Fonte: ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''}${item.data.data ? ` del ${item.data.data}` : ''}`], 11);
+        doc.setTextColor(120);
+        doc.text(`${dossier.title} · VisuaLex`, margin, 810);
+        doc.text(`Pagina ${page}`, 555, 810, { align: 'right' });
         doc.setTextColor(0);
-      }
-      y += 12;
-    });
+      };
+      const ensureSpace = (height: number) => {
+        if (y + height <= bottom) return;
+        footer();
+        doc.addPage();
+        y = 54;
+      };
+      const writeLines = (lines: string[], lineHeight: number) => {
+        lines.forEach(line => {
+          ensureSpace(lineHeight);
+          doc.text(line, margin, y);
+          y += lineHeight;
+        });
+      };
+      const write = (text: string, size: number, style: 'normal' | 'bold' | 'italic', lineHeight: number, grey = false) => {
+        doc.setFontSize(size);
+        doc.setFont('helvetica', style);
+        doc.setTextColor(grey ? 100 : 0);
+        writeLines(doc.splitTextToSize(text, width) as string[], lineHeight);
+        doc.setTextColor(0);
+      };
 
-    footer();
-    doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+      doc.setFillColor(30, 64, 175);
+      doc.rect(0, 0, 595, 12, 'F');
+      write(dossier.title, 22, 'bold', 28);
+      write(`Fascicolo normativo · ${countsLine} · Esportato il ${new Date().toLocaleDateString('it-IT')}`, 9, 'normal', 18, true);
+      if (dossier.description) {
+        write(dossier.description, 11, 'italic', 14);
+        y += 6;
+      }
+      if (dossier.tags?.length) write(`Tag: ${dossier.tags.join(' · ')}`, 9, 'normal', 13, true);
+      doc.setDrawColor(190);
+      doc.line(margin, y + 4, 551, y + 4);
+      y += 22;
+
+      blocks.forEach((block) => {
+        if (block.kind === 'notes') {
+          ensureSpace(32);
+          write('Note', 14, 'bold', 18);
+          block.notes.forEach((text) => { write(text, 10, 'normal', 13); y += 6; });
+          y += 10;
+          return;
+        }
+        ensureSpace(48);
+        write(block.heading, 14, 'bold', 18);
+        if (block.title) write(block.title, 10, 'italic', 13, true);
+        y += 6;
+        block.articles.forEach((article) => {
+          ensureSpace(32);
+          const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
+          write(head, 11, 'bold', 15);
+          write(article.text, 9, article.missing === 'none' ? 'normal' : 'italic', 12, article.missing !== 'none');
+          y += 10;
+        });
+        y += 8;
+      });
+
+      footer();
+      doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+      const missing = blocks.reduce((n, b) => n + (b.kind === 'act' ? b.articles.filter((a) => a.missing === 'unavailable').length : 0), 0);
+      if (missing > 0) {
+        showToast(`PDF salvato: ${missing === 1 ? '1 testo non disponibile' : `${missing} testi non disponibili`}`, 'info');
+      }
+    } catch (err) {
+      console.error('Failed to export the dossier PDF:', err);
+      showToast('Impossibile creare il PDF del dossier', 'error');
+    } finally {
+      setPdfProgress(null);
+    }
   };
 
   const handleCreateSnapshot = async () => {
@@ -450,152 +542,63 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               </div>
             )}
             <div className="text-xs md:text-sm text-slate-400 mt-2">
-              Creato il {formatTimestampLong(dossier.createdAt)} • {dossier.items.length} elementi{snapshots.length > 0 ? ` • ${snapshots.length} snapshot` : ''}
+              Creato il {formatTimestampLong(dossier.createdAt)} · {countsLine}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}
             </div>
           </div>
 
-          <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-            <ToolbarButton
-              variant="mobile"
-              color="slate"
-              icon={Edit2}
-              onClick={() => setEditingDossier(dossier)}
-              title="Modifica"
-              ariaLabel="Modifica dossier"
-            />
-            <ToolbarButton
-              variant="mobile"
-              color="slateMuted"
-              pressedColor="yellow"
-              pressed={!!dossier.isPinned}
-              icon={Star}
-              onClick={() => toggleDossierPin(dossier.id)}
-              title={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-              ariaLabel={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-            />
-            <ToolbarButton
-              variant="mobile"
-              color="emerald"
-              icon={Download}
-              onClick={handleExportPdf}
-              title="Esporta PDF"
-              ariaLabel="Esporta PDF"
-              className="dossier-export"
-            />
-            <ToolbarButton
-              variant="mobile"
-              color="blue"
-              icon={Share2}
-              onClick={copyShareLink}
-              title="Condividi"
-              ariaLabel="Condividi dossier"
-            />
-            <ToolbarButton
-              variant="mobile"
-              color="indigo"
-              icon={ExternalLink}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
               onClick={handleOpenAllOnDashboard}
               disabled={!hasNormaItems}
-              title="Apri su Dashboard"
-              ariaLabel="Apri tutti su Dashboard"
-            />
-            <ToolbarButton
-              variant="mobile"
-              color="green"
-              icon={TreeDeciduous}
-              onClick={() => setTreeNavigatorOpen(true)}
-              title="Importa da norma"
-              ariaLabel="Importa articoli da norma"
-            />
-            <ToolbarButton
-              variant="mobile"
-              color="yellow"
-              icon={StickyNote}
-              onClick={() => setAddNoteOpen(true)}
-              title="Aggiungi nota"
-              ariaLabel="Aggiungi una nota libera al dossier"
-            />
-            <ToolbarButton
-              variant="mobile"
-              color="red"
-              icon={Trash2}
-              onClick={() => setConfirmDeleteOpen(true)}
-              title="Elimina"
-              ariaLabel="Elimina dossier"
-            />
-          </div>
-
-          <div className="hidden md:flex gap-2">
-            <ToolbarButton
-              color="slate"
-              icon={Edit2}
-              onClick={() => setEditingDossier(dossier)}
-              title="Modifica"
-              ariaLabel="Modifica dossier"
-            />
-            <ToolbarButton
-              id="tour-dossier-pin"
-              color="slateMuted"
-              pressedColor="yellow"
-              pressed={!!dossier.isPinned}
-              icon={Star}
-              onClick={() => toggleDossierPin(dossier.id)}
-              title={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-              ariaLabel={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-            />
-            <ToolbarButton
-              id="tour-dossier-export"
-              color="emerald"
-              icon={Download}
-              onClick={handleExportPdf}
-              title="Esporta PDF"
-              ariaLabel="Esporta PDF"
-              className="dossier-export"
-            />
-            <button type="button" onClick={() => void handleCreateSnapshot()} disabled={snapshotBusy} className="rounded-lg border border-indigo-200 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/30">{snapshotBusy ? 'Salvo…' : 'Snapshot'}</button>
-            <ToolbarButton
-              color="purple"
-              icon={FileJson}
-              onClick={exportDossierJSON}
-              title="Esporta JSON"
-              ariaLabel="Esporta JSON"
-            />
-            <ToolbarButton
-              color="blue"
-              icon={Share2}
-              onClick={copyShareLink}
-              title="Copia link di condivisione"
-              ariaLabel="Copia link di condivisione"
-            />
-            <ToolbarButton
-              color="green"
-              icon={TreeDeciduous}
-              onClick={() => setTreeNavigatorOpen(true)}
-              title="Importa da norma"
-              ariaLabel="Importa articoli da norma"
-            />
-            <ToolbarButton
-              color="yellow"
-              icon={StickyNote}
-              onClick={() => setAddNoteOpen(true)}
-              title="Aggiungi nota"
-              ariaLabel="Aggiungi una nota libera al dossier"
-            />
-            <ToolbarButton
-              color="indigo"
-              icon={ExternalLink}
-              onClick={handleOpenAllOnDashboard}
-              disabled={!hasNormaItems}
-              title="Apri tutti su Dashboard"
-              ariaLabel="Apri tutti su Dashboard"
-            />
-            <ToolbarButton
-              color="red"
-              icon={Trash2}
-              onClick={() => setConfirmDeleteOpen(true)}
-              title="Elimina Dossier"
-              ariaLabel="Elimina dossier"
-            />
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-40 md:min-h-0 md:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+            >
+              <ExternalLink size={16} aria-hidden />
+              <span>Apri tutto<span className="hidden sm:inline"> su Dashboard</span></span>
+            </button>
+            <MenuButton
+              label="Aggiungi"
+              align="left"
+              triggerClassName={SECONDARY_BUTTON}
+              items={[
+                { label: 'Articoli da una norma', icon: TreeDeciduous, onSelect: () => setTreeNavigatorAct(null) },
+                { label: 'Nota', icon: StickyNote, onSelect: () => setAddNoteOpen(true) },
+                { label: 'Cerca un articolo', icon: Search, onSelect: () => navigate('/') },
+              ]}
+            >
+              <Plus size={16} aria-hidden />
+              <span className="hidden sm:inline">Aggiungi</span>
+            </MenuButton>
+            <MenuButton
+              label="Esporta"
+              align="left"
+              triggerClassName={SECONDARY_BUTTON}
+              items={[
+                { label: 'PDF', icon: Download, onSelect: () => void handleExportPdf(), disabled: !!pdfProgress },
+                { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
+                { label: 'JSON', icon: FileJson, onSelect: exportDossierJSON },
+                { label: snapshotBusy ? 'Salvo lo snapshot…' : 'Salva snapshot', icon: History, onSelect: () => void handleCreateSnapshot(), disabled: snapshotBusy },
+              ]}
+            >
+              <Download size={16} aria-hidden />
+              {pdfProgress ? (
+                <span role="status">Preparo il PDF…{pdfProgress.total > 0 ? ` ${pdfProgress.done} di ${pdfProgress.total}` : ''}</span>
+              ) : (
+                <span className="hidden sm:inline">Esporta</span>
+              )}
+            </MenuButton>
+            <MenuButton
+              label="Altre azioni"
+              triggerClassName={ICON_BUTTON}
+              items={[
+                { label: 'Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
+                { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
+                { label: showBulkActions ? 'Annulla selezione' : 'Seleziona elementi', icon: CheckSquare, onSelect: () => { setShowBulkActions((v) => !v); clearSelection(); } },
+                { label: 'Elimina dossier', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => setConfirmDeleteOpen(true) },
+              ]}
+            >
+              <MoreHorizontal size={18} />
+            </MenuButton>
           </div>
         </div>
       </header>
@@ -625,7 +628,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           </div>
           <button
             type="button"
-            onClick={() => setExpandedIds(allExpanded ? new Set() : new Set(visibleItems.map(i => i.id)))}
+            onClick={toggleExpandAll}
             className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             aria-pressed={allExpanded}
           >
@@ -635,31 +638,21 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         </div>
       )}
 
-      {dossier.items.length > 0 && (
+      {showBulkActions && dossier.items.length > 0 && (
         <div className="mb-4 flex flex-col md:flex-row items-stretch md:items-center gap-3 md:justify-between bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => setShowBulkActions(!showBulkActions)}
-              aria-pressed={showBulkActions}
-              className={cn(
-                'px-4 py-2 md:px-3 md:py-1.5 rounded-md text-sm transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                showBulkActions
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600',
-              )}
-            >
-              {showBulkActions ? 'Annulla selezione' : 'Seleziona'}
+            <button onClick={selectAllItems} className="text-sm text-blue-600 hover:underline min-h-[44px] md:min-h-0 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
+              Seleziona tutti
             </button>
-            {showBulkActions && (
-              <>
-                <button onClick={selectAllItems} className="text-sm text-blue-600 hover:underline min-h-[44px] md:min-h-0 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
-                  Seleziona tutti
-                </button>
-                <span className="text-sm text-slate-500">{selectedItems.size} selezionati</span>
-              </>
-            )}
+            <span className="text-sm text-slate-500">{selectedItems.size} selezionati</span>
+            <button
+              onClick={() => { setShowBulkActions(false); clearSelection(); }}
+              className="text-sm text-slate-600 dark:text-slate-300 hover:underline min-h-[44px] md:min-h-0 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+            >
+              Annulla selezione
+            </button>
           </div>
-          {showBulkActions && selectedItems.size > 0 && (
+          {selectedItems.size > 0 && (
             <div className="flex items-center gap-2">
               <button onClick={() => setMoveToModalOpen(true)} className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                 <FolderInput size={16} />
@@ -674,75 +667,98 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         </div>
       )}
 
-      {hasFilter && visibleItems.length > 1 && (
+      {hasFilter && layout.acts.length > 1 && (
         <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
           <GripVertical size={12} className="opacity-60" aria-hidden />
           Riordina disabilitato con filtri attivi
         </div>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={visibleItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-          <div id="tour-dossier-items" className="space-y-3">
-            {dossier.items.length === 0 ? (
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
-                <EmptyState
-                  variant="dossier"
-                  title="Dossier vuoto"
-                  description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
-                  action={
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                      <button onClick={() => navigate('/')} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
-                        <Search size={18} />
-                        Cerca articoli
-                      </button>
-                      <button onClick={() => setTreeNavigatorOpen(true)} className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2">
-                        <TreeDeciduous size={18} />
-                        Importa da norma
-                      </button>
-                    </div>
-                  }
-                />
-              </div>
-            ) : visibleItems.length === 0 ? (
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
-                <EmptyState
-                  variant="search"
-                  title="Nessun elemento corrisponde ai filtri"
-                  description="La ricerca non ha trovato corrispondenze in questo dossier."
-                  action={
-                    <button
-                      type="button"
-                      onClick={() => setItemSearchQuery('')}
-                      className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                    >
-                      <X size={18} />
-                      Azzera filtri
-                    </button>
-                  }
-                />
-              </div>
-            ) : (
-              visibleItems.map((item) => (
-                <SortableDossierItem
-                  key={item.id}
-                  item={item}
-                  isSelected={selectedItems.has(item.id)}
-                  onToggleSelect={() => toggleItemSelection(item.id)}
-                  isExpanded={expandedIds.has(item.id)}
-                  onToggleExpand={() => toggleExpanded(item.id)}
-                  onOpenOnDashboard={() => openItemOnDashboard(item)}
-                  showToast={showToast}
-                  onRemove={() => handleRemoveSingle(item)}
-                  onToggleImportant={() => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
-                  showCheckbox={showBulkActions}
-                  dragDisabled={hasFilter}
-                />
-              ))
-            )}
+      <div id="tour-dossier-items" className="space-y-4">
+        {dossier.items.length === 0 ? (
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
+            <EmptyState
+              variant="dossier"
+              title="Dossier vuoto"
+              description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
+              action={
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button onClick={() => navigate('/')} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                    <Search size={18} />
+                    Cerca articoli
+                  </button>
+                  <button onClick={() => setTreeNavigatorAct(null)} className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2">
+                    <TreeDeciduous size={18} />
+                    Importa da norma
+                  </button>
+                </div>
+              }
+            />
           </div>
-        </SortableContext>
-      </DndContext>
+        ) : visibleItems.length === 0 ? (
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
+            <EmptyState
+              variant="search"
+              title="Nessun elemento corrisponde ai filtri"
+              description="La ricerca non ha trovato corrispondenze in questo dossier."
+              action={
+                <button
+                  type="button"
+                  onClick={() => setItemSearchQuery('')}
+                  className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                >
+                  <X size={18} />
+                  Azzera filtri
+                </button>
+              }
+            />
+          </div>
+        ) : (
+          <>
+            <DossierNotesSection notes={layout.notes as NoteItem[]} onRemove={handleRemoveSingle} />
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleActDragEnd}
+              accessibility={{
+                announcements: dragAnnouncements,
+                screenReaderInstructions: { draggable: "Per spostare l'atto premi Spazio, poi le frecce su e giù, e di nuovo Spazio per lasciarlo; Esc annulla." },
+              }}
+            >
+              <SortableContext items={layout.acts.map((a) => a.key)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-3">
+                  {layout.acts.map((block) => (
+                    <DossierActBlock
+                      key={block.key}
+                      block={block}
+                      dragDisabled={hasFilter}
+                      isFolded={foldedActs.has(block.key)}
+                      onToggleFold={() => toggleFolded(block.key)}
+                      expandedIds={expandedIds}
+                      onToggleExpand={toggleExpanded}
+                      selectedIds={selectedItems}
+                      showCheckbox={showBulkActions}
+                      onToggleSelect={toggleItemSelection}
+                      // The whole act, even while the search shows only some of its articles.
+                      onOpenAct={() => openGroupsOnDashboard((fullBlocks.get(block.key) ?? block).groups)}
+                      onAddArticles={() => setTreeNavigatorAct({
+                        tipo_atto: block.articles[0].data.tipo_atto,
+                        numero_atto: block.articles[0].data.numero_atto || '',
+                        data: block.articles[0].data.data || '',
+                      })}
+                      onRemoveAct={() => handleRemoveAct(fullBlocks.get(block.key) ?? block)}
+                      onOpenItem={openItemOnDashboard}
+                      onRemoveItem={handleRemoveSingle}
+                      onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
+                      showToast={showToast}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </>
+        )}
+      </div>
 
       {moveToModalOpen && (
         <MoveToDossierModal
@@ -761,9 +777,10 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         />
       )}
 
-      {treeNavigatorOpen && (
+      {treeNavigatorAct !== undefined && (
         <TreeNavigatorModal
-          onClose={() => setTreeNavigatorOpen(false)}
+          initialAct={treeNavigatorAct ?? undefined}
+          onClose={() => setTreeNavigatorAct(undefined)}
           onImport={handleTreeImport}
         />
       )}
@@ -804,11 +821,11 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           groups={openPickerGroups}
           onPick={(group) => {
             setOpenPickerGroups(null);
-            openGroupOnDashboard(group);
+            openGroupsOnDashboard([group]);
           }}
           onPickAll={() => {
             setOpenPickerGroups(null);
-            openAllGroupsOnDashboard();
+            openGroupsOnDashboard(normaGroups);
           }}
           onClose={() => setOpenPickerGroups(null)}
         />
