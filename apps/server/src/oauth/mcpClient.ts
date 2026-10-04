@@ -26,7 +26,13 @@ export function isMcpClient(req: Request): boolean {
   const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
   const colon = decoded.indexOf(':');
   if (colon < 0) return false;
-  const id = decodeURIComponent(decoded.slice(0, colon));
-  const secret = decodeURIComponent(decoded.slice(colon + 1));
+  let id: string;
+  let secret: string;
+  try {
+    id = decodeURIComponent(decoded.slice(0, colon));
+    secret = decodeURIComponent(decoded.slice(colon + 1));
+  } catch {
+    return false; // a malformed escape is a failed authentication, not a server error
+  }
   return id === MCP_CLIENT_ID && sameSecret(secret, expected);
 }

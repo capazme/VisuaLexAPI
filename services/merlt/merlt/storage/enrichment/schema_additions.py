@@ -60,6 +60,29 @@ _STATEMENTS = (
     "ALTER TABLE user_documents DROP CONSTRAINT IF EXISTS user_documents_file_hash_key",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_documents_hash_owner "
     "ON user_documents (file_hash, uploaded_by)",
+    # 006_massimario_ingestion.sql: Massimario batches stage chunks next to
+    # nodes/edges, and `massimario` is a batch source.
+    "ALTER TABLE merlt_ingestion_batches ADD COLUMN IF NOT EXISTS extras JSON",
+    "DO $$ BEGIN "
+    "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'check_batch_source' "
+    "AND pg_get_constraintdef(oid) LIKE '%massimario%') THEN "
+    "ALTER TABLE merlt_ingestion_batches DROP CONSTRAINT IF EXISTS check_batch_source; "
+    "ALTER TABLE merlt_ingestion_batches ADD CONSTRAINT check_batch_source "
+    "CHECK (source IN ('visualex_tree','italia_corpus','massimario')); "
+    "END IF; END $$",
+    # The bridge lives in the same database; guarded because a fresh database
+    # gets it from the seed DDL, not from create_tables(). The DDL and the ORM
+    # already declare UNIQUE (chunk_id, graph_node_urn), which ON CONFLICT needs:
+    # a unique index is added only to a table that lacks one.
+    "DO $$ BEGIN "
+    "IF to_regclass('bridge_table') IS NOT NULL THEN "
+    "ALTER TABLE bridge_table ADD COLUMN IF NOT EXISTS expert_affinity JSONB; "
+    "IF NOT EXISTS (SELECT 1 FROM pg_index WHERE indrelid = 'bridge_table'::regclass AND indisunique "
+    "AND pg_get_indexdef(indexrelid) LIKE '%(chunk_id, graph_node_urn)') THEN "
+    "CREATE UNIQUE INDEX uq_bridge_chunk_node ON bridge_table (chunk_id, graph_node_urn); "
+    "END IF; "
+    "CREATE INDEX IF NOT EXISTS idx_bridge_source ON bridge_table (source); "
+    "END IF; END $$",
 )
 
 

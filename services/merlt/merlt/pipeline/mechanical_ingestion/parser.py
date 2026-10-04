@@ -438,6 +438,10 @@ def get_adapter(source: str) -> MechanicalSourceAdapter:
         return ItaliaCorpusAdapter()
     if source == "visualex_tree":
         return VisualexTreeAdapter()
+    if source == "massimario":
+        from merlt.pipeline.massimario.adapter import MassimarioAdapter
+
+        return MassimarioAdapter()
     raise ValueError(f"unknown mechanical ingestion source: {source}")
 
 

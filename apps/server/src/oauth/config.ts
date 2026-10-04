@@ -24,9 +24,9 @@ export interface OAuthConfig {
   registrationsPerHour: number;
   /**
    * Requests per address per 15 minutes on authorize, token and revoke; unset
-   * keeps the SDK's defaults (100, 50, 50). The token exchange and
-   * introspection, which the MCP server calls for every user from one
-   * address, have their own limit keyed by client instead.
+   * keeps the SDK's defaults (100, 50, 50). Introspection and the token
+   * exchange, which the MCP server calls for every user from one address,
+   * have a much higher ceiling of their own.
    */
   requestsPer15Minutes?: number;
 }

@@ -5,8 +5,8 @@ export const UNUSED_CLIENT_LIFETIME_MS = 7 * DAY;
 
 /**
  * Deletes what has expired and can never be used again: authorization requests
- * and codes past their life (a used code is kept until it expires, to recognise
- * a replay), and clients registered more than seven days ago that never
+ * and codes a day past their life (a used code is kept that day so that its
+ * replay is still recognised and revokes what it produced), and clients registered more than seven days ago that never
  * obtained a grant (spec 4.2). Tokens are kept with their grant: a revoked or
  * expired one answers `active: false` either way.
  */

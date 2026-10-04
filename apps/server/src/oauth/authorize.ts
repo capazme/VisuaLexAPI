@@ -1,7 +1,12 @@
 import type { Response } from 'express';
 import type { AuthorizationParams } from '@modelcontextprotocol/sdk/server/auth/provider.js';
 import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { InvalidRequestError, InvalidScopeError, InvalidTargetError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import {
+  InvalidRequestError,
+  InvalidScopeError,
+  InvalidTargetError,
+  OAuthError,
+} from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { prisma } from '../lib/prisma';
 import { IGNORED_SCOPES, SCOPES, type OAuthConfig } from './config';
 import { matchesRedirectUri } from './redirectUri';
@@ -29,8 +34,8 @@ export function requestedScopes(scopes: string[] | undefined): string[] {
  * library that requests the URL once before opening the browser (LibreLex's
  * does) therefore leaves only an unclaimed request behind, which expires.
  *
- * What it throws, the SDK's handler turns into an error redirect to the
- * (already validated) redirect URI.
+ * An unregistered redirect URI is thrown to the SDK's handler; every other
+ * refusal is answered here as an error redirect that carries `iss`.
  */
 export async function beginAuthorization(
   config: OAuthConfig,
@@ -38,14 +43,29 @@ export async function beginAuthorization(
   params: AuthorizationParams,
   res: Response,
 ): Promise<void> {
-  if (!params.resource) throw new InvalidRequestError('resource is required (RFC 8707)');
-  if (params.resource.href !== canonicalResource(config.resource)) {
-    throw new InvalidTargetError('resource is not served by this authorization server');
-  }
   if (!matchesRedirectUri(client.redirect_uris, params.redirectUri)) {
     throw new InvalidRequestError('Unregistered redirect_uri');
   }
-  const scopes = requestedScopes(params.scopes);
+  let scopes: string[];
+  try {
+    if (!params.resource) throw new InvalidRequestError('resource is required (RFC 8707)');
+    if (params.resource.href !== canonicalResource(config.resource)) {
+      throw new InvalidTargetError('resource is not served by this authorization server');
+    }
+    scopes = requestedScopes(params.scopes);
+  } catch (error) {
+    if (!(error instanceof OAuthError)) throw error;
+    // Answered here rather than thrown to the SDK, whose error redirect lacks
+    // `iss`: RFC 9207 wants it on error responses too, and the metadata says
+    // it is always there.
+    const redirect = new URL(params.redirectUri);
+    redirect.searchParams.set('error', error.errorCode);
+    redirect.searchParams.set('error_description', error.message);
+    if (params.state) redirect.searchParams.set('state', params.state);
+    redirect.searchParams.set('iss', config.issuer);
+    res.redirect(302, redirect.href);
+    return;
+  }
 
   const request = await prisma.oAuthAuthorizationRequest.create({
     data: {
