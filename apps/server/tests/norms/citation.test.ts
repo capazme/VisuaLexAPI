@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citeAct, citeArticle, citeStoredAct } from '../../src/norms/citation';
+import { citeAct, citeArticle, citeStoredAct, citeStoredNorm } from '../../src/norms/citation';
 // The web app's golden file is the specification of the wording (the owner reads
 // it). The server's formatter is pinned to it: for every case the web cites, the
 // "art. …" part of its citation is what the server writes. A change of style in
@@ -112,5 +112,17 @@ describe('citeStoredAct', () => {
     expect(citeStoredAct('norm', { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' })).toBe('l. 31 dicembre 2012, n. 247');
     expect(citeStoredAct('note', 'appunto')).toBeNull();
     expect(citeStoredAct('norm', { numero_articolo: '3' })).toBeNull();
+    expect(citeStoredAct('norm', { tipo_atto: '   ', numero_articolo: '3' })).toBeNull();
+  });
+
+  // The items route stores any JSON: a malformed item must not fail the whole dossier.
+  it('reads only the string fields of a malformed item, and never throws', () => {
+    const euWithNumericDate = { tipo_atto: 'regolamento UE', numero_atto: '679', data: 20160427, numero_articolo: '5' };
+    expect(citeStoredAct('norm', euWithNumericDate)).toBe('regolamento (UE)');
+    expect(citeStoredNorm('norm', euWithNumericDate)).toBe('art. 5, regolamento (UE)');
+    const realTypeNotText = { tipo_atto: 'legge', tipo_atto_reale: 7, numero_atto: '247', data: '2012-12-31', numero_articolo: '3' };
+    expect(citeStoredAct('norm', realTypeNotText)).toBe('l. 31 dicembre 2012, n. 247');
+    expect(citeStoredNorm('norm', realTypeNotText)).toBe('art. 3, l. 31 dicembre 2012, n. 247');
+    expect(citeStoredNorm('norm', { tipo_atto: 'legge', numero_articolo: 3 })).toBeNull();
   });
 });
