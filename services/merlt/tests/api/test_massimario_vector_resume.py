@@ -1,5 +1,7 @@
-"""A promoted Massimario batch whose vectors stopped half-way can be promoted again."""
+"""A promoted Massimario batch whose vectors stopped half-way can be promoted again;
+one whose vectors are still being written cannot."""
 import importlib
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -34,12 +36,16 @@ async def promote(b):
         ), queue
 
 
+def ago(seconds):
+    return (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
+
+
 @pytest.mark.parametrize("vectors", [
-    {"done": 300, "total": 1360, "error": "ReadTimeout"},
-    {"done": 300, "total": 1360},
-    {"done": 0, "total": 1360},
+    {"done": 300, "total": 1360, "error": "ReadTimeout", "updated_at": ago(10)},
+    {"done": 300, "total": 1360, "updated_at": ago(2 * 3600)},  # no progress for two hours: the chain died
+    {"done": 0, "total": 1360},  # no timestamp: written before progress had one
 ])
-async def test_incomplete_vectors_can_be_resumed(vectors):
+async def test_stopped_vectors_can_be_resumed(vectors):
     response, queue = await promote(batch(vectors=vectors))
     assert response.status == "promoting"
     queue.enqueue.assert_called_once()
@@ -47,6 +53,7 @@ async def test_incomplete_vectors_can_be_resumed(vectors):
 
 @pytest.mark.parametrize("b", [
     batch(vectors={"done": 1360, "total": 1360}),
+    batch(vectors={"done": 300, "total": 1360, "updated_at": ago(60)}),  # still running
     batch(source="visualex_tree"),
     batch(status="rejected", vectors={"done": 0, "total": 10}),
 ])

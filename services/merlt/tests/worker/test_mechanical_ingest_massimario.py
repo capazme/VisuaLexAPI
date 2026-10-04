@@ -84,7 +84,8 @@ async def test_massimario_promotion_uses_its_own_writer():
     own.assert_awaited_once()
     generic.assert_not_awaited()
     enqueue.assert_called_once_with("b1", 0)
-    assert batch.stats["vectors"] == {"done": 0, "total": 0}
+    assert {k: v for k, v in batch.stats["vectors"].items() if k != "updated_at"} == {"done": 0, "total": 0}
+    assert batch.stats["vectors"]["updated_at"]
 
 
 async def test_a_visualex_timeout_fails_the_batch_with_a_reason():
@@ -103,3 +104,26 @@ async def test_a_visualex_timeout_fails_the_batch_with_a_reason():
         result = await tasks._run_parse_and_stage("b1")
     assert result["status"] == "failed" and batch.status == "failed"
     assert batch.error == "ReadTimeout"
+
+
+async def test_a_failed_enqueue_of_the_vectors_is_recorded():
+    batch = fake_batch()
+    batch.status, batch.nodes, batch.edges = "promoting", [], []
+    batch.extras = {"chunks": [{"point_id": "p"}]}
+
+    @asynccontextmanager
+    async def session():
+        yield FakeSession(batch)
+
+    graph = MagicMock(connect=AsyncMock(), close=AsyncMock())
+    with patch("merlt.storage.enrichment.database.init_db", new=AsyncMock()), \
+         patch("merlt.storage.enrichment.database.get_db_session", new=session), \
+         patch("merlt.storage.graph.client.FalkorDBClient", return_value=graph), \
+         patch("merlt.pipeline.massimario.promote.promote_massimario_graph",
+               new=AsyncMock(return_value={"nodes_merged": 0, "edges_merged": 0, "edges_skipped": 0})), \
+         patch("merlt.worker.massimario_tasks.enqueue_index_slice", side_effect=ConnectionError("redis down")), \
+         patch("merlt.worker.massimario_tasks.record_vectors_error", new=AsyncMock()) as record:
+        result = await tasks._run_promote("b1", False)
+    assert result["status"] == "promoted"
+    record.assert_awaited_once_with("b1", 0, "ConnectionError: redis down")
+

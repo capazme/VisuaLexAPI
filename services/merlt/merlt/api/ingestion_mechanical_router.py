@@ -228,11 +228,14 @@ async def get_batch(
 
 
 def _vectors_incomplete(batch: MerltIngestionBatch) -> bool:
-    """A promoted Massimario batch whose vectors and bridge rows are not all written."""
+    """A promoted Massimario batch whose vectors stopped before the end: an error was
+    recorded, or the chain has not moved for an hour. Vectors still being written are
+    not resumed: a second chain would only redo the same work."""
     if batch.source != "massimario" or batch.status != "promoted":
         return False
-    vectors = (batch.stats or {}).get("vectors") or {}
-    return bool(vectors.get("error")) or int(vectors.get("done") or 0) < int(vectors.get("total") or 0)
+    from merlt.worker.massimario_tasks import vectors_stopped
+
+    return vectors_stopped((batch.stats or {}).get("vectors"))
 
 
 @router.post("/batches/{batch_id}/promote", response_model=PromoteResponse)
@@ -252,9 +255,10 @@ async def promote_batch_endpoint(
     object) so two admins racing to promote the same batch can't both pass
     the checks below and both enqueue a job.
 
-    A promoted Massimario batch whose vectors did not finish (a slice failed, or
-    its job died) is promoted again: the graph writes are idempotent and the
-    vector job restarts from 0 with upserts on stable ids.
+    A promoted Massimario batch whose vectors stopped (a slice failed, its job
+    died, or the chain has not moved for an hour) is promoted again: the graph
+    writes are idempotent and the vector job restarts from 0 with upserts on
+    stable ids.
     """
     batch = await session.get(MerltIngestionBatch, batch_id)
     if batch is None:

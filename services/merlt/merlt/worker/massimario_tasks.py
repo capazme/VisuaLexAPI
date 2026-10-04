@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import datetime, timezone
 
 import structlog
 
@@ -23,6 +24,32 @@ log = structlog.get_logger()
 
 SLICE = int(os.getenv("MASSIMARIO_EMBED_SLICE", "100"))
 QUEUE = "merlt_bulk"
+JOB_TIMEOUT_S = 1800
+# A chain whose progress has not moved for this long is dead (a worker killed outright
+# records nothing): one slice's timeout, plus one bulk job it may have queued behind.
+STALE_AFTER_S = 2 * JOB_TIMEOUT_S
+
+
+def vector_progress(done: int, total: int, error: str | None = None) -> dict:
+    """`stats.vectors`: dated, so a stopped chain can be told from a running one."""
+    progress = {"done": done, "total": total, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if error:
+        progress["error"] = error
+    return progress
+
+
+def vectors_stopped(progress: dict | None) -> bool:
+    """Vectors that will not finish on their own: an error, or no progress for STALE_AFTER_S."""
+    progress = progress or {}
+    if progress.get("error"):
+        return True
+    if int(progress.get("done") or 0) >= int(progress.get("total") or 0):
+        return False
+    try:
+        updated = datetime.fromisoformat(progress["updated_at"])
+    except (KeyError, TypeError, ValueError):
+        return True  # undated progress predates the timestamp: nothing says it still runs
+    return (datetime.now(timezone.utc) - updated).total_seconds() > STALE_AFTER_S
 
 
 def _bridge():
@@ -44,7 +71,7 @@ def enqueue_index_slice(batch_id: str, start: int) -> None:
     queue = Queue(QUEUE, connection=Redis.from_url(os.getenv("RQ_REDIS_URL", "redis://localhost:6379/1")))
     queue.enqueue(
         "merlt.worker.massimario_tasks.index_slice", batch_id, start,
-        job_id=f"mass-vec-{batch_id}-{start}", job_timeout=1800,
+        job_id=f"mass-vec-{batch_id}-{start}", job_timeout=JOB_TIMEOUT_S,
         on_failure=Callback("merlt.worker.massimario_tasks.record_index_failure"),
     )
 
@@ -63,8 +90,8 @@ async def record_vectors_error(batch_id: str, start: int, error: str) -> None:
         ).scalar_one_or_none()
         if batch is None:
             return
-        vectors = {**((batch.stats or {}).get("vectors") or {}), "done": start, "error": error}
-        batch.stats = {**(batch.stats or {}), "vectors": vectors}
+        total = int(((batch.stats or {}).get("vectors") or {}).get("total") or 0)
+        batch.stats = {**(batch.stats or {}), "vectors": vector_progress(start, total, error)}
         await session.commit()
 
 
@@ -102,12 +129,12 @@ async def _run_index_slice(batch_id: str, start: int) -> dict:
         except Exception as e:  # noqa: BLE001 — recorded on the batch, the chain stops
             error = str(e) or type(e).__name__  # a timeout's message is empty
             log.error("massimario.index_slice.failed", batch_id=batch_id, start=start, error=error)
-            batch.stats = {**(batch.stats or {}), "vectors": {"done": start, "total": len(chunks), "error": error}}
+            batch.stats = {**(batch.stats or {}), "vectors": vector_progress(start, len(chunks), error)}
             await session.commit()
             return {"batch_id": batch_id, "status": "failed", "error": error}
         finally:
             await bridge.close()
-        batch.stats = {**(batch.stats or {}), "vectors": {"done": done, "total": len(chunks)}}
+        batch.stats = {**(batch.stats or {}), "vectors": vector_progress(done, len(chunks))}
         await session.commit()
     if done < len(chunks):
         enqueue_index_slice(batch_id, done)
