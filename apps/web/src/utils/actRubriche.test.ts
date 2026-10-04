@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { matchRubrichePart, rubricheFor } from './actRubriche';
+import type { ActRubricheResponse } from './actStructureCache';
 
 // The shape measured on 4 Oct 2026 for d.lgs. 196/2003: the top-level map is an annex's.
-const DLGS_196 = {
+const DLGS_196: ActRubricheResponse & { parts: NonNullable<ActRubricheResponse['parts']> } = {
   rubriche: { '1': 'Delibera del Garante n. 515 del 19 dicembre 2018, in G.U. 14 gennaio 2019, n. 11' },
   parts: [
     { name: 'Allegato A.4 Regole deontologiche', keys: ['1', '2', '3'], rubriche: { '1': 'Delibera del Garante n. 515…' }, abrogati: [] },

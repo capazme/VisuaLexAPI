@@ -74,6 +74,14 @@ describe('compareArticles', () => {
       .sort(compareArticles).map(articleLabel);
     expect(sorted).toEqual(['art. 2', 'art. 2-bis', 'art. 2 ter', 'art. 10', 'art. 25-ter', 'art. 25-terdecies', 'All. A, art. 1']);
   });
+  it('reads a suffix written without a hyphen, and sub-numbers as numbers', () => {
+    const sorted = [nv('2bis'), nv('2-bis.10'), nv('2'), nv('2-bis.2'), nv('2ter'), nv('270-bis.1')]
+      .sort(compareArticles).map((x) => x.numero_articolo);
+    expect(sorted).toEqual(['2', '2bis', '2-bis.2', '2-bis.10', '2ter', '270-bis.1']);
+  });
+  it('puts an article that is not a number after the numbered ones', () => {
+    expect([nv('unico'), nv('5')].sort(compareArticles).map((x) => x.numero_articolo)).toEqual(['5', 'unico']);
+  });
   it('puts the text in force before past texts, past texts by date', () => {
     const sorted = [
       nv('3', { versione: 'originale', data_versione: '2015-01-01' }),
@@ -107,6 +115,20 @@ describe('the smaller helpers', () => {
     const b = art({ numero_atto: '49', data: '2023-04-21', numero_articolo: '1' }, L49);
     const c = note('x');
     const layout = layoutDossier([a, b, c]);
-    expect(dossierItemOrder(layout, [layout.acts[1].key, layout.acts[0].key])).toEqual([c.id, b.id, a.id]);
+    expect(dossierItemOrder([a, b, c], layout, [layout.acts[1].key, layout.acts[0].key])).toEqual([c.id, b.id, a.id]);
+  });
+  it('never drops an item from the saved order, even one of an act the drag does not name', () => {
+    const a = art({ numero_articolo: '3' }, L247);
+    const b = art({ numero_atto: '49', data: '2023-04-21', numero_articolo: '1' }, L49);
+    const layout = layoutDossier([a, b]);
+    expect(dossierItemOrder([a, b], layout, [layout.acts[1].key])).toEqual([b.id, a.id]);
+  });
+  it('folds two versions of one article into one number', () => {
+    const { acts } = layoutDossier([
+      art({ numero_articolo: '3' }, L247),
+      art({ numero_articolo: '3', versione: 'originale', data_versione: '2013-01-01' }, L247),
+      art({ numero_articolo: '1', allegato: 'A' }, L247),
+    ]);
+    expect(foldedArticleList(acts[0])).toBe('artt. 3, All. A art. 1');
   });
 });

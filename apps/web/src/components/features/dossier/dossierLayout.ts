@@ -66,8 +66,10 @@ const ORDINALS: Record<string, number> = {
 };
 
 // "2043" → [2043, 0, ''], "2-bis" → [2, 2, ''], "270-bis.1" → [270, 2, '.1'].
+// "2bis", as a history entry stores what was typed, reads as "2-bis" (the
+// server's own normalisation); a split ordinal ("135-sex-decies") ranks last.
 function articleRank(numero: string): [number, number, string] {
-  const id = normalizeArticleId(numero || '');
+  const id = normalizeArticleId(numero || '').replace(/^(\d+)([a-z])/, '$1-$2');
   const match = /^(\d+)(?:-([a-z]+))?(.*)$/.exec(id);
   if (!match) return [Number.MAX_SAFE_INTEGER, 0, id];
   return [parseInt(match[1], 10), match[2] ? (ORDINALS[match[2]] ?? 99) : 0, match[3] ?? ''];
@@ -86,7 +88,7 @@ export function compareArticles(a: NormaVisitata, b: NormaVisitata): number {
   const [nb, ob, rb] = articleRank(b.numero_articolo);
   if (na !== nb) return na - nb;
   if (oa !== ob) return oa - ob;
-  if (ra !== rb) return ra.localeCompare(rb);
+  if (ra !== rb) return ra.localeCompare(rb, 'it', { numeric: true });
   // The text in force first, then past texts by the day asked for.
   const pastA = requestIsHistorical(a);
   const pastB = requestIsHistorical(b);
@@ -105,7 +107,7 @@ export function articleLabel(norma: NormaVisitata): string {
 
 /** A folded block's one line: "artt. 1, 3, 25" (each article once, whatever its versions). */
 export function foldedArticleList(block: ActBlock): string {
-  const labels = block.articles.map((i) => (i.data.allegato ? `All. ${i.data.allegato}, ${i.data.numero_articolo}` : i.data.numero_articolo));
+  const labels = block.articles.map((i) => (i.data.allegato ? `All. ${i.data.allegato} art. ${i.data.numero_articolo}` : i.data.numero_articolo));
   const unique = labels.filter((label, index) => labels.indexOf(label) === index);
   return `${unique.length === 1 ? 'art.' : 'artt.'} ${unique.join(', ')}`;
 }
@@ -144,12 +146,16 @@ export function layoutDossier(items: DossierItem[]): DossierLayout {
 
 /**
  * The full item order a drag of the acts saves: notes as they are, then each
- * act's articles in display order, in the new order of the acts.
+ * act's articles in display order, in the new order of the acts, then every
+ * other item in its stored order — the order sent to the server must name every
+ * item of the dossier.
  */
-export function dossierItemOrder(layout: DossierLayout, actKeys: string[]): string[] {
+export function dossierItemOrder(items: DossierItem[], layout: DossierLayout, actKeys: string[]): string[] {
   const blocks = new Map(layout.acts.map((a) => [a.key, a]));
-  return [
+  const ordered = [
     ...layout.notes.map((i) => i.id),
     ...actKeys.flatMap((key) => blocks.get(key)?.articles.map((i) => i.id) ?? []),
   ];
+  const placed = new Set(ordered);
+  return [...ordered, ...items.filter((i) => !placed.has(i.id)).map((i) => i.id)];
 }
