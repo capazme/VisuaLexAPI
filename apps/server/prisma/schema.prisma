@@ -405,6 +405,11 @@ model Dossier {
 
   isPinned    Boolean  @default(false) @map("is_pinned")
 
+  // Which connected application created this row (MCP); null = the user.
+  // Set by the server from the delegation, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+
   sourceSuggestionId String?                @map("source_suggestion_id")
   originalAuthorId   String?                @map("original_author_id")
 
@@ -457,6 +462,15 @@ model DossierItem {
   position  Int               @default(0)
   status    DossierItemStatus @default(unread)
   createdAt DateTime          @default(now()) @map("created_at")
+
+  // Which connected application created this row (MCP); null = the user.
+  // Set by the server from the delegation, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+  // A note about another entry of the same dossier (an article), as a whole:
+  // never a passage of its text (root rule 23). No foreign key: the entry may
+  // be in the trash, and the note must survive it and reattach on restore.
+  aboutItemId String? @map("about_item_id")
 
   // Relationships
   dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)

@@ -139,12 +139,18 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   }
 
   let user;
+  // The name the application registered with (unverified): the mark on what it creates.
+  let clientName: string | null = null;
   try {
-    const grant = await prisma.oAuthGrant.findUnique({ where: { id: claims.grant }, include: { user: true } });
+    const grant = await prisma.oAuthGrant.findUnique({
+      where: { id: claims.grant },
+      include: { user: true, client: { select: { clientName: true } } },
+    });
     if (!grant || grant.revokedAt || grant.userId !== claims.sub || !grant.user.isActive) {
       return refuse(res, 401, 'Il collegamento è stato revocato.', 'invalid_token');
     }
     user = grant.user;
+    clientName = grant.client.clientName ?? null;
   } catch (error) {
     console.error('delegatedAuth: could not read the grant:', error instanceof Error ? error.message : error);
     res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
@@ -196,6 +202,6 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   });
 
   req.user = user;
-  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: claims.scope.split(' ') };
+  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: claims.scope.split(' '), clientName };
   next();
 }

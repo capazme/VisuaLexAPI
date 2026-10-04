@@ -7,6 +7,53 @@ import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
 import { citeStoredNorm } from '../norms/citation';
 
+/** Who created a row: the connected application when the request is delegated, else nobody (the user). */
+export function provenanceFromRequest(req: Request) {
+  return req.delegation
+    ? { createdByClientId: req.delegation.clientId, createdByClientName: req.delegation.clientName }
+    : { createdByClientId: null, createdByClientName: null };
+}
+
+/** The mark the API shows: the connection that created the row, or null for the user's own. */
+const createdBy = (row: { createdByClientId: string | null; createdByClientName: string | null }) =>
+  row.createdByClientId ? { clientName: row.createdByClientName } : null;
+
+type ItemRow = Prisma.DossierItemGetPayload<object>;
+
+/** A dossier entry as every route answers it. */
+function serializeItem(i: ItemRow) {
+  return {
+    id: i.id,
+    item_type: i.itemType,
+    title: i.title,
+    // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
+    citation: citeStoredNorm(i.itemType, i.content),
+    content: i.content,
+    position: i.position,
+    status: i.status,
+    created_at: i.createdAt,
+    created_by: createdBy(i),
+    // The entry a note is about (an article of the same dossier), or null.
+    about_item_id: i.aboutItemId,
+  };
+}
+
+/** A dossier as every route answers it. */
+function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[] }) {
+  return {
+    id: d.id,
+    name: d.name,
+    description: d.description,
+    color: d.color,
+    tags: d.tags,
+    is_pinned: d.isPinned,
+    created_at: d.createdAt,
+    updated_at: d.updatedAt,
+    created_by: createdBy(d),
+    items: d.items.map(serializeItem),
+  };
+}
+
 // Validation schemas
 const createDossierSchema = z.object({
   name: z.string().min(1).max(200),
@@ -56,27 +103,7 @@ export const listDossiers = async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  res.json(dossiers.map(d => ({
-    id: d.id,
-    name: d.name,
-    description: d.description,
-    color: d.color,
-    tags: d.tags,
-    is_pinned: d.isPinned,
-    created_at: d.createdAt,
-    updated_at: d.updatedAt,
-    items: d.items.map(i => ({
-      id: i.id,
-      item_type: i.itemType,
-      title: i.title,
-      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
-      citation: citeStoredNorm(i.itemType, i.content),
-      content: i.content,
-      position: i.position,
-      status: i.status,
-      created_at: i.createdAt,
-    })),
-  })));
+  res.json(dossiers.map(serializeDossier));
 };
 
 /**
@@ -98,27 +125,7 @@ export const getDossier = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  res.json({
-    id: dossier.id,
-    name: dossier.name,
-    description: dossier.description,
-    color: dossier.color,
-    tags: dossier.tags,
-    is_pinned: dossier.isPinned,
-    created_at: dossier.createdAt,
-    updated_at: dossier.updatedAt,
-    items: dossier.items.map(i => ({
-      id: i.id,
-      item_type: i.itemType,
-      title: i.title,
-      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
-      citation: citeStoredNorm(i.itemType, i.content),
-      content: i.content,
-      position: i.position,
-      status: i.status,
-      created_at: i.createdAt,
-    })),
-  });
+  res.json(serializeDossier(dossier));
 };
 
 /**
@@ -134,23 +141,14 @@ export const createDossier = async (req: Request, res: Response) => {
       color: data.color,
       tags: data.tags ?? [],
       userId: req.user!.id,
+      ...provenanceFromRequest(req),
     },
     include: {
       items: true,
     },
   });
 
-  res.status(201).json({
-    id: dossier.id,
-    name: dossier.name,
-    description: dossier.description,
-    color: dossier.color,
-    tags: dossier.tags,
-    is_pinned: dossier.isPinned,
-    created_at: dossier.createdAt,
-    updated_at: dossier.updatedAt,
-    items: [],
-  });
+  res.status(201).json(serializeDossier(dossier));
 };
 
 /**
@@ -185,27 +183,7 @@ export const updateDossier = async (req: Request, res: Response) => {
     },
   });
 
-  res.json({
-    id: dossier.id,
-    name: dossier.name,
-    description: dossier.description,
-    color: dossier.color,
-    tags: dossier.tags,
-    is_pinned: dossier.isPinned,
-    created_at: dossier.createdAt,
-    updated_at: dossier.updatedAt,
-    items: dossier.items.map(i => ({
-      id: i.id,
-      item_type: i.itemType,
-      title: i.title,
-      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
-      citation: citeStoredNorm(i.itemType, i.content),
-      content: i.content,
-      position: i.position,
-      status: i.status,
-      created_at: i.createdAt,
-    })),
-  });
+  res.json(serializeDossier(dossier));
 };
 
 /**
@@ -260,18 +238,11 @@ export const addDossierItem = async (req: Request, res: Response) => {
       content: data.content || null,
       position: data.position ?? (maxPos._max.position ?? -1) + 1,
       ...(data.status !== undefined && { status: data.status }),
+      ...provenanceFromRequest(req),
     },
   });
 
-  res.status(201).json({
-    id: item.id,
-    item_type: item.itemType,
-    title: item.title,
-    content: item.content,
-    position: item.position,
-    status: item.status,
-    created_at: item.createdAt,
-  });
+  res.status(201).json(serializeItem(item));
 };
 
 /**
@@ -312,15 +283,7 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     throw err;
   }
 
-  res.json({
-    id: item.id,
-    item_type: item.itemType,
-    title: item.title,
-    content: item.content,
-    position: item.position,
-    status: item.status,
-    created_at: item.createdAt,
-  });
+  res.json(serializeItem(item));
 };
 
 /**
@@ -407,15 +370,7 @@ export const moveDossierItem = async (req: Request, res: Response) => {
       });
     });
 
-    res.json({
-      id: item.id,
-      item_type: item.itemType,
-      title: item.title,
-      content: item.content,
-      position: item.position,
-      status: item.status,
-      created_at: item.createdAt,
-    });
+    res.json(serializeItem(item));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       throw new AppError(404, 'Dossier item not found');
@@ -563,6 +518,7 @@ export const addDossierNorms = async (req: Request, res: Response) => {
               title: norm.tipo_atto,
               content: norm as unknown as Prisma.InputJsonValue,
               position: position++,
+              ...provenanceFromRequest(req),
             },
           }),
         );
