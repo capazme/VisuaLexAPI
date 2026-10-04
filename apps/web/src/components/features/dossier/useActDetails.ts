@@ -18,6 +18,23 @@ export function actUrnForBlock(block: ActBlock): string | null {
   return urn ? urn.split('~')[0] : null;
 }
 
+/**
+ * The act's URN, resolved when no item carries one (articles imported from an
+ * index have none). `resolveAct` probes article 1: the act is the part before "~".
+ */
+export async function resolveBlockUrn(block: ActBlock): Promise<string> {
+  const known = actUrnForBlock(block);
+  if (known) return known;
+  const first = block.articles[0].data;
+  const { urn } = await resolveAct({ act_type: first.tipo_atto, act_number: first.numero_atto, date: first.data });
+  return urn.split('~')[0];
+}
+
+/** The annex an act's URN names: "…;262:2" is Allegato 2 of R.D. 262/1942 (the codice civile); none, ''. */
+export function annexFromActUrn(urn: string): string {
+  return /;[^;~!@]+:([^:;~!@]+)$/.exec(urn)?.[1] ?? '';
+}
+
 // annex ('' = body) → rubriche keyed by normalised article id
 type RubricheByAnnex = Record<string, Record<string, string>>;
 
@@ -29,32 +46,34 @@ type RubricheByAnnex = Record<string, Record<string, string>>;
 export function useActDetails(block: ActBlock): ActDetails {
   const [title, setTitle] = useState<string | null>(null);
   const [byAnnex, setByAnnex] = useState<RubricheByAnnex>({});
+  // A code's articles all sit in the code's own annex, whether an item says so
+  // («2» from a search) or not (nothing from the index): the annex they are read from.
+  const [codeAnnex, setCodeAnnex] = useState<string | null>(null);
 
   // Primitives only, so a new block object for the same act does not load again.
   const knownUrn = actUrnForBlock(block);
-  // A code's articles all sit in the code's own annex, whether an item says so
-  // («2» from a search) or not (nothing from the index): read them all from it.
-  const codeAnnex = block.isCode ? (block.articles.find((i) => i.data.allegato)?.data.allegato ?? '') : null;
-  const annexOf = (allegato: string | null | undefined) => codeAnnex ?? (allegato || '');
-  const annexesKey = Array.from(new Set(block.articles.map((i) => annexOf(i.data.allegato)))).join('|');
+  const isCode = block.isCode;
+  const storedCodeAnnex = isCode ? (block.articles.find((i) => i.data.allegato)?.data.allegato ?? '') : '';
+  const annexesKey = isCode ? '' : Array.from(new Set(block.articles.map((i) => i.data.allegato || ''))).join('|');
   const first = block.articles[0]?.data;
   const actType = first?.tipo_atto ?? '';
   const actNumber = first?.numero_atto;
   const actDate = first?.data;
-  const isCode = block.isCode;
 
   useEffect(() => {
     // Another act: nothing of the previous one stays on screen while this one loads.
     setTitle(null);
     setByAnnex({});
+    setCodeAnnex(null);
     if (!actType) return;
     let cancelled = false;
-    const annexes = annexesKey.split('|');
     (async () => {
       let urn = knownUrn;
       try {
-        // resolveAct probes article 1: the act's URN is the part before "~".
         urn ??= (await resolveAct({ act_type: actType, act_number: actNumber, date: actDate })).urn.split('~')[0];
+        // A code imported from its index carries no annex: its URN names it.
+        const ownAnnex = isCode ? (storedCodeAnnex || annexFromActUrn(urn)) : null;
+        const annexes = ownAnnex !== null ? [ownAnnex] : annexesKey.split('|');
         const answer = await fetchActRubriche(urn);
         let maps: RubricheByAnnex;
         if ((answer.parts ?? []).length === 0) {
@@ -71,16 +90,17 @@ export function useActDetails(block: ActBlock): ActDetails {
         if (cancelled) return;
         setTitle(isCode ? null : (answer.title?.trim() || null));
         setByAnnex(maps);
+        setCodeAnnex(ownAnnex);
       } catch (err) {
         // Decoration only: the rows keep "art. N" (gotcha 18: logged, never swallowed).
         console.error('Act title and rubriche unavailable for', urn ?? actType, err);
       }
     })();
     return () => { cancelled = true; };
-  }, [knownUrn, annexesKey, actType, actNumber, actDate, isCode]);
+  }, [knownUrn, annexesKey, storedCodeAnnex, actType, actNumber, actDate, isCode]);
 
   const rubricaOf = (norma: NormaVisitata) =>
-    byAnnex[annexOf(norma.allegato)]?.[normalizeArticleId(norma.numero_articolo)] ?? null;
+    byAnnex[codeAnnex ?? (norma.allegato || '')]?.[normalizeArticleId(norma.numero_articolo)] ?? null;
 
   return { title, rubricaOf };
 }

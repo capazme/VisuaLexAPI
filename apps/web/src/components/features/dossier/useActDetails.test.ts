@@ -10,7 +10,7 @@ vi.mock('../../../utils/actStructureCache', () => ({
 }));
 vi.mock('../../../utils/actUrn', () => ({ resolveAct: (...a: unknown[]) => resolveAct(...a) }));
 
-import { useActDetails, actUrnForBlock } from './useActDetails';
+import { useActDetails, actUrnForBlock, annexFromActUrn, resolveBlockUrn } from './useActDetails';
 import { layoutDossier } from './dossierLayout';
 import type { DossierItem } from '../../../types';
 
@@ -65,6 +65,27 @@ describe('useActDetails', () => {
     expect(result.current.rubricaOf(block.articles[1].data)).toBe('Risarcimento per fatto illecito');
   });
 
+  it("finds a code's own part for articles imported from its index, which carry no annex and no urn", async () => {
+    resolveAct.mockResolvedValue({ urn: 'urn:x;262:2~art1', norma: {} });
+    fetchActRubriche.mockResolvedValue({
+      title: '', rubriche: {},
+      parts: [
+        { name: 'Dispositivo', keys: ['1', '2'], rubriche: {}, abrogati: [] },
+        { name: 'CODICE CIVILE', keys: ['1', '2', '2043'], rubriche: { '2043': 'Risarcimento per fatto illecito' }, abrogati: [] },
+      ],
+    });
+    fetchActTree.mockResolvedValue({ articles: [], metadata: { annexes: [
+      { number: null, label: 'Dispositivo', article_count: 2, article_numbers: ['1', '2'] },
+      { number: '2', label: 'Codice civile', article_count: 3, article_numbers: ['1', '2', '2043'] },
+    ] } });
+    const [block] = layoutDossier([{
+      id: 'cc', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_atto: '', data: '', numero_articolo: '2043' },
+    }]).acts;
+    const { result } = renderHook(() => useActDetails(block));
+    await waitFor(() => expect(result.current.rubricaOf(block.articles[0].data)).toBe('Risarcimento per fatto illecito'));
+    expect(fetchActTree).toHaveBeenCalledWith('urn:x;262:2');
+  });
+
   it('resolves the act when no item carries a urn', async () => {
     resolveAct.mockResolvedValue({ urn: `${URN}~art1`, norma: {} });
     fetchActRubriche.mockResolvedValue({ title: 'Nuova disciplina', rubriche: {}, parts: [] });
@@ -91,5 +112,18 @@ describe('useActDetails', () => {
 describe('actUrnForBlock', () => {
   it('is the first urn without the article', () => {
     expect(actUrnForBlock(layoutDossier([item('3')]).acts[0])).toBe(URN);
+  });
+});
+
+describe('the act behind a block', () => {
+  it("reads a decree's annex from its URN", () => {
+    expect(annexFromActUrn('https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2')).toBe('2');
+    expect(annexFromActUrn('urn:nir:stato:regio.decreto:1930-10-19;1398:1')).toBe('1');
+    expect(annexFromActUrn(URN)).toBe('');
+  });
+  it('resolves a block with no urn through the act, without the probed article', async () => {
+    resolveAct.mockResolvedValue({ urn: `${URN}~art1`, norma: {} });
+    const [block] = layoutDossier([item('3', { urn: undefined })]).acts;
+    expect(await resolveBlockUrn(block)).toBe(URN);
   });
 });

@@ -51,7 +51,7 @@ import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout'
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { buildPdfBlocks, loadDossierTexts } from './dossierPdf';
-import { actUrnForBlock } from './useActDetails';
+import { resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { EditDossierModal } from './EditDossierModal';
@@ -381,12 +381,14 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
       const texts = await loadDossierTexts(dossier.items, (done, total) => setPdfProgress({ done, total }));
       const titles = new Map<string, string | null>();
       await Promise.all(fullLayout.acts.map(async (block) => {
-        const urn = actUrnForBlock(block);
-        if (block.isCode || !urn) return;
-        const answer = await fetchActRubriche(urn).catch((err: unknown) => {
-          console.error('PDF: act title unavailable for', urn, err);
-          return null;
-        });
+        if (block.isCode) return;
+        // The same act as the block on screen, resolved when no item has a URN.
+        const answer = await resolveBlockUrn(block)
+          .then((urn) => fetchActRubriche(urn))
+          .catch((err: unknown) => {
+            console.error('PDF: act title unavailable for', block.heading, err);
+            return null;
+          });
         titles.set(block.key, answer?.title?.trim() || null);
       }));
       const blocks = buildPdfBlocks(dossier.items, texts, titles);

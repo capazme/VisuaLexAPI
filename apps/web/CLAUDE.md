@@ -463,7 +463,10 @@ handler must start with `if (e.target !== e.currentTarget) return;` or interacti
 children re-trigger the toggle. Always add
 `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500`.
 Never nest interactive content inside the element carrying `role="button"` —
-scope the role to the header, as `DossierArticleRow` does.
+scope the role to the header, as `DossierArticleRow` does. A collapsible whose header
+is a section heading follows the accordion pattern instead (`DossierActBlock`):
+the toggle sits inside the `<h3>`, its name is the heading's own text and its
+state is `aria-expanded` alone, with no `aria-label` replacing what it says.
 
 **Popovers with `@floating-ui/react`** — split positioning and animation across
 **two** elements: outer div takes `refs.setFloating` + `floatingStyles`, inner div
