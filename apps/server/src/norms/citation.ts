@@ -62,17 +62,20 @@ function citationDate(iso: string): string {
   return `${day === 1 ? '1°' : day} ${month} ${match[1]}`;
 }
 
-export function citeArticle(norm: CitableNorm): string {
-  const article = `art. ${norm.numero_articolo}`;
+export type CitableAct = Omit<CitableNorm, 'numero_articolo'>;
+
+// The act, and how an article joins it: a code and the Constitution follow the
+// article with a space ("art. 1284 c.c."), every other act with a comma.
+function actOf(norm: CitableAct): { act: string; joiner: ' ' | ', ' } {
   const type = (norm.tipo_atto || '').trim().toLowerCase();
 
   const code = CODE_ABBREVIATIONS[type];
-  if (code) return `${article} ${code}`;
+  if (code) return { act: code, joiner: ' ' };
 
   const eu = EU_ACTS[type];
   if (eu) {
     const year = (norm.data || '').slice(0, 4);
-    return norm.numero_atto && /^\d{4}$/.test(year) ? `${article}, ${eu} ${year}/${norm.numero_atto}` : `${article}, ${eu}`;
+    return { act: norm.numero_atto && /^\d{4}$/.test(year) ? `${eu} ${year}/${norm.numero_atto}` : eu, joiner: ', ' };
   }
 
   // An aliased act ("codice in materia di protezione dei dati personali") is
@@ -81,14 +84,57 @@ export function citeArticle(norm: CitableNorm): string {
   const act = TYPE_ABBREVIATIONS[real] ?? real;
   const date = norm.data ? ` ${citationDate(norm.data)}` : '';
   const number = norm.numero_atto ? `, n. ${norm.numero_atto}` : '';
-  const annex = norm.allegato ? ` (Allegato ${norm.allegato})` : '';
-  return `${article}, ${act}${date}${number}${annex}`;
+  return { act: `${act}${date}${number}`, joiner: ', ' };
+}
+
+/**
+ * The act alone, for whatever names an act once above its articles (the
+ * dossier groups its articles by act): "l. 31 dicembre 2012, n. 247", "c.c.",
+ * "regolamento (UE) 2016/679". The annex is left out: it is where an article
+ * sits, not another act.
+ */
+export function citeAct(norm: CitableAct): string {
+  return actOf(norm).act;
+}
+
+export function citeArticle(norm: CitableNorm): string {
+  const { act, joiner } = actOf(norm);
+  const article = `art. ${norm.numero_articolo}`;
+  // The codes' annex is the code itself (c.c. is Allegato 2 of R.D. 262/1942): never named.
+  const annex = joiner === ', ' && norm.allegato && !EU_ACTS[(norm.tipo_atto || '').trim().toLowerCase()]
+    ? ` (Allegato ${norm.allegato})`
+    : '';
+  return `${article}${joiner}${act}${annex}`;
+}
+
+// A stored item's content is whatever the client sent (the items route takes
+// any JSON): only its string fields are read, so a malformed item is cited from
+// what it does say, or not at all, and never fails the dossier's answer.
+function storedAct(itemType: string, content: unknown): (CitableAct & { numero_articolo?: string }) | null {
+  if (itemType !== 'norm' || !content || typeof content !== 'object') return null;
+  const raw = content as Record<string, unknown>;
+  const text = (key: string): string | null => (typeof raw[key] === 'string' ? (raw[key] as string) : null);
+  const tipo = text('tipo_atto');
+  if (!tipo || !tipo.trim()) return null;
+  return {
+    tipo_atto: tipo,
+    tipo_atto_reale: text('tipo_atto_reale'),
+    numero_atto: text('numero_atto'),
+    data: text('data'),
+    allegato: text('allegato'),
+    numero_articolo: text('numero_articolo') ?? undefined,
+  };
 }
 
 /** The citation of a stored dossier item's content, or null when it is not a norm. */
 export function citeStoredNorm(itemType: string, content: unknown): string | null {
-  if (itemType !== 'norm' || !content || typeof content !== 'object') return null;
-  const norm = content as Partial<CitableNorm>;
-  if (typeof norm.tipo_atto !== 'string' || typeof norm.numero_articolo !== 'string' || !norm.numero_articolo) return null;
+  const norm = storedAct(itemType, content);
+  if (!norm?.numero_articolo) return null;
   return citeArticle(norm as CitableNorm);
+}
+
+/** The act of a stored dossier item's content, or null when it is not a norm. */
+export function citeStoredAct(itemType: string, content: unknown): string | null {
+  const norm = storedAct(itemType, content);
+  return norm ? citeAct(norm) : null;
 }
