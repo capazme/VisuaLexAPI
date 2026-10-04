@@ -1,4 +1,4 @@
-import { formatDateForCitation, withPreposition } from '../../../utils/dateUtils';
+import { formatDateForCitation, todayInRome, withPreposition } from '../../../utils/dateUtils';
 
 /**
  * What a trash entry holds, in one line, and when it goes. The trash keeps
@@ -59,7 +59,7 @@ export function trashCardsSummary(cards: TrashCardSummary[], max = 3): string {
 }
 
 // The day in Rome, as the rest of the app reads a day.
-const romeDay = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+const romeDay = (iso: string) => todayInRome(new Date(iso));
 
 /** «Rimosso da Claude Code il 4 ottobre 2026 · resta nel cestino fino al 3 novembre 2026». */
 export function trashWhen(entry: { clientName: string | null; deletedAt: string; expiresAt: string }): string {

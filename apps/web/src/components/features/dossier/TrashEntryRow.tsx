@@ -85,7 +85,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
       </div>
       {needsTarget && (
         <div className="mt-2 flex flex-col gap-2 rounded-md bg-amber-50 p-2 md:flex-row md:items-center dark:bg-amber-950/20">
-          <p className="text-sm text-amber-800 dark:text-amber-300">{needsTarget}</p>
+          <p role="alert" className="text-sm text-amber-800 dark:text-amber-300">{needsTarget}</p>
           <label className="sr-only" htmlFor={`trash-target-${entry.id}`}>Dossier in cui ripristinare</label>
           <select
             id={`trash-target-${entry.id}`}

@@ -1682,8 +1682,22 @@ const appStore = createStore<AppState>()(
                     const fresh = dossierFromApi(await dossierService.getById(dossierId));
                     set((state) => {
                         const index = state.dossiers.findIndex(d => d.id === dossierId);
-                        if (index >= 0) state.dossiers[index] = fresh;
-                        else state.dossiers.unshift(fresh);
+                        if (index < 0) {
+                            state.dossiers.unshift(fresh);
+                            return;
+                        }
+                        const local = state.dossiers[index];
+                        // An add, an undo or an order still on its way would be lost
+                        // by a wholesale replace: then only what came back is added
+                        // (a restore keeps its ids and is appended on the server too).
+                        const busy = !!state.pendingDossierOrders[dossierId]
+                            || local.items.some(i => state.pendingDossierItemIds[i.id]);
+                        if (!busy) {
+                            state.dossiers[index] = fresh;
+                            return;
+                        }
+                        const known = new Set(local.items.map(i => i.id));
+                        local.items.push(...fresh.items.filter(i => !known.has(i.id)));
                     });
                 } catch (err) {
                     console.error('Failed to reload the dossier:', dossierId, err);

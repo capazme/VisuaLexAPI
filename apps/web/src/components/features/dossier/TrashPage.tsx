@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { EmptyState } from '../../ui/EmptyState';
@@ -17,7 +18,9 @@ interface Props {
  */
 export function TrashPage({ trash, onBack, showToast }: Props) {
   const dossiers = useAppStore((s) => s.dossiers);
-  const { entries, error, restore, purge } = trash;
+  const { entries, error, restore, purge, reload } = trash;
+  // Opening the trash reads it again: Claude may have deleted since the page loaded.
+  useEffect(() => { void reload(); }, [reload]);
 
   return (
     <div>
@@ -32,7 +35,7 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
           <Trash2 className="text-slate-500" size={22} aria-hidden /> Cestino
         </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni. Ciò che elimini tu dall’app si annulla subito, non passa di qui.
+          Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni. Ciò che elimini tu nell’app si può annullare subito e non passa di qui.
         </p>
       </header>
       {error && <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

@@ -36,6 +36,7 @@ describe('useTrash', () => {
   });
 
   it('asks for a dossier when the entry’s own is gone', async () => {
+    appStore.setState({ dossiers: [] });
     list.mockResolvedValue([entry()]);
     restoreCall.mockRejectedValue({ status: 409, message: 'Il dossier non esiste più: scegli dove ripristinare.' });
     const { result } = renderHook(() => useTrash());
@@ -61,5 +62,51 @@ describe('useTrash', () => {
     await act(async () => { await result.current.purge(entry()); });
     expect(purgeCall).toHaveBeenCalledWith('t1');
     expect(result.current.entries).toEqual([]);
+  });
+});
+
+describe('useTrash — what can go wrong', () => {
+  it('drops an entry the server no longer has, and says why', async () => {
+    list.mockResolvedValue([entry()]);
+    restoreCall.mockRejectedValue({ status: 404, message: 'Elemento del cestino non trovato.' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(entry()); });
+    expect(outcome).toEqual({ kind: 'failed', message: expect.stringMatching(/Non è più nel cestino/) });
+    expect(result.current.entries).toEqual([]);
+  });
+
+  it("does not ask for a dossier when the entry's own is still here (restored meanwhile)", async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', items: [], tags: [] }] });
+    list.mockResolvedValue([entry()]);
+    restoreCall.mockRejectedValue({ status: 409, message: 'Questi elementi sono già stati ripristinati.' });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(entry()); });
+    expect(outcome).toEqual({ kind: 'failed', message: 'Questi elementi sono già stati ripristinati.' });
+    error.mockRestore();
+  });
+
+  it("never shows the server's English words", async () => {
+    list.mockResolvedValue([entry()]);
+    restoreCall.mockRejectedValue({ status: 500, message: 'Internal server error' });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(entry()); });
+    expect(outcome).toEqual({ kind: 'failed', message: 'Impossibile ripristinare. Riprova.' });
+    error.mockRestore();
+  });
+
+  it('reads the trash again when the tab comes back into view', async () => {
+    list.mockResolvedValueOnce([]).mockResolvedValueOnce([entry()]);
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toEqual([]));
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
   });
 });

@@ -349,3 +349,30 @@ describe('notes through the notes route', () => {
     await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[1]).toMatchObject({ id: 'srv-n', aboutItemId: 'a' }));
   });
 });
+
+describe('refreshDossier', () => {
+  const api = (items: string[]) => ({
+    id: 'd1', name: 'P', is_pinned: false, created_at: '', updated_at: '', tags: [],
+    items: items.map((id) => ({ id, item_type: 'note' as const, title: 'Nota', content: id, position: 0, status: 'unread' as const, created_at: '' })),
+  });
+  it('replaces the dossier with what the server has', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [{ id: 'a', type: 'note', data: 'a', addedAt: '' }] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.getById).mockResolvedValueOnce(api(['a', 'b']));
+    await appStore.getState().refreshDossier('d1');
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a', 'b']);
+  });
+  it('adds a dossier that came back whole', async () => {
+    appStore.setState({ dossiers: [], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.getById).mockResolvedValueOnce(api(['a']));
+    await appStore.getState().refreshDossier('d1');
+    expect(appStore.getState().dossiers.map((d) => d.id)).toEqual(['d1']);
+  });
+  it('only adds what came back while an edit is on its way', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'tmp', type: 'note', data: 'nuova', addedAt: '' }, { id: 'a', type: 'note', data: 'a', addedAt: '' },
+    ] }], pendingDossierItemIds: { tmp: true }, pendingDossierOrders: {} });
+    vi.mocked(dossierService.getById).mockResolvedValueOnce(api(['a', 'b']));
+    await appStore.getState().refreshDossier('d1');
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['tmp', 'a', 'b']);
+  });
+});
