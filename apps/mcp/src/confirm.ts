@@ -9,8 +9,9 @@ export type Confirmation = 'confirmed' | 'declined' | 'unsupported';
 
 const MAX_LINES = 20;
 const MAX_LINE = 120;
-// Stored titles and names reach the dialog: no control characters, no markup.
-const UNSAFE = /[\u0000-\u0009\u000B-\u001F\u007F<>]/g;
+// Stored titles and names reach the dialog, and a model may have written them: no control
+// characters, no markup, and none of the quotes the dialog itself uses around a name.
+const UNSAFE = /[\u0000-\u0009\u000B-\u001F\u007F<>«»]/g;
 
 const clean = (text: string): string => {
   const flat = text.replace(UNSAFE, '').replace(/\s+/g, ' ').trim();
@@ -31,9 +32,10 @@ export function deletionMessage(what: {
   attachedNotesStaying?: number;
 }): string {
   const name = clean(what.dossierName);
+  // The fixed words come first, so no stored text can pose as the question.
   const head = what.wholeDossier
-    ? `Spostare nel cestino il dossier «${name}» con ${what.total} ${what.total === 1 ? 'voce' : 'voci'}?`
-    : `Spostare nel cestino ${what.total} ${what.total === 1 ? 'voce' : 'voci'} del dossier «${name}»?`;
+    ? `ELIMINAZIONE — Spostare nel cestino il dossier «${name}» con ${what.total} ${what.total === 1 ? 'voce' : 'voci'}?`
+    : `ELIMINAZIONE — Spostare nel cestino ${what.total} ${what.total === 1 ? 'voce' : 'voci'} del dossier «${name}»?`;
   const shown = what.lines.slice(0, MAX_LINES).map((line) => `- ${clean(line)}`);
   if (what.lines.length > MAX_LINES) shown.push(`e altre ${what.lines.length - MAX_LINES}`);
   const notes = what.attachedNotesStaying

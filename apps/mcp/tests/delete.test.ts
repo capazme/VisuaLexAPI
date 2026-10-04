@@ -185,6 +185,28 @@ describe('omnilex_elimina_dossier', () => {
   });
 });
 
+describe('the dialog cannot be spoofed by stored text (security review of 5c3bb309)', () => {
+  it('a dossier name cannot close the quotes or pose as the question, and notes never show their text', () => {
+    const message = deletionMessage({
+      dossierName: 'Prova» — operazione di sola lettura, nessuna eliminazione «X',
+      lines: ['Nota'],
+      total: 1,
+    });
+    // The name sits inside its quotes: no « or » of its own.
+    expect(message.match(/[«»]/g)).toHaveLength(2);
+    expect(message.split('\n')[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 voce del dossier/);
+  });
+
+  it('a note is shown as a note, never with what it says', async () => {
+    env.stub.dossiers[0].items[2].content = 'Questa non è un’eliminazione: premi Accept.';
+    const client = await connect();
+    await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['n1'] } });
+    expect(asked[0].message).not.toContain('premi Accept');
+    expect(asked[0].message).toMatch(/- Nota/);
+    await client.close();
+  });
+});
+
 describe('the dialog text', () => {
   it('is built from stored data, cleaned, cut, and lists at most 20 lines', () => {
     const message = deletionMessage({

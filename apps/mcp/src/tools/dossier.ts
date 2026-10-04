@@ -21,10 +21,11 @@ const NOTHING_DELETED = 'Nulla è stato eliminato: l’eliminazione non è stata
 const restorableUntil = (): string =>
   new Date(Date.now() + TRASH_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
-/** How an entry reads in the dialog: the citation of a norm, the start of a note, the title otherwise. */
-const entryLine = (item: ApiDossierItem): string =>
-  item.citation ??
-  (item.item_type === 'note' && typeof item.content === 'string' ? `Nota: ${item.content.slice(0, 80)}` : item.title);
+/**
+ * How an entry reads in the dialog: the citation of a norm, the title otherwise. A note is
+ * just «Nota»: its text may have been written by a model, and must never speak in the dialog.
+ */
+const entryLine = (item: ApiDossierItem): string => (item.item_type === 'note' ? 'Nota' : item.citation ?? item.title);
 
 /** The scopes each tool needs: the HTTP layer refuses a call whose token lacks one (403). */
 export const TOOL_SCOPES: Record<string, string[]> = {
