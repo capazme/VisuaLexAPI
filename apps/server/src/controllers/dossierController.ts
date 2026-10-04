@@ -273,6 +273,9 @@ export const addDossierItem = async (req: Request, res: Response) => {
     id: item.id,
     item_type: item.itemType,
     title: item.title,
+    // The same names as GET /dossiers/:id, so the web heads a new act's block at once.
+    citation: citeStoredNorm(item.itemType, item.content),
+    act_citation: citeStoredAct(item.itemType, item.content),
     content: item.content,
     position: item.position,
     status: item.status,
