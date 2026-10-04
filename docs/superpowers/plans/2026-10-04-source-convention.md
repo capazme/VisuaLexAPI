@@ -64,17 +64,17 @@
 - [ ] **MCP**: a stub server answering the golden citations; the tools pass `citation` and `display` through byte for byte.
 - [ ] **Suites:** `npm --prefix apps/server run build`, `npm --prefix apps/server test` (after the orchestrator's go), `npm --prefix apps/mcp run build && npm --prefix apps/mcp test`.
 
-## PR 3 — Python API: identity edges (`fix/api-source-identity`)
+## PR 3 — Python API: identity edges (3a: `fix/api-source-identity`; 3b: year-only)
 
 **Files:** create `services/visualex/visualex_api/tools/sources.py` (normaliser, EU identity, labels for `/parse_query`); extend `services/visualex/tests/test_sources_golden.py` (PR 0 ships it for the `current` cases); modify `tools/urngenerator.py` (year-only, no number), `tools/map.py` (the two ministerial rows of `NORMATTIVA_URN_CODICI`), `services/visualex/app.py:801-803` (`display`; not `visualex_api/app.py`, the unused alternative server); `services/visualex/CLAUDE.md`.
 
-- [ ] **Golden test**: `generate_urn` on every norm input equals `identity.article` (or `reference` for the year-only case); the normaliser maps every `aliases` entry to `identity.article`; `decisions.model.Identity.key()` equals each decision's `key`.
-- [ ] **Year-only**: `generate_urn` never writes `1983-01-01`. No text is fetched from a year-only URN: the resolver matches year and number only and can answer with another act (`act_dates.py:11-13`), so the date is resolved first and checked against the page's title, as `act_dates` does. How the reader does that is the owner's open A/B in `fix/year-only-date-lookup`, which owns `complete_date`: this PR waits for it and adopts its answer.
-- [ ] **Ministerial rows of the codes table**: today `…stato:/uri-res/N2Ls?urn:nir:ministero…`; one live request fixes their form (spec §1.3) before the golden case leaves `proposed`.
-- [ ] **No number**: no `;None`. **One live request** to Normattiva confirms the unnumbered form before the golden case goes from `proposed` to `current`.
-- [ ] **Normaliser** `normalize_norm_urn`: wrapper, version markers, code aliases (`CODE_ACTS`), `decreto legislativo`/`decreto-legge` tokens, ministry-form decrees.
-- [ ] **EU identity**: `celex:<CELEX>~art<N>` from type, year and number (the same reading as `euCitation.ts` / `resolve_eu_year_and_number`).
-- [ ] **`/parse_query` `display`** = the citation.
+- [x] **Golden test** (3a): `generate_urn` equals every `current` Normattiva identity; the normaliser maps every `aliases` entry to `identity.article`; `eu_identity` gives the CELEX identities; `cite_article` writes every decided citation; no golden URN carries `;None` (an act with no date still gets `…:None;241`: a pre-existing gap, left to 3b, which rewrites the date path); `/parse_query`'s `display` is the citation.
+- [ ] **Year-only**: `generate_urn` never writes `1983-01-01`. No text is fetched from a year-only URN: the resolver matches year and number only and can answer with another act (`act_dates.py:11-13`), so the date is resolved first and checked against the page's title, as `act_dates` does. **3b**, after the small-fixes job carries out the owner's choice (4 October 2026: «se davvero non serve più complete_date sostituiamola»: `act_dates` in place of `complete_date` where no caller still needs it).
+- [x] **Ministerial rows of the codes table** (3a): now `decreto.ministeriale:<date>;<n>` in both copies of the table (the API's and MERL-T's); Normattiva resolves that form to the c.p.i. regulation (checked 4 October); the c.p.p. regulation's row (`decreto.ministeriale:1989-09-30;334`) was not checked live — one request, spaced, before anything relies on it.
+- [x] **No number** (3a): no `;None`. Normattiva answers the d.p.c.m. of 8 March 2020 with its error page under the State form (checked 4 October): it probably does not hold the decree, so that case stays `proposed`.
+- [x] **Normaliser** (3a) `normalize_norm_urn`: wrapper, version markers, code aliases (`CODE_ACTS`), `decreto legislativo`/`decreto-legge` tokens, ministry-form decrees.
+- [x] **EU identity** (3a): `celex:<CELEX>~art<N>` from type, year and number (the same reading as `euCitation.ts` / `resolve_eu_year_and_number`).
+- [x] **`/parse_query` `display`** (3a) = the citation (`cite_article`, which writes every decided form, D4, D6 and D7 included; a list or range of articles reads «artt.»).
 - [ ] **Suites:** `(cd services/visualex && .venv/bin/python -m pytest tests/ -q)`; archive suite too if `tools/` changed.
 
 ## PR 4 — MERL-T: labels and tables (`refactor/merlt-source-labels`)
