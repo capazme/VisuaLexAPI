@@ -71,6 +71,26 @@ if [ ! -f "$PROJECT_ROOT/apps/server/.env" ]; then
     )
     echo -e "${YELLOW}Created apps/server/.env from the example, with a fresh JWT secret${NC}"
 fi
+# The MCP server's two secrets: its credential at the authorization server (shared by
+# apps/server and apps/mcp) and the key exchanged tokens are signed with. Added when
+# missing, also to an existing apps/server/.env; never replaced.
+(
+    umask 077
+    S="$PROJECT_ROOT/apps/server/.env"; M="$PROJECT_ROOT/apps/mcp/.env"
+    if [ -z "$(env_get "$S" OAUTH_MCP_CLIENT_SECRET)" ]; then
+        env_set "$S" OAUTH_MCP_CLIENT_SECRET "$(random_secret 48)" '"'
+        echo -e "${YELLOW}Added OAUTH_MCP_CLIENT_SECRET to apps/server/.env${NC}"
+    fi
+    if [ -z "$(env_get "$S" OAUTH_DELEGATION_SECRET)" ]; then
+        env_set "$S" OAUTH_DELEGATION_SECRET "$(random_secret 48)" '"'
+        echo -e "${YELLOW}Added OAUTH_DELEGATION_SECRET to apps/server/.env${NC}"
+    fi
+    if [ ! -f "$M" ] && [ -f "$PROJECT_ROOT/apps/mcp/.env.example" ]; then
+        cp "$PROJECT_ROOT/apps/mcp/.env.example" "$M"
+        env_set "$M" MCP_CLIENT_SECRET "$(env_get "$S" OAUTH_MCP_CLIENT_SECRET)" '"'
+        echo -e "${YELLOW}Created apps/mcp/.env, with the server's MCP credential${NC}"
+    fi
+)
 # Same values as Compose reads: ports, stack name, passwords.
 if [ -f "$PROJECT_ROOT/infra/.env" ]; then set -a; . "$PROJECT_ROOT/infra/.env"; set +a; fi
 COMPOSE=(docker compose -f "$PROJECT_ROOT/infra/compose.yml")
@@ -113,7 +133,7 @@ cleanup() {
     [ -n "$CLEANED_UP" ] && return
     CLEANED_UP=1
     echo -e "\n${YELLOW}Shutting down...${NC}"
-    for pid in ${API_PID:-} ${SERVER_PID:-} ${WEB_PID:-} ${MERLT_PID:-} ${MERLT_WORKER_PID:-}; do kill_tree "$pid"; done
+    for pid in ${API_PID:-} ${SERVER_PID:-} ${WEB_PID:-} ${MCP_PID:-} ${MERLT_PID:-} ${MERLT_WORKER_PID:-}; do kill_tree "$pid"; done
     # Only once this run started the stores: a second start.sh that stops at a
     # check must not take the running stack's stores away. stop, not down:
     # containers and volumes stay for the next start.
@@ -137,7 +157,7 @@ check_port() {
         return 1
     fi
 }
-for p in 5000 3001 5173; do check_port "$p" || exit 1; done
+for p in 5000 3001 5173 3002; do check_port "$p" || exit 1; done
 
 if ! docker info >/dev/null 2>&1; then
     echo -e "${RED}Docker is not running${NC} - start Docker Desktop and run ./start.sh again"; exit 1
@@ -162,7 +182,7 @@ if ! "$VENV/bin/python" -c "import redis, playwright" 2>/dev/null; then
     echo -e "${YELLOW}Installing the Python dependencies...${NC}"
     "$VENV/bin/pip" install -q -r "$PROJECT_ROOT/services/visualex/requirements-dev.txt"
 fi
-for app in apps/server apps/web; do
+for app in apps/server apps/web apps/mcp; do
     if [ ! -d "$PROJECT_ROOT/$app/node_modules" ]; then
         echo -e "${YELLOW}Installing the $app dependencies...${NC}"
         npm ci --prefix "$PROJECT_ROOT/$app"
@@ -197,15 +217,15 @@ if [ "$MERLT_ENABLED" = "true" ]; then
     fi
 fi
 
-echo -e "\n${YELLOW}[1/4] Data stores...${NC}"
+echo -e "\n${YELLOW}[1/5] Data stores...${NC}"
 STORES_STARTED=1
 "${COMPOSE[@]}" up -d --wait postgres redis falkordb qdrant
 
-echo -e "\n${YELLOW}[2/4] Python API (:5000)...${NC}"
+echo -e "\n${YELLOW}[2/5] Python API (:5000)...${NC}"
 ( cd "$PROJECT_ROOT/services/visualex" && exec "$VENV/bin/python" app.py ) &
 API_PID=$!
 
-echo -e "\n${YELLOW}[3/4] Server (:3001)...${NC}"
+echo -e "\n${YELLOW}[3/5] Server (:3001)...${NC}"
 cd "$PROJECT_ROOT/apps/server"
 npx prisma generate > /dev/null 2>&1 || echo -e "${YELLOW}prisma generate failed${NC}"
 npx prisma migrate deploy || echo -e "${YELLOW}prisma migrate deploy failed - does DATABASE_URL in apps/server/.env point at port ${VISUALEX_PG_PORT:-5436}?${NC}"
@@ -214,10 +234,16 @@ if [ -n "${ADMIN_PASSWORD:-$(server_env ADMIN_PASSWORD)}" ]; then npm run db:see
 npm run dev &
 SERVER_PID=$!
 
-echo -e "\n${YELLOW}[4/4] Web (:5173)...${NC}"
+echo -e "\n${YELLOW}[4/5] Web (:5173)...${NC}"
 cd "$PROJECT_ROOT/apps/web"
 npm run dev &
 WEB_PID=$!
+
+# The MCP server for Claude Code and LibreLex (apps/mcp/CLAUDE.md): it reads apps/mcp/.env.
+echo -e "\n${YELLOW}[5/5] MCP server (:3002)...${NC}"
+cd "$PROJECT_ROOT/apps/mcp"
+npm run dev &
+MCP_PID=$!
 cd "$PROJECT_ROOT"
 
 if [ "$MERLT_ENABLED" = "true" ]; then
@@ -263,7 +289,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
 fi
 
 sleep 3
-echo -e "\n${GREEN}Running:${NC} Python API http://localhost:5000 · server http://localhost:3001 · web http://localhost:5173"
+echo -e "\n${GREEN}Running:${NC} Python API http://localhost:5000 · server http://localhost:3001 · web http://localhost:5173 · MCP http://localhost:3002/mcp"
 [ "$MERLT_ENABLED" = "true" ] && echo -e "         MERL-T http://localhost:$MERLT_PORT"
 echo -e "${YELLOW}Ctrl+C stops everything (data stays in the volumes).${NC}\n"
 wait
