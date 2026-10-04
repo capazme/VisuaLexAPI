@@ -208,19 +208,23 @@ async function importDossiersChecked(
     let lost = 0;
     for (const raw of dossiers) {
         const check = validateImportedDossier(raw);
+        // A dossier that vanishes is a loss even when it holds no items: counting 0 would let the
+        // caller say "con successo" for a dossier the user no longer has (in replace mode, after the
+        // old ones were deleted). So each such dossier counts at least one.
         if (!check) {
-            lost += Array.isArray(raw?.items) ? raw.items.length : 0;
+            lost += Math.max(1, Array.isArray(raw?.items) ? raw.items.length : 0);
             continue;
         }
-        lost += check.discarded.length;
+        let dossierLost = check.discarded.length;
         const outcome = await importDossier(check.dossier);
         if (outcome) {
             imported += outcome.imported;
-            lost += outcome.failed;
+            dossierLost += outcome.failed;
         } else {
             // The dossier itself could not be created: none of its items came in.
-            lost += check.dossier.items.length;
+            dossierLost = Math.max(1, dossierLost + check.dossier.items.length);
         }
+        lost += dossierLost;
     }
     return { imported, lost };
 }
@@ -2538,7 +2542,7 @@ const appStore = createStore<AppState>()(
                 }
                 const existingTitles = new Set(get().dossiers.map(d => d.title.toLowerCase()));
                 const dossiersToImport = (filtered.dossiers || []).filter(d =>
-                    mode === 'replace' ? true : !existingTitles.has(d.title.toLowerCase())
+                    mode === 'replace' ? true : !(typeof d?.title === 'string' && existingTitles.has(d.title.toLowerCase()))
                 );
                 const dossierOutcome = await importDossiersChecked(dossiersToImport, get().importDossier);
 
@@ -2664,7 +2668,7 @@ const appStore = createStore<AppState>()(
 
                 const existingTitles = new Set(get().dossiers.map(d => d.title.toLowerCase()));
                 const dossiersToImport = env.dossiers.filter(d =>
-                    mode === 'replace' ? true : !existingTitles.has(d.title.toLowerCase())
+                    mode === 'replace' ? true : !(typeof d?.title === 'string' && existingTitles.has(d.title.toLowerCase()))
                 );
 
                 // Imports happen sequentially so that in replace-mode the

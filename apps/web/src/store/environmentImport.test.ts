@@ -9,6 +9,13 @@ vi.mock('../services/dossierService', () => ({
   },
 }));
 
+vi.mock('../services/annotationService', () => ({
+  annotationService: { deleteAll: vi.fn(async () => 0), create: vi.fn(async () => ({})) },
+}));
+vi.mock('../services/highlightService', () => ({
+  highlightService: { deleteAll: vi.fn(async () => 0), create: vi.fn(async () => ({})) },
+}));
+
 import { appStore } from './useAppStore';
 import { dossierService } from '../services/dossierService';
 import type { Environment } from '../types';
@@ -61,5 +68,68 @@ describe('an environment checks its decisions and reports its losses', () => {
     expect(await appStore.getState().importEnvironmentPartial(env(items), selection, 'merge')).toEqual({ imported: 2, lost: 0 });
     appStore.setState({ dossiers: [], environments: [env(items)] });
     expect(await appStore.getState().applyEnvironment('e1', 'merge')).toEqual({ imported: 2, lost: 0 });
+  });
+  describe('a dossier that vanishes is a loss, even without items', () => {
+    const empty = { id: 'd1', title: 'Vuoto', createdAt: '', items: [] };
+    const withDossiers = (dossiers: unknown[]) => ({ ...env([]), dossiers }) as unknown as Environment;
+
+    it('counts a dossier the server cannot create', async () => {
+      vi.mocked(dossierService.create).mockRejectedValueOnce(new Error('500'));
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      appStore.setState({ environments: [withDossiers([empty])] });
+      expect(await appStore.getState().applyEnvironment('e1', 'merge')).toEqual({ imported: 0, lost: 1 });
+      error.mockRestore();
+    });
+
+    it('counts the items of a dossier the server cannot create', async () => {
+      vi.mocked(dossierService.create).mockRejectedValueOnce(new Error('500'));
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      appStore.setState({ environments: [env([valid, malformed])] });
+      expect(await appStore.getState().applyEnvironment('e1', 'merge')).toEqual({ imported: 0, lost: 2 });
+      error.mockRestore();
+    });
+
+    it('drops a dossier with a blank title and no items whole, and counts it', async () => {
+      appStore.setState({ environments: [withDossiers([{ ...empty, title: '   ' }])] });
+      expect(await appStore.getState().applyEnvironment('e1', 'merge')).toEqual({ imported: 0, lost: 1 });
+      expect(dossierService.create).not.toHaveBeenCalled();
+    });
+
+    it('counts a dossier whose items are not a list', async () => {
+      appStore.setState({ environments: [withDossiers([{ ...empty, items: 'no' }])] });
+      expect(await appStore.getState().applyEnvironment('e1', 'merge')).toEqual({ imported: 0, lost: 1 });
+    });
+
+    it('a non-string title neither throws in the merge filter nor vanishes unnoticed', async () => {
+      const odd = [{ ...empty, title: 123, items: [{ id: 'n', type: 'note', data: 'x', addedAt: '' }] }, { ...empty, id: 'd2', title: null }];
+      appStore.setState({ environments: [withDossiers(odd)] });
+      expect(await appStore.getState().applyEnvironment('e1', 'merge')).toEqual({ imported: 0, lost: 2 });
+      expect(await appStore.getState().importEnvironmentPartial(
+        withDossiers(odd), { ...selection, dossierIds: ['d1', 'd2'] }, 'merge',
+      )).toEqual({ imported: 0, lost: 2 });
+    });
+  });
+
+  describe('applyEnvironment in replace mode', () => {
+    it('still wipes the existing dossiers, then imports and reports as the merge does', async () => {
+      appStore.setState({
+        dossiers: [{ id: 'old', title: 'Pratica', createdAt: '', items: [] }],
+        environments: [env([valid, malformed])],
+      });
+      const outcome = await appStore.getState().applyEnvironment('e1', 'replace');
+      expect(dossierService.delete).toHaveBeenCalledWith('old');
+      expect(outcome).toEqual({ imported: 1, lost: 1 });
+      expect(appStore.getState().dossiers.map((d) => d.id)).toEqual(['srv-1']);
+    });
+
+    it('imports a dossier with the title of an existing one (replace takes every dossier), and counts one that vanishes', async () => {
+      appStore.setState({
+        dossiers: [{ id: 'old', title: 'Pratica', createdAt: '', items: [] }],
+        environments: [{ ...env([valid]), dossiers: [
+          { id: 'd1', title: 'pratica', createdAt: '', items: [valid] }, { id: 'd2', title: '', createdAt: '', items: [] },
+        ] } as unknown as Environment],
+      });
+      expect(await appStore.getState().applyEnvironment('e1', 'replace')).toEqual({ imported: 1, lost: 1 });
+    });
   });
 });
