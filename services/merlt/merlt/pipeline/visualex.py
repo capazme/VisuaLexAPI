@@ -56,6 +56,7 @@ class NormaMetadata:
             date=self.data,
             act_number=self.numero_atto,
             article=self.numero_articolo,
+            annex=self.allegato,
             version=self.versione,
             version_date=self.data_versione,
             urn_flag=True  # Include full URL
@@ -74,6 +75,7 @@ class NormaMetadata:
             date=self.data,
             act_number=self.numero_atto,
             article=None,  # No article for codice root
+            annex=self.allegato,
             version=self.versione,
             version_date=self.data_versione,
             urn_flag=True

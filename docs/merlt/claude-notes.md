@@ -354,6 +354,22 @@ Lazy ingestion runs on RQ, not arq: arq's redis pin conflicts with falkordb's.
 `job_id = "ingest-" + sha256(urn)[:40]` and `job_timeout=600`. The worker
 calls the BFF back at `/api/merlt/internal/job-callback`.
 
+The worker's `_urn_to_ingest_params` (`services/merlt/merlt/worker/tasks.py`)
+turns the article URN into the arguments of `ingest_norm`:
+
+- A code or the Constitution travels by its VisuaLex name. The annex picks the
+  code: `262:1` is the preleggi, `262:2` the civil code.
+- Any other act travels by type, date, number and annex. Without them VisuaLex
+  asked Normattiva for `legge:None;None`, and every ordinary act failed.
+- Before any request, the worker rebuilds the URN the pipeline will write
+  (`NormaMetadata.to_urn`). That URN must equal the one asked for, so the text
+  lands on the existing node, such as a Massimario stub.
+- A URN that cannot be ingested fails the job at once, with the reason and
+  without RQ retries. Examples: no article, a year-only date, no number, a
+  code without its annex.
+- A fetch that fails inside `ingest_norm` (`result.fatal_error`) is a failed
+  job, never `completed` with 0 nodes.
+
 **BFF (`/api/merlt/graph/*`).**
 
 - `services/merlt/graphClient.ts` has these methods:
