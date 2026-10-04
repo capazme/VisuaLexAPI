@@ -36,6 +36,13 @@ from visualex_api.services.normattiva_validity import (
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
+from visualex_api.services.decisions.model import InvalidReference, parse_reference
+from visualex_api.services.decisions.resolver import (
+    DECISION_CACHE_SWEEP_SECONDS,
+    SourceUnavailable,
+    get_resolver,
+    sweep_decision_caches,
+)
 from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
@@ -180,7 +187,8 @@ class NormaController:
         self.app = Quart(__name__)
         self.app = cors(self.app, allow_origin=ALLOWED_ORIGINS)
         self.fetch_queue = RateLimitedTaskQueue(FETCH_QUEUE_WORKERS, FETCH_QUEUE_DELAY)
-        
+        self._decision_sweep: asyncio.Task | None = None
+
         # Middleware per registrare il tempo di inizio della richiesta
         self.app.before_request(self.record_start_time)
         # Middleware per il rate limiting
@@ -198,12 +206,28 @@ class NormaController:
 
     async def start_background_services(self):
         await self.fetch_queue.start()
+        self._decision_sweep = asyncio.create_task(self._sweep_decision_caches())
         log.info("Background services started")
 
     async def stop_background_services(self):
         await self.fetch_queue.stop()
+        if self._decision_sweep is not None:
+            self._decision_sweep.cancel()
+            await asyncio.gather(self._decision_sweep, return_exceptions=True)
+            self._decision_sweep = None
         await cleanup_browser_pool()
         log.info("Background services stopped and browser pool cleaned up")
+
+    async def _sweep_decision_caches(self):
+        """Expired court-decision cache entries are deleted at start and then every
+        DECISION_CACHE_SWEEP_SECONDS: the filesystem cache deletes one only when its key is
+        read again. A failed sweep is logged and the next one runs on time."""
+        while True:
+            try:
+                await sweep_decision_caches()
+            except Exception:
+                log.exception("Decision cache sweep failed")
+            await asyncio.sleep(DECISION_CACHE_SWEEP_SECONDS)
 
 
     async def stream_article_text(self):
@@ -364,6 +388,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
         self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
         self.app.add_url_rule('/fetch_act_fingerprints', view_func=self.fetch_act_fingerprints, methods=['POST'])
+        self.app.add_url_rule('/fetch_decision', view_func=self.fetch_decision, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only. Not routed by the ingress
         # (infra/ingress/Caddyfile routes an allowlist of prefixes) nor proxied by Vite.
@@ -1028,6 +1053,40 @@ class NormaController:
             return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
         except Exception as exc:
             return self._error_response(exc, 'fetch_recitals')
+
+    async def fetch_decision(self):
+        """One court decision by its reference (design 2026-10-01 §3). Every answer this
+        handler writes is JSON with `esito`: trovata and ambigua 200, non_trovata 404,
+        fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a
+        fixed body). A source that cannot be reached is never "non trovata".
+
+        Answers this handler does not write are not: the per-IP rate limit (429
+        `{"error": …}`) and the login gate's 401 or 429, passed through by the ingress, come
+        before it; the framework answers with its own pages a method other than POST or
+        OPTIONS (405), a stalled body (408) and a body over 16 MB (413; 1 MB behind the
+        ingress, whose own page answers)."""
+        try:
+            body = await request.get_json(silent=True)
+        except (RecursionError, UnicodeDecodeError):
+            # a nesting bomb or bytes that are not UTF-8: the caller's fault
+            body = None
+        try:
+            reference = parse_reference(body)
+        except InvalidReference as exc:
+            return jsonify({'esito': 'richiesta_non_valida', 'errori': exc.errors}), 400
+        try:
+            outcome = await get_resolver().resolve(reference)
+            payload = outcome.to_dict()
+        except SourceUnavailable as exc:
+            log.warning("Decision source unreachable", fonte=exc.fonte, error=str(exc))
+            return jsonify({'esito': 'fonte_non_raggiungibile', 'fonte': exc.fonte}), 503
+        except Exception:
+            # a bug, never the caller's or the source's fault: a fixed body, the details in the log
+            log.exception("Decision lookup failed", corte=reference.corte,
+                          numero=reference.numero, anno=reference.anno)
+            return jsonify({'esito': 'errore_interno'}), 500
+        status = 404 if outcome.esito == 'non_trovata' else 200
+        return jsonify(payload), status
 
     async def fetch_massimario(self):
         """One element of the Massimario portal, raw. Internal route (MERL-T only)."""

@@ -24,6 +24,7 @@ describe('scrapeCost', () => {
     expect(scrapeCost('/stream_article_text')).toBe(3);
     expect(scrapeCost('/fetch_all_data')).toBe(5);
     expect(scrapeCost('/health/detailed')).toBe(5);
+    expect(scrapeCost('/fetch_decision')).toBe(2);
     expect(scrapeCost('/fetch_article_text')).toBe(1);
   });
 
