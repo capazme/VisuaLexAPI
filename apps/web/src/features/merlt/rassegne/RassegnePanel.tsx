@@ -94,6 +94,13 @@ export interface RassegnePanelProps {
 export function RassegnePanel({ articleUrn }: RassegnePanelProps) {
   const [open, setOpen] = useState(false);
   const [archivio, setArchivio] = useState<Archivio | undefined>(undefined);
+  // Another article starts closed and unfiltered: the slot does not remount the panel per URN.
+  const [shownUrn, setShownUrn] = useState(articleUrn);
+  if (shownUrn !== articleUrn) {
+    setShownUrn(articleUrn);
+    setOpen(false);
+    setArchivio(undefined);
+  }
   const summary = useRassegneSummary(articleUrn, archivio);
 
   if (!articleUrn || summary.status === 'idle' || summary.status === 'loading') return null;

@@ -168,4 +168,16 @@ describe('RassegnePanel', () => {
     expect(screen.getByText("Rassegna dell'anno 2024")).toBeInTheDocument();
     error.mockRestore();
   });
+
+  it('another article starts closed and unfiltered', async () => {
+    const OTHER = URN.replace('art2043', 'art2051');
+    fetchRassegne.mockResolvedValue({ ...SUMMARY, archivi: ['civile', 'penale'] });
+    const { rerender } = renderPanel();
+    await openPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Penale' }));
+    rerender(<MemoryRouter><RassegnePanel articleUrn={OTHER} /></MemoryRouter>);
+    await waitFor(() => expect(fetchRassegne).toHaveBeenLastCalledWith({ urn: OTHER }));
+    expect(await screen.findByRole('button', { name: /Espandi le rassegne della Cassazione/ }))
+      .toHaveAttribute('aria-expanded', 'false');
+  });
 });
