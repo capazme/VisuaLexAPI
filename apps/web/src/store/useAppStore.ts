@@ -16,7 +16,7 @@ import { normalizeArticleId } from '../utils/treeUtils';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
-import { dossierService, type DossierApi, type DossierItemApi } from '../services/dossierService';
+import { dossierService, type DossierItemApi } from '../services/dossierService';
 import { annotationService } from '../services/annotationService';
 import { highlightService } from '../services/highlightService';
 import { environmentService, type EnvironmentApi, type EnvironmentCreatePayload } from '../services/environmentService';
@@ -32,7 +32,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
-import { serverFieldsFromApi, dossierItemFromApi, packItemContent } from '../components/features/dossier/dossierUtils';
+import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, packItemContent } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -360,6 +360,8 @@ interface AppState {
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     setDossierItemOrder: (dossierId: string, itemIds: string[]) => void;
+    /** Reads one dossier again from the server (after a restore from the trash): replaces it, or adds it when it came back whole. */
+    refreshDossier: (dossierId: string) => Promise<void>;
     /** A note through the notes route, about one article when `aboutItemId` is given; true once the server has it. */
     addNoteToDossier: (dossierId: string, text: string, aboutItemId?: string) => Promise<boolean>;
     /** Saves a dossier's waiting order once none of its items is pending (see `pendingDossierOrders`). */
@@ -565,15 +567,7 @@ const appStore = createStore<AppState>()(
                     }));
 
                     // Transform API dossiers to local format
-                    const dossiers: Dossier[] = dossiersRes.map((d: DossierApi) => ({
-                        id: d.id,
-                        title: d.name,
-                        description: d.description || undefined,
-                        createdAt: d.created_at,
-                        items: d.items.map(dossierItemFromApi),
-                        tags: d.tags ?? [],
-                        isPinned: d.is_pinned,
-                    }));
+                    const dossiers: Dossier[] = dossiersRes.map(dossierFromApi);
 
                     const environments: Environment[] = environmentsRes.map(environmentApiToStore);
                     const quickNorms: QuickNorm[] = quickNormsRes.map(quickNormApiToStore);
@@ -1681,6 +1675,34 @@ const appStore = createStore<AppState>()(
                     });
                     get().pushSyncError('Impossibile salvare il nuovo ordine degli atti. Riprova.');
                 });
+            },
+
+            refreshDossier: async (dossierId) => {
+                try {
+                    const fresh = dossierFromApi(await dossierService.getById(dossierId));
+                    set((state) => {
+                        const index = state.dossiers.findIndex(d => d.id === dossierId);
+                        if (index < 0) {
+                            state.dossiers.unshift(fresh);
+                            return;
+                        }
+                        const local = state.dossiers[index];
+                        // An add, an undo or an order still on its way would be lost
+                        // by a wholesale replace: then only what came back is added
+                        // (a restore keeps its ids and is appended on the server too).
+                        const busy = !!state.pendingDossierOrders[dossierId]
+                            || local.items.some(i => state.pendingDossierItemIds[i.id]);
+                        if (!busy) {
+                            state.dossiers[index] = fresh;
+                            return;
+                        }
+                        const known = new Set(local.items.map(i => i.id));
+                        local.items.push(...fresh.items.filter(i => !known.has(i.id)));
+                    });
+                } catch (err) {
+                    console.error('Failed to reload the dossier:', dossierId, err);
+                    get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
+                }
             },
 
             // Server first (gotcha 17): a note has no optimistic window to undo.

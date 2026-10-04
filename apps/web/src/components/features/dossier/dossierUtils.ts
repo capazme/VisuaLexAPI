@@ -3,7 +3,7 @@ import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
 import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
-import type { DossierItemApi } from '../../../services/dossierService';
+import type { DossierApi, DossierItemApi } from '../../../services/dossierService';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
@@ -191,6 +191,19 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
   return api.item_type === 'norm'
     ? { ...base, type: 'norma', data: data as DossierNormaData }
     : { ...base, type: 'note', data: data as string };
+}
+
+/** One server dossier as the store holds it. */
+export function dossierFromApi(d: DossierApi): Dossier {
+  return {
+    id: d.id,
+    title: d.name,
+    description: d.description || undefined,
+    createdAt: d.created_at,
+    items: d.items.map(dossierItemFromApi),
+    tags: d.tags ?? [],
+    isPinned: d.is_pinned,
+  };
 }
 
 /** «scritta da Claude Code (applicazione collegata)»: who wrote an entry, on screen (`ClaudeMark`) and in the PDF. */

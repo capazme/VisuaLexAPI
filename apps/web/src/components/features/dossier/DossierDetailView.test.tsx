@@ -180,3 +180,20 @@ describe('DossierDetailView — search keeps an article and its notes together',
     expect(screen.getByRole('button', { name: /^Espandi .*articolo 1, 1 nota$/ })).toBeInTheDocument();
   });
 });
+
+describe('DossierDetailView — what Claude removed from it', () => {
+  it("shows only this dossier's entries, never another dossier's or LingoLex cards", () => {
+    const at = { clientName: 'Claude Code', deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z' };
+    const trash = {
+      entries: [
+        { ...at, id: 'mine', kind: 'DOSSIER_ITEMS' as const, dossierId: 'd1', label: 'Ricorso Rossi', itemCount: 1, items: [{ itemType: 'note', citation: null, actCitation: null }] },
+        { ...at, id: 'other', kind: 'DOSSIER_ITEMS' as const, dossierId: 'd2', label: 'Altro', itemCount: 1, items: [] },
+        { ...at, id: 'cards', kind: 'LINGO_CARDS' as const, dossierId: null, label: 'Schede LingoLex', itemCount: 1, cards: [] },
+      ],
+      error: null, reload: vi.fn(), restore: vi.fn(), purge: vi.fn(),
+    };
+    appStore.setState({ dossiers: [structuredClone(dossier)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={dossier} onBack={() => {}} showToast={() => {}} trash={trash} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: 'Rimossi di recente (1) — ripristina' })).toBeInTheDocument();
+  });
+});

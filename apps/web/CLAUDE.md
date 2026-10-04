@@ -286,6 +286,16 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `created_by`, by design, so Claude's mark does not survive a web undo (the
   MCP trash, which keeps ids, restores it). The note dialog closes only once
   the server has the note, so a refused note keeps its text.
+- **The trash** (what a connected application deleted, 30 days; spec §10-11):
+  one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
+  when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
+  «Da «dossier»», «Schede LingoLex» by their first questions) and a dossier's
+  own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
+  entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
+  which dossier to restore into — or emptied behind a danger confirmation; a
+  restore reloads that dossier from the server (`refreshDossier`). The web never
+  moves anything to the trash: its own deletions stay immediate, with an undo.
+  A decision in the trash has no label until the convention's server PR.
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da

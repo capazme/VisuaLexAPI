@@ -54,6 +54,8 @@ import { buildPdfBlocks, loadDossierTexts } from './dossierPdf';
 import { resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
+import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
+import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
@@ -75,9 +77,11 @@ interface Props {
   dossier: Dossier;
   onBack: () => void;
   showToast: (message: string, type?: ToastType) => void;
+  /** The page's trash: this dossier's entries show at the bottom. */
+  trash?: ReturnType<typeof useTrash>;
 }
 
-export function DossierDetailView({ dossier, onBack, showToast }: Props) {
+export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) {
   const {
     dossiers,
     deleteDossier,
@@ -783,6 +787,16 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           </>
         )}
       </div>
+
+      {trash && (
+        <DossierRecentlyRemoved
+          entries={(trash.entries ?? []).filter((e) => e.kind === 'DOSSIER_ITEMS' && e.dossierId === dossier.id)}
+          dossiers={dossiers}
+          onRestore={trash.restore}
+          onPurge={trash.purge}
+          showToast={showToast}
+        />
+      )}
 
       {moveToModalOpen && (
         <MoveToDossierModal
