@@ -14,6 +14,7 @@ const SOURCE_HINTS: Record<IngestionSource, string> = {
   visualex_tree:
     'JSON con i parametri dell\'albero VisuaLex, es. {"act_type":"codice civile","articles":"2043-2059"}. "articles" è opzionale (omesso = intero atto).',
   italia_corpus: 'Percorso o URN del documento nel corpus italia-corpus da ingerire.',
+  massimario: 'JSON con l\'id del volume sul Portale del Massimario, es. {"volume":96}. Un volume per lotto.',
 };
 
 export interface IngestionRunFormProps {
@@ -72,6 +73,7 @@ export function IngestionRunForm({ onStarted }: IngestionRunFormProps) {
           >
             <option value="visualex_tree">Albero VisuaLex</option>
             <option value="italia_corpus">italia-corpus</option>
+            <option value="massimario">Massimario (rassegne)</option>
           </select>
         </div>
         <div>

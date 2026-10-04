@@ -3,10 +3,13 @@ import { Loader2, X, CheckCircle2, Ban } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { BatchStatusBadge } from './BatchStatusBadge';
 import { ConflictReportPanel } from './ConflictReportPanel';
+import { MassimarioReportPanel } from './MassimarioReportPanel';
 import { SampleTable } from './SampleTable';
 import { PromoteBatchDialog } from './PromoteBatchDialog';
 import { RejectBatchDialog } from './RejectBatchDialog';
 import { useBatchPoll } from './useBatchPoll';
+import { promoteBatch } from './opsIngestionApi';
+import type { VectorProgress } from './types';
 
 const SAMPLE_PAGE_SIZE = 20;
 
@@ -32,6 +35,7 @@ export function BatchDetailPanel({ batchId, onClose, onQueueRefreshNeeded }: Bat
   const [restartToken, setRestartToken] = useState(0);
   const [showPromote, setShowPromote] = useState(false);
   const [showReject, setShowReject] = useState(false);
+  const [resumeFailed, setResumeFailed] = useState(false);
 
   const poll = useBatchPoll(batchId, { nodeLimit, edgeLimit, restartToken });
 
@@ -90,6 +94,31 @@ export function BatchDetailPanel({ batchId, onClose, onQueueRefreshNeeded }: Bat
         {batch && (
           <>
             {batch.conflict_report && <ConflictReportPanel report={batch.conflict_report} />}
+            {batch.conflict_report?.massimario && (
+              <MassimarioReportPanel
+                report={batch.conflict_report.massimario}
+                vectors={batch.stats?.vectors as VectorProgress | undefined}
+                onResume={
+                  batch.status === 'promoted'
+                    ? () => {
+                        setResumeFailed(false);
+                        promoteBatch(batch.id).then(
+                          () => setRestartToken((t) => t + 1),
+                          (err: unknown) => {
+                            console.error('[ingestion] resume vectors failed', { batchId: batch.id, err });
+                            setResumeFailed(true);
+                          },
+                        );
+                      }
+                    : undefined
+                }
+              />
+            )}
+            {resumeFailed && (
+              <p role="alert" className="text-sm text-amber-600 dark:text-amber-400">
+                Ripresa dei vettori non riuscita: riprova più tardi.
+              </p>
+            )}
 
             <SampleTable
               title="Nodi"

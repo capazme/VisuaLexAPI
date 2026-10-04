@@ -9,7 +9,7 @@
  * that would silently desync from what the network actually returns.
  */
 
-export type IngestionSource = 'visualex_tree' | 'italia_corpus';
+export type IngestionSource = 'visualex_tree' | 'italia_corpus' | 'massimario';
 
 export type IngestionBatchStatus =
   | 'parsing'
@@ -89,6 +89,49 @@ export interface ConflictReport {
   duplicates: string[];
   coverage: { expected: number; extracted: number; coverage_pct: number } | null;
   stats: ConflictReportStats;
+  massimario?: MassimarioReport;
+}
+
+/** `conflict_report.massimario` of a Massimario batch (MERL-T pipeline/massimario/volume.py). */
+export interface MassimarioReport {
+  volume: { id: number; titolo: string; anno: number; archivio: string; numero: number | null };
+  paragrafi: number;
+  frammenti: number;
+  citazioni: {
+    rv_totali: number;
+    rv_riconosciute: number;
+    copertura_pct: number | null;
+    per_forma: Record<string, number>;
+    senza_identita: Record<string, number>;
+    non_riconosciute: string[];
+  };
+  pronunce: {
+    totali: number;
+    anno_implicito: number;
+    chiavi_con_piu_sezioni: { key: string; sezioni: string[] }[];
+    gia_nel_grafo: number | null;
+  };
+  norme: {
+    riferimenti: number;
+    articoli: number;
+    atti: number;
+    stub: number;
+    date_completate: number;
+    non_risolte: number;
+    partizioni: number;
+    campioni_non_risolti: string[];
+    gia_nel_grafo: number | null;
+    /** links the portal wrote as laws whose anchor is a Cassazione section letter ("Sez. L, n. …") */
+    link_a_pronunce?: number;
+  };
+  sezioni_fuori_capitolo: number;
+}
+
+/** `stats.vectors` of a promoted Massimario batch. */
+export interface VectorProgress {
+  done: number;
+  total: number;
+  error?: string;
 }
 
 export interface BatchDetail extends BatchSummary {
