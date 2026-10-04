@@ -245,6 +245,58 @@ export const addDossierItem = async (req: Request, res: Response) => {
   res.status(201).json(serializeItem(item));
 };
 
+export const MAX_NOTE_LENGTH = 4000;
+// Plain text: new lines and tabs, nothing else below U+0020.
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+const noteSchema = z
+  .object({
+    text: z
+      .string()
+      .trim()
+      .min(1)
+      .max(MAX_NOTE_LENGTH)
+      .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.'),
+    aboutItemId: z.string().uuid().optional(),
+  })
+  .strict();
+
+/**
+ * A note in a dossier, or about one of its articles as a whole (MCP second
+ * round, spec §5): never about a passage of the article's text, whose anchors
+ * need exact offsets (root rule 23). Open to the user's session and to an
+ * exchanged token; through one, the note carries the connection's mark.
+ */
+export const addDossierNote = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { text, aboutItemId } = noteSchema.parse(req.body);
+
+  const dossier = await prisma.dossier.findFirst({ where: { id, userId: req.user!.id } });
+  if (!dossier) throw new AppError(404, 'Dossier not found');
+
+  if (aboutItemId) {
+    const article = await prisma.dossierItem.findFirst({ where: { id: aboutItemId, dossierId: id, itemType: 'norm' } });
+    if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questo dossier.');
+  }
+
+  const item = await prisma.$transaction(async (tx) => {
+    const last = await tx.dossierItem.aggregate({ where: { dossierId: id }, _max: { position: true } });
+    return tx.dossierItem.create({
+      data: {
+        dossierId: id,
+        itemType: 'note',
+        // As the web app titles a note it adds (`addToDossier`).
+        title: 'Nota',
+        content: text,
+        position: (last._max.position ?? -1) + 1,
+        aboutItemId: aboutItemId ?? null,
+        ...provenanceFromRequest(req),
+      },
+    });
+  });
+
+  res.status(201).json(serializeItem(item));
+};
+
 /**
  * Update dossier item
  */

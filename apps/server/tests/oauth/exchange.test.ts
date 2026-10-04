@@ -230,7 +230,7 @@ describe('the daily quota of delegated calls', () => {
     expect(eleventh.body.quota).toBe('dossier_create');
     expect((await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Mio' })).status).toBe(201);
     const quota = await request(app).get('/api/oauth/quota').set(bearer(apiToken));
-    expect(quota.body.dossierCreations).toMatchObject({ limit: 10, remaining: 0 });
+    expect(quota.body.counters.dossier_create).toMatchObject({ limit: 10, remaining: 0 });
   });
 
   it('reports what is left and when it renews', async () => {
@@ -239,7 +239,12 @@ describe('the daily quota of delegated calls', () => {
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       points: { limit: expect.any(Number), remaining: expect.any(Number) },
-      dossierCreations: { limit: 10, remaining: 10 },
+      counters: {
+        dossier_create: { limit: 10, remaining: 10 },
+        note: { limit: 100, remaining: 100 },
+        trash: { limit: 20, remaining: 20 },
+        card: { limit: 100, remaining: 100 },
+      },
     });
     expect(response.body.points.remaining).toBe(response.body.points.limit);
     expect('resetsAt' in response.body.points).toBe(true);
@@ -248,7 +253,7 @@ describe('the daily quota of delegated calls', () => {
   it('is readable from the user session too', async () => {
     const response = await request(app).get('/api/oauth/quota').set(authHeader(alice));
     expect(response.status).toBe(200);
-    expect(response.body.dossierCreations.limit).toBe(10);
+    expect(response.body.counters.dossier_create.limit).toBe(10);
   });
 });
 
@@ -282,6 +287,6 @@ describe('review findings on PR #57', () => {
     expect(refused.status).toBe(400);
     const after = await quota();
     expect(after.points.remaining).toBe(before.points.remaining);
-    expect(after.dossierCreations.remaining).toBe(before.dossierCreations.remaining);
+    expect(after.counters.dossier_create.remaining).toBe(before.counters.dossier_create.remaining);
   });
 });
