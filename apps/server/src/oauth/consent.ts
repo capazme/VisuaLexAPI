@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-import type { OAuthConfig } from './config';
+import { DELETE_SCOPE, type OAuthConfig } from './config';
 import { randomSecret, sha256 } from './hash';
 
 export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
@@ -8,7 +8,8 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 /** What each scope lets an application do, as the consent page says it. */
 export const SCOPE_LABELS: Record<string, string> = {
   'dossier:read': 'Leggere i tuoi dossier: i nomi e le norme che contengono',
-  'dossier:write': 'Creare dossier e aggiungervi norme (non può modificare né cancellare nulla)',
+  'dossier:write': 'Creare dossier e aggiungervi norme e note (non può modificare né cancellare nulla)',
+  [DELETE_SCOPE]: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
 };
 
 const hostOf = (uri: string): string => new URL(uri).hostname;
@@ -35,7 +36,9 @@ export async function readAuthorizationRequest(requestId: string, userId: string
       // Every client today registered itself (RFC 7591): nobody vouched for its name.
       registeredAutomatically: true,
     },
-    scopes: request.scopes.map((scope) => ({ scope, label: SCOPE_LABELS[scope] ?? scope })),
+    // Deletion is never one of the listed permissions: the page offers it apart, unticked (spec §4.2).
+    scopes: request.scopes.filter((scope) => scope !== DELETE_SCOPE).map((scope) => ({ scope, label: SCOPE_LABELS[scope] ?? scope })),
+    deletion: { label: SCOPE_LABELS[DELETE_SCOPE] },
     expiresAt: request.expiresAt,
   };
 }
@@ -67,6 +70,7 @@ export async function decideAuthorizationRequest(
   requestId: string,
   userId: string,
   approve: boolean,
+  allowDelete = false,
 ): Promise<{ redirectTo: string }> {
   const request = await claimable(requestId, userId);
   const now = new Date();
@@ -92,6 +96,8 @@ export async function decideAuthorizationRequest(
     return { redirectTo: redirect.href };
   }
 
+  // Whatever the client asked, deletion is what the user ticked on this page.
+  const scopes = [...request.scopes.filter((scope) => scope !== DELETE_SCOPE), ...(allowDelete ? [DELETE_SCOPE] : [])];
   const code = randomSecret();
   await prisma.$transaction(async (tx) => {
     const live = await tx.oAuthGrant.findFirst({
@@ -100,10 +106,11 @@ export async function decideAuthorizationRequest(
     const grant = live
       ? await tx.oAuthGrant.update({
           where: { id: live.id },
-          data: { scopes: [...new Set([...live.scopes, ...request.scopes])] },
+          // Read and write merge with what was granted before; deletion follows this decision.
+          data: { scopes: [...new Set([...live.scopes.filter((scope) => scope !== DELETE_SCOPE), ...scopes])] },
         })
       : await tx.oAuthGrant.create({
-          data: { userId, clientId: request.clientId, scopes: request.scopes, resource: request.resource },
+          data: { userId, clientId: request.clientId, scopes, resource: request.resource },
         });
     await tx.oAuthAuthorizationCode.create({
       data: {
@@ -114,7 +121,7 @@ export async function decideAuthorizationRequest(
         redirectUri: request.redirectUri,
         codeChallenge: request.codeChallenge,
         resource: request.resource,
-        scopes: request.scopes,
+        scopes,
         expiresAt: new Date(now.getTime() + AUTHORIZATION_CODE_LIFETIME_MS),
       },
     });

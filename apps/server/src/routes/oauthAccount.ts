@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
-import { oauthConfig } from '../oauth/config';
+import { DELETE_SCOPE, oauthConfig } from '../oauth/config';
 import { decideAuthorizationRequest, readAuthorizationRequest } from '../oauth/consent';
 import { revokeGrant } from '../oauth/tokens';
 import { delegatedQuotaStatus } from '../middleware/delegated';
@@ -18,7 +18,8 @@ const router = Router();
 router.use(authenticate);
 
 const userId = (req: Request): string => req.user!.id;
-const decisionSchema = z.object({ approve: z.boolean() }).strict();
+const decisionSchema = z.object({ approve: z.boolean(), allowDelete: z.boolean().optional() }).strict();
+const permissionSchema = z.object({ canDelete: z.boolean() }).strict();
 
 router.get('/requests/:id', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -26,9 +27,9 @@ router.get('/requests/:id', async (req, res) => {
 });
 
 router.post('/requests/:id/decision', async (req, res) => {
-  const { approve } = decisionSchema.parse(req.body);
+  const { approve, allowDelete } = decisionSchema.parse(req.body);
   res.setHeader('Cache-Control', 'no-store');
-  res.json(await decideAuthorizationRequest(oauthConfig, req.params.id, userId(req), approve));
+  res.json(await decideAuthorizationRequest(oauthConfig, req.params.id, userId(req), approve, allowDelete ?? false));
 });
 
 router.get('/grants', async (req, res) => {
@@ -43,10 +44,24 @@ router.get('/grants', async (req, res) => {
       clientName: grant.client.clientName,
       redirectHost: grant.client.redirectUris[0] ? new URL(grant.client.redirectUris[0]).hostname : null,
       scopes: grant.scopes,
+      canDelete: grant.scopes.includes(DELETE_SCOPE),
       createdAt: grant.createdAt,
       lastUsedAt: grant.lastUsedAt,
     })),
   );
+});
+
+// The deletion permission of one connection, switched from the settings (spec §4.2). User session only:
+// this route is outside the delegated table, so no connected application can switch its own.
+router.patch('/grants/:id', async (req, res) => {
+  const { canDelete } = permissionSchema.parse(req.body);
+  const grant = await prisma.oAuthGrant.findFirst({
+    where: { id: req.params.id, userId: userId(req), revokedAt: null },
+  });
+  if (!grant) throw new AppError(404, 'Applicazione collegata non trovata.');
+  const scopes = [...grant.scopes.filter((scope) => scope !== DELETE_SCOPE), ...(canDelete ? [DELETE_SCOPE] : [])];
+  const updated = await prisma.oAuthGrant.update({ where: { id: grant.id }, data: { scopes } });
+  res.json({ id: updated.id, scopes: updated.scopes, canDelete });
 });
 
 router.delete('/grants/:id', async (req, res) => {

@@ -8,7 +8,7 @@ import {
   OAuthError,
 } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { prisma } from '../lib/prisma';
-import { IGNORED_SCOPES, SCOPES, type OAuthConfig } from './config';
+import { DELETE_SCOPE, IGNORED_SCOPES, SCOPES, type OAuthConfig } from './config';
 import { matchesRedirectUri } from './redirectUri';
 
 export const AUTHORIZATION_REQUEST_LIFETIME_MS = 10 * 60 * 1000;
@@ -24,7 +24,8 @@ export function requestedScopes(scopes: string[] | undefined): string[] {
   const asked = (scopes ?? []).filter((scope) => scope && !IGNORED_SCOPES.has(scope));
   const unknown = asked.filter((scope) => !(SCOPES as readonly string[]).includes(scope));
   if (unknown.length > 0) throw new InvalidScopeError(`unsupported scope: ${unknown.join(' ')}`);
-  return asked.length > 0 ? [...new Set(asked)] : [...SCOPES];
+  // No scope asked: read and write. Deletion is never implied; the consent page offers it apart.
+  return asked.length > 0 ? [...new Set(asked)] : SCOPES.filter((scope) => scope !== DELETE_SCOPE);
 }
 
 /**
