@@ -1,23 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 const fetchDecision = vi.fn();
 vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
 
 import { DecisionPage } from './DecisionPage';
 
+// `data-state` is what the address carries in the history entry: nothing, for this page. A span,
+// not an <output>: that element has the role `status`, which the loading line of the page has too.
 function LocationProbe() {
   const l = useLocation();
-  return <output data-testid="location">{l.pathname + l.search}</output>;
+  return <span data-testid="location" data-state={JSON.stringify(l.state)}>{l.pathname + l.search}</span>;
 }
 
-function renderAt(path: string) {
+// The reader going elsewhere while the page is open.
+function GoTo({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate(to)}>Vai a {to}</button>;
+}
+
+function renderAt(path: string, goTo?: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/sentenze" element={<DecisionPage />} />
-        <Route path="/sentenze/:corte/:numero/:anno" element={<><DecisionPage /><LocationProbe /></>} />
+        <Route
+          path="/sentenze/:corte/:numero/:anno"
+          element={<><DecisionPage /><LocationProbe />{goTo && <GoTo to={goTo} />}</>}
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -55,7 +66,11 @@ const consulta = {
   avvisi: [],
 };
 
-beforeEach(() => fetchDecision.mockReset());
+// Braces: a hook that returns a function has it called as its teardown, and `mockReset()` returns
+// the mock, so an answer that never resolves would hang the hook.
+beforeEach(() => {
+  fetchDecision.mockReset();
+});
 
 describe('DecisionPage', () => {
   it('shows the decision and rewrites the address to its identity, without fetching twice', async () => {
@@ -76,6 +91,23 @@ describe('DecisionPage', () => {
     renderAt('/sentenze/cassazione-penale/10787/2024');
     fireEvent.click(await screen.findByRole('button', { name: 'Copia citazione' }));
     expect(writeText).toHaveBeenCalledWith('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787');
+    expect(await screen.findByText('Citazione copiata')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['there is no clipboard', () => Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })],
+    ['the clipboard refuses', () => Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }, configurable: true })],
+  ])('says so, and logs why, when the citation cannot be copied: %s', async (_case, setUp) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setUp();
+    fetchDecision.mockResolvedValue(found);
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    fireEvent.click(await screen.findByRole('button', { name: 'Copia citazione' }));
+    expect(await screen.findByText('Copia non riuscita')).toBeInTheDocument();
+    expect(screen.queryByText('Citazione copiata')).toBeNull();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it('«Apri sulla fonte» only where the source has a page for the decision, and no licence line', async () => {
@@ -139,9 +171,44 @@ describe('DecisionPage', () => {
   it('a source that does not answer offers Riprova and asks again', async () => {
     fetchDecision.mockResolvedValueOnce({ esito: 'fonte_non_raggiungibile', fonte: 'cassazione' }).mockResolvedValueOnce(found);
     renderAt('/sentenze/cassazione-penale/10787/2024');
-    fireEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByText('La fonte non risponde in questo momento.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
     expect(await screen.findByText(/Sentenza n\. 10787\/2024/)).toBeInTheDocument();
     expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it('a limit of requests that is reached says so, and Riprova asks again', async () => {
+    fetchDecision.mockResolvedValueOnce({ esito: 'fonte_non_raggiungibile', fonte: 'quota' }).mockResolvedValueOnce(found);
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByText('Hai raggiunto il limite di richieste: riprova tra un minuto.')).toBeInTheDocument();
+    expect(screen.queryByText(/La fonte non risponde/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByText(/Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it('a request that never reached the server says so, not that the source is silent, and logs why', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchDecision.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce(found);
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByText('Il server non ha risposto: controlla la connessione e riprova.')).toBeInTheDocument();
+    expect(screen.queryByText(/La fonte non risponde/)).toBeNull();
+    expect(error).toHaveBeenCalledWith('fetch_decision failed', expect.objectContaining({ error: expect.any(Error) }));
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByText(/Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(2);
+    error.mockRestore();
+  });
+
+  it('a request the route refuses shows the form, filled in, with the route\'s reason on its field', async () => {
+    fetchDecision.mockResolvedValue({ esito: 'richiesta_non_valida', errori: { numero: 'Il numero va da 1 a 999999' } });
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    const numero = await screen.findByRole('textbox', { name: 'Numero' });
+    expect(numero).toHaveValue('10787');
+    expect(numero).toBeInvalid();
+    expect(numero).toHaveAccessibleDescription('Il numero va da 1 a 999999');
+    expect(screen.getByRole('button', { name: 'Apri' })).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(1);
   });
 
   it('an unexpected failure is a generic error with Riprova, never "non trovata"', async () => {
@@ -165,5 +232,125 @@ describe('DecisionPage', () => {
   it('/sentenze is the lookup form', async () => {
     renderAt('/sentenze');
     expect(await screen.findByRole('heading', { name: 'Apri una sentenza' })).toBeInTheDocument();
+  });
+
+  it('keeps nothing in the history: the answer in memory serves the rewritten address, a reload asks again', async () => {
+    fetchDecision.mockResolvedValue(found);
+    const first = renderAt('/sentenze/cassazione/10787/2024?sezione=VII');
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/sentenze/cassazione-penale/10787/2024'));
+    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveAttribute('data-state', 'null'); // no answer carried in the entry
+    expect(fetchDecision).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    // a reload, or a fresh visit of the same address: nothing was kept, so the route is asked
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores an answer that arrives after the reader asked for another decision', async () => {
+    let answerFirst: (answer: unknown) => void = () => {};
+    const other = {
+      ...found,
+      identita: { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 222, anno: 2023 },
+      attributi: { sezione: '1', tipo: 'sentenza', data_deposito: '2023-05-02' },
+      avvisi: [],
+    };
+    fetchDecision
+      .mockImplementationOnce(() => new Promise((resolve) => { answerFirst = resolve; }))
+      .mockResolvedValueOnce(other);
+    renderAt('/sentenze/cassazione-penale/10787/2024', '/sentenze/cassazione-civile/222/2023');
+    fireEvent.click(screen.getByRole('button', { name: /Vai a/ }));
+    expect(await screen.findByText(/Sentenza n\. 222\/2023/)).toBeInTheDocument();
+
+    // the first answer comes late: it answers a question nobody is asking any more
+    await act(async () => { answerFirst(found); });
+    expect(screen.getByText(/Sentenza n\. 222\/2023/)).toBeInTheDocument();
+    expect(screen.queryByText(/n\. 10787\/2024/)).toBeNull();
+    expect(screen.getByTestId('location').textContent).toBe('/sentenze/cassazione-civile/222/2023');
+    expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  describe('headings: one h1 on every screen', () => {
+    const PATH = '/sentenze/cassazione-penale/10787/2024';
+    const retry = () => screen.findByRole('button', { name: 'Riprova' });
+    const homonym = (archivio: 'civile' | 'penale') => ({
+      identita: { corte: 'cassazione' as const, archivio, numero: 10787, anno: 2024 },
+      attributi: {},
+    });
+    const SCREENS = [
+      { name: 'the lookup form', path: '/sentenze', ready: () => screen.findByRole('heading', { name: 'Apri una sentenza' }) },
+      { name: 'an address it cannot read', path: '/sentenze/tar/12/2024', ready: () => screen.findAllByText(/Organo non riconosciuto/) },
+      { name: 'loading', answer: new Promise(() => {}), ready: () => screen.findByRole('status') },
+      { name: 'a decision not found', answer: { esito: 'non_trovata', motivo: 'inesistente' }, ready: () => screen.findByText(/non è presente/) },
+      { name: 'two candidates', answer: { esito: 'ambigua', candidati: [homonym('civile'), homonym('penale')] }, ready: () => screen.findAllByRole('link') },
+      { name: 'a source that does not answer', answer: { esito: 'fonte_non_raggiungibile', fonte: 'cassazione' }, ready: retry },
+      { name: 'an unexpected failure', answer: { esito: 'errore_interno' }, ready: retry },
+      { name: 'a refused request', answer: { esito: 'richiesta_non_valida', errori: { numero: 'Numero non valido' } }, ready: () => screen.findByRole('textbox', { name: 'Numero' }) },
+    ];
+    const heading = () => screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent);
+
+    it.each(SCREENS)('«Sentenze» is the h1 of $name', async ({ path = PATH, answer, ready }) => {
+      if (answer instanceof Promise) fetchDecision.mockReturnValue(answer);
+      else if (answer) fetchDecision.mockResolvedValue(answer);
+      renderAt(path);
+      await ready();
+      expect(heading()).toEqual(['Sentenze']);
+    });
+
+    it("the decision's own heading is the h1 of the decision", async () => {
+      fetchDecision.mockResolvedValue(found);
+      renderAt(PATH);
+      await screen.findByRole('button', { name: 'Copia citazione' });
+      expect(heading()).toEqual(['Corte di cassazione · Sez. VII penale · Sentenza n. 10787/2024 · depositata il 12 marzo 2024']);
+    });
+  });
+
+  it('announces the loading in a status that is not inside a busy container', () => {
+    fetchDecision.mockReturnValue(new Promise(() => {}));
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Caricamento della decisione…');
+    expect(status.closest('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('keeps 44px touch targets on mobile on its buttons and on the links to choose from', async () => {
+    const target = ['min-h-[44px]', 'md:min-h-0'];
+    fetchDecision.mockResolvedValueOnce(found);
+    const decision = renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByRole('button', { name: 'Copia citazione' })).toHaveClass(...target);
+    decision.unmount();
+
+    fetchDecision.mockResolvedValueOnce({ esito: 'errore_interno' });
+    const failure = renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByRole('button', { name: 'Riprova' })).toHaveClass(...target);
+    failure.unmount();
+
+    fetchDecision.mockResolvedValueOnce({ esito: 'non_trovata', motivo: 'inesistente' });
+    const missing = renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByRole('button', { name: 'Apri' })).toHaveClass(...target);
+    missing.unmount();
+
+    fetchDecision.mockResolvedValueOnce({ esito: 'ambigua', candidati: [
+      { identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }, attributi: {} },
+      { identita: { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 }, attributi: {} },
+    ] });
+    renderAt('/sentenze/cassazione/10787/2024');
+    for (const link of await screen.findAllByRole('link')) expect(link).toHaveClass(...target);
+  });
+
+  it('draws its links readable on the dark page', async () => {
+    fetchDecision.mockResolvedValueOnce(consulta);
+    const decision = renderAt('/sentenze/corte-costituzionale/1/2014');
+    expect(await screen.findByRole('link', { name: /Apri sulla fonte/ })).toHaveClass('text-primary-600', 'dark:text-primary-400');
+    decision.unmount();
+
+    fetchDecision.mockResolvedValueOnce({ esito: 'ambigua', candidati: [
+      { identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }, attributi: {} },
+      { identita: { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 }, attributi: {} },
+    ] });
+    renderAt('/sentenze/cassazione/10787/2024');
+    for (const link of await screen.findAllByRole('link')) expect(link).toHaveClass('text-primary-600', 'dark:text-primary-400');
   });
 });

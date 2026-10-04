@@ -792,7 +792,14 @@
   font-size: 0.78em;
   font-weight: 600;
   letter-spacing: 0.04em;
-  @apply font-sans text-slate-500 dark:text-slate-400;
+  @apply font-sans text-slate-500;
+}
+
+/* A rule of its own: a `dark:` utility inside a `::before` rule compiles to a selector that ends
+   `::before:where(.dark, .dark *)`, which is not valid, and the build drops it without a word
+   (src/theme.test.ts checks this rule is in the stylesheet). */
+.dark .vlx-decision .vlx-dec-block::before {
+  @apply text-slate-400;
 }
 
 .vlx-decision .vlx-dec-para {

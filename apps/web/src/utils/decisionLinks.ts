@@ -10,7 +10,8 @@ import type {
 } from '../types/decisions';
 import { formatDateForCitation, formatDateItalianLong, withPreposition } from './dateUtils';
 
-/** False until App.tsx routes /sentenze/:corte/:numero/:anno; the decision-page PR sets it true. */
+/** True: App.tsx routes /sentenze/:corte/:numero/:anno, so data that names a decision (the Massimario's
+ *  chips) can link to its page. The one switch for those links. */
 export const DECISION_PAGE_AVAILABLE = true;
 
 /** A decision as other data names it (graph nodes, imports): loose, possibly incomplete. */

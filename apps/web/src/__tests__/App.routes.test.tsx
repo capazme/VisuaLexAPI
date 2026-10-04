@@ -90,6 +90,10 @@ describe('App routing', () => {
   });
 
   it('lazy-loads the decision page at /sentenze and at a decision address', async () => {
+    const lookup = renderAt('/sentenze');
+    expect(await screen.findByTestId('decision-page')).toBeInTheDocument();
+    lookup.unmount();
+
     renderAt('/sentenze/cassazione-civile/10787/2024');
     expect(await screen.findByTestId('decision-page')).toBeInTheDocument();
   });

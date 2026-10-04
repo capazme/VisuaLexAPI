@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { DecisionReference } from '../../../types/decisions';
 import { decisionPath, decisionSlug, parseDecisionPath } from '../../../utils/decisionLinks';
 
@@ -50,7 +51,7 @@ export function DecisionLookupForm({ initial, errors: initialErrors }: DecisionL
           >
             {COURTS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
-          {errors.corte && <span role="alert" className="text-xs text-red-600">{errors.corte}</span>}
+          {errors.corte && <span role="alert" className="text-xs text-red-600 dark:text-red-400">{errors.corte}</span>}
         </label>
         <Input label="Numero" inputMode="numeric" value={numero} onChange={(e) => setNumero(e.target.value)} error={errors.numero} />
         <Input label="Anno" inputMode="numeric" value={anno} onChange={(e) => setAnno(e.target.value)} error={errors.anno} />
@@ -63,7 +64,7 @@ export function DecisionLookupForm({ initial, errors: initialErrors }: DecisionL
           />
         )}
         <div className="sm:col-span-2">
-          <Button type="submit" variant="primary">Apri</Button>
+          <Button type="submit" variant="primary" className={TOUCH_TARGET_RESPONSIVE}>Apri</Button>
         </div>
       </form>
     </section>
