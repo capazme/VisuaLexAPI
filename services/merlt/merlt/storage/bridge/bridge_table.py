@@ -548,6 +548,39 @@ class BridgeTable:
                 for row in rows
             ]
 
+    _PRIMARY = "coalesce((metadata->>'piece')::int, 0) = 0"
+
+    async def year_counts_for_node(self, graph_node_urn: str, *, source: str, relation_type: str,
+                                   archivio: Optional[str] = None) -> Dict[int, int]:
+        """{year: rows} of the whole-paragraph rows linking `graph_node_urn` (pieces > 0 excluded)."""
+        sql = (f"SELECT (metadata->>'anno')::int AS anno, count(*) FROM {self.config.table_name} "
+               f"WHERE graph_node_urn = :urn AND source = :source AND relation_type = :rel AND {self._PRIMARY}"
+               + (" AND metadata->>'archivio' = :archivio" if archivio else "") + " GROUP BY 1")
+        params = {"urn": graph_node_urn, "source": source, "rel": relation_type, "archivio": archivio}
+        async with self._session_maker() as session:
+            rows = (await session.execute(text(sql), params)).fetchall()
+        return {int(r[0]): int(r[1]) for r in rows if r[0] is not None}
+
+    async def archives_for_node(self, graph_node_urn: str, *, source: str, relation_type: str) -> List[str]:
+        sql = (f"SELECT DISTINCT metadata->>'archivio' FROM {self.config.table_name} "
+               f"WHERE graph_node_urn = :urn AND source = :source AND relation_type = :rel AND {self._PRIMARY}")
+        async with self._session_maker() as session:
+            rows = (await session.execute(text(sql), {"urn": graph_node_urn, "source": source, "rel": relation_type})).fetchall()
+        return sorted(r[0] for r in rows if r[0])
+
+    async def page_for_node(self, graph_node_urn: str, *, source: str, relation_type: str, anno: int,
+                            archivio: Optional[str] = None, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        sql = (f"SELECT chunk_id, metadata FROM {self.config.table_name} "
+               f"WHERE graph_node_urn = :urn AND source = :source AND relation_type = :rel AND {self._PRIMARY} "
+               f"AND (metadata->>'anno')::int = :anno"
+               + (" AND metadata->>'archivio' = :archivio" if archivio else "")
+               + " ORDER BY (metadata->>'ordine')::bigint LIMIT :limit OFFSET :offset")
+        params = {"urn": graph_node_urn, "source": source, "rel": relation_type, "anno": anno,
+                  "archivio": archivio, "limit": limit, "offset": offset}
+        async with self._session_maker() as session:
+            rows = (await session.execute(text(sql), params)).fetchall()
+        return [{"chunk_id": str(r[0]), "metadata": r[1]} for r in rows]
+
     async def delete_mappings_for_chunk(self, chunk_id: UUID) -> int:
         """
         Delete all mappings for a chunk.
