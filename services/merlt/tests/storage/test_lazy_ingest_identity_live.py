@@ -18,7 +18,7 @@ and after, so the Libro IV graph is never touched.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -78,18 +78,17 @@ async def _lazy_ingest(graph, urn: str):
     kg._falkordb = graph
     kg._ingestion_pipeline = IngestionPipelineV2(falkordb_client=graph)
     kg._normattiva_scraper = SimpleNamespace(get_document=AsyncMock(return_value=(TEXT, urn + "!vig=")))
-    with patch("merlt.core.legal_knowledge_graph.get_hierarchical_tree", new=AsyncMock(return_value=(None, 0))):
-        return await kg.ingest_norm(
-            params.tipo_atto,
-            params.articolo,
-            include_brocardi=False,
-            include_embeddings=False,
-            include_bridge=False,
-            include_multivigenza=False,
-            data=params.data,
-            numero_atto=params.numero_atto,
-            allegato=params.allegato,
-        )
+    return await kg.ingest_norm(
+        params.tipo_atto,
+        params.articolo,
+        include_brocardi=False,
+        include_embeddings=False,
+        include_bridge=False,
+        include_multivigenza=False,
+        data=params.data,
+        numero_atto=params.numero_atto,
+        allegato=params.allegato,
+    )
 
 
 async def test_the_ingested_article_lands_on_the_massimario_stub(graph):

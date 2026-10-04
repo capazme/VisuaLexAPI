@@ -48,8 +48,7 @@ async def test_an_ordinary_act_reaches_visualex_and_the_pipeline_with_its_date_a
     fetch = AsyncMock(return_value=("Testo dell'articolo.", N2LS + "urn:nir:stato:legge:2012-12-31;247~art18!vig="))
     kg = _kg(fetch)
 
-    with patch("merlt.core.legal_knowledge_graph.get_hierarchical_tree", new=AsyncMock(return_value=(None, 0))) as tree:
-        result = await _ingest(kg, "legge", "18", data="2012-12-31", numero_atto="247")
+    result = await _ingest(kg, "legge", "18", data="2012-12-31", numero_atto="247")
 
     nv = fetch.await_args.args[0]
     assert (nv.norma.tipo_atto, nv.norma.data, nv.norma.numero_atto, nv.numero_articolo) == (
@@ -57,8 +56,6 @@ async def test_an_ordinary_act_reaches_visualex_and_the_pipeline_with_its_date_a
     )
     meta = kg._ingestion_pipeline.ingest_article.await_args.kwargs["article"].metadata
     assert (meta.data, meta.numero_atto) == ("2012-12-31", "247")
-    # The act's own tree, not the tree of "legge" (which has none).
-    tree.assert_awaited_once_with(N2LS + "urn:nir:stato:legge:2012-12-31;247")
     assert result.article_urn == N2LS + "urn:nir:stato:legge:2012-12-31;247~art18"
     assert result.fatal_error is None
 
@@ -67,8 +64,7 @@ async def test_the_annex_reaches_visualex_and_the_article_urn():
     fetch = AsyncMock(return_value=("Testo.", "u"))
     kg = _kg(fetch)
 
-    with patch("merlt.core.legal_knowledge_graph.get_hierarchical_tree", new=AsyncMock(return_value=(None, 0))):
-        result = await _ingest(kg, "decreto legislativo", "3", data="2011-06-23", numero_atto="118", allegato="1")
+    result = await _ingest(kg, "decreto legislativo", "3", data="2011-06-23", numero_atto="118", allegato="1")
 
     assert fetch.await_args.args[0].allegato == "1"
     assert result.article_urn == N2LS + "urn:nir:stato:decreto.legislativo:2011-06-23;118:1~art3"
@@ -78,8 +74,7 @@ async def test_a_code_still_travels_by_name_alone():
     fetch = AsyncMock(return_value=("Testo.", "u"))
     kg = _kg(fetch)
 
-    with patch("merlt.core.legal_knowledge_graph.get_hierarchical_tree", new=AsyncMock(return_value=(None, 0))):
-        result = await _ingest(kg, "codice civile", "2043")
+    result = await _ingest(kg, "codice civile", "2043")
 
     nv = fetch.await_args.args[0]
     assert (nv.norma.data, nv.norma.numero_atto, nv.allegato) == (None, None, None)
@@ -90,8 +85,30 @@ async def test_a_failed_fetch_is_a_fatal_error_in_the_result():
     fetch = AsyncMock(side_effect=Exception("Impossibile estrarre il testo dell'articolo"))
     kg = _kg(fetch)
 
-    with patch("merlt.core.legal_knowledge_graph.get_hierarchical_tree", new=AsyncMock(return_value=(None, 0))):
-        result = await _ingest(kg, "legge", "18", data="2012-12-31", numero_atto="247")
+    result = await _ingest(kg, "legge", "18", data="2012-12-31", numero_atto="247")
 
     assert result.fatal_error == "Impossibile estrarre il testo dell'articolo"
     kg._ingestion_pipeline.ingest_article.assert_not_awaited()
+
+
+async def test_no_tree_is_requested():
+    # The client's tree never carried a position (it reads `number`/`position`,
+    # VisuaLex sends `numero`/`allegato`/`url`): asking for it cost a Normattiva
+    # request per ingestion and gave nothing.
+    kg = _kg(AsyncMock(return_value=("Testo.", "u")))
+
+    with patch(
+        "merlt.clients.visualex_client.VisuaLexClient.fetch_tree", new=AsyncMock()
+    ) as fetch_tree, patch(
+        "merlt.core.legal_knowledge_graph.get_hierarchical_tree", new=AsyncMock()
+    ) as tree:
+        for args, kwargs in (
+            (("codice civile", "2043"), {}),
+            (("legge", "18"), {"data": "2012-12-31", "numero_atto": "247"}),
+        ):
+            result = await _ingest(kg, *args, **kwargs)
+            assert result.fatal_error is None
+
+    fetch_tree.assert_not_awaited()
+    tree.assert_not_awaited()
+    assert kg._ingestion_pipeline.ingest_article.await_args.kwargs["norm_tree"] is None

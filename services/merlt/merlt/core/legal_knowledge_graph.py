@@ -537,12 +537,14 @@ class LegalKnowledgeGraph:
                 brocardi_info=brocardi_info,
             )
 
-            # 4. Run ingestion pipeline (graph + chunks)
-            cached_tree = norm_tree or await self._get_cached_norm_tree(tipo_atto, data, numero_atto, allegato)
+            # 4. Run ingestion pipeline (graph + chunks). The act's tree is not
+            # fetched: the client reads `number`/`position` from items VisuaLex
+            # sends as `numero`/`allegato`/`url` (and section titles as plain
+            # strings), so it never yielded a position, only a Normattiva request.
             ingestion_result = await self._ingestion_pipeline.ingest_article(
                 article=visualex_article,
                 create_graph_nodes=True,
-                norm_tree=cached_tree,
+                norm_tree=norm_tree,
             )
 
             result.article_urn = ingestion_result.article_urn
@@ -735,6 +737,8 @@ class LegalKnowledgeGraph:
         """Get the cached NormTree of the act, or fetch and cache it.
 
         Keyed by the act's URN: two laws share their `tipo_atto` ("legge").
+        The tree carries no article positions yet (see `ingest_norm`, step 4):
+        only the batch ingestion still asks for it.
         """
         # Genera URN direttamente (Norma non ha property .urn)
         urn = generate_urn(act_type=tipo_atto, date=data, act_number=numero_atto, annex=allegato, urn_flag=True)
