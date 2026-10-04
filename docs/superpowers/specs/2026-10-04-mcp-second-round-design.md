@@ -84,7 +84,7 @@ One new table, `trash_entries`, so that no existing query needs a "deleted" filt
 | `kind` | `DOSSIER` or `DOSSIER_ITEMS` |
 | `dossier_id` | the dossier deleted, or the one the entries came from (no foreign key: the dossier may be gone) |
 | `label` | the dossier's name (for `DOSSIER_ITEMS`, the name of the dossier they came from) |
-| `summary` | what the entry holds, written at deletion so the list never opens `payload`: `itemCount`, and for `DOSSIER_ITEMS` `items: [{ itemType, citation, actCitation }]` — `citation` as dossier items carry it («art. 3, l. 31 dicembre 2012, n. 247»), `actCitation` the act alone («l. 31 dicembre 2012, n. 247»), both null for notes and sections; a `sentenza` entry will carry the decision's label |
+| `summary` | what the entry holds, written at deletion so the list never opens `payload`: `itemCount`, and for `DOSSIER_ITEMS` `items: [{ itemType, citation, actCitation }]` — `citation` as dossier items carry it («art. 3, l. 31 dicembre 2012, n. 247»), `actCitation` the act alone («l. 31 dicembre 2012, n. 247»; `citeAct` and dossier items' `act_citation`, from #66 — no second formatter), both null for notes and sections; a `sentenza` entry will carry the decision's label |
 | `payload` | the rows as they were: the dossier with its entries and snapshots, or the entries — any entry type, so the `sentenza` entry of the Sentenze round is covered without change |
 | `client_id`, `client_name`, `grant_id` | which connection deleted it (plain columns: the trash outlives the client and the grant) |
 | `deleted_at`, `expires_at` | 30 days |
