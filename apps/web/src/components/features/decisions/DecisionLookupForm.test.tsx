@@ -22,7 +22,7 @@ function renderForm(props: DecisionLookupFormProps = {}) {
 }
 
 const field = (name: string) => screen.getByRole('textbox', { name });
-const court = () => screen.getByRole('combobox', { name: /Organo/ });
+const court = () => screen.getByRole('combobox', { name: 'Organo' });
 const section = () => screen.queryByRole('textbox', { name: 'Sezione (facoltativa)' });
 
 describe('DecisionLookupForm', () => {
@@ -83,6 +83,28 @@ describe('DecisionLookupForm', () => {
     expect(field('Anno')).toHaveValue('1999');
     expect(field('Anno')).toBeInvalid();
     expect(field('Anno')).toHaveAccessibleDescription("L'anno va dal 1900 al 2026");
+  });
+
+  it('names the court by its label alone, and claims no error it does not have', () => {
+    renderForm();
+    expect(court()).toHaveAttribute('id');
+    expect(screen.getByText('Organo')).toHaveAttribute('for', court().id);
+    expect(court()).not.toHaveAttribute('aria-invalid');
+    expect(court()).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('describes the error of the court on the select, which keeps its clean name', () => {
+    renderForm({ errors: { corte: 'Organo non riconosciuto' } });
+    // the exact name, not «Organo Organo non riconosciuto»: the error is not part of the label
+    expect(court()).toHaveAttribute('aria-invalid', 'true');
+    expect(court()).toBeInvalid();
+    expect(court()).toHaveAccessibleDescription('Organo non riconosciuto');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Organo non riconosciuto');
+    expect(court().getAttribute('aria-describedby')).toBe(alert.id);
+    expect(alert.closest('label')).toBeNull();
+    expect(court().closest('label')).toBeNull();
   });
 
   it('draws the error of the court readable on the dark page, and keeps a 44px button on mobile', () => {

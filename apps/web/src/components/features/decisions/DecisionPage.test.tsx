@@ -126,6 +126,20 @@ describe('DecisionPage', () => {
     expect(screen.queryByText(/licenza|CC BY-SA/i)).toBeNull();
   });
 
+  it.each([
+    ['javascript:', 'javascript:alert(1)'],
+    ['http', 'http://www.cortecostituzionale.it/scheda-pronuncia/2014/1'],
+    ['a protocol-relative address', '//evil.example'],
+  ])('draws no «Apri sulla fonte» for a source address that is not https (%s)', async (_what, url) => {
+    fetchDecision.mockResolvedValue({ ...consulta, fonte: { ...consulta.fonte, url } });
+    const { container } = renderAt('/sentenze/corte-costituzionale/1/2014');
+    await screen.findByRole('button', { name: 'Copia citazione' });
+    expect(screen.queryByRole('link', { name: /Apri sulla fonte/ })).toBeNull();
+    for (const anchor of container.querySelectorAll('a')) expect(anchor.getAttribute('href')).not.toBe(url);
+    // the decision itself is shown all the same
+    expect(screen.getByText('Fonte: Corte costituzionale — dati aperti')).toBeInTheDocument();
+  });
+
   it('a decision without its text shows its particulars and why, and no text block', async () => {
     fetchDecision.mockResolvedValue(withheld);
     const { container } = renderAt('/sentenze/cassazione-civile/10787/2024');
@@ -198,6 +212,28 @@ describe('DecisionPage', () => {
     expect(await screen.findByText(/Sentenza n\. 10787\/2024/)).toBeInTheDocument();
     expect(fetchDecision).toHaveBeenCalledTimes(2);
     error.mockRestore();
+  });
+
+  it.each([
+    ['a gateway error', 'risposta 502'],
+    ['the login gate', 'risposta 401'],
+    ['a page of the framework', 'risposta 404'],
+  ])("an answer that was not the route's (%s) says the service failed, never that the source is silent", async (_what, fonte) => {
+    fetchDecision.mockResolvedValueOnce({ esito: 'fonte_non_raggiungibile', fonte }).mockResolvedValueOnce(found);
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByText('Il servizio non ha risposto correttamente: riprova tra poco.')).toBeInTheDocument();
+    expect(screen.queryByText(/La fonte non risponde/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByText(/Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['cassazione', 'corte_costituzionale'])('a source that is silent (%s) is still the source that does not answer', async (fonte) => {
+    fetchDecision.mockResolvedValueOnce({ esito: 'fonte_non_raggiungibile', fonte });
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(await screen.findByText('La fonte non risponde in questo momento.')).toBeInTheDocument();
+    expect(screen.queryByText(/Il servizio non ha risposto/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
   });
 
   it('a request the route refuses shows the form, filled in, with the route\'s reason on its field', async () => {

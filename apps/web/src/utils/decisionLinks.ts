@@ -254,3 +254,20 @@ export function notFoundMessage(answer: NotFoundDecision, ref: DecisionReference
   void unhandled;
   return `${decisione} non è stata trovata.`;
 }
+
+/**
+ * An address that may go into an `href`: the one given, as it parses, when it is an absolute https
+ * address; null for anything else (http, `javascript:`, `data:`, a protocol-relative `//host`, a
+ * relative path, a string that is no address, nothing). The page links what was checked: the parsed
+ * form leaves a browser no second reading of `https:host`. Our server builds the source links from
+ * fixed bases, so this is defence in depth, for the day that stops being so.
+ */
+export function httpsUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}

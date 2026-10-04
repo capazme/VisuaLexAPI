@@ -5,6 +5,7 @@ import {
   describeNotice,
   formatDecisionCitation,
   formatDecisionHeading,
+  httpsUrl,
   linkableDecisionPath,
   notFoundMessage,
   parseDecisionPath,
@@ -256,5 +257,37 @@ describe('how a decision is named', () => {
     expect(describeNotice({ tipo: 'avviso_nuovo' } as unknown as DecisionNotice)).toBe('Avviso della fonte.');
     expect(notFoundMessage({ esito: 'non_trovata', motivo: 'motivo_nuovo' } as unknown as NotFoundDecision,
       { corte: 'cassazione', numero: 1, anno: 2024 })).toBe('La decisione n. 1/2024 non è stata trovata.');
+  });
+});
+
+// The source link of a decision comes from our server, built on fixed bases: this is defence in
+// depth, for the day that stops being so.
+describe('httpsUrl', () => {
+  it('keeps an https address', () => {
+    expect(httpsUrl('https://www.cortecostituzionale.it/scheda-pronuncia/2014/1'))
+      .toBe('https://www.cortecostituzionale.it/scheda-pronuncia/2014/1');
+  });
+
+  it.each([
+    ['http', 'http://www.cortecostituzionale.it/scheda-pronuncia/2014/1'],
+    ['javascript:', 'javascript:alert(1)'],
+    ['javascript: in capitals', 'JavaScript:alert(1)'],
+    ['data:', 'data:text/html,<script>alert(1)</script>'],
+    ['ftp', 'ftp://www.cortecostituzionale.it/scheda-pronuncia/2014/1'],
+    ['a protocol-relative address', '//evil.example'],
+    ['a relative path', '/scheda-pronuncia/2014/1'],
+    ['a string that is no address', 'non un indirizzo'],
+    ['an empty string', ''],
+    ['nothing', undefined],
+  ])('gives null for %s', (_what, value) => {
+    expect(httpsUrl(value)).toBeNull();
+  });
+
+  it('gives the address as it parses, so the page links what was checked', () => {
+    // "https:host" is read relative to the page's own address by a browser, and as a host by `new URL`
+    expect(httpsUrl('https:www.cortecostituzionale.it/scheda-pronuncia/2014/1'))
+      .toBe('https://www.cortecostituzionale.it/scheda-pronuncia/2014/1');
+    expect(httpsUrl('HTTPS://www.cortecostituzionale.it/scheda-pronuncia/2014/1'))
+      .toBe('https://www.cortecostituzionale.it/scheda-pronuncia/2014/1');
   });
 });

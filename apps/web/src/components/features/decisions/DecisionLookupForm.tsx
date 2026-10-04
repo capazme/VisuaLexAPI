@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
@@ -20,6 +20,9 @@ export interface DecisionLookupFormProps {
 
 export function DecisionLookupForm({ initial, errors: initialErrors }: DecisionLookupFormProps) {
   const navigate = useNavigate();
+  // the label and the error of the court find the select by id, as the fields' do (ui/Input)
+  const courtId = useId();
+  const courtErrorId = `${courtId}-error`;
   const [court, setCourt] = useState(initial?.corte ? decisionSlug({ corte: initial.corte, archivio: initial.archivio }) : 'cassazione-civile');
   const [numero, setNumero] = useState(initial?.numero ? String(initial.numero) : '');
   const [anno, setAnno] = useState(initial?.anno ? String(initial.anno) : '');
@@ -42,17 +45,22 @@ export function DecisionLookupForm({ initial, errors: initialErrors }: DecisionL
     <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <h2 className="mb-3 font-semibold text-slate-900 dark:text-white">Apri una sentenza</h2>
       <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2" noValidate>
-        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300 sm:col-span-2">
-          Organo
+        <div className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300 sm:col-span-2">
+          <label htmlFor={courtId}>Organo</label>
           <select
+            id={courtId}
             value={court}
             onChange={(e) => setCourt(e.target.value)}
+            aria-invalid={errors.corte ? true : undefined}
+            aria-describedby={errors.corte ? courtErrorId : undefined}
             className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
           >
             {COURTS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
-          {errors.corte && <span role="alert" className="text-xs text-red-600 dark:text-red-400">{errors.corte}</span>}
-        </label>
+          {errors.corte && (
+            <span id={courtErrorId} role="alert" className="text-xs text-red-600 dark:text-red-400">{errors.corte}</span>
+          )}
+        </div>
         <Input label="Numero" inputMode="numeric" value={numero} onChange={(e) => setNumero(e.target.value)} error={errors.numero} />
         <Input label="Anno" inputMode="numeric" value={anno} onChange={(e) => setAnno(e.target.value)} error={errors.anno} />
         {isCassazione && (

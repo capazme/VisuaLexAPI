@@ -12,6 +12,7 @@ import {
   describeNotice,
   formatDecisionCitation,
   formatDecisionHeading,
+  httpsUrl,
   notFoundMessage,
   parseDecisionPath,
 } from '../../../utils/decisionLinks';
@@ -44,6 +45,9 @@ function Alert({ children }: { children: React.ReactNode }) {
 }
 
 function FoundView({ answer, onCopy }: { answer: FoundDecision; onCopy: () => void }) {
+  // The source's own page, only ever over https: the address comes from our server, built on fixed
+  // bases, so this is defence in depth.
+  const sourceUrl = httpsUrl(answer.fonte.url);
   return (
     <article className="space-y-5">
       <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
@@ -56,9 +60,9 @@ function FoundView({ answer, onCopy }: { answer: FoundDecision; onCopy: () => vo
         <Button variant="secondary" size="sm" icon={<Copy size={16} />} className={TOUCH_TARGET_RESPONSIVE} onClick={onCopy}>
           Copia citazione
         </Button>
-        {answer.fonte.url && (
+        {sourceUrl && (
           <a
-            href={answer.fonte.url}
+            href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400"
@@ -76,6 +80,19 @@ function FoundView({ answer, onCopy }: { answer: FoundDecision; onCopy: () => vo
       </footer>
     </article>
   );
+}
+
+/**
+ * Who did not answer, in the page's words. `quota`: the limit of requests. `rete`: the request never
+ * reached our server. `risposta <status>`: something answered that was not the route (the ingress, the
+ * login gate or the framework: a 502 while VisuaLex's Python service is down). Those are ours, and are
+ * never blamed on the source; only the name of a source (`cassazione`, `corte_costituzionale`) is.
+ */
+function unreachableMessage(fonte: string): string {
+  if (fonte === 'quota') return 'Hai raggiunto il limite di richieste: riprova tra un minuto.';
+  if (fonte === 'rete') return 'Il server non ha risposto: controlla la connessione e riprova.';
+  if (fonte.startsWith('risposta ')) return 'Il servizio non ha risposto correttamente: riprova tra poco.';
+  return 'La fonte non risponde in questo momento.';
 }
 
 export function DecisionPage() {
@@ -206,18 +223,13 @@ export function DecisionPage() {
       </>
     );
   } else if (answer.esito === 'fonte_non_raggiungibile') {
-    // also a Corte costituzionale copy that could not be refreshed and lacks the number: it
-    // confirms, it never denies. `rete`: the request never reached our server, so it is not the
-    // source that is silent.
+    // Our own failures (the limit of requests, the network, an answer that was not the route's) are
+    // told apart from a source that is silent, and never blamed on it (`unreachableMessage`). A source
+    // that is silent includes a Corte costituzionale copy that could not be refreshed and lacks the
+    // number: it confirms, it never denies.
     body = (
       <Alert>
-        <p>
-          {answer.fonte === 'quota'
-            ? 'Hai raggiunto il limite di richieste: riprova tra un minuto.'
-            : answer.fonte === 'rete'
-              ? 'Il server non ha risposto: controlla la connessione e riprova.'
-              : 'La fonte non risponde in questo momento.'}
-        </p>
+        <p>{unreachableMessage(answer.fonte)}</p>
         {retry}
       </Alert>
     );
