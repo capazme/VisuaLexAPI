@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citeArticle } from '../../src/norms/citation';
+import { citeAct, citeArticle, citeStoredAct } from '../../src/norms/citation';
 // The web app's golden file is the specification of the wording (the owner reads
 // it). The server's formatter is pinned to it: for every case the web cites, the
 // "art. …" part of its citation is what the server writes. A change of style in
@@ -68,5 +68,49 @@ describe('citeArticle', () => {
   it('cites an act of the Union by its number and year (the web app cites none: a reading is not a version)', () => {
     expect(citeArticle({ tipo_atto: 'regolamento UE', numero_atto: '679', data: '2016-04-27', numero_articolo: '5' })).toBe('art. 5, regolamento (UE) 2016/679');
     expect(citeArticle({ tipo_atto: 'direttiva UE', numero_atto: '790', data: '2019-04-17', numero_articolo: '17' })).toBe('art. 17, direttiva (UE) 2019/790');
+  });
+});
+
+// The act alone, for whatever names an act once above its articles (the dossier
+// groups its articles by act). It is the article's citation without the article
+// and without the annex: an annex is where an article sits, not another act.
+describe('citeAct', () => {
+  it('is the article\'s citation without "art. N" and the annex, for every case the web cites', () => {
+    const cases = CITATION_GOLDEN.filter((c) => c.expected !== null);
+    for (const c of cases) {
+      const norma = c.context.norma;
+      const article = citeArticle(norma).replace(/ \(Allegato [^)]*\)$/, '');
+      const act = citeAct(norma);
+      expect([`art. ${norma.numero_articolo} ${act}`, `art. ${norma.numero_articolo}, ${act}`]).toContain(article);
+    }
+  });
+
+  it('names a law by type, date and number, and tells two laws apart', () => {
+    expect(citeAct({ tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31' })).toBe('l. 31 dicembre 2012, n. 247');
+    expect(citeAct({ tipo_atto: 'legge', numero_atto: '49', data: '2023-04-21' })).toBe('l. 21 aprile 2023, n. 49');
+  });
+
+  it('names the codes and the Constitution by their abbreviation', () => {
+    expect(citeAct(CC)).toBe('c.c.');
+    expect(citeAct({ tipo_atto: 'costituzione' })).toBe('Cost.');
+    expect(citeAct({ tipo_atto: 'Codice di procedura civile' })).toBe('c.p.c.');
+  });
+
+  it('names an aliased act by the act it is, and leaves the annex out', () => {
+    expect(citeAct({ tipo_atto: 'codice in materia di protezione dei dati personali', tipo_atto_reale: 'decreto legislativo', numero_atto: '196', data: '2003-06-30' })).toBe('d.lgs. 30 giugno 2003, n. 196');
+    expect(citeAct({ tipo_atto: 'decreto legislativo', numero_atto: '36', data: '2023-03-31', allegato: 'I.1' })).toBe('d.lgs. 31 marzo 2023, n. 36');
+  });
+
+  it('names an act of the Union by its year and number', () => {
+    expect(citeAct({ tipo_atto: 'regolamento UE', numero_atto: '679', data: '2016-04-27' })).toBe('regolamento (UE) 2016/679');
+    expect(citeAct({ tipo_atto: 'direttiva UE' })).toBe('direttiva (UE)');
+  });
+});
+
+describe('citeStoredAct', () => {
+  it('names the act of a stored norm, and nothing for anything else', () => {
+    expect(citeStoredAct('norm', { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' })).toBe('l. 31 dicembre 2012, n. 247');
+    expect(citeStoredAct('note', 'appunto')).toBeNull();
+    expect(citeStoredAct('norm', { numero_articolo: '3' })).toBeNull();
   });
 });
