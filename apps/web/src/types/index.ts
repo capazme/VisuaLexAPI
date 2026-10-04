@@ -1,3 +1,6 @@
+import type { DossierSentenzaData } from './decisions';
+export type { DossierSentenzaData } from './decisions';
+
 export interface Norma {
     tipo_atto: string;
     data: string;
@@ -299,6 +302,7 @@ interface DossierItemBase {
 
 export type DossierItem =
     | (DossierItemBase & { type: 'norma'; data: DossierNormaData })
+    | (DossierItemBase & { type: 'sentenza'; data: DossierSentenzaData })
     | (DossierItemBase & { type: 'note'; data: string });
 
 export interface Bookmark {

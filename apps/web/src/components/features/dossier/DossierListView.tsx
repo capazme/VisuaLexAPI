@@ -20,7 +20,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeNormaGroups, computeItemCounts, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, type NormaGroup,
 } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
@@ -73,6 +73,7 @@ export function DossierListView({ onSelect, showToast }: Props) {
             return item.data.tipo_atto?.toLowerCase().includes(q) ||
                    item.data.numero_articolo?.includes(q);
           }
+          if (item.type === 'sentenza') return decisionCitationOf(item.data).toLowerCase().includes(q);
           return item.data?.toLowerCase?.().includes(q);
         })
       );
@@ -215,10 +216,10 @@ export function DossierListView({ onSelect, showToast }: Props) {
     if (!importingDossier) return;
     const snapshot = importingDossier;
     setImportingDossier(null);
-    const newId = await importDossier(snapshot);
-    if (newId) {
+    const outcome = await importDossier(snapshot);
+    if (outcome) {
       showToast('Dossier importato', 'success');
-      onSelect(newId);
+      onSelect(outcome.id);
     } else {
       showToast('Impossibile importare il dossier: errore server', 'error');
     }

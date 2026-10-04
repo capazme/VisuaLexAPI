@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 import { getErrorMessage } from '../utils/errors';
 import {
@@ -32,7 +32,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
-import { citationsFromApi, dossierItemFromApi, packItemContent } from '../components/features/dossier/dossierUtils';
+import { citationsFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -183,6 +183,13 @@ export interface StructureWindowState {
     blockId: string | null;
     /** Where the user parked it. Persisted: that is the point of a movable window. */
     position: { x: number; y: number };
+}
+
+/** What an import made of a dossier: the new dossier's id, and how many items the server took or refused. */
+export interface ImportOutcome {
+    id: string;
+    imported: number;
+    failed: number;
 }
 
 interface AppState {
@@ -356,7 +363,7 @@ interface AppState {
     deleteDossier: (id: string) => void;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
-    addToDossier: (dossierId: string, item: DossierNormaData | string, type: 'norma' | 'note') => void;
+    addToDossier: (dossierId: string, item: DossierNormaData | DossierSentenzaData | string, type: 'norma' | 'note' | 'sentenza') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     setDossierItemOrder: (dossierId: string, itemIds: string[]) => void;
@@ -364,7 +371,7 @@ interface AppState {
     flushDossierOrder: (dossierId: string) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
-    importDossier: (dossier: Dossier) => Promise<string | null>; // returns new server-side dossier ID, null on failure
+    importDossier: (dossier: Dossier) => Promise<ImportOutcome | null>; // null when the dossier itself could not be created
 
     addAnnotation: (normaKey: string, articleId: string, text: string, anchor?: { anchorText: string; startOffset: number }) => void;
     removeAnnotation: (id: string) => void;
@@ -1438,9 +1445,13 @@ const appStore = createStore<AppState>()(
 
             addToDossier: (dossierId, itemData, type) => {
                 const tempId = uuidv4();
-                const newItem: DossierItem = typeof itemData === 'string'
-                    ? { id: tempId, type: 'note', data: itemData, addedAt: new Date().toISOString() }
-                    : { id: tempId, type: 'norma', data: itemData, addedAt: new Date().toISOString() };
+                const addedAt = new Date().toISOString();
+                // Built from `type`, not from the shape of the data: a decision is an object too.
+                const newItem: DossierItem = type === 'note'
+                    ? { id: tempId, type: 'note', data: itemData as string, addedAt }
+                    : type === 'sentenza'
+                        ? { id: tempId, type: 'sentenza', data: itemData as DossierSentenzaData, addedAt }
+                        : { id: tempId, type: 'norma', data: itemData as DossierNormaData, addedAt };
 
                 // Optimistic update
                 set((state) => {
@@ -1457,9 +1468,8 @@ const appStore = createStore<AppState>()(
 
                 // API call
                 dossierService.addItem(dossierId, {
-                    itemType: type === 'norma' ? 'norm' : 'note',
-                    title: typeof itemData === 'string' ? 'Nota' : (itemData.tipo_atto || 'Nota'),
-                    content: itemData,
+                    ...serverItemFor(newItem),
+                    content: itemContentFor(newItem),
                 }).then(created => {
                     // Update with server ID; the item is now settled.
                     set((state) => {
@@ -1483,7 +1493,7 @@ const appStore = createStore<AppState>()(
                     const settledItem = get().dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
                     if (settledItem?.status === 'important') {
                         dossierService.updateItem(dossierId, created.id, {
-                            content: packItemContent(settledItem.data, 'important'),
+                            content: itemContentFor(settledItem, 'important'),
                         }).catch(err => {
                             console.error('Failed to persist dossier item status set while item was pending:', err);
                             set((state) => {
@@ -1576,9 +1586,8 @@ const appStore = createStore<AppState>()(
                     state.pendingDossierOrders[dossierId] = true;
                 });
                 dossierService.addItem(dossierId, {
-                    itemType: item.type === 'norma' ? 'norm' : 'note',
-                    title: item.type === 'norma' ? (item.data.tipo_atto || 'Nota') : 'Nota',
-                    content: packItemContent(item.data, item.status),
+                    ...serverItemFor(item),
+                    content: itemContentFor(item),
                 }).then(created => {
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
@@ -1594,7 +1603,7 @@ const appStore = createStore<AppState>()(
                     const settled = get().dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
                     if (settled && settled.status !== item.status) {
                         dossierService.updateItem(dossierId, created.id, {
-                            content: packItemContent(settled.data, settled.status),
+                            content: itemContentFor(settled),
                         }).catch(err => console.error('Failed to persist the star of a restored item:', err));
                     }
                     get().flushDossierOrder(dossierId);
@@ -1666,7 +1675,8 @@ const appStore = createStore<AppState>()(
             updateDossierItemStatus: (dossierId, itemId, status) => {
                 const dossier = get().dossiers.find(d => d.id === dossierId);
                 const item = dossier?.items.find(i => i.id === itemId);
-                if (!dossier || !item || item.type !== 'norma') return;
+                // Norms and decisions carry the star; a note is a plain string and has none.
+                if (!dossier || !item || item.type === 'note') return;
 
                 // The item hasn't settled on the server yet — itemId is
                 // still the client-generated tempId from addToDossier. A PUT
@@ -1696,7 +1706,7 @@ const appStore = createStore<AppState>()(
                 // API call - persist the star (only 'important' is meaningfully
                 // encoded server-side via the _dossierMeta envelope; see packItemContent)
                 dossierService.updateItem(dossierId, itemId, {
-                    content: packItemContent(item.data, status),
+                    content: itemContentFor(item, status),
                 }).catch(err => {
                     console.error('Failed to persist dossier item status:', err);
                     // Rollback
@@ -1792,9 +1802,8 @@ const appStore = createStore<AppState>()(
                     const itemResults = await Promise.allSettled(
                         dossier.items.map(async (item) => {
                             const serverItem = await dossierService.addItem(created.id, {
-                                itemType: item.type === 'norma' ? 'norm' : 'note',
-                                title: item.type === 'norma' ? (item.data?.tipo_atto || 'Norma') : 'Nota',
-                                content: packItemContent(item.data, item.status),
+                                ...serverItemFor(item),
+                                content: itemContentFor(item),
                             });
                             return { serverItem, original: item };
                         })
@@ -1825,7 +1834,7 @@ const appStore = createStore<AppState>()(
                             isPinned: !!dossier.isPinned,
                         });
                     });
-                    return created.id;
+                    return { id: created.id, imported: items.length, failed: failedCount };
                 } catch (err) {
                     console.error('Failed to import dossier:', err);
                     return null;

@@ -5,7 +5,7 @@ export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
 
 export interface DossierItemApi {
   id: string;
-  item_type: 'norm' | 'note' | 'section';
+  item_type: 'norm' | 'note' | 'section' | 'sentenza';
   title: string;
   // The server's names for a norm and its act; null for anything else.
   citation?: string | null;
@@ -44,7 +44,7 @@ export interface DossierUpdate {
 }
 
 export interface DossierItemCreate {
-  itemType: 'norm' | 'note' | 'section';
+  itemType: 'norm' | 'note' | 'section' | 'sentenza';
   title: string;
   content?: unknown;
   position?: number;

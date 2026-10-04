@@ -4,6 +4,8 @@ import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
 import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
 import type { DossierItemApi } from '../../../services/dossierService';
+import type { DecisionArchive, DecisionAttributes, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
+import { decisionKey, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
@@ -176,23 +178,136 @@ export function citationsFromApi(api: Pick<DossierItemApi, 'citation' | 'act_cit
   };
 }
 
+export function assertNever(value: never): never {
+  throw new Error(`Unexpected dossier item: ${JSON.stringify(value)}`);
+}
+
+const SENTENZA_KEYS = new Set(['corte', 'numero', 'anno', 'archivio', 'sezione', 'tipo', 'data_deposito', 'etichetta']);
+const SEZIONI = new Set(['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F']);
+const TIPI = new Set(['sentenza', 'ordinanza', 'ordinanza interlocutoria', 'decreto']);
+
+/** The content of a `sentenza` item, or null. Mirrors apps/server/src/schemas/decisionItem.ts:
+ *  change both together. Imported and stored content is untrusted. */
+export function parseSentenzaContent(data: unknown, now: Date = new Date()): DossierSentenzaData | null {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
+  const d = data as Record<string, unknown>;
+  if (Object.keys(d).some((k) => !SENTENZA_KEYS.has(k))) return null;
+  const { corte, numero, anno, archivio, sezione, tipo, data_deposito, etichetta } = d;
+  if (corte !== 'cassazione' && corte !== 'corte_costituzionale') return null;
+  if (typeof numero !== 'number' || !Number.isInteger(numero) || numero < 1 || numero > 999_999) return null;
+  const first = corte === 'corte_costituzionale' ? 1956 : 1900;
+  if (typeof anno !== 'number' || !Number.isInteger(anno) || anno < first || anno > now.getFullYear()) return null;
+  if (typeof etichetta !== 'string' || !etichetta.trim() || etichetta.length > 200) return null;
+  if (corte === 'cassazione' && archivio !== 'civile' && archivio !== 'penale') return null;
+  if (corte === 'corte_costituzionale' && (archivio !== undefined || sezione !== undefined)) return null;
+  if (sezione !== undefined && !(typeof sezione === 'string' && SEZIONI.has(sezione))) return null;
+  if (tipo !== undefined && !(typeof tipo === 'string' && TIPI.has(tipo))) return null;
+  if (data_deposito !== undefined && !(typeof data_deposito === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data_deposito))) return null;
+  return {
+    corte,
+    numero,
+    anno,
+    ...(archivio ? { archivio: archivio as DecisionArchive } : {}),
+    ...(sezione ? { sezione: sezione as string } : {}),
+    ...(tipo ? { tipo: tipo as string } : {}),
+    ...(data_deposito ? { data_deposito: data_deposito as string } : {}),
+    etichetta,
+  };
+}
+
+/**
+ * A kept decision's citation, recomputed from its identity and attributes (source convention
+ * §8.3, Q9). The stored `etichetta` is a convenience copy: the app shows this, and writes this as
+ * `etichetta` whenever it writes the item (`itemContentFor`, `serverItemFor`).
+ */
+export function decisionCitationOf(data: Omit<DossierSentenzaData, 'etichetta'>): string {
+  return formatDecisionCitation(identityOf(data), {
+    ...(data.sezione ? { sezione: data.sezione } : {}),
+    ...(data.tipo ? { tipo: data.tipo } : {}),
+    ...(data.data_deposito ? { data_deposito: data.data_deposito } : {}),
+  });
+}
+
+/** The item a decision page adds: its identity, the attributes the item schema accepts, and the
+ *  citation computed from those, so that a later write recomputes the same label. */
+export function sentenzaFromDecision(identity: DecisionIdentity, attrs: DecisionAttributes): DossierSentenzaData {
+  const kept = {
+    corte: identity.corte,
+    numero: identity.numero,
+    anno: identity.anno,
+    ...(identity.archivio ? { archivio: identity.archivio } : {}),
+    ...(attrs.sezione && SEZIONI.has(attrs.sezione) && identity.corte === 'cassazione' ? { sezione: attrs.sezione } : {}),
+    ...(attrs.tipo && TIPI.has(attrs.tipo) ? { tipo: attrs.tipo } : {}),
+    ...(attrs.data_deposito ? { data_deposito: attrs.data_deposito } : {}),
+  };
+  return { ...kept, etichetta: decisionCitationOf(kept) };
+}
+
+/** The server's type and title for an item; a decision's title is its recomputed citation (Q9). */
+export function serverItemFor(item: DossierItem): { itemType: 'norm' | 'note' | 'sentenza'; title: string } {
+  switch (item.type) {
+    case 'norma':
+      return { itemType: 'norm', title: item.data.tipo_atto || 'Norma' };
+    case 'sentenza':
+      return { itemType: 'sentenza', title: decisionCitationOf(item.data) };
+    case 'note':
+      return { itemType: 'note', title: 'Nota' };
+    default:
+      return assertNever(item);
+  }
+}
+
+/** The content the app writes for an item: the star in its envelope, and a decision's label
+ *  recomputed (Q9), whatever copy it was read with. */
+export function itemContentFor(item: DossierItem, status: DossierItem['status'] = item.status): unknown {
+  const data = item.type === 'sentenza' ? { ...item.data, etichetta: decisionCitationOf(item.data) } : item.data;
+  return packItemContent(data, status);
+}
+
 // One server item as the store holds it. The star travels inside `content` as a
 // _dossierMeta envelope (packItemContent); the DB `status` column is not read.
 export function dossierItemFromApi(api: DossierItemApi): DossierItem {
   const { data, status } = unpackItemContent(api.content);
   const base = { id: api.id, addedAt: api.created_at, ...(status ? { status } : {}), ...citationsFromApi(api) };
-  return api.item_type === 'norm'
-    ? { ...base, type: 'norma', data: data as DossierNormaData }
-    : { ...base, type: 'note', data: data as string };
+  if (api.item_type === 'norm') {
+    // A Forum suggestion taken before 2026-10 stored the whole entry: {articleRef, status}.
+    const entry = data as { articleRef?: unknown } | null;
+    const norma = entry && typeof entry === 'object' && entry.articleRef ? entry.articleRef : data;
+    return { ...base, type: 'norma', data: norma as DossierNormaData };
+  }
+  if (api.item_type === 'sentenza') {
+    const sentenza = parseSentenzaContent(data);
+    if (sentenza) return { ...base, type: 'sentenza', data: sentenza };
+    console.error('Dossier item of type sentenza with unreadable content', { id: api.id });
+    return { ...base, type: 'note', data: 'Sentenza non leggibile: i dati salvati sono incompleti.' };
+  }
+  // 'note' and the unused 'section'; a note taken from a Forum suggestion before 2026-10 was {note}
+  const entry = data as { note?: unknown } | null;
+  const text = typeof data === 'string' ? data
+    : entry && typeof entry === 'object' && typeof entry.note === 'string' ? entry.note : '';
+  return { ...base, type: 'note', data: text };
 }
 
-export function computeItemCounts(items: DossierItem[]): { norme: number; note: number; important: number } {
-  let norme = 0, note = 0, important = 0;
+export function dossierContainsDecision(dossier: Dossier, identity: DecisionIdentity): boolean {
+  const key = decisionKey(identity);
+  return dossier.items.some((i) => i.type === 'sentenza' && decisionKey(i.data) === key);
+}
+
+export function computeItemCounts(items: DossierItem[]): { norme: number; sentenze: number; note: number; important: number } {
+  let norme = 0;
+  let sentenze = 0;
+  let note = 0;
+  let important = 0;
   for (const i of items) {
-    if (i.type === 'norma') norme++; else note++;
+    switch (i.type) {
+      case 'norma': norme++; break;
+      case 'sentenza': sentenze++; break;
+      case 'note': note++; break;
+      default: assertNever(i);
+    }
     if (i.status === 'important') important++;
   }
-  return { norme, note, important };
+  return { norme, sentenze, note, important };
 }
 
 // Most recent activity on a dossier: the max of its creation time and every

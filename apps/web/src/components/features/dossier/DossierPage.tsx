@@ -57,9 +57,9 @@ export function DossierPage() {
     if (!importingDossier) return;
     const snapshot = importingDossier;
     setImportingDossier(null);
-    const newId = await importDossier(snapshot);
-    if (newId) {
-      setSelectedDossierId(newId);
+    const outcome = await importDossier(snapshot);
+    if (outcome) {
+      setSelectedDossierId(outcome.id);
       showToast('Dossier importato', 'success');
     } else {
       showToast('Impossibile importare il dossier: errore server', 'error');

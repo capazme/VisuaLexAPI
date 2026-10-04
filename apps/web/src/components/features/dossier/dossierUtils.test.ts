@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
   computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
   dossierItemFromApi,
+  parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -66,7 +67,7 @@ describe('computeItemCounts', () => {
       item({}), item({ id: 'i2', status: 'important' }),
       item({ id: 'i3', type: 'note', data: 'memo' }),
       item({ id: 'i4', status: 'done' }), // legacy value: not important
-    ])).toEqual({ norme: 3, note: 1, important: 1 });
+    ])).toEqual({ norme: 3, sentenze: 0, note: 1, important: 1 });
   });
 });
 
@@ -319,5 +320,65 @@ describe('dossierItemFromApi', () => {
   it('reads a note, and an answer from a server without the fields', () => {
     const note = dossierItemFromApi({ ...base, id: 'n', item_type: 'note', content: 'appunto' });
     expect(note).toEqual({ id: 'n', type: 'note', data: 'appunto', addedAt: base.created_at });
+  });
+});
+
+const SENTENZA = { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024, sezione: '7',
+  tipo: 'sentenza', data_deposito: '2024-03-12', etichetta: 'Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787' } as const;
+
+describe('decision items', () => {
+  const at = '2026-10-01T00:00:00Z';
+  const api = { title: 't', position: 0, status: 'unread' as const, created_at: at };
+
+  it('parseSentenzaContent mirrors the server schema', () => {
+    expect(parseSentenzaContent(SENTENZA)).toEqual(SENTENZA);
+    for (const bad of [
+      { ...SENTENZA, corte: 'tar' }, { ...SENTENZA, archivio: undefined }, { ...SENTENZA, numero: 0 },
+      { ...SENTENZA, anno: 3000 }, { ...SENTENZA, testo: 'x' }, { ...SENTENZA, etichetta: '' },
+      { ...SENTENZA, sezione: '6-3' }, { corte: 'corte_costituzionale', numero: 1, anno: 2014, sezione: '3', etichetta: 'x' },
+      'stringa', null, [],
+    ]) {
+      expect(parseSentenzaContent(bad)).toBeNull();
+    }
+  });
+
+  it('dossierItemFromApi reads a decision, and the entries a Forum take stored whole before 2026-10', () => {
+    expect(dossierItemFromApi({ ...api, id: 's', item_type: 'sentenza', content: { ...SENTENZA, _dossierMeta: { important: true } } }))
+      .toEqual({ id: 's', type: 'sentenza', data: SENTENZA, addedAt: at, status: 'important' });
+    expect(dossierItemFromApi({ ...api, id: 'n', item_type: 'norm', content: { articleRef: { tipo_atto: 'codice civile' }, status: 'important' } }).data)
+      .toEqual({ tipo_atto: 'codice civile' });
+    expect(dossierItemFromApi({ ...api, id: 'o', item_type: 'note', content: { note: 'vecchia' } }).data).toBe('vecchia');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const broken = dossierItemFromApi({ ...api, id: 'b', item_type: 'sentenza', content: { corte: 'tar' } });
+    expect(broken).toMatchObject({ type: 'note', data: 'Sentenza non leggibile: i dati salvati sono incompleti.' });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('the stored label is a copy: what is shown and written is the citation recomputed (source convention, Q9)', () => {
+    const stale = { ...SENTENZA, etichetta: 'Cass. pen. n. 10787/2024 (vecchia forma)' };
+    const item = { id: '1', type: 'sentenza' as const, data: stale, addedAt: '', status: 'important' as const };
+    expect(decisionCitationOf(stale)).toBe(SENTENZA.etichetta);
+    expect(serverItemFor(item)).toEqual({ itemType: 'sentenza', title: SENTENZA.etichetta });
+    expect(itemContentFor(item)).toEqual({ ...SENTENZA, _dossierMeta: { important: true } });
+    expect(itemContentFor(item, 'unread')).toEqual(SENTENZA);
+  });
+
+  it('counts decisions apart, and tells a kept decision from the other archive\'s', () => {
+    const item = { id: '1', type: 'sentenza' as const, data: { ...SENTENZA }, addedAt: '' };
+    expect(computeItemCounts([item, { id: '2', type: 'note', data: 'x', addedAt: '' }]))
+      .toEqual({ norme: 0, sentenze: 1, note: 1, important: 0 });
+    const kept = { id: 'd', title: 'D', createdAt: '', items: [item] };
+    expect(dossierContainsDecision(kept, { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 })).toBe(true);
+    expect(dossierContainsDecision(kept, { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 })).toBe(false);
+  });
+
+  it('sentenzaFromDecision keeps only what the item schema accepts, and labels it from that', () => {
+    expect(sentenzaFromDecision({ corte: 'cassazione', archivio: 'civile', numero: 5, anno: 2022 },
+      { sezione: '6-3', tipo: 'provvedimento', data_deposito: '2022-01-10', relatore: 'X' }))
+      .toEqual({ corte: 'cassazione', archivio: 'civile', numero: 5, anno: 2022, data_deposito: '2022-01-10',
+        etichetta: 'Cass. civ., 10 gennaio 2022, n. 5' });
+    expect(sentenzaFromDecision({ corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 },
+      { sezione: '7', tipo: 'sentenza', data_deposito: '2024-03-12' })).toEqual(SENTENZA);
   });
 });

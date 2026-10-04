@@ -158,9 +158,9 @@ describe('importDossier', () => {
       ],
     };
 
-    const id = await appStore.getState().importDossier(importedDossier);
+    const outcome = await appStore.getState().importDossier(importedDossier);
 
-    expect(id).toBe('srv-1');
+    expect(outcome).toEqual({ id: 'srv-1', imported: 1, failed: 0 });
     expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', expect.objectContaining({
       content: { ...norma, _dossierMeta: { important: true } },
     }));
@@ -285,5 +285,40 @@ describe('the order after a refusal, and after a restore', () => {
     await vi.waitFor(() => expect(appStore.getState().dossiers[0].items).toHaveLength(0));
     expect(appStore.getState().lastSyncError?.message).toMatch(/ripristinare/);
     error.mockRestore();
+  });
+});
+
+describe('decision items in the store', () => {
+  // As stored before a change of style: the store writes the citation recomputed (source convention, Q9).
+  const sentenza = { corte: 'corte_costituzionale' as const, numero: 1, anno: 2014, tipo: 'sentenza',
+    data_deposito: '2014-01-13', etichetta: 'Corte cost. 1/2014' };
+  const current = { ...sentenza, etichetta: 'Corte cost., sent. 13 gennaio 2014, n. 1' };
+
+  it('addToDossier sends a sentenza item titled by its citation', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [] }] });
+    appStore.getState().addToDossier('d1', sentenza, 'sentenza');
+    expect(dossierService.addItem).toHaveBeenCalledWith('d1', { itemType: 'sentenza', title: current.etichetta, content: current });
+    expect(appStore.getState().dossiers[0].items[0]).toMatchObject({ type: 'sentenza', data: sentenza });
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-1'));
+  });
+
+  it('a decision can be starred, and the star is written with the citation recomputed', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [
+      { id: 's1', type: 'sentenza', data: sentenza, addedAt: '' },
+    ] }] });
+    appStore.getState().updateDossierItemStatus('d1', 's1', 'important');
+    await vi.waitFor(() => expect(dossierService.updateItem).toHaveBeenCalledWith(
+      'd1', 's1', { content: { ...current, _dossierMeta: { important: true } } },
+    ));
+  });
+
+  it('importDossier says how many items the server refused', async () => {
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('ok')).mockRejectedValueOnce(new Error('400'));
+    const outcome = await appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: [
+      { id: 'a', type: 'sentenza', data: sentenza, addedAt: '' },
+      { id: 'b', type: 'note', data: 'n', addedAt: '' },
+    ] });
+    expect(outcome).toEqual({ id: 'srv-1', imported: 1, failed: 1 });
+    expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', { itemType: 'sentenza', title: current.etichetta, content: current });
   });
 });
