@@ -1,6 +1,6 @@
 # The MCP server, second round — design
 
-**Status:** the owner answered the first six questions on 4 October 2026 (§10); two follow-ups on cards (§10, Q7–Q8) are open. Nothing here is built.
+**Status:** approved — the owner answered all eight questions on 4 October 2026 (§10). Nothing here is built; the plan is `docs/superpowers/plans/2026-10-04-mcp-second-round.md`.
 **Follows:** `docs/superpowers/specs/2026-10-02-mcp-spike-design.md` (phase 1, in `develop`: #53, #57, #58, #60, #64). Where this document and that one differ, this one wins; that spec's E8, §6 "Prompt injection", §8, §12 and Review Focus 5 of its plan now point here.
 **Decisions it rests on** (the owners' private workspace, cited by ID only): D-036, D-037, D-046, D-050.
 
@@ -14,7 +14,7 @@
 
 ## 2. Decisions
 
-"Owner" means the owner said it (exact words in the session brief or in §10, 4 October). "Proposed" means this session proposes it and the owner has not answered it yet (§10, Q7–Q8).
+"Owner" means the owner said it (exact words in the session brief or in §10, 4 October). "Agreed" means the dossier UI round agreed it through the orchestrator.
 
 | # | Decision | Source | Why / cost of changing |
 | --- | --- | --- | --- |
@@ -33,8 +33,8 @@
 | S12 | Order: notes and the mark → stateful MCP server → trash and permission → deletion tools → cards | Owner (§10 Q5) | |
 | P2 | The MCP server becomes **stateful** (sessions in memory) | Forced by S2 — §3 | Stateless cannot elicit (measured). Cost: a restart drops the sessions and clients sign in to a new one |
 | P7 | **No restore through MCP**: restore is the web app's alone | Proposed, part of the approved design | A connection that deletes by mistake cannot also be the one that hides it; revocation never strands the trash |
-| P8 | Through MCP a user deletes **only their own cards in a personal state** (draft, archived); a card the community has taken up is refused | Proposed — §10 Q7 | The same line `deleteUserAccount` draws (D-045) |
-| P9 | Card entries appear in the **same trash list** as dossiers, until LingoLex has screens | Proposed — §10 Q8 | |
+| P8 | Through MCP a user deletes **only their own cards in a personal state** (draft, archived); a card the community has taken up is refused | Owner (§10 Q7: «28 sì») | The same line `deleteUserAccount` draws (D-045) |
+| P9 | Card entries appear **only in the global trash** («Cestino» from the dossier list, under «Schede LingoLex»); a dossier's own «Rimossi di recente» shows only its entries | Agreed with the dossier UI round (§10 Q8) | Moves to LingoLex's screens when they exist |
 
 ## 3. What was measured (4 October 2026, scratch probe outside the repository)
 
@@ -98,7 +98,7 @@ One new table, `trash_entries`, so that no existing query needs a "deleted" filt
 - **Expiry:** expired entries are deleted by a sweep awaited on the trash routes, at most every ten minutes (phase 1's lesson: no fire-and-forget work on the database).
 - **Account deletion** removes the trash with the person (cascade; `deleteUserAccount` stays the one path).
 - **Revocation does not touch the trash.** What a connection deleted stays restorable after the user revokes it; the revoked connection can reach nothing.
-- **The web screens** (the trash list and Restore) belong to the dossier UI round, which places them in its new layout; this round delivers the routes, their tests and the data shape, agreed with that session through the orchestrator (§9). The consent checkbox and the settings switch are this round's (they live in phase 1's connections feature).
+- **The web screens** (the global «Cestino», a dossier's «Rimossi di recente», Restore) belong to the dossier UI round, which places them in its new layout; this round delivers the routes, their tests and the data shape, agreed with that session through the orchestrator (§9). The consent checkbox and the settings switch are this round's (they live in phase 1's connections feature).
 
 ### 4.4 The tools
 
@@ -113,7 +113,7 @@ All three carry the `destructiveHint` annotation. Quota: 1 point per call plus a
 ### 4.5 The MCP server becomes stateful
 
 - Sessions (`Mcp-Session-Id`) in memory, created at `initialize`. Each session is **bound to the user and the grant** of the token that opened it; every later request is still introspected, and a token of another user or grant on that session is a 404 (the session does not exist for it).
-- A session ends after 30 minutes idle, at `DELETE`, or when its token's introspection fails; at most 10 open sessions per grant (the oldest is closed).
+- A session ends after 30 minutes idle or at `DELETE`; at most 10 open sessions per grant (the oldest is closed). A request whose token is inactive is refused (401) without ending the session: the client refreshes and continues it with the new token of the same grant, and a revoked grant can never pass introspection again, so its sessions just idle out.
 - `GET` opens the server-to-client stream (Claude Code opens one at once — measured); `DELETE` ends the session. Responses to `POST` become SSE streams (the SDK's default): JSON responses cannot carry a request back to the client mid-call. All three clients tried accept SSE.
 - A restart drops every session; a client sending an unknown session id gets 404 and starts a new one (as the protocol requires; checked against Claude Code in the plan's transport task).
 - Only one `apps/mcp` process: no sharing of sessions between processes is designed (the exposure round decides how it runs in production).
@@ -121,7 +121,7 @@ All three carry the `destructiveHint` annotation. Quota: 1 point per call plus a
 ## 5. Notes
 
 - **Tool** `omnilex_aggiungi_nota_dossier` `{ dossier, testo, voce? }`: adds one note to a dossier the user names (by id or exact name, as `omnilex_leggi_dossier`). Scope `dossier:read` + `dossier:write`. API: `POST /api/dossiers/:id/notes` `{ text, aboutItemId? }`, in the delegated table and open to the user's session too (the web app may use it; the dossier UI round decides).
-- **A note on an article (S11).** With `voce`, the id of a norm entry of that dossier (later also a `sentenza` entry), the note is **attached to that entry as a whole**: a new column `about_item_id` on `dossier_items` (no foreign key), returned as `about_item_id`; the dossier UI round shows it under the article. Never a note on a passage: anchored notes need an exact character offset into `article_text` (root rule 23), a model cannot be trusted to produce one, and a wrong offset makes the note vanish without a trace. An id that is not a norm entry of that dossier is refused. When the article entry goes to the trash the note stays as a plain dossier note, and it is attached again when the article is restored (same id).
+- **A note on an article (S11).** With `voce`, the id of a norm entry of that dossier (later also a `sentenza` entry), the note is **attached to that entry as a whole**: a new column `about_item_id` on `dossier_items` (no foreign key), returned as `about_item_id`; the dossier UI round shows it with its article, and a note whose article is no longer in the dossier as a plain note at the top. Never a note on a passage: anchored notes need an exact character offset into `article_text` (root rule 23), a model cannot be trusted to produce one, and a wrong offset makes the note vanish without a trace. An id that is not a norm entry of that dossier is refused. When the article entry goes to the trash the note stays as a plain dossier note, and it is attached again when the article is restored (same id).
 - **Add-only:** no tool edits, moves or deletes a note (deleting one goes through §4, like any entry). The user edits or deletes Claude's notes in the web app as their own.
 - **Length:** 1–4,000 characters of plain text (trimmed; control characters other than new lines refused); the web app aligns its own note cap to 4,000 (dossier UI round). **Cost:** 2 points, plus a daily counter **`note`, 100 a day** through MCP (placeholders).
 - **The mark.** Every entry and dossier created through MCP records, in columns the server sets and no route accepts from a body, **which connection created it**: `created_by_client_id`, `created_by_client_name` on `dossier_items` and `dossiers` (null = the user). Norms added through MCP get it too: it is free, and the dossier UI decides where to show it. The client's name is the one it registered with, unverified, so the web app should say «scritta da Claude Code (applicazione collegata)», not just «Claude». The mark stays when the user edits the note.
@@ -146,7 +146,7 @@ What this round must withstand, each with a test in the plan and a security revi
 3. **Replay of a confirmation.** An answer is bound to one request of one session inside one tool call; there is nothing to replay. A re-sent `trash-items` call finds the entries gone (404).
 4. **Deletion outside the user's dossiers.** Ownership checked on every trash route; an item id of another dossier is refused, not ignored (the dossier id scopes the query, as `updateDossierItem` does); a card of another user is «not found», a community card «not deletable».
 5. **Restore after revocation.** Restore is the user's session only; a revoked or any other connection cannot restore, list or empty the trash (outside the delegated table: 403).
-6. **Session hijack.** A session id with another user's token is a 404; sessions die with their token.
+6. **Session hijack.** A session id with another user's or another grant's token is a 404; every request is introspected whatever its session.
 7. **The mark forged.** `created_by_*` is set from the delegation, never from a body; a user-session write leaves it null.
 8. **Secrets and content in logs.** One line per tool call as today: user, client, tool, outcome — never the note's text, a title or an answer to the dialog's content.
 
@@ -174,7 +174,5 @@ Answered on 4 October (through the orchestrator; where he agreed he kept the rec
 5. Order: notes and the mark → stateful server → trash and permission → deletions → cards → **agreed**; no earlier Gate 0 date for the cards.
 6. Cards not deletable → **no**: «facciamo in modo che si possano cancellare» (S1b).
 
-Open:
-
-7. **Which cards Claude may delete.** Proposal: only the user's own cards in a personal state (draft, archived), the same line account deletion draws; a card proposed to the community, validated or under review is refused per card and stays. **Recommendation: yes.**
-8. **Where deleted cards show.** LingoLex has no screens yet. Proposal: card entries appear in the same «Rimossi di recente» list as dossiers (label «Schede LingoLex», the first questions), and move to LingoLex's screens when they exist. **Recommendation: yes**, to be agreed with the dossier UI round.
+7. Which cards Claude may delete: only the user's own cards in a personal state (draft, archived); the others refused per card → **«28 sì»**.
+8. Where deleted cards show → agreed with the dossier UI round: only in the global trash («Cestino» from the dossier list, «Schede LingoLex» with the first two or three questions); a dossier's «Rimossi di recente» shows only its own entries.
