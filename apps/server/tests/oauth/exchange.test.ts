@@ -251,3 +251,37 @@ describe('the daily quota of delegated calls', () => {
     expect(response.body.dossierCreations.limit).toBe(10);
   });
 });
+
+describe('review findings on PR #57', () => {
+  let alice: TestUser;
+  beforeEach(async () => {
+    alice = await createTestUser('findings57-alice');
+  });
+
+  it('M1. refuses a delegated write whose body is not JSON (a form body would dodge the weight)', async () => {
+    const { apiToken } = await delegatedToken(alice);
+    const response = await request(app)
+      .post('/api/dossiers')
+      .set(bearer(apiToken))
+      .type('form')
+      .send('name=Form');
+    expect(response.status).toBe(415);
+    expect(await prisma.dossier.count()).toBe(0);
+  });
+
+  it('M2. a Bearer value that claims to be a JWT and is not is a 401, not a 500', async () => {
+    const bogus = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.bm90IGpzb24.sig';
+    expect((await request(app).get('/api/dossiers').set(bearer(bogus))).status).toBe(401);
+  });
+
+  it('M3. a refused call costs nothing: points and the creation counter come back', async () => {
+    const { apiToken } = await delegatedToken(alice);
+    const quota = async () => (await request(app).get('/api/oauth/quota').set(bearer(apiToken))).body;
+    const before = await quota();
+    const refused = await request(app).post('/api/dossiers').set(bearer(apiToken)).send({ name: '' });
+    expect(refused.status).toBe(400);
+    const after = await quota();
+    expect(after.points.remaining).toBe(before.points.remaining);
+    expect(after.dossierCreations.remaining).toBe(before.dossierCreations.remaining);
+  });
+});

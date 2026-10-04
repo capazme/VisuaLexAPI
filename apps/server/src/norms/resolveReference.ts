@@ -9,12 +9,20 @@
  * 2. `POST /fetch_norma_data`: the norm as the reader stores it (the same
  *    object the web app puts in a dossier), and a first existence check where
  *    the act's tree is known ("Articolo N non presente …").
- * 3. `POST /fetch_act_fingerprints`, once per act for the whole batch: an
- *    article exists if its number is a key of the answer. When the act has no
- *    AKN index (`available: false`, or an EU act, which has no AKN export) the
- *    article's own text is fetched instead.
+ * 3. Existence, once per act for the whole batch. A Normattiva act with a
+ *    single part is decided on `POST /fetch_act_fingerprints` (an article
+ *    exists if its number is a key). An act with annexes is decided on its
+ *    tree (`POST /fetch_tree`), which lists (annex, article) pairs: the
+ *    fingerprints cover the dominant part only, and art. 40 of the code is not
+ *    art. 40 of the preleggi. With neither, the reference is `unavailable`:
+ *    the text alone proves nothing, since Normattiva answers a request for a
+ *    missing article with the act's art. 1 and a 200. An EU act (no AKN
+ *    export) is decided on its article's text, where EUR-Lex does say "not
+ *    found".
  * An article that does not exist must never reach a dossier: a previous bug
- * did exactly that.
+ * did exactly that. A source that fails, or answers 429 (the Python API limits
+ * each address), makes the references it touched `unavailable`, never
+ * "missing" or "not recognised".
  */
 
 export type ReferenceOutcome = 'resolved' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
@@ -48,6 +56,9 @@ const CONCURRENCY = 5;
 const apiBase = (): string => (process.env.LEGAL_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
 
 class SourceUnavailable extends Error {}
+
+/** A status that says nothing about the reference: the source is down, slow or limiting us. */
+const sourceFailed = (status: number): boolean => status === 429 || status >= 500 || status === 0;
 
 async function post(path: string, body: unknown): Promise<{ status: number; data: Record<string, unknown> }> {
   let response: Response;
@@ -83,12 +94,14 @@ async function mapLimited<T, R>(items: T[], limit: number, task: (item: T) => Pr
 const SEVERAL_ARTICLES = /[,;]|\s(e|ed)\s|^\d+\s*-\s*\d+$/i;
 const NOT_PRESENT = /non presente/i;
 
-const articleKey = (article: string): string => article.toLowerCase().replace(/\s+/g, '').replace(/^(\d+)([a-z])/, '$1-$2');
+// "2645-bis", "2645 bis", "2645bis" → "2645-bis": the fingerprints, the tree and the norm write it differently.
+const articleKey = (article: string): string =>
+  article.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2');
 
 /** Steps 1 and 2 for one reference: what it names, or why not. */
 async function identify(reference: string): Promise<Resolution> {
   const parsed = await post('/parse_query', { query: reference });
-  if (parsed.status >= 500) throw new SourceUnavailable(`parse_query ${parsed.status}`);
+  if (parsed.status !== 200) throw new SourceUnavailable(`parse_query ${parsed.status}`);
   const params = parsed.data.parsed as Record<string, string> | null | undefined;
   if (!parsed.data.recognized || !params?.act_type) {
     return { outcome: 'not_recognised', detail: 'Riferimento non riconosciuto: indica articolo e atto (es. «art. 2043 c.c.»).' };
@@ -102,11 +115,12 @@ async function identify(reference: string): Promise<Resolution> {
   }
 
   const fetched = await post('/fetch_norma_data', params);
-  if (fetched.status >= 500 && !NOT_PRESENT.test(String(fetched.data.error ?? ''))) {
-    throw new SourceUnavailable(`fetch_norma_data ${fetched.status}`);
-  }
   if (NOT_PRESENT.test(String(fetched.data.error ?? ''))) {
     return { outcome: 'does_not_exist', display, detail: String(fetched.data.error) };
+  }
+  if (sourceFailed(fetched.status)) throw new SourceUnavailable(`fetch_norma_data ${fetched.status}`);
+  if (fetched.status !== 200) {
+    return { outcome: 'ambiguous', display, detail: 'Il riferimento non individua un articolo di un atto preciso.' };
   }
   const norms = Array.isArray(fetched.data.norma_data) ? (fetched.data.norma_data as NormaVisitata[]) : [];
   if (norms.length !== 1) {
@@ -121,7 +135,9 @@ async function identify(reference: string): Promise<Resolution> {
   return { outcome: 'resolved', norm, display };
 }
 
-/** Step 3: one fingerprint call per act; per-article fallback when it has no index. */
+type Verdict = 'exists' | 'missing' | 'unknown';
+
+/** Step 3: one decision per act, for every reference that names it. */
 async function confirmExistence(resolutions: Resolution[]): Promise<void> {
   const byAct = new Map<string, Resolution[]>();
   for (const resolution of resolutions) {
@@ -131,25 +147,67 @@ async function confirmExistence(resolutions: Resolution[]): Promise<void> {
   }
 
   await mapLimited([...byAct.entries()], CONCURRENCY, async ([act, group]) => {
-    let fingerprints: Record<string, unknown> | null = null;
-    if (!act.includes('eur-lex')) {
-      const answer = await post('/fetch_act_fingerprints', { urn: act });
-      if (answer.status >= 500) throw new SourceUnavailable(`fetch_act_fingerprints ${answer.status}`);
-      if (answer.data.available === true && answer.data.fingerprints && typeof answer.data.fingerprints === 'object') {
-        fingerprints = answer.data.fingerprints as Record<string, unknown>;
-      }
+    let verdicts: Verdict[];
+    try {
+      verdicts = act.includes('eur-lex')
+        ? await mapLimited(group, CONCURRENCY, (resolution) => euArticleVerdict(resolution.norm!))
+        : await normattivaVerdicts(act, group.map((resolution) => resolution.norm!));
+    } catch (error) {
+      if (!(error instanceof SourceUnavailable)) throw error;
+      verdicts = group.map(() => 'unknown');
     }
-    if (fingerprints) {
-      const keys = new Set(Object.keys(fingerprints).map(articleKey));
-      for (const resolution of group) {
-        if (!keys.has(articleKey(resolution.norm!.numero_articolo))) markMissing(resolution);
-      }
-      return;
-    }
-    await mapLimited(group, CONCURRENCY, async (resolution) => {
-      if (!(await articleHasText(resolution.norm!))) markMissing(resolution);
+    group.forEach((resolution, i) => {
+      if (verdicts[i] === 'missing') markMissing(resolution);
+      else if (verdicts[i] === 'unknown') markUnverifiable(resolution);
     });
   });
+}
+
+/** Fingerprints for a single-part act; the tree, annex by annex, otherwise. */
+async function normattivaVerdicts(act: string, norms: NormaVisitata[]): Promise<Verdict[]> {
+  const answer = await post('/fetch_act_fingerprints', { urn: act });
+  const fingerprints =
+    answer.status === 200 && answer.data.available === true && answer.data.fingerprints && typeof answer.data.fingerprints === 'object'
+      ? (answer.data.fingerprints as Record<string, unknown>)
+      : null;
+  const parts = Array.isArray(answer.data.parts) ? answer.data.parts.length : 0;
+  if (fingerprints && parts <= 1) {
+    const keys = new Set(Object.keys(fingerprints).map(articleKey));
+    return norms.map((norm) => (keys.has(articleKey(norm.numero_articolo)) ? 'exists' : 'missing'));
+  }
+
+  const tree = await post('/fetch_tree', { urn: act, return_metadata: false });
+  const articles = tree.status === 200 && Array.isArray(tree.data.articles) ? (tree.data.articles as unknown[]) : null;
+  if (!articles) return norms.map(() => 'unknown');
+  const pairs = new Set(
+    articles
+      .filter((a): a is { allegato?: unknown; numero?: unknown } => Boolean(a) && typeof a === 'object')
+      .filter((a) => typeof a.numero === 'string')
+      .map((a) => `${a.allegato ?? ''}|${articleKey(a.numero as string)}`),
+  );
+  if (pairs.size === 0) return norms.map(() => 'unknown');
+  return norms.map((norm) => (pairs.has(`${norm.allegato ?? ''}|${articleKey(norm.numero_articolo)}`) ? 'exists' : 'missing'));
+}
+
+// What EUR-Lex's reader says of an article it cannot find; any other error is the source failing.
+const EU_NOT_FOUND = /not found|non trovat|non presente|DocumentNotFound/i;
+
+async function euArticleVerdict(norm: NormaVisitata): Promise<Verdict> {
+  const answer = await post('/fetch_article_text', {
+    act_type: norm.tipo_atto,
+    act_number: norm.numero_atto ?? '',
+    date: norm.data ?? '',
+    article: norm.numero_articolo,
+    version: 'vigente',
+    show_brocardi_info: false,
+  });
+  if (answer.status !== 200) return 'unknown';
+  // The endpoint answers an array, one entry per article asked; errors ride inside a 200.
+  const list: unknown[] = Array.isArray(answer.data) ? answer.data : [];
+  const first = list[0] as { article_text?: unknown; error?: unknown } | undefined;
+  if (!first) return 'unknown';
+  if (first.error) return EU_NOT_FOUND.test(String(first.error)) ? 'missing' : 'unknown';
+  return typeof first.article_text === 'string' && first.article_text.trim() ? 'exists' : 'unknown';
 }
 
 function markMissing(resolution: Resolution): void {
@@ -158,21 +216,10 @@ function markMissing(resolution: Resolution): void {
   delete resolution.norm;
 }
 
-async function articleHasText(norm: NormaVisitata): Promise<boolean> {
-  const answer = await post('/fetch_article_text', {
-    act_type: norm.tipo_atto,
-    act_number: norm.numero_atto ?? '',
-    date: norm.data ?? '',
-    article: norm.numero_articolo,
-    version: 'vigente',
-    annex: norm.allegato ?? undefined,
-    show_brocardi_info: false,
-  });
-  if (answer.status >= 500) throw new SourceUnavailable(`fetch_article_text ${answer.status}`);
-  // The endpoint answers an array, one entry per article asked.
-  const list: unknown[] = Array.isArray(answer.data) ? answer.data : [];
-  const first = list[0] as { article_text?: unknown; error?: unknown } | undefined;
-  return Boolean(first && !first.error && typeof first.article_text === 'string' && first.article_text.trim());
+function markUnverifiable(resolution: Resolution): void {
+  resolution.outcome = 'unavailable';
+  resolution.detail = 'Impossibile verificare che l’articolo esista: riprova più tardi.';
+  delete resolution.norm;
 }
 
 /**
@@ -189,18 +236,7 @@ export async function resolveReferences(references: string[]): Promise<Resolutio
       return { outcome: 'unavailable', detail: 'Fonte non raggiungibile: riprova più tardi.' } as Resolution;
     }
   });
-  try {
-    await confirmExistence(resolutions);
-  } catch (error) {
-    if (!(error instanceof SourceUnavailable)) throw error;
-    for (const resolution of resolutions) {
-      if (resolution.outcome === 'resolved') {
-        resolution.outcome = 'unavailable';
-        resolution.detail = 'Impossibile verificare che l’articolo esista: riprova più tardi.';
-        delete resolution.norm;
-      }
-    }
-  }
+  await confirmExistence(resolutions);
   return resolutions;
 }
 
