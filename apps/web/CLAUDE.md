@@ -6,16 +6,26 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 
 ### Frontend (`apps/web/src`)
 
-- `App.tsx` — routing. Routes: `/` (search), `/dossier`, `/history`,
-  `/environments`, `/forum`, `/documents`, `/admin/*`, plus `/login` and
-  `/register`.
+- `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
+  `/history`, `/environments`, `/forum`, `/documents`, `/sentenze` (the form to
+  open a court decision) and `/sentenze/:corte/:numero/:anno` (a decision), then
+  the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
+  `/grafo` (`/merlt/qa` and `/merlt/chiedi` redirect to `/grafo`), and a 404 for
+  anything else. The MERL-T routes are always registered: `VITE_FEATURE_MERLT`
+  and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
+  entries and whether a page says it is unavailable. Outside the layout:
+  `/login`, `/register`, `/connect` (the consent page an MCP client's
+  authorization request lands on: signed in, the user approves or refuses) and
+  `/admin/*` (admins only).
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`, `environments`,
   `bulletin` (the Forum), `history`, `compare`, `settings`, `documents`
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
   user drops in — parsed in the browser, never uploaded — each opening the
-  reader through `navigate('/')` + `triggerSearch`, gotcha 15).
+  reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
+  (`DecisionPage`, `DecisionLookupForm`, `DecisionTextView`: a court decision
+  by its address; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.

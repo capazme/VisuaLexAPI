@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { formatNormCitation } from '../citation';
-import { linkableDecisionPath, type LooseDecisionRef } from '../decisionLinks';
+import { decisionKey, formatDecisionCitation, linkableDecisionPath, type LooseDecisionRef } from '../decisionLinks';
+import type { DecisionAttributes, DecisionIdentity } from '../../types/decisions';
 
 // The convention for legal sources (docs/superpowers/specs/2026-10-04-source-convention-design.md)
 // lives in one neutral file every suite reads. Until each area adopts it, this test keeps the
-// file honest: its shape, the citations the owner decided, the decision paths the app builds.
+// file honest: its shape, the citations the owner decided, the decision paths, keys and citations
+// the app builds.
 
 function findGolden(from: string): string {
   for (let dir = from; ; dir = dirname(dir)) {
@@ -103,6 +105,57 @@ describe('the golden file of legal sources', () => {
       const path = c.identity.path ?? c.identity.reference_path;
       if (path?.status !== 'current') continue;
       it(c.id, () => expect(linkableDecisionPath(c.input.reference, now)).toBe(path.value));
+    }
+  });
+
+  describe('decided citations and current keys of decisions are what decisionLinks.ts writes', () => {
+    // A case is an identity when the file gives it a key: its reference is then complete (the archive
+    // and the year are known), as the Python suite reads it. `identity.fields`, where the file has it
+    // (two cases of nine), must say the same.
+    const identityOfReference = (r: LooseDecisionRef): DecisionIdentity | null => {
+      if (r.anno == null) return null;
+      if (r.corte === 'corte_costituzionale') return { corte: r.corte, numero: r.numero, anno: r.anno };
+      if (r.corte === 'cassazione' && (r.archivio === 'civile' || r.archivio === 'penale')) {
+        return { corte: r.corte, archivio: r.archivio, numero: r.numero, anno: r.anno };
+      }
+      return null;
+    };
+    const keyed = golden.decisions.filter((c) => c.identity.key?.status === 'current' && typeof c.identity.key.value === 'string');
+    const unkeyed = golden.decisions.filter((c) => c.identity.key?.status === 'current' && c.identity.key.value === null);
+    const identities = keyed.flatMap((c) => {
+      const identity = identityOfReference(c.input.reference);
+      // the file's attributes are a decision's, plus fields the model has not got yet (data_udienza)
+      return identity ? [{ c, identity, attributes: c.input.attributes as DecisionAttributes }] : [];
+    });
+
+    it('has an identity for every case with a key, the same as identity.fields, and none for the rest', () => {
+      expect(keyed.length).toBeGreaterThan(4);
+      expect(identities.map((i) => i.c.id)).toEqual(keyed.map((c) => c.id));
+      for (const { c, identity } of identities) {
+        if (c.identity.fields?.status === 'current') expect(c.identity.fields.value, c.id).toEqual(identity);
+      }
+      expect(unkeyed.length).toBeGreaterThan(0);
+      for (const c of unkeyed) expect(identityOfReference(c.input.reference), c.id).toBeNull();
+    });
+
+    for (const { c, identity } of identities) {
+      it(`${c.id}: the key`, () => expect(decisionKey(identity)).toBe(c.identity.key.value));
+    }
+
+    // Decided and not written yet: the hearing date. Italgiure gives none and the model has no `data_udienza`.
+    // A case listed here that starts passing fails too, so the list cannot go stale.
+    const PENDING_DECISIONS = new Set(['cass-pen-hearing-date-known']);
+    const decided = identities.filter(({ c }) => c.labels.citation?.status === 'decided');
+    it('covers the decisions the owner decided a citation for', () => expect(decided.length).toBeGreaterThan(4));
+    it('lists only decided cases as pending', () => {
+      for (const id of PENDING_DECISIONS) expect(decided.map(({ c }) => c.id), id).toContain(id);
+    });
+    for (const { c, identity, attributes } of decided) {
+      if (PENDING_DECISIONS.has(c.id)) {
+        it(`${c.id} (pending adoption)`, () => expect(formatDecisionCitation(identity, attributes)).not.toBe(c.labels.citation.value));
+      } else {
+        it(`${c.id}: the citation`, () => expect(formatDecisionCitation(identity, attributes)).toBe(c.labels.citation.value));
+      }
     }
   });
 });
