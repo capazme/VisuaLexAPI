@@ -103,7 +103,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **`norms/citation.ts`** — `citeArticle`, how a lawyer cites an article in the
   owner's style: «art. 3, l. 31 dicembre 2012, n. 247», «art. 1284 c.c.», «art. 81
   Cost.». Dossier items carry it as `citation` (null for anything but a norm) in
-  `GET /dossiers` and `GET /dossiers/:id`, and the MCP tools pass it on. It is a
+  `GET /dossiers` and `GET /dossiers/:id`, and the MCP tools pass it on. `citeAct`
+  is the act alone («l. 31 dicembre 2012, n. 247», «c.c.»), without the article
+  or the annex, carried as `act_citation` for a reader that names each act once
+  above its articles; `citeArticle` is built on it, so the two cannot drift. It is a
   second implementation of the web app's `utils/citation.ts`, pinned to the web's
   golden file: `tests/norms/citation.test.ts` imports
   `apps/web/src/utils/__fixtures__/citationGolden.ts` and fails when the two

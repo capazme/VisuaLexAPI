@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
-import { citeStoredNorm } from '../norms/citation';
+import { citeStoredAct, citeStoredNorm } from '../norms/citation';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -28,6 +28,8 @@ function serializeItem(i: ItemRow) {
     title: i.title,
     // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
     citation: citeStoredNorm(i.itemType, i.content),
+    // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
+    act_citation: citeStoredAct(i.itemType, i.content),
     content: i.content,
     position: i.position,
     status: i.status,

@@ -18,7 +18,7 @@ and after, so the Libro IV graph is never touched.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -37,6 +37,7 @@ TEST_GRAPH = "merlt_test_lazy_ingest_identity"
 PORTAL_ARTICLE = "/uri-res/N2Ls?urn:nir:stato:legge:2012-12-31;247~art18"
 PORTAL_ACT = "/uri-res/N2Ls?urn:nir:stato:legge:2012-12-31;247"
 DECISION = "cass:test:1"
+CODE_CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2"
 TEXT = (
     "Art. 18\n\n(Rubrica di prova).\n\n"
     "Primo comma del testo di prova.\n\n"
@@ -65,6 +66,11 @@ async def _massimario_stubs(graph) -> tuple[str, str]:
     return article, act
 
 
+async def _properties(graph, urn: str) -> list[dict]:
+    rows = await graph.query("MATCH (n:Norma {URN: $u}) RETURN properties(n) AS p", {"u": urn})
+    return [row["p"] for row in rows]
+
+
 async def _lazy_ingest(graph, urn: str):
     params = _urn_to_ingest_params(urn)
     kg = LegalKnowledgeGraph()
@@ -72,18 +78,17 @@ async def _lazy_ingest(graph, urn: str):
     kg._falkordb = graph
     kg._ingestion_pipeline = IngestionPipelineV2(falkordb_client=graph)
     kg._normattiva_scraper = SimpleNamespace(get_document=AsyncMock(return_value=(TEXT, urn + "!vig=")))
-    with patch("merlt.core.legal_knowledge_graph.get_hierarchical_tree", new=AsyncMock(return_value=(None, 0))):
-        return await kg.ingest_norm(
-            params.tipo_atto,
-            params.articolo,
-            include_brocardi=False,
-            include_embeddings=False,
-            include_bridge=False,
-            include_multivigenza=False,
-            data=params.data,
-            numero_atto=params.numero_atto,
-            allegato=params.allegato,
-        )
+    return await kg.ingest_norm(
+        params.tipo_atto,
+        params.articolo,
+        include_brocardi=False,
+        include_embeddings=False,
+        include_bridge=False,
+        include_multivigenza=False,
+        data=params.data,
+        numero_atto=params.numero_atto,
+        allegato=params.allegato,
+    )
 
 
 async def test_the_ingested_article_lands_on_the_massimario_stub(graph):
@@ -115,3 +120,30 @@ async def test_the_ingested_article_lands_on_the_massimario_stub(graph):
         {"act": act, "art": article},
     )
     assert contains[0]["n"] == 1
+
+
+async def test_an_ordinary_act_not_yet_in_the_graph_is_born_a_stub_never_a_code(graph):
+    # 4 Oct 2026, live: the act node of l. 247/2012 was created with
+    # tipo_documento 'codice', titolo 'Legge', autorita 'Parlamento'.
+    article = to_canonical(parse_portal_urn(PORTAL_ARTICLE), {})
+    act = to_canonical(parse_portal_urn(PORTAL_ACT), {})
+
+    result = await _lazy_ingest(graph, article)
+
+    assert result.fatal_error is None
+    assert await _properties(graph, act) == [stub_properties(act)]
+    contains = await graph.query(
+        "MATCH (:Norma {URN: $act})-[:CONTIENE]->(:Norma {URN: $art}) RETURN count(*) AS n",
+        {"act": act, "art": article},
+    )
+    assert contains[0]["n"] == 1
+
+
+async def test_a_code_keeps_its_code_node(graph):
+    result = await _lazy_ingest(graph, CODE_CC + "~art2043")
+
+    assert result.fatal_error is None
+    (code,) = await _properties(graph, CODE_CC)
+    assert code["tipo_documento"] == "codice"
+    assert code["titolo"] == "Codice Civile"
+    assert "is_stub" not in code
