@@ -145,6 +145,7 @@ describe('DossierDetailView — notes about an article', () => {
     const notes = screen.getByRole('region', { name: /Note \(1\)/ });
     expect(within(notes).queryByText('Sul primo articolo.')).toBeNull();
     expect(screen.getByTitle('1 nota')).toBeInTheDocument();
+    expect(screen.getByText(/2 atti · 3 articoli · 2 note/)).toBeInTheDocument();
   });
 
   it('writes a note to the dossier through the notes route', async () => {

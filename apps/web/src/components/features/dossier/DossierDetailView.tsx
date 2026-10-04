@@ -162,10 +162,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
       onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
     };
   }, [fullBlocks]);
+  const noteCount = dossier.items.filter((i) => i.type === 'note').length;
   const countsLine = [
     plural(fullLayout.acts.length, 'atto', 'atti'),
     plural(fullLayout.acts.reduce((n, a) => n + a.articles.length, 0), 'articolo', 'articoli'),
-    ...(fullLayout.notes.length > 0 ? [plural(fullLayout.notes.length, 'nota', 'note')] : []),
+    // Every note: the free ones and those about an article.
+    ...(noteCount > 0 ? [plural(noteCount, 'nota', 'note')] : []),
   ].join(' · ');
   const visibleArticleIds = useMemo(() => layout.acts.flatMap((a) => a.articles.map((i) => i.id)), [layout]);
 
