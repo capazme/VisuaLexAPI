@@ -151,3 +151,17 @@ describe('actsSummary', () => {
     expect(actsSummary(layoutDossier([note('x')]))).toBe('');
   });
 });
+
+describe('notes about an article', () => {
+  it("sit with their article; one whose article is gone is a plain note", () => {
+    const a = art({ numero_articolo: '3' }, L247);
+    const about: DossierItem = { id: 'n-a', type: 'note', data: 'Sul dovere', addedAt: '', aboutItemId: a.id };
+    const orphan: DossierItem = { id: 'n-o', type: 'note', data: 'Era su un articolo tolto', addedAt: '', aboutItemId: 'gone' };
+    const plain = note('libera');
+    const layout = layoutDossier([a, about, orphan, plain]);
+    expect(layout.attached.get(a.id)?.map((i) => i.id)).toEqual(['n-a']);
+    expect(layout.notes.map((i) => i.id)).toEqual(['n-o', 'n-libera']);
+    // A drag keeps every item, the attached note included.
+    expect(dossierItemOrder([a, about, orphan, plain], layout, [layout.acts[0].key]).sort()).toEqual([a.id, 'n-a', 'n-libera', 'n-o'].sort());
+  });
+});

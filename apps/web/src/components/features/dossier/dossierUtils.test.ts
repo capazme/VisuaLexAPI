@@ -316,6 +316,10 @@ describe('dossierItemFromApi', () => {
     });
     expect(item.data).not.toHaveProperty('_dossierMeta');
   });
+  it("reads the article a note is about and who wrote it", () => {
+    const note = dossierItemFromApi({ ...base, id: 'n', item_type: 'note', content: 'Sul danno.', about_item_id: 'a', created_by: { clientName: 'Claude Code' } });
+    expect(note).toMatchObject({ type: 'note', data: 'Sul danno.', aboutItemId: 'a', createdBy: { clientName: 'Claude Code' } });
+  });
   it('reads a note, and an answer from a server without the fields', () => {
     const note = dossierItemFromApi({ ...base, id: 'n', item_type: 'note', content: 'appunto' });
     expect(note).toEqual({ id: 'n', type: 'note', data: 'appunto', addedAt: base.created_at });

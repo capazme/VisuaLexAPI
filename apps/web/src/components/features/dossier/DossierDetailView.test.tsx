@@ -12,6 +12,10 @@ vi.mock('../../../services/dossierService', () => ({
     deleteItem: vi.fn(async () => {}),
     updateItem: vi.fn(async () => ({})),
     reorderItems: vi.fn(async () => {}),
+    addNote: vi.fn(async (_d: string, body: { text: string; aboutItemId?: string }) => ({
+      id: 'srv-note', item_type: 'note', title: 'Nota', content: body.text, position: 9, status: 'unread', created_at: '2026-10-04T12:00:00Z',
+      about_item_id: body.aboutItemId ?? null, created_by: null,
+    })),
   },
 }));
 
@@ -19,6 +23,7 @@ import { appStore } from '../../../store/useAppStore';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
 import { DossierDetailView } from './DossierDetailView';
 import type { Dossier } from '../../../types';
+import { dossierService } from '../../../services/dossierService';
 
 const L247 = 'l. 31 dicembre 2012, n. 247';
 const L49 = 'l. 21 aprile 2023, n. 49';
@@ -128,5 +133,50 @@ describe('DossierDetailView — the page by act', () => {
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
     expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: `Sposta ${L49}` })).toBeNull();
+  });
+});
+
+describe('DossierDetailView — notes about an article', () => {
+  it('shows a note about an article with it, not among the free notes', () => {
+    const withNote = structuredClone(dossier);
+    withNote.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Sul primo articolo.', aboutItemId: 'a1', createdBy: { clientName: 'Claude Code' } });
+    appStore.setState({ dossiers: [withNote], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={withNote} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const notes = screen.getByRole('region', { name: /Note \(1\)/ });
+    expect(within(notes).queryByText('Sul primo articolo.')).toBeNull();
+    expect(screen.getByTitle('1 nota')).toBeInTheDocument();
+    expect(screen.getByText(/2 atti · 3 articoli · 2 note/)).toBeInTheDocument();
+  });
+
+  it('writes a note to the dossier through the notes route', async () => {
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Nota' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Testo della nota' }), { target: { value: 'Nuova nota' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    await waitFor(() => expect(dossierService.addNote).toHaveBeenCalledWith('d1', { text: 'Nuova nota' }));
+    await waitFor(() => expect(appStore.getState().dossiers[0].items.some((i) => i.id === 'srv-note')).toBe(true));
+  });
+});
+
+describe('DossierDetailView — search keeps an article and its notes together', () => {
+  const withNote = (): Dossier => {
+    const d = structuredClone(dossier);
+    d.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Termine di decadenza.', aboutItemId: 'b1' });
+    return d;
+  };
+  it('a note found keeps its article on screen, with the note under it', () => {
+    const d = withNote();
+    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: 'decadenza' } });
+    expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Note \(/ })).toBeNull();
+  });
+  it('the closed row names its notes for a screen reader', () => {
+    const d = withNote();
+    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: /^Espandi .*articolo 1, 1 nota$/ })).toBeInTheDocument();
   });
 });

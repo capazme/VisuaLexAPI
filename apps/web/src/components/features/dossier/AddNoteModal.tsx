@@ -1,17 +1,30 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { StickyNote, X } from 'lucide-react';
+import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../../constants/zIndex';
 
 interface Props {
   onClose: () => void;
-  onSave: (text: string) => void;
+  /** Resolves true once the note is saved: only then the dialog closes, so a refused note keeps its text. */
+  onSave: (text: string) => void | boolean | Promise<boolean>;
+  /** What the note is about, as the dialog's title; the dossier itself by default. */
+  heading?: string;
+  confirmLabel?: string;
 }
 
 // The cap the MCP round sets for Claude's notes too (S11): one cap for every note of a dossier.
 const MAX_NOTE_LENGTH = 4000;
 
-export function AddNoteModal({ onClose, onSave }: Props) {
+export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al dossier', confirmLabel = 'Aggiungi al dossier' }: Props) {
   const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus goes back where it came from («Aggiungi una nota all'articolo», the menu).
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    return () => opener?.focus?.();
+  }, []);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -22,17 +35,19 @@ export function AddNoteModal({ onClose, onSave }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    onSave(trimmed);
-    onClose();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    const saved = await onSave(trimmed);
+    setSaving(false);
+    if (saved !== false) onClose();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      handleSave();
+      void handleSave();
     }
   };
 
@@ -41,13 +56,18 @@ export function AddNoteModal({ onClose, onSave }: Props) {
   const remaining = MAX_NOTE_LENGTH - text.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-note-heading"
+      className={cn(Z_INDEX.modal, 'fixed inset-0 flex items-center justify-center p-4')}
+    >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-800 flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h3 className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
-            <StickyNote size={20} className="text-yellow-500" />
-            Aggiungi una nota al dossier
+          <h3 id="add-note-heading" className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+            <StickyNote size={20} className="text-yellow-500 flex-shrink-0" />
+            {heading}
           </h3>
           <button
             type="button"
@@ -89,11 +109,11 @@ export function AddNoteModal({ onClose, onSave }: Props) {
           </button>
           <button
             type="button"
-            onClick={handleSave}
-            disabled={isEmpty}
+            onClick={() => void handleSave()}
+            disabled={isEmpty || saving}
             className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
           >
-            Aggiungi al dossier
+            {saving ? 'Salvo…' : confirmLabel}
           </button>
         </div>
       </div>

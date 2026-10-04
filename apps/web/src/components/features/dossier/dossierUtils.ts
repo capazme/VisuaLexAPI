@@ -167,12 +167,19 @@ export function unpackItemContent(content: unknown): { data: unknown; status?: '
   return _dossierMeta?.important ? { data: rest, status: 'important' } : { data: rest };
 }
 
-// The server's names for an item, copied only when it gave them: an answer from
-// an older server leaves the fields absent, and the layout falls back.
-export function citationsFromApi(api: Pick<DossierItemApi, 'citation' | 'act_citation'>): { citation?: string | null; actCitation?: string | null } {
+type ServerFields = Pick<DossierItem, 'citation' | 'actCitation' | 'aboutItemId' | 'createdBy'>;
+
+// What only the server says about an item (its names, the article a note is
+// about, who wrote it), copied only when it said it: an answer from an older
+// server leaves the fields absent, and the page falls back.
+export function serverFieldsFromApi(
+  api: Pick<DossierItemApi, 'citation' | 'act_citation' | 'about_item_id' | 'created_by'>,
+): ServerFields {
   return {
     ...(api.citation !== undefined ? { citation: api.citation } : {}),
     ...(api.act_citation !== undefined ? { actCitation: api.act_citation } : {}),
+    ...(api.about_item_id !== undefined ? { aboutItemId: api.about_item_id } : {}),
+    ...(api.created_by !== undefined ? { createdBy: api.created_by } : {}),
   };
 }
 
@@ -180,10 +187,16 @@ export function citationsFromApi(api: Pick<DossierItemApi, 'citation' | 'act_cit
 // _dossierMeta envelope (packItemContent); the DB `status` column is not read.
 export function dossierItemFromApi(api: DossierItemApi): DossierItem {
   const { data, status } = unpackItemContent(api.content);
-  const base = { id: api.id, addedAt: api.created_at, ...(status ? { status } : {}), ...citationsFromApi(api) };
+  const base = { id: api.id, addedAt: api.created_at, ...(status ? { status } : {}), ...serverFieldsFromApi(api) };
   return api.item_type === 'norm'
     ? { ...base, type: 'norma', data: data as DossierNormaData }
     : { ...base, type: 'note', data: data as string };
+}
+
+/** «scritta da Claude Code (applicazione collegata)»: who wrote an entry, on screen (`ClaudeMark`) and in the PDF. */
+export function claudeMarkSentence(createdBy: NonNullable<DossierItem['createdBy']>): string {
+  const name = createdBy.clientName?.trim();
+  return name ? `scritta da ${name} (applicazione collegata)` : "scritta da un'applicazione collegata";
 }
 
 export function computeItemCounts(items: DossierItem[]): { norme: number; note: number; important: number } {

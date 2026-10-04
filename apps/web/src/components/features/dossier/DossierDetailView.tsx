@@ -91,6 +91,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     triggerSearch,
     triggerMultiSearch,
     addToDossier,
+    addNoteToDossier,
     addWorkspaceTab,
   } = useAppStore();
   const navigate = useNavigate();
@@ -107,7 +108,8 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [openPickerGroups, setOpenPickerGroups] = useState<NormaGroup[] | null>(null);
-  const [addNoteOpen, setAddNoteOpen] = useState(false);
+  // The note being written: about the dossier (no article), or about one article.
+  const [noteTarget, setNoteTarget] = useState<{ aboutItemId?: string; heading: string } | null>(null);
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
@@ -126,8 +128,8 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   // the full `dossier.items` array, so indexes stay absolute even while filtered.
   const visibleItems = useMemo(() => {
     const q = itemSearchQuery.trim().toLowerCase();
-    return dossier.items.filter((item) => {
-      if (!q) return true;
+    if (!q) return dossier.items;
+    const matches = (item: DossierItem) => {
       if (item.type === 'norma') {
         const d = item.data;
         return (
@@ -140,7 +142,17 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         );
       }
       return typeof item.data === 'string' && item.data.toLowerCase().includes(q);
+    };
+    // An article and the notes about it are found together: a note found keeps
+    // its article on screen, an article found keeps its notes.
+    const found = new Set(dossier.items.filter(matches).map((i) => i.id));
+    dossier.items.forEach((i) => {
+      if (i.type === 'note' && i.aboutItemId && found.has(i.id)) found.add(i.aboutItemId);
     });
+    dossier.items.forEach((i) => {
+      if (i.type === 'note' && i.aboutItemId && found.has(i.aboutItemId)) found.add(i.id);
+    });
+    return dossier.items.filter((i) => found.has(i.id));
   }, [dossier.items, itemSearchQuery]);
 
   const hasFilter = itemSearchQuery.trim().length > 0;
@@ -160,10 +172,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
       onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
     };
   }, [fullBlocks]);
+  const noteCount = dossier.items.filter((i) => i.type === 'note').length;
   const countsLine = [
     plural(fullLayout.acts.length, 'atto', 'atti'),
     plural(fullLayout.acts.reduce((n, a) => n + a.articles.length, 0), 'articolo', 'articoli'),
-    ...(fullLayout.notes.length > 0 ? [plural(fullLayout.notes.length, 'nota', 'note')] : []),
+    // Every note: the free ones and those about an article.
+    ...(noteCount > 0 ? [plural(noteCount, 'nota', 'note')] : []),
   ].join(' · ');
   const visibleArticleIds = useMemo(() => layout.acts.flatMap((a) => a.articles.map((i) => i.id)), [layout]);
 
@@ -343,9 +357,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     }
   };
 
-  const handleAddNote = (text: string) => {
-    addToDossier(dossier.id, text, 'note');
-    showToast('Nota aggiunta al dossier', 'success');
+  // Every note of a dossier takes the notes route, the one Claude's notes take too.
+  const handleAddNote = async (text: string): Promise<boolean> => {
+    if (!noteTarget) return false;
+    const saved = await addNoteToDossier(dossier.id, text, noteTarget.aboutItemId);
+    if (saved) showToast(noteTarget.aboutItemId ? "Nota aggiunta all'articolo" : 'Nota aggiunta al dossier', 'success');
+    return saved;
   };
 
   const handleTreeImport = (
@@ -458,6 +475,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           ensureSpace(32);
           const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
           write(head, 11, 'bold', 15);
+          article.notes.forEach((text) => write(`Nota: ${text}`, 9, 'italic', 12));
           write(article.text, 9, article.missing === 'none' ? 'normal' : 'italic', 12, article.missing !== 'none');
           y += 10;
         });
@@ -562,7 +580,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               triggerClassName={SECONDARY_BUTTON}
               items={[
                 { label: 'Articoli da una norma', icon: TreeDeciduous, onSelect: () => setTreeNavigatorAct(null) },
-                { label: 'Nota', icon: StickyNote, onSelect: () => setAddNoteOpen(true) },
+                { label: 'Nota', icon: StickyNote, onSelect: () => setNoteTarget({ heading: 'Aggiungi una nota al dossier' }) },
                 { label: 'Cerca un articolo', icon: Search, onSelect: () => navigate('/') },
               ]}
             >
@@ -751,6 +769,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                       onRemoveItem={handleRemoveSingle}
                       onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
                       showToast={showToast}
+                      attachedNotes={layout.attached}
+                      onAddNote={(item) => setNoteTarget({
+                        aboutItemId: item.id,
+                        heading: `Nota su ${item.citation ?? (item.type === 'norma' ? `art. ${item.data.numero_articolo}` : 'questo articolo')}`,
+                      })}
+                      onRemoveNote={handleRemoveSingle}
                     />
                   ))}
                 </div>
@@ -785,9 +809,11 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         />
       )}
 
-      {addNoteOpen && (
+      {noteTarget && (
         <AddNoteModal
-          onClose={() => setAddNoteOpen(false)}
+          heading={noteTarget.heading}
+          confirmLabel={noteTarget.aboutItemId ? "Aggiungi all'articolo" : 'Aggiungi al dossier'}
+          onClose={() => setNoteTarget(null)}
           onSave={handleAddNote}
         />
       )}

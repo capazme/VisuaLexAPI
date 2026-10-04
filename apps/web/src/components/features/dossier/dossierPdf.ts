@@ -3,6 +3,7 @@ import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import { describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
 import { articleLabel, layoutDossier } from './dossierLayout';
+import { claudeMarkSentence } from './dossierUtils';
 
 /**
  * The dossier's PDF as the page is (spec §9): the notes, then each act named
@@ -13,6 +14,8 @@ import { articleLabel, layoutDossier } from './dossierLayout';
 
 export interface PdfArticle {
   label: string;
+  /** The notes about this article, each with who wrote it when an application did. */
+  notes: string[];
   rubrica: string | null;
   versionLabel: string | null;
   text: string;
@@ -30,6 +33,11 @@ export interface LoadedText {
 }
 
 export const PDF_TEXT_UNAVAILABLE = 'Testo non disponibile al momento';
+
+// A note as the PDF prints it: its text, then who wrote it when an application did.
+function noteLine(note: DossierItem): string {
+  return note.createdBy ? `${String(note.data)} (${claudeMarkSentence(note.createdBy)})` : String(note.data);
+}
 
 function plain(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -72,7 +80,7 @@ export function buildPdfBlocks(
 ): PdfBlock[] {
   const layout = layoutDossier(items);
   const blocks: PdfBlock[] = [];
-  if (layout.notes.length > 0) blocks.push({ kind: 'notes', notes: layout.notes.map((n) => String(n.data)) });
+  if (layout.notes.length > 0) blocks.push({ kind: 'notes', notes: layout.notes.map(noteLine) });
   for (const act of layout.acts) {
     blocks.push({
       kind: 'act',
@@ -82,6 +90,7 @@ export function buildPdfBlocks(
         const loaded = texts.get(item.id);
         const base = {
           label: articleLabel(item.data),
+          notes: (layout.attached.get(item.id) ?? []).map(noteLine),
           rubrica: loaded?.rubrica ?? null,
           versionLabel: historicalItemLabel(item.data),
         };
