@@ -185,3 +185,105 @@ describe('importDossier', () => {
     }));
   });
 });
+
+describe('addToDossier reads the citations of the answer', () => {
+  it('puts act_citation on the settled item', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '2026-10-04', items: [], tags: [] }] });
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce({
+      ...fakeDossierItemApi('srv-9'),
+      citation: 'art. 2043 c.c.', act_citation: 'c.c.',
+    });
+    appStore.getState().addToDossier('d1', norma, 'norma');
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('srv-9'));
+    expect(appStore.getState().dossiers[0].items[0]).toMatchObject({ citation: 'art. 2043 c.c.', actCitation: 'c.c.' });
+  });
+});
+
+describe('setDossierItemOrder', () => {
+  const two = () => [
+    { id: 'a', type: 'note' as const, data: 'a', addedAt: '' },
+    { id: 'b', type: 'note' as const, data: 'b', addedAt: '' },
+  ];
+
+  it('reorders locally and saves the whole order', () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: two() }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().setDossierItemOrder('d1', ['b', 'a']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b', 'a']);
+    expect(dossierService.reorderItems).toHaveBeenCalledWith('d1', ['b', 'a']);
+  });
+
+  it('never sends a temporary id: the save waits while an item is pending', () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'tmp', type: 'note', data: 'a', addedAt: '' }, { id: 'b', type: 'note', data: 'b', addedAt: '' },
+    ] }], pendingDossierItemIds: { tmp: true }, pendingDossierOrders: {} });
+    appStore.getState().setDossierItemOrder('d1', ['b', 'tmp']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b', 'tmp']);
+    expect(dossierService.reorderItems).not.toHaveBeenCalled();
+    expect(appStore.getState().pendingDossierOrders).toEqual({ d1: true });
+  });
+
+  it('reverts and says so when the server refuses', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: two() }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.reorderItems).mockRejectedValueOnce(new Error('500'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.getState().setDossierItemOrder('d1', ['b', 'a']);
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a', 'b']));
+    error.mockRestore();
+  });
+
+  it('keeps the items the order does not name, after the named ones', () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: two() }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().setDossierItemOrder('d1', ['b']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b', 'a']);
+  });
+
+  it('replays a waiting order with the server ids once the pending item settles', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'b', type: 'note', data: 'b', addedAt: '' },
+    ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    let settle: (value: DossierItemApi) => void = () => {};
+    vi.mocked(dossierService.addItem).mockReturnValueOnce(new Promise((resolve) => { settle = resolve; }));
+    appStore.getState().addToDossier('d1', norma, 'norma');
+    const tempId = appStore.getState().dossiers[0].items[1].id;
+    appStore.getState().setDossierItemOrder('d1', [tempId, 'b']);
+    expect(dossierService.reorderItems).not.toHaveBeenCalled();
+    settle(fakeDossierItemApi('srv-7'));
+    await vi.waitFor(() => expect(dossierService.reorderItems).toHaveBeenCalledWith('d1', ['srv-7', 'b']));
+    expect(appStore.getState().pendingDossierOrders).toEqual({});
+  });
+});
+
+describe('the order after a refusal, and after a restore', () => {
+  it('puts back the previous order on the items there are now, never an item removed meanwhile', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'a', type: 'note', data: 'a', addedAt: '' }, { id: 'b', type: 'note', data: 'b', addedAt: '' }, { id: 'c', type: 'note', data: 'c', addedAt: '' },
+    ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    let refuse: (e: Error) => void = () => {};
+    vi.mocked(dossierService.reorderItems).mockReturnValueOnce(new Promise((_, reject) => { refuse = reject; }));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.getState().setDossierItemOrder('d1', ['c', 'b', 'a']);
+    appStore.getState().removeFromDossier('d1', 'b');
+    refuse(new Error('404'));
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a', 'c']));
+    error.mockRestore();
+  });
+
+  it('saves where a restored item was, once the server has it', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'b', type: 'note', data: 'b', addedAt: '' },
+    ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce({ ...fakeDossierItemApi('srv-a'), item_type: 'note', content: 'a' });
+    appStore.getState().restoreDossierItem('d1', { id: 'a', type: 'note', data: 'a', addedAt: '' }, 0);
+    await vi.waitFor(() => expect(dossierService.reorderItems).toHaveBeenCalledWith('d1', ['srv-a', 'b']));
+  });
+
+  it('takes a restored item off the page when the server refuses it', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.addItem).mockRejectedValueOnce(new Error('500'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.getState().restoreDossierItem('d1', { id: 'a', type: 'note', data: 'a', addedAt: '' }, 0);
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items).toHaveLength(0));
+    expect(appStore.getState().lastSyncError?.message).toMatch(/ripristinare/);
+    error.mockRestore();
+  });
+});

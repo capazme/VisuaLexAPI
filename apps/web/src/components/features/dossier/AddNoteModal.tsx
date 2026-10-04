@@ -6,7 +6,8 @@ interface Props {
   onSave: (text: string) => void;
 }
 
-const MAX_NOTE_LENGTH = 2000;
+// The cap the MCP round sets for Claude's notes too (S11): one cap for every note of a dossier.
+const MAX_NOTE_LENGTH = 4000;
 
 export function AddNoteModal({ onClose, onSave }: Props) {
   const [text, setText] = useState('');

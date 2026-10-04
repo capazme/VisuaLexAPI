@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import jwt from 'jsonwebtoken';
 import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible';
 import { prisma } from '../lib/prisma';
-import { oauthConfig } from '../oauth/config';
+import { DELETE_SCOPE, oauthConfig } from '../oauth/config';
 import { ACTOR, delegationSecret } from '../oauth/delegationSecret';
 import { findDelegatedRoute, type DelegatedCounter } from '../oauth/delegatedRoutes';
 import type { DelegatedClaims } from '../oauth/exchange';
@@ -168,6 +168,12 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     });
     if (!grant || grant.revokedAt || grant.userId !== claims.sub || !grant.user.isActive) {
       return refuse(res, 401, 'Il collegamento è stato revocato.', 'invalid_token');
+    }
+    // Deletion is read live from the grant (spec §4.2): a token exchanged before the
+    // user switched it off must not delete after.
+    // And deleting needs reading what is deleted: a connection granted write and delete only cannot.
+    if (route.scope === DELETE_SCOPE && (!grant.scopes.includes(DELETE_SCOPE) || (route.readScope && !grant.scopes.includes(route.readScope)))) {
+      return refuse(res, 403, 'Il collegamento non autorizza più le eliminazioni.', 'insufficient_scope');
     }
     user = grant.user;
     clientName = grant.client.clientName ?? null;

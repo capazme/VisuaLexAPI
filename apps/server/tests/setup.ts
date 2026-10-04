@@ -71,6 +71,7 @@ beforeEach(async () => {
       "lingo_card_ancore",
       "lingo_cards",
       "oauth_tokens",
+      "trash_entries",
       "oauth_authorization_codes",
       "oauth_grants",
       "oauth_authorization_requests",

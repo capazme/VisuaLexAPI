@@ -20,6 +20,7 @@ const REQUEST = {
     { scope: 'dossier:read', label: 'Leggere i tuoi dossier: i nomi e le norme che contengono' },
     { scope: 'dossier:write', label: 'Creare dossier e aggiungervi norme (non può modificare né cancellare nulla)' },
   ],
+  deletion: { label: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)' },
   expiresAt: new Date(Date.now() + 600_000).toISOString(),
 };
 
@@ -76,7 +77,19 @@ describe('ConnectPage', () => {
     renderAt('/connect?request=req-1');
     fireEvent.click(await screen.findByRole('button', { name: /autorizza/i }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith('http://127.0.0.1:33418/callback?code=abc&state=s&iss=http%3A%2F%2Flocalhost%3A3001'));
-    expect(decide).toHaveBeenCalledWith('req-1', true);
+    expect(decide).toHaveBeenCalledWith('req-1', true, false);
+  });
+
+  it('offers the deletion apart, unticked, and sends it only when ticked', async () => {
+    getRequest.mockResolvedValue(REQUEST);
+    decide.mockResolvedValue({ redirectTo: 'http://127.0.0.1:33418/callback?code=abc' });
+    renderAt('/connect?request=req-1');
+    const box = await screen.findByRole('checkbox', { name: REQUEST.deletion.label });
+    expect(box).not.toBeChecked();
+    fireEvent.click(box);
+    expect(box).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /autorizza/i }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('req-1', true, true));
   });
 
   it('refuses and still sends the browser back, with the refusal', async () => {
@@ -85,7 +98,7 @@ describe('ConnectPage', () => {
     renderAt('/connect?request=req-1');
     fireEvent.click(await screen.findByRole('button', { name: /rifiuta/i }));
     await waitFor(() => expect(assign).toHaveBeenCalled());
-    expect(decide).toHaveBeenCalledWith('req-1', false);
+    expect(decide).toHaveBeenCalledWith('req-1', false, false);
   });
 
   it('never follows a redirect that is not http(s)', async () => {

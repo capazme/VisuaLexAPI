@@ -1,13 +1,14 @@
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import { historicalItemLabel, requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
-import type { ArticleData, Dossier, DossierItem, Norma, NormaVisitata, SearchParams } from '../../../types';
+import { requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
+import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
+import type { DossierItemApi } from '../../../services/dossierService';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
 // The UI now only ever writes/reads 'unread' | 'important' (see the amber
-// star in SortableDossierItem) — 'reading' and 'done' are inert leftovers.
+// star in DossierArticleRow) — 'reading' and 'done' are inert leftovers.
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
 
 // Turn a stored timestamp (ISO string or epoch ms) into the Italian long format
@@ -111,15 +112,6 @@ export function searchesForGroups(
   });
 }
 
-// The heading of an item in the dossier's PDF: a past text says so, or the page
-// would pass it off as the text in force.
-export function dossierItemPdfTitle(item: DossierItem, index: number): string {
-  if (item.type !== 'norma') return `${index + 1}. Nota personale`;
-  const label = historicalItemLabel(item.data);
-  return `${index + 1}. ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''} · Art. ${item.data.numero_articolo}`
-    + (label ? ` · ${label}` : '');
-}
-
 // Map a stored NormaVisitata back to the SearchParams shape triggerSearch()
 // expects. Honors the stored version/version_date: a dossier can hold a
 // historical text and the reader must not silently swap it for the current one.
@@ -173,6 +165,25 @@ export function unpackItemContent(content: unknown): { data: unknown; status?: '
   if (typeof content !== 'object' || content === null) return { data: content };
   const { _dossierMeta, ...rest } = content as Record<string, unknown> & { _dossierMeta?: DossierMeta };
   return _dossierMeta?.important ? { data: rest, status: 'important' } : { data: rest };
+}
+
+// The server's names for an item, copied only when it gave them: an answer from
+// an older server leaves the fields absent, and the layout falls back.
+export function citationsFromApi(api: Pick<DossierItemApi, 'citation' | 'act_citation'>): { citation?: string | null; actCitation?: string | null } {
+  return {
+    ...(api.citation !== undefined ? { citation: api.citation } : {}),
+    ...(api.act_citation !== undefined ? { actCitation: api.act_citation } : {}),
+  };
+}
+
+// One server item as the store holds it. The star travels inside `content` as a
+// _dossierMeta envelope (packItemContent); the DB `status` column is not read.
+export function dossierItemFromApi(api: DossierItemApi): DossierItem {
+  const { data, status } = unpackItemContent(api.content);
+  const base = { id: api.id, addedAt: api.created_at, ...(status ? { status } : {}), ...citationsFromApi(api) };
+  return api.item_type === 'norm'
+    ? { ...base, type: 'norma', data: data as DossierNormaData }
+    : { ...base, type: 'note', data: data as string };
 }
 
 export function computeItemCounts(items: DossierItem[]): { norme: number; note: number; important: number } {

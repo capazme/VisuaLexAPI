@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
@@ -66,5 +66,44 @@ describe('DossierListView — the quick-open of a card', () => {
     expect(appStore.getState().searchTrigger).toMatchObject({
       version_date: '2007-12-29', show_brocardi_info: false, tabLabel: 'Pratica Rossi — testo al 29/12/2007',
     });
+  });
+});
+
+describe('DossierListView — the menu of a card', () => {
+  it('opens, closes on Escape, and never opens the dossier', () => {
+    const onSelect = vi.fn();
+    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={onSelect} showToast={() => {}} /></MemoryRouter>);
+    const trigger = screen.getByRole('button', { name: 'Azioni su Pratica Rossi' });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Rinomina / Modifica' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('deletes through the confirmation', () => {
+    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Azioni su Pratica Rossi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
+    expect(screen.getByText('Eliminare questo dossier?')).toBeInTheDocument();
+  });
+});
+
+describe('DossierListView — a card names its acts', () => {
+  it('lists the acts a dossier holds, and its notes', () => {
+    appStore.setState({ dossiers: [{
+      id: 'd1', title: 'Pratica Rossi', createdAt: '2026-08-01T10:00:00.000Z',
+      items: [
+        { id: 'a', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z', actCitation: 'l. 31 dicembre 2012, n. 247', data: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' } },
+        { id: 'b', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z', data: CIVIL },
+        { id: 'n', type: 'note', addedAt: '2026-08-01T10:00:00.000Z', data: 'appunto' },
+      ],
+    }], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByText('l. 31 dicembre 2012, n. 247 · Codice civile')).toBeInTheDocument();
+    expect(screen.getByText('1 nota')).toBeInTheDocument();
   });
 });

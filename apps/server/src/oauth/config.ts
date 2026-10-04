@@ -4,8 +4,21 @@
  * build a router with other values.
  */
 
-export const SCOPES = ['dossier:read', 'dossier:write'] as const;
+export const SCOPES = ['dossier:read', 'dossier:write', 'content:delete'] as const;
 export type Scope = (typeof SCOPES)[number];
+
+/**
+ * The permission to delete through a connected application (MCP second round,
+ * spec §4.2): granted only when the user ticks it, switchable per connection,
+ * and read live from the grant, never from the token.
+ */
+export const DELETE_SCOPE = 'content:delete';
+
+/** The token's scopes with deletion read live from the grant: switching it takes effect on the next call. */
+export function effectiveScopes(tokenScopes: string[], grantScopes: string[]): string[] {
+  const rest = tokenScopes.filter((scope) => scope !== DELETE_SCOPE && grantScopes.includes(scope));
+  return grantScopes.includes(DELETE_SCOPE) ? [...rest, DELETE_SCOPE] : rest;
+}
 
 // Asked for by clients that read `scopes_supported` as the list to request
 // (or by habit): refresh tokens are always issued, so it is accepted and dropped.

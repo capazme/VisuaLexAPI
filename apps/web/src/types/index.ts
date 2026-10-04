@@ -183,7 +183,7 @@ export interface AnnexMetadata {
     number: string | null;  // null for main text, "1"/"2"/"A" for annexes
     label: string;          // Display label (e.g., "Allegato A", "Legge di Emanazione")
     article_count: number;  // Number of articles in this annex
-    article_numbers: string[];  // List of article numbers (limited to first 50)
+    article_numbers: string[];  // The annex's article numbers
 }
 
 export interface TreeMetadata {
@@ -291,6 +291,10 @@ interface DossierItemBase {
     id: string;
     addedAt: string;
     status?: 'unread' | 'reading' | 'important' | 'done';
+    // How the server names the item and its act (`citation`, `act_citation`), in the
+    // app's citation style; null for anything but a norm, absent before the server answered.
+    citation?: string | null;
+    actCitation?: string | null;
 }
 
 export type DossierItem =

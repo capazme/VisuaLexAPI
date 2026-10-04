@@ -121,7 +121,7 @@ export function SharedEnvironmentCard({
         : 'border-slate-200 dark:border-slate-700'
     }`}>
       {/* Category Stripe (4px leading edge) — same pattern as EnvironmentCard
-          and SortableDossierItem. Replaces the former horizontal category
+          and DossierArticleRow. Replaces the former horizontal category
           banner that duplicated bg/border colour signals. */}
       <span
         aria-hidden="true"

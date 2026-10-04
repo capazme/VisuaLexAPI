@@ -256,7 +256,26 @@ combination for "back" already belongs to the browser.
 ### Dossier
 
 A dossier is where the articles needed for a task are aggregated and read.
+It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-atto-design.md`).
 
+- **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
+  the notes first (`DossierNotesSection`), then one `DossierActBlock` per act in
+  the order the acts entered the dossier. An act's identity is a code's name
+  (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
+  its heading is a code's name or the server's `act_citation`, never formatted
+  here (a muted fallback until the server answers); its articles sort by annex,
+  number and ordinal, the text in force before past texts. A block shows the
+  act's title (`/fetch_rubriche` `title`, not for codes) and each row «art. N —
+  rubrica» through `useActDetails` (one cached call per act; the tree only for an
+  act in parts — `utils/actRubriche.ts`). Acts reorder by drag:
+  `setDossierItemOrder` saves the whole order and waits, never sending a
+  temporary id, while an added or restored item is pending
+  (`pendingDossierOrders`). Articles do not drag. The header has three actions
+  and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
+- **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
+  article's text as the reader shows it, fetched through `articleFetchCache` —
+  never a stored `article_text`, which items added through MCP or «Importa da
+  norma» do not have.
 - **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
   inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
   composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
@@ -276,9 +295,10 @@ A dossier is where the articles needed for a task are aggregated and read.
   guards duplicates, and its inline "Nuovo dossier" waits for the server id
   before adding — `createDossier()` returns `Promise<string | null>`.
   `DossierModal` is create-only.
-- **Rows** (`SortableDossierItem`): the expand toggle lives on a header-scoped
+- **Rows** (`DossierArticleRow`): the expand toggle lives on a header-scoped
   sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
-  star keeps a 44px touch target.
+  star keeps a 44px touch target. The accessible name carries the server's
+  `citation`, so two laws' art. 3 never read alike.
 - **Versions**: an item keeps the version it was added with (`versione`,
   `data_versione`), whichever button added it (`normaForDossier` for the window
   header's), and `dossierContainsArticle` tells two versions of one article apart,
@@ -399,9 +419,20 @@ Duplicating any of these is a defect, not a shortcut.
   (exact → whitespace-tolerant search → the occurrence whose context agrees;
   never guesses: ambiguous or missing = `detached`).
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
-  `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
+  `packItemContent`/`unpackItemContent`, `dossierItemFromApi`/`citationsFromApi`
+  (a server item as the store holds it), `computeItemCounts`, `dossierRecency`,
   `dossierContainsArticle`, `normaForDossier`, `computeNormaGroups`,
   `formatTimestampLong`.
+- `components/features/dossier/dossierLayout.ts` — `layoutDossier`, `actKeyOf`,
+  `codeName`, `compareArticles`, `articleLabel`, `foldedArticleList`,
+  `dossierItemOrder`, `actsSummary`: the dossier by act.
+- `utils/actRubriche.ts` — `matchRubrichePart`, `rubricheFor`, `abrogatiFor`:
+  which article titles belong to the articles in view. An act in parts gets the
+  part matched by article numbers (on a tie, the one of the annex's size; still
+  tied, none) and never the top-level map, which can be an annex's (d.lgs.
+  196/2003). The index window and the dossier use it.
+- `components/ui/MenuButton.tsx` — the one menu button (arrows, Home/End,
+  Escape/Tab, focus return, click outside; clicks never reach the card).
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
 - `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
   `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
@@ -442,7 +473,10 @@ handler must start with `if (e.target !== e.currentTarget) return;` or interacti
 children re-trigger the toggle. Always add
 `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500`.
 Never nest interactive content inside the element carrying `role="button"` —
-scope the role to the header, as `SortableDossierItem` does.
+scope the role to the header, as `DossierArticleRow` does. A collapsible whose header
+is a section heading follows the accordion pattern instead (`DossierActBlock`):
+the toggle sits inside the `<h3>`, its name is the heading's own text and its
+state is `aria-expanded` alone, with no `aria-label` replacing what it says.
 
 **Popovers with `@floating-ui/react`** — split positioning and animation across
 **two** elements: outer div takes `refs.setFloating` + `floatingStyles`, inner div
@@ -511,10 +545,11 @@ meant to stay split; add new features as new files, not inside the shells:
 
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
   `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
-  `i`), `DossierDetailView.tsx`, `SortableDossierItem.tsx` (row + star + expand),
-  `DossierItemReader.tsx` (in-place article), `AddToDossierPopover.tsx`,
-  `ToolbarButton.tsx` (colour-token toolbar button with `pressed`/`pressedColor`),
-  one file per modal, shared helpers in `dossierUtils.ts`.
+  `i`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
+  `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
+  `AddToDossierPopover.tsx`, one file per modal, shared helpers in
+  `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `useActDetails.ts`.
 - `features/environments/` — `EnvironmentPage.tsx` shell + `EnvironmentCard.tsx` +
   one file per modal; `EnvironmentContentViewer.tsx` renders the shared
   dossier/quickNorm/alias/annotation/highlight tree. Cards carry a category

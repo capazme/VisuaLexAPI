@@ -270,6 +270,39 @@ git commit -m "feat(api): /fetch_rubriche gives the act's title, made presentabl
 
 Ask the orchestrator for the go before the first commit of this PR.
 
+### Amendments during execution (4 Oct 2026)
+
+What the code ended up with where it differs from the tasks below; later tasks
+(14–16) build on these names.
+
+- **Task 1** landed through #70 (`feat/mcp-notes`), whose shared `serializeItem`
+  answers every item route with `citation` and `act_citation`; PR 1 kept only
+  the test.
+- **Task 2**: `presentable_title` also drops the older Gazzetta code
+  («(030U1398)»), closes a space before «)» and keeps the full stop of a final
+  abbreviation («c.p.c.»).
+- **Task 4**: `compareArticles` puts the text in force before past texts with
+  `requestIsHistorical` (the plan's `versionKey` order put «originale» first),
+  reads «2bis» as «2-bis» and sub-numbers numerically. `dossierItemOrder(items,
+  layout, actKeys)` takes the items too and appends any item no act names: the
+  saved order always names every item (Task 14 relies on it for decisions).
+  An annexed article folds as «All. A art. 1».
+- **Task 5**: on a tie between parts, the part of the annex's size wins; still
+  tied, none (the server lists the code body before the Dispositivo, and both
+  hold arts. 1–3). `abrogatiFor` follows the same rule.
+- **Task 6**: the URN from `resolveAct` drops its probed article; the previous
+  act's title and rubriche clear when the act changes.
+- **Task 7**: Enter and Space are the trigger's own click (handling them on
+  keydown too opened and closed the menu at once).
+- **Task 9**: `restoreDossierItem` marks the restored item pending too, and
+  `flushDossierOrder(dossierId)` saves a waiting order once no item is pending.
+- **Task 10**: `TreeNavigatorModal` stores the act as the source resolved it
+  (the day as typed, «31-12-2012», made one act two blocks). «Seleziona tutti»
+  takes the articles on screen only (notes have no checkbox).
+- **Task 12**: `dossierItemPdfTitle` is gone; the PDF's headings come from
+  `buildPdfBlocks`. Task 14 adds a `decisions` block there instead of the
+  Sentenze plan's `dossierItemPdfTitle` changes.
+
 ### Task 3: Items carry the server's citations
 
 **Files:**
