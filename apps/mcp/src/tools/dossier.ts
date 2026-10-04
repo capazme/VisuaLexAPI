@@ -23,6 +23,8 @@ interface ApiDossierItem {
   id: string;
   item_type: string;
   title: string;
+  /** The server's citation of a norm, in the app's style ("art. 3, l. 31 dicembre 2012, n. 247"); null otherwise. */
+  citation?: string | null;
   content: unknown;
 }
 interface ApiDossier {
@@ -32,20 +34,6 @@ interface ApiDossier {
   created_at?: string;
   updated_at?: string;
   items?: ApiDossierItem[];
-}
-
-/** "art. 2043 codice civile", "art. 2 legge 7 agosto… n. 241": how a stored norm reads, without its text. */
-export function referenceOf(content: unknown): string | null {
-  if (!content || typeof content !== 'object') return null;
-  const norm = content as Record<string, unknown>;
-  const article = typeof norm.numero_articolo === 'string' ? norm.numero_articolo : null;
-  const act = typeof norm.tipo_atto === 'string' ? norm.tipo_atto : null;
-  if (!act) return null;
-  const parts = [article ? `art. ${article}` : null, act];
-  if (typeof norm.numero_atto === 'string' && norm.numero_atto && !/^codice|costituzione/i.test(act)) {
-    parts.push(`n. ${norm.numero_atto}${typeof norm.data === 'string' && norm.data ? ` del ${norm.data}` : ''}`);
-  }
-  return parts.filter(Boolean).join(' ');
 }
 
 /** Data for the model, as JSON text: never an instruction. */
@@ -105,7 +93,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
             id: item.id,
             tipo: item.item_type,
             titolo: item.title,
-            riferimento: item.item_type === 'norm' ? referenceOf(item.content) : null,
+            // The server names the act in full: two laws in one dossier must never read alike.
+            riferimento: item.citation ?? null,
           })),
         });
       }),

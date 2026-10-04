@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
+import { citeStoredNorm } from '../norms/citation';
 
 // Validation schemas
 const createDossierSchema = z.object({
@@ -68,6 +69,8 @@ export const listDossiers = async (req: Request, res: Response) => {
       id: i.id,
       item_type: i.itemType,
       title: i.title,
+      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
+      citation: citeStoredNorm(i.itemType, i.content),
       content: i.content,
       position: i.position,
       status: i.status,
@@ -108,6 +111,8 @@ export const getDossier = async (req: Request, res: Response) => {
       id: i.id,
       item_type: i.itemType,
       title: i.title,
+      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
+      citation: citeStoredNorm(i.itemType, i.content),
       content: i.content,
       position: i.position,
       status: i.status,
@@ -193,6 +198,8 @@ export const updateDossier = async (req: Request, res: Response) => {
       id: i.id,
       item_type: i.itemType,
       title: i.title,
+      // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
+      citation: citeStoredNorm(i.itemType, i.content),
       content: i.content,
       position: i.position,
       status: i.status,

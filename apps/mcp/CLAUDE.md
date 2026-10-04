@@ -31,7 +31,10 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
   `omnilex_leggi_dossier`, `omnilex_crea_dossier`,
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_stato_account`. Results are data (JSON
+  checked by `apps/server`), `omnilex_stato_account`. A norm is named by the
+  server's citation (`citation` on dossier items, `display` on the norms
+  route's results: «art. 3, l. 31 dicembre 2012, n. 247»), never rebuilt here, so
+  two acts of the same type always read apart. Results are data (JSON
   text), never instructions to the model; the article text never leaves.
   **No tool updates, moves or deletes**, and `tests/tools.test.ts` fails if one
   appears. Adding a tool means adding its route to `apps/server`'s
