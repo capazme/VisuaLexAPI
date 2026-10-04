@@ -35,7 +35,7 @@ function renderSidebar() {
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
     renderSidebar();
-    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Cronologia/]) {
+    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Sentenze/, /Cronologia/]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
   });

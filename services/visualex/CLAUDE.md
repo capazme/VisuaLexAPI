@@ -194,8 +194,9 @@ POST unless noted, JSON bodies.
   Cassazione's have no source link. Lookups cached per archive: found 30 days, absent 1
   hour, a decision found without its text 24 hours (with the notice
   `testo_non_disponibile`; `attributi.testo_assente` says why only when the source did:
-  `oscuramento`), errors never. Expired entries are swept at start and every six hours
-  (`sweep_decision_caches`). Design: docs/superpowers/specs/2026-10-01-sentenze-design.md
+  `oscuramento` or `valutazione_oscuramento`), errors never. Expired entries are swept at
+  start and every six hours (`sweep_decision_caches`). Design:
+  docs/superpowers/specs/2026-10-01-sentenze-design.md
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
 - `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
@@ -457,16 +458,36 @@ Breaking one of these breaks the product. Read before editing.
     against the portal.
 
 33. **A decision found is not a text found.** Italgiure answers many decisions with its own
-    notice in place of the text ("La sentenza richiesta è in fase di oscuramento": personal
-    data being removed; about 6% of civil records and 33,000 penal ones, in every year,
-    measured on 2026-10-02). `decisions/italgiure.py` returns such a decision with
-    `testo == {}` and `testo_assente == "oscuramento"`, which travels in `attributi` and
-    through the caches: the page reads why from it. A record with neither a text nor the
-    notice (a missing `ocr`, a renamed field) comes back with `testo == {}`, no
-    `testo_assente` and a logged warning: never present it as the source's anonymisation.
-    The resolver keeps a decision without its text 24 hours (`decisions_pending`), never 30
-    days, and adds the notice `testo_non_disponibile`. Never pass the notice on as
-    `motivazione`: the page would show it as the court's reasons and a note could anchor to
-    it. The decision caches hold whole texts, with whatever personal data the source left:
-    `sweep_decision_caches` deletes their expired entries at start and every six hours,
-    since the filesystem cache deletes one only when its key is read again.
+    notice in place of the text, while personal data are being removed (counted on
+    2026-10-04, archive-wide): "La sentenza richiesta è in fase di oscuramento" (10,789
+    civil and 32,898 penal records), "in fase di valutazione oscuramento" (21,168 civil and
+    17,175 penal), and rarely a stub such as "Oscuramento disposto Numero registro generale
+    …" (85 characters). The rule is «at most 300 characters and mentions oscuramento»: such
+    a text is never the court's. `decisions/italgiure.py` returns the decision with
+    `testo == {}` and `testo_assente` `"oscuramento"`, `"valutazione_oscuramento"` or, for
+    the stub, none, which travels in `attributi` and through the caches: the page reads why
+    from it. A record with neither a text nor a notice (a missing `ocr`, a renamed field)
+    comes back with `testo == {}`, no `testo_assente` and a logged warning: never present it
+    as the source's anonymisation. The resolver keeps a decision without its text 24 hours
+    (`decisions_pending`), never 30 days, and adds the notice `testo_non_disponibile`. Never
+    pass a notice on as `motivazione`: the page would show it as the court's reasons and a
+    note could anchor to it (the first reader did, with the second notice and the stub, and
+    the caches kept them 30 days). The decision caches hold whole texts, with whatever
+    personal data the source left: `sweep_decision_caches` deletes their expired entries at
+    start and every six hours, since the filesystem cache deletes one only when its key is
+    read again.
+    Italgiure's text is one line (45 of 45 sampled texts): `paragraphs` inserts blank lines
+    before the headings, «P.Q.M.» and the numbered points and changes nothing else (a combined
+    heading, «RITENUTO IN FATTO E CONSIDERATO IN DIRITTO», stays one; a point keeps the words
+    it opens, so there is no break between «3.» and a «P.Q.M.» right after it), and line
+    breaks are invisible to anchors (root rule 23), so a note never moves when the rule is
+    refined. Italgiure's `ocr` already ends with the dispositivo that `ocrdis` repeats (36 of
+    the 36 sampled texts that have one): `split_dispositivo` cuts it off, so a decision reads
+    it once. The Corte costituzionale's open data break lines two ways, and `line_paragraphs`
+    turns a line break into a paragraph break unless it is a typewriter wrap of at most 80
+    characters (the texts before about 2001): the page draws a paragraph only between blank
+    lines, so without it a block is one paragraph. Both add line breaks and nothing else.
+    Whatever changes the shape of what a reader returns must raise the version in its cache
+    key (`italgiure:v2:…`, `corte_cost:v2:…`), or the entries cached before are served for up
+    to 30 days. The `v2` keys cover the readers of Tasks 7a to 7c, none of which had shipped,
+    so Task 7c raised no version of its own.

@@ -212,7 +212,7 @@ README states the minimum version.
 
 | `esito` | Status | Content |
 |---|---|---|
-| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione?`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form, text missing: `attributi.testo_assente` says `oscuramento` when the source withholds it) |
+| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione?`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form, text missing: `attributi.testo_assente` says `oscuramento` or `valutazione_oscuramento` when the source withholds it) |
 | `ambigua` | 200 | `candidati`: identity and attributes of each |
 | `non_trovata` | 404 | `motivo` (see below), `archivio_dal` when known, `suggerimento` when found |
 | `fonte_non_raggiungibile` | 503 | `fonte` |
@@ -236,13 +236,16 @@ year may be a different decision.
 - **Requests.** A plain `GET` of the site for the session cookie, then a `POST`
   to the Solr endpoint.
 - **Query.** `kind:"snciv"` or `kind:"snpen"` per archive, `numdec` zero-padded
-  (the plan measures the stored form and keeps the bare number as a fallback),
-  and `anno`. **No section in the query**: the section is compared after
-  reading, so a wrong section is reported instead of silently dropped.
+  to five digits, the form the index stores (measured on 2026-10-02: the bare
+  form never matched, so it is not queried), and `anno`. **No section in the
+  query**: the section is compared after reading, so a wrong section is
+  reported instead of silently dropped.
 - **Fields.** `numdec`, `anno`, `szdec`, `datdep`, `tipoprov`, `materia`,
-  `relatore`, `presidente`, `kind`, `ocr` (the motivazione), `ocrdis` (the
-  dispositivo, often empty at the source) and the document id.
-- **Text.** Never truncated.
+  `relatore`, `presidente`, `kind`, `ocr` (the motivazione, which already ends
+  with the dispositivo), `ocrdis` (the dispositivo, which repeats the end of
+  `ocr`; often empty at the source) and the document id.
+- **Text.** Never truncated: the dispositivo is cut off the end of the
+  motivazione, not dropped (§4).
 - **Archive start.** Read from the archive itself (the earliest date of deposit
   per archive), cached for a day, and used in `fuori_archivio` and
   `anno_parziale`.
@@ -272,9 +275,11 @@ year may be a different decision.
 - **Fields.** Type, dates of decision and deposit, ECLI, presidente, relatore
   or redattore, epigrafe, testo, dispositivo. Measured on the 2001–today
   bundle, 3,592 of 4,056 ordinanze (2001–2026) have an empty `testo`, and in
-  3,579 of them the "Ritenuto… / Considerato…" reasoning is inside `epigrafe`:
-  the reader passes the blocks as the source gives them, and how the page
-  labels them is decided with the page.
+  3,577 of them (3,514 + 63) the reasoning inside `epigrafe` starts at a line
+  whose first word is "Ritenuto" or "Considerato": the reader splits such an
+  epigrafe there, searching after "ha pronunciato la seguente" when it is
+  there. An epigrafe without such a line stays whole, and the page labels it
+  «Testo» (decided by the owner on 2026-10-04).
 
 **Common to both readers:**
 
@@ -307,12 +312,13 @@ year may be a different decision.
   - the Vite proxy list;
   - the ingress `@legal` list (`paths.test.mjs` keeps the last two in step);
   - `scrapeGate`'s cost table, at 2 per call, whatever the call sends
-    upstream. A Cassazione lookup sends a homepage `GET` and a Solr `POST` per
-    query: a number below 10000 is queried in two forms, a reference without
-    the archive queries both archives, and a miss adds the query for the
-    archive's start (once a day per archive) and, for the penal archive, the
-    next year's lookup. A Corte costituzionale call makes at most one
-    download, shared by concurrent callers.
+    upstream. A Cassazione search sends at most 10 requests (decided by the
+    owner on 2026-10-04): a homepage `GET` and a Solr `POST` per query, for
+    both archives when none is named, for each archive's start on the first
+    miss of the day, and, for the penal archive, for the next year's lookup.
+    Retries of a failed request are not counted (the owner's reading). A Corte
+    costituzionale call makes at most one download, shared by concurrent
+    callers.
 
 ### 4. The page
 
@@ -340,24 +346,53 @@ over the reader. From the top:
      (`www.cortecostituzionale.it/scheda-pronuncia/<anno>/<numero>`); none for
      the Cassazione.
 4. **The text**, in the blocks the source gives (epigrafe, motivazione,
-   dispositivo), at the reader's 68ch measure. Rendering follows S6: within a
-   block, the text nodes spell the received text minus `\n`, as gotcha 23
-   prescribes for articles. The plan measures the line breaks of Italgiure's
-   OCR and chooses the CSS that reflows them without touching a character. Text
-   is rendered as React text, never as HTML.
+   dispositivo), at the reader's 68ch measure. Where the Corte costituzionale's
+   open data leave the reasoning in the epigrafe, the data route splits it
+   (§3), so the page shows the blocks as the route divides them. Rendering
+   follows S6: within a block, the text nodes spell the received text minus
+   `\n`, as gotcha 23 prescribes for articles. Italgiure's texts carry no line
+   break at all (measured on 2026-10-04: 45 of 45 sampled texts, up to 82,322
+   characters), so the data route restores the paragraphs by inserting a blank
+   line before each heading («FATTI DI CAUSA», «RAGIONI DELLA DECISIONE»,
+   «Rilevato che:» …), before «P.Q.M.» and before each numbered point that
+   starts a sentence, and changes nothing else (decided by the owner on
+   2026-10-04). A combined heading («RITENUTO IN FATTO E CONSIDERATO IN
+   DIRITTO») stays one, and a numbered point keeps the words it opens, with no
+   break between «3.» and a «P.Q.M.» or a heading right after it. Italgiure's
+   reasons already end with the dispositivo, which its separate field repeats
+   (36 of the 36 sampled texts that have one): the data route cuts it off the
+   end of the reasons, so a decision reads it once, in «Dispositivo». The Corte
+   costituzionale's open data break lines two ways (measured on 2026-10-04 over
+   the three bundles): since about 2001 each line is a paragraph or a heading;
+   before, the text is typewritten at a measure of at most 80 characters, and a
+   paragraph ends where a line stops short. The data route turns a line break
+   into a paragraph break (a blank line) unless it is such a wrap (the lines of
+   the block fill a measure of at most 80, the line before fills at least three
+   quarters of it, and it does not end a sentence where the next word would
+   still have fit), and adds nothing else. The page draws each group of lines
+   between blank lines as a paragraph. Text is rendered as React text, never as
+   HTML. The blocks are labelled «Epigrafe», «Motivazione» and «Dispositivo»; an
+   epigrafe without a motivazione holds the reasoning too and is labelled
+   «Testo» (decided by the owner on 2026-10-04). A decision without its text
+   shows no block.
 5. **The source**, at the foot: "Fonte: Corte di cassazione — archivio pubblico
-   SentenzeWeb (Italgiure)" or "Fonte: Corte costituzionale — dati aperti,
-   licenza CC BY-SA 3.0". The attribution appears in exports too.
+   SentenzeWeb (Italgiure)" or "Fonte: Corte costituzionale — dati aperti". A
+   dossier's PDF names it too. Neither shows the licence (the owner's decisions
+   of 2026-10-04); the data keep `fonte.licenza`.
 
 **Each outcome has its own screen:**
 - loading;
 - the decision;
+- the decision without its text: its particulars and the notice (§3), no text
+  block;
 - the choice between two candidates;
 - not found, with the reason, the form filled in and, for a penal decision, the
   suggested next year;
 - outside the archive, with the date it starts;
 - partly covered year;
 - source unreachable, with "Riprova";
+- an unexpected failure (`errore_interno`), with "Riprova", never
+  "non trovata";
 - invalid address, with the form and the message.
 
 **The lookup form** (`/sentenze`, "Apri una sentenza") asks for:
@@ -459,8 +494,8 @@ repository.
   the source withholds a text while it removes personal data (Italgiure
   answers with its own notice), the page shows the decision's particulars and
   says so: the notice is never shown as the text. It gives that reason only
-  when the source did (`attributi.testo_assente` is `oscuramento`): a text
-  missing for any other reason carries none.
+  when the source did (`attributi.testo_assente` is `oscuramento` or
+  `valutazione_oscuramento`): a text missing for any other reason carries none.
 - **Login.** No open redirect (§5).
 - **Imports.** Imported items are untrusted (§6).
 - **Licences.** The README's third-party sentence names the Corte di cassazione

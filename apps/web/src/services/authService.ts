@@ -2,6 +2,7 @@
  * Authentication service for user registration, login, and token management
  */
 import { post, get, put } from './api';
+import { forgetReturnTo } from '../utils/returnTo';
 import type {
   UserRegisterRequest,
   UserLoginRequest,
@@ -39,6 +40,7 @@ export const logout = (): void => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   currentUserRequest = null;
+  forgetReturnTo();
   // Optionally redirect to login page
   window.location.href = '/login';
 };

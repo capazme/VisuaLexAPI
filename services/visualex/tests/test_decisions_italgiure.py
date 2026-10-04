@@ -9,6 +9,8 @@ from visualex_api.services.decisions import italgiure
 from visualex_api.services.decisions.italgiure import (
     ItalgiureReader,
     SourceAnswerError,
+    paragraphs,
+    split_dispositivo,
     to_decision,
 )
 from visualex_api.services.http_client import HttpResult
@@ -73,13 +75,14 @@ async def test_the_penal_decision_with_the_same_number(monkeypatch):
     assert d.relatore and d.presidente
 
 
-async def test_a_number_below_10000_is_tried_padded_then_bare(monkeypatch):
-    empty = json.dumps({"response": {"numFound": 0, "docs": []}})
-    calls = _serve(monkeypatch, [empty, empty])
+async def test_a_number_below_10000_is_tried_padded_only(monkeypatch):
+    # the index stores the number padded to five digits: the bare form never matched (measured
+    # on 2026-10-02), and every query costs a homepage GET and a Solr POST
+    calls = _serve(monkeypatch, [json.dumps({"response": {"numFound": 0, "docs": []}})])
     assert await ItalgiureReader().lookup("civile", 123, 2024) is None
-    queries = [c[2]["data"]["q"] for c in calls if c[0] == "POST"]
-    assert queries == ['kind:"snciv" AND numdec:00123 AND anno:2024',
-                       'kind:"snciv" AND numdec:123 AND anno:2024']
+    assert [c[2]["data"]["q"] for c in calls if c[0] == "POST"] == [
+        'kind:"snciv" AND numdec:00123 AND anno:2024']
+    assert [c[0] for c in calls] == ["GET", "POST"]
 
 
 async def test_not_found_is_none(monkeypatch):
@@ -160,6 +163,112 @@ def test_a_record_without_text_or_notice_gives_no_cause(monkeypatch):
     # never presented as the source's anonymisation: nothing said why
     assert d.testo == {} and d.testo_assente is None
     assert warnings == [("Italgiure record without text", {"id": "snciv2024300001S"})]
+
+
+def test_the_valuation_notice_is_never_the_text():
+    d = to_decision({"numdec": "5722", "anno": "2022", "szdec": "3",
+                     "ocr": ["in fase di valutazione oscuramento"]}, "civile")
+    assert d.testo == {} and d.testo_assente == "valutazione_oscuramento"
+
+
+def test_a_short_stub_about_obscuring_is_never_the_text():
+    stub = "Oscuramento disposto Numero registro generale 21174/2023 Numero sezionale 1"
+    d = to_decision({"numdec": "1", "anno": "2025", "ocr": [stub]}, "civile")
+    assert d.testo == {} and d.testo_assente is None
+
+
+@pytest.mark.parametrize("text,expected", [
+    # an upper-case heading, and P.Q.M.
+    ("composta dai magistrati FATTI DI CAUSA La Corte d'appello ha deciso. RAGIONI DELLA DECISIONE "
+     "Il ricorso è fondato. P.Q.M. La Corte accoglie il ricorso.",
+     "composta dai magistrati \n\nFATTI DI CAUSA La Corte d'appello ha deciso. \n\nRAGIONI DELLA DECISIONE "
+     "Il ricorso è fondato. \n\nP.Q.M. La Corte accoglie il ricorso."),
+    # a mixed-case lead and the numbered point right after it
+    ("Presidente e relatore. Rilevato che: 1.L'Agenzia propone ricorso. 2. Resiste il contribuente.",
+     "Presidente e relatore. \n\nRilevato che: \n\n1.L'Agenzia propone ricorso. \n\n2. Resiste il contribuente."),
+    # sub-points and a point after a code abbreviation
+    ("Il motivo è infondato. 2.1. Come statuito. 2.1.2. La sentenza. Ai sensi dell'art. 360 c.p.c. 3. La Corte rigetta.",
+     "Il motivo è infondato. \n\n2.1. Come statuito. \n\n2.1.2. La sentenza. Ai sensi dell'art. 360 c.p.c. \n\n3. La Corte rigetta."),
+    # a number after a word that introduces numbers is not a point
+    ("Come prevede l'art. 47. Il termine decorre dalla notifica, secondo il n. 3. La parte resiste.",
+     "Come prevede l'art. 47. Il termine decorre dalla notifica, secondo il n. 3. La parte resiste."),
+    # a «P. Q. M.» with spaces, and a point with a dash
+    ("Così deciso. 4 - La Corte. P. Q. M. rigetta.",
+     "Così deciso. \n\n4 - La Corte. \n\nP. Q. M. rigetta."),
+    # nothing to mark
+    ("Il ricorso è inammissibile per tardività.", "Il ricorso è inammissibile per tardività."),
+    # a combined heading stays one, whatever the case of its connective
+    ("Premessa. RITENUTO IN FATTO E CONSIDERATO IN DIRITTO Il ricorso.",
+     "Premessa. \n\nRITENUTO IN FATTO E CONSIDERATO IN DIRITTO Il ricorso."),
+    ("Premessa. FATTI DI CAUSA e RAGIONI DELLA DECISIONE La Corte.",
+     "Premessa. \n\nFATTI DI CAUSA e RAGIONI DELLA DECISIONE La Corte."),
+    # a numbered point keeps the words it opens: no break between its label and a lead, a
+    # «P.Q.M.» or a heading right after it
+    ("Fine. 1.2. Rileva, poi, la Corte che il motivo.",
+     "Fine. \n\n1.2. Rileva, poi, la Corte che il motivo."),
+    ("Fine. 3. P.Q.M. La Corte rigetta.", "Fine. \n\n3. P.Q.M. La Corte rigetta."),
+    ("Fine. 3. RITENUTO CHE il ricorso.", "Fine. \n\n3. RITENUTO CHE il ricorso."),
+    # a point skipped after «art.» does not take away the lead's own break
+    ("Visto l'art. 5. Considerato che, il ricorso.", "Visto l'art. 5. \n\nConsiderato che, il ricorso."),
+])
+def test_paragraphs_are_restored_with_blank_lines_only(text, expected):
+    assert paragraphs(text) == expected
+    assert paragraphs(text).replace("\n", "") == text.replace("\n", "")
+
+
+def test_a_decision_comes_with_its_paragraphs():
+    d = to_decision({"numdec": "1", "anno": "2024",
+                     "ocr": "Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta.",
+                     "ocrdis": "Visto il ricorso. P.Q.M. Rigetta."}, "civile")
+    assert d.testo["motivazione"] == "Premessa. \n\nFATTI DI CAUSA Il fatto. \n\nP.Q.M. Rigetta."
+    assert d.testo["dispositivo"] == "Visto il ricorso. \n\nP.Q.M. Rigetta."
+
+
+def test_a_long_word_before_a_number_is_still_read_by_its_last_part():
+    # the look-back for the word before a number is a window, not the whole text before it: a
+    # citation after a word longer than the window («dell'art.» is «art.») is still skipped
+    text = "x" * 100 + "'art. 5. Il motivo."
+    assert paragraphs(text) == text
+
+
+@pytest.mark.parametrize("text,dispositivo,expected,from_the_text", [
+    # the text ends with the dispositivo: it is cut off, so the decision reads once
+    ("Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta il ricorso.", "P.Q.M. Rigetta il ricorso.",
+     ("Premessa. FATTI DI CAUSA Il fatto.", "P.Q.M. Rigetta il ricorso."), True),
+    # whitespace aside: the dispositivo returned is the text's own, with its own spacing
+    ("Premessa. Il fatto. P.Q.M. Rigetta  il ricorso.", "P.Q.M.\nRigetta il ricorso.",
+     ("Premessa. Il fatto.", "P.Q.M. Rigetta  il ricorso."), True),
+    # held elsewhere than at the end: dropped, and the text stays whole
+    ("Premessa. P.Q.M. Rigetta. Così deciso in Roma.", "P.Q.M. Rigetta.",
+     ("Premessa. P.Q.M. Rigetta. Così deciso in Roma.", ""), True),
+    # not held at all: it stays as the source gave it
+    ("Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta.", "Visto il ricorso. P.Q.M. Rigetta.",
+     ("Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta.", "Visto il ricorso. P.Q.M. Rigetta."),
+     False),
+    # the text is the dispositivo and nothing else
+    ("P.Q.M. Rigetta.", "P.Q.M. Rigetta.", ("P.Q.M. Rigetta.", ""), True),
+    # no dispositivo
+    ("Premessa. Il fatto.", "", ("Premessa. Il fatto.", ""), True),
+    # the text ends with it only inside a word: a cut never falls inside one, so it is held
+    # elsewhere and dropped, never «Si Rige» and «tta.»
+    ("Si Rigetta.", "tta.", ("Si Rigetta.", ""), True),
+], ids=["the text ends with it", "whitespace aside", "held elsewhere", "not held",
+        "the text is the dispositivo", "no dispositivo", "never inside a word"])
+def test_the_dispositivo_the_text_ends_with_is_read_once(text, dispositivo, expected,
+                                                         from_the_text):
+    motivazione, cut = split_dispositivo(text, dispositivo)
+    assert (motivazione, cut) == expected
+    if from_the_text:
+        # nothing is added, dropped or changed but whitespace: every character is the text's own
+        assert "".join((motivazione + cut).split()) == "".join(text.split())
+
+
+def test_a_decision_reads_its_dispositivo_once():
+    d = to_decision({"numdec": "1", "anno": "2024",
+                     "ocr": "Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta il ricorso.",
+                     "ocrdis": "P.Q.M. Rigetta il ricorso."}, "civile")
+    assert d.testo == {"motivazione": "Premessa. \n\nFATTI DI CAUSA Il fatto.",
+                       "dispositivo": "P.Q.M. Rigetta il ricorso."}
 
 
 @pytest.mark.live

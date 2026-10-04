@@ -1,4 +1,4 @@
-import { forwardRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -11,8 +11,16 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, icon, error, helperText, variant = 'default', onFocusChange, className, ...props }, ref) => {
+  ({ label, icon, error, helperText, variant = 'default', onFocusChange, className, id, 'aria-describedby': describedBy, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
+
+    // The label and the message find the field by id: the one the caller gave, or a generated one.
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
+    const message = error || helperText;
+    const messageId = `${inputId}-message`;
+    // a description the caller gave stays, and the field's own message follows it
+    const describedByIds = [describedBy, message ? messageId : undefined].filter(Boolean).join(' ') || undefined;
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
@@ -44,7 +52,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="space-y-1.5 w-full">
         {label && (
-          <label className="block text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 ml-1 mb-1">
+          <label htmlFor={inputId} className="block text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 ml-1 mb-1">
             {label}
           </label>
         )}
@@ -70,6 +78,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
           <input
             ref={ref}
+            id={inputId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedByIds}
             className={cn(
               'w-full py-2.5 border rounded-lg',
               'transition-all duration-200 ease-smooth-out outline-none',
@@ -90,14 +101,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           />
         </div>
 
-        {(error || helperText) && (
+        {message && (
           <p
+            id={messageId}
             className={cn(
               'text-xs ml-1',
               error ? 'text-red-500 dark:text-red-400 font-medium' : 'text-slate-500 dark:text-slate-400'
             )}
           >
-            {error || helperText}
+            {message}
           </p>
         )}
       </div>

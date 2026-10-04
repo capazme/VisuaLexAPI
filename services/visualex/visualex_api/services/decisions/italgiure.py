@@ -4,14 +4,26 @@ Recovered from the 2026-08-29 round (reverted for priorities, not for a defect) 
 the lookup of one decision:
 - the archive is a filter: civil and penal decisions are numbered in two series that overlap
   (n. 10787/2024 is Sez. III civile and Sez. VII penale);
-- the number is tried zero-padded, as the index stores it, then bare;
-- the text comes back whole: `ocr` is the reasons, `ocrdis` the dispositivo (often empty at the
-  source, which then leaves it at the end of the reasons).
+- the number is queried zero-padded to five digits, as the index stores it: the bare form
+  never matched (measured on 2026-10-02), so a lookup is one query per archive;
+- the text comes back whole: `ocr` is the reasons and already ends with the dispositivo, which
+  `ocrdis` repeats when the source has one (36 of the 36 sampled texts that have one, measured
+  on 2026-10-04): `split_dispositivo` cuts it off the end of the reasons, so the decision reads
+  once. A dispositivo that the text holds elsewhere, or only inside a word, is dropped, one it
+  does not hold stays as the source gave it, and without an `ocrdis` the dispositivo stays at
+  the end of the reasons.
 - a decision whose text the source withholds comes back with the source's own notice as its
-  text ("La sentenza richiesta è in fase di oscuramento": personal data are being removed).
-  The notice is not the court's text: the decision is returned without one, and with
-  `testo_assente` "oscuramento". A record with neither a text nor the notice is returned
-  without a text and without a cause, and logged: the source said nothing about why.
+  text, while personal data are being removed: "La sentenza richiesta è in fase di
+  oscuramento" (`testo_assente` "oscuramento"), "in fase di valutazione oscuramento"
+  (`testo_assente` "valutazione_oscuramento"), and rarely a stub such as "Oscuramento disposto
+  Numero registro generale …" (no cause). A text of at most 300 characters that mentions
+  "oscuramento" is never the court's text: the decision is returned without one. A record with
+  neither a text nor a notice is returned without a text and without a cause, and logged: the
+  source said nothing about why.
+- the text arrives as one line (measured on 2026-10-04: 45 of 45 sampled texts, up to 82,322
+  characters). `paragraphs` restores the paragraphs by inserting blank lines before the
+  headings, "P.Q.M." and the numbered points, and changes nothing else: a note anchored to the
+  text never moves.
 
 The archive is a moving window (in 2026 it starts in 2021); its start is read from the
 archive, never written here.
@@ -38,11 +50,77 @@ SOURCE = {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgi
 TIPI = {"s": "sentenza", "sentenza": "sentenza", "o": "ordinanza", "ordinanza": "ordinanza",
         "ordinanza interlocutoria": "ordinanza interlocutoria", "d": "decreto",
         "decreto": "decreto"}
-# Italgiure's stand-in for a text it withholds while personal data are removed (measured on
-# 2026-10-02: about 6% of civil records and 33,000 penal ones, in every year). A real text is
-# never this short; the length bound keeps a real text that quotes the phrase.
-_WITHHELD = "in fase di oscuramento"
+# Italgiure's stand-ins for a text it withholds while personal data are removed (counted on
+# 2026-10-04, archive-wide): «La sentenza richiesta è in fase di oscuramento» (10,789 civil and
+# 32,898 penal records), «in fase di valutazione oscuramento» (21,168 civil and 17,175 penal),
+# and rarely a stub such as «Oscuramento disposto Numero registro generale …». A real text is
+# never this short; the bound keeps a real text that discusses obscuring.
 _WITHHELD_MAX = 300
+_WITHHELD_CAUSES = (("in fase di valutazione oscuramento", "valutazione_oscuramento"),
+                    ("in fase di oscuramento", "oscuramento"))
+
+# Italgiure's text arrives as one line (measured on 2026-10-04: 45 of 45 sampled texts, up to
+# 82,322 characters). Paragraphs are restored by inserting blank lines and nothing else: a note
+# anchored to the text never moves (line breaks are invisible to anchors, gotcha 23), and the
+# rule can be refined later without moving one.
+_HEADINGS = ("RITENUTO IN FATTO", "CONSIDERATO IN DIRITTO", "FATTI DI CAUSA", "RAGIONI DELLA DECISIONE",
+             "MOTIVI DELLA DECISIONE", "SVOLGIMENTO DEL PROCESSO", "RILEVATO CHE", "CONSIDERATO CHE",
+             "RITENUTO CHE", "PREMESSO CHE", "OSSERVA")
+# «RITENUTO IN FATTO E CONSIDERATO IN DIRITTO» is one heading: no break after its «E» (or «e»)
+_HEADING = re.compile(r"(?<![A-Za-zÀ-ÿ])(?<!\b[Ee] )(?:" + "|".join(re.escape(h) for h in _HEADINGS)
+                      + r")(?![A-Za-zÀ-ÿ])")
+_LEAD = re.compile(r"(?<=[.;:!?»”\"] )(?:Rilevato che|Considerato che|Ritenuto che|Premesso che|"
+                   r"Osserva|Rileva)\s?[:,]")
+_PQM = re.compile(r"(?<![A-Za-z])P\.\s?Q\.\s?M\.?")
+_POINT = re.compile(r"(?<=[.;:!?»”\"] )\d{1,2}(?:\.\d{1,2}){0,3}\.?\s?(?:[-–]\s?)?(?=[A-ZÀ-Ý«])")
+# words after which a number is part of a citation, not a numbered point
+_BEFORE_NUMBER = frozenset({"art", "artt", "n", "nn", "co", "comma", "lett", "pag", "pagg", "par",
+                            "cap", "sez", "cfr", "v", "vol", "p", "pp", "nota", "tab", "all", "doc"})
+
+
+def paragraphs(text: str) -> str:
+    """The text with a blank line before each heading, «P.Q.M.» and numbered point that starts a
+    sentence; nothing else changes: without its line breaks it is the text without its line
+    breaks. A combined heading («… E CONSIDERATO IN DIRITTO») stays one, and a numbered point
+    keeps the words it opens: no break between «3.» and the «P.Q.M.» or heading right after it."""
+    cuts = {m.start() for regex in (_HEADING, _LEAD, _PQM) for m in regex.finditer(text)}
+    points = []
+    for m in _POINT.finditer(text):
+        # only the last word before the number matters, so look back over a window: copying all
+        # the text before each candidate was quadratic (1 MB of candidates took about 4 s)
+        word = text[max(0, m.start() - 60):m.start()].rstrip().rsplit(" ", 1)[-1].rstrip(".").lower()
+        if re.split(r"['’]", word)[-1] not in _BEFORE_NUMBER:  # «dell'art.» is «art.»
+            points.append(m)
+    cuts |= {m.start() for m in points}
+    cuts -= {m.end() for m in points}  # a point's label stays with its words: «3. P.Q.M.»
+    cuts.discard(0)
+    pieces, last = [], 0
+    for cut in sorted(cuts):
+        pieces += [text[last:cut], "\n\n"]
+        last = cut
+    pieces.append(text[last:])
+    return "".join(pieces)
+
+
+def split_dispositivo(text: str, dispositivo: str) -> tuple[str, str]:
+    """`ocr` already ends with the dispositivo that `ocrdis` repeats: it is cut off the text, so
+    the decision reads once. Whitespace aside, the end of the text must equal the dispositivo and
+    start a word (a cut never falls inside one); the dispositivo returned is that end of the text,
+    so every character comes from one source. A dispositivo the text holds elsewhere, or only
+    inside a word, is dropped; one it does not hold stays as given."""
+    tail = "".join(dispositivo.split())
+    if not tail:
+        return text, ""
+    flat = "".join(text.split())
+    if flat.endswith(tail) and len(flat) > len(tail):
+        left, cut = len(tail), len(text)
+        while left:
+            cut -= 1
+            if not text[cut].isspace():
+                left -= 1
+        if cut == 0 or text[cut - 1].isspace():  # a cut never falls inside a word
+            return text[:cut].rstrip(), text[cut:]
+    return (text, "") if tail in flat else (text, dispositivo)
 
 
 class SourceAnswerError(Exception):
@@ -72,13 +150,13 @@ def to_decision(doc: dict, archivio: str) -> Decision:
     motivazione = _text(doc.get("ocr")).strip()
     flat = " ".join(motivazione.lower().split())
     testo_assente = None
-    if len(flat) <= _WITHHELD_MAX and _WITHHELD in flat:
+    if len(flat) <= _WITHHELD_MAX and "oscuramento" in flat:
         testo: dict[str, str] = {}  # the source's notice, not the court's text
-        testo_assente = "oscuramento"
+        testo_assente = next((cause for phrase, cause in _WITHHELD_CAUSES if phrase in flat), None)
     else:
-        testo = {key: value for key, value in (("motivazione", motivazione),
-                                                ("dispositivo", _text(doc.get("ocrdis")).strip()))
-                 if value}
+        motivazione, dispositivo = split_dispositivo(motivazione, _text(doc.get("ocrdis")).strip())
+        testo = {key: paragraphs(value) for key, value in (
+            ("motivazione", motivazione), ("dispositivo", dispositivo)) if value}
     decision = Decision(
         identita=Identity("cassazione", int(_scalar(doc.get("numdec"))),
                           int(_scalar(doc.get("anno"))), archivio),
@@ -92,7 +170,7 @@ def to_decision(doc: dict, archivio: str) -> Decision:
         testo=testo,
         fonte=dict(SOURCE),
     )
-    if not testo and testo_assente is None:
+    if not testo and not flat:
         # no text and no notice (a missing `ocr`, a renamed field): never presented as the
         # source's anonymisation
         log.warning("Italgiure record without text", id=_scalar(doc.get("id")))
@@ -120,20 +198,19 @@ class ItalgiureReader:
         return data
 
     async def lookup(self, archivio: str, numero: int, anno: int) -> Decision | None:
-        kind = KINDS[archivio]
-        forms = [f"{numero:05d}"] + ([str(numero)] if numero < 10000 else [])
-        for numdec in forms:
-            data = await self._select({
-                "q": f'kind:"{kind}" AND numdec:{numdec} AND anno:{anno}',
-                "rows": "1", "fl": FIELDS})
-            docs = data.get("response", {}).get("docs", [])
-            if docs:
-                try:
-                    return to_decision(docs[0], archivio)
-                except ValueError as exc:  # a record without a readable number or year
-                    raise SourceAnswerError(
-                        "Italgiure ha risposto con una decisione illeggibile") from exc
-        return None
+        # one query: with a homepage GET and a Solr POST per query, a search stays within the
+        # owner's 10 requests (2026-10-04)
+        data = await self._select({
+            "q": f'kind:"{KINDS[archivio]}" AND numdec:{numero:05d} AND anno:{anno}',
+            "rows": "1", "fl": FIELDS})
+        docs = data.get("response", {}).get("docs", [])
+        if not docs:
+            return None
+        try:
+            return to_decision(docs[0], archivio)
+        except ValueError as exc:  # a record without a readable number or year
+            raise SourceAnswerError(
+                "Italgiure ha risposto con una decisione illeggibile") from exc
 
     async def archive_start(self, archivio: str) -> tuple[int, str] | None:
         data = await self._select({"q": f'kind:"{KINDS[archivio]}"', "rows": "1",

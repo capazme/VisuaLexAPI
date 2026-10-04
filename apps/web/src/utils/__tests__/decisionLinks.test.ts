@@ -32,7 +32,7 @@ describe('linkableDecisionPath', () => {
     expect(linkableDecisionPath(raw, NOW)).toBeNull();
   });
 
-  it('the decision page does not exist yet', () => {
-    expect(DECISION_PAGE_AVAILABLE).toBe(false);
+  it('the decision page exists', () => {
+    expect(DECISION_PAGE_AVAILABLE).toBe(true);
   });
 });
