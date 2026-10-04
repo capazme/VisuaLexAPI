@@ -124,6 +124,30 @@ def _restore_accents(text: str) -> str:
     return _TRANSLITTERATED_WORD.sub(replace, text)
 
 
+# "… professione forense. (13G00018)": the Gazzetta's code for the act, which a
+# heading does not need.
+_GAZZETTA_CODE = re.compile(r"\s*\.?\s*\(\d{2}[A-Z]\d{5}\)\s*$")
+
+
+def presentable_title(raw: str | None) -> str:
+    """An act's AKN title as a heading (the dossier names each act once, with it).
+
+    Three repairs, each measured on Normattiva's export: the Gazzetta code at the
+    end goes; the amendment brackets "((…))" are unwrapped and the space they
+    leave before a comma closed up; transliterated accents are restored as in a
+    rubrica ("nonche'" -> "nonché"). The final full stop goes too. Only for the
+    title: never used on article text (root rule 23).
+    """
+    if not raw:
+        return ""
+    text = " ".join(raw.split())
+    text = _GAZZETTA_CODE.sub("", text)
+    text = text.replace("((", " ").replace("))", " ")
+    text = re.sub(r"\s+([,.;:])", r"\1", text)
+    text = " ".join(text.split()).rstrip(".").strip()
+    return _restore_accents(text)
+
+
 def extract_rubrica(article_text: str | None, key: str | None = None) -> str | None:
     """The rubrica of a rendered article, or None when it has none.
 

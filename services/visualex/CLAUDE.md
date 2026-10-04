@@ -150,7 +150,10 @@ POST unless noted, JSON bodies.
 - `/fetch_tree` — article tree for a complete URN
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
-  AKN index. Structure only: it never carries the display text
+  AKN index, and the act's `title` (`presentable_title`: no Gazzetta code, no
+  amendment brackets, accents restored; `''` when there is none), so the
+  dossier names an act with one call. Structure only: it never carries the
+  display text
 - `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
   Reads the OJ page the tree already uses; a consolidated text has no

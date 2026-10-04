@@ -36,6 +36,7 @@ from visualex_api.services.normattiva_validity import (
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
+from visualex_api.services.akn_parser import presentable_title
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
 from visualex_api.services.decisions.resolver import (
     DECISION_CACHE_SWEEP_SECONDS,
@@ -982,6 +983,7 @@ class NormaController:
                     rubriche = {}
                 log.info("Rubriche served (EUR-Lex)", urn=str(urn)[:100], count=len(rubriche))
                 return jsonify({
+                    'title': '',
                     'rubriche': rubriche,
                     'abrogati': [],
                     'parts': [],
@@ -995,11 +997,13 @@ class NormaController:
             index = await fetch_act_index(SimpleNamespace(url=act_url))
             if index is None:
                 log.info("No AKN index available for rubriche", urn=act_url[:100])
-                return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0})
+                return jsonify({'title': '', 'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0})
 
             log.info("Rubriche served", urn=act_url[:100],
                      count=len(index.rubriche), parts=len(index.parts_detail))
             return jsonify({
+                # The act's title as a heading: the dossier names each act with it.
+                'title': presentable_title(index.title),
                 'rubriche': index.rubriche,
                 'abrogati': index.abrogati,
                 # Each annex has its own article 1 with its own rubrica; the
@@ -1010,7 +1014,7 @@ class NormaController:
         except Exception as e:
             # Never fail the index over its decoration.
             log.warning("Error in fetch_rubriche", error=str(e), exc_info=True)
-            return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
+            return jsonify({'title': '', 'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
 
     async def fetch_recitals(self):
         """All the considerando of an EU act, in one call.
