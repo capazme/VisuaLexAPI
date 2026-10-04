@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
-  computeNormaGroups, searchParamsFromGroup, dossierItemPdfTitle, tabLabelForGroup, searchesForGroups,
+  computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
   dossierItemFromApi,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
@@ -245,24 +245,6 @@ describe('searchParamsFromGroup', () => {
   it('asks for the annex a group holds, and sends no annex key when it holds none', () => {
     expect(searchParamsFromGroup(group({ allegato: 'A' }))).toMatchObject({ annex: 'A' });
     expect(searchParamsFromGroup(group())).not.toHaveProperty('annex');
-  });
-});
-
-describe('dossierItemPdfTitle', () => {
-  it('keeps the title of the text in force byte for byte', () => {
-    expect(dossierItemPdfTitle(item({}), 0)).toBe('1. codice civile n. 262 · Art. 2043');
-    expect(dossierItemPdfTitle(item({ data: { ...norma, numero_atto: '' } }), 2)).toBe('3. codice civile · Art. 2043');
-  });
-  it('keeps the title of a note', () => {
-    expect(dossierItemPdfTitle({ id: 'n1', type: 'note', data: 'appunto', addedAt: '2026-08-01' } as DossierItem, 1)).toBe('2. Nota personale');
-  });
-  it('says which day a past item holds', () => {
-    expect(dossierItemPdfTitle(item({ data: { ...norma, versione: 'vigente', data_versione: '2007-12-29' } }), 0))
-      .toBe('1. codice civile n. 262 · Art. 2043 · Testo al 29/12/2007');
-  });
-  it('says it is the original text', () => {
-    expect(dossierItemPdfTitle(item({ data: { ...norma, versione: 'originale' } }), 0))
-      .toBe('1. codice civile n. 262 · Art. 2043 · Testo originale');
   });
 });
 

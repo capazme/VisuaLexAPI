@@ -1,7 +1,7 @@
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import { historicalItemLabel, requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
+import { requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
 import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
 import type { DossierItemApi } from '../../../services/dossierService';
 
@@ -110,15 +110,6 @@ export function searchesForGroups(
     }
     return { ...searchParamsFromGroup(group), tabLabel, targetTabId };
   });
-}
-
-// The heading of an item in the dossier's PDF: a past text says so, or the page
-// would pass it off as the text in force.
-export function dossierItemPdfTitle(item: DossierItem, index: number): string {
-  if (item.type !== 'norma') return `${index + 1}. Nota personale`;
-  const label = historicalItemLabel(item.data);
-  return `${index + 1}. ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''} · Art. ${item.data.numero_articolo}`
-    + (label ? ` · ${label}` : '');
 }
 
 // Map a stored NormaVisitata back to the SearchParams shape triggerSearch()

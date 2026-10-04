@@ -46,11 +46,14 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchesForGroups, dossierItemPdfTitle, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchesForGroups, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
+import { buildPdfBlocks, loadDossierTexts } from './dossierPdf';
+import { actUrnForBlock } from './useActDetails';
+import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
@@ -108,6 +111,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Hydrate the snapshot list, or the "• N snapshot" counter reads 0 after a
   // reload even when rows exist. Logged on failure, never hidden (gotcha 18).
@@ -355,88 +359,109 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     }
   };
 
-  const handleExportPdf = () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    const margin = 44;
-    const bottom = 770;
-    let y = 54;
+  // The PDF as the page is: notes, then each act once with its articles and
+  // every text, fetched like the reader's (spec §9). Titles come from the
+  // session cache the act blocks already filled.
+  const handleExportPdf = async () => {
+    if (pdfProgress) return;
+    setPdfProgress({ done: 0, total: 0 });
+    try {
+      const texts = await loadDossierTexts(dossier.items, (done, total) => setPdfProgress({ done, total }));
+      const titles = new Map<string, string | null>();
+      await Promise.all(fullLayout.acts.map(async (block) => {
+        const urn = actUrnForBlock(block);
+        if (block.isCode || !urn) return;
+        const answer = await fetchActRubriche(urn).catch((err: unknown) => {
+          console.error('PDF: act title unavailable for', urn, err);
+          return null;
+        });
+        titles.set(block.key, answer?.title?.trim() || null);
+      }));
+      const blocks = buildPdfBlocks(dossier.items, texts, titles);
 
-    const footer = () => {
-      const page = doc.getNumberOfPages();
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(120);
-      doc.text(`${dossier.title} · VisuaLex`, margin, 810);
-      doc.text(`Pagina ${page}`, 555, 810, { align: 'right' });
-      doc.setTextColor(0);
-    };
-    const ensureSpace = (height: number) => {
-      if (y + height <= bottom) return;
-      footer();
-      doc.addPage();
-      y = 54;
-    };
-    const writeLines = (lines: string[], lineHeight: number) => {
-      lines.forEach(line => {
-        ensureSpace(lineHeight);
-        doc.text(line, margin, y);
-        y += lineHeight;
-      });
-    };
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const margin = 44;
+      const bottom = 770;
+      const width = 507;
+      let y = 54;
 
-    doc.setFillColor(30, 64, 175);
-    doc.rect(0, 0, 595, 12, 'F');
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text(dossier.title, margin, y);
-    y += 28;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    doc.text(`Fascicolo normativo · ${dossier.items.length} elementi · Esportato il ${new Date().toLocaleDateString('it-IT')}`, margin, y);
-    y += 18;
-    if (dossier.description) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'italic');
-      writeLines(doc.splitTextToSize(dossier.description, 507) as string[], 14);
-      y += 6;
-    }
-    if (dossier.tags?.length) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      writeLines([`Tag: ${dossier.tags.join(' · ')}`], 13);
-    }
-    doc.setTextColor(0);
-    doc.setDrawColor(190);
-    doc.line(margin, y + 4, 551, y + 4);
-    y += 22;
-
-    dossier.items.forEach((item, idx) => {
-      const title = dossierItemPdfTitle(item, idx);
-      ensureSpace(32);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text(title, margin, y);
-      y += 17;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      const rawContent = item.type === 'norma'
-        ? String(item.data.article_text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-        : String(item.data || '');
-      const content = rawContent || '(Nessun testo disponibile)';
-      writeLines(doc.splitTextToSize(content, 507) as string[], 12);
-      if (item.type === 'norma') {
+      const footer = () => {
+        const page = doc.getNumberOfPages();
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.setTextColor(100);
-        writeLines([`Fonte: ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''}${item.data.data ? ` del ${item.data.data}` : ''}`], 11);
+        doc.setTextColor(120);
+        doc.text(`${dossier.title} · VisuaLex`, margin, 810);
+        doc.text(`Pagina ${page}`, 555, 810, { align: 'right' });
         doc.setTextColor(0);
-      }
-      y += 12;
-    });
+      };
+      const ensureSpace = (height: number) => {
+        if (y + height <= bottom) return;
+        footer();
+        doc.addPage();
+        y = 54;
+      };
+      const writeLines = (lines: string[], lineHeight: number) => {
+        lines.forEach(line => {
+          ensureSpace(lineHeight);
+          doc.text(line, margin, y);
+          y += lineHeight;
+        });
+      };
+      const write = (text: string, size: number, style: 'normal' | 'bold' | 'italic', lineHeight: number, grey = false) => {
+        doc.setFontSize(size);
+        doc.setFont('helvetica', style);
+        doc.setTextColor(grey ? 100 : 0);
+        writeLines(doc.splitTextToSize(text, width) as string[], lineHeight);
+        doc.setTextColor(0);
+      };
 
-    footer();
-    doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+      doc.setFillColor(30, 64, 175);
+      doc.rect(0, 0, 595, 12, 'F');
+      write(dossier.title, 22, 'bold', 28);
+      write(`Fascicolo normativo · ${countsLine} · Esportato il ${new Date().toLocaleDateString('it-IT')}`, 9, 'normal', 18, true);
+      if (dossier.description) {
+        write(dossier.description, 11, 'italic', 14);
+        y += 6;
+      }
+      if (dossier.tags?.length) write(`Tag: ${dossier.tags.join(' · ')}`, 9, 'normal', 13, true);
+      doc.setDrawColor(190);
+      doc.line(margin, y + 4, 551, y + 4);
+      y += 22;
+
+      blocks.forEach((block) => {
+        if (block.kind === 'notes') {
+          ensureSpace(32);
+          write('Note', 14, 'bold', 18);
+          block.notes.forEach((text) => { write(text, 10, 'normal', 13); y += 6; });
+          y += 10;
+          return;
+        }
+        ensureSpace(48);
+        write(block.heading, 14, 'bold', 18);
+        if (block.title) write(block.title, 10, 'italic', 13, true);
+        y += 6;
+        block.articles.forEach((article) => {
+          ensureSpace(32);
+          const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
+          write(head, 11, 'bold', 15);
+          write(article.text, 9, article.missing === 'none' ? 'normal' : 'italic', 12, article.missing !== 'none');
+          y += 10;
+        });
+        y += 8;
+      });
+
+      footer();
+      doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+      const missing = blocks.reduce((n, b) => n + (b.kind === 'act' ? b.articles.filter((a) => a.missing === 'unavailable').length : 0), 0);
+      if (missing > 0) {
+        showToast(`PDF salvato: ${missing === 1 ? '1 testo non disponibile' : `${missing} testi non disponibili`}`, 'info');
+      }
+    } catch (err) {
+      console.error('Failed to export the dossier PDF:', err);
+      showToast('Impossibile creare il PDF del dossier', 'error');
+    } finally {
+      setPdfProgress(null);
+    }
   };
 
   const handleCreateSnapshot = async () => {
@@ -535,14 +560,18 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               align="left"
               triggerClassName={cn(SECONDARY_BUTTON, 'dossier-export')}
               items={[
-                { label: 'PDF', icon: Download, onSelect: handleExportPdf },
+                { label: 'PDF', icon: Download, onSelect: () => void handleExportPdf(), disabled: !!pdfProgress },
                 { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
                 { label: 'JSON', icon: FileJson, onSelect: exportDossierJSON },
                 { label: snapshotBusy ? 'Salvo lo snapshot…' : 'Salva snapshot', icon: History, onSelect: () => void handleCreateSnapshot(), disabled: snapshotBusy },
               ]}
             >
               <Download size={16} aria-hidden />
-              <span className="hidden sm:inline">Esporta</span>
+              {pdfProgress ? (
+                <span role="status">Preparo il PDF…{pdfProgress.total > 0 ? ` ${pdfProgress.done} di ${pdfProgress.total}` : ''}</span>
+              ) : (
+                <span className="hidden sm:inline">Esporta</span>
+              )}
             </MenuButton>
             <MenuButton
               label="Altre azioni"
