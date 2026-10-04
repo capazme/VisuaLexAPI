@@ -5,7 +5,7 @@ import {
   computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
   dossierItemFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
-  validateImportedDossier, dossierSuggestionPayload, importReport,
+  validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importToastType,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -453,5 +453,64 @@ describe('an imported dossier', () => {
       { articleRef: undefined, sentenzaRef: SENTENZA, note: undefined, status: 'important' },
       { articleRef: undefined, sentenzaRef: undefined, note: 'n', status: undefined },
     ]);
+  });
+});
+
+describe('an imported dossier is rebuilt from what was checked', () => {
+  const check = (items: unknown[], extra: Record<string, unknown> = {}) => validateImportedDossier({ title: 'T', items, ...extra });
+
+  it('accepts a decision with a valid identity and a markup label, and stores the recomputed citation', () => {
+    const out = check([{ id: 's', type: 'sentenza', addedAt: '2026-10-01T00:00:00Z',
+      data: { ...SENTENZA, etichetta: '<img src=x onerror=alert(1)>' } }]);
+    expect(out?.discarded).toEqual([]);
+    expect(out?.dossier.items).toEqual([
+      { id: 's', type: 'sentenza', addedAt: '2026-10-01T00:00:00Z', data: SENTENZA },
+    ]);
+  });
+
+  it('refuses an entry that is not an object, with a reason', () => {
+    const proto = JSON.parse('{"__proto__": {"type": "sentenza"}}');
+    const out = check([null, 42, 'x', proto]);
+    expect(out?.dossier.items).toEqual([]);
+    expect(out?.discarded).toEqual([0, 1, 2, 3].map((index) => ({ index, reason: 'tipo di voce sconosciuto' })));
+  });
+
+  it('carries over no status, citation or foreign key of a decision, only the whitelisted fields', () => {
+    const out = check([{ id: 's', type: 'sentenza', addedAt: '', status: 'x', citation: '<b>x</b>', actCitation: 'y',
+      isAdmin: true, data: { ...SENTENZA } }]);
+    expect(out?.dossier.items[0]).toEqual({ id: 's', type: 'sentenza', addedAt: expect.any(String), data: SENTENZA });
+    expect(Object.keys(out?.dossier.items[0] ?? {}).sort()).toEqual(['addedAt', 'data', 'id', 'type']);
+    const starred = check([{ id: 's', type: 'sentenza', status: 'important', data: { ...SENTENZA } }]);
+    expect(starred?.dossier.items[0].status).toBe('important');
+  });
+
+  it('gives a decision without a usable id or date a new id and the time of the import', () => {
+    const out = check([{ id: 7, type: 'sentenza', addedAt: 3, data: { ...SENTENZA } }]);
+    const item = out?.dossier.items[0];
+    expect(typeof item?.id).toBe('string');
+    expect(item?.id).not.toBe('');
+    expect(Number.isNaN(Date.parse(item?.addedAt ?? ''))).toBe(false);
+  });
+
+  it('refuses a dossier with an empty or blank title', () => {
+    expect(validateImportedDossier({ title: '', items: [] })).toBeNull();
+    expect(validateImportedDossier({ title: '   ', items: [] })).toBeNull();
+  });
+
+  it('drops a description that is not a string and tags that are not a list of strings', () => {
+    const bad = check([], { description: { a: 1 }, tags: 'uno,due' });
+    expect(bad?.dossier).not.toHaveProperty('description');
+    expect(bad?.dossier).not.toHaveProperty('tags');
+    expect(check([], { tags: ['a', 3] })?.dossier).not.toHaveProperty('tags');
+    const good = check([], { description: 'd', tags: ['a', 'b'] });
+    expect(good?.dossier).toMatchObject({ description: 'd', tags: ['a', 'b'] });
+  });
+
+  it('words the counts, and picks the toast type from what came in and what was lost', () => {
+    expect(importCounts(1, 2)).toBe('1 voce importata, 2 scartate');
+    expect(importToastType(3, 0)).toBe('success');
+    expect(importToastType(0, 0)).toBe('success');
+    expect(importToastType(2, 1)).toBe('info');
+    expect(importToastType(0, 2)).toBe('warning');
   });
 });

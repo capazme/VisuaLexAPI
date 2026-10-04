@@ -6,9 +6,9 @@ import { Toast } from '../../ui/Toast';
 import { DossierListView } from './DossierListView';
 import { DossierDetailView } from './DossierDetailView';
 import { ImportDossierModal } from './ImportDossierModal';
-import { importReport, validateImportedDossier, type ImportCheck } from './dossierUtils';
+import { importReport, importToastType, validateImportedDossier, type ImportCheck } from './dossierUtils';
 
-type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null;
+type ToastState = { message: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
 
 export function DossierPage() {
   const { dossiers, importDossier } = useAppStore();
@@ -17,7 +17,7 @@ export function DossierPage() {
   const [toast, setToast] = useState<ToastState>(null);
   const { tryStartTour } = useTour();
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
     setToast({ message, type });
   };
 
@@ -64,7 +64,7 @@ export function DossierPage() {
     }
     setSelectedDossierId(outcome.id);
     const lost = outcome.failed + discarded.length;
-    showToast(importReport(outcome.imported, lost), lost === 0 ? 'success' : 'info');
+    showToast(importReport(outcome.imported, lost), importToastType(outcome.imported, lost));
   };
 
   const selectedDossier = dossiers.find((d) => d.id === selectedDossierId) ?? null;

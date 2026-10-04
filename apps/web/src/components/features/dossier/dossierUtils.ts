@@ -3,6 +3,7 @@ import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
 import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
+import { v4 as uuidv4 } from 'uuid';
 import type { DossierItemApi } from '../../../services/dossierService';
 import type { DecisionArchive, DecisionAttributes, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
 import { decisionKey, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
@@ -301,28 +302,59 @@ export interface ImportCheck {
 export function validateImportedDossier(raw: unknown): ImportCheck | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const candidate = raw as { title?: unknown; items?: unknown };
-  if (typeof candidate.title !== 'string' || !Array.isArray(candidate.items)) return null;
+  if (typeof candidate.title !== 'string' || candidate.title.trim() === '' || !Array.isArray(candidate.items)) return null;
   const items: DossierItem[] = [];
   const discarded: ImportCheck['discarded'] = [];
   candidate.items.forEach((entry, index) => {
-    const item = entry as { type?: unknown; data?: unknown } | null;
+    const item = entry as { id?: unknown; type?: unknown; data?: unknown; addedAt?: unknown; status?: unknown } | null;
     if (item?.type === 'sentenza') {
       const data = parseSentenzaContent(item.data);
-      if (data) items.push({ ...(entry as DossierItem), type: 'sentenza', data } as DossierItem);
-      else discarded.push({ index, reason: 'sentenza con dati non validi' });
+      if (data) {
+        // Rebuilt from whitelisted fields, never spread: the entry is untrusted. The stored label is
+        // the citation recomputed, never an incoming one (source convention, Q9).
+        items.push({
+          id: typeof item.id === 'string' && item.id ? item.id : uuidv4(),
+          type: 'sentenza',
+          data: { ...data, etichetta: decisionCitationOf(data) },
+          addedAt: typeof item.addedAt === 'string' && item.addedAt ? item.addedAt : new Date().toISOString(),
+          ...(item.status === 'important' ? { status: 'important' as const } : {}),
+        });
+      } else discarded.push({ index, reason: 'sentenza con dati non validi' });
     } else if (item?.type === 'norma' || item?.type === 'note') {
       items.push(entry as DossierItem);
     } else {
       discarded.push({ index, reason: 'tipo di voce sconosciuto' });
     }
   });
-  return { dossier: { ...(raw as Dossier), items }, discarded };
+  // Dossier-level fields are untrusted too: a description that is not a string and tags that are not
+  // a list of strings are dropped.
+  const { description, tags, ...rest } = raw as Dossier;
+  return {
+    dossier: {
+      ...rest,
+      items,
+      ...(typeof description === 'string' ? { description } : {}),
+      ...(Array.isArray(tags) && tags.every((t) => typeof t === 'string') ? { tags } : {}),
+    },
+    discarded,
+  };
+}
+
+/** The toast's type after an import: whole, partial, or nothing came in. */
+export function importToastType(imported: number, lost: number): 'success' | 'info' | 'warning' {
+  if (lost === 0) return 'success';
+  return imported === 0 ? 'warning' : 'info';
+}
+
+/** «1 voce importata, 1 scartata»: the counts of a partial import. */
+export function importCounts(imported: number, lost: number): string {
+  return `${imported} ${imported === 1 ? 'voce importata' : 'voci importate'}, ${lost} ${lost === 1 ? 'scartata' : 'scartate'}`;
 }
 
 /** The toast after an import: whole, or how many items were left out (not importable, or refused by the server). */
 export function importReport(imported: number, lost: number): string {
   if (lost === 0) return 'Dossier importato';
-  return `Dossier importato in parte: ${imported} ${imported === 1 ? 'voce importata' : 'voci importate'}, ${lost} ${lost === 1 ? 'scartata' : 'scartate'}`;
+  return `Dossier importato in parte: ${importCounts(imported, lost)}`;
 }
 
 /** A dossier as a Forum suggestion carries it; the server makes each entry the item it stands for.

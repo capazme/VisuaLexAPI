@@ -20,7 +20,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, searchParamsFromGroup, searchesForGroups,
+  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, importToastType, searchParamsFromGroup, searchesForGroups,
   tabLabelForGroup, validateImportedDossier, type ImportCheck, type NormaGroup,
 } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
@@ -30,7 +30,7 @@ import type { Dossier } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { actsSummary, layoutDossier } from './dossierLayout';
 
-type ToastType = 'success' | 'error' | 'info';
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface Props {
   onSelect: (dossierId: string) => void;
@@ -224,7 +224,7 @@ export function DossierListView({ onSelect, showToast }: Props) {
       return;
     }
     const lost = outcome.failed + discarded.length;
-    showToast(importReport(outcome.imported, lost), lost === 0 ? 'success' : 'info');
+    showToast(importReport(outcome.imported, lost), importToastType(outcome.imported, lost));
     onSelect(outcome.id);
   };
 

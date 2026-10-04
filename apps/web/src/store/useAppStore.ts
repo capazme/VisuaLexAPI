@@ -32,7 +32,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
-import { citationsFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
+import { citationsFromApi, dossierItemFromApi, itemContentFor, serverItemFor, validateImportedDossier } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -190,6 +190,39 @@ export interface ImportOutcome {
     id: string;
     imported: number;
     failed: number;
+}
+
+/** What importing an environment's dossiers made of their items: how many came in, and how many were
+ *  left out, by the client's check (`validateImportedDossier`) or by the server. */
+export interface EnvironmentImportOutcome {
+    imported: number;
+    lost: number;
+}
+
+/** Imports each dossier of an environment: checked first, and every loss counted, never in silence. */
+async function importDossiersChecked(
+    dossiers: Dossier[],
+    importDossier: (dossier: Dossier) => Promise<ImportOutcome | null>,
+): Promise<EnvironmentImportOutcome> {
+    let imported = 0;
+    let lost = 0;
+    for (const raw of dossiers) {
+        const check = validateImportedDossier(raw);
+        if (!check) {
+            lost += Array.isArray(raw?.items) ? raw.items.length : 0;
+            continue;
+        }
+        lost += check.discarded.length;
+        const outcome = await importDossier(check.dossier);
+        if (outcome) {
+            imported += outcome.imported;
+            lost += outcome.failed;
+        } else {
+            // The dossier itself could not be created: none of its items came in.
+            lost += check.dossier.items.length;
+        }
+    }
+    return { imported, lost };
 }
 
 interface AppState {
@@ -432,8 +465,8 @@ interface AppState {
     updateEnvironment: (id: string, updates: Partial<Omit<Environment, 'id' | 'createdAt'>>) => Promise<void>;
     deleteEnvironment: (id: string) => Promise<void>;
     importEnvironment: (env: Environment) => Promise<string | null>;
-    importEnvironmentPartial: (envData: Partial<Environment>, selection: EnvironmentSelection, mode: 'merge' | 'replace') => Promise<void>;
-    applyEnvironment: (id: string, mode: 'replace' | 'merge') => Promise<void>;
+    importEnvironmentPartial: (envData: Partial<Environment>, selection: EnvironmentSelection, mode: 'merge' | 'replace') => Promise<EnvironmentImportOutcome>;
+    applyEnvironment: (id: string, mode: 'replace' | 'merge') => Promise<EnvironmentImportOutcome>;
     refreshEnvironmentFromCurrent: (id: string) => Promise<void>;
     getCurrentStateAsEnvironment: (name: string) => Environment;
 }
@@ -2507,9 +2540,7 @@ const appStore = createStore<AppState>()(
                 const dossiersToImport = (filtered.dossiers || []).filter(d =>
                     mode === 'replace' ? true : !existingTitles.has(d.title.toLowerCase())
                 );
-                for (const d of dossiersToImport) {
-                    await get().importDossier(d);
-                }
+                const dossierOutcome = await importDossiersChecked(dossiersToImport, get().importDossier);
 
                 // ── quickNorms + customAliases (server-backed, gotcha #17):
                 // POST each so the server owns the id; otherwise the next
@@ -2612,11 +2643,12 @@ const appStore = createStore<AppState>()(
                 if (syncedHl.length > 0) {
                     set((state) => { state.highlights.push(...syncedHl); });
                 }
+                return dossierOutcome;
             },
 
             applyEnvironment: async (id, mode) => {
                 const env = get().environments.find(e => e.id === id);
-                if (!env) return;
+                if (!env) return { imported: 0, lost: 0 };
 
                 // ── Dossiers: must go through the server (same reason as
                 // importDossier — addItem later checks server ownership and
@@ -2638,9 +2670,7 @@ const appStore = createStore<AppState>()(
                 // Imports happen sequentially so that in replace-mode the
                 // order env→store matches env→UI with no flicker. Each call
                 // pushes one populated dossier into the store.
-                for (const d of dossiersToImport) {
-                    await get().importDossier(d);
-                }
+                const dossierOutcome = await importDossiersChecked(dossiersToImport, get().importDossier);
 
                 // ── quickNorms + customAliases are SERVER-BACKED (gotcha #17):
                 // each must be POSTed so the server owns the id, else the next
@@ -2756,6 +2786,7 @@ const appStore = createStore<AppState>()(
                 if (syncedHl.length > 0) {
                     set((state) => { state.highlights.push(...syncedHl); });
                 }
+                return dossierOutcome;
             },
 
             // Re-snapshot an existing environment from the current app state.
