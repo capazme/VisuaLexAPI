@@ -25,6 +25,9 @@ import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
+import { createOAuthRouter } from './routes/oauth';
+import oauthAccountRoutes from './routes/oauthAccount';
+import { oauthConfig } from './oauth/config';
 
 const app = express();
 
@@ -51,6 +54,14 @@ app.use(cors({
 // (per user and per address), so it comes before the general limiter: reading many articles must
 // not use up the quota of every other call.
 app.get('/api/auth/verify', ...createScrapeGate(config.scrape));
+
+// The OAuth authorization server for MCP clients (spec 2026-10-02-mcp-spike):
+// /.well-known/oauth-authorization-server and /oauth/*. Outside /api, so none of
+// the session-authenticated routers sees these requests, and before the general
+// limiter: every endpoint has its own limit, and the MCP server introspects and
+// exchanges for all its users from one address, which the anonymous tier
+// (100 a minute per address) would throttle.
+app.use(createOAuthRouter(oauthConfig));
 
 // Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory
@@ -105,6 +116,8 @@ app.use('/api/merlt', merltKillSwitch, merltRoutes);
 // Same reason for LingoLex: a prefixed router authenticates once, here, instead
 // of passing through every catch-all router below first.
 app.use('/api/lingo/simulazioni', lingoSimulazioniRoutes);
+// The consent page and the connected applications (MCP spike), same reason.
+app.use('/api/oauth', oauthAccountRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);

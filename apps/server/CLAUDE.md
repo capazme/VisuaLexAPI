@@ -44,6 +44,31 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   limiter in `app.ts` on purpose: it has limits of its own, and reading many articles must
   not spend the quota of every other call. Both caps count over
   `SCRAPE_QUOTA_WINDOW_SECONDS`. Limiter errors fail open, authentication never does.
+- **The OAuth 2.1 authorization server** (MCP spike; spec
+  `docs/superpowers/specs/2026-10-02-mcp-spike-design.md`), `src/oauth/` and
+  `routes/oauth.ts`, mounted at the root **before** the general limiter and the
+  body parsers: `/.well-known/oauth-authorization-server`, `/oauth/register`,
+  `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, `/oauth/introspect`.
+  Built on the MCP SDK's handlers one by one (pinned 1.31.0), not its
+  `mcpAuthRouter`, whose metadata puts the endpoints at the root and knows no
+  token exchange; the metadata is ours (`oauth/metadata.ts`) and `iss` equals
+  its `issuer` character for character. Registration makes every client public
+  (no secret, whatever it asked) and accepts only loopback redirect URIs and
+  the `OAUTH_ALLOWED_REDIRECT_URIS` allow-list, at most five; on a loopback
+  address only the port may differ (`oauth/redirectUri.ts`). `/oauth/authorize`
+  never issues a code: it stores an `OAuthAuthorizationRequest` (ten minutes)
+  and redirects to the web consent page, so calling it twice is harmless. The
+  consent page uses `routes/oauthAccount.ts` (`/api/oauth`, user session): the
+  first user who opens a request claims it; the decision is single use and
+  issues a 60-second code bound to client, redirect, challenge and resource.
+  Codes and tokens are stored only as SHA-256. Access tokens last 8 hours,
+  refresh tokens 30 days and rotate; a replayed code revokes its chain, a
+  replayed refresh token the whole grant. Introspection answers only the MCP
+  server's credential (`mcp-omnilex`, HTTP Basic, `OAUTH_MCP_CLIENT_SECRET`).
+  `GET`/`DELETE /api/oauth/grants` list and revoke the user's connected
+  applications. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
+  at most every ten minutes: never fire-and-forget it, a background sweep
+  deadlocked the test suite's TRUNCATE.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore
@@ -209,6 +234,9 @@ filesystem is read-only.
 saved-norm watcher (see the Node backend section); all three have defaults.
 `SCRAPE_QUOTA_POINTS` / `SCRAPE_QUOTA_WINDOW_SECONDS` / `SCRAPE_IP_POINTS` (defaults
 300, 60, 1200) size the quota behind `GET /api/auth/verify`.
+`OAUTH_*` configure the authorization server (see `.env.example`);
+`tests/setup.ts` lifts its per-address limits for the suite and sets a test
+`OAUTH_MCP_CLIENT_SECRET`.
 
 ## Critical Files
 

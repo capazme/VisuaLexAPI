@@ -72,6 +72,11 @@ model User {
   // LingoLex: the study cards this user wrote
   lingoCards LingoCard[]
 
+  // OAuth: the applications this user connected (MCP spike)
+  oauthAuthorizationRequests OAuthAuthorizationRequest[]
+  oauthAuthorizationCodes    OAuthAuthorizationCode[]
+  oauthGrants                OAuthGrant[]
+
   @@map("users")
 }
 
@@ -1018,4 +1023,133 @@ model LingoCardAncora {
   @@index([normaKey, articleId, aknFingerprint])
   @@index([cardId])
   @@map("lingo_card_ancore")
+}
+
+// ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
+// Spec: docs/superpowers/specs/2026-10-02-mcp-spike-design.md, section 4.
+// Every secret (authorization code, access and refresh token) is stored as the
+// SHA-256 of its value, never the value itself. Every row that belongs to a
+// person cascades from User, so `deleteUserAccount` stays the one deletion path.
+
+// A client registered dynamically (RFC 7591). Always public: no secret is
+// stored, because none is issued. The MCP server's own confidential credential
+// comes from configuration, not from this table.
+model OAuthClient {
+  id           String   @id
+  clientName   String?  @map("client_name")
+  redirectUris String[] @map("redirect_uris")
+  // The registration answer as the client received it (RFC 7591 metadata).
+  metadata     Json
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  authorizationRequests OAuthAuthorizationRequest[]
+  authorizationCodes    OAuthAuthorizationCode[]
+  grants                OAuthGrant[]
+
+  @@index([createdAt])
+  @@map("oauth_clients")
+}
+
+// An authorization request waiting for the user's decision on the consent page.
+// Its id is what the page carries; it lives ten minutes. The first signed-in
+// user who opens it claims it (`userId`); only that user can decide.
+model OAuthAuthorizationRequest {
+  id                  String    @id @default(uuid())
+  clientId            String    @map("client_id")
+  userId              String?   @map("user_id")
+  redirectUri         String    @map("redirect_uri")
+  codeChallenge       String    @map("code_challenge")
+  state               String?
+  scopes              String[]
+  resource            String
+  expiresAt           DateTime  @map("expires_at")
+  decidedAt           DateTime? @map("decided_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("oauth_authorization_requests")
+}
+
+// A 60-second, single-use authorization code, bound to client, redirect URI,
+// PKCE challenge and resource. `usedAt` stays set after use so that a second
+// presentation is recognised as a replay and the tokens it produced revoked.
+model OAuthAuthorizationCode {
+  id            String    @id @default(uuid())
+  codeHash      String    @unique @map("code_hash")
+  clientId      String    @map("client_id")
+  userId        String    @map("user_id")
+  grantId       String    @map("grant_id")
+  redirectUri   String    @map("redirect_uri")
+  codeChallenge String    @map("code_challenge")
+  resource      String
+  scopes        String[]
+  expiresAt     DateTime  @map("expires_at")
+  usedAt        DateTime? @map("used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grant  OAuthGrant  @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId])
+  @@index([userId])
+  @@map("oauth_authorization_codes")
+}
+
+// A connected application: what the user approved for one client. The user
+// sees it in the settings and can revoke it; revocation stops every token of
+// the grant on its next use.
+model OAuthGrant {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  clientId   String    @map("client_id")
+  scopes     String[]
+  resource   String
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  user   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  codes  OAuthAuthorizationCode[]
+  tokens OAuthToken[]
+
+  @@index([userId])
+  @@index([clientId])
+  @@map("oauth_grants")
+}
+
+enum OAuthTokenKind {
+  ACCESS
+  REFRESH
+}
+
+// An access or refresh token, stored as its SHA-256. `chainId` is the
+// authorization code that started the chain: every token issued from that code
+// and its refreshes carries it, so a replayed code revokes exactly what it
+// produced. `rotatedAt` marks a refresh token already exchanged; presenting it
+// again revokes the grant.
+model OAuthToken {
+  id        String         @id @default(uuid())
+  tokenHash String         @unique @map("token_hash")
+  kind      OAuthTokenKind
+  grantId   String         @map("grant_id")
+  chainId   String         @map("chain_id")
+  scopes    String[]
+  resource  String
+  expiresAt DateTime       @map("expires_at")
+  rotatedAt DateTime?      @map("rotated_at")
+  revokedAt DateTime?      @map("revoked_at")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  grant OAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId])
+  @@index([chainId])
+  @@map("oauth_tokens")
 }
