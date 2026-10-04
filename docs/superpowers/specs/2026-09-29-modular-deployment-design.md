@@ -204,8 +204,8 @@ chose the refactor instead.
   1. **Preflight.** Linux with Docker and the Compose plugin, 2.24 or newer (on another
      system a warning only, so that a trial on the development machine runs); `infra/.env` and
      `apps/server/.env` exist and none of the development passwords is left in them;
-     the working tree is clean and `HEAD` is `main` or a `vX.Y.Z` tag, unless
-     `--allow-branch` says otherwise. The commit or tag being deployed is printed.
+     the working tree is clean and `HEAD` is `main`, `develop` or a `vX.Y.Z` tag, unless
+     `--allow-branch` says otherwise (`develop` with a warning: not a release). The commit or tag being deployed is printed.
   2. **First run only.** Missing env files are created with **generated** random secrets,
      never the development defaults, and their location is printed — the values are not.
      `MERLT_ENABLED` starts as `true`.
@@ -217,9 +217,16 @@ chose the refactor instead.
   4. **Build and start.** `docker compose -f … up -d --build --wait`, the MERL-T profile
      included, migrations included, then a health check of every module.
   5. **Report.** The address it answers on and how to follow the logs.
-  It **does not** run `git pull`: it deploys what is checked out, and says which. It does
-  not stay in the foreground; the containers keep running.
-- A rollback is `git checkout vX.Y.Z && ./start.sh --prod`. Migrations do not walk
+  Which commit: `--branch main|develop` first fast-forwards the checkout to origin's latest
+  commit of that branch (`scripts/prod/update.sh`: Docker not answering, a dirty tree, a local
+  commit origin lacks, a branch that predates `--prod`, or one that lacks a database migration
+  the checked-out version has — its code would run on a schema already migrated past it — stop
+  it before the checkout moves), then runs the deploy script of the version just pulled.
+  `--no-pull` deploys what is checked out. A bare `--prod` asks at a terminal, offering the
+  branch already checked out as the default, and means `--no-pull` without one. (Amended 4 Oct 2026: the first
+  version never pulled.) It says which commit it deploys, and does not stay in the
+  foreground; the containers keep running.
+- A rollback is `git checkout vX.Y.Z && ./start.sh --prod --no-pull`. Migrations do not walk
   backwards: the pre-deploy backup is the rollback for the data.
 - Stopping: `./start.sh --prod --stop` (containers and volumes stay).
 
