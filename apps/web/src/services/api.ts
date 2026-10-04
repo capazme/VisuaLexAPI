@@ -4,6 +4,7 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { isAccessTokenExpired } from './authService';
+import { stashReturnTo } from '../utils/returnTo';
 
 // API base URL - uses relative path to leverage Vite proxy in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -33,6 +34,7 @@ let refreshInFlight: Promise<string> | null = null;
 export function handleUnauthenticated(): void {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
+  stashReturnTo(`${window.location.pathname}${window.location.search}${window.location.hash}`);
   window.location.href = '/login';
 }
 
