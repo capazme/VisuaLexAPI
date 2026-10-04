@@ -6,6 +6,46 @@ import type { Caller } from '../auth.js';
 import type { McpConfig } from '../config.js';
 import { ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
+import { TRASH_DAYS, canAsk, confirmWithUser, deletionMessage, type Confirmation } from '../confirm.js';
+
+const DELETE_SCOPE = 'content:delete';
+export const MAX_DELETIONS = 50;
+
+const NO_PERMISSION =
+  'Questa applicazione non è autorizzata a eliminare. Puoi abilitarlo in VisuaLex: Impostazioni → Applicazioni collegate → «Può eliminare dossier, voci e schede».';
+const CANNOT_ASK =
+  'Questo client non può chiederti conferma, quindi da qui non si elimina nulla. Puoi eliminare dalla pagina del dossier in VisuaLex.';
+const NOTHING_DELETED = 'Nulla è stato eliminato: l’eliminazione non è stata confermata.';
+/** What the user reads when the question did not end in a confirmation. */
+const NOT_CONFIRMED: Record<Exclude<Confirmation, 'confirmed' | 'unsupported'>, string> = {
+  declined: NOTHING_DELETED,
+  timeout: 'Nessuna risposta alla richiesta di conferma in tempo. Nulla è stato eliminato.',
+  failed: 'La richiesta di conferma non è arrivata all’utente. Nulla è stato eliminato.',
+};
+
+/** Until when what goes to the trash today can be restored, in Italian. */
+const restorableUntil = (): string =>
+  new Date(Date.now() + TRASH_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/**
+ * How an entry reads in the dialog: a norm by the citation the server builds from its
+ * structured fields; anything else by its kind. Titles and note texts may have been
+ * written by a model, and must never speak in the dialog.
+ */
+const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione' };
+/** Who wrote it, from the server's mark; never the application's own (self-chosen) name. */
+const author = (item: ApiDossierItem): string =>
+  item.created_by ? (item.item_type === 'note' ? ' (scritta da un’applicazione collegata)' : ' (di un’applicazione collegata)') : ' (tua)';
+const entryLine = (item: ApiDossierItem, all: ApiDossierItem[]): string => {
+  if (item.item_type === 'norm') return item.citation ?? KIND_WORDS.norm;
+  if (item.item_type === 'note') {
+    const article = item.about_item_id ? all.find((other) => other.id === item.about_item_id && other.item_type === 'norm') : undefined;
+    return `${article?.citation ? `Nota su ${article.citation}` : 'Nota'}${author(item)}`;
+  }
+  return `${KIND_WORDS[item.item_type] ?? 'Voce'}${author(item)}`;
+};
+const UNREACHABLE_AFTER_CONFIRM =
+  'VisuaLex non ha risposto e non so se l’eliminazione è avvenuta: controlla il cestino di VisuaLex prima di riprovare.';
 
 /** The scopes each tool needs: the HTTP layer refuses a call whose token lacks one (403). */
 export const TOOL_SCOPES: Record<string, string[]> = {
@@ -15,6 +55,9 @@ export const TOOL_SCOPES: Record<string, string[]> = {
   // Finds the dossier first (by id or name), then writes.
   omnilex_aggiungi_norme_dossier: ['dossier:read', 'dossier:write'],
   omnilex_aggiungi_nota_dossier: ['dossier:read', 'dossier:write'],
+  // content:delete is checked by the tools themselves, live, so that they can say how to turn it on.
+  omnilex_elimina_dossier: ['dossier:read'],
+  omnilex_elimina_voci_dossier: ['dossier:read'],
   omnilex_stato_account: ['dossier:read'],
 };
 
@@ -64,7 +107,8 @@ async function findDossier(config: McpConfig, caller: Caller, dossier: string): 
 /**
  * The dossier tools (spec section 6). Each acts for the caller of its own
  * request (the session may outlive a token) through a token exchanged per
- * call; there is no tool that updates, moves or deletes.
+ * call. Nothing updates or moves; the two deletion tools move to the trash,
+ * after the user confirms in the client's own dialog (second round, spec §4).
  */
 export function registerDossierTools(server: McpServer, config: McpConfig, run: RunTool): void {
   server.registerTool(
@@ -188,6 +232,89 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           { method: 'POST', body: { text: testo, ...(voce ? { aboutItemId: voce } : {}) } },
         );
         return data({ dossier: { id: found.id, nome: found.name }, nota: { id: created.id, nota_su: created.about_item_id ?? null } });
+      }),
+  );
+
+  server.registerTool(
+    'omnilex_elimina_voci_dossier',
+    {
+      title: 'Elimina voci da un dossier',
+      description:
+        `Sposta nel cestino da 1 a ${MAX_DELETIONS} voci di un dossier (gli id da omnilex_leggi_dossier). ` +
+        `Prima chiede conferma all’utente con una finestra che il modello non può compilare; ciò che è eliminato resta ripristinabile da VisuaLex per ${TRASH_DAYS} giorni. ` +
+        'Serve il permesso di eliminare, che l’utente concede nelle impostazioni di VisuaLex.',
+      inputSchema: {
+        dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
+        voci: z.array(z.string().min(1).max(64)).min(1).max(MAX_DELETIONS).describe('Gli id delle voci da eliminare'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    ({ dossier, voci }, extra) =>
+      run('omnilex_elimina_voci_dossier', extra, async (caller) => {
+        if (!caller.scopes.includes(DELETE_SCOPE)) throw new ToolError(NO_PERMISSION);
+        // Before reading anything: a client that cannot ask costs nothing (spec §4.1).
+        if (!canAsk(server)) throw new ToolError(CANNOT_ASK);
+        const found = await findDossier(config, caller, dossier);
+        const items = found.items ?? [];
+        const wanted = [...new Set(voci)];
+        const missing = wanted.filter((id) => !items.some((item) => item.id === id));
+        if (missing.length > 0) throw new ToolError(`Voci non trovate in questo dossier: ${missing.join(', ')}. Nulla è stato eliminato.`);
+        // The targets are fixed here: the dialog names exactly these, and exactly these are sent.
+        const targets = wanted.map((id) => items.find((item) => item.id === id)!);
+        const notesStaying = items.filter(
+          (item) => item.item_type === 'note' && item.about_item_id && wanted.includes(item.about_item_id) && !wanted.includes(item.id),
+        ).length;
+        const message = deletionMessage({
+          dossierName: found.name,
+          dossierId: found.id,
+          lines: targets.map((item) => entryLine(item, items)),
+          kinds: targets.map((item) => item.item_type),
+          total: targets.length,
+          attachedNotesStaying: notesStaying,
+        });
+        const answer = await confirmWithUser(server, message, { relatedRequestId: extra.requestId, timeoutMs: config.confirmationTimeoutMs, signal: extra.signal });
+        if (answer === 'unsupported') throw new ToolError(CANNOT_ASK);
+        if (answer !== 'confirmed') return data({ esito: 'annullata', messaggio: NOT_CONFIRMED[answer] });
+        // The delete-scoped token is exchanged only now, after the user's Accept.
+        const moved = await callApi<{ moved: string[]; notFound: string[] }>(
+          config,
+          caller,
+          DELETE_SCOPE,
+          `/dossiers/${encodeURIComponent(found.id)}/trash-items`,
+          { method: 'POST', body: { itemIds: wanted }, notFound: 'Le voci indicate non sono più nel dossier: nulla è stato eliminato.', unreachable: UNREACHABLE_AFTER_CONFIRM },
+        );
+        return data({ spostate_nel_cestino: moved.moved.length, non_trovate: moved.notFound, ripristinabili_fino_al: restorableUntil() });
+      }),
+  );
+
+  server.registerTool(
+    'omnilex_elimina_dossier',
+    {
+      title: 'Elimina un dossier',
+      description:
+        `Sposta nel cestino un intero dossier con le sue voci. Prima chiede conferma all’utente con una finestra che il modello non può compilare; ` +
+        `il dossier resta ripristinabile da VisuaLex per ${TRASH_DAYS} giorni. Serve il permesso di eliminare, che l’utente concede nelle impostazioni di VisuaLex.`,
+      inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    ({ dossier }, extra) =>
+      run('omnilex_elimina_dossier', extra, async (caller) => {
+        if (!caller.scopes.includes(DELETE_SCOPE)) throw new ToolError(NO_PERMISSION);
+        // Before reading anything: a client that cannot ask costs nothing (spec §4.1).
+        if (!canAsk(server)) throw new ToolError(CANNOT_ASK);
+        const found = await findDossier(config, caller, dossier);
+        const items = found.items ?? [];
+        const message = deletionMessage({ dossierName: found.name, dossierId: found.id, lines: items.map((item) => entryLine(item, items)), kinds: items.map((item) => item.item_type), total: items.length, wholeDossier: true });
+        const answer = await confirmWithUser(server, message, { relatedRequestId: extra.requestId, timeoutMs: config.confirmationTimeoutMs, signal: extra.signal });
+        if (answer === 'unsupported') throw new ToolError(CANNOT_ASK);
+        if (answer !== 'confirmed') return data({ esito: 'annullata', messaggio: NOT_CONFIRMED[answer] });
+        // The entries shown travel with the move: the server refuses it if the dossier changed meanwhile.
+        const moved = await callApi<{ itemCount: number }>(config, caller, DELETE_SCOPE, `/dossiers/${encodeURIComponent(found.id)}/trash`, {
+          method: 'POST',
+          body: { itemIds: items.map((item) => item.id) },
+          unreachable: UNREACHABLE_AFTER_CONFIRM,
+        });
+        return data({ dossier_nel_cestino: found.name, voci: moved.itemCount, ripristinabili_fino_al: restorableUntil() });
       }),
   );
 

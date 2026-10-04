@@ -15,6 +15,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ElicitRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 const VISUALEX = (process.env.VISUALEX_URL || 'http://localhost:3001').replace(/\/+$/, '');
 const MCP = process.env.MCP_URL || 'http://localhost:3002/mcp';
@@ -94,8 +95,15 @@ let tokens = await json(tokenResponse);
 must('access and refresh token', tokenResponse.status === 200 && tokens.access_token && tokens.refresh_token, `expires_in ${tokens.expires_in}`);
 
 // 6. The tools, through the SDK's own client.
+// The client answers a deletion's confirmation with whatever `answer` says, as a user would.
+let answer = { action: 'decline' };
+const asked = [];
 const connect = async (token) => {
-  const client = new Client({ name: 'visualex-e2e', version: '1.0.0' });
+  const client = new Client({ name: 'visualex-e2e', version: '1.0.0' }, { capabilities: { elicitation: { form: {} } } });
+  client.setRequestHandler(ElicitRequestSchema, async (request) => {
+    asked.push(request.params.message);
+    return answer;
+  });
   await client.connect(new StreamableHTTPClientTransport(new URL(MCP), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
   return client;
 };
@@ -108,7 +116,8 @@ const call = async (client, name, args = {}) => {
 };
 let client = await connect(tokens.access_token);
 const { tools } = await client.listTools();
-check('six tools, none destructive', tools.length === 6 && tools.every((t) => t.annotations?.destructiveHint === false), tools.map((t) => t.name).join(', '));
+const destructive = tools.filter((t) => t.annotations?.destructiveHint !== false).map((t) => t.name).sort().join(', ');
+check('eight tools, only the two deletions destructive', tools.length === 8 && destructive === 'omnilex_elimina_dossier, omnilex_elimina_voci_dossier', destructive);
 const name = `E2E MCP ${new Date().toISOString().slice(0, 19)}`;
 const created = await call(client, 'omnilex_crea_dossier', { nome: name });
 must('omnilex_crea_dossier', !created.isError && created.data?.id, created.isError ? created.text : name);
@@ -125,6 +134,36 @@ const noteEntry = reread.data?.voci?.find((v) => v.tipo === 'note');
 check('the note reads as written by the application, about that article', noteEntry?.nota_su === article?.id && noteEntry?.aggiunta_da === 'VisuaLex e2e', `aggiunta_da ${noteEntry?.aggiunta_da}`);
 const fifty1 = await client.callTool({ name: 'omnilex_aggiungi_norme_dossier', arguments: { dossier: created.data.id, riferimenti: Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`) } }).catch((e) => ({ isError: true, content: [{ text: String(e) }] }));
 check('51 references refused', Boolean(fifty1.isError));
+
+// Deletion (second round): off until the user switches it on; then confirmed, into the trash, restorable.
+const grantsNow = await json(await fetch(`${VISUALEX}/api/oauth/grants`, { headers: session }));
+const grantNow = grantsNow.find?.((g) => g.clientName === 'VisuaLex e2e');
+const offAnswer = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
+check('without the permission the deletion says where to turn it on', offAnswer.isError && offAnswer.text.includes('Applicazioni collegate'), offAnswer.text.slice(0, 60));
+const switched = await fetch(`${VISUALEX}/api/oauth/grants/${grantNow?.id}`, { method: 'PATCH', headers: session, body: JSON.stringify({ canDelete: true }) });
+check('the user switches deletion on in the settings', switched.status === 200);
+answer = { action: 'decline' };
+const askedBefore = asked.length;
+const declined = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
+const stillThere = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
+check(
+  'the user is asked, and Decline deletes nothing',
+  asked.length === askedBefore + 1 && !declined.isError && declined.data?.esito === 'annullata' && stillThere.data?.voci?.some((v) => v.id === article?.id),
+  asked.at(-1)?.split('\n')[0],
+);
+answer = { action: 'accept', content: { conferma: true } };
+const accepted = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
+check('Accept moves the entry to the trash', accepted.data?.spostate_nel_cestino === 1, accepted.isError ? accepted.text : `fino al ${accepted.data?.ripristinabili_fino_al}`);
+const trash = await json(await fetch(`${VISUALEX}/api/trash`, { headers: session }));
+const entry = trash.find?.((t) => t.dossierId === created.data.id && t.kind === 'DOSSIER_ITEMS');
+check('the trash lists it, with its citation and the application that deleted it', entry?.items?.[0]?.citation === article?.riferimento && entry?.clientName === 'VisuaLex e2e', entry?.items?.[0]?.citation);
+const restored = await fetch(`${VISUALEX}/api/trash/${entry?.id}/restore`, { method: 'POST', headers: session, body: '{}' });
+const back = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
+check('the user restores it from VisuaLex, with its note still about it', restored.status === 200 && back.data?.voci?.some((v) => v.id === article?.id) && back.data?.voci?.find((v) => v.tipo === 'note')?.nota_su === article?.id);
+await fetch(`${VISUALEX}/api/oauth/grants/${grantNow?.id}`, { method: 'PATCH', headers: session, body: JSON.stringify({ canDelete: false }) });
+const offAgain = await call(client, 'omnilex_elimina_dossier', { dossier: created.data.id });
+check('switched off again, the next deletion is refused', offAgain.isError && offAgain.text.includes('non è autorizzata'));
+
 const quota = await call(client, 'omnilex_stato_account');
 check('omnilex_stato_account', typeof quota.data?.points?.remaining === 'number', `points left ${quota.data?.points?.remaining}`);
 await client.close();
@@ -152,7 +191,7 @@ try {
 }
 check('after the revocation the next call fails', afterRevoke.isError, afterRevoke.text.slice(0, 80));
 
-// 9. Clean up: the dossier goes (through the user session; MCP cannot delete).
+// 9. Clean up: the dossier goes for good through the user session (MCP only moves things to the trash).
 const deleted = await fetch(`${VISUALEX}/api/dossiers/${created.data.id}`, { method: 'DELETE', headers: session });
 check('cleanup: the e2e dossier deleted through the user session', deleted.status === 204 || deleted.status === 200);
 
