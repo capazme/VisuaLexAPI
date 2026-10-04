@@ -117,3 +117,62 @@ describe('POST /api/dossiers/:id/notes', () => {
     expect(before.counters.note.remaining - after.counters.note.remaining).toBe(1);
   });
 });
+
+// PUT /api/dossiers/:id/items/:itemId with aboutItemId: the web app reattaches a
+// note to an article it restored (an undone removal gives it a new id).
+describe('PUT /api/dossiers/:id/items/:itemId — the article a note is about', () => {
+  let alice: TestUser;
+  let dossierId: string;
+  let normId: string;
+  let noteId: string;
+  const put = (who: Record<string, string>, itemId: string, body: unknown, id = dossierId) =>
+    request(app).put(`/api/dossiers/${id}/items/${itemId}`).set(who).send(body as object);
+
+  beforeEach(async () => {
+    alice = await createTestUser('notes-put-alice');
+    dossierId = (await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Prova' })).body.id;
+    normId = (
+      await request(app)
+        .post(`/api/dossiers/${dossierId}/items`)
+        .set(authHeader(alice))
+        .send({ itemType: 'norm', title: 'codice civile', content: { tipo_atto: 'codice civile', numero_articolo: '2043' } })
+    ).body.id;
+    noteId = (await request(app).post(`/api/dossiers/${dossierId}/notes`).set(authHeader(alice)).send({ text: 'Sul danno.' })).body.id;
+  });
+
+  it('attaches a note to an article of the same dossier, and detaches it with null', async () => {
+    const attached = await put(authHeader(alice), noteId, { aboutItemId: normId });
+    expect(attached.status).toBe(200);
+    expect(attached.body.about_item_id).toBe(normId);
+    const detached = await put(authHeader(alice), noteId, { aboutItemId: null });
+    expect(detached.body.about_item_id).toBeNull();
+  });
+
+  it('keeps the mark of the application that wrote the note', async () => {
+    await prisma.dossierItem.update({ where: { id: noteId }, data: { createdByClientId: 'c1', createdByClientName: 'Claude Code' } });
+    const response = await put(authHeader(alice), noteId, { aboutItemId: normId });
+    expect(response.body.created_by).toEqual({ clientName: 'Claude Code' });
+  });
+
+  it("refuses another dossier's article, a note, an unknown id, and an item that is not a note", async () => {
+    const other = (await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Altro' })).body.id;
+    const otherNorm = (
+      await request(app).post(`/api/dossiers/${other}/items`).set(authHeader(alice)).send({ itemType: 'norm', title: 'x', content: {} })
+    ).body.id;
+    for (const aboutItemId of [otherNorm, noteId, 'art-2043']) {
+      const response = await put(authHeader(alice), noteId, { aboutItemId });
+      expect(response.status).toBe(400);
+      expect(response.body.detail).toBe('La voce indicata non è un articolo di questo dossier.');
+    }
+    const onANorm = await put(authHeader(alice), normId, { aboutItemId: normId });
+    expect(onANorm.status).toBe(400);
+    expect(onANorm.body.detail).toBe('Solo una nota può riferirsi a un articolo.');
+    expect((await prisma.dossierItem.findUnique({ where: { id: noteId } }))?.aboutItemId).toBeNull();
+  });
+
+  it('is not reachable through an exchanged token', async () => {
+    const { apiToken } = await delegatedToken(alice);
+    const response = await put({ Authorization: `Bearer ${apiToken}` }, noteId, { aboutItemId: normId });
+    expect(response.status).toBe(403);
+  });
+});
