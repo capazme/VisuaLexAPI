@@ -3,7 +3,7 @@ import { InvalidGrantError, InvalidScopeError, InvalidTargetError } from '@model
 import type { OAuthGrant, OAuthToken, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { randomSecret, sha256 } from './hash';
-import { IGNORED_SCOPES } from './config';
+import { DELETE_SCOPE, IGNORED_SCOPES } from './config';
 
 export const ACCESS_TOKEN_LIFETIME_MS = 8 * 60 * 60 * 1000;
 export const REFRESH_TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
@@ -138,7 +138,9 @@ export async function exchangeRefresh(
     throw new InvalidGrantError('Invalid refresh token');
   }
   if (resource && resource.href !== row.resource) throw new InvalidTargetError('resource does not match the grant');
-  const asked = scopes?.filter((scope) => scope && !IGNORED_SCOPES.has(scope));
+  // Deletion is the grant's to decide, read live elsewhere: a client that asks for it again
+  // on refresh (every scope it once asked) is not refused, it simply does not get it here.
+  const asked = scopes?.filter((scope) => scope && !IGNORED_SCOPES.has(scope) && scope !== DELETE_SCOPE);
   if (asked && asked.some((scope) => !row.scopes.includes(scope))) {
     throw new InvalidScopeError('scope exceeds what was granted');
   }

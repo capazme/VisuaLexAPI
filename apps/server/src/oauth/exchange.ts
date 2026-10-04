@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 import { canonicalResource } from './authorize';
-import type { OAuthConfig } from './config';
+import { effectiveScopes, type OAuthConfig } from './config';
 import { ACTOR, DELEGATED_TOKEN_LIFETIME_SECONDS, delegationSecret } from './delegationSecret';
 import { isMcpClient } from './mcpClient';
 import { findActiveAccessToken } from './tokens';
@@ -73,7 +73,8 @@ export function createExchangeHandler(config: OAuthConfig) {
       return;
     }
     const scopes = [...new Set((field('scope') ?? '').split(' ').filter(Boolean))];
-    if (scopes.length === 0 || scopes.some((scope) => !subject.token.scopes.includes(scope))) {
+    const allowed = effectiveScopes(subject.token.scopes, subject.grant.scopes);
+    if (scopes.length === 0 || scopes.some((scope) => !allowed.includes(scope))) {
       oauthError(res, 400, 'invalid_scope', 'scope must be a non-empty part of the subject token’s scope');
       return;
     }

@@ -23,6 +23,8 @@ export function ConnectedAppsSection() {
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [pending, setPending] = useState<ConnectedApp | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // The connection whose permission is being changed: its switch waits, so what it shows is what the server holds.
+  const [switching, setSwitching] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +38,32 @@ export function ConnectedAppsSection() {
       cancelled = true;
     };
   }, []);
+
+  const toggleDelete = async (app: ConnectedApp) => {
+    if (switching) return;
+    const canDelete = !app.canDelete;
+    const set = (value: boolean) =>
+      setState((current) =>
+        current.status === 'ready'
+          ? { status: 'ready', apps: current.apps.map((a) => (a.id === app.id ? { ...a, canDelete: value } : a)) }
+          : current,
+      );
+    set(canDelete);
+    setSwitching(app.id);
+    try {
+      await connectionsService.setCanDelete(app.id, canDelete);
+      setMessage(
+        canDelete
+          ? `${appName(app)} ora può eliminare: ogni eliminazione ti chiederà conferma e finirà nel cestino per 30 giorni.`
+          : `${appName(app)} non può più eliminare.`,
+      );
+    } catch (error: unknown) {
+      set(app.canDelete);
+      setMessage(getErrorMessage(error) ?? 'Impossibile cambiare il permesso.');
+    } finally {
+      setSwitching(null);
+    }
+  };
 
   const confirmRevoke = async () => {
     const app = pending;
@@ -73,6 +101,16 @@ export function ConnectedAppsSection() {
                   <p className="text-xs text-slate-500">
                     {app.lastUsedAt ? `Ultimo uso: ${formatDate(app.lastUsedAt)}` : 'Mai usata'}
                   </p>
+                  <label className="mt-1 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={app.canDelete}
+                      disabled={switching === app.id}
+                      onChange={() => void toggleDelete(app)}
+                    />
+                    Può eliminare dossier, voci e schede
+                  </label>
                 </div>
                 <button
                   type="button"
