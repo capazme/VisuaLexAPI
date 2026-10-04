@@ -38,10 +38,15 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   'art. 40 preleggi': { parsed: { act_type: 'preleggi', article: '40' }, recognized: true },
   'art. 12 preleggi': { parsed: { act_type: 'preleggi', article: '12' }, recognized: true },
   'art. 99 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', article: '99' }, recognized: true },
-  'art. 3 l. 241/1990': { parsed: { act_type: 'legge', act_number: '241', date: '1990', article: '3' }, recognized: true },
+  'art. 3 l. 241/1990': { parsed: { act_type: 'legge', act_number: '241', date: '1990', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
+  'art. 3 l. 247/2012': { parsed: { act_type: 'legge', act_number: '247', date: '2012', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
+  'art. 3 l. 49/2023': { parsed: { act_type: 'legge', act_number: '49', date: '2023', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
 };
 
-const L241 = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241';
+// The full date fetch_norma_data finds for a law named by number and year.
+const LAW_DATES: Record<string, string> = { '241': '1990-08-07', '247': '2012-12-31', '49': '2023-04-21' };
+const lawUrl = (number: string) => `https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:${LAW_DATES[number]};${number}`;
+
 
 const GDPR_5 = {
   allegato: null, data: '2016-04-27', data_versione: null, numero_articolo: '5', numero_atto: '679',
@@ -86,8 +91,9 @@ function stubPythonApi() {
         url: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None', urn: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None~art2' }] }];
     }
     if (body.act_type === 'legge') {
-      return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: '1990-08-07', numero_atto: '241', allegato: null, tipo_atto_reale: null,
-        numero_articolo: body.article, url: L241, urn: `${L241}~art${body.article}` }] }];
+      const url = lawUrl(body.act_number);
+      return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: LAW_DATES[body.act_number], numero_atto: body.act_number, allegato: null, tipo_atto_reale: null,
+        numero_articolo: body.article, url, urn: `${url}~art${body.article}` }] }];
     }
     if (body.act_type === 'preleggi') {
       return [200, { norma_data: [{ ...ccArticle(body.article), tipo_atto: 'preleggi', allegato: '1', urn: `${CC_ACT}:1~art${body.article}` }] }];
@@ -100,7 +106,7 @@ function stubPythonApi() {
     const f = forced('/fetch_act_fingerprints');
     if (f) return f;
     if (!fingerprintsAvailable) return [200, { available: false, fingerprints: {}, parts: [], count: 0 }];
-    if (body.urn === L241) return [200, { available: true, fingerprints: { '1': 'x', '2': 'y', '3': 'z' }, parts: [{ name: 'Legge', fingerprints: {} }], count: 3 }];
+    if (body.urn.includes(':legge:')) return [200, { available: true, fingerprints: { '1': 'x', '2': 'y', '3': 'z' }, parts: [{ name: 'Legge', fingerprints: {} }], count: 3 }];
     // The codice civile has three parts; `fingerprints` is the dominant one (the code), which has an art. 40.
     return [200, {
       available: true,
@@ -157,7 +163,7 @@ describe('POST /api/dossiers/:id/norms', () => {
     const response = await addNorms(alice, dossierId, ['art. 2043 c.c.', 'art 2059 cc']);
     expect(response.status).toBe(200);
     expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'added']);
-    expect(response.body.results[0]).toMatchObject({ reference: 'art. 2043 c.c.', display: 'Art. 2043 — codice civile' });
+    expect(response.body.results[0]).toMatchObject({ reference: 'art. 2043 c.c.', display: 'art. 2043 c.c.' });
     const items = await prisma.dossierItem.findMany({ where: { dossierId }, orderBy: { position: 'asc' } });
     expect(items.map((i) => i.itemType)).toEqual(['norm', 'norm']);
     expect(items[0].title).toBe('codice civile');
@@ -267,6 +273,58 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(await prisma.dossierItem.count()).toBe(0);
   });
 
+  it('names each norm in the app\'s citation style, so two laws in one dossier are told apart', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 3 l. 247/2012', 'art. 3 l. 49/2023', 'art. 2043 c.c.', 'art. 99 c.c.']);
+    expect(response.body.results.map((r: { outcome: string; display?: string }) => [r.outcome, r.display])).toEqual([
+      ['added', 'art. 3, l. 31 dicembre 2012, n. 247'],
+      ['added', 'art. 3, l. 21 aprile 2023, n. 49'],
+      ['added', 'art. 2043 c.c.'],
+      ['does_not_exist', 'art. 99 c.c.'],
+    ]);
+    // Python's own label ("Art. 3 — legge") never reaches the answer.
+    expect(JSON.stringify(response.body)).not.toContain('— legge');
+
+    // The dossier's items carry the same citation, for every reader of the API (the MCP tools included).
+    const dossier = await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice));
+    expect(dossier.body.items.map((i: { citation?: string | null }) => i.citation)).toEqual([
+      'art. 3, l. 31 dicembre 2012, n. 247',
+      'art. 3, l. 21 aprile 2023, n. 49',
+      'art. 2043 c.c.',
+    ]);
+    // And the act alone, so a reader can name each act once above its articles.
+    expect(dossier.body.items.map((i: { act_citation?: string | null }) => i.act_citation)).toEqual([
+      'l. 31 dicembre 2012, n. 247',
+      'l. 21 aprile 2023, n. 49',
+      'c.c.',
+    ]);
+    const list = await request(app).get('/api/dossiers').set(authHeader(alice));
+    expect(list.body[0].items[0].citation).toBe('art. 3, l. 31 dicembre 2012, n. 247');
+    expect(list.body[0].items[0].act_citation).toBe('l. 31 dicembre 2012, n. 247');
+  });
+
+  it('gives a note no citation', async () => {
+    await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({ itemType: 'note', title: 'Nota', content: 'appunto' });
+    const dossier = await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice));
+    expect(dossier.body.items[0].citation).toBeNull();
+    expect(dossier.body.items[0].act_citation).toBeNull();
+  });
+
+  it('answers an added item with its citations, so the web names the act at once', async () => {
+    const norm = await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({
+      itemType: 'norm', title: 'legge',
+      content: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' },
+    });
+    expect(norm.status).toBe(201);
+    expect(norm.body.citation).toBe('art. 3, l. 31 dicembre 2012, n. 247');
+    expect(norm.body.act_citation).toBe('l. 31 dicembre 2012, n. 247');
+
+    const note = await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({
+      itemType: 'note', title: 'Nota', content: 'appunto',
+    });
+    expect(note.body.citation).toBeNull();
+    expect(note.body.act_citation).toBeNull();
+  });
+
   it('takes 1 to 50 references, each a short string', async () => {
     const fiftyOne = Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`);
     expect((await addNorms(alice, dossierId, fiftyOne)).status).toBe(400);
@@ -280,6 +338,17 @@ describe('POST /api/dossiers/:id/norms', () => {
     const response = await addNorms(bob, dossierId, ['art. 2043 c.c.']);
     expect(response.status).toBe(404);
     expect(await prisma.dossierItem.count()).toBe(0);
+  });
+
+  it('marks the norms an exchanged token adds with the connection, and not those the user adds', async () => {
+    const { apiToken } = await delegatedToken(alice);
+    await request(app)
+      .post(`/api/dossiers/${dossierId}/norms`)
+      .set({ Authorization: `Bearer ${apiToken}` })
+      .send({ references: ['art. 2043 c.c.'] });
+    await addNorms(alice, dossierId, ['art 2059 cc']);
+    const read = await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice));
+    expect(read.body.items.map((i: { created_by: unknown }) => i.created_by)).toEqual([{ clientName: 'Claude Code' }, null]);
   });
 
   it('is open to an exchanged token with dossier:write, at two points per reference', async () => {

@@ -2,7 +2,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startStubs } from './stubs.js';
-import { referenceOf } from '../src/tools/dossier.js';
 
 let env: Awaited<ReturnType<typeof startStubs>>;
 let client: Client;
@@ -24,9 +23,12 @@ beforeEach(async () => {
           id: 'i1',
           item_type: 'norm',
           title: 'codice civile',
+          citation: 'art. 2043 c.c.',
           content: { tipo_atto: 'codice civile', numero_articolo: '2043', numero_atto: '262', data: '1942-03-16', article_text: 'NON DEVE USCIRE' },
+          created_by: { clientName: 'Claude Code' },
+          about_item_id: null,
         },
-        { id: 'i2', item_type: 'note', title: 'Nota', content: 'appunto' },
+        { id: 'i2', item_type: 'note', title: 'Nota', citation: null, content: 'appunto', created_by: null, about_item_id: 'i1' },
       ],
     },
     { id: 'd2', name: 'Doppio', items: [] },
@@ -42,10 +44,11 @@ const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.conten
 const json = (result: Awaited<ReturnType<Client['callTool']>>) => JSON.parse(text(result));
 
 describe('the tool list', () => {
-  it('has the five dossier tools, the read-only ones marked, and nothing that updates, moves or deletes', async () => {
+  it('has the six dossier tools, the read-only ones marked, and nothing that updates, moves or deletes', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       'omnilex_aggiungi_norme_dossier',
+      'omnilex_aggiungi_nota_dossier',
       'omnilex_crea_dossier',
       'omnilex_elenca_dossier',
       'omnilex_leggi_dossier',
@@ -78,12 +81,19 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
         id: 'd1',
         nome: 'Prova',
         voci: [
-          { id: 'i1', tipo: 'norm', titolo: 'codice civile', riferimento: 'art. 2043 codice civile' },
-          { id: 'i2', tipo: 'note', titolo: 'Nota', riferimento: null },
+          { id: 'i1', tipo: 'norm', titolo: 'codice civile', riferimento: 'art. 2043 c.c.', aggiunta_da: 'Claude Code', nota_su: null },
+          { id: 'i2', tipo: 'note', titolo: 'Nota', riferimento: null, aggiunta_da: null, nota_su: 'i1' },
         ],
       });
       expect(text(result)).not.toContain('NON DEVE USCIRE');
     }
+  });
+
+  it('never reads an entry added by an unnamed application as the user\'s own', async () => {
+    env.stub.dossiers[0].items[0].created_by = { clientName: null };
+    const result = await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'd1' } });
+    expect(json(result).voci[0].aggiunta_da).toBe('applicazione collegata');
+    expect(json(result).voci[1].aggiunta_da).toBeNull();
   });
 
   it('calls an ambiguous or unknown name an error', async () => {
@@ -152,6 +162,44 @@ describe('omnilex_aggiungi_norme_dossier', () => {
   });
 });
 
+describe('omnilex_aggiungi_nota_dossier', () => {
+  it('adds a note to the dossier named, through dossier:write, and answers with its id', async () => {
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'Prova', testo: 'Vedi Cass. 2020.' } });
+    expect(result.isError).toBeFalsy();
+    expect(json(result)).toEqual({ dossier: { id: 'd1', nome: 'Prova' }, nota: { id: 'n-new', nota_su: null } });
+    const call = env.stub.apiCalls.find((c) => c.method === 'POST');
+    expect(call).toMatchObject({ path: '/dossiers/d1/notes', bearer: 'api-token-for-dossier:write', body: { text: 'Vedi Cass. 2020.' } });
+  });
+
+  it('attaches the note to the article named by voce', async () => {
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'Sul danno.', voce: 'i1' } });
+    expect(json(result).nota).toEqual({ id: 'n-new', nota_su: 'i1' });
+    expect(env.stub.apiCalls.find((c) => c.method === 'POST')?.body).toEqual({ text: 'Sul danno.', aboutItemId: 'i1' });
+  });
+
+  it('refuses a note longer than 4000 characters before calling anything', async () => {
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'a'.repeat(4001) } });
+    expect(result.isError).toBe(true);
+    expect(env.stub.apiCalls).toEqual([]);
+  });
+
+  it("passes the server's reason for a refusal on, as one sentence", async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.endsWith('/notes') ? [400, { detail: 'La voce indicata non è un articolo di questo dossier.' }] : undefined;
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'x', voce: 'i2' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('Richiesta non valida: La voce indicata non è un articolo di questo dossier.');
+  });
+
+  it('says when the daily notes limit is reached and when it renews', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.endsWith('/notes') ? [429, { quota: 'note', resetsAt: '2026-10-05T10:00:00.000Z' }] : undefined;
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'una di troppo' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/^Hai raggiunto il limite giornaliero di note scritte tramite applicazioni collegate: si rinnova /);
+  });
+});
+
 describe('omnilex_stato_account', () => {
   it('reports the quota', async () => {
     const result = await client.callTool({ name: 'omnilex_stato_account', arguments: {} });
@@ -159,9 +207,20 @@ describe('omnilex_stato_account', () => {
   });
 });
 
-describe('referenceOf', () => {
-  it('reads a stored norm without its text', () => {
-    expect(referenceOf({ tipo_atto: 'legge', numero_articolo: '2', numero_atto: '241', data: '1990-08-07' })).toBe('art. 2 legge n. 241 del 1990-08-07');
-    expect(referenceOf('nota')).toBeNull();
+describe('two acts of the same type in one dossier', () => {
+  it('names each article with its act, in the app\'s citation style, as the server gives it', async () => {
+    env.stub.dossiers.push({
+      id: 'd9',
+      name: 'Equo compenso',
+      items: [
+        { id: 'a', item_type: 'norm', title: 'legge', citation: 'art. 3, l. 31 dicembre 2012, n. 247', content: { tipo_atto: 'legge', numero_articolo: '3' } },
+        { id: 'b', item_type: 'norm', title: 'legge', citation: 'art. 3, l. 21 aprile 2023, n. 49', content: { tipo_atto: 'legge', numero_articolo: '3' } },
+      ],
+    });
+    const result = await client.callTool({ name: 'omnilex_leggi_dossier', arguments: { dossier: 'Equo compenso' } });
+    expect(json(result).voci.map((v: { riferimento: string }) => v.riferimento)).toEqual([
+      'art. 3, l. 31 dicembre 2012, n. 247',
+      'art. 3, l. 21 aprile 2023, n. 49',
+    ]);
   });
 });

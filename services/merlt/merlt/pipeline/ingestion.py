@@ -31,7 +31,14 @@ from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 from merlt.models import BridgeMapping
 
 from merlt.clients import NormTree, get_article_position
-from merlt.storage.graph.schema import Fonte, Provenance, canonical_urn, text_fingerprint
+from merlt.storage.graph.schema import (
+    Fonte,
+    Provenance,
+    act_name_from_urn,
+    canonical_urn,
+    stub_properties,
+    text_fingerprint,
+)
 
 log = structlog.get_logger()
 
@@ -449,7 +456,22 @@ class IngestionPipelineV2:
         codice_urn: str,
         result: IngestionResult,
     ) -> None:
-        """Create Norma node for codice (root document)."""
+        """Create the Norma node of the act the article belongs to.
+
+        A code (an act of the URN table: the codes, the Constitution, their
+        annexes) gets its code node. Any other act is born a stub in the one
+        shape (`schema.stub_properties`), ON CREATE only: written with the code
+        properties, a law became `tipo_documento 'codice'`, `titolo 'Legge'`,
+        `autorita_emanante 'Parlamento'` (l. 247/2012, 4 Oct 2026). Its type
+        stays in its key.
+        """
+        if act_name_from_urn(codice_urn) is None:
+            await self.falkordb.query(
+                "MERGE (act:Norma {URN: $urn}) ON CREATE SET act += $stub",
+                {"urn": canonical_urn(codice_urn), "stub": stub_properties(codice_urn)},
+            )
+            result.nodes_created.append(f"Norma(atto):{canonical_urn(codice_urn)}")
+            return
         await self.falkordb.query(
             """
             MERGE (codice:Norma {URN: $urn})

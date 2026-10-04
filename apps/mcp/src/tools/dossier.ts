@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { Caller } from '../auth.js';
 import type { McpConfig } from '../config.js';
 import { ToolError } from '../errors.js';
@@ -13,17 +14,25 @@ export const TOOL_SCOPES: Record<string, string[]> = {
   omnilex_crea_dossier: ['dossier:write'],
   // Finds the dossier first (by id or name), then writes.
   omnilex_aggiungi_norme_dossier: ['dossier:read', 'dossier:write'],
+  omnilex_aggiungi_nota_dossier: ['dossier:read', 'dossier:write'],
   omnilex_stato_account: ['dossier:read'],
 };
 
 export const MAX_REFERENCES = 50;
 export const MAX_DOSSIER_NAME = 100;
+export const MAX_NOTE_LENGTH = 4000;
 
 interface ApiDossierItem {
   id: string;
   item_type: string;
   title: string;
+  /** The server's citation of a norm, in the app's style ("art. 3, l. 31 dicembre 2012, n. 247"); null otherwise. */
+  citation?: string | null;
   content: unknown;
+  /** The connected application that added the entry, or null for the user's own. */
+  created_by?: { clientName: string | null } | null;
+  /** For a note: the entry (an article) it is about, or null. */
+  about_item_id?: string | null;
 }
 interface ApiDossier {
   id: string;
@@ -32,20 +41,6 @@ interface ApiDossier {
   created_at?: string;
   updated_at?: string;
   items?: ApiDossierItem[];
-}
-
-/** "art. 2043 codice civile", "art. 2 legge 7 agosto… n. 241": how a stored norm reads, without its text. */
-export function referenceOf(content: unknown): string | null {
-  if (!content || typeof content !== 'object') return null;
-  const norm = content as Record<string, unknown>;
-  const article = typeof norm.numero_articolo === 'string' ? norm.numero_articolo : null;
-  const act = typeof norm.tipo_atto === 'string' ? norm.tipo_atto : null;
-  if (!act) return null;
-  const parts = [article ? `art. ${article}` : null, act];
-  if (typeof norm.numero_atto === 'string' && norm.numero_atto && !/^codice|costituzione/i.test(act)) {
-    parts.push(`n. ${norm.numero_atto}${typeof norm.data === 'string' && norm.data ? ` del ${norm.data}` : ''}`);
-  }
-  return parts.filter(Boolean).join(' ');
 }
 
 /** Data for the model, as JSON text: never an instruction. */
@@ -67,10 +62,11 @@ async function findDossier(config: McpConfig, caller: Caller, dossier: string): 
 }
 
 /**
- * The dossier tools (spec section 6). Each acts for `caller` through a token
- * exchanged per call; there is no tool that updates, moves or deletes.
+ * The dossier tools (spec section 6). Each acts for the caller of its own
+ * request (the session may outlive a token) through a token exchanged per
+ * call; there is no tool that updates, moves or deletes.
  */
-export function registerDossierTools(server: McpServer, config: McpConfig, caller: Caller, run: RunTool): void {
+export function registerDossierTools(server: McpServer, config: McpConfig, run: RunTool): void {
   server.registerTool(
     'omnilex_elenca_dossier',
     {
@@ -79,8 +75,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    () =>
-      run('omnilex_elenca_dossier', async () => {
+    (_args, extra) =>
+      run('omnilex_elenca_dossier', extra, async (caller) => {
         const dossiers = await callApi<ApiDossier[]>(config, caller, 'dossier:read', '/dossiers');
         return data(dossiers.map((d) => ({ id: d.id, nome: d.name, voci: d.items?.length ?? 0 })));
       }),
@@ -95,8 +91,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    ({ dossier }) =>
-      run('omnilex_leggi_dossier', async () => {
+    ({ dossier }, extra) =>
+      run('omnilex_leggi_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
         return data({
           id: found.id,
@@ -105,7 +101,11 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
             id: item.id,
             tipo: item.item_type,
             titolo: item.title,
-            riferimento: item.item_type === 'norm' ? referenceOf(item.content) : null,
+            // The server names the act in full: two laws in one dossier must never read alike.
+            riferimento: item.citation ?? null,
+            // An application that registered without a name is still not the user.
+            aggiunta_da: item.created_by ? (item.created_by.clientName ?? 'applicazione collegata') : null,
+            nota_su: item.about_item_id ?? null,
           })),
         });
       }),
@@ -122,8 +122,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ nome, descrizione }) =>
-      run('omnilex_crea_dossier', async () => {
+    ({ nome, descrizione }, extra) =>
+      run('omnilex_crea_dossier', extra, async (caller) => {
         const created = await callApi<ApiDossier>(config, caller, 'dossier:write', '/dossiers', {
           method: 'POST',
           body: { name: nome, ...(descrizione ? { description: descrizione } : {}) },
@@ -149,8 +149,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
-    ({ dossier, riferimenti }) =>
-      run('omnilex_aggiungi_norme_dossier', async () => {
+    ({ dossier, riferimenti }, extra) =>
+      run('omnilex_aggiungi_norme_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
         const answer = await callApi<{ results: Record<string, unknown>[] }>(
           config,
@@ -164,6 +164,34 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
   );
 
   server.registerTool(
+    'omnilex_aggiungi_nota_dossier',
+    {
+      title: 'Aggiungi una nota a un dossier',
+      description:
+        `Aggiunge una nota (testo semplice, fino a ${MAX_NOTE_LENGTH} caratteri) a un dossier, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
+        'La nota resta segnata come scritta da questa applicazione. Aggiunge soltanto: non modifica né cancella note.',
+      inputSchema: {
+        dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
+        testo: z.string().trim().min(1).max(MAX_NOTE_LENGTH).describe('Il testo della nota'),
+        voce: z.string().min(1).max(64).optional().describe('L’id dell’articolo del dossier a cui si riferisce la nota'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    ({ dossier, testo, voce }, extra) =>
+      run('omnilex_aggiungi_nota_dossier', extra, async (caller) => {
+        const found = await findDossier(config, caller, dossier);
+        const created = await callApi<ApiDossierItem>(
+          config,
+          caller,
+          'dossier:write',
+          `/dossiers/${encodeURIComponent(found.id)}/notes`,
+          { method: 'POST', body: { text: testo, ...(voce ? { aboutItemId: voce } : {}) } },
+        );
+        return data({ dossier: { id: found.id, nome: found.name }, nota: { id: created.id, nota_su: created.about_item_id ?? null } });
+      }),
+  );
+
+  server.registerTool(
     'omnilex_stato_account',
     {
       title: 'Stato dell’account',
@@ -171,12 +199,17 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    () =>
-      run('omnilex_stato_account', async () => {
+    (_args, extra) =>
+      run('omnilex_stato_account', extra, async (caller) => {
         const quota = await callApi<Record<string, unknown>>(config, caller, 'dossier:read', '/oauth/quota');
         return data(quota);
       }),
   );
 }
 
-export type RunTool = (tool: string, body: () => Promise<CallToolResult>) => Promise<CallToolResult>;
+/** Runs a tool for the caller of this request (from the SDK's `extra`), logging the outcome. */
+export type RunTool = (
+  tool: string,
+  extra: { authInfo?: AuthInfo },
+  body: (caller: Caller) => Promise<CallToolResult>,
+) => Promise<CallToolResult>;

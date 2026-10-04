@@ -4,7 +4,7 @@ import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible'
 import { prisma } from '../lib/prisma';
 import { oauthConfig } from '../oauth/config';
 import { ACTOR, delegationSecret } from '../oauth/delegationSecret';
-import { findDelegatedRoute } from '../oauth/delegatedRoutes';
+import { findDelegatedRoute, type DelegatedCounter } from '../oauth/delegatedRoutes';
 import type { DelegatedClaims } from '../oauth/exchange';
 import { createLimiter } from './rateLimiter';
 
@@ -12,18 +12,36 @@ const DAY_SECONDS = 24 * 60 * 60;
 
 /** The daily allowance of delegated calls (spec section 6: placeholders to calibrate). */
 export const DELEGATED_DAILY_POINTS = parseInt(process.env.OAUTH_DAILY_POINTS || '500', 10);
-export const DELEGATED_DAILY_DOSSIER_CREATIONS = 10;
+/** Named daily counters beside the points: how many of each a connected application may do a day. */
+export const DELEGATED_COUNTERS: Record<DelegatedCounter, number> = {
+  dossier_create: 10,
+  note: 100,
+  trash: 20,
+  card: 100,
+};
+
+const COUNTER_WORDS: Record<DelegatedCounter, string> = {
+  dossier_create: 'dossier creati',
+  note: 'note scritte',
+  trash: 'eliminazioni',
+  card: 'schede create',
+};
 
 // Created on first use: the Redis client, when enabled, is read then.
 let points: RateLimiterAbstract | undefined;
-let dossierCreations: RateLimiterAbstract | undefined;
+const counters: Partial<Record<DelegatedCounter, RateLimiterAbstract>> = {};
 const pointsLimiter = () => (points ??= createLimiter('rl:mcp-points', DELEGATED_DAILY_POINTS, DAY_SECONDS));
-const creationsLimiter = () =>
-  (dossierCreations ??= createLimiter('rl:mcp-dossier-create', DELEGATED_DAILY_DOSSIER_CREATIONS, DAY_SECONDS));
+const counterLimiter = (name: DelegatedCounter) =>
+  (counters[name] ??= createLimiter(`rl:mcp-${name.replace('_', '-')}`, DELEGATED_COUNTERS[name], DAY_SECONDS));
 
 /** Spends a user's delegated points, as calls would (tests use it to reach the limit). */
 export async function spendDelegatedQuota(userId: string, amount: number): Promise<void> {
   await pointsLimiter().penalty(userId, amount);
+}
+
+/** Spends one of a user's named daily counters, as calls would (tests use it to reach the limit). */
+export async function spendDelegatedCounter(userId: string, counter: DelegatedCounter, amount: number): Promise<void> {
+  await counterLimiter(counter).penalty(userId, amount);
 }
 
 export interface QuotaLine {
@@ -45,16 +63,18 @@ async function line(limiter: RateLimiterAbstract, limit: number, userId: string)
 
 /** What is left of the user's delegated allowance today (`GET /api/oauth/quota`). */
 export async function delegatedQuotaStatus(userId: string) {
+  const names = Object.keys(DELEGATED_COUNTERS) as DelegatedCounter[];
+  const lines = await Promise.all(names.map((name) => line(counterLimiter(name), DELEGATED_COUNTERS[name], userId)));
   return {
     points: await line(pointsLimiter(), DELEGATED_DAILY_POINTS, userId),
-    dossierCreations: await line(creationsLimiter(), DELEGATED_DAILY_DOSSIER_CREATIONS, userId),
+    counters: Object.fromEntries(names.map((name, i) => [name, lines[i]])) as Record<DelegatedCounter, QuotaLine>,
   };
 }
 
-async function refund(userId: string, points: number, creation: boolean): Promise<void> {
+async function refund(userId: string, points: number, counter: DelegatedCounter | null): Promise<void> {
   try {
     if (points > 0) await pointsLimiter().reward(userId, points);
-    if (creation) await creationsLimiter().reward(userId, 1);
+    if (counter) await counterLimiter(counter).reward(userId, 1);
   } catch (error) {
     console.error('delegatedAuth: refund failed:', error instanceof Error ? error.message : error);
   }
@@ -65,14 +85,14 @@ function refuse(res: Response, status: 401 | 403, detail: string, error: string)
   res.status(status).json({ detail, error });
 }
 
-function overQuota(res: Response, quota: 'points' | 'dossier_create', limit: RateLimiterRes): void {
+function overQuota(res: Response, quota: 'points' | DelegatedCounter, limit: RateLimiterRes): void {
   const seconds = Math.max(1, Math.ceil(limit.msBeforeNext / 1000));
   res.setHeader('Retry-After', String(seconds));
   res.status(429).json({
     detail:
       quota === 'points'
         ? 'Limite giornaliero delle operazioni tramite applicazioni collegate raggiunto.'
-        : 'Limite giornaliero di dossier creati tramite applicazioni collegate raggiunto.',
+        : `Limite giornaliero di ${COUNTER_WORDS[quota]} tramite applicazioni collegate raggiunto.`,
     quota,
     resetsAt: new Date(Date.now() + limit.msBeforeNext).toISOString(),
   });
@@ -139,12 +159,18 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   }
 
   let user;
+  // The name the application registered with (unverified): the mark on what it creates.
+  let clientName: string | null = null;
   try {
-    const grant = await prisma.oAuthGrant.findUnique({ where: { id: claims.grant }, include: { user: true } });
+    const grant = await prisma.oAuthGrant.findUnique({
+      where: { id: claims.grant },
+      include: { user: true, client: { select: { clientName: true } } },
+    });
     if (!grant || grant.revokedAt || grant.userId !== claims.sub || !grant.user.isActive) {
       return refuse(res, 401, 'Il collegamento è stato revocato.', 'invalid_token');
     }
     user = grant.user;
+    clientName = grant.client.clientName ?? null;
   } catch (error) {
     console.error('delegatedAuth: could not read the grant:', error instanceof Error ? error.message : error);
     res.status(503).json({ detail: 'Servizio temporaneamente non disponibile, riprova tra poco.' });
@@ -175,15 +201,15 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     if (error instanceof RateLimiterRes) return overQuota(res, 'points', error);
     console.error('delegatedAuth: quota limiter error (fail-open):', error instanceof Error ? error.message : error);
   }
-  let counted = false;
-  if (route.counter === 'dossier_create') {
+  let counted: DelegatedCounter | null = null;
+  if (route.counter) {
     try {
-      await creationsLimiter().consume(user.id, 1);
-      counted = true;
+      await counterLimiter(route.counter).consume(user.id, 1);
+      counted = route.counter;
     } catch (error) {
       if (error instanceof RateLimiterRes) {
-        await refund(user.id, charged, false);
-        return overQuota(res, 'dossier_create', error);
+        await refund(user.id, charged, null);
+        return overQuota(res, route.counter, error);
       }
       console.error('delegatedAuth: counter limiter error (fail-open):', error instanceof Error ? error.message : error);
     }
@@ -192,10 +218,11 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   // back part of the charge (the norms route, for references it could not check).
   res.on('finish', () => {
     const back = res.statusCode >= 400 ? charged : Math.min(charged, Number(res.locals.delegatedRefund) || 0);
-    if (back > 0 || (counted && res.statusCode >= 400)) void refund(user.id, back, counted && res.statusCode >= 400);
+    const counterBack = res.statusCode >= 400 ? counted : null;
+    if (back > 0 || counterBack) void refund(user.id, back, counterBack);
   });
 
   req.user = user;
-  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: claims.scope.split(' ') };
+  req.delegation = { grantId: claims.grant, clientId: claims.client_id, scopes: claims.scope.split(' '), clientName };
   next();
 }

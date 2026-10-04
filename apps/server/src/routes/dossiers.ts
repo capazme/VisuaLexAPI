@@ -18,6 +18,8 @@ router.delete('/dossiers/:id', dossierController.deleteDossier);
 router.post('/dossiers/:id/items', dossierController.addDossierItem);
 // Norms from references in free text, checked for existence (MCP spike).
 router.post('/dossiers/:id/norms', dossierController.addDossierNorms);
+// A note, or a note about one of the dossier's articles (MCP second round); the web app uses it too.
+router.post('/dossiers/:id/notes', dossierController.addDossierNote);
 router.put('/dossiers/:id/items/:itemId', dossierController.updateDossierItem);
 router.delete('/dossiers/:id/items/:itemId', dossierController.deleteDossierItem);
 // Moves the row itself to another dossier of the same user (see moveDossierItem).

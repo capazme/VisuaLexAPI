@@ -28,6 +28,7 @@ security risk.
 | `services/merlt/` | MERL-T and RLCF — its own licence (Apache-2.0) | `services/merlt/CLAUDE.md` |
 | `tools/archivio-normativo/` | CLI: a local archive of acts | `tools/archivio-normativo/CLAUDE.md` |
 | `tools/e2e/` | end-to-end and stress harness | `tools/e2e/README.md` |
+| `conventions/` | the convention for legal sources: identity and labels of norms and decisions, as one golden file (read today by the web and API suites, by the others as they adopt it) | `conventions/sources/README.md` |
 | `infra/` | the Compose stack: stores and MERL-T, and the production modules (app, scrapers, overlay) | `infra/compose.yml` header |
 | `scripts/` | data backup and restore, smoke tests; `scripts/prod/`: what `./start.sh --prod` runs | `scripts/datakit/README.md` |
 | `vendor/mcp-legal-it/` | git submodule | — |
@@ -39,7 +40,8 @@ MERL-T work that spans the server and the web app: `docs/merlt/claude-notes.md`.
 
 ```bash
 ./start.sh [--dev]                           # the development stack (the default); MERLT_ENABLED=true adds MERL-T
-./start.sh --prod [--allow-branch]           # the deployment host only: build and run everything as containers
+./start.sh --prod --branch main|develop      # the deployment host only: pull that branch, build and run everything as containers
+./start.sh --prod --no-pull [--allow-branch] # the same, with what is checked out; bare --prod asks which
 ./start.sh --prod --stop                     # stop that stack (containers and volumes stay)
 sh scripts/prod/tests/test_deploy.sh         # start.sh and scripts/prod, against a stub docker
 npm --prefix apps/web run test -- --run      # web tests
@@ -58,9 +60,11 @@ A bare `tsc --noEmit` does not walk the project references and reports a false
 green. The MERL-T suite runs in CI or against a disposable database
 (`services/merlt/CLAUDE.md`), never against the development stack's.
 First-time setup: `docs/setup.md`. `--dev` prepares a fresh checkout itself (env
-files, venv, packages, Chromium). `--prod` deploys what is checked out — `main`
-or a `vX.Y.Z` tag, clean tree, unless `--allow-branch` — after a backup of an
-existing stack; on its first run it creates `infra/.env` and `apps/server/.env`
+files, venv, packages, Chromium). `--prod --branch main|develop` fast-forwards the
+checkout to origin's latest commit of that branch (`scripts/prod/update.sh`) and
+deploys it; `--no-pull` deploys what is checked out — `main`, `develop` or a
+`vX.Y.Z` tag, clean tree, unless `--allow-branch`; a bare `--prod` asks at the
+terminal. Either way after a backup of an existing stack; on its first run it creates `infra/.env` and `apps/server/.env`
 with generated secrets and refuses development values. Both modes read
 `infra/.env` and, by default, share the stack name `visualex` (`VISUALEX_STACK`):
 never run `--dev` on the deployment host. Design:

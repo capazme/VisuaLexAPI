@@ -80,14 +80,28 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `act` claim, verifies it strictly, and holds it to `oauth/delegatedRoutes.ts`
   — default deny: any route outside the table is 403, a missing scope 403
   `insufficient_scope` — to a live grant and an active user, and to the daily
-  quota (points by route, `OAUTH_DAILY_POINTS`; at most ten dossiers created a
-  day). A delegated POST must be JSON (415): the weight is read from the body
-  before the app's parsers run. A refused call (4xx/5xx) gives its points
-  back. Then it sets `req.user` and `req.delegation`, and `authenticate` lets
+  quota (points by route, `OAUTH_DAILY_POINTS`; and named daily counters,
+  `DELEGATED_COUNTERS`: 10 dossiers created, 100 notes, 20 deletions, 100
+  cards). A delegated POST must be JSON (415): the weight is read from the body
+  before the app's parsers run. A refused call (4xx/5xx) gives back its points
+  and the counter it spent. Then it sets `req.user` and `req.delegation`, and `authenticate` lets
   the request through; nothing else sets `req.delegation`. **Adding a route to
   the table is a security decision**: every entry is reachable by any MCP
   client the user connected, and none may update, move or delete.
-  `GET /api/oauth/quota` reports what is left.
+  `GET /api/oauth/quota` reports what is left (`{ points, counters }`).
+- **Provenance and notes** (MCP second round; spec
+  `docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` §5). Dossiers
+  and items carry `created_by_client_id`/`_name`: the connected application
+  that created the row, set by `provenanceFromRequest` from `req.delegation`
+  and never from a body; answered as `created_by: { clientName } | null`.
+  Every dossier and item answer goes through `serializeDossier`/`serializeItem`
+  in `dossierController.ts`: add a field there, not in a route.
+  `POST /api/dossiers/:id/notes` `{ text, aboutItemId? }` (user session and
+  exchanged tokens with `dossier:write`): plain text, 1–4,000 characters; with
+  `aboutItemId` the note is about a norm entry of the same dossier as a whole
+  (`about_item_id`, no foreign key), never a passage of its text (root rule 23).
+  A note moved to another dossier loses its `about_item_id`; a client treats one
+  that points outside its dossier as a plain note.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
   norm as the reader stores it), then existence once per act: the
@@ -97,7 +111,20 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   art. 1 and a 200. A source that fails or answers 429 makes the reference
   `unavailable`, never "missing". Outcomes: `added`, `already_present`,
   `not_recognised`, `does_not_exist`, `ambiguous`, `unavailable`; the added
-  ones in one transaction, after the dossier's last item.
+  ones in one transaction, after the dossier's last item. Each resolved
+  reference's `display` is its citation (below), never Python's own label
+  («Art. 3 — legge» named no act).
+- **`norms/citation.ts`** — `citeArticle`, how a lawyer cites an article in the
+  owner's style: «art. 3, l. 31 dicembre 2012, n. 247», «art. 1284 c.c.», «art. 81
+  Cost.». Dossier items carry it as `citation` (null for anything but a norm) in
+  `GET /dossiers`, `GET /dossiers/:id` and the answer of `POST /dossiers/:id/items`, and the MCP tools pass it on. `citeAct`
+  is the act alone («l. 31 dicembre 2012, n. 247», «c.c.»), without the article
+  or the annex, carried as `act_citation` for a reader that names each act once
+  above its articles; `citeArticle` is built on it, so the two cannot drift. It is a
+  second implementation of the web app's `utils/citation.ts`, pinned to the web's
+  golden file: `tests/norms/citation.test.ts` imports
+  `apps/web/src/utils/__fixtures__/citationGolden.ts` and fails when the two
+  disagree. Change the wording in both.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore

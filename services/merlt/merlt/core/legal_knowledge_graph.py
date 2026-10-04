@@ -173,6 +173,9 @@ class UnifiedIngestionResult:
 
     # Errors
     errors: List[str] = field(default_factory=list)
+    # Set when the article itself could not be fetched or written: the other
+    # errors are optional parts (Brocardi, vectors, bridge, multivigenza).
+    fatal_error: Optional[str] = None
 
     def summary(self) -> Dict[str, Any]:
         """Return summary for logging."""
@@ -455,6 +458,9 @@ class LegalKnowledgeGraph:
         include_bridge: bool = True,
         include_multivigenza: bool = True,
         norm_tree: Optional[NormTree] = None,
+        data: Optional[str] = None,
+        numero_atto: Optional[str] = None,
+        allegato: Optional[str] = None,
     ) -> UnifiedIngestionResult:
         """
         Ingest a single legal norm with all integrations.
@@ -470,9 +476,14 @@ class LegalKnowledgeGraph:
             include_embeddings: Whether to generate and store embeddings
             include_bridge: Whether to update bridge table
             include_multivigenza: Whether to track amendments
+            data: Date of the act (YYYY-MM-DD); required for any act that is
+                not a code or the Constitution, which VisuaLex finds by name
+            numero_atto: Number of the act; required with `data`
+            allegato: Annex of the act, when the article belongs to one
 
         Returns:
-            UnifiedIngestionResult with all operation results
+            UnifiedIngestionResult with all operation results; `fatal_error` is
+            set when the article itself was not ingested
         """
         if not self._connected:
             raise RuntimeError("Not connected. Call connect() first.")
@@ -481,8 +492,8 @@ class LegalKnowledgeGraph:
         articolo_norm = articolo.replace(' ', '-')
 
         # Create NormaVisitata reference
-        norma = Norma(tipo_atto=tipo_atto, data=None, numero_atto=None)
-        nv = NormaVisitata(norma=norma, numero_articolo=articolo_norm)
+        norma = Norma(tipo_atto=tipo_atto, data=data, numero_atto=numero_atto)
+        nv = NormaVisitata(norma=norma, numero_articolo=articolo_norm, allegato=allegato)
 
         log.info(f"Ingesting: {tipo_atto} art. {articolo}")
 
@@ -516,6 +527,7 @@ class LegalKnowledgeGraph:
                 data=norma.data,
                 numero_atto=norma.numero_atto,
                 numero_articolo=articolo_norm,
+                allegato=allegato,
             )
 
             visualex_article = VisualexArticle(
@@ -525,14 +537,17 @@ class LegalKnowledgeGraph:
                 brocardi_info=brocardi_info,
             )
 
-            # 4. Run ingestion pipeline (graph + chunks)
-            cached_tree = norm_tree or await self._get_cached_norm_tree(tipo_atto)
+            # 4. Run ingestion pipeline (graph + chunks). The act's tree is not
+            # fetched: the client reads `number`/`position` from items VisuaLex
+            # sends as `numero`/`allegato`/`url` (and section titles as plain
+            # strings), so it never yielded a position, only a Normattiva request.
             ingestion_result = await self._ingestion_pipeline.ingest_article(
                 article=visualex_article,
                 create_graph_nodes=True,
-                norm_tree=cached_tree,
+                norm_tree=norm_tree,
             )
 
+            result.article_urn = ingestion_result.article_urn
             result.nodes_created = ingestion_result.nodes_created
             result.relations_created = ingestion_result.relations_created
             result.chunks_created = len(ingestion_result.chunks)
@@ -582,6 +597,7 @@ class LegalKnowledgeGraph:
         except Exception as e:
             log.error(f"Ingestion failed: {e}", exc_info=True)
             result.errors.append(f"Fatal: {str(e)}")
+            result.fatal_error = str(e)
 
         return result
 
@@ -711,21 +727,33 @@ class LegalKnowledgeGraph:
 
         return len(points_to_upsert)
 
-    async def _get_cached_norm_tree(self, tipo_atto: str) -> Optional[Any]:
-        """Get cached NormTree for act type, or fetch and cache it."""
-        if tipo_atto not in self._norm_trees:
+    async def _get_cached_norm_tree(
+        self,
+        tipo_atto: str,
+        data: Optional[str] = None,
+        numero_atto: Optional[str] = None,
+        allegato: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Get the cached NormTree of the act, or fetch and cache it.
+
+        Keyed by the act's URN: two laws share their `tipo_atto` ("legge").
+        The tree carries no article positions yet (see `ingest_norm`, step 4):
+        only the batch ingestion still asks for it.
+        """
+        # Genera URN direttamente (Norma non ha property .urn)
+        urn = generate_urn(act_type=tipo_atto, date=data, act_number=numero_atto, annex=allegato, urn_flag=True)
+        if not urn:
+            return None
+        if urn not in self._norm_trees:
             try:
-                # Genera URN direttamente (Norma non ha property .urn)
-                urn = generate_urn(act_type=tipo_atto, urn_flag=True)
-                if urn:
-                    tree, _count = await get_hierarchical_tree(urn)
-                    if isinstance(tree, NormTree):
-                        self._norm_trees[tipo_atto] = tree
+                tree, _count = await get_hierarchical_tree(urn)
+                if isinstance(tree, NormTree):
+                    self._norm_trees[urn] = tree
             except Exception as e:
-                log.warning(f"Could not fetch NormTree for {tipo_atto}: {e}")
+                log.warning(f"Could not fetch NormTree for {urn}: {e}")
                 return None
 
-        return self._norm_trees.get(tipo_atto)
+        return self._norm_trees.get(urn)
 
     async def search(
         self,

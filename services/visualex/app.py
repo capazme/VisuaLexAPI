@@ -36,6 +36,7 @@ from visualex_api.services.normattiva_validity import (
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
+from visualex_api.services.akn_parser import presentable_title
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
 from visualex_api.services.decisions.resolver import (
     DECISION_CACHE_SWEEP_SECONDS,
@@ -48,6 +49,7 @@ from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
 from visualex_api.tools.map import codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
+from visualex_api.tools.sources import cite_act, cite_article
 from visualex_api.tools.alias_resolver import resolve_alias
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
@@ -796,11 +798,18 @@ class NormaController:
                 if normavisitate:
                     nv = normavisitate[0]
                     urn = getattr(nv, "urn", None)
-                    article = parsed_params.get("article")
-                    act = parsed_params.get("act_type")
-                    display = (
-                        f"Art. {article} — {act}" if article and act else act or query
-                    )
+                    # The citation in the owner's style (source convention), from the norm
+                    # as resolved: «art. 2, l. 7 agosto 1990, n. 241», never «Art. 2 — legge».
+                    # A query with no article names the act alone (the URN's article 1
+                    # is only the probe create_norma_visitata_from_data needs).
+                    article = str(parsed_params.get("article") or "").strip()
+                    if not article:
+                        display = cite_act(nv.to_dict())
+                    elif re.search(r",|^\d+\s*-\s*\d+$", article):
+                        listed = ", ".join(part.strip() for part in article.split(","))
+                        display = "artt." + cite_article({**nv.to_dict(), "numero_articolo": listed})[len("art."):]
+                    else:
+                        display = cite_article({**nv.to_dict(), "numero_articolo": article})
             except Exception as e:
                 log.warning("parse_query URN build failed", error=str(e))
 
@@ -982,6 +991,7 @@ class NormaController:
                     rubriche = {}
                 log.info("Rubriche served (EUR-Lex)", urn=str(urn)[:100], count=len(rubriche))
                 return jsonify({
+                    'title': '',
                     'rubriche': rubriche,
                     'abrogati': [],
                     'parts': [],
@@ -995,11 +1005,13 @@ class NormaController:
             index = await fetch_act_index(SimpleNamespace(url=act_url))
             if index is None:
                 log.info("No AKN index available for rubriche", urn=act_url[:100])
-                return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0})
+                return jsonify({'title': '', 'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0})
 
             log.info("Rubriche served", urn=act_url[:100],
                      count=len(index.rubriche), parts=len(index.parts_detail))
             return jsonify({
+                # The act's title as a heading: the dossier names each act with it.
+                'title': presentable_title(index.title),
                 'rubriche': index.rubriche,
                 'abrogati': index.abrogati,
                 # Each annex has its own article 1 with its own rubrica; the
@@ -1010,7 +1022,7 @@ class NormaController:
         except Exception as e:
             # Never fail the index over its decoration.
             log.warning("Error in fetch_rubriche", error=str(e), exc_info=True)
-            return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
+            return jsonify({'title': '', 'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
 
     async def fetch_recitals(self):
         """All the considerando of an EU act, in one call.

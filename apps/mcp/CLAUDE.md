@@ -9,10 +9,19 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
 **no database, no Prisma**, never the Python API. Everything goes through
 `apps/server`.
 
-- **Transport** — Streamable HTTP on one endpoint (`/mcp`), stateless: a fresh
-  `McpServer` and transport per request, JSON responses, `GET`/`DELETE` answer
-  405. SDK `@modelcontextprotocol/sdk` pinned at **1.31.0** (serves 2025-11-25
-  and earlier; a client asking for 2026-07-28, as Claude Code does first, is
+- **Transport** — Streamable HTTP on one endpoint (`/mcp`), with sessions
+  (`src/sessions.ts`; second-round spec §4.5): stateless cannot ask the user to
+  confirm mid-call (an elicitation needs the client's `initialize` and a stream
+  back), measured on 4 October. A session starts at `initialize`, belongs to the
+  user and grant of its token (a refreshed token of the same grant continues it;
+  any other is a 404), answers on SSE streams; `GET` opens the server-to-client
+  stream, `DELETE` ends it. At most 10 sessions per grant and 20 per user (their
+  own oldest closes), 1000 in the process (a new one gets 503, nobody else's is
+  closed); idle 30 minutes → closed; a restart drops them all and clients open
+  new ones (Claude Code does so by itself). Tools read the caller of their own
+  request (`callerOf`), never the one that opened the session. SDK
+  `@modelcontextprotocol/sdk` pinned at **1.31.0** (serves 2025-11-25 and
+  earlier; a client asking for 2026-07-28, as Claude Code does first, is
   negotiated down). Bump it in a task of its own.
 - **Authentication** (`src/auth.ts`) — every request's bearer token is
   introspected at `apps/server`'s `/oauth/introspect` with the server's own
@@ -31,7 +40,14 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
   `omnilex_leggi_dossier`, `omnilex_crea_dossier`,
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_stato_account`. Results are data (JSON
+  checked by `apps/server`), `omnilex_aggiungi_nota_dossier` (one plain-text
+  note up to 4,000 characters, in a dossier or about one of its articles with
+  `voce`; add-only), `omnilex_stato_account`. `omnilex_leggi_dossier` says which
+  entries a connected application added (`aggiunta_da`, from the server's
+  `created_by`) and which article a note is about (`nota_su`). A norm is named by the
+  server's citation (`citation` on dossier items, `display` on the norms
+  route's results: «art. 3, l. 31 dicembre 2012, n. 247»), never rebuilt here, so
+  two acts of the same type always read apart. Results are data (JSON
   text), never instructions to the model; the article text never leaves.
   **No tool updates, moves or deletes**, and `tests/tools.test.ts` fails if one
   appears. Adding a tool means adding its route to `apps/server`'s

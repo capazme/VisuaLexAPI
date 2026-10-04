@@ -120,6 +120,18 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
     pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
     fails).
+  - `sources.py` — the convention for legal sources as this API holds it (spec
+    `docs/superpowers/specs/2026-10-04-source-convention-design.md`, golden file
+    `conventions/sources/golden.json`, `tests/test_sources_golden.py`):
+    `normalize_norm_urn` (any spelling of a norm → its identity: the resolver wrapper,
+    version markers cut, Normattiva's alias form of a code, `decreto legislativo` /
+    `decreto-legge` tokens, a ministry-form decree), `eu_identity` (`celex:32016R0679~art5`;
+    `generate_urn` keeps building the EUR-Lex page) and `cite_article` / `cite_act`, the
+    owner's citation style with every form he decided (the web's `utils/citation.ts` and
+    the server's `norms/citation.ts` take the forms decided on 4 October, and the golden
+    file, with the plan's PRs 1 and 2). `/parse_query`'s `display` is `cite_article`, or
+    `cite_act` for a query with no article. A year-only URN and anything that is not a NIR
+    URN pass through `normalize_norm_urn` unchanged
   - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
     exposed at `POST /parse_query`
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
@@ -150,7 +162,10 @@ POST unless noted, JSON bodies.
 - `/fetch_tree` — article tree for a complete URN
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
-  AKN index. Structure only: it never carries the display text
+  AKN index, and the act's `title` (`presentable_title`: no Gazzetta code, no
+  amendment brackets, accents restored; `''` when there is none), so the
+  dossier names an act with one call. Structure only: it never carries the
+  display text
 - `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
   Reads the OJ page the tree already uses; a consolidated text has no
@@ -292,7 +307,7 @@ by `NormaController.handle_error()`. Logging is structlog.
 
 Duplicating any of these is a defect, not a shortcut.
 
-**Python**: `urngenerator.py` (URNs) · `text_op.py` (text parsing + dates) ·
+**Python**: `urngenerator.py` (URNs) · `sources.py` (identity and citation of a source) · `text_op.py` (text parsing + dates) ·
 `treextractor.py` (trees) · `PlaywrightManager` (browsers) ·
 `article_suffixes.py` (the ordinal suffix table).
 

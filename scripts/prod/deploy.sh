@@ -1,10 +1,13 @@
 #!/bin/sh
 # ./start.sh --prod: deploy what is checked out, on the production host.
 #
-#   deploy.sh [--allow-branch] [--no-backup]     build, migrate and start the stack
+#   deploy.sh [--branch main|develop] [--allow-branch] [--no-backup]
+#                                                build, migrate and start the stack
 #   deploy.sh --stop                             stop it (containers and volumes stay)
 #
-# It does NOT run `git pull`: it deploys the commit that is checked out, and says which.
+# With --branch it first brings the checkout to the latest commit of that branch on origin
+# (update.sh, fast-forward only), then runs the deploy of the version it just pulled. Without
+# it, it deploys the commit that is checked out. Either way it says which.
 # Design: docs/superpowers/specs/2026-09-29-modular-deployment-design.md, section 6.
 set -eu
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -13,22 +16,42 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: deploy.sh [--allow-branch] [--no-backup]    build, migrate and start the stack
+Usage: deploy.sh [--branch main|develop] [--allow-branch] [--no-backup]
+                                                   pull that branch (optional), build, migrate and start the stack
        deploy.sh --stop                            stop it (containers and volumes stay)
 EOF
 }
 
-allow=""; backup=1; stop=0
-for arg in "$@"; do
-  case "$arg" in
-    --allow-branch) allow=--allow-branch ;;
-    --no-backup)    backup=0 ;;
+allow=""; backup=1; stop=0; branch=""; rest=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --allow-branch) allow=--allow-branch; rest="$rest $1" ;;
+    --no-backup)    backup=0; rest="$rest $1" ;;
     --stop)         stop=1 ;;
+    --branch)       [ "$#" -ge 2 ] || { err "--branch needs main or develop"; usage >&2; exit 2; }
+                    branch="$2"; shift ;;
+    --branch=*)     branch="${1#--branch=}" ;;
     -h|--help)      usage; exit 0 ;;
-    *) err "unknown option: $arg"; usage >&2; exit 2 ;;
+    *) err "unknown option: $1"; usage >&2; exit 2 ;;
   esac
+  shift
 done
+case "$branch" in
+  ""|main|develop) ;;
+  *) err "--branch takes main or develop, not '$branch'"; usage >&2; exit 2 ;;
+esac
+if [ "$stop" = 1 ] && [ -n "$branch" ]; then err "--stop and --branch do not go together"; usage >&2; exit 2; fi
 cd "$root"
+
+# 0. The latest version of the branch, then the deploy as that version writes it: the script
+# running now may be older than the one just pulled.
+if [ -n "$branch" ]; then
+  # Docker first: a host that cannot deploy is found before the checkout moves.
+  sh scripts/prod/preflight.sh docker || exit 1
+  sh scripts/prod/update.sh "$branch" || exit 1
+  # shellcheck disable=SC2086
+  exec sh "$root/scripts/prod/deploy.sh" $rest
+fi
 
 # The Compose files of the production stack, in order; compose.prod.yml always last.
 # compose.scrapers.yml stays out when the scrapers live on another machine (SCRAPERS_ADDR
