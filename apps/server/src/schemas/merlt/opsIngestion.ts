@@ -12,7 +12,7 @@ import { z } from 'zod';
  */
 
 export const runIngestionBodySchema = z.object({
-  source: z.enum(['visualex_tree', 'italia_corpus']),
+  source: z.enum(['visualex_tree', 'italia_corpus', 'massimario']),
   source_ref: z.string().min(1),
   scope_label: z.string().min(1).max(300),
 });

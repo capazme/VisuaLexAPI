@@ -10,6 +10,7 @@ import expertsRouter from './experts';
 import nerRouter from './ner';
 import healthRouter from './health';
 import profileRouter from './profile';
+import rassegneRouter from './rassegne';
 import { featureGate } from '../../middleware/merlt/featureGate';
 
 /**
@@ -24,6 +25,9 @@ import { featureGate } from '../../middleware/merlt/featureGate';
  * Slice 2a endpoints (graphRouter):
  *  - /graph/article/:urn, /graph/ingest, /graph/jobs/:jobId/status (auth)
  *  - /internal/job-callback (internalAuth, NO JWT)
+ *
+ * Reader endpoint (rassegneRouter): the Massimario's review paragraphs citing an article.
+ *  - /rassegne (auth, ungated: reading, not the graph view)
  *
  * Admin mechanical ingestion endpoints (opsIngestionRouter) — deterministic,
  * zero-LLM corpus→graph batches, admin-reviewed before promotion.
@@ -67,6 +71,9 @@ router.use('/', featureGate('ops', ['/ops']), opsIngestionRouter);
 // Loop β Phase F — experts Q&A. Per-route auth → order-safe; before the
 // catch-all auth routers (gotcha #1).
 router.use('/', expertsRouter);
+// Massimario reviews for the reader's panel. Per-route auth → order-safe; before the
+// catch-all auth routers (gotcha #1). Not behind a sub-flag: it is reading, not the graph view.
+router.use('/', rassegneRouter);
 // Loop β #2 — NER feedback. Per-route auth → order-safe; before catch-all (gotcha #1).
 router.use(
   '/',
