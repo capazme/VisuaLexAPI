@@ -3,6 +3,7 @@ import { InvalidGrantError, InvalidScopeError, InvalidTargetError } from '@model
 import type { OAuthGrant, OAuthToken, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { randomSecret, sha256 } from './hash';
+import { IGNORED_SCOPES } from './config';
 
 export const ACCESS_TOKEN_LIFETIME_MS = 8 * 60 * 60 * 1000;
 export const REFRESH_TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
@@ -13,17 +14,19 @@ async function issuePair(
   tx: Tx,
   grant: Pick<OAuthGrant, 'id'>,
   chainId: string,
-  scopes: string[],
+  scopes: { access: string[]; refresh: string[] },
   resource: string,
 ): Promise<OAuthTokens> {
   const access = randomSecret();
   const refresh = randomSecret();
   const now = Date.now();
-  const base = { grantId: grant.id, chainId, scopes, resource };
+  const base = { grantId: grant.id, chainId, resource };
   await tx.oAuthToken.createMany({
     data: [
-      { ...base, kind: 'ACCESS', tokenHash: sha256(access), expiresAt: new Date(now + ACCESS_TOKEN_LIFETIME_MS) },
-      { ...base, kind: 'REFRESH', tokenHash: sha256(refresh), expiresAt: new Date(now + REFRESH_TOKEN_LIFETIME_MS) },
+      { ...base, kind: 'ACCESS', scopes: scopes.access, tokenHash: sha256(access), expiresAt: new Date(now + ACCESS_TOKEN_LIFETIME_MS) },
+      // The refresh token keeps what the chain was granted: asking for less on
+      // one refresh narrows that access token only (RFC 6749 §6).
+      { ...base, kind: 'REFRESH', scopes: scopes.refresh, tokenHash: sha256(refresh), expiresAt: new Date(now + REFRESH_TOKEN_LIFETIME_MS) },
     ],
   });
   await tx.oAuthGrant.update({ where: { id: grant.id }, data: { lastUsedAt: new Date(now) } });
@@ -32,7 +35,7 @@ async function issuePair(
     token_type: 'Bearer',
     expires_in: ACCESS_TOKEN_LIFETIME_MS / 1000,
     refresh_token: refresh,
-    scope: scopes.join(' '),
+    scope: scopes.access.join(' '),
   };
 }
 
@@ -49,22 +52,27 @@ export async function revokeGrant(grantId: string): Promise<void> {
 
 /**
  * The challenge the SDK verifies the PKCE verifier against. A code that is
- * unknown, foreign or expired is `invalid_grant` here; a used one still
- * answers, so that its replay reaches `exchangeAuthorizationCode` and is
- * recognised there.
+ * unknown, foreign, or expired without ever being used is `invalid_grant`
+ * here; a used one still answers, even past its expiry, so that its replay
+ * reaches `exchangeAuthorizationCode` and is recognised there.
  */
 export async function challengeForCode(client: OAuthClientInformationFull, code: string): Promise<string> {
   const row = await prisma.oAuthAuthorizationCode.findUnique({ where: { codeHash: sha256(code) } });
-  if (!row || row.clientId !== client.client_id || row.expiresAt.getTime() <= Date.now()) {
+  if (!row || row.clientId !== client.client_id || (!row.usedAt && row.expiresAt.getTime() <= Date.now())) {
     throw new InvalidGrantError('Invalid authorization code');
   }
   return row.codeChallenge;
 }
 
+const REPLAY = Symbol('replay');
+
 /**
- * Code → tokens, after the SDK verified PKCE. The code is consumed first, by a
- * conditional update, so a second presentation finds it used: that is a
- * replay, and the tokens the first one produced are revoked (OAuth 2.1 §4.1.3).
+ * Code → tokens, after the SDK verified PKCE. The request is checked first;
+ * then the code is consumed by a conditional update and the tokens written in
+ * the same transaction. A second presentation racing the first waits on the
+ * row lock until the first commits, finds the code used, and revokes the
+ * chain the first one produced (OAuth 2.1 §4.1.3): nothing it produced can
+ * be committed after the revocation ran.
  */
 export async function exchangeCode(
   client: OAuthClientInformationFull,
@@ -73,16 +81,13 @@ export async function exchangeCode(
   resource: URL | undefined,
 ): Promise<OAuthTokens> {
   const codeHash = sha256(code);
-  const now = new Date();
-  const consumed = await prisma.oAuthAuthorizationCode.updateMany({
-    where: { codeHash, clientId: client.client_id, usedAt: null, expiresAt: { gt: now } },
-    data: { usedAt: now },
-  });
   const row = await prisma.oAuthAuthorizationCode.findUnique({ where: { codeHash }, include: { grant: true } });
-  if (consumed.count === 0 || !row) {
-    if (row?.usedAt && row.clientId === client.client_id) await revokeChain(row.id);
+  if (!row || row.clientId !== client.client_id) throw new InvalidGrantError('Invalid authorization code');
+  if (row.usedAt) {
+    await revokeChain(row.id);
     throw new InvalidGrantError('Invalid authorization code');
   }
+  if (row.expiresAt.getTime() <= Date.now()) throw new InvalidGrantError('Invalid authorization code');
   if (redirectUri !== undefined && redirectUri !== row.redirectUri) {
     throw new InvalidGrantError('redirect_uri does not match the authorization request');
   }
@@ -90,14 +95,27 @@ export async function exchangeCode(
   if (resource.href !== row.resource) throw new InvalidTargetError('resource does not match the authorization request');
   if (row.grant.revokedAt) throw new InvalidGrantError('The authorization was revoked');
 
-  return prisma.$transaction((tx) => issuePair(tx, row.grant, row.id, row.scopes, row.resource));
+  const result = await prisma.$transaction(async (tx) => {
+    const consumed = await tx.oAuthAuthorizationCode.updateMany({
+      where: { id: row.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    if (consumed.count === 0) return REPLAY;
+    return issuePair(tx, row.grant, row.id, { access: row.scopes, refresh: row.scopes }, row.resource);
+  });
+  if (result === REPLAY) {
+    await revokeChain(row.id);
+    throw new InvalidGrantError('Invalid authorization code');
+  }
+  return result;
 }
 
 /**
  * Refresh with rotation. A refresh token already rotated and presented again
- * means two parties hold it: the whole grant is revoked (spec 4.2). Every
- * other failure is `invalid_grant`, which is what Claude expects of a dead
- * refresh token.
+ * means two parties hold it: the whole grant is revoked (spec 4.2). Rotation
+ * and the new pair are one transaction, so a failure between them leaves the
+ * old token usable rather than burning it. Every other failure is
+ * `invalid_grant`, which is what Claude expects of a dead refresh token.
  */
 export async function exchangeRefresh(
   client: OAuthClientInformationFull,
@@ -120,22 +138,26 @@ export async function exchangeRefresh(
     throw new InvalidGrantError('Invalid refresh token');
   }
   if (resource && resource.href !== row.resource) throw new InvalidTargetError('resource does not match the grant');
-  const asked = scopes?.filter(Boolean);
+  const asked = scopes?.filter((scope) => scope && !IGNORED_SCOPES.has(scope));
   if (asked && asked.some((scope) => !row.scopes.includes(scope))) {
     throw new InvalidScopeError('scope exceeds what was granted');
   }
+  const accessScopes = asked && asked.length > 0 ? [...new Set(asked)] : row.scopes;
 
-  const rotated = await prisma.oAuthToken.updateMany({
-    where: { id: row.id, rotatedAt: null, revokedAt: null },
-    data: { rotatedAt: new Date() },
-  });
-  if (rotated.count === 0) {
+  const result = await prisma.$transaction(async (tx) => {
+    const rotated = await tx.oAuthToken.updateMany({
+      where: { id: row.id, rotatedAt: null, revokedAt: null },
+      data: { rotatedAt: new Date() },
+    });
     // Rotated by a concurrent request with the same token: the same replay.
+    if (rotated.count === 0) return REPLAY;
+    return issuePair(tx, row.grant, row.chainId, { access: accessScopes, refresh: row.scopes }, row.resource);
+  });
+  if (result === REPLAY) {
     await revokeGrant(row.grantId);
     throw new InvalidGrantError('Invalid refresh token');
   }
-  const granted = asked && asked.length > 0 ? asked : row.scopes;
-  return prisma.$transaction((tx) => issuePair(tx, row.grant, row.chainId, granted, row.resource));
+  return result;
 }
 
 export interface ActiveAccessToken {
