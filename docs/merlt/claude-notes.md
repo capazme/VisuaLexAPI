@@ -358,7 +358,9 @@ The worker's `_urn_to_ingest_params` (`services/merlt/merlt/worker/tasks.py`)
 turns the article URN into the arguments of `ingest_norm`:
 
 - A code or the Constitution travels by its VisuaLex name. The annex picks the
-  code: `262:1` is the preleggi, `262:2` the civil code.
+  code: `262:1` is the preleggi, `262:2` the civil code. A table name the URN
+  generator cannot resolve (it has capitals, such as the disp. att. c.c.)
+  makes the act travel as an ordinary act.
 - Any other act travels by type, date, number and annex. Without them VisuaLex
   asked Normattiva for `legge:None;None`, and every ordinary act failed.
 - Before any request, the worker rebuilds the URN the pipeline will write

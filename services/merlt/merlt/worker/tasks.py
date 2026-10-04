@@ -21,6 +21,7 @@ import structlog
 from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 from merlt.pipeline.visualex import NormaMetadata
 from merlt.storage.graph.schema import canonical_urn
+from merlt.utils.text_op import normalize_act_type
 from merlt.worker.config import merlt_config_from_env
 
 log = structlog.get_logger()
@@ -89,17 +90,20 @@ def _code_name(act: str, annex: Optional[str]) -> Optional[str]:
     annex 2 the civil code. Without one, a code is found by its decree alone, so
     that a code URN missing its annex is recognised (and then refused by the
     identity check, not fetched as the bare decree).
+
+    Only a name the URN generator resolves counts: a few of the table's names
+    carry capitals ("…attuazione del Codice civile…", "codice del Terzo
+    settore") that it lowercases and no longer finds. Those acts have their date
+    and number in the URN and travel as ordinary acts instead.
     """
+    names = [name for name in NORMATTIVA_URN_CODICI if normalize_act_type(name) in NORMATTIVA_URN_CODICI]
     if annex:
         wanted = f"{act}:{annex}"
-        return next((name for name, urn in NORMATTIVA_URN_CODICI.items() if urn == wanted), None)
-    exact = next((name for name, urn in NORMATTIVA_URN_CODICI.items() if urn == act), None)
+        return next((name for name in names if NORMATTIVA_URN_CODICI[name] == wanted), None)
+    exact = next((name for name in names if NORMATTIVA_URN_CODICI[name] == act), None)
     if exact:
         return exact
-    return next(
-        (name for name, urn in NORMATTIVA_URN_CODICI.items() if _ANNEX_TAIL_RE.sub("", urn) == act),
-        None,
-    )
+    return next((name for name in names if _ANNEX_TAIL_RE.sub("", NORMATTIVA_URN_CODICI[name]) == act), None)
 
 
 def _urn_to_ingest_params(urn: str) -> IngestParams:

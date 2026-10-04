@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from merlt.utils.map import NORMATTIVA_URN_CODICI
 from merlt.worker.tasks import IngestParams, UrnNotIngestible, _run_ingest, _urn_to_ingest_params
 
 N2LS = "https://www.normattiva.it/uri-res/N2Ls?"
@@ -196,6 +197,16 @@ def _p(tipo, art, key, data=None, numero=None, allegato=None):
             _p("codice di procedura penale", "191", N2LS + "urn:nir:stato:decreto.del.presidente.della.repubblica:1988-09-22;447~art191"),
         ),
         (N2LS + "urn:nir:stato:costituzione~art1", _p("costituzione", "1", N2LS + "urn:nir:stato:costituzione~art1")),
+        # Acts the code table names with capitals, which the URN generator cannot
+        # resolve by name: they travel as ordinary acts, annex included.
+        (
+            N2LS + "urn:nir:stato:regio.decreto:1942-03-30;318:1~art18",
+            _p("regio decreto", "18", N2LS + "urn:nir:stato:regio.decreto:1942-03-30;318:1~art18", "1942-03-30", "318", "1"),
+        ),
+        (
+            N2LS + "urn:nir:stato:decreto.legislativo:2017-07-03;117~art5",
+            _p("decreto legislativo", "5", N2LS + "urn:nir:stato:decreto.legislativo:2017-07-03;117~art5", "2017-07-03", "117"),
+        ),
         # The bare URN and a version marker reach the same key.
         ("urn:nir:stato:costituzione~art24", _p("costituzione", "24", N2LS + "urn:nir:stato:costituzione~art24")),
         (L247_ART18 + "!vig=2024-01-01", _p("legge", "18", L247_ART18, "2012-12-31", "247")),
@@ -223,3 +234,13 @@ def test_urn_to_ingest_params_for_every_act_family(urn, expected):
 def test_an_urn_that_cannot_be_ingested_says_why(urn, reason):
     with pytest.raises(UrnNotIngestible, match=reason):
         _urn_to_ingest_params(urn)
+
+
+def test_every_state_act_of_the_code_table_can_be_ingested():
+    # The Massimario keys its stubs by these acts (`urns._annexed_codes`); the
+    # ministerial decrees in the table are not state acts and are refused.
+    for urn in NORMATTIVA_URN_CODICI.values():
+        if urn.startswith("/"):
+            continue
+        key = N2LS + "urn:nir:stato:" + urn + "~art1"
+        assert _urn_to_ingest_params(key).graph_key == key
