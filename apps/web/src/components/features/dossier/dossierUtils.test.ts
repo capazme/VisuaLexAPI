@@ -342,6 +342,34 @@ describe('decision items', () => {
     }
   });
 
+  it('parseSentenzaContent refuses each bound for its own reason', () => {
+    const COST = { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' } as const;
+    expect(parseSentenzaContent(COST)).toEqual(COST);
+    for (const bad of [
+      { ...COST, anno: 1955 },                         // before the Corte costituzionale's first year
+      { ...SENTENZA, anno: 1899 },                     // before the Cassazione's first year
+      { ...SENTENZA, numero: 1.5 },                    // not an integer
+      { ...SENTENZA, numero: 1_000_000 },              // above the maximum
+      { ...SENTENZA, tipo: 'x' },                      // not a known type
+      { ...SENTENZA, data_deposito: '12/03/2024' },    // not an ISO date
+      { ...SENTENZA, etichetta: 'x'.repeat(201) },     // label too long
+      { ...COST, archivio: 'civile' },                 // the Corte costituzionale has no archive
+    ]) {
+      expect(parseSentenzaContent(bad)).toBeNull();
+    }
+    // The edges themselves are accepted.
+    expect(parseSentenzaContent({ ...COST, anno: 1956 })).not.toBeNull();
+    expect(parseSentenzaContent({ ...SENTENZA, anno: 1900 })).not.toBeNull();
+    expect(parseSentenzaContent({ ...SENTENZA, numero: 999_999 })).not.toBeNull();
+    expect(parseSentenzaContent({ ...SENTENZA, etichetta: 'x'.repeat(200) })).not.toBeNull();
+  });
+
+  it('parseSentenzaContent takes the year bound from the clock it is given', () => {
+    const now = new Date('2026-06-01T00:00:00Z');
+    expect(parseSentenzaContent({ ...SENTENZA, anno: 2026 }, now)).not.toBeNull();
+    expect(parseSentenzaContent({ ...SENTENZA, anno: 2027 }, now)).toBeNull();
+  });
+
   it('dossierItemFromApi reads a decision, and the entries a Forum take stored whole before 2026-10', () => {
     expect(dossierItemFromApi({ ...api, id: 's', item_type: 'sentenza', content: { ...SENTENZA, _dossierMeta: { important: true } } }))
       .toEqual({ id: 's', type: 'sentenza', data: SENTENZA, addedAt: at, status: 'important' });
@@ -380,5 +408,12 @@ describe('decision items', () => {
         etichetta: 'Cass. civ., 10 gennaio 2022, n. 5' });
     expect(sentenzaFromDecision({ corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 },
       { sezione: '7', tipo: 'sentenza', data_deposito: '2024-03-12' })).toEqual(SENTENZA);
+  });
+
+  it('sentenzaFromDecision leaves out a date that is not a plain day', () => {
+    const kept = sentenzaFromDecision({ corte: 'cassazione', archivio: 'civile', numero: 5, anno: 2022 },
+      { data_deposito: '2022-01-10T00:00:00Z' });
+    expect(kept).not.toHaveProperty('data_deposito');
+    expect(parseSentenzaContent(kept)).not.toBeNull();
   });
 });

@@ -321,4 +321,22 @@ describe('decision items in the store', () => {
     expect(outcome).toEqual({ id: 'srv-1', imported: 1, failed: 1 });
     expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', { itemType: 'sentenza', title: current.etichetta, content: current });
   });
+
+  it('restoreDossierItem puts a decision back as a decision, its citation recomputed', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().restoreDossierItem('d1', { id: 'x', type: 'sentenza', data: sentenza, addedAt: '' }, 0);
+    expect(dossierService.addItem).toHaveBeenCalledWith('d1', { itemType: 'sentenza', title: current.etichetta, content: current });
+    expect(appStore.getState().dossiers[0].items[0]).toMatchObject({ type: 'sentenza', data: sentenza });
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-1'));
+    expect(appStore.getState().dossiers[0].items[0].type).toBe('sentenza');
+  });
+
+  it('restoreDossierItem carries the star of a decision in its content', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().restoreDossierItem('d1', { id: 'x', type: 'sentenza', data: sentenza, addedAt: '', status: 'important' }, 0);
+    expect(dossierService.addItem).toHaveBeenCalledWith('d1', {
+      itemType: 'sentenza', title: current.etichetta, content: { ...current, _dossierMeta: { important: true } },
+    });
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-1'));
+  });
 });

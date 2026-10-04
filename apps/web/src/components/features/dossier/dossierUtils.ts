@@ -238,7 +238,7 @@ export function sentenzaFromDecision(identity: DecisionIdentity, attrs: Decision
     ...(identity.archivio ? { archivio: identity.archivio } : {}),
     ...(attrs.sezione && SEZIONI.has(attrs.sezione) && identity.corte === 'cassazione' ? { sezione: attrs.sezione } : {}),
     ...(attrs.tipo && TIPI.has(attrs.tipo) ? { tipo: attrs.tipo } : {}),
-    ...(attrs.data_deposito ? { data_deposito: attrs.data_deposito } : {}),
+    ...(attrs.data_deposito && /^\d{4}-\d{2}-\d{2}$/.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
   };
   return { ...kept, etichetta: decisionCitationOf(kept) };
 }
