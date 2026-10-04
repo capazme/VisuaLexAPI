@@ -143,9 +143,14 @@ check('without the permission the deletion says where to turn it on', offAnswer.
 const switched = await fetch(`${VISUALEX}/api/oauth/grants/${grantNow?.id}`, { method: 'PATCH', headers: session, body: JSON.stringify({ canDelete: true }) });
 check('the user switches deletion on in the settings', switched.status === 200);
 answer = { action: 'decline' };
+const askedBefore = asked.length;
 const declined = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
 const stillThere = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
-check('Decline deletes nothing', !declined.isError && declined.data?.esito === 'annullata' && stillThere.data?.voci?.some((v) => v.id === article?.id), asked.at(-1)?.split('\n')[0]);
+check(
+  'the user is asked, and Decline deletes nothing',
+  asked.length === askedBefore + 1 && !declined.isError && declined.data?.esito === 'annullata' && stillThere.data?.voci?.some((v) => v.id === article?.id),
+  asked.at(-1)?.split('\n')[0],
+);
 answer = { action: 'accept', content: { conferma: true } };
 const accepted = await call(client, 'omnilex_elimina_voci_dossier', { dossier: created.data.id, voci: [article?.id] });
 check('Accept moves the entry to the trash', accepted.data?.spostate_nel_cestino === 1, accepted.isError ? accepted.text : `fino al ${accepted.data?.ripristinabili_fino_al}`);

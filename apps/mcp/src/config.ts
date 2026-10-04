@@ -25,6 +25,12 @@ export interface McpConfig {
   confirmationTimeoutMs: number;
 }
 
+/** A positive integer from the environment, or the default: a NaN timeout would refuse every deletion at once. */
+const positiveInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 export function readConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
   const port = parseInt(env.MCP_PORT || '3002', 10);
   const issuer = (env.MCP_AUTH_ISSUER || 'http://localhost:3001').replace(/\/+$/, '');
@@ -46,6 +52,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
-    confirmationTimeoutMs: parseInt(env.MCP_CONFIRMATION_TIMEOUT_MS || String(CONFIRMATION_TIMEOUT_MS), 10),
+    confirmationTimeoutMs: positiveInt(env.MCP_CONFIRMATION_TIMEOUT_MS, CONFIRMATION_TIMEOUT_MS),
   };
 }

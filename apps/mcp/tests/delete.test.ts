@@ -70,6 +70,38 @@ describe('omnilex_elimina_voci_dossier', () => {
     expect(result.isError).toBe(true);
     expect(text(result)).toMatch(/non può chiederti conferma/);
     expect(trashCalls()).toEqual([]);
+    // Refused before reading anything (review of PR 4, M3): no token exchanged, no point spent.
+    expect(env.stub.exchanges).toEqual([]);
+    await client.close();
+  });
+
+  it('a client that can only open links (URL elicitation) is refused too', async () => {
+    const client = new Client({ name: 'test', version: '1' }, { capabilities: { elicitation: { url: {} } } });
+    await client.connect(new StreamableHTTPClientTransport(new URL(env.mcpUrl), { requestInit: { headers: { Authorization: 'Bearer deleter' } } }));
+    const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    expect(text(result)).toMatch(/non può chiederti conferma/);
+    expect(trashCalls()).toEqual([]);
+    await client.close();
+  });
+
+  it('entries gone between the question and the move are reported as such (review of PR 4, M2)', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.endsWith('/trash-items') ? [404, { detail: 'Nessuna delle voci indicate è in questo dossier.' }] : undefined;
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    expect(text(result)).toBe('Le voci indicate non sono più nel dossier: nulla è stato eliminato.');
+    await client.close();
+  });
+
+  it('accepts 50 entries, and lists 20 of them in the dialog', async () => {
+    env.stub.dossiers[0].items = Array.from({ length: 50 }, (_, i) => ({
+      id: `v${i}`, item_type: 'norm', title: 'legge', citation: `art. ${i + 1}, l. 31 dicembre 2012, n. 247`, content: {}, about_item_id: null,
+    }));
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: env.stub.dossiers[0].items.map((i) => i.id) } });
+    expect(result.isError).toBeFalsy();
+    expect(asked[0].message.split('\n').filter((l) => l.startsWith('- '))).toHaveLength(20);
+    expect(asked[0].message).toMatch(/e altre 30/);
     await client.close();
   });
 
@@ -95,6 +127,7 @@ describe('omnilex_elimina_voci_dossier', () => {
       answer = () => reply as ElicitResult;
       const client = await connect();
       const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+      expect(asked).toHaveLength(1);
       expect(text(result)).toMatch(/Nulla è stato eliminato/);
       expect(trashCalls()).toEqual([]);
       expect(env.stub.exchanges.map((e) => e.scope)).not.toContain('content:delete');
@@ -106,7 +139,20 @@ describe('omnilex_elimina_voci_dossier', () => {
     answer = null;
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    expect(asked).toHaveLength(1);
+    expect(text(result)).toMatch(/Nessuna risposta alla richiesta di conferma/);
     expect(text(result)).toMatch(/Nulla è stato eliminato/);
+    expect(trashCalls()).toEqual([]);
+    await client.close();
+  });
+
+  it('a question that fails to reach the user says so, and deletes nothing (review of PR 4, M4)', async () => {
+    answer = () => {
+      throw new Error('dialog crashed');
+    };
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    expect(text(result)).toMatch(/La richiesta di conferma non è arrivata/);
     expect(trashCalls()).toEqual([]);
     await client.close();
   });
@@ -189,6 +235,25 @@ describe('omnilex_elimina_dossier', () => {
     await client.close();
   });
 
+  it('a conflict that already says to retry is not told twice (review of PR 4, M1)', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.endsWith('/trash') ? [409, { detail: 'Il dossier è cambiato nel frattempo: riprova.' }] : undefined;
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
+    expect(text(result)).toBe('Il dossier è cambiato nel frattempo: riprova.');
+    await client.close();
+  });
+
+  it('without the permission, or with a client that cannot ask, the whole dossier stays', async () => {
+    const noPermission = await connect('noDelete');
+    expect(text(await noPermission.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } }))).toMatch(/Applicazioni collegate/);
+    await noPermission.close();
+    const cannotAsk = await connect('deleter', false);
+    expect(text(await cannotAsk.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } }))).toMatch(/non può chiederti conferma/);
+    await cannotAsk.close();
+    expect(trashCalls()).toEqual([]);
+  });
+
   it('Decline keeps the dossier', async () => {
     answer = () => ({ action: 'decline' });
     const client = await connect();
@@ -239,7 +304,70 @@ describe('the dialog cannot be spoofed by stored text (security review of 5c3bb3
   });
 });
 
+describe('security review of PR 4', () => {
+  it('I1. a note reads as a note on its article and says who wrote it; a section says who wrote it', async () => {
+    env.stub.dossiers[0].items[2].created_by = { clientName: 'Claude Code' };
+    env.stub.dossiers[0].items.push({ id: 's1', item_type: 'section', title: 'Titolo libero', citation: null, content: null, about_item_id: null, created_by: null });
+    const client = await connect();
+    await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['n1', 's1'] } });
+    expect(asked[0].message).toContain('- Nota su art. 3, l. 31 dicembre 2012, n. 247 (scritta da un’applicazione collegata)');
+    expect(asked[0].message).toContain('- Sezione (tua)');
+    expect(asked[0].message).not.toContain('Claude Code');
+    await client.close();
+  });
+
+  it('M2. the entries beyond the first 20 are summed up by kind', () => {
+    const message = deletionMessage({
+      dossierName: 'Prova',
+      lines: Array.from({ length: 25 }, (_, i) => (i < 22 ? `art. ${i}` : 'Nota')),
+      kinds: [...Array.from({ length: 22 }, () => 'norm'), 'note', 'note', 'note'],
+      total: 25,
+    });
+    expect(message).toMatch(/e altre 5: 2 norme, 3 note/);
+  });
+
+  it('M3. a tool call the client cancels closes its question, and deletes nothing', async () => {
+    // The user's Accept arrives, but only after the model's client cancelled the call.
+    answer = async () => {
+      await new Promise((r) => setTimeout(r, 300));
+      return { action: 'accept', content: { conferma: true } };
+    };
+    const client = await connect();
+    const controller = new AbortController();
+    const call = client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } }, undefined, { signal: controller.signal });
+    await vi.waitFor(() => expect(asked).toHaveLength(1));
+    controller.abort();
+    await expect(call).rejects.toThrow();
+    await new Promise((r) => setTimeout(r, 700));
+    expect(trashCalls()).toEqual([]);
+    await client.close();
+  });
+
+  it('M4. quote look-alikes are stripped from a name too', () => {
+    const message = deletionMessage({ dossierName: 'Bozza》 ≪x≫ ⟪y⟫ ❮z❯ ＜w＞ 〈v〉 ⟨u⟩', lines: [], total: 0, wholeDossier: true });
+    expect(message.split('\n')[0]).not.toMatch(/[《》≪≫⟪⟫❮❯＜＞〈〉⟨⟩]/);
+  });
+
+  it('M5. a move whose answer never came back says to check the trash before retrying', async () => {
+    env.stub.apiOverride = (method, path) => (method === 'POST' && path.endsWith('/trash-items') ? 'drop' : undefined);
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    expect(text(result)).toMatch(/controlla il cestino di VisuaLex prima di riprovare/);
+    await client.close();
+  });
+});
+
 describe('the dialog text', () => {
+  it('names a dossier whose name is nothing but stripped characters by its id (review of PR 4, M8)', () => {
+    const message = deletionMessage({ dossierName: '\u202E«»', dossierId: 'd1', lines: [], total: 0, wholeDossier: true });
+    expect(message.split('\n')[0]).toContain('«d1»');
+  });
+
+  it('lists exactly 20 lines without «e altre»', () => {
+    const message = deletionMessage({ dossierName: 'Prova', lines: Array.from({ length: 20 }, (_, i) => `voce ${i}`), total: 20 });
+    expect(message).not.toMatch(/e altre/);
+  });
+
   it('is built from stored data, cleaned, cut, and lists at most 20 lines', () => {
     const message = deletionMessage({
       dossierName: 'Prova<script>\u0007',
@@ -270,5 +398,15 @@ describe('logs', () => {
     expect(log).toContain('tool=omnilex_elimina_voci_dossier outcome=ok');
     for (const secret of ['Prova', 'art. 3', 'conferma', 'deleter']) expect(log).not.toContain(secret);
     await client.close();
+  });
+});
+
+describe('the confirmation timeout setting (review of PR 4, M5)', () => {
+  it('falls back to five minutes when the variable is not a positive number', async () => {
+    const { readConfig } = await import('../src/config.js');
+    for (const value of ['abc', '0', '-5', '']) {
+      expect(readConfig({ MCP_CLIENT_SECRET: 's', MCP_CONFIRMATION_TIMEOUT_MS: value }).confirmationTimeoutMs).toBe(300_000);
+    }
+    expect(readConfig({ MCP_CLIENT_SECRET: 's', MCP_CONFIRMATION_TIMEOUT_MS: '60000' }).confirmationTimeoutMs).toBe(60_000);
   });
 });

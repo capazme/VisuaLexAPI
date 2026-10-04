@@ -23,7 +23,8 @@ export interface Stub {
   apiCalls: { method: string; path: string; bearer: string | undefined; body: unknown }[];
   exchanges: { subject: string; scope: string; audience: string }[];
   /** Override an API answer: return [status, body] or undefined for the default. */
-  apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | undefined;
+  /** 'drop' closes the connection without an answer (a network failure). */
+  apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | 'drop' | undefined;
   dossiers: {
     id: string;
     name: string;
@@ -66,6 +67,7 @@ export async function startStubs() {
     const path = req.path.slice(4);
     stub.apiCalls.push({ method: req.method, path, bearer: req.headers.authorization?.slice(7), body: req.body });
     const override = stub.apiOverride?.(req.method, path, req.body);
+    if (override === 'drop') return void req.socket.destroy();
     if (override) return void res.status(override[0]).json(override[1]);
     if (req.method === 'GET' && path === '/dossiers') return void res.json(stub.dossiers);
     if (req.method === 'POST' && path === '/dossiers') {
