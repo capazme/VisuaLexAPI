@@ -9,7 +9,7 @@
       "identity": {
         "act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2", "status": "current"},
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043", "status": "current"},
-        "aliases": {"value": ["urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043!vig=2024-01-15", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043@originale"], "status": "proposed"}
+        "aliases": {"value": ["urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043!vig=2024-01-15", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043@originale"], "status": "current"}
       },
       "labels": {"citation": {"value": "art. 2043 c.c.", "status": "decided"}, "short": {"value": "art. 2043 c.c.", "status": "proposed"}, "act_citation": {"value": "c.c.", "status": "proposed"}, "act_short": {"value": "c.c.", "status": "proposed"}, "act_heading": {"value": "Codice civile", "status": "decided"}, "authority": {"value": "Re", "status": "proposed"}}
     },
@@ -54,7 +54,7 @@
       "input": {"tipo_atto": "codice di procedura penale", "tipo_atto_reale": "decreto del presidente della repubblica", "numero_atto": "447", "data": "1988-09-22", "numero_articolo": "191"},
       "identity": {
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.della.repubblica:1988-09-22;447~art191", "status": "current"},
-        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.procedura.penale:1988-09-22;447~art191"], "status": "proposed"}
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.procedura.penale:1988-09-22;447~art191"], "status": "current"}
       },
       "labels": {"citation": {"value": "art. 191 c.p.p.", "status": "decided"}, "short": {"value": "art. 191 c.p.p.", "status": "proposed"}}
     },
@@ -78,7 +78,7 @@
       "input": {"tipo_atto": "codice del consumo", "tipo_atto_reale": "decreto legislativo", "numero_atto": "206", "data": "2005-09-06", "numero_articolo": "33"},
       "identity": {
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2005-09-06;206~art33", "status": "current"},
-        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto legislativo:2005-09-06;206~art33"], "status": "proposed"}
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto legislativo:2005-09-06;206~art33"], "status": "current"}
       },
       "labels": {"citation": {"value": "art. 33, d.lgs. 6 settembre 2005, n. 206", "status": "decided"}, "short": {"value": "art. 33 d.lgs. 206/2005", "status": "decided"}, "act_heading": {"value": "d.lgs. 6 settembre 2005, n. 206", "status": "decided"}}
     },
@@ -95,7 +95,7 @@
       "input": {"tipo_atto": "decreto legge", "numero_atto": "18", "data": "2020-03-17", "numero_articolo": "1"},
       "identity": {
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legge:2020-03-17;18~art1", "status": "current"},
-        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto-legge:2020-03-17;18~art1"], "status": "proposed"}
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto-legge:2020-03-17;18~art1"], "status": "current"}
       },
       "labels": {"citation": {"value": "art. 1, d.l. 17 marzo 2020, n. 18", "status": "decided"}, "short": {"value": "art. 1 d.l. 18/2020", "status": "decided"}, "act_heading": {"value": "d.l. 17 marzo 2020, n. 18", "status": "decided"}, "authority": {"value": "Governo", "status": "proposed"}}
     },
@@ -129,7 +129,7 @@
     },
     {
       "id": "dpcm-2020-03-08-1",
-      "note": "An act with no number: no number clause and no ';None'. Today the type is written in full (decided: a type with no abbreviation); Q4 asks for d.p.c.m. The identity's exact form is checked live before this case leaves 'proposed'.",
+      "note": "An act with no number: no number clause and no ';None'. Today the type is written in full (decided: a type with no abbreviation); Q4 asks for d.p.c.m. Since PR 3a generate_urn writes no ';None'. Normattiva answers this URN with its error page (checked 4 October 2026): it probably does not hold the decree at all, so the form stays 'proposed'.",
       "input": {"tipo_atto": "decreto del presidente del consiglio dei ministri", "data": "2020-03-08", "numero_articolo": "1"},
       "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.del.consiglio.dei.ministri:2020-03-08~art1", "status": "proposed"}},
       "labels": {"citation": {"value": "art. 1, d.p.c.m. 8 marzo 2020", "status": "decided"}, "short": {"value": "art. 1 d.p.c.m. 8 marzo 2020", "status": "decided"}}
@@ -140,17 +140,17 @@
       "input": {"tipo_atto": "decreto ministeriale", "numero_atto": "55", "data": "2014-03-10", "numero_articolo": "4"},
       "identity": {
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.ministeriale:2014-03-10;55~art4", "status": "current"},
-        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:ministero.giustizia:decreto:2014-03-10;55~art4"], "status": "proposed"}
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:ministero.giustizia:decreto:2014-03-10;55~art4"], "status": "current"}
       },
       "labels": {"citation": {"value": "art. 4, d.m. 10 marzo 2014, n. 55", "status": "decided"}, "short": {"value": "art. 4 d.m. 55/2014", "status": "decided"}, "authority": {"value": "Ministro", "status": "proposed"}}
     },
     {
       "id": "cpi-regolamento-1",
-      "note": "A ministerial regulation listed in the codes table. The table stores it as '/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33', so generate_urn writes 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33~art1' today. Its identity takes the form of a ministerial decree (spec §1.4); the exact string is checked live before it leaves 'proposed'.",
+      "note": "A ministerial regulation listed in the codes table. The table stores it as '/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33', so generate_urn writes 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33~art1' today. Its identity takes the form of a ministerial decree (spec §1.4): Normattiva resolves 'urn:nir:stato:decreto.ministeriale:2010-01-13;33' to it (checked 4 October 2026), and the table row says so since PR 3a.",
       "input": {"tipo_atto": "regolamento di attuazione del Codice della proprietà industriale", "numero_articolo": "1"},
       "identity": {
-        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.ministeriale:2010-01-13;33~art1", "status": "proposed"},
-        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33~art1"], "status": "proposed"}
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.ministeriale:2010-01-13;33~art1", "status": "current"},
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33~art1"], "status": "current"}
       },
       "labels": {"citation": {"value": "art. 1, d.m. 13 gennaio 2010, n. 33", "status": "decided"}}
     },
@@ -165,21 +165,21 @@
       "id": "gdpr-5",
       "note": "An EU regulation: identified by its CELEX; the year comes first in the number since 2015 (2016/679).",
       "input": {"tipo_atto": "regolamento ue", "numero_atto": "679", "data": "2016", "numero_articolo": "5"},
-      "identity": {"act": {"value": "celex:32016R0679", "status": "proposed"}, "article": {"value": "celex:32016R0679~art5", "status": "proposed"}},
+      "identity": {"act": {"value": "celex:32016R0679", "status": "current"}, "article": {"value": "celex:32016R0679~art5", "status": "current"}},
       "labels": {"citation": {"value": "art. 5, reg. (UE) 2016/679", "status": "decided"}, "short": {"value": "art. 5 reg. (UE) 2016/679", "status": "decided"}, "act_heading": {"value": "reg. (UE) 2016/679", "status": "decided"}}
     },
     {
       "id": "nis2-21",
       "note": "An EU directive.",
       "input": {"tipo_atto": "direttiva ue", "numero_atto": "2555", "data": "2022", "numero_articolo": "21"},
-      "identity": {"act": {"value": "celex:32022L2555", "status": "proposed"}, "article": {"value": "celex:32022L2555~art21", "status": "proposed"}},
+      "identity": {"act": {"value": "celex:32022L2555", "status": "current"}, "article": {"value": "celex:32022L2555~art21", "status": "current"}},
       "labels": {"citation": {"value": "art. 21, dir. (UE) 2022/2555", "status": "decided"}, "short": {"value": "art. 21 dir. (UE) 2022/2555", "status": "decided"}}
     },
     {
       "id": "tfue-101",
       "note": "A treaty: cited like a code, by its abbreviation and with no comma.",
       "input": {"tipo_atto": "TFUE", "numero_articolo": "101"},
-      "identity": {"act": {"value": "celex:12016E", "status": "proposed"}, "article": {"value": "celex:12016E~art101", "status": "proposed"}},
+      "identity": {"act": {"value": "celex:12016E", "status": "current"}, "article": {"value": "celex:12016E~art101", "status": "current"}},
       "labels": {"citation": {"value": "art. 101 TFUE", "status": "decided"}, "short": {"value": "art. 101 TFUE", "status": "decided"}, "act_heading": {"value": "Trattato sul funzionamento dell'Unione europea", "status": "proposed"}}
     }
   ],

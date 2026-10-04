@@ -143,7 +143,8 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
         normalized_act_type_urn = normalized_act_type.replace(' ', '.')
         try:
             formatted_date = complete_date_or_parse(date, act_type, act_number)
-            urn = f"{normalized_act_type_urn}:{formatted_date};{act_number}"
+            # An act with no number (a d.p.c.m.) has no ";": never ";None".
+            urn = f"{normalized_act_type_urn}:{formatted_date}" + (f";{act_number}" if act_number else "")
             logging.info(f"Generated base URN: {urn}")
         except Exception as e:
             logging.error(f"Error generating URN: {e}", exc_info=True)
