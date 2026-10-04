@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
 import { accountService } from '../../services/accountService';
+import { ConnectedAppsSection } from '../../features/connections';
 
 interface CommitInfo {
     hash: string;
@@ -280,6 +281,8 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                         {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
                     </div>
                 </div>
+
+                <ConnectedAppsSection />
 
                 {/* Version Info */}
                 <div>

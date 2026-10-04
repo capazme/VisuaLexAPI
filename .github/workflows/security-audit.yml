@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        workspace: [apps/web, apps/server]
+        workspace: [apps/web, apps/server, apps/mcp]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

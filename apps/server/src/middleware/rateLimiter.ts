@@ -51,6 +51,9 @@ if (backend === 'memory') {
  * Returns userId if valid access token, null otherwise.
  */
 function identifyUser(req: Request): string | null {
+  // An exchanged token: the MCP server calls for every user from one address,
+  // so counting it by address would throttle them all together.
+  if (req.delegation && req.user) return req.user.id;
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return null;
   const payload = verifyToken(header.substring(7));

@@ -4,6 +4,14 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// The OAuth endpoints' own rate limits are per address, and the whole suite
+// comes from 127.0.0.1: lift them here (the flood test builds its own router
+// with a low one), and give the MCP server's credential a test value.
+process.env.OAUTH_REGISTRATIONS_PER_HOUR ??= '100000';
+process.env.OAUTH_REQUESTS_PER_15_MINUTES ??= '100000';
+process.env.OAUTH_MCP_CLIENT_SECRET ??= 'test-mcp-client-secret';
+process.env.OAUTH_DELEGATION_SECRET ??= 'test-delegation-secret';
+
 // SAFETY GUARD: this setup resets the database (drops everything). If vitest is
 // run WITHOUT the `dotenv -e .env.test` wrapper (i.e. `npx vitest` instead of
 // `npm test`), Prisma loads `.env` and DATABASE_URL points at the DEV database
@@ -62,6 +70,11 @@ beforeEach(async () => {
       "lingo_tracce",
       "lingo_card_ancore",
       "lingo_cards",
+      "oauth_tokens",
+      "oauth_authorization_codes",
+      "oauth_grants",
+      "oauth_authorization_requests",
+      "oauth_clients",
       "users"
     RESTART IDENTITY CASCADE;
   `);

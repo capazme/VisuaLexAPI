@@ -10,6 +10,8 @@ is actually enforced today:
 |---|---|
 | `www.normattiva.it` | Normattiva — Istituto Poligrafico e Zecca dello Stato |
 | `eur-lex.europa.eu` | EUR-Lex — Ufficio delle pubblicazioni UE |
+| `www.italgiure.giustizia.it` | Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb) |
+| `dati.cortecostituzionale.it` | Corte costituzionale — dati aperti (CC BY-SA 3.0) |
 | `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.portaledelmassimario.ipzs.it` | Portale del Massimario — Corte di cassazione (realizzazione Istituto Poligrafico e Zecca dello Stato) |
@@ -26,10 +28,11 @@ Two mechanisms, with different guarantees:
   catch a URL assembled from fragments at runtime, and nothing here claims
   otherwise.
 - **Runtime.** `is_allowed()` is checked in `ThrottledHttpClient.request` before
-  every request made **through the shared HTTP client**, so a host that is not on
-  the list is refused there even if the URL was built dynamically. That client
-  carries the scrapers' document fetches; it is not the only way this process
-  opens a socket.
+  every request made **through a `ThrottledHttpClient`** (the shared one and the
+  court-decision readers' own), so a host that is not on the list is refused
+  there even if the URL was built dynamically. Those clients carry the scrapers'
+  document fetches and the court-decision lookups; they are not the only way this
+  process opens a socket.
 
 ### Not yet covered
 
@@ -47,10 +50,10 @@ open, not oversights:
   browser and never consults the allowlist. `POST /export_pdf` has its own,
   narrower guard (`is_allowed_pdf_urn`, Normattiva URNs only); the other two do
   not.
-- **Redirects.** The shared client checks the host of the URL it is given.
-  `aiohttp` follows redirects by default and the client does not re-check the
-  target, so an allowed host that answers with a 302 can move the request
-  somewhere unlisted.
+- **Redirects.** Every `ThrottledHttpClient` (the shared one and the
+  court-decision readers') checks the host of the URL it is given. `aiohttp`
+  follows redirects by default and none of them re-checks the target, so an
+  allowed host that answers with a 302 can move the request somewhere unlisted.
 
 If you are evaluating this server for client work, treat the table above as the
 list of sources it consults on its own initiative, and this section as the list
@@ -127,6 +130,12 @@ BFF must carry `X-Internal-Secret`.
 ## Transport
 
 Certificate verification is enabled for every outbound request.
+
+One host needs help to be verified. `www.italgiure.giustizia.it` serves an incomplete chain:
+it omits the intermediate "TI Trust Technologies OV CA". VisuaLex ships that intermediate
+(`services/visualex/visualex_api/tools/certs/titrust_ov_ca.der`) and trusts it only when its
+SHA-256 matches the pin in `visualex_api/tools/tls.py`; nothing is downloaded at run time and
+verification is never switched off. The rotation procedure is in that file.
 
 ## Reporting
 

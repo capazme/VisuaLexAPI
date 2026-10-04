@@ -61,7 +61,7 @@ def _get_queue():
 
 
 class RunIngestionRequest(BaseModel):
-    source: str = Field(..., pattern="^(visualex_tree|italia_corpus)$")
+    source: str = Field(..., pattern="^(visualex_tree|italia_corpus|massimario)$")
     source_ref: str = Field(..., min_length=1)
     scope_label: str = Field(..., min_length=1, max_length=300)
     created_by: Optional[str] = Field(None, max_length=100)
@@ -227,6 +227,17 @@ async def get_batch(
     )
 
 
+def _vectors_incomplete(batch: MerltIngestionBatch) -> bool:
+    """A promoted Massimario batch whose vectors stopped before the end: an error was
+    recorded, or the chain has not moved for an hour. Vectors still being written are
+    not resumed: a second chain would only redo the same work."""
+    if batch.source != "massimario" or batch.status != "promoted":
+        return False
+    from merlt.worker.massimario_tasks import vectors_stopped
+
+    return vectors_stopped((batch.stats or {}).get("vectors"))
+
+
 @router.post("/batches/{batch_id}/promote", response_model=PromoteResponse)
 async def promote_batch_endpoint(
     batch_id: str,
@@ -243,13 +254,19 @@ async def promote_batch_endpoint(
     `UPDATE ... WHERE status = <snapshot>` (not a read-then-write of the ORM
     object) so two admins racing to promote the same batch can't both pass
     the checks below and both enqueue a job.
+
+    A promoted Massimario batch whose vectors stopped (a slice failed, its job
+    died, or the chain has not moved for an hour) is promoted again: the graph
+    writes are idempotent and the vector job restarts from 0 with upserts on
+    stable ids.
     """
     batch = await session.get(MerltIngestionBatch, batch_id)
     if batch is None:
         raise HTTPException(status_code=404, detail="batch_not_found")
-    if batch.status not in ("pending_review", "failed"):
+    resuming = _vectors_incomplete(batch)
+    if batch.status not in ("pending_review", "failed") and not resuming:
         raise HTTPException(status_code=409, detail=f"batch_not_pending_review: {batch.status}")
-    if batch.expires_at and batch.expires_at < datetime.utcnow():
+    if batch.expires_at and batch.expires_at < datetime.utcnow() and not resuming:
         raise HTTPException(status_code=409, detail="batch_expired")
 
     conflicts = (batch.conflict_report or {}).get("urn_conflicts") or []

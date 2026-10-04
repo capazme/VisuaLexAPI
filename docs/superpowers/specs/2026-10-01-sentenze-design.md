@@ -203,15 +203,21 @@ README states the minimum version.
 **The route.** One Python route, `POST /fetch_decision`, the name used in the
 2026-08-29 round.
 - **Body:** `{corte, numero, anno, archivio?, sezione?}`.
-- **Answer:** always JSON with `esito`.
+- **Answer:** JSON with `esito`, for every answer the handler writes. The
+  others are not: the per-IP rate limit (429 `{"error": …}`) and the login
+  gate's 401 or 429 passed through by the ingress, both before the handler,
+  and the framework's own pages, 405 (a method other than POST or OPTIONS),
+  408 (a stalled body) and 413 (a body over 16 MB; 1 MB behind the ingress,
+  whose own page answers).
 
 | `esito` | Status | Content |
 |---|---|---|
-| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form) |
+| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione?`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form, text missing: `attributi.testo_assente` says `oscuramento` when the source withholds it) |
 | `ambigua` | 200 | `candidati`: identity and attributes of each |
 | `non_trovata` | 404 | `motivo` (see below), `archivio_dal` when known, `suggerimento` when found |
 | `fonte_non_raggiungibile` | 503 | `fonte` |
 | invalid request | 400 | the field errors |
+| `errore_interno` | 500 | nothing else: an unexpected failure, whose details stay in the log |
 
 `motivo` is one of:
 - `inesistente`;
@@ -251,7 +257,12 @@ year may be a different decision.
 - **Cache.** The range bundle is downloaded into the API's cache directory and
   only the requested year is extracted.
   - **Expiry:** 30 days for closed years; 24 hours for the current year, since
-    the bundle is regenerated daily.
+    the bundle is regenerated daily. When a refresh fails, the copy on disk
+    still confirms a decision it holds for a year before the current one,
+    however old. A number it does not hold is answered 503: it cannot be
+    verified, since the copy may have been written before that decision was
+    deposited, so it is never `non_trovata`. The current year is never read
+    from a copy that could not be refreshed.
   - **Downloads:** one per bundle at a time, so concurrent misses wait for the
     same download.
 - **Lookup.** The year's JSON is parsed once and indexed by number in memory,
@@ -259,7 +270,11 @@ year may be a different decision.
 - **Matching.** A record matches on its own `numero` and `anno` fields, not on
   the file it sits in.
 - **Fields.** Type, dates of decision and deposit, ECLI, presidente, relatore
-  or redattore, epigrafe, testo, dispositivo.
+  or redattore, epigrafe, testo, dispositivo. Measured on the 2001–today
+  bundle, 3,592 of 4,056 ordinanze (2001–2026) have an empty `testo`, and in
+  3,579 of them the "Ritenuto… / Considerato…" reasoning is inside `epigrafe`:
+  the reader passes the blocks as the source gives them, and how the page
+  labels them is decided with the page.
 
 **Common to both readers:**
 
@@ -270,8 +285,9 @@ year may be a different decision.
   - The 2026-08-29 runtime download from the plaintext AIA URL is dropped,
     along with its egress host.
 - **VisuaLex identifies itself honestly** (D5). Requests go through
-  `ThrottledHttpClient`: throttle, retries, circuit breaker and the egress
-  allowlist (D6).
+  `ThrottledHttpClient`: throttle, retries and the egress allowlist (D6). It
+  has no circuit breaker (only the `/api` twin server has one): when Italgiure
+  is down, a lookup spends its retries, about 16–25 s, before its 503.
 - **Egress.** `www.italgiure.giustizia.it` and `dati.cortecostituzionale.it` go
   into `visualex_api/tools/egress.py` and `SECURITY.md`.
 - **Caching** is per archive lookup, and the answer is composed from those
@@ -282,6 +298,7 @@ year may be a different decision.
   |---|---|
   | found | 30 days: a deposited decision does not change |
   | not found | 1 hour: indexing lags, and the other series may reach that number later |
+  | found without its text | 24 hours: withheld by the source while personal data are removed, or missing at the source |
   | error | never |
 
 - **Behind the login** with the per-user quota (ADR-001). The route is added
@@ -289,9 +306,13 @@ year may be a different decision.
   - `app.py`;
   - the Vite proxy list;
   - the ingress `@legal` list (`paths.test.mjs` keeps the last two in step);
-  - `scrapeGate`'s cost table, at 2 per call. A Cassazione lookup makes two
-    upstream requests per archive. A Corte costituzionale call makes at most
-    one download, shared by concurrent callers.
+  - `scrapeGate`'s cost table, at 2 per call, whatever the call sends
+    upstream. A Cassazione lookup sends a homepage `GET` and a Solr `POST` per
+    query: a number below 10000 is queried in two forms, a reference without
+    the archive queries both archives, and a miss adds the query for the
+    archive's start (once a day per archive) and, for the penal archive, the
+    next year's lookup. A Corte costituzionale call makes at most one
+    download, shared by concurrent callers.
 
 ### 4. The page
 
@@ -314,7 +335,10 @@ over the reader. From the top:
      actually carries.
    - **Aggiungi al dossier** (§6).
    - **Apri sulla fonte**, only if the plan verifies a stable per-decision
-     address at the source; otherwise it is absent.
+     address at the source; otherwise it is absent. Verified on 2026-10-02 for
+     the Corte costituzionale
+     (`www.cortecostituzionale.it/scheda-pronuncia/<anno>/<numero>`); none for
+     the Cassazione.
 4. **The text**, in the blocks the source gives (epigrafe, motivazione,
    dispositivo), at the reader's 68ch measure. Rendering follows S6: within a
    block, the text nodes spell the received text minus `\n`, as gotcha 23
@@ -430,8 +454,13 @@ repository.
 - **Transport.** TLS verified, with the pinned intermediate; an honest
   User-Agent; the egress allowlist; the per-user quota.
 - **Personal data.** A decision is shown as its source publishes it, with the
-  anonymisation the source applies, and is held only in caches. The owner
-  confirmed this posture.
+  anonymisation the source applies, and is held only in caches, whose expired
+  entries are swept every six hours. The owner confirmed this posture. When
+  the source withholds a text while it removes personal data (Italgiure
+  answers with its own notice), the page shows the decision's particulars and
+  says so: the notice is never shown as the text. It gives that reason only
+  when the source did (`attributi.testo_assente` is `oscuramento`): a text
+  missing for any other reason carries none.
 - **Login.** No open redirect (§5).
 - **Imports.** Imported items are untrusted (§6).
 - **Licences.** The README's third-party sentence names the Corte di cassazione

@@ -10,6 +10,7 @@ import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardP
 import { DocumentReviewPage } from './components/features/documents/DocumentReviewPage';
 import { ConsentProvider } from './features/merlt/consent/ConsentContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { ConnectPage } from './features/connections';
 import { AdminRoute } from './components/auth/AdminRoute';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
@@ -53,6 +54,15 @@ function App() {
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        {/* The OAuth consent page (MCP spike): signed in, outside the app layout. */}
+        <Route
+          path="/connect"
+          element={
+            <ProtectedRoute>
+              <ConnectPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Protected app routes with layout */}
         <Route

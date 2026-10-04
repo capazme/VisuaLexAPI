@@ -27,7 +27,7 @@ export interface OpsIngestionClientConfig {
 
 /** POST /api/v1/ingestion/mechanical/run request body (created_by injected server-side). */
 export interface RunIngestionRequest {
-  source: 'visualex_tree' | 'italia_corpus';
+  source: 'visualex_tree' | 'italia_corpus' | 'massimario';
   source_ref: string;
   scope_label: string;
   created_by: string;

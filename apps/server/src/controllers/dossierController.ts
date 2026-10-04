@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
+import { resolveReferences } from '../norms/resolveReference';
 
 // Validation schemas
 const createDossierSchema = z.object({
@@ -489,4 +490,86 @@ export const reorderDossierItems = async (req: Request, res: Response) => {
   }
 
   res.json({ message: 'Items reordered successfully' });
+};
+
+export const MAX_REFERENCES_PER_CALL = 50;
+
+const addNormsSchema = z.object({
+  references: z.array(z.string().trim().min(1).max(200)).min(1).max(MAX_REFERENCES_PER_CALL),
+}).strict();
+
+type NormOutcome = 'added' | 'already_present' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
+
+/**
+ * Adds norms to a dossier from references in free text ("art. 2043 c.c."),
+ * 1 to 50 per call (MCP spike, spec section 7). Each reference is resolved
+ * and checked for existence by the Python API (`norms/resolveReference.ts`);
+ * one that is not recognised, ambiguous, missing or unverifiable is reported
+ * and does not stop the others. The resolved ones are created in one
+ * transaction as `norm` items whose content is the norm as the reader stores
+ * it, after the dossier's last item; an article already in the dossier (or
+ * twice in the call) is added once. Nothing is updated, moved or deleted.
+ */
+export const addDossierNorms = async (req: Request, res: Response) => {
+  const { references } = addNormsSchema.parse(req.body);
+  const dossier = await prisma.dossier.findFirst({
+    where: { id: req.params.id, userId: req.user!.id },
+    include: { items: { where: { itemType: 'norm' }, select: { content: true } } },
+  });
+  if (!dossier) throw new AppError(404, 'Dossier not found');
+
+  const resolutions = await resolveReferences(references);
+  const present = new Set(
+    dossier.items
+      .map((item) => (item.content && typeof item.content === 'object' ? (item.content as { urn?: unknown }).urn : undefined))
+      .filter((urn): urn is string => typeof urn === 'string'),
+  );
+
+  const toCreate: { index: number; urn: string }[] = [];
+  type NormResult = { reference: string; outcome: NormOutcome; display?: string; detail?: string; itemId?: string };
+  const results: NormResult[] =
+    resolutions.map((resolution, index): NormResult => {
+      const base = { reference: references[index], display: resolution.display, detail: resolution.detail };
+      if (resolution.outcome !== 'resolved' || !resolution.norm) {
+        // `resolved` without a norm cannot happen; reported as unavailable rather than added.
+        return { ...base, outcome: resolution.outcome === 'resolved' ? 'unavailable' : resolution.outcome };
+      }
+      if (present.has(resolution.norm.urn)) return { ...base, outcome: 'already_present' as const, detail: undefined };
+      present.add(resolution.norm.urn);
+      toCreate.push({ index, urn: resolution.norm.urn });
+      return { ...base, outcome: 'added' as const };
+    });
+
+  if (toCreate.length > 0) {
+    const created = await prisma.$transaction(async (tx) => {
+      const last = await tx.dossierItem.aggregate({ where: { dossierId: dossier.id }, _max: { position: true } });
+      let position = (last._max.position ?? -1) + 1;
+      const rows = [];
+      for (const { index } of toCreate) {
+        const norm = resolutions[index].norm!;
+        rows.push(
+          await tx.dossierItem.create({
+            data: {
+              dossierId: dossier.id,
+              itemType: 'norm',
+              // As the web app titles a norm it adds (`addToDossier`).
+              title: norm.tipo_atto,
+              content: norm as unknown as Prisma.InputJsonValue,
+              position: position++,
+            },
+          }),
+        );
+      }
+      await tx.dossier.update({ where: { id: dossier.id }, data: { updatedAt: new Date() } });
+      return rows;
+    });
+    toCreate.forEach(({ index }, i) => {
+      results[index].itemId = created[i].id;
+    });
+  }
+
+  // Under an exchanged token each reference is charged two points; one the
+  // sources could not check is handed back (middleware/delegated.ts).
+  res.locals.delegatedRefund = results.filter((r) => r.outcome === 'unavailable').length * 2;
+  res.json({ results });
 };

@@ -6,6 +6,7 @@ import type { BatchSummary, IngestionSource } from './types';
 const SOURCE_LABELS: Record<IngestionSource, string> = {
   visualex_tree: 'Albero VisuaLex',
   italia_corpus: 'italia-corpus',
+  massimario: 'Massimario',
 };
 
 function formatStats(batch: BatchSummary): string {

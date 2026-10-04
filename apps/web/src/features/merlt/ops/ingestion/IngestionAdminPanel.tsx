@@ -149,6 +149,7 @@ export function IngestionAdminPanel() {
 
       {selectedBatchId && (
         <BatchDetailPanel
+          key={selectedBatchId} // a resume's outcome never lands on another batch
           batchId={selectedBatchId}
           onClose={() => setSelectedBatchId(null)}
           onQueueRefreshNeeded={fetchBatches}

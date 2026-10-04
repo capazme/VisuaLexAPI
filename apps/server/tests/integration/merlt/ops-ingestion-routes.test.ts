@@ -107,6 +107,32 @@ describe('POST /api/merlt/ops/ingestion/run', () => {
     expect(sentApiKey).toBe('test-admin-key');
   });
 
+  it('forwards a Massimario volume run', async () => {
+    const user = await createTestUser('opsing-massimario');
+    await makeAdmin(user);
+
+    let sentBody: unknown = null;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/ingestion/mechanical/run', (body) => {
+        sentBody = body;
+        return true;
+      })
+      .reply(202, { batch_id: 'batch_2', job_id: 'job_2' });
+
+    const res = await request(app)
+      .post('/api/merlt/ops/ingestion/run')
+      .set(authHeader(user))
+      .send({ source: 'massimario', source_ref: '{"volume":96}', scope_label: 'Massimario 2024 civile vol. 1' });
+
+    expect(res.status).toBe(202);
+    expect(sentBody).toEqual({
+      source: 'massimario',
+      source_ref: '{"volume":96}',
+      scope_label: 'Massimario 2024 civile vol. 1',
+      created_by: user.username,
+    });
+  });
+
   it('503s when MERL-T is unavailable', async () => {
     const user = await createTestUser('opsing-admin2');
     await makeAdmin(user);

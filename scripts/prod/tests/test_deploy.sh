@@ -377,7 +377,8 @@ EOF
 mkdev() { # mkdev <name>: a repo as mkrepo makes it, plus what ./start.sh --dev reaches; prints its path
   d="$(mkrepo "$1")"
   cp "$root/start.sh" "$d/start.sh"
-  mkdir -p "$d/apps/web" "$d/services/visualex" "$d/stubs"
+  mkdir -p "$d/apps/web" "$d/apps/mcp" "$d/services/visualex" "$d/stubs"
+  cp "$root/apps/mcp/.env.example" "$d/apps/mcp/.env.example"
   echo redis >"$d/services/visualex/requirements-dev.txt"
   # the venv that the host python "creates", and the tools inside it
   cat >"$d/stubs/python" <<'EOF'
@@ -438,10 +439,16 @@ if [ -f "$d/infra/.env" ] && [ -f "$d/apps/server/.env" ]; then ok "the first ru
 jwt="$(value_of "$d/apps/server/.env" JWT_SECRET)"
 if [ "${#jwt}" -ge 32 ] && [ "$jwt" != "$(value_of "$d/apps/server/.env.example" JWT_SECRET)" ]; then ok "with a JWT secret of its own"; else bad "with a JWT secret of its own (${#jwt} characters, or the example's)"; fi
 if grep -qF -- "$jwt" "$work/out"; then bad "which is not printed"; else ok "which is not printed"; fi
+mcp_secret="$(value_of "$d/apps/server/.env" OAUTH_MCP_CLIENT_SECRET)"; delegation="$(value_of "$d/apps/server/.env" OAUTH_DELEGATION_SECRET)"
+if [ "${#mcp_secret}" -ge 32 ] && [ "${#delegation}" -ge 32 ] && [ "$delegation" != "$jwt" ]; then ok "and the MCP server's two secrets"; else bad "and the MCP server's two secrets (${#mcp_secret}, ${#delegation} characters)"; fi
+if [ -f "$d/apps/mcp/.env" ] && [ "$(value_of "$d/apps/mcp/.env" MCP_CLIENT_SECRET)" = "$mcp_secret" ]; then ok "apps/mcp/.env carries the same credential"; else bad "apps/mcp/.env carries the same credential"; fi
+[ "$(mode_of "$d/apps/mcp/.env")" = "-rw-------" ] && ok "readable by its owner only" || bad "apps/mcp/.env is readable by its owner only ($(mode_of "$d/apps/mcp/.env"))"
+if grep -qF -- "$mcp_secret" "$work/out" || grep -qF -- "$delegation" "$work/out"; then bad "neither is printed"; else ok "neither is printed"; fi
 expect_log "$d" "python3.14 -m venv" "it creates the venv"
 expect_log_re "$d" "pip install -q -r .*/services/visualex/requirements-dev.txt" "installs the Python dependencies"
 expect_log_re "$d" "npm ci --prefix .*/apps/server$" "installs the server's packages"
 expect_log_re "$d" "npm ci --prefix .*/apps/web$" "and the web app's"
+expect_log_re "$d" "npm ci --prefix .*/apps/mcp$" "and the MCP server's"
 expect_log "$d" "playwright install chromium" "installs Chromium"
 expect_log "$d" "up -d --wait postgres redis falkordb qdrant" "and reaches the stores"
 a="$(line_of "$d" 'docker info')"; b="$(line_of "$d" 'python3.14 -m venv')"; c="$(line_of "$d" 'up -d --wait')"
@@ -453,6 +460,11 @@ cp "$d/apps/server/.env" "$work/env.before"
 EXTRA_ENV="STUB_DOCKER_EXIT=1"; outcomeb "$d" start.sh --dev; EXTRA_ENV=""
 if grep -qF -- "is the default" "$work/out"; then bad "an explicit --dev does not say it is the default"; else ok "an explicit --dev does not say it is the default"; fi
 cmp -s "$work/env.before" "$d/apps/server/.env" && ok "a second run does not touch the env files" || bad "a second run does not touch the env files"
+# An apps/server/.env from before the MCP server gains its two secrets, and nothing else changes.
+sed -i.bak '/^OAUTH_MCP_CLIENT_SECRET=/d;/^OAUTH_DELEGATION_SECRET=/d' "$d/apps/server/.env" && rm -f "$d/apps/server/.env.bak"
+grep -v '^OAUTH_' "$d/apps/server/.env" >"$work/env.old"
+EXTRA_ENV="STUB_DOCKER_EXIT=1"; outcomeb "$d" start.sh --dev; EXTRA_ENV=""
+if [ -n "$(value_of "$d/apps/server/.env" OAUTH_DELEGATION_SECRET)" ] && grep -v '^OAUTH_' "$d/apps/server/.env" | cmp -s - "$work/env.old"; then ok "an older env file gains the MCP secrets and keeps everything else"; else bad "an older env file gains the MCP secrets and keeps everything else"; fi
 for what in python3.14 "pip " "npm " "playwright "; do expect_no_log "$d" "$what" "and does not run '$what' again"; done
 expect_log "$d" "up -d --wait" "and goes straight to the stores"
 
