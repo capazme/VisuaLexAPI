@@ -4,8 +4,12 @@ import type { Caller } from './auth.js';
 
 /** A session nobody used for this long is closed (spec §4.5). */
 export const SESSION_IDLE_MS = 30 * 60 * 1000;
-/** Open sessions per grant: a new one beyond this closes the oldest. */
+/** Open sessions per grant: a new one beyond this closes the grant's oldest. */
 export const MAX_SESSIONS_PER_GRANT = 10;
+/** Open sessions per user, across all their connected applications: a new one beyond this closes the user's oldest. */
+export const MAX_SESSIONS_PER_USER = 20;
+/** Open sessions in the process: when full, a new one is refused rather than another user's closed. */
+export const MAX_SESSIONS = 1000;
 
 export interface Session {
   id: string;
@@ -26,6 +30,16 @@ export interface Session {
  */
 export class SessionStore {
   private readonly sessions = new Map<string, Session>();
+  private readonly maxSessions: number;
+
+  constructor(options: { maxSessions?: number } = {}) {
+    this.maxSessions = options.maxSessions ?? MAX_SESSIONS;
+  }
+
+  /** Whether a new session may open: the process cap is never met by closing someone else's. */
+  hasRoom(): boolean {
+    return this.sessions.size < this.maxSessions;
+  }
 
   /** The session for this id if it belongs to this caller's user and grant; otherwise undefined (answer 404). */
   find(id: string, caller: Pick<Caller, 'userId' | 'grantId'>): Session | undefined {
@@ -35,14 +49,21 @@ export class SessionStore {
     return session;
   }
 
-  /** Adds a session; when its grant already has the maximum, the oldest of that grant is closed first. */
+  /**
+   * Adds a session. When its grant, or its user across all grants, already has
+   * the maximum, their own oldest sessions are closed first; nobody else's.
+   */
   async add(session: Session): Promise<void> {
-    const sameGrant = [...this.sessions.values()].filter((s) => s.grantId === session.grantId);
-    // A Map iterates in insertion order: the first ones are the oldest.
-    for (const old of sameGrant.slice(0, Math.max(0, sameGrant.length - MAX_SESSIONS_PER_GRANT + 1))) {
-      await this.close(old.id);
-    }
+    await this.trim((s) => s.grantId === session.grantId, MAX_SESSIONS_PER_GRANT);
+    await this.trim((s) => s.userId === session.userId, MAX_SESSIONS_PER_USER);
     this.sessions.set(session.id, session);
+  }
+
+  /** Closes the oldest sessions matching `which` until one more fits under `max`. */
+  private async trim(which: (s: Session) => boolean, max: number): Promise<void> {
+    // A Map iterates in insertion order: the first ones are the oldest.
+    const matching = [...this.sessions.values()].filter(which);
+    for (const old of matching.slice(0, Math.max(0, matching.length - max + 1))) await this.close(old.id);
   }
 
   async close(id: string): Promise<void> {

@@ -150,6 +150,11 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
         res.status(400).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Bad Request: no session; start with initialize' }, id: null });
         return;
       }
+      await store.sweep();
+      if (!store.hasRoom()) {
+        res.status(503).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Too many open sessions: retry later' }, id: null });
+        return;
+      }
       const server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
       registerDossierTools(server, config, runner);
       // No JSON responses: a tool that asks the user to confirm sends that

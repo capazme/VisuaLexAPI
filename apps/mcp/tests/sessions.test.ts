@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { rpc, rpcBody, startStubs } from './stubs.js';
-import { MAX_SESSIONS_PER_GRANT, SESSION_IDLE_MS } from '../src/sessions.js';
+import { MAX_SESSIONS_PER_GRANT, MAX_SESSIONS_PER_USER, SESSION_IDLE_MS, SessionStore } from '../src/sessions.js';
 
 // The MCP server keeps sessions (spec §4.5): the only way it can ask the user
 // to confirm inside a tool call. A session belongs to the user and the grant
@@ -111,6 +111,37 @@ describe('sessions', () => {
     await open('a');
     expect(env.store.size()).toBe(MAX_SESSIONS_PER_GRANT);
     expect((await rpc(env.mcpUrl, listTools, { ...bearer('a'), 'mcp-session-id': first })).status).toBe(404);
+  });
+
+  it(`a user's sessions across all their grants stop at ${MAX_SESSIONS_PER_USER}: the oldest closes`, async () => {
+    // One user, several connected applications (one grant each): the per-grant cap alone would not bound them.
+    for (let g = 0; g < 3; g++) env.stub.tokens[`g${g}`] = { active: true, grant: `grant-u${g}` };
+    const first = await open('g0');
+    for (let i = 1; i < MAX_SESSIONS_PER_USER + 5; i++) await open(`g${i % 3}`);
+    expect(env.store.size()).toBe(MAX_SESSIONS_PER_USER);
+    expect((await rpc(env.mcpUrl, listTools, { ...bearer('g0'), 'mcp-session-id': first })).status).toBe(404);
+  });
+
+  it('when the process holds its maximum of sessions, a new one is refused (503), never another user\'s closed', async () => {
+    const small = new SessionStore({ maxSessions: 2 });
+    const fake = (id: string, userId: string) => ({
+      id, userId, grantId: `grant-${id}`, lastSeen: Date.now(),
+      transport: { close: async () => undefined }, server: { close: async () => undefined },
+    }) as unknown as Parameters<SessionStore['add']>[0];
+    expect(small.hasRoom()).toBe(true);
+    await small.add(fake('s1', 'u1'));
+    await small.add(fake('s2', 'u2'));
+    expect(small.hasRoom()).toBe(false);
+    expect(small.size()).toBe(2);
+  });
+
+  it('refuses initialize with 503 when the process is full, and closes nobody', async () => {
+    const id = await open('a');
+    const spy = vi.spyOn(env.store, 'hasRoom').mockReturnValue(false);
+    const refused = await rpc(env.mcpUrl, initialize(), bearer('bob'));
+    spy.mockRestore();
+    expect(refused.status).toBe(503);
+    expect((await rpc(env.mcpUrl, listTools, { ...bearer('a'), 'mcp-session-id': id })).status).toBe(200);
   });
 
   it('the sweep closes sessions idle for longer than the limit, and only those', async () => {
