@@ -20,7 +20,10 @@ export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
+  // Back where the user was sent from, query included: the consent page carries
+  // its request there (/connect?request=…).
+  const fromLocation = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+  const from = fromLocation?.pathname ? `${fromLocation.pathname}${fromLocation.search ?? ''}` : '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +83,7 @@ export function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
+              <label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
                 Email
               </label>
               <div
@@ -99,6 +102,7 @@ export function LoginForm() {
                   />
                 </div>
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -114,7 +118,7 @@ export function LoginForm() {
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
+              <label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
                 Password
               </label>
               <div
@@ -133,6 +137,7 @@ export function LoginForm() {
                   />
                 </div>
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
