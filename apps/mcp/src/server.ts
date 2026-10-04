@@ -1,11 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { authenticate, type Caller } from './auth.js';
+import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import { authenticate, authInfoFor, callerOf, type Caller } from './auth.js';
 import type { McpConfig } from './config.js';
 import { ToolError } from './errors.js';
+import { SessionStore } from './sessions.js';
 import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier.js';
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
@@ -26,10 +29,10 @@ function challenge(config: McpConfig, extra: Record<string, string> = {}): strin
 }
 
 /** One log line per tool call: who, through what, which tool, how it went. Never arguments or tokens. */
-function runner(caller: Caller): RunTool {
-  return async (tool, body) => {
+const runner: RunTool = async (tool, extra, body) => {
+    const caller = callerOf(extra);
     try {
-      const result = await body();
+      const result = await body(caller);
       console.info(`[mcp] user=${caller.userId} client=${caller.clientId} tool=${tool} outcome=ok`);
       return result;
     } catch (error) {
@@ -39,8 +42,7 @@ function runner(caller: Caller): RunTool {
       const text = known ? error.message : 'Errore imprevisto: riprova tra poco.';
       return { isError: true, content: [{ type: 'text', text }] } satisfies CallToolResult;
     }
-  };
-}
+};
 
 /** The scopes a JSON-RPC message needs before it reaches the tools: only `tools/call` needs any. */
 function scopesNeeded(message: unknown): string[] {
@@ -50,14 +52,22 @@ function scopesNeeded(message: unknown): string[] {
   return TOOL_SCOPES[params.name] ?? [];
 }
 
+type AuthedRequest = Request & { auth?: AuthInfo };
+
+const sessionNotFound = (res: Response) =>
+  res.status(404).json({ jsonrpc: '2.0', error: { code: -32001, message: 'Session not found' }, id: null });
+
 /**
- * The MCP server (spec section 6): Streamable HTTP on one endpoint, stateless
- * (a fresh server and transport per request), behind the authorization
- * server. No token: 401 with the discovery header. A token without the scope
- * a tool needs: 403 `insufficient_scope`. It never reads the database and
- * never forwards the client's token to the API.
+ * The MCP server (spec section 6; sessions: second round, §4.5): Streamable
+ * HTTP on one endpoint, behind the authorization server. A session starts at
+ * `initialize` and belongs to the user and grant of its token; it is what lets
+ * a tool ask the user to confirm mid-call. Every request is introspected,
+ * session or not. No token: 401 with the discovery header. A token without the
+ * scope a tool needs: 403 `insufficient_scope`. It never reads the database
+ * and never forwards the client's token to the API.
  */
-export function createApp(config: McpConfig) {
+export function createApp(config: McpConfig, options: { store?: SessionStore } = {}) {
+  const store = options.store ?? new SessionStore();
   const app = express();
   app.disable('x-powered-by');
 
@@ -89,17 +99,27 @@ export function createApp(config: McpConfig) {
 
   const endpoint = new URL(config.resource).pathname;
 
-  app.post(endpoint, express.json({ limit: '1mb' }), async (req: Request, res: Response) => {
+  /** The caller of this request, or the 401/503 answer already sent. */
+  async function callerOrRefuse(req: Request, res: Response): Promise<Caller | undefined> {
     const auth = await authenticate(config, req.headers.authorization);
-    if (!auth.ok) {
-      if (auth.status === 503) {
-        res.status(503).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Authorization server unavailable' }, id: null });
-        return;
-      }
-      res.setHeader('WWW-Authenticate', challenge(config, auth.error ? { error: auth.error } : {}));
-      res.status(401).json({ error: auth.error ?? 'unauthorized' });
-      return;
+    if (auth.ok) return auth.caller;
+    if (auth.status === 503) {
+      res.status(503).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Authorization server unavailable' }, id: null });
+      return undefined;
     }
+    res.setHeader('WWW-Authenticate', challenge(config, auth.error ? { error: auth.error } : {}));
+    res.status(401).json({ error: auth.error ?? 'unauthorized' });
+    return undefined;
+  }
+
+  const sessionId = (req: Request): string | undefined => {
+    const value = req.headers['mcp-session-id'];
+    return typeof value === 'string' && value ? value : undefined;
+  };
+
+  app.post(endpoint, express.json({ limit: '1mb' }), async (req: AuthedRequest, res: Response) => {
+    const caller = await callerOrRefuse(req, res);
+    if (!caller) return;
     // 2025-11-25 has no JSON-RPC batching; a batch would also carry tool
     // calls past the scope check below, which reads one message.
     if (Array.isArray(req.body) || !req.body || typeof req.body !== 'object') {
@@ -107,24 +127,41 @@ export function createApp(config: McpConfig) {
       return;
     }
     const needed = scopesNeeded(req.body);
-    const missing = needed.filter((scope) => !auth.caller.scopes.includes(scope));
+    const missing = needed.filter((scope) => !caller.scopes.includes(scope));
     if (missing.length > 0) {
       // The scopes the token has plus the ones it lacks: a client that signs in
       // again with exactly this list keeps what it had (MCP 2025-11-25, step-up).
-      const scope = [...new Set([...auth.caller.scopes, ...needed])].join(' ');
+      const scope = [...new Set([...caller.scopes, ...needed])].join(' ');
       res.setHeader('WWW-Authenticate', challenge(config, { error: 'insufficient_scope', scope }));
       res.status(403).json({ error: 'insufficient_scope' });
       return;
     }
 
-    const server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
-    registerDossierTools(server, config, auth.caller, runner(auth.caller));
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    res.on('close', () => {
-      void transport.close();
-      void server.close();
-    });
+    req.auth = authInfoFor(caller);
     try {
+      const id = sessionId(req);
+      if (id) {
+        const session = store.find(id, caller);
+        if (!session) return void sessionNotFound(res);
+        await session.transport.handleRequest(req, res, req.body);
+        return;
+      }
+      if ((req.body as { method?: unknown }).method !== 'initialize') {
+        res.status(400).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Bad Request: no session; start with initialize' }, id: null });
+        return;
+      }
+      const server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
+      registerDossierTools(server, config, runner);
+      // No JSON responses: a tool that asks the user to confirm sends that
+      // request back on the call's own SSE stream.
+      const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (newId) =>
+          store.add({ id: newId, userId: caller.userId, grantId: caller.grantId, transport, server, lastSeen: Date.now() }),
+      });
+      transport.onclose = () => {
+        if (transport.sessionId) void store.close(transport.sessionId);
+      };
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
@@ -135,9 +172,30 @@ export function createApp(config: McpConfig) {
     }
   });
 
-  // Stateless: no stream to open with GET, no session to end with DELETE.
+  // GET opens the session's server-to-client stream; DELETE ends the session.
+  const onSession = async (req: AuthedRequest, res: Response) => {
+    const caller = await callerOrRefuse(req, res);
+    if (!caller) return;
+    const id = sessionId(req);
+    if (!id) {
+      res.status(400).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Bad Request: Mcp-Session-Id required' }, id: null });
+      return;
+    }
+    const session = store.find(id, caller);
+    if (!session) return void sessionNotFound(res);
+    req.auth = authInfoFor(caller);
+    try {
+      await session.transport.handleRequest(req, res);
+    } catch (error) {
+      console.error('[mcp] request failed:', error instanceof Error ? error.message : 'unknown error');
+      if (!res.headersSent) res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal error' }, id: null });
+    }
+  };
+  app.get(endpoint, onSession);
+  app.delete(endpoint, onSession);
+
   app.all(endpoint, (_req, res) => {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'GET, POST, DELETE');
     res.status(405).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed' }, id: null });
   });
 
@@ -155,5 +213,5 @@ export function createApp(config: McpConfig) {
     res.status(status).json({ jsonrpc: '2.0', error: { code: status === 500 ? -32603 : -32600, message: status === 500 ? 'Internal error' : 'Invalid Request' }, id: null });
   });
 
-  return app;
+  return Object.assign(app, { sessions: store });
 }
