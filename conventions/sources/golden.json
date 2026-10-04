@@ -1,0 +1,259 @@
+{
+  "version": 1,
+  "about": "How VisuaLex identifies and writes legal sources. Specification: docs/superpowers/specs/2026-10-04-source-convention-design.md. Each expected value carries a status: decided (the owner's words exist), current (what the code does today, kept), proposed (Claude's low-impact call, stated in the spec), open:Qn (waits for question n of the spec, section 9; the value is the recommendation).",
+  "norms": [
+    {
+      "id": "cc-2043",
+      "note": "A code: cited by its abbreviation, with no comma (owner, 1 October 2026). Identified by its enacting decree and annex.",
+      "input": {"tipo_atto": "codice civile", "tipo_atto_reale": "regio decreto", "numero_atto": "262", "data": "1942-03-16", "allegato": "2", "numero_articolo": "2043"},
+      "identity": {
+        "act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2", "status": "current"},
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043", "status": "current"},
+        "aliases": {"value": ["urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043!vig=2024-01-15", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043@originale"], "status": "proposed"}
+      },
+      "labels": {"citation": {"value": "art. 2043 c.c.", "status": "decided"}, "short": {"value": "art. 2043 c.c.", "status": "proposed"}, "act_citation": {"value": "c.c.", "status": "proposed"}, "act_short": {"value": "c.c.", "status": "proposed"}, "act_heading": {"value": "Codice civile", "status": "proposed"}, "authority": {"value": "Re", "status": "proposed"}}
+    },
+    {
+      "id": "cc-2645-bis",
+      "note": "An article with an ordinal: the hyphen in the data and in the label, concatenated in the URN.",
+      "input": {"tipo_atto": "codice civile", "tipo_atto_reale": "regio decreto", "numero_atto": "262", "data": "1942-03-16", "allegato": "2", "numero_articolo": "2645-bis"},
+      "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2645bis", "status": "current"}},
+      "labels": {"citation": {"value": "art. 2645-bis c.c.", "status": "decided"}, "short": {"value": "art. 2645-bis c.c.", "status": "proposed"}}
+    },
+    {
+      "id": "cost-81",
+      "note": "The Constitution: cited by its abbreviation, with no comma (owner, 1 October 2026).",
+      "input": {"tipo_atto": "costituzione", "numero_articolo": "81"},
+      "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art81", "status": "current"}},
+      "labels": {"citation": {"value": "art. 81 Cost.", "status": "decided"}, "short": {"value": "art. 81 Cost.", "status": "proposed"}, "act_citation": {"value": "Cost.", "status": "proposed"}, "act_short": {"value": "Cost.", "status": "proposed"}, "act_heading": {"value": "Costituzione", "status": "proposed"}, "authority": {"value": "Assemblea costituente", "status": "proposed"}}
+    },
+    {
+      "id": "preleggi-12",
+      "note": "Annex 1 of the r.d. 262/1942, cited by its own name: never the codice civile, whose decree it shares (round «Testo alla data», applied as recommended).",
+      "input": {"tipo_atto": "preleggi", "tipo_atto_reale": "regio decreto", "numero_atto": "262", "data": "1942-03-16", "allegato": "1", "numero_articolo": "12"},
+      "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:1", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:1~art12", "status": "current"}},
+      "labels": {"citation": {"value": "art. 12 preleggi", "status": "decided"}, "short": {"value": "art. 12 preleggi", "status": "proposed"}, "act_citation": {"value": "preleggi", "status": "proposed"}, "act_heading": {"value": "Disposizioni sulla legge in generale", "status": "proposed"}}
+    },
+    {
+      "id": "dispatt-cc-3",
+      "note": "The disposizioni di attuazione, in the palette's own spelling: cited by their own name (decided with the preleggi).",
+      "input": {"tipo_atto": "disposizioni per l'attuazione del Codice civile e disposizioni transitorie", "tipo_atto_reale": "regio decreto", "numero_atto": "318", "data": "1942-03-30", "allegato": "1", "numero_articolo": "3"},
+      "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-30;318:1", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-30;318:1~art3", "status": "current"}},
+      "labels": {"citation": {"value": "art. 3 disp. att. c.c.", "status": "decided"}, "short": {"value": "art. 3 disp. att. c.c.", "status": "proposed"}, "act_citation": {"value": "disp. att. c.c.", "status": "proposed"}, "act_heading": {"value": "Disposizioni per l'attuazione del codice civile", "status": "proposed"}}
+    },
+    {
+      "id": "cpc-183-bis",
+      "note": "A procedure code, annex 1 of its decree.",
+      "input": {"tipo_atto": "codice di procedura civile", "tipo_atto_reale": "regio decreto", "numero_atto": "1443", "data": "1940-10-28", "allegato": "1", "numero_articolo": "183-bis"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1940-10-28;1443:1~art183bis", "status": "current"}},
+      "labels": {"citation": {"value": "art. 183-bis c.p.c.", "status": "decided"}, "short": {"value": "art. 183-bis c.p.c.", "status": "proposed"}, "act_heading": {"value": "Codice di procedura civile", "status": "proposed"}}
+    },
+    {
+      "id": "cpp-191",
+      "note": "The codice di procedura penale is a d.p.r. with no annex.",
+      "input": {"tipo_atto": "codice di procedura penale", "tipo_atto_reale": "decreto del presidente della repubblica", "numero_atto": "447", "data": "1988-09-22", "numero_articolo": "191"},
+      "identity": {
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.della.repubblica:1988-09-22;447~art191", "status": "current"},
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.procedura.penale:1988-09-22;447~art191"], "status": "proposed"}
+      },
+      "labels": {"citation": {"value": "art. 191 c.p.p.", "status": "decided"}, "short": {"value": "art. 191 c.p.p.", "status": "proposed"}}
+    },
+    {
+      "id": "l-241-1990-2",
+      "note": "The owner's model: «art. 2, l. 7 agosto 1990, n. 241» — art. in lower case, a comma after the number, the act in lower case (1 October 2026).",
+      "input": {"tipo_atto": "legge", "numero_atto": "241", "data": "1990-08-07", "numero_articolo": "2"},
+      "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art2", "status": "current"}},
+      "labels": {"citation": {"value": "art. 2, l. 7 agosto 1990, n. 241", "status": "decided"}, "short": {"value": "art. 2 l. 241/1990", "status": "open:Q5"}, "act_citation": {"value": "l. 7 agosto 1990, n. 241", "status": "proposed"}, "act_short": {"value": "l. 241/1990", "status": "open:Q5"}, "act_heading": {"value": "Legge 7 agosto 1990, n. 241", "status": "proposed"}, "authority": {"value": "Parlamento", "status": "proposed"}}
+    },
+    {
+      "id": "privacy-7",
+      "note": "An aliased code is cited by the act it is, not by its name (round «Testo alla data»). Q3 asks whether its short label uses an abbreviation.",
+      "input": {"tipo_atto": "codice in materia di protezione dei dati personali", "tipo_atto_reale": "decreto legislativo", "numero_atto": "196", "data": "2003-06-30", "numero_articolo": "7"},
+      "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2003-06-30;196", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2003-06-30;196~art7", "status": "current"}},
+      "labels": {"citation": {"value": "art. 7, d.lgs. 30 giugno 2003, n. 196", "status": "decided"}, "short": {"value": "art. 7 d.lgs. 196/2003", "status": "open:Q3"}, "act_citation": {"value": "d.lgs. 30 giugno 2003, n. 196", "status": "proposed"}, "act_short": {"value": "d.lgs. 196/2003", "status": "open:Q3"}, "act_heading": {"value": "Codice in materia di protezione dei dati personali", "status": "proposed"}, "authority": {"value": "Governo", "status": "proposed"}}
+    },
+    {
+      "id": "consumo-33",
+      "note": "Another code enacted by a d.lgs.: today the graph writes «Art. 33 cod. cons.», the citation «art. 33, d.lgs. 6 settembre 2005, n. 206».",
+      "input": {"tipo_atto": "codice del consumo", "tipo_atto_reale": "decreto legislativo", "numero_atto": "206", "data": "2005-09-06", "numero_articolo": "33"},
+      "identity": {
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2005-09-06;206~art33", "status": "current"},
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto legislativo:2005-09-06;206~art33"], "status": "proposed"}
+      },
+      "labels": {"citation": {"value": "art. 33, d.lgs. 6 settembre 2005, n. 206", "status": "decided"}, "short": {"value": "art. 33 d.lgs. 206/2005", "status": "open:Q3"}, "act_heading": {"value": "Codice del consumo", "status": "proposed"}}
+    },
+    {
+      "id": "dpr-445-2000-38",
+      "note": "d.p.r. in lower case, like every act (round «Testo alla data», applied as recommended; the owner: «atto minuscolo»).",
+      "input": {"tipo_atto": "decreto del presidente della repubblica", "numero_atto": "445", "data": "2000-12-28", "numero_articolo": "38"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.della.repubblica:2000-12-28;445~art38", "status": "current"}},
+      "labels": {"citation": {"value": "art. 38, d.p.r. 28 dicembre 2000, n. 445", "status": "decided"}, "short": {"value": "art. 38 d.p.r. 445/2000", "status": "open:Q5"}, "act_heading": {"value": "Decreto del Presidente della Repubblica 28 dicembre 2000, n. 445", "status": "proposed"}, "authority": {"value": "Presidente della Repubblica", "status": "proposed"}}
+    },
+    {
+      "id": "dl-18-2020-1",
+      "note": "A decreto-legge. Normattiva's URN token is decreto.legge: decreto-legge is malformed and is mapped on the way in.",
+      "input": {"tipo_atto": "decreto legge", "numero_atto": "18", "data": "2020-03-17", "numero_articolo": "1"},
+      "identity": {
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legge:2020-03-17;18~art1", "status": "current"},
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto-legge:2020-03-17;18~art1"], "status": "proposed"}
+      },
+      "labels": {"citation": {"value": "art. 1, d.l. 17 marzo 2020, n. 18", "status": "decided"}, "short": {"value": "art. 1 d.l. 18/2020", "status": "open:Q5"}, "act_heading": {"value": "Decreto-legge 17 marzo 2020, n. 18", "status": "proposed"}, "authority": {"value": "Governo", "status": "proposed"}}
+    },
+    {
+      "id": "rd-773-1931-86",
+      "note": "A regio decreto that is not a code.",
+      "input": {"tipo_atto": "regio decreto", "numero_atto": "773", "data": "1931-06-18", "numero_articolo": "86"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1931-06-18;773~art86", "status": "current"}},
+      "labels": {"citation": {"value": "art. 86, r.d. 18 giugno 1931, n. 773", "status": "decided"}, "short": {"value": "art. 86 r.d. 773/1931", "status": "open:Q5"}, "act_heading": {"value": "Regio decreto 18 giugno 1931, n. 773", "status": "proposed"}, "authority": {"value": "Re", "status": "proposed"}}
+    },
+    {
+      "id": "dlgs-385-1993-127",
+      "note": "An act dated on the first of a month: «1°», as the Gazzetta Ufficiale writes it (decided).",
+      "input": {"tipo_atto": "decreto legislativo", "numero_atto": "385", "data": "1993-09-01", "numero_articolo": "127"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1993-09-01;385~art127", "status": "current"}},
+      "labels": {"citation": {"value": "art. 127, d.lgs. 1° settembre 1993, n. 385", "status": "decided"}, "short": {"value": "art. 127 d.lgs. 385/1993", "status": "open:Q5"}}
+    },
+    {
+      "id": "dlgs-81-2008-annex-a",
+      "note": "An annex of an act that is not a code is named in the citation (decided). The annex letter shows the form; it is not a claim about the real annexes of that act.",
+      "input": {"tipo_atto": "decreto legislativo", "numero_atto": "81", "data": "2008-04-09", "allegato": "A", "numero_articolo": "1"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2008-04-09;81:A~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)", "status": "decided"}, "short": {"value": "art. 1 d.lgs. 81/2008 (All. A)", "status": "open:Q5"}}
+    },
+    {
+      "id": "l-184-1983-6-year-only",
+      "note": "An act known by its year only (the l. 4 maggio 1983, n. 184). No identity until Normattiva's resolver gives the date: never the synthetic 1983-01-01 that generate_urn writes today, never stored as a key.",
+      "input": {"tipo_atto": "legge", "numero_atto": "184", "data": "1983", "numero_articolo": "6"},
+      "identity": {"act": {"value": null, "status": "proposed"}, "article": {"value": null, "status": "proposed"}, "reference": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1983;184~art6", "status": "proposed"}},
+      "labels": {"citation": {"value": "art. 6, l. n. 184 del 1983", "status": "open:Q7"}, "short": {"value": "art. 6 l. 184/1983", "status": "open:Q5"}}
+    },
+    {
+      "id": "dpcm-2020-03-08-1",
+      "note": "An act with no number: no number clause and no ';None'. Today the type is written in full (decided: a type with no abbreviation); Q4 asks for d.p.c.m. The identity's exact form is checked live before this case leaves 'proposed'.",
+      "input": {"tipo_atto": "decreto del presidente del consiglio dei ministri", "data": "2020-03-08", "numero_articolo": "1"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.del.consiglio.dei.ministri:2020-03-08~art1", "status": "proposed"}},
+      "labels": {"citation": {"value": "art. 1, d.p.c.m. 8 marzo 2020", "status": "open:Q4"}, "short": {"value": "art. 1 d.p.c.m. 8 marzo 2020", "status": "open:Q5"}}
+    },
+    {
+      "id": "dm-55-2014-4",
+      "note": "A ministerial decree. VisuaLex's form is the identity; Normattiva's own form (the ministry as authority) resolves to the same act (checked 4 October 2026) and is mapped on the way in.",
+      "input": {"tipo_atto": "decreto ministeriale", "numero_atto": "55", "data": "2014-03-10", "numero_articolo": "4"},
+      "identity": {
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.ministeriale:2014-03-10;55~art4", "status": "current"},
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:ministero.giustizia:decreto:2014-03-10;55~art4"], "status": "proposed"}
+      },
+      "labels": {"citation": {"value": "art. 4, d.m. 10 marzo 2014, n. 55", "status": "open:Q4"}, "short": {"value": "art. 4 d.m. 55/2014", "status": "open:Q5"}, "authority": {"value": "Ministro", "status": "proposed"}}
+    },
+    {
+      "id": "cpi-regolamento-1",
+      "note": "A ministerial regulation listed in the codes table. The table stores it as '/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33', so generate_urn writes 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33~art1' today. Its identity takes the form of a ministerial decree (spec §1.4); the exact string is checked live before it leaves 'proposed'.",
+      "input": {"tipo_atto": "regolamento di attuazione del Codice della proprietà industriale", "numero_articolo": "1"},
+      "identity": {
+        "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.ministeriale:2010-01-13;33~art1", "status": "proposed"},
+        "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:ministero.sviluppo.economico:decreto:2010-01-13;33~art1"], "status": "proposed"}
+      },
+      "labels": {"citation": {"value": "art. 1, d.m. 13 gennaio 2010, n. 33", "status": "open:Q4"}}
+    },
+    {
+      "id": "lcost-1-2012-1",
+      "note": "A constitutional law: today written in full (a type with no abbreviation); Q4 asks for l. cost.",
+      "input": {"tipo_atto": "legge costituzionale", "numero_atto": "1", "data": "2012-04-20", "numero_articolo": "1"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge.costituzionale:2012-04-20;1~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, l. cost. 20 aprile 2012, n. 1", "status": "open:Q4"}, "short": {"value": "art. 1 l. cost. 1/2012", "status": "open:Q5"}, "authority": {"value": "Parlamento", "status": "proposed"}}
+    },
+    {
+      "id": "gdpr-5",
+      "note": "An EU regulation: identified by its CELEX; the year comes first in the number since 2015 (2016/679).",
+      "input": {"tipo_atto": "regolamento ue", "numero_atto": "679", "data": "2016", "numero_articolo": "5"},
+      "identity": {"act": {"value": "celex:32016R0679", "status": "proposed"}, "article": {"value": "celex:32016R0679~art5", "status": "proposed"}},
+      "labels": {"citation": {"value": "art. 5, reg. (UE) 2016/679", "status": "open:Q6"}, "short": {"value": "art. 5 reg. (UE) 2016/679", "status": "open:Q6"}, "act_heading": {"value": "Regolamento (UE) 2016/679", "status": "proposed"}}
+    },
+    {
+      "id": "nis2-21",
+      "note": "An EU directive.",
+      "input": {"tipo_atto": "direttiva ue", "numero_atto": "2555", "data": "2022", "numero_articolo": "21"},
+      "identity": {"act": {"value": "celex:32022L2555", "status": "proposed"}, "article": {"value": "celex:32022L2555~art21", "status": "proposed"}},
+      "labels": {"citation": {"value": "art. 21, dir. (UE) 2022/2555", "status": "open:Q6"}, "short": {"value": "art. 21 dir. (UE) 2022/2555", "status": "open:Q6"}}
+    },
+    {
+      "id": "tfue-101",
+      "note": "A treaty: cited like a code, by its abbreviation and with no comma.",
+      "input": {"tipo_atto": "TFUE", "numero_articolo": "101"},
+      "identity": {"act": {"value": "celex:12016E", "status": "proposed"}, "article": {"value": "celex:12016E~art101", "status": "proposed"}},
+      "labels": {"citation": {"value": "art. 101 TFUE", "status": "open:Q6"}, "short": {"value": "art. 101 TFUE", "status": "open:Q6"}, "act_heading": {"value": "Trattato sul funzionamento dell'Unione europea", "status": "proposed"}}
+    }
+  ],
+  "decisions": [
+    {
+      "id": "cass-civ-su-31310-2024",
+      "note": "Read live on 4 October 2026: sentenza of the Sezioni Unite, deposited 6 December 2024. Italgiure gives no date of decision. Rv. from the Massimario. The citation is what the Sentenze plan's formatDecisionCitation writes (decisionLinks.ts, Task 8); Q1 asks to confirm it for every area.",
+      "input": {"reference": {"corte": "cassazione", "archivio": "civile", "numero": 31310, "anno": 2024, "sezione": "U"}, "attributes": {"tipo": "sentenza", "sezione": "U", "data_deposito": "2024-12-06"}, "rv": ["673165-01"]},
+      "identity": {
+        "fields": {"value": {"corte": "cassazione", "numero": 31310, "anno": 2024, "archivio": "civile"}, "status": "current"},
+        "key": {"value": "cassazione:civile:31310:2024", "status": "current"},
+        "path": {"value": "/sentenze/cassazione-civile/31310/2024", "status": "current"}
+      },
+      "labels": {"citation": {"value": "Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310", "status": "open:Q1"}, "short": {"value": "Cass. civ., sez. un., n. 31310/2024", "status": "open:Q2"}, "short_with_rv": {"value": "Cass. civ., sez. un., n. 31310/2024 · Rv. 673165-01", "status": "open:Q2"}}
+    },
+    {
+      "id": "cass-civ-lav-12789-2022",
+      "note": "Read live on 4 October 2026: sentenza of the sezione lavoro, deposited 21 April 2022. The citation is what the Sentenze plan's formatDecisionCitation writes (decisionLinks.ts, Task 8); Q1 asks to confirm it for every area.",
+      "input": {"reference": {"corte": "cassazione", "archivio": "civile", "numero": 12789, "anno": 2022}, "attributes": {"tipo": "sentenza", "sezione": "L", "data_deposito": "2022-04-21"}},
+      "identity": {"key": {"value": "cassazione:civile:12789:2022", "status": "current"}, "path": {"value": "/sentenze/cassazione-civile/12789/2022", "status": "current"}},
+      "labels": {"citation": {"value": "Cass. civ., sez. lav., sent. 21 aprile 2022, n. 12789", "status": "open:Q1"}, "short": {"value": "Cass. civ., sez. lav., n. 12789/2022", "status": "open:Q2"}}
+    },
+    {
+      "id": "cass-pen-7-10787-2024",
+      "note": "Read live on 4 October 2026: ordinanza of the sez. VII penale, deposited 14 March 2024; no hearing date at the source. A date alone would read as the hearing date, so «dep.» says which one it is. The citation is what the Sentenze plan's formatDecisionCitation writes (decisionLinks.ts, Task 8); Q1 asks to confirm it for every area.",
+      "input": {"reference": {"corte": "cassazione", "archivio": "penale", "numero": 10787, "anno": 2024}, "attributes": {"tipo": "ordinanza", "sezione": "7", "data_deposito": "2024-03-14"}},
+      "identity": {"key": {"value": "cassazione:penale:10787:2024", "status": "current"}, "path": {"value": "/sentenze/cassazione-penale/10787/2024", "status": "current"}},
+      "labels": {"citation": {"value": "Cass. pen., sez. VII, ord. dep. 14 marzo 2024, n. 10787", "status": "open:Q1"}, "short": {"value": "Cass. pen., sez. VII, n. 10787/2024", "status": "open:Q2"}}
+    },
+    {
+      "id": "cass-pen-hearing-date-known",
+      "note": "The form when a hearing date is known (the Massimario sometimes gives one). The hearing date here is illustrative, not the real one of this decision. The citation is what the Sentenze plan's formatDecisionCitation writes (decisionLinks.ts, Task 8); Q1 asks to confirm it for every area.",
+      "input": {"reference": {"corte": "cassazione", "archivio": "penale", "numero": 10787, "anno": 2024}, "attributes": {"tipo": "ordinanza", "sezione": "7", "data_deposito": "2024-03-14", "data_udienza": "2024-01-10"}},
+      "identity": {"key": {"value": "cassazione:penale:10787:2024", "status": "current"}},
+      "labels": {"citation": {"value": "Cass. pen., sez. VII, ord. 10 gennaio 2024 (dep. 14 marzo 2024), n. 10787", "status": "open:Q1"}}
+    },
+    {
+      "id": "corte-cost-71-2020",
+      "note": "Read live on 4 October 2026: sentenza decided 12 February 2020, deposited 24 April 2020, ECLI:IT:COST:2020:71 (an attribute, never the key). The citation is what the Sentenze plan's formatDecisionCitation writes (decisionLinks.ts, Task 8); Q1 asks to confirm it for every area.",
+      "input": {"reference": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "attributes": {"tipo": "sentenza", "data_decisione": "2020-02-12", "data_deposito": "2020-04-24", "ecli": "ECLI:IT:COST:2020:71"}},
+      "identity": {
+        "fields": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"},
+        "key": {"value": "corte_costituzionale:71:2020", "status": "current"},
+        "path": {"value": "/sentenze/corte-costituzionale/71/2020", "status": "current"}
+      },
+      "labels": {"citation": {"value": "Corte cost., sent. 24 aprile 2020, n. 71", "status": "open:Q1"}, "short": {"value": "Corte cost., n. 71/2020", "status": "open:Q2"}}
+    },
+    {
+      "id": "brocardi-cass-civ-31191-2025",
+      "note": "A Brocardi massima: «Cass. civ.», number and year, no section, type or date. It has an identity; its legacy graph key is re-keyed to it in graph phase 2. The citation is what the Sentenze plan's formatDecisionCitation writes (decisionLinks.ts, Task 8); Q1 asks to confirm it for every area.",
+      "input": {"reference": {"corte": "cassazione", "archivio": "civile", "numero": 31191, "anno": 2025}, "attributes": {}, "legacy_keys": ["massima_cassazione_civile_31191_2025"]},
+      "identity": {"key": {"value": "cassazione:civile:31191:2025", "status": "current"}, "path": {"value": "/sentenze/cassazione-civile/31191/2025", "status": "current"}},
+      "labels": {"citation": {"value": "Cass. civ., n. 31191/2025", "status": "open:Q1"}, "short": {"value": "Cass. civ., n. 31191/2025", "status": "open:Q2"}}
+    },
+    {
+      "id": "reference-without-year",
+      "note": "A Massimario citation whose year could not be read: a reference, not an identity. Never keyed, never linked.",
+      "input": {"reference": {"corte": "cassazione", "archivio": "civile", "numero": 2633, "anno": null, "sezione": "3"}, "attributes": {}},
+      "identity": {"key": {"value": null, "status": "current"}, "path": {"value": null, "status": "current"}},
+      "labels": {"short": {"value": "Cass. civ., sez. III, n. 2633", "status": "open:Q2"}}
+    },
+    {
+      "id": "reference-without-archive",
+      "note": "Brocardi's bare «Cassazione» (16 graph nodes): no archive, so no identity. Keeps its legacy key.",
+      "input": {"reference": {"corte": "cassazione", "numero": 2633, "anno": 1982}, "attributes": {}, "legacy_keys": ["massima_cassazione_2633_1982"]},
+      "identity": {"key": {"value": null, "status": "current"}, "reference_path": {"value": "/sentenze/cassazione/2633/1982", "status": "current"}},
+      "labels": {"short": {"value": "Cass., n. 2633/1982", "status": "open:Q2"}}
+    },
+    {
+      "id": "reference-section-hint",
+      "note": "A reference with a section and no archive: the path carries the section as a hint for the page to resolve (Sentenze design §2).",
+      "input": {"reference": {"corte": "cassazione", "numero": 10787, "anno": 2024, "sezione": "7"}, "attributes": {}},
+      "identity": {"key": {"value": null, "status": "current"}, "reference_path": {"value": "/sentenze/cassazione/10787/2024?sezione=7", "status": "current"}},
+      "labels": {}
+    }
+  ]
+}
