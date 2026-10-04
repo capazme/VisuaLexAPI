@@ -6,13 +6,14 @@ beforeEach(() => sessionStorage.clear());
 describe('the return address', () => {
   it('accepts only paths of the app itself', () => {
     expect(safeReturnPath('/sentenze/cassazione/10787/2024?sezione=3')).toBe('/sentenze/cassazione/10787/2024?sezione=3');
-    for (const bad of ['//evil.example/x', '/\\evil.example', 'https://evil.example', 'javascript:alert(1)', '/\t/evil.example', '/\n/evil.example', '/\r/evil.example', '', null, 42]) {
+    for (const bad of ['//evil.example/x', '/\\evil.example', 'https://evil.example', 'javascript:alert(1)', '/\t/evil.example', '/\n/evil.example', '/\r/evil.example', '/..//x', '/.//x', '/a/..//x', '?x', '#x', '', null, 42]) {
       expect(safeReturnPath(bad)).toBeNull();
     }
   });
 
   it('normalises a backslash inside a path instead of refusing it', () => {
     expect(safeReturnPath('/a\\b')).toBe('/a/b');
+    expect(safeReturnPath('/.%2e/x')).toBe('/x');
   });
 
   it('keeps the query and the fragment of a router location', () => {
@@ -33,7 +34,7 @@ describe('the return address', () => {
   });
 
   it('never stashes the login page, with a slash, a query or a fragment after it', () => {
-    for (const login of ['/login/', '/login#x', '/login?next=/x']) {
+    for (const login of ['/login/', '/login#x', '/login?next=/x', '/LOGIN', '/login//', '/%6cogin']) {
       stashReturnTo(login);
       expect(takeReturnTo()).toBeNull();
     }

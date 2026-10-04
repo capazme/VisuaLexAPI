@@ -15,7 +15,11 @@ function appUrl(value: unknown): URL | null {
   try {
     const url = new URL(value, BASE);
     // «//host», «/\host», «/\t/host»: the parser reads them as another host
-    return url.origin === BASE ? url : null;
+    if (url.origin !== BASE) return null;
+    // Dot segments are removed but an empty one stays: «/..//x» comes out as «//x», which a
+    // browser reads as another host the next time it is used. Refused, not repaired.
+    if (url.pathname.startsWith('//')) return null;
+    return url;
   } catch {
     return null;
   }
@@ -31,11 +35,21 @@ export function locationToPath(loc: { pathname?: string; search?: string; hash?:
   return safeReturnPath(`${loc.pathname}${loc.search ?? ''}${loc.hash ?? ''}`);
 }
 
+/** The router matches paths without case and with extra slashes, and a percent escape is a letter. */
+function isLoginPage(pathname: string): boolean {
+  let name = pathname;
+  try {
+    name = decodeURIComponent(pathname);
+  } catch {
+    // a malformed escape: keep the raw pathname
+  }
+  return name.toLowerCase().replace(/\/+$/, '') === '/login';
+}
+
 export function stashReturnTo(path: string): void {
   const safe = safeReturnPath(path);
   if (!safe) return;
-  const { pathname } = new URL(safe, BASE);
-  if (pathname === '/login' || pathname === '/login/') return;
+  if (isLoginPage(new URL(safe, BASE).pathname)) return;
   try {
     sessionStorage.setItem(KEY, safe);
   } catch (error) {
