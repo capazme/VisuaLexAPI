@@ -3,10 +3,12 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 
 const listConnectedApps = vi.fn();
 const revoke = vi.fn();
+const setCanDelete = vi.fn();
 vi.mock('../connectionsService', () => ({
   connectionsService: {
     listConnectedApps: (...args: unknown[]) => listConnectedApps(...args),
     revoke: (...args: unknown[]) => revoke(...args),
+    setCanDelete: (...args: unknown[]) => setCanDelete(...args),
   },
 }));
 
@@ -17,6 +19,7 @@ const APP = {
   clientName: 'Claude Code',
   redirectHost: '127.0.0.1',
   scopes: ['dossier:read', 'dossier:write'],
+  canDelete: false,
   createdAt: '2026-10-04T10:00:00.000Z',
   lastUsedAt: '2026-10-04T12:30:00.000Z',
 };
@@ -24,6 +27,7 @@ const APP = {
 beforeEach(() => {
   listConnectedApps.mockReset();
   revoke.mockReset();
+  setCanDelete.mockReset();
 });
 
 describe('ConnectedAppsSection', () => {
@@ -52,6 +56,28 @@ describe('ConnectedAppsSection', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /^revoca$/i }));
     await waitFor(() => expect(revoke).toHaveBeenCalledWith('grant-1'));
     await waitFor(() => expect(screen.queryByText('Claude Code')).toBeNull());
+  });
+
+  it('switches the permission to delete for one connection', async () => {
+    listConnectedApps.mockResolvedValue([APP]);
+    setCanDelete.mockResolvedValue(undefined);
+    render(<ConnectedAppsSection />);
+    const toggle = await screen.findByRole('switch', { name: /può eliminare dossier, voci e schede/i });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    await waitFor(() => expect(setCanDelete).toHaveBeenCalledWith('grant-1', true));
+    await waitFor(() => expect(toggle).toBeChecked());
+  });
+
+  it('puts the switch back and says why when the change fails', async () => {
+    listConnectedApps.mockResolvedValue([{ ...APP, canDelete: true }]);
+    setCanDelete.mockRejectedValue({ status: 500, message: 'Errore del server' });
+    render(<ConnectedAppsSection />);
+    const toggle = await screen.findByRole('switch', { name: /può eliminare/i });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/errore del server/i));
+    expect(toggle).toBeChecked();
   });
 
   it('keeps the application when the revocation is cancelled', async () => {
