@@ -60,7 +60,7 @@ The graph co-evolves on its own:
 services/merlt/
 ├── merlt/                 the Python package (below)
 ├── tests/                 pytest suite (api, pipeline, rlcf, scripts, storage, unit, worker)
-├── alembic/ + alembic.ini Alembic revisions 001–008 + baafa63897a6 (not run by the live stack)
+├── alembic/ + alembic.ini Alembic revisions 001–010 + baafa63897a6 (not run by the live stack)
 ├── config/                RLCF training YAML (`rlcf_training.yaml`)
 ├── scripts/               utility scripts
 ├── data/                  seeds + dumps, mounted read-only at /app/data in the containers
@@ -79,9 +79,9 @@ services/merlt/
 | `tools/` | the tools the experts call (`search.py`, `mcp_legal_adapter.py` for mcp-legal-it, `registry.py`, …) |
 | `rlcf/` | `training_scheduler.py` (buffer, `add_experience`, persistence), `replay_buffer.py`, `buffer_rehydration.py`, `policy_gradient.py` (REINFORCE, `GRAPH_TO_POLICY_RELATION`), `policy_manager.py` (loads `*_latest.pt`), `authority.py`, `domain_authority.py`, `authority_sync.py`, `aggregation.py`, `devils_advocate.py`, `quarantine_service.py`, `ai_service.py` (`OpenRouterService`), and more |
 | `weights/` | `store.py` (`WeightStore`, `weight_versions`), `learner.py`, `experiment.py`, `config/` |
-| `pipeline/` | `document_parser.py` (notes → staging, relation endpoint resolution), `provisional_writer.py`, `promotion.py`, `hygiene.py`, `mechanical_ingestion/` (parser, conflict report, promote), `ingestion.py`, `enrichment/`, `semantic_chunking/`, `live_enrichment.py`, `multivigenza.py` |
+| `pipeline/` | `document_parser.py` (notes → staging, relation endpoint resolution), `provisional_writer.py`, `promotion.py`, `hygiene.py`, `mechanical_ingestion/` (parser, conflict report, promote), `massimario/` (the Massimario's annual reviews: portal links to URNs, paragraphs, citation grammar, volume assembly, promotion, vectors, the reader), `ingestion.py`, `enrichment/`, `semantic_chunking/`, `live_enrichment.py`, `multivigenza.py` |
 | `storage/` | `graph/` (FalkorDB client and config, `entity_writer.py`, `relation_endpoints.py`), `vectors/` (embeddings, `collection.py`), `retriever/`, `bridge/`, `trace/`, `temporal/`, `enrichment/` (SQLAlchemy models, `database.py`, `consensus_triggers.py`, `schema_additions.py`, `deduplication.py`), `migrations/` (plain SQL for the `create_tables()` stack) |
-| `worker/` | RQ tasks: `tasks.py` (article ingest), `extraction_tasks.py` (`extract_to_staging`), `mechanical_ingest_tasks.py`, `ner_training_tasks.py` |
+| `worker/` | RQ tasks: `tasks.py` (article ingest), `extraction_tasks.py` (`extract_to_staging`), `mechanical_ingest_tasks.py`, `massimario_tasks.py` (a promoted Massimario batch's vectors and bridge rows, 100 paragraphs a job, chained on `merlt_bulk`), `ner_training_tasks.py` |
 | `ner/` | spaCy model, feedback buffer, training data conversion |
 | `disagreement/` | the companion `LegalDisagreementNet` classifier (not part of the policy gradient) |
 | `citation/`, `clients/`, `config/`, `core/`, `utils/`, `scripts/`, `benchmark/` | URN parsing/formatting; the client to the VisuaLex Python API; `RuntimeConfig`; `LegalKnowledgeGraph`; `urn_labels.py`, `urngenerator.py`, ordinals, maps; the seed loader and backfills; the RAG benchmark |
@@ -122,6 +122,7 @@ router is mounted with `prefix="/api/v1"` plus its own prefix:
 | `api_keys_router` | `/api-keys` |
 | `ner_router` | `/ner` |
 | `ingestion_mechanical_router` | `/ingestion/mechanical` |
+| `rassegne_router` | `/rassegne` (`GET /by-norma`: the review paragraphs citing a norm, by year) |
 
 **Auth.** `app.py` sets `app.dependency_overrides[verify_api_key] = optional_api_key`,
 so a route that declares only `verify_api_key` accepts requests without a key.
