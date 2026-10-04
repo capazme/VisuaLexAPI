@@ -7,11 +7,26 @@ offsets index the returned text.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 
 _BLOCKS = {"p", "li", "div", "blockquote", "tr", "h1", "h2", "h3", "h4", "h5", "h6"}
 _SKIP = {"script", "style"}
+# The portal writes «…» as `<<…>>` inside its HTML. A `<` opens markup only when a
+# whole tag of a known name follows, every attribute with a value; any other `<`
+# is the author's text (`<<i fatti>>` is not an <i> tag).
+_TAG = re.compile(
+    r"</?(?:p|a|br|b|i|u|em|strong|sup|sub|span|div|li|ul|ol|blockquote|tr|td|th|table|tbody|thead"
+    r"|h[1-6]|img|script|style|font)"
+    r"(?:\s+[\w:-]{1,40}\s*=\s*(?:\"[^\"]{0,2000}\"|'[^']{0,2000}'|[^\s\"'>]{1,2000}))*\s*/?>"
+    r"|<!--",
+    re.IGNORECASE,
+)
+
+
+def _escape_stray_brackets(html: str) -> str:
+    return re.sub("<", lambda found: "<" if _TAG.match(html, found.start()) else "&lt;", html)
 
 
 @dataclass(frozen=True)
@@ -107,7 +122,7 @@ class _Collector(HTMLParser):
 
 def extract_paragraphs(html: str) -> list[Paragraph]:
     collector = _Collector()
-    collector.feed(html or "")
+    collector.feed(_escape_stray_brackets(html or ""))
     collector.close()
     collector.flush()
     return collector.paragraphs

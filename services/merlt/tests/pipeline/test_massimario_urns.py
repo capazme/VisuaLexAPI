@@ -2,7 +2,7 @@
 """Portal links → the graph's canonical URNs (spec §5.3)."""
 import pytest
 
-from merlt.pipeline.massimario.urns import NORMATTIVA_PREFIX, parse_portal_urn, to_canonical
+from merlt.pipeline.massimario.urns import NORMATTIVA_PREFIX, is_decision_link, parse_portal_urn, to_canonical
 
 PORTAL = "http://www.normattiva.it/uri-res/N2Ls?urn:nir:"
 
@@ -69,3 +69,48 @@ def test_an_act_without_its_number_has_no_canonical_key(act):
     # the graph and VisuaLex key every act but the codes by its number: a stub keyed
     # without one would never meet the act's node
     assert parse_portal_urn(PORTAL + act) is None
+
+
+@pytest.mark.parametrize("portal,canonical", [
+    ("stato:decreto.legislativo:2010-07-02;104~art133", "stato:decreto.legislativo:2010-07-02;104:2~art133"),
+    ("stato:decreto.legislativo:2016-08-26;174~art172", "stato:decreto.legislativo:2016-08-26;174:1~art172"),
+    ("presidente.repubblica:decreto:1973-03-29;156~art318",
+     "stato:decreto.del.presidente.della.repubblica:1973-03-29;156:1~art318"),
+])
+def test_codes_keyed_with_their_annex(portal, canonical):
+    # VisuaLex keys these codes by the decree's annex (merlt/utils/map.py)
+    assert to_canonical(parse_portal_urn(PORTAL + portal), {}) == NORMATTIVA_PREFIX + "urn:nir:" + canonical
+
+
+def test_a_resolved_year_only_code_takes_its_annex():
+    norm = parse_portal_urn(PORTAL + "stato:decreto.legislativo:2010;104~art133")
+    resolved = {"urn:nir:stato:decreto.legislativo:2010;104": "urn:nir:stato:decreto.legislativo:2010-07-02;104"}
+    assert to_canonical(norm, resolved) == (
+        NORMATTIVA_PREFIX + "urn:nir:stato:decreto.legislativo:2010-07-02;104:2~art133"
+    )
+
+
+def test_an_act_number_never_starts_with_zero():
+    assert parse_portal_urn(PORTAL + "stato:legge:2021;0099") is None
+
+
+@pytest.mark.parametrize("before,text", [
+    ("ex multis, Sez. 6 - ", "L, n. 09952/2022"),
+    ("Afferma Sez. ", "L., n. 20134/2024"),
+    ("in conformità con Sez. 6-", "L, 00403/2012"),
+    ("e Sez. ", "L, n. 687 del 2014"),
+    ("qui anche Sez. ", "L. n. 24474/2024"),
+    ("così ", "L, n. 1234/2020"),
+])
+def test_a_section_label_linked_as_a_law_is_a_decision(before, text):
+    assert is_decision_link(text, before)
+
+
+@pytest.mark.parametrize("before,text", [
+    ("convertito dalla ", "l. n. 248 del 2005"),
+    ("in attuazione della ", "L. 146/90"),
+    ("della ", "legge n. 89 del 2001"),
+    ("il ", "L. n. 67 del 1939"),
+])
+def test_a_law_is_not_a_decision(before, text):
+    assert not is_decision_link(text, before)

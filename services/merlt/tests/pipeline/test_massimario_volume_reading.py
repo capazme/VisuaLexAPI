@@ -47,3 +47,19 @@ def test_mixed_volume_reads_the_archive_from_the_part_title():
     contexts = list(iter_paragraphs(raw))
     assert contexts[0].archivio == "penale"
     assert contexts[4].archivio is None  # "I CONTRATTI": no hint
+
+
+def test_mixed_volume_with_both_words_says_nothing():
+    raw = volume_9001()
+    raw["index"]["items"][0]["text"] = "Massimario 2019 CIVILE E PENALE"
+    raw["index"]["items"][0]["nodes"][0]["title"] = "RAPPORTI TRA GIUDIZIO PENALE E GIUDIZIO CIVILE"
+    assert list(iter_paragraphs(raw))[0].archivio is None
+
+
+def test_a_loose_section_keeps_its_place_in_the_index():
+    raw = volume_9001()
+    nodes = raw["index"]["items"][0]["nodes"]
+    nodes.insert(0, nodes.pop())  # the loose section first, as some volumes have it
+    contexts = list(iter_paragraphs(raw))
+    assert [c.sezione.id for c in contexts] == [9201, 9111, 9111, 9112, 9112, 9121]
+    assert [c.ordine for c in contexts] == sorted(c.ordine for c in contexts)

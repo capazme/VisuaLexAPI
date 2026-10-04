@@ -45,3 +45,18 @@ def test_split_for_vectors_covers_the_text_at_sentence_ends():
     assert all(end - start <= 500 for start, end in pieces)
     assert all(text[end - 1] == "." for _, end in pieces[:-1])
     assert split_for_vectors("breve") == [(0, 5)]
+
+
+def test_quotes_written_as_angle_brackets_are_text():
+    # the portal writes «…» as << and >> inside the HTML
+    html = (
+        "<p>Tra le <<forme di tutela>> rientra la <<i fatti>> e <<a norma>>; "
+        f'il <<danno di cui all\'<a href="{LINK}">art. 2043 c.c.</a>>> resta. 3 < 4.</p>'
+    )
+    (p,) = extract_paragraphs(html)
+    assert p.text == (
+        "Tra le <<forme di tutela>> rientra la <<i fatti>> e <<a norma>>; "
+        "il <<danno di cui all'art. 2043 c.c.>> resta. 3 < 4."
+    )
+    (link,) = p.links
+    assert p.text[link.start:link.end] == "art. 2043 c.c."

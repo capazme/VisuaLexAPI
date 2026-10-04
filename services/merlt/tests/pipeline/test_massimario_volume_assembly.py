@@ -100,3 +100,18 @@ def test_unresolved_year_only_act_is_reported_not_linked():
 
 def test_build_is_deterministic():
     assert build() == build()
+
+
+def test_a_decision_linked_as_a_law_is_no_norm():
+    raw = volume_9001()
+    section = raw["capitoli"][9102]["sezioni"][0]
+    section["testo"] += (
+        '<p>Così Sez. 6 - <a href="http://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:2022;9522">'
+        "L, n. 09952/2022</a>, Rv. 670900-01.</p>"
+    )
+    assert year_only_acts(raw) == {"urn:nir:stato:legge:1983;184"}
+    out = build_volume(raw, resolved={**RESOLVED, "urn:nir:stato:legge:2022;9522": "urn:nir:stato:legge:2022-12-01;9522"},
+                       bands=BANDS)
+    assert not any("9522" in n["id"] for n in out["nodes"])
+    assert out["report"]["massimario"]["norme"]["link_a_pronunce"] == 1
+    assert "cassazione:civile:9952:2022" in {n["id"] for n in out["nodes"]}

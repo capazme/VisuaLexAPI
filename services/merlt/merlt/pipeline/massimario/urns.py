@@ -13,6 +13,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from merlt.utils.map import NORMATTIVA_URN_CODICI
+
 NORMATTIVA_PREFIX = "https://www.normattiva.it/uri-res/N2Ls?"
 
 CODE_ACTS = {
@@ -22,14 +24,36 @@ CODE_ACTS = {
     "stato:codice.procedura.penale:1988-09-22;447": "stato:decreto.del.presidente.della.repubblica:1988-09-22;447",
     "stato:costituzione:1947-12-27": "stato:costituzione",
 }
+
+
+def _annexed_codes() -> dict[str, str]:
+    """`stato:<decree>` → `stato:<decree>:<annex>` for every code VisuaLex keys by the
+    one annex of its decree (`decreto.legislativo:2010-07-02;104:2`, the c.p.a.). A
+    decree with two annexes in the table (r.d. 262/1942: preleggi and codice civile)
+    is left alone: its links cannot say which one they mean."""
+    annexes: dict[str, list[str]] = {}
+    for urn in NORMATTIVA_URN_CODICI.values():
+        found = re.fullmatch(r"([a-z.]+:\d{4}-\d{2}-\d{2};\d+):\d", urn)
+        if found:
+            annexes.setdefault("stato:" + found.group(1), []).append("stato:" + urn)
+    return {act: keyed[0] for act, keyed in annexes.items() if len(keyed) == 1}
+
+
+CODE_ACTS.update({act: keyed for act, keyed in _annexed_codes().items() if act not in CODE_ACTS})
 _AUTHORITIES = {
     "presidente.repubblica:decreto:": "stato:decreto.del.presidente.della.repubblica:",
     "presidente.consiglio.ministri:decreto:": "stato:decreto.del.presidente.del.consiglio.dei.ministri:",
 }
 
 _HREF = re.compile(r"^(?:https?://www\.normattiva\.it)?/uri-res/N2Ls\?urn:nir:([^\s\"'<>]+)$")
-_ACT = re.compile(r"([a-z.]{1,60}):([a-z.]{1,60}):(\d{4}(?:-\d{2}-\d{2})?)(?:;(\d{1,6}[a-z]*))?(?::(\d))?")
+_ACT = re.compile(r"([a-z.]{1,60}):([a-z.]{1,60}):(\d{4}(?:-\d{2}-\d{2})?)(?:;([1-9]\d{0,5}[a-z]*))?(?::(\d))?")
 _ARTICLE = re.compile(r"art(\d{1,5}[a-z]*(?:\.\d{1,2})?)(?:-(.+))?")
+# The portal links some Sezione lavoro citations as laws: in "Sez. 6 - L, n. 09952/2022"
+# the anchor is "L, n. 09952/2022" and the href `stato:legge:2022;9522`. The anchor is
+# the section's letter, with a comma after it, or after a section label.
+_SECTION_LETTER = re.compile(r"L\.?\s*,")
+_SECTION_LETTER_AFTER_LABEL = re.compile(r"L\.?\s")
+_SECTION_LABEL_BEFORE = re.compile(r"\bSez(?:ione|\.)?\s*,?\s*(?:[0-9]{1,2}\s*[-–]?\s*)?$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -42,6 +66,15 @@ class PortalNorm:
     @property
     def year_only_urn(self) -> Optional[str]:
         return f"urn:nir:{self.act}" if self.year_only else None
+
+
+def is_decision_link(text: str, before: str) -> bool:
+    """A link whose anchor is a Cassazione section's letter (`L, n. …`), not a law.
+    `before` is the paragraph's text just before the anchor."""
+    anchor = (text or "").lstrip()
+    if _SECTION_LETTER.match(anchor):
+        return True
+    return bool(_SECTION_LETTER_AFTER_LABEL.match(anchor) and _SECTION_LABEL_BEFORE.search((before or "")[-40:]))
 
 
 def parse_portal_urn(href: str) -> Optional[PortalNorm]:
