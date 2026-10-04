@@ -8,7 +8,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-04-source-convention-design.md`. **Evidence:** `docs/superpowers/specs/2026-10-04-source-convention-inventory.md` (every site to replace is listed there with `file:line`).
 
-**Starts only after** the owner approves the spec and answers its §9 questions. A PR whose labels depend on an unanswered question ships its identity work and leaves those labels as they are, with the golden cases still `open`.
+**Approved** (4 October 2026): the owner approved the spec and took every recommendation of its §9, «per il 31 procedi con le raccomandazione». **Each PR starts on the orchestrator's go**: several running sessions share these files (Sentenze PR B: `decisionLinks.ts`; the dossier UI round: dossier rows and PDF; the MCP second round: `citeAct`/`citeArticle` and the MCP labels), so the orchestrator sequences every adoption PR with them. Each adoption PR removes its cases from the web test's `PENDING_ADOPTION` list.
 
 ## Global Constraints
 

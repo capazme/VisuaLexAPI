@@ -35,10 +35,10 @@ Every expected value `E` is `{ "value": …, "status": … }`:
 
 | status | meaning | asserted |
 |---|---|---|
-| `decided` | the owner's words exist (quoted in `note` or in the spec) | today: the web suite for norm citations; every adopting suite |
+| `decided` | the owner's words exist (quoted in `note` or in the spec) | today: the web suite for norm citations, except the cases still listed in its `PENDING_ADOPTION`; every adopting suite |
 | `current` | what the code does today, and the convention keeps it | by the suites that hold that code (today: the API for norm identities and decision keys, the web for decision paths) |
 | `proposed` | a low-impact call stated in the spec; the owner can overturn it | once the area adopts the convention |
-| `open:Qn` | waits for question n of the spec (§9); the value is the recommendation | once the owner answers and the status flips |
+| `open:Qn` | waits for question n of the spec (§9); the value is the recommendation | once the owner answers and the status flips (none today: the owner answered Q1–Q9 on 4 October 2026) |
 
 `aliases` are other spellings of the same identity (a bare URN, Normattiva's
 alias form, a version marker, a malformed type token): the normaliser maps each

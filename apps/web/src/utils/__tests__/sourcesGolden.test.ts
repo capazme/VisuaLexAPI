@@ -75,10 +75,24 @@ describe('the golden file of legal sources', () => {
   });
 
   describe('decided citations of norms are what citation.ts writes', () => {
+    // Decided by the owner on 4 October 2026 and not written by citation.ts yet: the web
+    // adoption PR (plan, PR 1) empties this list. A case listed here that starts passing
+    // fails too, so the list cannot go stale.
+    const PENDING_ADOPTION = new Set([
+      'l-184-1983-6-year-only', 'dpcm-2020-03-08-1', 'dm-55-2014-4', 'cpi-regolamento-1',
+      'lcost-1-2012-1', 'gdpr-5', 'nis2-21', 'tfue-101',
+    ]);
     const decided = golden.norms.filter((c) => c.labels.citation?.status === 'decided');
     it('covers the cases the owner decided', () => expect(decided.length).toBeGreaterThan(10));
+    it('lists only decided cases as pending', () => {
+      for (const id of PENDING_ADOPTION) expect(decided.map((c) => c.id), id).toContain(id);
+    });
     for (const c of decided) {
-      it(c.id, () => expect(citationHead(c.input)).toBe(c.labels.citation.value));
+      if (PENDING_ADOPTION.has(c.id)) {
+        it(`${c.id} (pending adoption)`, () => expect(citationHead(c.input)).not.toBe(c.labels.citation.value));
+      } else {
+        it(c.id, () => expect(citationHead(c.input)).toBe(c.labels.citation.value));
+      }
     }
   });
 

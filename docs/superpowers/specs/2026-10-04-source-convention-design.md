@@ -7,6 +7,11 @@ giurisprudenziali». The evidence is the inventory
 `docs/superpowers/plans/2026-10-04-source-convention.md`. The golden file is
 `conventions/sources/golden.json`.
 
+**Approved.** The owner approved this spec as a whole and took every
+recommendation of §9 (Q1–Q9), in his words of 4 October 2026, relayed by the
+orchestrator: «per il 31 procedi con le raccomandazione». Adoption follows the plan, one PR at a time, sequenced by the
+orchestrator with the sessions that share its files.
+
 ## Why
 
 Every area names and identifies sources its own way, and they drift. On 4
@@ -222,10 +227,10 @@ built now.
 **Status of each form.** The citation column for national acts is the owner's
 (decided 1 October: «art.» lower case, a comma after the number, the act in
 lower case; codes, the Constitution, preleggi and disp. att. by their own name
-and with no comma; an aliased code cited by the act it is). Everything marked
-`open` in the golden file waits for the questions in §9: the short forms, the
-headings, the EU forms, new abbreviations. The golden file holds the
-recommended value for each, with its status.
+and with no comma; an aliased code cited by the act it is). The short forms, the
+EU forms and the new abbreviations were the questions of §9; the owner took
+every recommendation (4 October), so the golden file marks them `decided`. The
+act headings remain `proposed`.
 
 ### 3.3 The tables
 
@@ -277,7 +282,7 @@ intervento a parte», and this convention is that intervention.
 | **short** | chips (Massimario, Brocardi, Q&A), lists, the graph's `estremi` |
 | **page line** | the identity line at the top of the decision page (Sentenze design §4.1; unchanged) |
 
-### 4.2 Recommended forms (all `open` until Q1–Q2 are answered)
+### 4.2 The forms (decided: Q1–Q2, 4 October 2026)
 
 The baseline is the form of the Sentenze design §4, which the owner approved
 with that spec (court and archive, section, type, date, number), as its plan
@@ -438,14 +443,16 @@ rule 23; web gotcha 23).
 | `DossierItem.title` (the act type) | left as it is; every reader shows the derived citation |
 | `QuickNorm.label` | the user's text, untouched; new quick norms are suggested with the short label |
 | `NormaChangeNotification.message` (the raw key) | new messages carry the citation; old ones are already re-labelled from their snapshot (`normaChangeLabel`) |
-| decision dossier item `etichetta` and `title` (Sentenze PR C, not built) | the approved Sentenze design §6 stores the citation as `etichetta` (required) and as `title`. That freezes today's wording into user data: if Q1 or Q2 later changes, every saved decision keeps the old label. **Recommendation (Q9):** keep both fields, since sharing and export need a label without a lookup, but treat them as a cache: readers show `formatDecisionCitation` of the stored identity and attributes, and the stored copy is rewritten on read when it differs. Changing Sentenze §6 waits for the owner's answer |
+| decision dossier item `etichetta` and `title` (Sentenze PR C, not built) | the approved Sentenze design §6 stores the citation as `etichetta` (required) and as `title`. That freezes today's wording into user data: if Q1 or Q2 later changes, every saved decision keeps the old label. **Decided (Q9, 4 October 2026):** keep both fields, since sharing and export need a label without a lookup, but treat them as a cache: readers show `formatDecisionCitation` of the stored identity and attributes, and the stored copy is rewritten on read when it differs. Sentenze §6 is amended accordingly by the Sentenze session |
 | graph `estremi`, `titolo`, `autorita_emanante` | recomputed by the backfill (§5.3) |
 
-## 9. Questions for the owner
+## 9. Questions for the owner — answered
 
 Sent through the orchestrator as one list, in Italian, each with real examples
-and a recommendation. The golden file holds each recommendation with status
-`open:Qn`. Summary:
+and a recommendation. **Answer (4 October 2026):** «per il 31 procedi con le raccomandazione» — every recommendation
+below stands, including Q1's form for a penal decision whose hearing date is
+known (the Sentenze plan did not have it). The golden file marks them
+`decided`. The questions were:
 
 | Q | About | Recommendation |
 |---|---|---|
@@ -463,10 +470,9 @@ and a recommendation. The golden file holds each recommendation with status
 
 - **Sentenze PR B** (decision page): builds `decisionLinks.ts`'s wording as
   its plan says; it becomes the web implementation of §4, and the golden
-  decision cases are its test cases. Nothing to change unless Q1 changes a form.
-- **Sentenze PR C** (dossier): stores `etichetta` and `title` as its spec says
-  until Q9 is answered; if the owner takes the recommendation, readers re-derive
-  the label (§8.3).
+  decision cases are its test cases. Q1 confirmed its forms; it adds the penal form with a known hearing date.
+- **Sentenze PR C** (dossier): stores `etichetta` and `title` as a cache;
+  readers re-derive the label (§8.3, Q9 decided).
 - **#63 follow-up** (graph act nodes): writes no `titolo` or `autorita_emanante`
   for a stub; a code node takes the act heading and the authority table of §5.1.
 - **Dossier UI rethink** (grouping by act): groups by act identity (§1.1) and
