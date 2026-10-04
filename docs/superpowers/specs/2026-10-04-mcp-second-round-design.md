@@ -83,14 +83,15 @@ One new table, `trash_entries`, so that no existing query needs a "deleted" filt
 | `id`, `user_id` (cascade from User) | |
 | `kind` | `DOSSIER` or `DOSSIER_ITEMS` |
 | `dossier_id` | the dossier deleted, or the one the entries came from (no foreign key: the dossier may be gone) |
-| `label` | what the list shows: the dossier's name, or «3 voci da Prova» |
+| `label` | the dossier's name (for `DOSSIER_ITEMS`, the name of the dossier they came from) |
+| `summary` | what the entry holds, written at deletion so the list never opens `payload`: `itemCount`, and for `DOSSIER_ITEMS` `items: [{ itemType, citation, actCitation }]` — `citation` as dossier items carry it («art. 3, l. 31 dicembre 2012, n. 247»), `actCitation` the act alone («l. 31 dicembre 2012, n. 247»), both null for notes and sections; a `sentenza` entry will carry the decision's label |
 | `payload` | the rows as they were: the dossier with its entries and snapshots, or the entries — any entry type, so the `sentenza` entry of the Sentenze round is covered without change |
 | `client_id`, `client_name`, `grant_id` | which connection deleted it (plain columns: the trash outlives the client and the grant) |
 | `deleted_at`, `expires_at` | 30 days |
 
 - **Routes reachable by an exchanged token** (delegated table, scope `dossier:delete`): `POST /api/dossiers/:id/trash` (the whole dossier) and `POST /api/dossiers/:id/trash-items` `{ itemIds: 1–50 }`. They move rows to the trash; **no route reachable by an exchanged token deletes anything for good** (spike Review Focus 5, restated). The existing `DELETE` routes stay outside the table.
-- **Routes for the user's session only:** `GET /api/trash` (newest first, with client name and expiry), `POST /api/trash/:id/restore` `{ targetDossierId? }`, `DELETE /api/trash/:id` (empty one entry now).
-- **Restore** re-creates the rows with their original ids and deletes the trash entry in one transaction; a second restore is a 404. Entries whose dossier no longer exists need `targetDossierId` (one of the user's dossiers), otherwise 409 «il dossier non esiste più: scegli dove ripristinare». A dossier restored after its entries were trashed separately does not pull them back: each trash entry is restored on its own.
+- **Routes for the user's session only:** `GET /api/trash` → `[{ id, kind, dossierId, label, itemCount, items?, clientName, deletedAt, expiresAt }]` newest first (`items` only for `DOSSIER_ITEMS`; the web groups them by `actCitation`, e.g. «l. 31 dicembre 2012, n. 247: artt. 3, 25 · 1 nota»), `POST /api/trash/:id/restore` `{ targetDossierId? }`, `DELETE /api/trash/:id` (empty one entry now). Shape agreed with the dossier UI round (4 October).
+- **Restore** is of a whole trash entry only. It re-creates the rows with their original ids (restored entries are appended after the dossier's last entry, in their original order) and deletes the trash entry in one transaction; a second restore is a 404. Entries whose dossier no longer exists need `targetDossierId` (one of the user's dossiers), otherwise 409 «il dossier non esiste più: scegli dove ripristinare». A dossier restored after its entries were trashed separately does not pull them back: each trash entry is restored on its own.
 - **Expiry:** expired entries are deleted by a sweep awaited on the trash routes, at most every ten minutes (phase 1's lesson: no fire-and-forget work on the database).
 - **Account deletion** removes the trash with the person (cascade; `deleteUserAccount` stays the one path).
 - **Revocation does not touch the trash.** What a connection deleted stays restorable after the user revokes it; the revoked connection can reach nothing.
@@ -117,7 +118,7 @@ Both carry the `destructiveHint` annotation. Quota: 1 point per call plus a dail
 
 - **Tool** `omnilex_aggiungi_nota_dossier` `{ dossier, testo }`: adds one note to a dossier the user names (by id or exact name, as `omnilex_leggi_dossier`). Scope `dossier:read` + `dossier:write`.
 - **Add-only:** no tool edits, moves or deletes a note (deleting one goes through §4, like any entry). The user edits or deletes Claude's notes in the web app as their own.
-- **Length:** 1–4,000 characters of plain text (trimmed; control characters other than new lines refused). **Cost:** 2 points, plus a daily counter **`note`, 100 a day** through MCP (placeholders).
+- **Length:** 1–4,000 characters of plain text (trimmed; control characters other than new lines refused); the web app aligns its own note cap to 4,000 (dossier UI round). **Cost:** 2 points, plus a daily counter **`note`, 100 a day** through MCP (placeholders).
 - **The mark.** Every entry and dossier created through MCP records, in columns the server sets and no route accepts from a body, **which connection created it**: `created_by_client_id`, `created_by_client_name` on `dossier_items` and `dossiers` (null = the user). Norms added through MCP get it too: it is free, and the dossier UI decides where to show it. The client's name is the one it registered with, unverified, so the web app should say «scritta da Claude Code (applicazione collegata)», not just «Claude». The mark stays when the user edits the note.
 - **Dossier items gain `created_by`** in the API's answers (`{ clientName } | null`), for the web app and for `omnilex_leggi_dossier`, which reports which entries Claude added.
 
