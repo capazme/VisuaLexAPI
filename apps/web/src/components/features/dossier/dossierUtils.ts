@@ -2,7 +2,8 @@ import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { historicalItemLabel, requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
-import type { ArticleData, Dossier, DossierItem, Norma, NormaVisitata, SearchParams } from '../../../types';
+import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
+import type { DossierItemApi } from '../../../services/dossierService';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
@@ -173,6 +174,25 @@ export function unpackItemContent(content: unknown): { data: unknown; status?: '
   if (typeof content !== 'object' || content === null) return { data: content };
   const { _dossierMeta, ...rest } = content as Record<string, unknown> & { _dossierMeta?: DossierMeta };
   return _dossierMeta?.important ? { data: rest, status: 'important' } : { data: rest };
+}
+
+// The server's names for an item, copied only when it gave them: an answer from
+// an older server leaves the fields absent, and the layout falls back.
+export function citationsFromApi(api: Pick<DossierItemApi, 'citation' | 'act_citation'>): { citation?: string | null; actCitation?: string | null } {
+  return {
+    ...(api.citation !== undefined ? { citation: api.citation } : {}),
+    ...(api.act_citation !== undefined ? { actCitation: api.act_citation } : {}),
+  };
+}
+
+// One server item as the store holds it. The star travels inside `content` as a
+// _dossierMeta envelope (packItemContent); the DB `status` column is not read.
+export function dossierItemFromApi(api: DossierItemApi): DossierItem {
+  const { data, status } = unpackItemContent(api.content);
+  const base = { id: api.id, addedAt: api.created_at, ...(status ? { status } : {}), ...citationsFromApi(api) };
+  return api.item_type === 'norm'
+    ? { ...base, type: 'norma', data: data as DossierNormaData }
+    : { ...base, type: 'note', data: data as string };
 }
 
 export function computeItemCounts(items: DossierItem[]): { norme: number; note: number; important: number } {

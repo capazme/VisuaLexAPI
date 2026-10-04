@@ -3,6 +3,7 @@ import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
   computeNormaGroups, searchParamsFromGroup, dossierItemPdfTitle, tabLabelForGroup, searchesForGroups,
+  dossierItemFromApi,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -316,5 +317,25 @@ describe('searchesForGroups', () => {
   it('creates no shared tab when every group asks for a past text', () => {
     const { created } = run([g(PAST), g({ versione: 'originale' })]);
     expect(created).toEqual(['Pratica — testo al 29/12/2007', 'Pratica — testo originale']);
+  });
+});
+
+describe('dossierItemFromApi', () => {
+  const base = { title: 'x', position: 0, status: 'unread' as const, created_at: '2026-10-04T10:00:00Z' };
+  it("keeps the server's citations on a norm", () => {
+    const item = dossierItemFromApi({
+      ...base, id: 'a', item_type: 'norm',
+      content: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3', _dossierMeta: { important: true } },
+      citation: 'art. 3, l. 31 dicembre 2012, n. 247', act_citation: 'l. 31 dicembre 2012, n. 247',
+    });
+    expect(item).toMatchObject({
+      id: 'a', type: 'norma', status: 'important', addedAt: base.created_at,
+      citation: 'art. 3, l. 31 dicembre 2012, n. 247', actCitation: 'l. 31 dicembre 2012, n. 247',
+    });
+    expect(item.data).not.toHaveProperty('_dossierMeta');
+  });
+  it('reads a note, and an answer from a server without the fields', () => {
+    const note = dossierItemFromApi({ ...base, id: 'n', item_type: 'note', content: 'appunto' });
+    expect(note).toEqual({ id: 'n', type: 'note', data: 'appunto', addedAt: base.created_at });
   });
 });

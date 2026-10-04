@@ -291,6 +291,10 @@ interface DossierItemBase {
     id: string;
     addedAt: string;
     status?: 'unread' | 'reading' | 'important' | 'done';
+    // How the server names the item and its act (`citation`, `act_citation`), in the
+    // app's citation style; null for anything but a norm, absent before the server answered.
+    citation?: string | null;
+    actCitation?: string | null;
 }
 
 export type DossierItem =

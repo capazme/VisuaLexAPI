@@ -32,7 +32,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
-import { packItemContent, unpackItemContent } from '../components/features/dossier/dossierUtils';
+import { citationsFromApi, dossierItemFromApi, packItemContent } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -559,28 +559,7 @@ const appStore = createStore<AppState>()(
                         title: d.name,
                         description: d.description || undefined,
                         createdAt: d.created_at,
-                        items: d.items.map((item): DossierItem => {
-                            // The star travels inside `content` as a _dossierMeta
-                            // envelope (packItemContent); the DB `status` column is
-                            // not read. Branch on item_type so each arm satisfies
-                            // its member of the DossierItem union.
-                            const { data, status } = unpackItemContent(item.content);
-                            return item.item_type === 'norm'
-                                ? {
-                                    id: item.id,
-                                    type: 'norma',
-                                    data: data as DossierNormaData,
-                                    addedAt: item.created_at,
-                                    ...(status ? { status } : {}),
-                                }
-                                : {
-                                    id: item.id,
-                                    type: 'note',
-                                    data: data as string,
-                                    addedAt: item.created_at,
-                                    ...(status ? { status } : {}),
-                                };
-                        }),
+                        items: d.items.map(dossierItemFromApi),
                         tags: d.tags ?? [],
                         isPinned: d.is_pinned,
                     }));
@@ -1479,6 +1458,7 @@ const appStore = createStore<AppState>()(
                         const item = dossier?.items.find(i => i.id === tempId);
                         if (item) {
                             item.id = created.id;
+                            Object.assign(item, citationsFromApi(created));
                         }
                         delete state.pendingDossierItemIds[tempId];
                     });
@@ -1585,7 +1565,10 @@ const appStore = createStore<AppState>()(
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
                         const restored = dossier?.items.find(i => i.id === localId);
-                        if (restored) restored.id = created.id;
+                        if (restored) {
+                            restored.id = created.id;
+                            Object.assign(restored, citationsFromApi(created));
+                        }
                     });
                 }).catch(err => {
                     console.error('Failed to restore item on server:', err);
@@ -1763,6 +1746,7 @@ const appStore = createStore<AppState>()(
                             ...r.value.original,
                             id: r.value.serverItem.id,
                             addedAt: r.value.serverItem.created_at,
+                            ...citationsFromApi(r.value.serverItem),
                         }));
 
                     const failedCount = itemResults.filter((r) => r.status === 'rejected').length;

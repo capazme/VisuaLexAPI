@@ -185,3 +185,16 @@ describe('importDossier', () => {
     }));
   });
 });
+
+describe('addToDossier reads the citations of the answer', () => {
+  it('puts act_citation on the settled item', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '2026-10-04', items: [], tags: [] }] });
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce({
+      ...fakeDossierItemApi('srv-9'),
+      citation: 'art. 2043 c.c.', act_citation: 'c.c.',
+    });
+    appStore.getState().addToDossier('d1', norma, 'norma');
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('srv-9'));
+    expect(appStore.getState().dossiers[0].items[0]).toMatchObject({ citation: 'art. 2043 c.c.', actCitation: 'c.c.' });
+  });
+});
