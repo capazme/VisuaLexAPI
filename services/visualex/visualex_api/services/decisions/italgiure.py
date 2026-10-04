@@ -9,8 +9,9 @@ the lookup of one decision:
 - the text comes back whole: `ocr` is the reasons and already ends with the dispositivo, which
   `ocrdis` repeats when the source has one (36 of the 36 sampled texts that have one, measured
   on 2026-10-04): `split_dispositivo` cuts it off the end of the reasons, so the decision reads
-  once. A dispositivo that the text holds elsewhere is dropped, one it does not hold stays as
-  the source gave it, and without an `ocrdis` the dispositivo stays at the end of the reasons.
+  once. A dispositivo that the text holds elsewhere, or only inside a word, is dropped, one it
+  does not hold stays as the source gave it, and without an `ocrdis` the dispositivo stays at
+  the end of the reasons.
 - a decision whose text the source withholds comes back with the source's own notice as its
   text, while personal data are being removed: "La sentenza richiesta è in fase di
   oscuramento" (`testo_assente` "oscuramento"), "in fase di valutazione oscuramento"
@@ -103,9 +104,10 @@ def paragraphs(text: str) -> str:
 
 def split_dispositivo(text: str, dispositivo: str) -> tuple[str, str]:
     """`ocr` already ends with the dispositivo that `ocrdis` repeats: it is cut off the text, so
-    the decision reads once. Whitespace aside, the end of the text must equal the dispositivo; the
-    dispositivo returned is that end of the text, so every character comes from one source. A
-    dispositivo the text holds elsewhere is dropped; one it does not hold stays as given."""
+    the decision reads once. Whitespace aside, the end of the text must equal the dispositivo and
+    start a word (a cut never falls inside one); the dispositivo returned is that end of the text,
+    so every character comes from one source. A dispositivo the text holds elsewhere, or only
+    inside a word, is dropped; one it does not hold stays as given."""
     tail = "".join(dispositivo.split())
     if not tail:
         return text, ""
@@ -116,7 +118,8 @@ def split_dispositivo(text: str, dispositivo: str) -> tuple[str, str]:
             cut -= 1
             if not text[cut].isspace():
                 left -= 1
-        return text[:cut].rstrip(), text[cut:]
+        if cut == 0 or text[cut - 1].isspace():  # a cut never falls inside a word
+            return text[:cut].rstrip(), text[cut:]
     return (text, "") if tail in flat else (text, dispositivo)
 
 

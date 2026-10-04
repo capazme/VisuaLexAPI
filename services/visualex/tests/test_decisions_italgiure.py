@@ -249,8 +249,11 @@ def test_a_long_word_before_a_number_is_still_read_by_its_last_part():
     ("P.Q.M. Rigetta.", "P.Q.M. Rigetta.", ("P.Q.M. Rigetta.", ""), True),
     # no dispositivo
     ("Premessa. Il fatto.", "", ("Premessa. Il fatto.", ""), True),
+    # the text ends with it only inside a word: a cut never falls inside one, so it is held
+    # elsewhere and dropped, never «Si Rige» and «tta.»
+    ("Si Rigetta.", "tta.", ("Si Rigetta.", ""), True),
 ], ids=["the text ends with it", "whitespace aside", "held elsewhere", "not held",
-        "the text is the dispositivo", "no dispositivo"])
+        "the text is the dispositivo", "no dispositivo", "never inside a word"])
 def test_the_dispositivo_the_text_ends_with_is_read_once(text, dispositivo, expected,
                                                          from_the_text):
     motivazione, cut = split_dispositivo(text, dispositivo)

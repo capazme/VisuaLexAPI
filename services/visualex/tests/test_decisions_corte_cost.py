@@ -399,6 +399,25 @@ LONG_SECOND = ("2.- La questione non è fondata, perché la norma non introduce 
      "artt. 3 e 24 della Costituzione.\n\n"
      "La questione e' manifestamente infondata, come la Corte ha\n"
      "gia' deciso con la sentenza n. 1 del 1960."),
+    # a line that ends a sentence where the next word would still have fit is a paragraph end,
+    # though it fills three quarters of the measure
+    ("alfa beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron\n"
+     "Una frase compiuta che finisce prima del margine destro, qui.\n"
+     "Poi segue un nuovo capoverso che si avvolge regolarmente come le altre righe\n"
+     "e continua con altre parole fino a riempire anche questa riga del testo ok.",
+     "alfa beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron\n"
+     "Una frase compiuta che finisce prima del margine destro, qui.\n\n"
+     "Poi segue un nuovo capoverso che si avvolge regolarmente come le altre righe\n"
+     "e continua con altre parole fino a riempire anche questa riga del testo ok."),
+    # one that ends a sentence at the margin, where the next word would not have fit, is a wrap
+    ("alfa beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron\n"
+     "Una frase compiuta che arriva fino al margine destro del testo scritto a mano.\n"
+     "Poi segue un nuovo capoverso che si avvolge regolarmente come le altre righe\n"
+     "e continua con altre parole fino a riempire anche questa riga del testo ok.",
+     "alfa beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron\n"
+     "Una frase compiuta che arriva fino al margine destro del testo scritto a mano.\n"
+     "Poi segue un nuovo capoverso che si avvolge regolarmente come le altre righe\n"
+     "e continua con altre parole fino a riempire anche questa riga del testo ok."),
     # an old dispositivo: its short lines are paragraphs, its wrapped lines are not
     ("PER QUESTI MOTIVI\n"
      "LA CORTE COSTITUZIONALE\n"
@@ -420,7 +439,8 @@ LONG_SECOND = ("2.- La questione non è fondata, perché la norma non introduce 
     ("Premessa breve.\n\nSeconda parte breve.", "Premessa breve.\n\nSeconda parte breve."),
     # one line: nothing to break
     ("Una sola riga.", "Una sola riga."),
-], ids=["long lines", "typewritten", "an old dispositivo", "blank lines kept", "one line"])
+], ids=["long lines", "typewritten", "a sentence ends before the margin",
+        "a sentence ends at the margin", "an old dispositivo", "blank lines kept", "one line"])
 def test_a_line_break_is_a_paragraph_break_unless_it_is_a_typewriter_wrap(text, expected):
     out = line_paragraphs(text)
     assert out == expected
