@@ -433,6 +433,43 @@ class BridgeTable:
             await session.commit()
         return len(mappings)
 
+    async def replace_mappings_for_chunks(self, chunk_ids: List[str], mappings: List[Dict[str, Any]], *,
+                                          source: str) -> int:
+        """The rows of `source` for these chunks become exactly `mappings`, in one transaction:
+        a re-run that no longer links a chunk to a node removes that row."""
+        if not self._connected:
+            raise RuntimeError("Not connected to PostgreSQL. Call connect() first.")
+        if not chunk_ids:
+            return 0
+        delete_sql = text(
+            f"DELETE FROM {self.config.table_name} WHERE source = :source AND chunk_id = ANY(CAST(:ids AS uuid[]))"
+        )
+        upsert_sql = text(f"""
+            INSERT INTO {self.config.table_name}
+            (chunk_id, graph_node_urn, node_type, relation_type, confidence, chunk_text, source, metadata)
+            VALUES (:chunk_id, :graph_node_urn, :node_type, :relation_type, :confidence, :chunk_text, :source, CAST(:metadata AS jsonb))
+            ON CONFLICT (chunk_id, graph_node_urn) DO UPDATE SET
+                node_type = EXCLUDED.node_type, relation_type = EXCLUDED.relation_type,
+                confidence = EXCLUDED.confidence, chunk_text = EXCLUDED.chunk_text,
+                source = EXCLUDED.source, metadata = EXCLUDED.metadata, updated_at = CURRENT_TIMESTAMP
+        """)
+        async with self._session_maker() as session:
+            await session.execute(delete_sql, {"source": source, "ids": [str(i) for i in chunk_ids]})
+            for m in mappings:
+                metadata = m.get("metadata") or m.get("extra_metadata")
+                await session.execute(upsert_sql, {
+                    "chunk_id": str(m["chunk_id"]),
+                    "graph_node_urn": m["graph_node_urn"],
+                    "node_type": m["node_type"],
+                    "relation_type": m.get("relation_type"),
+                    "confidence": m.get("confidence"),
+                    "chunk_text": m.get("chunk_text"),
+                    "source": m.get("source"),
+                    "metadata": json.dumps(metadata) if metadata else None,
+                })
+            await session.commit()
+        return len(mappings)
+
     async def count_by_source(self, source: str) -> int:
         if not self._connected:
             raise RuntimeError("Not connected to PostgreSQL. Call connect() first.")

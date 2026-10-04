@@ -9,10 +9,14 @@ from __future__ import annotations
 import asyncio
 from typing import Optional
 
+import structlog
+
 from merlt.storage.graph.schema import canonical_urn
 
 from .urns import NORMATTIVA_PREFIX
 from .volume import BRIDGE_REL_NORMA, SOURCE
+
+log = structlog.get_logger()
 
 
 def normalize_reader_urn(urn: str) -> str:
@@ -56,6 +60,9 @@ class RassegneReader:
             ids=[r["chunk_id"] for r in page], with_payload=True, with_vectors=False,
         )
         payloads = {str(p.id): p.payload for p in points}
+        missing = [r["chunk_id"] for r in page if r["chunk_id"] not in payloads]
+        if missing:  # a bridge row without its point: counted above, not listed
+            log.warning("rassegne.points_missing", urn=urn, anno=target, chunk_ids=missing)
         return {
             "urn": urn,
             "total": sum(counts.values()),

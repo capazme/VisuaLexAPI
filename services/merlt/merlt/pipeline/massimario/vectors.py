@@ -2,8 +2,9 @@
 """Embed a slice of Massimario chunks, then write their points and bridge rows together.
 
 Points first, bridge rows second: the reader joins the bridge to the points, so
-it never meets a row whose point is missing. Both writes are upserts on stable
-ids, so a slice can be re-run.
+it never meets a row whose point is missing. Points are upserts on stable ids and
+a chunk's bridge rows are replaced as a whole, so a slice can be re-run, even
+after a parser fix that drops a link.
 """
 from __future__ import annotations
 
@@ -51,6 +52,6 @@ async def index_chunks(chunks: list[dict], *, embeddings, qdrant, bridge, collec
     await asyncio.to_thread(_ensure_collection, qdrant, collection)
     await asyncio.to_thread(qdrant.upsert, collection_name=collection, points=points)
     rows = [{**row, "chunk_id": c["point_id"], "source": SOURCE} for c in chunks for row in c["bridge"]]
-    await bridge.upsert_mappings_batch(rows)
+    await bridge.replace_mappings_for_chunks([c["point_id"] for c in chunks], rows, source=SOURCE)
     log.info("massimario.indexed", points=len(points), bridge_rows=len(rows))
     return len(points)

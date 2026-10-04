@@ -3,8 +3,10 @@
 
 Chained: each job enqueues the next slice on `merlt_bulk` (listed last by the
 worker, so readers' lazy ingestions go first). Progress lives on the batch
-(`stats.vectors`). A failed slice stops the chain and records the error; a new
-promotion of the batch starts again from 0, and every write is an upsert.
+(`stats.vectors`). A failed slice stops the chain and records the error, and so
+does a job RQ kills (its timeout) through `record_index_failure`. Promoting the
+batch again (the router allows it while the vectors are incomplete) starts from
+0: points are upserts and a chunk's bridge rows are replaced.
 
 GOTCHA (CLAUDE.md #6): the worker has no FastAPI lifespan, so `init_db()` first.
 """
@@ -37,13 +39,42 @@ def _embeddings():
 
 def enqueue_index_slice(batch_id: str, start: int) -> None:
     from redis import Redis
-    from rq import Queue
+    from rq import Callback, Queue
 
     queue = Queue(QUEUE, connection=Redis.from_url(os.getenv("RQ_REDIS_URL", "redis://localhost:6379/1")))
     queue.enqueue(
         "merlt.worker.massimario_tasks.index_slice", batch_id, start,
         job_id=f"mass-vec-{batch_id}-{start}", job_timeout=1800,
+        on_failure=Callback("merlt.worker.massimario_tasks.record_index_failure"),
     )
+
+
+async def record_vectors_error(batch_id: str, start: int, error: str) -> None:
+    """Write a failure on the batch's vector progress, keeping what is done."""
+    from sqlalchemy import select
+
+    from merlt.storage.enrichment.database import get_db_session, init_db
+    from merlt.storage.enrichment.models import MerltIngestionBatch
+
+    await init_db(echo=False)
+    async with get_db_session() as session:
+        batch = (
+            await session.execute(select(MerltIngestionBatch).where(MerltIngestionBatch.id == batch_id))
+        ).scalar_one_or_none()
+        if batch is None:
+            return
+        vectors = {**((batch.stats or {}).get("vectors") or {}), "done": start, "error": error}
+        batch.stats = {**(batch.stats or {}), "vectors": vectors}
+        await session.commit()
+
+
+def record_index_failure(job, connection, exc_type, exc_value, traceback) -> None:
+    """RQ on_failure: an exception that escaped the slice (RQ's timeout, a failed enqueue
+    of the next slice) is recorded on the batch, so the chain never stops in silence."""
+    batch_id, start = job.args[0], job.args[1]
+    error = f"{exc_type.__name__}: {exc_value}" if str(exc_value) else exc_type.__name__
+    log.error("massimario.index_slice.job_failed", batch_id=batch_id, start=start, error=error)
+    asyncio.run(record_vectors_error(batch_id, start, error))
 
 
 async def _run_index_slice(batch_id: str, start: int) -> dict:

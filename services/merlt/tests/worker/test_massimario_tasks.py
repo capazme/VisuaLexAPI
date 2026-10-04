@@ -53,3 +53,26 @@ async def test_a_batch_not_promoted_is_skipped():
     assert result["status"] == "skipped"
     index.assert_not_awaited()
     enqueue.assert_not_called()
+
+
+def test_a_slice_job_records_its_failure_on_the_batch():
+    with patch("redis.Redis.from_url"), patch("rq.Queue") as queue:
+        massimario_tasks.enqueue_index_slice("b1", 100)
+    callback = queue.return_value.enqueue.call_args.kwargs["on_failure"]
+    assert callback.name == "merlt.worker.massimario_tasks.record_index_failure"
+
+
+def test_the_failure_callback_writes_the_error():
+    job = SimpleNamespace(args=("b1", 200))
+    with patch.object(massimario_tasks, "record_vectors_error", new=AsyncMock()) as record:
+        massimario_tasks.record_index_failure(job, None, TimeoutError, TimeoutError("exceeded 1800 s"), None)
+    record.assert_awaited_once_with("b1", 200, "TimeoutError: exceeded 1800 s")
+
+
+async def test_record_vectors_error_keeps_the_progress():
+    b = batch()
+    b.stats = {"vectors": {"done": 200, "total": 250}, "promotion": {"nodes_merged": 3}}
+    with patch("merlt.storage.enrichment.database.init_db", new=AsyncMock()), \
+         patch("merlt.storage.enrichment.database.get_db_session", new=session_for(b)):
+        await massimario_tasks.record_vectors_error("b1", 200, "boom")
+    assert b.stats == {"vectors": {"done": 200, "total": 250, "error": "boom"}, "promotion": {"nodes_merged": 3}}

@@ -15,7 +15,8 @@ CHUNKS = [
 def fakes():
     embeddings = MagicMock(encode_batch_async=AsyncMock(return_value=[[0.1, 0.2], [0.3, 0.4]]))
     qdrant = MagicMock(collection_exists=MagicMock(return_value=True))
-    bridge = MagicMock(upsert_mappings_batch=AsyncMock(return_value=1), add_mappings_batch=AsyncMock())
+    bridge = MagicMock(replace_mappings_for_chunks=AsyncMock(return_value=1), upsert_mappings_batch=AsyncMock(),
+                       add_mappings_batch=AsyncMock())
     return embeddings, qdrant, bridge
 
 
@@ -27,8 +28,10 @@ async def test_points_then_bridge_rows():
     points = qdrant.upsert.call_args.kwargs["points"]
     assert [p.id for p in points] == [c["point_id"] for c in CHUNKS]
     assert points[0].payload == {"text": "uno"}
-    (rows,) = bridge.upsert_mappings_batch.await_args.args
+    ids, rows = bridge.replace_mappings_for_chunks.await_args.args
+    assert ids == [c["point_id"] for c in CHUNKS]
     assert rows == [{**CHUNKS[0]["bridge"][0], "chunk_id": CHUNKS[0]["point_id"], "source": "massimario"}]
+    assert bridge.replace_mappings_for_chunks.await_args.kwargs == {"source": "massimario"}
 
 
 async def test_reindexing_is_an_upsert():
