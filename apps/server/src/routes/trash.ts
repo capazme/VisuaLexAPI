@@ -15,6 +15,8 @@ const router = Router();
 router.use(authenticate);
 
 const itemsSchema = z.object({ itemIds: z.array(z.string().min(1).max(64)).min(1).max(50) }).strict();
+// The entries the user saw in the confirmation dialog: the whole dossier moves only if it still holds exactly these.
+const dossierSchema = z.object({ itemIds: z.array(z.string().min(1).max(64)).max(5000) }).strict();
 const restoreSchema = z.object({ targetDossierId: z.string().min(1).max(64).optional() }).strict();
 
 /** Who is deleting; only a connected application moves things to the trash. */
@@ -25,7 +27,8 @@ function deletedBy(req: Request): DeletedBy {
 
 router.post('/dossiers/:id/trash', async (req, res) => {
   const by = deletedBy(req);
-  res.json(await trashDossier(req.user!.id, req.params.id, by));
+  const { itemIds } = dossierSchema.parse(req.body);
+  res.json(await trashDossier(req.user!.id, req.params.id, itemIds, by));
 });
 
 router.post('/dossiers/:id/trash-items', async (req, res) => {

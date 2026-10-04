@@ -82,8 +82,17 @@ async function maybeSweep(): Promise<void> {
   await sweepExpiredTrash(new Date(now));
 }
 
-/** Moves a whole dossier, with its entries and snapshots, to the trash. */
-export async function trashDossier(userId: string, dossierId: string, by: DeletedBy): Promise<{ trashId: string; itemCount: number }> {
+/**
+ * Moves a whole dossier, with its entries and snapshots, to the trash — only
+ * if it still holds exactly the entries the user was shown when confirming
+ * (`seenItemIds`): one added or removed meanwhile refuses the move (409).
+ */
+export async function trashDossier(
+  userId: string,
+  dossierId: string,
+  seenItemIds: string[],
+  by: DeletedBy,
+): Promise<{ trashId: string; itemCount: number }> {
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
     if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
@@ -92,6 +101,10 @@ export async function trashDossier(userId: string, dossierId: string, by: Delete
       include: { items: { orderBy: { position: 'asc' } }, snapshots: { orderBy: { version: 'asc' } } },
     });
     if (!dossier) throw new AppError(404, 'Dossier not found');
+    const seen = new Set(seenItemIds);
+    if (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id))) {
+      throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+    }
     const { items, snapshots, ...row } = dossier;
     const now = new Date();
     const entry = await tx.trashEntry.create({

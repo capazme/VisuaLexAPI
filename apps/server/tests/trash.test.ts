@@ -52,7 +52,7 @@ describe('the trash', () => {
 
   it('moves a whole dossier, with its entries and snapshots, into one entry', async () => {
     const { bearer } = await connected(alice);
-    const moved = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({});
+    const moved = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
     expect(moved.status).toBe(200);
     expect(moved.body).toMatchObject({ itemCount: 3 });
     expect(await prisma.dossier.count({ where: { id: dossierId } })).toBe(0);
@@ -60,6 +60,20 @@ describe('the trash', () => {
     expect(list.body).toHaveLength(1);
     expect(list.body[0]).toMatchObject({ kind: 'DOSSIER', dossierId, label: 'Prova', itemCount: 3, clientName: 'Claude Code' });
     expect(new Date(list.body[0].expiresAt).getTime() - new Date(list.body[0].deletedAt).getTime()).toBe(30 * 24 * 3600 * 1000);
+  });
+
+  it('moves a whole dossier only if it still holds exactly the entries the user saw (security review of PR 4: TOCTOU)', async () => {
+    const { bearer } = await connected(alice);
+    // An entry added while the user was reading the confirmation dialog.
+    const late = await addItem(dossierId, { itemType: 'norm', title: 'legge', content: law('9') });
+    const refused = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
+    expect(refused.status).toBe(409);
+    expect(refused.body.detail).toBe('Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+    expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(4);
+    expect(await prisma.trashEntry.count()).toBe(0);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({})).status).toBe(400);
+    const moved = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [late, noteId, art25, art3] });
+    expect(moved.status).toBe(200);
   });
 
   it('moves exactly the entries given, and reports the ids that are not in this dossier', async () => {
@@ -111,7 +125,7 @@ describe('the trash', () => {
   it('restores a dossier with the same ids for the dossier, its entries and its snapshots', async () => {
     const { bearer } = await connected(alice);
     const before = await prisma.dossierSnapshot.findMany({ where: { dossierId } });
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({});
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
     const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
     const restored = await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({});
     expect(restored.status).toBe(200);
@@ -136,7 +150,7 @@ describe('the trash', () => {
       snapshots: await prisma.dossierSnapshot.findMany({ where: { dossierId } }),
     };
     const { bearer } = await connected(alice);
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({});
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
     const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
     expect(strip(await prisma.dossier.findUniqueOrThrow({ where: { id: dossierId } }))).toEqual(before.dossier);
@@ -148,7 +162,7 @@ describe('the trash', () => {
     const author = await createTestUser('trash-gone-author');
     await prisma.dossier.update({ where: { id: dossierId }, data: { originalAuthorId: author.id } });
     const { bearer } = await connected(alice);
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({});
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
     await prisma.user.delete({ where: { id: author.id } });
     const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
@@ -219,7 +233,7 @@ describe('the trash', () => {
 
   it('goes with the account', async () => {
     const { bearer } = await connected(alice);
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({});
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
     await deleteUserAccount(alice.id);
     expect(await prisma.trashEntry.count()).toBe(0);
   });
@@ -239,7 +253,7 @@ describe('the trash', () => {
     expect((await request(app).get('/api/trash').set(bearer)).status).toBe(403);
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(bearer).send({})).status).toBe(403);
     expect((await request(app).delete(`/api/trash/${entry.id}`).set(bearer)).status).toBe(403);
-    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(authHeader(alice)).send({})).status).toBe(403);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(authHeader(alice)).send({ itemIds: [] })).status).toBe(403);
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(authHeader(alice)).send({ itemIds: [art25] })).status).toBe(403);
   });
 
@@ -252,7 +266,7 @@ describe('the trash', () => {
   it("another user's dossier is a 404 for both moving routes, and nothing moves (security review of PR 3)", async () => {
     const bob = await createTestUser('trash-bob3');
     const { bearer } = await connected(bob);
-    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({})).status).toBe(404);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [] })).status).toBe(404);
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] })).status).toBe(404);
     expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(3);
     expect(await prisma.trashEntry.count()).toBe(0);
