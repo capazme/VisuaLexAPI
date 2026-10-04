@@ -26,7 +26,7 @@ describe('DossierDecisionsSection', () => {
   it('removes a decision as the other rows do', () => {
     const onRemove = vi.fn();
     render(<MemoryRouter><DossierDecisionsSection decisions={[cass]} onRemove={onRemove} /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi sentenza dal dossier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787 dal dossier' }));
     expect(onRemove).toHaveBeenCalledWith(cass);
   });
 

@@ -27,24 +27,27 @@ export function DossierDecisionsSection({ decisions, onRemove }: Props) {
         Giurisprudenza ({decisions.length})
       </h3>
       <ul className="space-y-1">
-        {decisions.map((item) => (
-          <li key={item.id} className="group flex items-center gap-2">
-            <Link
-              to={decisionPath(identityOf(item.data))}
-              className="flex min-h-[44px] min-w-0 flex-1 items-center rounded text-sm text-primary-600 hover:underline md:min-h-0 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <span className="truncate">{decisionCitationOf(item.data)}</span>
-            </Link>
-            <button
-              type="button"
-              onClick={() => onRemove(item)}
-              aria-label="Rimuovi sentenza dal dossier"
-              className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md text-slate-400 hover:text-red-500 md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-            >
-              <Trash2 size={15} />
-            </button>
-          </li>
-        ))}
+        {decisions.map((item) => {
+          const citation = decisionCitationOf(item.data);
+          return (
+            <li key={item.id} className="group flex items-center gap-2">
+              <Link
+                to={decisionPath(identityOf(item.data))}
+                className="flex min-h-[44px] min-w-0 flex-1 items-center rounded text-sm text-primary-600 hover:underline md:min-h-0 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <span className="truncate">{citation}</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => onRemove(item)}
+                aria-label={`Rimuovi ${citation} dal dossier`}
+                className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md text-slate-400 hover:text-red-500 md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              >
+                <Trash2 size={15} />
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

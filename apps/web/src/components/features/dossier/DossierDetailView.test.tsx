@@ -158,7 +158,7 @@ describe('DossierDetailView — decisions', () => {
 
   it('removes a decision behind the undo toast, and puts it back as a decision', async () => {
     renderView(withDecision);
-    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi sentenza dal dossier' }));
+    fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CITATION} dal dossier` }));
     await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
     expect(appStore.getState().dossiers[0].items.map((i) => i.id)).not.toContain('s1');
     await act(async () => { await toast?.onUndo(); });
