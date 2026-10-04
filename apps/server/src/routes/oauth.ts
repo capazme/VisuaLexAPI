@@ -9,6 +9,8 @@ import type { OAuthConfig } from '../oauth/config';
 import { authorizationServerMetadata } from '../oauth/metadata';
 import { createOAuthProvider } from '../oauth/provider';
 import { introspectionHandler } from '../oauth/introspect';
+import { createExchangeHandler } from '../oauth/exchange';
+import { TOKEN_EXCHANGE_GRANT } from '../oauth/metadata';
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -35,6 +37,16 @@ export function createOAuthRouter(config: OAuthConfig): Router {
     }),
   );
   router.use('/oauth/authorize', authorizationHandler({ provider, ...limit }));
+  // The token exchange is ours (RFC 8693); every other grant goes to the SDK.
+  const exchange = createExchangeHandler(config);
+  router.post(
+    '/oauth/token',
+    express.urlencoded({ extended: false }),
+    (req, _res, next) => (req.body?.grant_type === TOKEN_EXCHANGE_GRANT ? next() : next('route')),
+    // The MCP server exchanges for every user from one address: a high ceiling.
+    rateLimit({ windowMs: MINUTE, max: 1200, standardHeaders: true, legacyHeaders: false }),
+    exchange,
+  );
   router.use('/oauth/token', tokenHandler({ provider, ...limit }));
   router.use('/oauth/revoke', revocationHandler({ provider, ...limit }));
   router.post(

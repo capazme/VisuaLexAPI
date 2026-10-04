@@ -16,6 +16,8 @@ export interface OAuthConfig {
   issuer: string;
   /** The MCP server's canonical URI: the only `resource` and token audience. */
   resource: string;
+  /** The audience of exchanged tokens: the API, never the MCP server. */
+  apiAudience: string;
   /** The web page that shows the consent; the request id is appended as `?request=`. */
   consentUrl: string;
   /** HTTPS redirect URIs a client may register besides loopback ones. */
@@ -38,8 +40,10 @@ const list = (value: string | undefined, fallback: string): string[] =>
     .filter(Boolean);
 
 export function readOAuthConfig(env: NodeJS.ProcessEnv): OAuthConfig {
+  const issuer = (env.OAUTH_ISSUER || 'http://localhost:3001').replace(/\/+$/, '');
   return {
-    issuer: (env.OAUTH_ISSUER || 'http://localhost:3001').replace(/\/+$/, ''),
+    issuer,
+    apiAudience: env.OAUTH_API_AUDIENCE || `${issuer}/api`,
     resource: env.OAUTH_MCP_RESOURCE || 'http://localhost:3002/mcp',
     consentUrl: env.OAUTH_CONSENT_URL || 'http://localhost:5173/connect',
     // Claude's hosted apps (verified on Anthropic's documentation, 2 October 2026).

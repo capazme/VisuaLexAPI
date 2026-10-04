@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma';
 import { oauthConfig } from '../oauth/config';
 import { decideAuthorizationRequest, readAuthorizationRequest } from '../oauth/consent';
 import { revokeGrant } from '../oauth/tokens';
+import { delegatedQuotaStatus } from '../middleware/delegated';
 
 /**
  * The signed-in user's side of the authorization server (spec 4.1): the
@@ -55,6 +56,12 @@ router.delete('/grants/:id', async (req, res) => {
   if (!grant) throw new AppError(404, 'Applicazione collegata non trovata.');
   await revokeGrant(grant.id);
   res.status(204).end();
+});
+
+// What is left of the day's allowance for connected applications. Reachable by
+// an exchanged token (the MCP server's `omnilex_stato_account`) and by the user.
+router.get('/quota', async (req, res) => {
+  res.json(await delegatedQuotaStatus(userId(req)));
 });
 
 export default router;
