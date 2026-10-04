@@ -22,7 +22,10 @@ CODE_ACTS = {
     "stato:codice.procedura.penale:1988-09-22;447": "stato:decreto.del.presidente.della.repubblica:1988-09-22;447",
     "stato:costituzione:1947-12-27": "stato:costituzione",
 }
-_AUTHORITIES = {"presidente.repubblica:decreto:": "stato:decreto.del.presidente.della.repubblica:"}
+_AUTHORITIES = {
+    "presidente.repubblica:decreto:": "stato:decreto.del.presidente.della.repubblica:",
+    "presidente.consiglio.ministri:decreto:": "stato:decreto.del.presidente.del.consiglio.dei.ministri:",
+}
 
 _HREF = re.compile(r"^(?:https?://www\.normattiva\.it)?/uri-res/N2Ls\?urn:nir:([^\s\"'<>]+)$")
 _ACT = re.compile(r"([a-z.]{1,60}):([a-z.]{1,60}):(\d{4}(?:-\d{2}-\d{2})?)(?:;(\d{1,6}[a-z]*))?(?::(\d))?")
@@ -53,6 +56,8 @@ def parse_portal_urn(href: str) -> Optional[PortalNorm]:
     parts = _ACT.fullmatch(act)
     if not parts:
         return None
+    if parts.group(4) is None and act not in CODE_ACTS:
+        return None  # an act without its number: VisuaLex and the graph key acts by it
     article = comma = None
     if tail:
         found = _ARTICLE.fullmatch(tail)

@@ -18,6 +18,8 @@ PORTAL = "http://www.normattiva.it/uri-res/N2Ls?urn:nir:"
      "stato:decreto.del.presidente.della.repubblica:1973-01-23;43~art291ter"),
     ("stato:legge:2009-04-23;38~art5", "stato:legge:2009-04-23;38~art5"),
     ("stato:decreto.legislativo:2018-04-10;36", "stato:decreto.legislativo:2018-04-10;36"),
+    ("presidente.consiglio.ministri:decreto:2021-10-14;150~art1",
+     "stato:decreto.del.presidente.del.consiglio.dei.ministri:2021-10-14;150~art1"),
 ])
 def test_dated_links(portal, canonical):
     norm = parse_portal_urn(PORTAL + portal)
@@ -55,3 +57,15 @@ def test_partition_links_are_not_norms(href):
 ])
 def test_unusable_links(href):
     assert parse_portal_urn(href) is None
+
+
+@pytest.mark.parametrize("act", [
+    "stato:legge:1992-08-08",
+    "stato:legge:1865-06-25~art51",
+    "presidente.consiglio.ministri:decreto:2000-11-07~art1",
+    "stato:legge:1983",
+])
+def test_an_act_without_its_number_has_no_canonical_key(act):
+    # the graph and VisuaLex key every act but the codes by its number: a stub keyed
+    # without one would never meet the act's node
+    assert parse_portal_urn(PORTAL + act) is None
