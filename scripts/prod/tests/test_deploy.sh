@@ -19,7 +19,7 @@ show() { sed 's/^/     /' "$1" | head -8; }
 mkrepo() { # mkrepo <name>: prints its path
   d="$work/$1"
   mkdir -p "$d/scripts/prod" "$d/infra" "$d/apps/server" "$d/vendor/mcp-legal-it" "$d/bin"
-  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$d/scripts/prod/"
+  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$here"/update.sh "$d/scripts/prod/"
   cp "$root/infra/.env.example" "$d/infra/.env.example"
   cp "$root/apps/server/.env.example" "$d/apps/server/.env.example"
   for f in compose.yml compose.app.yml compose.scrapers.yml compose.prod.yml; do : >"$d/infra/$f"; done
@@ -341,6 +341,139 @@ expect_log "$d" "compose -f infra/compose.yml" "through the same Compose files"
 expect_log "$d" " stop" "with stop"
 if grep -E ' (up|down|build|rm)( |$)' "$d/docker.log" >/dev/null; then bad "and nothing else (no up, down, build or rm)"; show "$d/docker.log"; else ok "and nothing else (no up, down, build or rm)"; fi
 
+# --- the pull: --branch main|develop (update.sh) --------------------------------------------
+# A repo as mkrepo makes it, with an origin (a bare clone) on which develop is one commit ahead
+# of main; a second clone stands for whoever pushes there.
+gitc() { git -c user.name=t -c user.email=t@example.invalid "$@"; }
+mkorigin() { # mkorigin <name>: prints its path
+  d="$(mkrepo "$1")"
+  git clone -q --bare "$d" "$work/$1.git"
+  git -C "$d" remote add origin "$work/$1.git"
+  git -C "$d" fetch -q origin
+  git -C "$d" branch -q -u origin/main main
+  git clone -q "$work/$1.git" "$work/$1-up"
+  push "$1" develop "develop" README.md
+  echo "$d"
+}
+push() { # push <name> <branch> <text> <file>: someone else commits <text> to <file> on origin's <branch>
+  u="$work/$1-up"
+  if git -C "$u" show-ref --verify --quiet "refs/heads/$2"; then git -C "$u" switch -q "$2"
+  elif git -C "$u" show-ref --verify --quiet "refs/remotes/origin/$2"; then git -C "$u" switch -q "$2"
+  else git -C "$u" switch -q -c "$2"; fi
+  echo "$3" >>"$u/$4"
+  gitc -C "$u" commit -q -am "$3"
+  git -C "$u" push -q origin "$2"
+}
+head_of() { git -C "$1" rev-parse "$2"; }
+branch_of() { git -C "$1" symbolic-ref -q --short HEAD || echo detached; }
+
+d="$(mkorigin pulldev)"
+outcome "$d" scripts/prod/update.sh develop
+expect_status 0 "update.sh develop, with no local develop yet, runs"
+[ "$(branch_of "$d")" = develop ] && [ "$(head_of "$d" HEAD)" = "$(head_of "$d" origin/develop)" ] \
+  && ok "and leaves the checkout on develop, at origin's latest commit" || bad "and leaves the checkout on develop, at origin's latest commit ($(branch_of "$d"))"
+expect_out "develop updated" "and says it moved"
+outcome "$d" scripts/prod/update.sh develop
+expect_out "develop is up to date" "a second run says there was nothing to pull"
+
+push pulldev main "release" README.md
+outcome "$d" scripts/prod/update.sh main
+expect_status 0 "update.sh main switches back to main and pulls it"
+expect_out "goes back on some changes" "warning that main lacks a commit develop had"
+[ "$(branch_of "$d")" = main ] && [ "$(head_of "$d" HEAD)" = "$(head_of "$d" origin/main)" ] \
+  && ok "fast-forwarded to origin's main" || bad "fast-forwarded to origin's main ($(branch_of "$d"))"
+
+# A local commit origin does not have: refused, and before the switch.
+gitc -C "$d" commit -q --allow-empty -m "local only"
+push pulldev main "release 2" README.md
+git -C "$d" switch -q develop
+before="$(head_of "$d" main)"
+outcome "$d" scripts/prod/update.sh main
+expect_status nonzero "a local main that has diverged from origin's is refused"
+expect_out "cannot be fast-forwarded" "and says why"
+[ "$(branch_of "$d")" = develop ] && [ "$(head_of "$d" main)" = "$before" ] \
+  && ok "and the checkout stays where it was, main untouched" || bad "and the checkout stays where it was ($(branch_of "$d"))"
+
+# Back to a version without a migration the database may already carry: refused.
+d="$(mkorigin pullmigr)"
+u="$work/pullmigr-up"; git -C "$u" switch -q develop
+mkdir -p "$u/apps/server/prisma/migrations/20990101000000_newer"
+echo "-- newer" >"$u/apps/server/prisma/migrations/20990101000000_newer/migration.sql"
+git -C "$u" add -A && gitc -C "$u" commit -q -m "a migration" && git -C "$u" push -q origin develop
+run "$d" scripts/prod/update.sh develop >/dev/null 2>&1
+outcome "$d" scripts/prod/update.sh main
+expect_status nonzero "a branch that lacks a migration the checked-out version has is refused"
+expect_out "20990101000000_newer" "naming the migration"
+expect_out "restore the backup" "and the way back"
+[ "$(branch_of "$d")" = develop ] && ok "before the checkout moves" || bad "before the checkout moves ($(branch_of "$d"))"
+
+d="$(mkorigin pulldirty)"
+echo change >>"$d/README.md"
+outcome "$d" scripts/prod/update.sh develop
+expect_status nonzero "a dirty tree is not pulled"
+expect_out "uncommitted" "and says why"
+[ "$(branch_of "$d")" = main ] && ok "and the checkout is not switched" || bad "and the checkout is not switched"
+
+# A branch from before ./start.sh --prod: the checkout must not land where this script is missing.
+d="$(mkorigin pullold)"
+u="$work/pullold-up"; git -C "$u" switch -q main
+git -C "$u" rm -q scripts/prod/deploy.sh && gitc -C "$u" commit -q -m "an old main" && git -C "$u" push -q origin main
+git -C "$d" fetch -q origin && git -C "$d" switch -q -c develop --track origin/develop
+outcome "$d" scripts/prod/update.sh main
+expect_status nonzero "a branch that predates ./start.sh --prod is refused"
+expect_out "predates" "and says why, and what to do"
+[ "$(branch_of "$d")" = develop ] && [ -f "$d/scripts/prod/deploy.sh" ] \
+  && ok "before the checkout is switched to it" || bad "before the checkout is switched to it ($(branch_of "$d"))"
+
+outcome "$d" scripts/prod/update.sh feat/x
+[ "$status" = 2 ] && ok "update.sh takes main or develop only" || bad "update.sh takes main or develop only (exit $status)"
+
+d="$(mkrepo noremote)"
+outcome "$d" scripts/prod/update.sh main
+expect_status nonzero "with no origin to fetch from, update.sh stops"
+expect_out "git fetch from origin failed" "and says so"
+
+# deploy.sh --branch: pull, then run the deploy as the pulled version writes it.
+d="$(mkorigin deploybranch)"
+u="$work/deploybranch-up"; git -C "$u" switch -q develop
+sed 's/^cd "\$root"$/cd "$root"; say "THE PULLED DEPLOY"/' "$u/scripts/prod/deploy.sh" >"$u/deploy.new" && mv "$u/deploy.new" "$u/scripts/prod/deploy.sh"
+gitc -C "$u" commit -q -am "a newer deploy" && git -C "$u" push -q origin develop
+outcome "$d" scripts/prod/deploy.sh --branch develop
+expect_status 0 "deploy.sh --branch develop runs to the end"
+expect_out "fetching develop" "it pulls develop first"
+expect_out "THE PULLED DEPLOY" "then runs the deploy script it just pulled, not the one it started as"
+expect_out "deploying develop" "and deploys develop, without --allow-branch"
+expect_out "not a release" "saying it is not a release"
+expect_log "$d" "up -d --build --wait" "and builds the stack"
+[ "$(head_of "$d" HEAD)" = "$(head_of "$d" origin/develop)" ] && ok "at origin's latest develop" || bad "at origin's latest develop"
+
+d="$(mkorigin deploynodocker)"
+before="$(head_of "$d" HEAD)"
+EXTRA_ENV="STUB_INFO_EXIT=1"; outcome "$d" scripts/prod/deploy.sh --branch develop; EXTRA_ENV=""
+expect_status nonzero "deploy.sh --branch with Docker down stops"
+expect_out "Docker daemon" "and says so"
+expect_no_out "fetching" "before it pulls"
+[ "$(branch_of "$d")" = main ] && [ "$(head_of "$d" HEAD)" = "$before" ] && ok "so the checkout stays on what runs" || bad "so the checkout stays on what runs"
+
+d="$(mkrepo deploynoremote)"
+outcome "$d" scripts/prod/deploy.sh --branch main
+expect_status nonzero "deploy.sh --branch stops when the pull fails"
+expect_no_log "$d" "--build" "before anything is built"
+
+d="$(mkrepo deployflags)"
+outcome "$d" scripts/prod/deploy.sh --branch feat/x
+[ "$status" = 2 ] && ok "deploy.sh --branch takes main or develop only" || bad "deploy.sh --branch takes main or develop only (exit $status)"
+outcome "$d" scripts/prod/deploy.sh --stop --branch main
+[ "$status" = 2 ] && ok "deploy.sh --stop with --branch exits 2" || bad "deploy.sh --stop with --branch exits 2 (exit $status)"
+outcome "$d" scripts/prod/deploy.sh --branch
+[ "$status" = 2 ] && ok "deploy.sh --branch with no name exits 2" || bad "deploy.sh --branch with no name exits 2 (exit $status)"
+
+d="$(mkrepo develophost)"
+git -C "$d" switch -q -c develop
+outcome "$d" scripts/prod/preflight.sh host
+expect_status 0 "develop checked out is accepted without --allow-branch"
+expect_out "not a release" "with a warning that it is not a release"
+
 # --- the flags of start.sh ------------------------------------------------------------------
 # start.sh parses its flags before it does anything, so these are safe to run for real.
 sh_out() { if bash "$root/start.sh" "$@" >"$work/out" 2>&1; then status=0; else status=$?; fi; }
@@ -356,6 +489,18 @@ sh_out --allow-branch
 sh_out --help
 [ "$status" = 0 ] && ok "start.sh: --help exits 0" || bad "start.sh: --help exits 0 (exit $status)"
 expect_out "--prod" "and describes --prod"
+sh_out --branch develop
+[ "$status" = 2 ] && ok "start.sh: --branch without --prod exits 2" || bad "start.sh: --branch without --prod exits 2 (exit $status)"
+sh_out --prod --branch feat/x
+[ "$status" = 2 ] && ok "start.sh: --branch takes main or develop only" || bad "start.sh: --branch takes main or develop only (exit $status)"
+sh_out --prod --branch
+[ "$status" = 2 ] && ok "start.sh: --branch with no name exits 2" || bad "start.sh: --branch with no name exits 2 (exit $status)"
+sh_out --prod --branch develop --no-pull
+[ "$status" = 2 ] && ok "start.sh: --branch and --no-pull together exit 2" || bad "start.sh: --branch and --no-pull together exit 2 (exit $status)"
+sh_out --prod --stop --branch main
+[ "$status" = 2 ] && ok "start.sh: --stop with --branch exits 2" || bad "start.sh: --stop with --branch exits 2 (exit $status)"
+sh_out --help
+expect_out "--branch main|develop" "and --help describes --branch"
 
 # --- start.sh: the hand-over to --prod, and the first run of --dev ---------------------------------
 # A throwaway checkout that has start.sh and a stub for each tool the first run calls. The docker
@@ -429,6 +574,16 @@ if [ -e "$d/infra/.env" ] || [ -e "$d/apps/server/.env" ]; then bad "and made no
 if [ -s "$d/docker.log" ]; then bad "and started nothing of the development flow"; show "$d/docker.log"; else ok "and started nothing of the development flow"; fi
 outcomeb "$d" start.sh --prod --stop
 expect_out "DEPLOY --stop" "--prod --stop is handed over as it is"
+outcomeb "$d" start.sh --prod --branch develop --no-backup
+expect_out "DEPLOY --branch=develop --no-backup" "--prod --branch develop is handed over, as --branch=develop"
+outcomeb "$d" start.sh --prod --branch=main
+expect_out "DEPLOY --branch=main" "and so is --branch=main"
+outcomeb "$d" start.sh --prod --no-pull --allow-branch
+expect_out "DEPLOY --allow-branch" "--no-pull is start.sh's own: deploy.sh gets no --branch and no --no-pull"
+expect_no_out "--no-pull" "and never sees the word"
+outcomeb "$d" start.sh --prod </dev/null
+expect_out "DEPLOY" "--prod with no version and no terminal deploys what is checked out ..."
+expect_no_out "Which version" "... without asking"
 
 # the first --dev run on a fresh checkout
 d="$(mkdev dev)"

@@ -10,9 +10,13 @@
 #                             (developer mode: a venv with the merlt deps, no mcp-legal-it tools).
 #                           A fresh checkout is prepared here: env files, venv, dependencies, Chromium.
 #   ./start.sh --prod     on the deployment host: build the images and run the whole stack as
-#                           containers, behind the ingress (scripts/prod/deploy.sh). It deploys what
-#                           is checked out: main or a vX.Y.Z tag with a clean tree, unless
-#                           --allow-branch; after a backup, unless --no-backup.
+#                           containers, behind the ingress (scripts/prod/deploy.sh), after a backup
+#                           unless --no-backup. Which version:
+#                             --branch main      pull the released version, and deploy it
+#                             --branch develop   pull the latest work, and deploy it
+#                             --no-pull          what is checked out: main, develop or a vX.Y.Z
+#                                                tag with a clean tree, unless --allow-branch
+#                           With none of the three, in a terminal, it asks; otherwise --no-pull.
 #   ./start.sh --prod --stop
 #                         stop the production stack (containers and volumes stay).
 set -e
@@ -20,7 +24,11 @@ set -e
 usage() {
     cat <<'EOF'
 Usage: ./start.sh [--dev]                                  the development stack (the default)
-       ./start.sh --prod [--allow-branch] [--no-backup]    deploy what is checked out, on the production host
+       ./start.sh --prod --branch main|develop [--no-backup]
+                                                           pull that branch and deploy it, on the production host
+       ./start.sh --prod --no-pull [--allow-branch] [--no-backup]
+                                                           deploy what is checked out, without pulling
+       ./start.sh --prod                                   ask which of the three (in a terminal)
        ./start.sh --prod --stop                            stop the production stack (containers and volumes stay)
 EOF
 }
@@ -28,22 +36,45 @@ EOF
 # The flags come first: nothing is started, created or checked before they are understood.
 MODE=""
 PROD_ARGS=()
-for arg in "$@"; do
+BRANCH=""; NO_PULL=""; STOP=""
+while [ "$#" -gt 0 ]; do
+    arg="$1"
     case "$arg" in
         --dev|--prod)
             if [ -n "$MODE" ] && [ "$MODE" != "${arg#--}" ]; then
                 echo "Choose --dev or --prod, not both." >&2; usage >&2; exit 2
             fi
             MODE="${arg#--}" ;;
-        --stop|--allow-branch|--no-backup) PROD_ARGS+=("$arg") ;;
+        --stop) STOP=1; PROD_ARGS+=("$arg") ;;
+        --allow-branch|--no-backup) PROD_ARGS+=("$arg") ;;
+        --no-pull) NO_PULL=1; PROD_ARGS+=("$arg") ;;
+        --branch|--branch=*)
+            if [ "$arg" = --branch ]; then
+                [ "$#" -ge 2 ] || { echo "--branch needs main or develop." >&2; usage >&2; exit 2; }
+                BRANCH="$2"; shift
+            else
+                BRANCH="${arg#--branch=}"
+            fi
+            case "$BRANCH" in
+                main|develop) ;;
+                *) echo "--branch takes main or develop, not '$BRANCH'." >&2; usage >&2; exit 2 ;;
+            esac
+            PROD_ARGS+=("--branch=$BRANCH") ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $arg" >&2; usage >&2; exit 2 ;;
     esac
+    shift
 done
 DEFAULTED_TO_DEV=""
 if [ -z "$MODE" ]; then MODE=dev; DEFAULTED_TO_DEV=1; fi
 if [ "$MODE" = dev ] && [ "${#PROD_ARGS[@]}" -gt 0 ]; then
     echo "${PROD_ARGS[*]} only goes with --prod." >&2; usage >&2; exit 2
+fi
+if [ -n "$BRANCH" ] && [ -n "$NO_PULL" ]; then
+    echo "--branch pulls and --no-pull does not: choose one." >&2; usage >&2; exit 2
+fi
+if [ -n "$STOP" ] && { [ -n "$BRANCH" ] || [ -n "$NO_PULL" ]; }; then
+    echo "--stop stops what runs: it takes no --branch or --no-pull." >&2; usage >&2; exit 2
 fi
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
@@ -51,7 +82,30 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 if [ "$MODE" = prod ]; then
-    exec sh "$PROJECT_ROOT/scripts/prod/deploy.sh" "${PROD_ARGS[@]}"
+    # Which version, asked only of a person at a terminal; a script that says nothing gets what
+    # is checked out, as before.
+    if [ -z "$BRANCH" ] && [ -z "$NO_PULL" ] && [ -z "$STOP" ] && [ -t 0 ] && [ -t 1 ]; then
+        on="$(git -C "$PROJECT_ROOT" symbolic-ref -q --short HEAD 2>/dev/null || echo 'detached HEAD')"
+        current="$on $(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || true)"
+        # The default stays on the branch the host already runs: Enter never switches it.
+        case "$on" in main) default=1 ;; develop) default=2 ;; *) default=3 ;; esac
+        echo "Which version to deploy?"
+        echo "  1) main      the released version, pulled from origin"
+        echo "  2) develop   the latest work, pulled from origin (not a release)"
+        echo "  3) what is checked out now ($current), without pulling"
+        printf 'Choice [%s]: ' "$default"
+        read -r choice || choice=""
+        case "${choice:-$default}" in
+            1) PROD_ARGS+=("--branch=main") ;;
+            2) PROD_ARGS+=("--branch=develop") ;;
+            3) ;;
+            *) echo "No such choice: $choice" >&2; exit 2 ;;
+        esac
+    fi
+    # --no-pull is start.sh's own word for "no --branch": deploy.sh does not take it.
+    DEPLOY_ARGS=()
+    for a in ${PROD_ARGS[@]+"${PROD_ARGS[@]}"}; do [ "$a" = --no-pull ] || DEPLOY_ARGS+=("$a"); done
+    exec sh "$PROJECT_ROOT/scripts/prod/deploy.sh" ${DEPLOY_ARGS[@]+"${DEPLOY_ARGS[@]}"}
 fi
 
 # First run on a fresh checkout: the two env files the stack and the server read, from their
