@@ -212,7 +212,7 @@ README states the minimum version.
 
 | `esito` | Status | Content |
 |---|---|---|
-| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione?`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form, text missing: `attributi.testo_assente` says `oscuramento` when the source withholds it) |
+| `trovata` | 200 | `identita`, `attributi`, `testo` (`epigrafe?`, `motivazione?`, `dispositivo?`, each whole), `fonte` (`nome`, `licenza?`, `url?`), `avvisi` (wrong section, archive deduced from the section, unknown section form, text missing: `attributi.testo_assente` says `oscuramento` or `valutazione_oscuramento` when the source withholds it) |
 | `ambigua` | 200 | `candidati`: identity and attributes of each |
 | `non_trovata` | 404 | `motivo` (see below), `archivio_dal` when known, `suggerimento` when found |
 | `fonte_non_raggiungibile` | 503 | `fonte` |
@@ -348,13 +348,17 @@ over the reader. From the top:
    open data leave the reasoning in the epigrafe, the data route splits it
    (§3), so the page shows the blocks as the route divides them. Rendering
    follows S6: within a block, the text nodes spell the received text minus
-   `\n`, as gotcha 23 prescribes for articles. The plan measures the line
-   breaks of Italgiure's OCR and chooses the CSS that reflows them without
-   touching a character. Text is rendered as React text, never as HTML. The
-   blocks are labelled «Epigrafe», «Motivazione» and «Dispositivo»; an epigrafe
-   without a motivazione holds the reasoning too and is labelled «Testo»
-   (decided by the owner on 2026-10-04). A decision without its text shows no
-   block.
+   `\n`, as gotcha 23 prescribes for articles. Italgiure's texts carry no line
+   break at all (measured on 2026-10-04: 45 of 45 sampled texts, up to 82,322
+   characters), so the data route restores the paragraphs by inserting a blank
+   line before each heading («FATTI DI CAUSA», «RAGIONI DELLA DECISIONE»,
+   «Rilevato che:» …), before «P.Q.M.» and before each numbered point that
+   starts a sentence, and changes nothing else (decided by the owner on
+   2026-10-04); the page draws each group of lines between blank lines as a
+   paragraph. Text is rendered as React text, never as HTML. The blocks are
+   labelled «Epigrafe», «Motivazione» and «Dispositivo»; an epigrafe without a
+   motivazione holds the reasoning too and is labelled «Testo» (decided by the
+   owner on 2026-10-04). A decision without its text shows no block.
 5. **The source**, at the foot: "Fonte: Corte di cassazione — archivio pubblico
    SentenzeWeb (Italgiure)" or "Fonte: Corte costituzionale — dati aperti". A
    dossier's PDF names it too. Neither shows the licence (the owner's decisions
@@ -474,8 +478,8 @@ repository.
   the source withholds a text while it removes personal data (Italgiure
   answers with its own notice), the page shows the decision's particulars and
   says so: the notice is never shown as the text. It gives that reason only
-  when the source did (`attributi.testo_assente` is `oscuramento`): a text
-  missing for any other reason carries none.
+  when the source did (`attributi.testo_assente` is `oscuramento` or
+  `valutazione_oscuramento`): a text missing for any other reason carries none.
 - **Login.** No open redirect (§5).
 - **Imports.** Imported items are untrusted (§6).
 - **Licences.** The README's third-party sentence names the Corte di cassazione

@@ -9,6 +9,7 @@ from visualex_api.services.decisions import italgiure
 from visualex_api.services.decisions.italgiure import (
     ItalgiureReader,
     SourceAnswerError,
+    paragraphs,
     to_decision,
 )
 from visualex_api.services.http_client import HttpResult
@@ -161,6 +162,50 @@ def test_a_record_without_text_or_notice_gives_no_cause(monkeypatch):
     # never presented as the source's anonymisation: nothing said why
     assert d.testo == {} and d.testo_assente is None
     assert warnings == [("Italgiure record without text", {"id": "snciv2024300001S"})]
+
+
+def test_the_valuation_notice_is_never_the_text():
+    d = to_decision({"numdec": "5722", "anno": "2022", "szdec": "3",
+                     "ocr": ["in fase di valutazione oscuramento"]}, "civile")
+    assert d.testo == {} and d.testo_assente == "valutazione_oscuramento"
+
+
+def test_a_short_stub_about_obscuring_is_never_the_text():
+    stub = "Oscuramento disposto Numero registro generale 21174/2023 Numero sezionale 1"
+    d = to_decision({"numdec": "1", "anno": "2025", "ocr": [stub]}, "civile")
+    assert d.testo == {} and d.testo_assente is None
+
+
+@pytest.mark.parametrize("text,expected", [
+    # an upper-case heading, and P.Q.M.
+    ("composta dai magistrati FATTI DI CAUSA La Corte d'appello ha deciso. RAGIONI DELLA DECISIONE "
+     "Il ricorso è fondato. P.Q.M. La Corte accoglie il ricorso.",
+     "composta dai magistrati \n\nFATTI DI CAUSA La Corte d'appello ha deciso. \n\nRAGIONI DELLA DECISIONE "
+     "Il ricorso è fondato. \n\nP.Q.M. La Corte accoglie il ricorso."),
+    # a mixed-case lead and the numbered point right after it
+    ("Presidente e relatore. Rilevato che: 1.L'Agenzia propone ricorso. 2. Resiste il contribuente.",
+     "Presidente e relatore. \n\nRilevato che: \n\n1.L'Agenzia propone ricorso. \n\n2. Resiste il contribuente."),
+    # sub-points and a point after a code abbreviation
+    ("Il motivo è infondato. 2.1. Come statuito. 2.1.2. La sentenza. Ai sensi dell'art. 360 c.p.c. 3. La Corte rigetta.",
+     "Il motivo è infondato. \n\n2.1. Come statuito. \n\n2.1.2. La sentenza. Ai sensi dell'art. 360 c.p.c. \n\n3. La Corte rigetta."),
+    # a number after a word that introduces numbers is not a point
+    ("Come prevede l'art. 47. Il termine decorre dalla notifica, secondo il n. 3. La parte resiste.",
+     "Come prevede l'art. 47. Il termine decorre dalla notifica, secondo il n. 3. La parte resiste."),
+    # a «P. Q. M.» with spaces, and a point with a dash
+    ("Così deciso. 4 - La Corte. P. Q. M. rigetta.",
+     "Così deciso. \n\n4 - La Corte. \n\nP. Q. M. rigetta."),
+    # nothing to mark
+    ("Il ricorso è inammissibile per tardività.", "Il ricorso è inammissibile per tardività."),
+])
+def test_paragraphs_are_restored_with_blank_lines_only(text, expected):
+    assert paragraphs(text) == expected
+    assert paragraphs(text).replace("\n", "") == text.replace("\n", "")
+
+
+def test_a_decision_comes_with_its_paragraphs():
+    d = to_decision({"numdec": "1", "anno": "2024",
+                     "ocr": "Premessa. FATTI DI CAUSA Il fatto. P.Q.M. Rigetta."}, "civile")
+    assert d.testo["motivazione"] == "Premessa. \n\nFATTI DI CAUSA Il fatto. \n\nP.Q.M. Rigetta."
 
 
 @pytest.mark.live

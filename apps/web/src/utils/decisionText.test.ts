@@ -8,6 +8,13 @@ describe('decisionParagraphs', () => {
     expect(paragraphs).toEqual([['LA CORTE', 'SUPREMA DI CASSAZIONE'], ['  ha pronunciato', 'la seguente'], ['ORDINANZA']]);
     expect(paragraphs.flat().join('')).toBe(text.replaceAll('\n', ''));
   });
+
+  it('keeps the space that ends a paragraph the server restored with a blank line', () => {
+    const text = 'Premessa. \n\nFATTI DI CAUSA Il fatto. \n\nP.Q.M. Rigetta.';
+    const paragraphs = decisionParagraphs(text);
+    expect(paragraphs).toEqual([['Premessa. '], ['FATTI DI CAUSA Il fatto. '], ['P.Q.M. Rigetta.']]);
+    expect(paragraphs.flat().join('')).toBe(text.replaceAll('\n', ''));
+  });
 });
 
 describe('hasDecisionText', () => {

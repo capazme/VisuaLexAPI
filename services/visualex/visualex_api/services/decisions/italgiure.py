@@ -9,10 +9,17 @@ the lookup of one decision:
 - the text comes back whole: `ocr` is the reasons, `ocrdis` the dispositivo (often empty at the
   source, which then leaves it at the end of the reasons).
 - a decision whose text the source withholds comes back with the source's own notice as its
-  text ("La sentenza richiesta è in fase di oscuramento": personal data are being removed).
-  The notice is not the court's text: the decision is returned without one, and with
-  `testo_assente` "oscuramento". A record with neither a text nor the notice is returned
-  without a text and without a cause, and logged: the source said nothing about why.
+  text, while personal data are being removed: "La sentenza richiesta è in fase di
+  oscuramento" (`testo_assente` "oscuramento"), "in fase di valutazione oscuramento"
+  (`testo_assente` "valutazione_oscuramento"), and rarely a stub such as "Oscuramento disposto
+  Numero registro generale …" (no cause). A text of at most 300 characters that mentions
+  "oscuramento" is never the court's text: the decision is returned without one. A record with
+  neither a text nor a notice is returned without a text and without a cause, and logged: the
+  source said nothing about why.
+- the text arrives as one line (measured on 2026-10-04: 45 of 45 sampled texts, up to 82,322
+  characters). `paragraphs` restores the paragraphs by inserting blank lines before the
+  headings, "P.Q.M." and the numbered points, and changes nothing else: a note anchored to the
+  text never moves.
 
 The archive is a moving window (in 2026 it starts in 2021); its start is read from the
 archive, never written here.
@@ -39,11 +46,49 @@ SOURCE = {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgi
 TIPI = {"s": "sentenza", "sentenza": "sentenza", "o": "ordinanza", "ordinanza": "ordinanza",
         "ordinanza interlocutoria": "ordinanza interlocutoria", "d": "decreto",
         "decreto": "decreto"}
-# Italgiure's stand-in for a text it withholds while personal data are removed (measured on
-# 2026-10-02: about 6% of civil records and 33,000 penal ones, in every year). A real text is
-# never this short; the length bound keeps a real text that quotes the phrase.
-_WITHHELD = "in fase di oscuramento"
+# Italgiure's stand-ins for a text it withholds while personal data are removed (counted on
+# 2026-10-04, archive-wide): «La sentenza richiesta è in fase di oscuramento» (10,789 civil and
+# 32,898 penal records), «in fase di valutazione oscuramento» (21,168 civil and 17,175 penal),
+# and rarely a stub such as «Oscuramento disposto Numero registro generale …». A real text is
+# never this short; the bound keeps a real text that discusses obscuring.
 _WITHHELD_MAX = 300
+_WITHHELD_CAUSES = (("in fase di valutazione oscuramento", "valutazione_oscuramento"),
+                    ("in fase di oscuramento", "oscuramento"))
+
+# Italgiure's text arrives as one line (measured on 2026-10-04: 45 of 45 sampled texts, up to
+# 82,322 characters). Paragraphs are restored by inserting blank lines and nothing else: a note
+# anchored to the text never moves (line breaks are invisible to anchors, gotcha 23), and the
+# rule can be refined later without moving one.
+_HEADINGS = ("RITENUTO IN FATTO", "CONSIDERATO IN DIRITTO", "FATTI DI CAUSA", "RAGIONI DELLA DECISIONE",
+             "MOTIVI DELLA DECISIONE", "SVOLGIMENTO DEL PROCESSO", "RILEVATO CHE", "CONSIDERATO CHE",
+             "RITENUTO CHE", "PREMESSO CHE", "OSSERVA")
+_HEADING = re.compile(r"(?<![A-Za-zÀ-ÿ])(?:" + "|".join(re.escape(h) for h in _HEADINGS)
+                      + r")(?![A-Za-zÀ-ÿ])")
+_LEAD = re.compile(r"(?<=[.;:!?»”\"] )(?:Rilevato che|Considerato che|Ritenuto che|Premesso che|"
+                   r"Osserva|Rileva)\s?[:,]")
+_PQM = re.compile(r"(?<![A-Za-z])P\.\s?Q\.\s?M\.?")
+_POINT = re.compile(r"(?<=[.;:!?»”\"] )\d{1,2}(?:\.\d{1,2}){0,3}\.?\s?(?:[-–]\s?)?(?=[A-ZÀ-Ý«])")
+# words after which a number is part of a citation, not a numbered point
+_BEFORE_NUMBER = frozenset({"art", "artt", "n", "nn", "co", "comma", "lett", "pag", "pagg", "par",
+                            "cap", "sez", "cfr", "v", "vol", "p", "pp", "nota", "tab", "all", "doc"})
+
+
+def paragraphs(text: str) -> str:
+    """The text with a blank line before each heading, «P.Q.M.» and numbered point that starts a
+    sentence; nothing else changes: without its line breaks it is the text without its line
+    breaks."""
+    cuts = {m.start() for regex in (_HEADING, _LEAD, _PQM) for m in regex.finditer(text)}
+    for m in _POINT.finditer(text):
+        word = text[:m.start()].rstrip().rsplit(" ", 1)[-1].rstrip(".").lower()
+        if re.split(r"['’]", word)[-1] not in _BEFORE_NUMBER:  # «dell'art.» is «art.»
+            cuts.add(m.start())
+    cuts.discard(0)
+    pieces, last = [], 0
+    for cut in sorted(cuts):
+        pieces += [text[last:cut], "\n\n"]
+        last = cut
+    pieces.append(text[last:])
+    return "".join(pieces)
 
 
 class SourceAnswerError(Exception):
@@ -73,13 +118,13 @@ def to_decision(doc: dict, archivio: str) -> Decision:
     motivazione = _text(doc.get("ocr")).strip()
     flat = " ".join(motivazione.lower().split())
     testo_assente = None
-    if len(flat) <= _WITHHELD_MAX and _WITHHELD in flat:
+    if len(flat) <= _WITHHELD_MAX and "oscuramento" in flat:
         testo: dict[str, str] = {}  # the source's notice, not the court's text
-        testo_assente = "oscuramento"
+        testo_assente = next((cause for phrase, cause in _WITHHELD_CAUSES if phrase in flat), None)
     else:
-        testo = {key: value for key, value in (("motivazione", motivazione),
-                                                ("dispositivo", _text(doc.get("ocrdis")).strip()))
-                 if value}
+        testo = {key: paragraphs(value) for key, value in (
+            ("motivazione", motivazione), ("dispositivo", _text(doc.get("ocrdis")).strip()))
+            if value}
     decision = Decision(
         identita=Identity("cassazione", int(_scalar(doc.get("numdec"))),
                           int(_scalar(doc.get("anno"))), archivio),
@@ -93,7 +138,7 @@ def to_decision(doc: dict, archivio: str) -> Decision:
         testo=testo,
         fonte=dict(SOURCE),
     )
-    if not testo and testo_assente is None:
+    if not testo and not flat:
         # no text and no notice (a missing `ocr`, a renamed field): never presented as the
         # source's anonymisation
         log.warning("Italgiure record without text", id=_scalar(doc.get("id")))

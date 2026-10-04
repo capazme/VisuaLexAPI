@@ -219,6 +219,8 @@ describe('how a decision is named', () => {
   it('a missing text, and why only when the source said so', () => {
     expect(describeNotice({ tipo: 'testo_non_disponibile' }, { sezione: '3', testo_assente: 'oscuramento' }))
       .toBe('Testo non disponibile presso la fonte: la Corte di cassazione lo indica come in fase di oscuramento dei dati personali.');
+    expect(describeNotice({ tipo: 'testo_non_disponibile' }, { testo_assente: 'valutazione_oscuramento' }))
+      .toBe("Testo non disponibile presso la fonte: la Corte di cassazione lo indica come in fase di valutazione per l'oscuramento dei dati personali.");
     expect(describeNotice({ tipo: 'testo_non_disponibile' }, { sezione: '3' })).toBe('Testo non disponibile presso la fonte.');
     expect(describeNotice({ tipo: 'testo_non_disponibile' })).toBe('Testo non disponibile presso la fonte.');
   });

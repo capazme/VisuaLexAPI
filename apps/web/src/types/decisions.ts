@@ -26,7 +26,7 @@ export interface DecisionAttributes {
   relatore?: string;
   presidente?: string;
   materia?: string;
-  /** Why there is no text, only when the source said why: today only `oscuramento`. */
+  /** Why there is no text, only when the source said why: `oscuramento` or `valutazione_oscuramento`. */
   testo_assente?: string;
 }
 

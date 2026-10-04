@@ -204,9 +204,14 @@ export function describeNotice(notice: DecisionNotice, attrs: DecisionAttributes
         : `${lead} ${the} indicata è quella ${notice.archivio}.`;
     }
     case 'testo_non_disponibile':
-      return attrs.testo_assente === 'oscuramento'
-        ? 'Testo non disponibile presso la fonte: la Corte di cassazione lo indica come in fase di oscuramento dei dati personali.'
-        : 'Testo non disponibile presso la fonte.';
+      switch (attrs.testo_assente) {
+        case 'valutazione_oscuramento':
+          return "Testo non disponibile presso la fonte: la Corte di cassazione lo indica come in fase di valutazione per l'oscuramento dei dati personali.";
+        case 'oscuramento':
+          return 'Testo non disponibile presso la fonte: la Corte di cassazione lo indica come in fase di oscuramento dei dati personali.';
+        default:
+          return 'Testo non disponibile presso la fonte.';
+      }
     default: {
       // a new kind of notice fails to compile here, until it has its sentence
       const unhandled: never = notice;
