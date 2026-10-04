@@ -26,9 +26,23 @@ def upgrade() -> None:
         "ALTER TABLE merlt_ingestion_batches ADD CONSTRAINT check_batch_source "
         "CHECK (source IN ('visualex_tree','italia_corpus','massimario'))"
     )
+    op.execute(
+        "DO $$ BEGIN "
+        "IF to_regclass('bridge_table') IS NOT NULL THEN "
+        "ALTER TABLE bridge_table ADD COLUMN IF NOT EXISTS expert_affinity JSONB; "
+        "IF NOT EXISTS (SELECT 1 FROM pg_index WHERE indrelid = 'bridge_table'::regclass AND indisunique "
+        "AND pg_get_indexdef(indexrelid) LIKE '%(chunk_id, graph_node_urn)') THEN "
+        "CREATE UNIQUE INDEX uq_bridge_chunk_node ON bridge_table (chunk_id, graph_node_urn); "
+        "END IF; "
+        "CREATE INDEX IF NOT EXISTS idx_bridge_source ON bridge_table (source); "
+        "END IF; END $$"
+    )
 
 
 def downgrade() -> None:
+    # expert_affinity stays: the ORM model expects it
+    op.execute("DROP INDEX IF EXISTS uq_bridge_chunk_node")
+    op.execute("DROP INDEX IF EXISTS idx_bridge_source")
     op.execute("ALTER TABLE merlt_ingestion_batches DROP CONSTRAINT IF EXISTS check_batch_source")
     op.execute(
         "ALTER TABLE merlt_ingestion_batches ADD CONSTRAINT check_batch_source "

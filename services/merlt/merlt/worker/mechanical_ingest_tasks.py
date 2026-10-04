@@ -168,8 +168,17 @@ async def _run_promote(batch_id: str, force: bool) -> dict:
                 "forced": force,
             },
         }
+        # decided while the session is open; the job is enqueued once the row is committed
+        massimario = batch.source == "massimario"
+        if massimario:
+            total = len((batch.extras or {}).get("chunks") or [])
+            batch.stats = {**batch.stats, "vectors": {"done": 0, "total": total}}
         await session.commit()
 
+    if massimario:
+        from merlt.worker.massimario_tasks import enqueue_index_slice
+
+        enqueue_index_slice(batch_id, 0)
     log.info("mechanical_ingest.promote.done", batch_id=batch_id, **result)
     return {"batch_id": batch_id, "status": "promoted", **result}
 

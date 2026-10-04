@@ -402,6 +402,56 @@ class BridgeTable:
             log.info(f"Batch inserted {len(params)} mappings into {self.config.table_name}")
             return len(params)
 
+    async def upsert_mappings_batch(self, mappings: List[Dict[str, Any]]) -> int:
+        """Insert or update mappings on (chunk_id, graph_node_urn): re-running an ingestion never duplicates."""
+        if not self._connected:
+            raise RuntimeError("Not connected to PostgreSQL. Call connect() first.")
+        if not mappings:
+            return 0
+        upsert_sql = text(f"""
+            INSERT INTO {self.config.table_name}
+            (chunk_id, graph_node_urn, node_type, relation_type, confidence, chunk_text, source, metadata)
+            VALUES (:chunk_id, :graph_node_urn, :node_type, :relation_type, :confidence, :chunk_text, :source, CAST(:metadata AS jsonb))
+            ON CONFLICT (chunk_id, graph_node_urn) DO UPDATE SET
+                node_type = EXCLUDED.node_type, relation_type = EXCLUDED.relation_type,
+                confidence = EXCLUDED.confidence, chunk_text = EXCLUDED.chunk_text,
+                source = EXCLUDED.source, metadata = EXCLUDED.metadata, updated_at = CURRENT_TIMESTAMP
+        """)
+        async with self._session_maker() as session:
+            for m in mappings:
+                metadata = m.get("metadata") or m.get("extra_metadata")
+                await session.execute(upsert_sql, {
+                    "chunk_id": str(m["chunk_id"]),
+                    "graph_node_urn": m["graph_node_urn"],
+                    "node_type": m["node_type"],
+                    "relation_type": m.get("relation_type"),
+                    "confidence": m.get("confidence"),
+                    "chunk_text": m.get("chunk_text"),
+                    "source": m.get("source"),
+                    "metadata": json.dumps(metadata) if metadata else None,
+                })
+            await session.commit()
+        return len(mappings)
+
+    async def count_by_source(self, source: str) -> int:
+        if not self._connected:
+            raise RuntimeError("Not connected to PostgreSQL. Call connect() first.")
+        async with self._session_maker() as session:
+            result = await session.execute(
+                text(f"SELECT count(*) FROM {self.config.table_name} WHERE source = :source"), {"source": source}
+            )
+            return int(result.scalar())
+
+    async def delete_by_source(self, source: str) -> int:
+        if not self._connected:
+            raise RuntimeError("Not connected to PostgreSQL. Call connect() first.")
+        async with self._session_maker() as session:
+            result = await session.execute(
+                text(f"DELETE FROM {self.config.table_name} WHERE source = :source"), {"source": source}
+            )
+            await session.commit()
+            return result.rowcount
+
     async def get_nodes_for_chunk(
         self,
         chunk_id: UUID,

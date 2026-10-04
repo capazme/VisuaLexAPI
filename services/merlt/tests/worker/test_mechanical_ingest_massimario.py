@@ -77,8 +77,11 @@ async def test_massimario_promotion_uses_its_own_writer():
          patch("merlt.storage.graph.client.FalkorDBClient", return_value=graph), \
          patch("merlt.pipeline.massimario.promote.promote_massimario_graph",
                new=AsyncMock(return_value={"nodes_merged": 1, "edges_merged": 0, "edges_skipped": 0})) as own, \
-         patch("merlt.pipeline.mechanical_ingestion.promote.promote_batch", new=AsyncMock()) as generic:
+         patch("merlt.pipeline.mechanical_ingestion.promote.promote_batch", new=AsyncMock()) as generic, \
+         patch("merlt.worker.massimario_tasks.enqueue_index_slice") as enqueue:
         result = await tasks._run_promote("b1", False)
     assert result["status"] == "promoted"
     own.assert_awaited_once()
     generic.assert_not_awaited()
+    enqueue.assert_called_once_with("b1", 0)
+    assert batch.stats["vectors"] == {"done": 0, "total": 0}

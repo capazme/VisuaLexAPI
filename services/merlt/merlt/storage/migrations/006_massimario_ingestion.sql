@@ -14,3 +14,18 @@ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'check_batch_source'
         CHECK (source IN ('visualex_tree','italia_corpus','massimario'));
 END IF;
 END $$;
+
+-- The bridge lives in the same database; guarded because a fresh database gets it
+-- from the seed DDL. The DDL and the ORM already declare UNIQUE (chunk_id,
+-- graph_node_urn), which ON CONFLICT needs: a unique index is added only to a
+-- table that lacks one. expert_affinity is in the ORM model but not in the seed DDL.
+DO $$ BEGIN
+IF to_regclass('bridge_table') IS NOT NULL THEN
+    ALTER TABLE bridge_table ADD COLUMN IF NOT EXISTS expert_affinity JSONB;
+    IF NOT EXISTS (SELECT 1 FROM pg_index WHERE indrelid = 'bridge_table'::regclass AND indisunique
+                   AND pg_get_indexdef(indexrelid) LIKE '%(chunk_id, graph_node_urn)') THEN
+        CREATE UNIQUE INDEX uq_bridge_chunk_node ON bridge_table (chunk_id, graph_node_urn);
+    END IF;
+    CREATE INDEX IF NOT EXISTS idx_bridge_source ON bridge_table (source);
+END IF;
+END $$;
