@@ -324,6 +324,17 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(await prisma.dossierItem.count()).toBe(0);
   });
 
+  it('marks the norms an exchanged token adds with the connection, and not those the user adds', async () => {
+    const { apiToken } = await delegatedToken(alice);
+    await request(app)
+      .post(`/api/dossiers/${dossierId}/norms`)
+      .set({ Authorization: `Bearer ${apiToken}` })
+      .send({ references: ['art. 2043 c.c.'] });
+    await addNorms(alice, dossierId, ['art 2059 cc']);
+    const read = await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice));
+    expect(read.body.items.map((i: { created_by: unknown }) => i.created_by)).toEqual([{ clientName: 'Claude Code' }, null]);
+  });
+
   it('is open to an exchanged token with dossier:write, at two points per reference', async () => {
     const { apiToken } = await delegatedToken(alice);
     const bearer = { Authorization: `Bearer ${apiToken}` };
