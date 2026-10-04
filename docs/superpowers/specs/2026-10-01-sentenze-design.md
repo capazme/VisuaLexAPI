@@ -236,9 +236,10 @@ year may be a different decision.
 - **Requests.** A plain `GET` of the site for the session cookie, then a `POST`
   to the Solr endpoint.
 - **Query.** `kind:"snciv"` or `kind:"snpen"` per archive, `numdec` zero-padded
-  (the plan measures the stored form and keeps the bare number as a fallback),
-  and `anno`. **No section in the query**: the section is compared after
-  reading, so a wrong section is reported instead of silently dropped.
+  to five digits, the form the index stores (measured on 2026-10-02: the bare
+  form never matched, so it is not queried), and `anno`. **No section in the
+  query**: the section is compared after reading, so a wrong section is
+  reported instead of silently dropped.
 - **Fields.** `numdec`, `anno`, `szdec`, `datdep`, `tipoprov`, `materia`,
   `relatore`, `presidente`, `kind`, `ocr` (the motivazione), `ocrdis` (the
   dispositivo, often empty at the source) and the document id.
@@ -272,9 +273,11 @@ year may be a different decision.
 - **Fields.** Type, dates of decision and deposit, ECLI, presidente, relatore
   or redattore, epigrafe, testo, dispositivo. Measured on the 2001–today
   bundle, 3,592 of 4,056 ordinanze (2001–2026) have an empty `testo`, and in
-  3,579 of them the "Ritenuto… / Considerato…" reasoning is inside `epigrafe`:
-  the reader passes the blocks as the source gives them, and how the page
-  labels them is decided with the page.
+  3,577 of them (3,514 + 63) the reasoning inside `epigrafe` starts at a line
+  whose first word is "Ritenuto" or "Considerato": the reader splits such an
+  epigrafe there, searching after "ha pronunciato la seguente" when it is
+  there. An epigrafe without such a line stays whole, and the page labels it
+  «Testo» (decided by the owner on 2026-10-04).
 
 **Common to both readers:**
 
@@ -307,12 +310,13 @@ year may be a different decision.
   - the Vite proxy list;
   - the ingress `@legal` list (`paths.test.mjs` keeps the last two in step);
   - `scrapeGate`'s cost table, at 2 per call, whatever the call sends
-    upstream. A Cassazione lookup sends a homepage `GET` and a Solr `POST` per
-    query: a number below 10000 is queried in two forms, a reference without
-    the archive queries both archives, and a miss adds the query for the
-    archive's start (once a day per archive) and, for the penal archive, the
-    next year's lookup. A Corte costituzionale call makes at most one
-    download, shared by concurrent callers.
+    upstream. A Cassazione search sends at most 10 requests (decided by the
+    owner on 2026-10-04): a homepage `GET` and a Solr `POST` per query, for
+    both archives when none is named, for each archive's start on the first
+    miss of the day, and, for the penal archive, for the next year's lookup.
+    Retries of a failed request are not counted (the owner's reading). A Corte
+    costituzionale call makes at most one download, shared by concurrent
+    callers.
 
 ### 4. The page
 

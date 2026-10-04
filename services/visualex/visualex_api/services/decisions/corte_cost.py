@@ -14,6 +14,9 @@ written, so it cannot be verified: `lookup` raises ValueError (the resolver answ
 
 Ported from mcp-legal-it 2.15's open-data client (same author, relicensed MIT): the bundle
 names and the nested layout are its findings. Here the text is never cut.
+Most ordinanze (3,592 of 4,056 in 2001-2026) leave `testo` empty and carry their reasoning in
+the epigrafe: `split_epigrafe` splits it where the reasoning starts (the owner's rule of
+2026-10-04).
 """
 from __future__ import annotations
 
@@ -89,11 +92,38 @@ def _iso(value: object) -> str | None:
     return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
 
 
+# The owner's rule of 2026-10-04 for a decision whose `testo` the open data leave empty: its
+# reasoning sits in the epigrafe and starts at a line whose first word is "Ritenuto" or
+# "Considerato", in any case, after the header phrase.
+_HEADER_END = re.compile(r"ha\s+pronunciato\s+la\s+seguente", re.IGNORECASE)
+_REASONING_START = re.compile(r"^[ \t]*(ritenuto|considerato)\b", re.IGNORECASE | re.MULTILINE)
+
+
+def split_epigrafe(epigrafe: str) -> tuple[str, str]:
+    """(epigrafe, motivazione) out of an epigrafe that holds the reasoning too. The split point
+    is the first line whose first word is "Ritenuto" or "Considerato", in any case, searched
+    after the phrase "ha pronunciato la seguente" when the epigrafe has it, so that a line of
+    the header never splits it, and from the start otherwise. The epigrafe keeps what comes
+    before, without its trailing whitespace ("" when nothing else comes before); the
+    motivazione starts at the word. Without such a line the epigrafe stays whole and the
+    motivazione is "". Only the whitespace at the boundary is dropped: once notes on decisions
+    exist, this split is a data contract like `clean` (gotcha 23)."""
+    header = _HEADER_END.search(epigrafe)
+    match = _REASONING_START.search(epigrafe, header.end() if header else 0)
+    if match is None:
+        return epigrafe, ""
+    return epigrafe[:match.start()].rstrip(), epigrafe[match.start(1):]
+
+
 def to_decision(rec: dict) -> Decision:
     numero = int(str(rec["numero_pronuncia"]).strip())
     anno = int(str(rec["anno_pronuncia"]).strip())
-    testo = {key: value for key, value in (("epigrafe", clean(rec.get("epigrafe"))),
-                                            ("motivazione", clean(rec.get("testo"))),
+    epigrafe, motivazione = clean(rec.get("epigrafe")), clean(rec.get("testo"))
+    if epigrafe and not motivazione:
+        # most ordinanze: the open data leave `testo` empty and the reasoning in the epigrafe
+        epigrafe, motivazione = split_epigrafe(epigrafe)
+    testo = {key: value for key, value in (("epigrafe", epigrafe),
+                                            ("motivazione", motivazione),
                                             ("dispositivo", clean(rec.get("dispositivo"))))
              if value}
     return Decision(

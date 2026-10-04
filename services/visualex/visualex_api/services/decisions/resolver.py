@@ -146,8 +146,12 @@ class Resolver:
 
     async def resolve(self, ref: Reference) -> Outcome:
         if ref.corte == "corte_costituzionale":
+            # v2 since the reader splits an epigrafe that holds the reasoning (2026-10-04): the
+            # entries cached before, under "corte_cost:<numero>:<anno>", keep it unsplit for up
+            # to 30 days, and a new key never serves them (the sweep deletes them once expired).
+            # Raise the version whenever the reader changes the shape of what it returns.
             decision = await self._lookup(
-                f"corte_cost:{ref.numero}:{ref.anno}", "corte_costituzionale",
+                f"corte_cost:v2:{ref.numero}:{ref.anno}", "corte_costituzionale",
                 CORTE_COST_TIMEOUT, lambda: self.corte_cost.lookup(ref.numero, ref.anno))
             if decision is None:
                 return Outcome("non_trovata", motivo="inesistente")

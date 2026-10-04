@@ -4,7 +4,8 @@ Recovered from the 2026-08-29 round (reverted for priorities, not for a defect) 
 the lookup of one decision:
 - the archive is a filter: civil and penal decisions are numbered in two series that overlap
   (n. 10787/2024 is Sez. III civile and Sez. VII penale);
-- the number is tried zero-padded, as the index stores it, then bare;
+- the number is queried zero-padded to five digits, as the index stores it: the bare form
+  never matched (measured on 2026-10-02), so a lookup is one query per archive;
 - the text comes back whole: `ocr` is the reasons, `ocrdis` the dispositivo (often empty at the
   source, which then leaves it at the end of the reasons).
 - a decision whose text the source withholds comes back with the source's own notice as its
@@ -120,20 +121,19 @@ class ItalgiureReader:
         return data
 
     async def lookup(self, archivio: str, numero: int, anno: int) -> Decision | None:
-        kind = KINDS[archivio]
-        forms = [f"{numero:05d}"] + ([str(numero)] if numero < 10000 else [])
-        for numdec in forms:
-            data = await self._select({
-                "q": f'kind:"{kind}" AND numdec:{numdec} AND anno:{anno}',
-                "rows": "1", "fl": FIELDS})
-            docs = data.get("response", {}).get("docs", [])
-            if docs:
-                try:
-                    return to_decision(docs[0], archivio)
-                except ValueError as exc:  # a record without a readable number or year
-                    raise SourceAnswerError(
-                        "Italgiure ha risposto con una decisione illeggibile") from exc
-        return None
+        # one query: with a homepage GET and a Solr POST per query, a search stays within the
+        # owner's 10 requests (2026-10-04)
+        data = await self._select({
+            "q": f'kind:"{KINDS[archivio]}" AND numdec:{numero:05d} AND anno:{anno}',
+            "rows": "1", "fl": FIELDS})
+        docs = data.get("response", {}).get("docs", [])
+        if not docs:
+            return None
+        try:
+            return to_decision(docs[0], archivio)
+        except ValueError as exc:  # a record without a readable number or year
+            raise SourceAnswerError(
+                "Italgiure ha risposto con una decisione illeggibile") from exc
 
     async def archive_start(self, archivio: str) -> tuple[int, str] | None:
         data = await self._select({"q": f'kind:"{KINDS[archivio]}"', "rows": "1",

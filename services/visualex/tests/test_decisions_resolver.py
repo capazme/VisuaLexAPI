@@ -1,15 +1,19 @@
 """One reference in, one outcome out (design 2026-10-01 §2-§3)."""
+import json
 import threading
 from datetime import date
 
 import pytest
 
+from visualex_api.services.decisions.http import decisions_http_client
+from visualex_api.services.decisions.italgiure import ItalgiureReader
 from visualex_api.services.decisions.model import Decision, Identity, parse_reference
 from visualex_api.services.decisions.resolver import (
     Resolver,
     SourceUnavailable,
     sweep_decision_caches,
 )
+from visualex_api.services.http_client import HttpResult
 from visualex_api.tools.exceptions import NetworkError
 
 TODAY = date(2026, 10, 1)
@@ -229,6 +233,46 @@ async def test_the_corte_costituzionale():
         {"corte": "corte_costituzionale", "numero": 999, "anno": 2014}, TODAY))
     assert found.esito == "trovata" and (missing.esito, missing.motivo) == ("non_trovata",
                                                                             "inesistente")
+
+
+async def test_a_search_sends_at_most_ten_requests_to_italgiure(monkeypatch):
+    # the owner's ceiling (2026-10-04), through the real reader: the worst case is no archive
+    # named, a number below 10000, a miss, the first of the day, and the penal next year. The
+    # client's own retries of a failed request are not counted.
+    methods = []
+    start = json.dumps({"response": {"docs": [{"datdep": "20210217"}]}})
+    empty = json.dumps({"response": {"numFound": 0, "docs": []}})
+
+    async def fake_request(method, url, **kwargs):
+        methods.append(method)
+        if method == "GET":
+            return HttpResult(text="", status=200, headers={})
+        return HttpResult(text=start if "sort" in kwargs["data"] else empty, status=200,
+                          headers={})
+
+    monkeypatch.setattr(decisions_http_client, "request", fake_request)
+    resolver = _resolver(ItalgiureReader())
+    out = await resolver.resolve(ref(numero=123, anno=2023))
+    assert (out.esito, out.motivo) == ("non_trovata", "inesistente")
+    assert len(methods) == 10
+    methods.clear()
+    await resolver.resolve(ref(numero=124, anno=2023))  # each archive's start: once a day
+    assert len(methods) == 6
+
+
+async def test_a_corte_costituzionale_decision_cached_before_the_split_is_never_served():
+    # pull request A cached what its reader returned, the epigrafe unsplit, for up to 30 days:
+    # the key carries a version, so this reader never meets those entries
+    unsplit = Decision(identita=Identity("corte_costituzionale", 3, 2014), tipo="ordinanza",
+                       testo={"epigrafe": "ha pronunciato la seguente\nRitenuto che"})
+    split = Decision(identita=Identity("corte_costituzionale", 3, 2014), tipo="ordinanza",
+                     testo={"epigrafe": "ha pronunciato la seguente", "motivazione": "Ritenuto che"})
+    cache = FakeCache()
+    cache.get_persistent("decisions_found")["corte_cost:3:2014"] = unsplit.to_dict()
+    out = await _resolver(corte_cost=FakeCorteCost([split]), cache=cache).resolve(
+        parse_reference({"corte": "corte_costituzionale", "numero": 3, "anno": 2014}, TODAY))
+    assert out.decisione.testo == split.testo
+    assert "corte_cost:v2:3:2014" in cache.stores["decisions_found"]
 
 
 def test_the_outcomes_as_json():

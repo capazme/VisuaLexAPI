@@ -13,7 +13,12 @@ from datetime import date
 import pytest
 
 from visualex_api.services.decisions import corte_cost
-from visualex_api.services.decisions.corte_cost import CorteCostReader, clean
+from visualex_api.services.decisions.corte_cost import (
+    CorteCostReader,
+    clean,
+    split_epigrafe,
+    to_decision,
+)
 from visualex_api.services.http_client import HttpResult
 from visualex_api.tools.exceptions import NetworkError
 
@@ -292,6 +297,73 @@ def test_the_text_is_decoded_once_and_composed():
     assert clean("&laquo;x&raquo; &#8210; e&#768; &#8364; 5 &amp; C\r\n \r\n \r\nfine  \nR&S") == (
         "«x» ‒ è € 5 & C\n\nfine\nR&S")
     assert clean("\x8a\x9a &#160;x") == "Šš \xa0x"
+
+
+# The owner's rule of 2026-10-04: when the open data leave `testo` empty, the reasoning sits in
+# the epigrafe. One case per shape, on short synthetic texts.
+HEAD = "ha pronunciato la seguente\nORDINANZA\nnel giudizio di legittimità costituzionale"
+
+
+@pytest.mark.parametrize("epigrafe,head,reasoning", [
+    (f"{HEAD}\n\nRitenuto che il giudice dubita;\nConsiderato che la questione è infondata.",
+     HEAD, "Ritenuto che il giudice dubita;\nConsiderato che la questione è infondata."),
+    (f"{HEAD}\nConsiderato che la questione è inammissibile.",
+     HEAD, "Considerato che la questione è inammissibile."),
+    (f"{HEAD}\nConsiderato in fatto che il giudice dubita;\nRitenuto in diritto che",
+     HEAD, "Considerato in fatto che il giudice dubita;\nRitenuto in diritto che"),
+    (f"{HEAD}\n ritenuto che il giudice dubita", HEAD, "ritenuto che il giudice dubita"),
+    (f"{HEAD}\nRITENUTO IN FATTO\nil giudice dubita", HEAD, "RITENUTO IN FATTO\nil giudice dubita"),
+    ("LA CORTE COSTITUZIONALE\nConsiderato il ricorso\nha pronunciato la seguente\nORDINANZA\nRitenuto che",
+     "LA CORTE COSTITUZIONALE\nConsiderato il ricorso\nha pronunciato la seguente\nORDINANZA",
+     "Ritenuto che"),
+    # only a header phrase found in any case passes this one (161/1980, 330/1983)
+    ("LA CORTE COSTITUZIONALE\nConsiderato il ricorso\nha pronunciato la Seguente\nORDINANZA\nRitenuto che",
+     "LA CORTE COSTITUZIONALE\nConsiderato il ricorso\nha pronunciato la Seguente\nORDINANZA",
+     "Ritenuto che"),
+    ("LA CORTE COSTITUZIONALE\nnel giudizio promosso dal pretore\nRitenuto che",
+     "LA CORTE COSTITUZIONALE\nnel giudizio promosso dal pretore", "Ritenuto che"),
+    ("ha pronunciato la seguente\nRitenuto che il giudice dubita",
+     "ha pronunciato la seguente", "Ritenuto che il giudice dubita"),
+    (" \n\n  Ritenuto che il giudice dubita;\nConsiderato che", "",
+     "Ritenuto che il giudice dubita;\nConsiderato che"),
+    # 204/1988 and 132/2000: the reasoning opens with the word, but not first on its line
+    (f"{HEAD}\n1. - Ritenuto, in fatto, che il giudice dubita;\nudito il Giudice relatore. Considerato che",
+     f"{HEAD}\n1. - Ritenuto, in fatto, che il giudice dubita;\nudito il Giudice relatore. Considerato che",
+     ""),
+    (f"{HEAD}\nRilevato che la questione è già decisa.",
+     f"{HEAD}\nRilevato che la questione è già decisa.", ""),
+], ids=["Ritenuto", "Considerato only", "Considerato before Ritenuto", "lower case", "capitals",
+        "a line inside the header", "the header phrase in another case", "no header phrase",
+        "a head of only the header phrase", "a head of only whitespace",
+        "the word not first on its line", "no such line"])
+def test_an_epigrafe_is_split_where_the_reasoning_starts(epigrafe, head, reasoning):
+    assert split_epigrafe(epigrafe) == (head, reasoning)
+    # every character stays but the whitespace at the boundary: the two parts, which never
+    # overlap, joined by one line break are the epigrafe, up to that whitespace
+    gap = epigrafe[len(head):len(epigrafe) - len(reasoning)]
+    assert epigrafe.startswith(head) and epigrafe.endswith(reasoning)
+    assert len(head) + len(reasoning) <= len(epigrafe) and gap.strip() == ""
+
+
+def _record(**fields):
+    return {"numero_pronuncia": "1", "anno_pronuncia": "2010", "tipologia_pronuncia": "O",
+            "testo": "", **fields}
+
+
+def test_the_reader_splits_only_an_epigrafe_whose_testo_the_source_left_empty():
+    epigrafe = f"{HEAD}\nRitenuto che il giudice dubita"
+    assert to_decision(_record(epigrafe=epigrafe, dispositivo="per questi motivi")).testo == {
+        "epigrafe": HEAD, "motivazione": "Ritenuto che il giudice dubita",
+        "dispositivo": "per questi motivi"}
+    # the rule is by shape, not by type: a sentenza without its testo is split too
+    sentenza = to_decision(_record(epigrafe=epigrafe, tipologia_pronuncia="S"))
+    assert sentenza.testo["motivazione"] == "Ritenuto che il giudice dubita"
+    # a decision with its testo is never split
+    assert to_decision(_record(epigrafe=epigrafe, testo="1.- Con ordinanza del 2010")).testo == {
+        "epigrafe": epigrafe, "motivazione": "1.- Con ordinanza del 2010"}
+    # nothing before the reasoning: no epigrafe block, only the motivazione
+    assert to_decision(_record(epigrafe="Ritenuto che il giudice dubita")).testo == {
+        "motivazione": "Ritenuto che il giudice dubita"}
 
 
 @pytest.mark.live

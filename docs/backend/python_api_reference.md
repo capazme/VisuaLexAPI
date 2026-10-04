@@ -259,10 +259,12 @@ reference: the court, the number and the year a citation gives. The text comes b
 never cut. Cassazione decisions come from Italgiure's public archive (SentenzeWeb), Corte
 costituzionale decisions from the court's open data. Behind the ingress the route needs a
 login like the other scraping routes, and a call costs two points of the user's quota,
-whatever it sends upstream. A Cassazione lookup sends a homepage `GET` and a Solr `POST` per
-query: a number below 10000 is queried in two forms, a reference without the archive queries
-both archives, and a miss adds the query for the archive's start (once a day per archive) and,
-for the penal archive, the next year's lookup. A Corte costituzionale call makes at most one
+whatever it sends upstream.
+A Cassazione lookup sends a homepage `GET` and a Solr `POST` per query, at most 10 requests
+in all: a reference without the archive queries both archives (4), a miss adds the query for
+each archive's start, once a day (4), and, for the penal archive, the next year's lookup (2).
+A later miss the same day sends at most 6, a hit in a named archive 2; retries of a failed
+request come on top. A Corte costituzionale call makes at most one
 download, shared by concurrent callers.
 Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.
 
@@ -313,13 +315,15 @@ limit is 1 MB, and the ingress's own page answers).
   `presidente`, `materia`; and `testo_assente`, why there is no text, present only when the
   source said why: `oscuramento` (the source withholds the text while it removes personal
   data).
-- `testo`: the blocks the source gives, each whole: `epigrafe` (Corte costituzionale),
-  `motivazione`, `dispositivo` (a block the source leaves empty is absent). It is `{}` when
-  the decision comes without its text (notice `testo_non_disponibile`). Most Corte
-  costituzionale ordinanze have no `motivazione`: measured on the 2001–today bundle, the
-  source's `testo` field is empty in 3,592 of 4,056 ordinanze (2001–2026), and in 3,579 of
-  them the "Ritenuto… / Considerato…" reasoning is inside `epigrafe`. The blocks are passed
-  on as the source gives them; how the page labels them is decided with the page.
+- `testo`: the whole text, never cut, in blocks: `epigrafe` (Corte costituzionale),
+  `motivazione`, `dispositivo` (a block left empty is absent). It is `{}` when the decision
+  comes without its text (notice `testo_non_disponibile`). The Cassazione's blocks are the
+  source's. When the Corte costituzionale's open data leave their `testo` field empty (3,592 of
+  4,056 ordinanze, 2001–2026), the reasoning is inside the epigrafe, and the reader splits it at
+  the first line whose first word is "Ritenuto" or "Considerato", in any case, searched after
+  "ha pronunciato la seguente" when the epigrafe has it (3,577 of those 3,592): what comes
+  before is `epigrafe`, the rest `motivazione`, and only the whitespace at the boundary is
+  dropped. Without such a line nothing is split, and the reasoning stays in `epigrafe`.
 - `fonte`: `nome`; `licenza` (Corte costituzionale: CC BY-SA 3.0, credited wherever the text
   appears); `url` (Corte costituzionale only: the court's page for that decision, for the
   reader's browser, which this server never contacts). The Cassazione has no `url`.

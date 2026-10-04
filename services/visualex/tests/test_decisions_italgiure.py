@@ -73,13 +73,14 @@ async def test_the_penal_decision_with_the_same_number(monkeypatch):
     assert d.relatore and d.presidente
 
 
-async def test_a_number_below_10000_is_tried_padded_then_bare(monkeypatch):
-    empty = json.dumps({"response": {"numFound": 0, "docs": []}})
-    calls = _serve(monkeypatch, [empty, empty])
+async def test_a_number_below_10000_is_tried_padded_only(monkeypatch):
+    # the index stores the number padded to five digits: the bare form never matched (measured
+    # on 2026-10-02), and every query costs a homepage GET and a Solr POST
+    calls = _serve(monkeypatch, [json.dumps({"response": {"numFound": 0, "docs": []}})])
     assert await ItalgiureReader().lookup("civile", 123, 2024) is None
-    queries = [c[2]["data"]["q"] for c in calls if c[0] == "POST"]
-    assert queries == ['kind:"snciv" AND numdec:00123 AND anno:2024',
-                       'kind:"snciv" AND numdec:123 AND anno:2024']
+    assert [c[2]["data"]["q"] for c in calls if c[0] == "POST"] == [
+        'kind:"snciv" AND numdec:00123 AND anno:2024']
+    assert [c[0] for c in calls] == ["GET", "POST"]
 
 
 async def test_not_found_is_none(monkeypatch):
