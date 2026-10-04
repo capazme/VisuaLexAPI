@@ -2,6 +2,7 @@
 
 **Status:** draft for the owner's review (2 October 2026). Nothing here is built.
 **Decisions it rests on** (the owners' private workspace, cited by ID only): D-036 (the application MCP server is independent of `mcp-legal-it`), D-037 (it lives in this repository as `apps/mcp/`, a separate process), D-040 (the MERL-T graph round comes first, then this spike), D-046 (the owner approves the areas the repository file reserves to the other developer).
+**Second round:** `docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` adds confirmed deletion into a trash, a notes tool and the card tools, and changes E8, §6 "Prompt injection", §8 and §12 below; where they differ, it wins.
 **Deadline:** 31 October 2026 (the owners' Gate 0, criterion 5). The card criterion (3) is served by phase 2.
 
 ## 1. What the spike proves
