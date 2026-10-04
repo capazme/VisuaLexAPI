@@ -22,10 +22,13 @@ const restorableUntil = (): string =>
   new Date(Date.now() + TRASH_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /**
- * How an entry reads in the dialog: the citation of a norm, the title otherwise. A note is
- * just «Nota»: its text may have been written by a model, and must never speak in the dialog.
+ * How an entry reads in the dialog: a norm by the citation the server builds from its
+ * structured fields; anything else by its kind. Titles and note texts may have been
+ * written by a model, and must never speak in the dialog.
  */
-const entryLine = (item: ApiDossierItem): string => (item.item_type === 'note' ? 'Nota' : item.citation ?? item.title);
+const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione' };
+const entryLine = (item: ApiDossierItem): string =>
+  (item.item_type === 'norm' ? item.citation : null) ?? KIND_WORDS[item.item_type] ?? 'Voce';
 
 /** The scopes each tool needs: the HTTP layer refuses a call whose token lacks one (403). */
 export const TOOL_SCOPES: Record<string, string[]> = {
@@ -277,9 +280,10 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         const answer = await confirmWithUser(server, message, { relatedRequestId: extra.requestId, timeoutMs: config.confirmationTimeoutMs });
         if (answer === 'unsupported') throw new ToolError(CANNOT_ASK);
         if (answer !== 'confirmed') return data({ esito: 'annullata', messaggio: NOTHING_DELETED });
+        // The entries shown travel with the move: the server refuses it if the dossier changed meanwhile.
         const moved = await callApi<{ itemCount: number }>(config, caller, DELETE_SCOPE, `/dossiers/${encodeURIComponent(found.id)}/trash`, {
           method: 'POST',
-          body: {},
+          body: { itemIds: items.map((item) => item.id) },
         });
         return data({ dossier_nel_cestino: found.name, voci: moved.itemCount, ripristinabili_fino_al: restorableUntil() });
       }),

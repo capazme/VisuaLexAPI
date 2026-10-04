@@ -9,9 +9,10 @@ export type Confirmation = 'confirmed' | 'declined' | 'unsupported';
 
 const MAX_LINES = 20;
 const MAX_LINE = 120;
-// Stored titles and names reach the dialog, and a model may have written them: no control
-// characters, no markup, and none of the quotes the dialog itself uses around a name.
-const UNSAFE = /[\u0000-\u0009\u000B-\u001F\u007F<>«»]/g;
+// Stored names reach the dialog, and a model may have written them: no control or format
+// characters (direction overrides, zero-width marks, soft hyphens), no line or paragraph
+// separators, no markup, and no quote of any kind that could close or fake the dialog's « ».
+const UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}<>«»‹›“”„‟"]/gu;
 
 const clean = (text: string): string => {
   const flat = text.replace(UNSAFE, '').replace(/\s+/g, ' ').trim();

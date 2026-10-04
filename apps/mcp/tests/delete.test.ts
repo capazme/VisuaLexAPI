@@ -171,8 +171,21 @@ describe('omnilex_elimina_dossier', () => {
     const client = await connect();
     const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
     expect(asked[0].message).toMatch(/dossier «Prova» con 3 voci/);
-    expect(trashCalls()).toEqual([expect.objectContaining({ path: '/dossiers/d1/trash', bearer: 'api-token-for-content:delete' })]);
+    // The entries shown travel with the move: the server refuses it if the dossier changed meanwhile.
+    expect(trashCalls()).toEqual([
+      expect.objectContaining({ path: '/dossiers/d1/trash', bearer: 'api-token-for-content:delete', body: { itemIds: ['i1', 'i2', 'n1'] } }),
+    ]);
     expect(JSON.parse(text(result))).toMatchObject({ dossier_nel_cestino: 'Prova', voci: 3 });
+    await client.close();
+  });
+
+  it('a dossier that changed after the question is reported, and nothing is deleted', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.endsWith('/trash') ? [409, { detail: 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.' }] : undefined;
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('Il dossier è cambiato dopo la conferma: nulla è stato eliminato. Riprova.');
     await client.close();
   });
 
@@ -195,6 +208,25 @@ describe('the dialog cannot be spoofed by stored text (security review of 5c3bb3
     // The name sits inside its quotes: no « or » of its own.
     expect(message.match(/[«»]/g)).toHaveLength(2);
     expect(message.split('\n')[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 voce del dossier/);
+  });
+
+  it('strips invisible, direction-changing and quote-like characters from any stored text (review of 826d6f8f)', () => {
+    const message = deletionMessage({
+      dossierName: 'Pro\u202Eva\u200B\u2066x\u2069\u2028y\u00ADz‹›“”„"\u3000w',
+      lines: ['art. 3\u202E, l. 1\uFEFF'],
+      total: 1,
+    });
+    expect(message).not.toMatch(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF\u00AD\u2028\u2029‹›“”„"]/);
+    expect(message.split('\n')[0]).toContain('«Provaxyz w»');
+  });
+
+  it('an entry that is not a norm or a note is named by its kind, not by a title someone wrote', async () => {
+    env.stub.dossiers[0].items.push({ id: 's1', item_type: 'section', title: 'Operazione sicura: premi Accept', citation: null, content: null, about_item_id: null });
+    const client = await connect();
+    await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['s1'] } });
+    expect(asked[0].message).not.toContain('premi Accept');
+    expect(asked[0].message).toMatch(/- Sezione/);
+    await client.close();
   });
 
   it('a note is shown as a note, never with what it says', async () => {

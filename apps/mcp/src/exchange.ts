@@ -92,6 +92,9 @@ export async function callApi<T>(
       const what = typeof body.quota === 'string' ? QUOTA_WORDS[body.quota] ?? 'operazioni' : 'operazioni';
       throw new ToolError(`Hai raggiunto il limite giornaliero di ${what} tramite applicazioni collegate: si rinnova ${renewal}.`);
     }
+    case 409:
+      // The data changed under the call (a dossier edited while the user confirmed): the server says what.
+      throw new ToolError(`${typeof body.detail === 'string' ? body.detail : 'I dati sono cambiati nel frattempo.'} Riprova.`);
     case 400: {
       const detail = typeof body.detail === 'string' ? body.detail.replace(/\.$/, '') : 'controlla i dati inviati';
       throw new ToolError(`Richiesta non valida: ${detail}.`);
