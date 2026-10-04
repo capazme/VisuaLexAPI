@@ -9,10 +9,19 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
 **no database, no Prisma**, never the Python API. Everything goes through
 `apps/server`.
 
-- **Transport** — Streamable HTTP on one endpoint (`/mcp`), stateless: a fresh
-  `McpServer` and transport per request, JSON responses, `GET`/`DELETE` answer
-  405. SDK `@modelcontextprotocol/sdk` pinned at **1.31.0** (serves 2025-11-25
-  and earlier; a client asking for 2026-07-28, as Claude Code does first, is
+- **Transport** — Streamable HTTP on one endpoint (`/mcp`), with sessions
+  (`src/sessions.ts`; second-round spec §4.5): stateless cannot ask the user to
+  confirm mid-call (an elicitation needs the client's `initialize` and a stream
+  back), measured on 4 October. A session starts at `initialize`, belongs to the
+  user and grant of its token (a refreshed token of the same grant continues it;
+  any other is a 404), answers on SSE streams; `GET` opens the server-to-client
+  stream, `DELETE` ends it. At most 10 sessions per grant and 20 per user (their
+  own oldest closes), 1000 in the process (a new one gets 503, nobody else's is
+  closed); idle 30 minutes → closed; a restart drops them all and clients open
+  new ones (Claude Code does so by itself). Tools read the caller of their own
+  request (`callerOf`), never the one that opened the session. SDK
+  `@modelcontextprotocol/sdk` pinned at **1.31.0** (serves 2025-11-25 and
+  earlier; a client asking for 2026-07-28, as Claude Code does first, is
   negotiated down). Bump it in a task of its own.
 - **Authentication** (`src/auth.ts`) — every request's bearer token is
   introspected at `apps/server`'s `/oauth/introspect` with the server's own
