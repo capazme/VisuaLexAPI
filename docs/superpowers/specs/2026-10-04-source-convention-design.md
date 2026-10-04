@@ -208,20 +208,20 @@ built now.
 | **short** | the article in little room | tabs of a single article, dossier rows, comparison headers, chips (Q&A, links), quick-norm suggestions, the graph's `estremi`, PDF headings |
 | **act citation** | the act alone, as cited | workspace block subtitle, «Fonte:» lines |
 | **act short** | the act in little room | workspace tabs, dossier groups |
-| **act heading** | the act as a title | the graph's act node `titolo`, the dossier group title, the index window title |
+| **act heading** | the act as a title: the name for the acts cited by their own name (the codes cited by name, the Constitution, the preleggi, the disp. att.), the act citation for every other act (decided: the dossier spec `2026-10-04-dossier-per-atto-design.md` §2, interview Q6) | the dossier's act block, the graph's act node `titolo`, the index window title |
 
 ### 3.2 The forms
 
 | Source | citation | short | act citation | act short | act heading |
 |---|---|---|---|---|---|
-| l. 241/1990, art. 2 | `art. 2, l. 7 agosto 1990, n. 241` | `art. 2 l. 241/1990` | `l. 7 agosto 1990, n. 241` | `l. 241/1990` | `Legge 7 agosto 1990, n. 241` |
+| l. 241/1990, art. 2 | `art. 2, l. 7 agosto 1990, n. 241` | `art. 2 l. 241/1990` | `l. 7 agosto 1990, n. 241` | `l. 241/1990` | `l. 7 agosto 1990, n. 241` |
 | c.c., art. 2043 | `art. 2043 c.c.` | `art. 2043 c.c.` | `c.c.` | `c.c.` | `Codice civile` |
 | Cost., art. 81 | `art. 81 Cost.` | `art. 81 Cost.` | `Cost.` | `Cost.` | `Costituzione` |
-| preleggi, art. 12 | `art. 12 preleggi` | `art. 12 preleggi` | `preleggi` | `preleggi` | `Disposizioni sulla legge in generale` |
-| disp. att. c.c., art. 3 | `art. 3 disp. att. c.c.` | `art. 3 disp. att. c.c.` | `disp. att. c.c.` | `disp. att. c.c.` | `Disposizioni per l'attuazione del codice civile` |
-| d.lgs. 196/2003 (codice privacy), art. 7 | `art. 7, d.lgs. 30 giugno 2003, n. 196` | `art. 7 d.lgs. 196/2003` | `d.lgs. 30 giugno 2003, n. 196` | `d.lgs. 196/2003` | `Codice in materia di protezione dei dati personali` |
-| d.p.r. 445/2000, art. 38 | `art. 38, d.p.r. 28 dicembre 2000, n. 445` | `art. 38 d.p.r. 445/2000` | … | `d.p.r. 445/2000` | `Decreto del Presidente della Repubblica 28 dicembre 2000, n. 445` |
-| reg. (UE) 2016/679, art. 5 | `art. 5, reg. (UE) 2016/679` | `art. 5 reg. (UE) 2016/679` | `reg. (UE) 2016/679` | `reg. (UE) 2016/679` | `Regolamento (UE) 2016/679` |
+| preleggi, art. 12 | `art. 12 preleggi` | `art. 12 preleggi` | `preleggi` | `preleggi` | `Preleggi` |
+| disp. att. c.c., art. 3 | `art. 3 disp. att. c.c.` | `art. 3 disp. att. c.c.` | `disp. att. c.c.` | `disp. att. c.c.` | `Disposizioni di attuazione del codice civile` |
+| d.lgs. 196/2003 (codice privacy), art. 7 | `art. 7, d.lgs. 30 giugno 2003, n. 196` | `art. 7 d.lgs. 196/2003` | `d.lgs. 30 giugno 2003, n. 196` | `d.lgs. 196/2003` | `d.lgs. 30 giugno 2003, n. 196` |
+| d.p.r. 445/2000, art. 38 | `art. 38, d.p.r. 28 dicembre 2000, n. 445` | `art. 38 d.p.r. 445/2000` | … | `d.p.r. 445/2000` | `d.p.r. 28 dicembre 2000, n. 445` |
+| reg. (UE) 2016/679, art. 5 | `art. 5, reg. (UE) 2016/679` | `art. 5 reg. (UE) 2016/679` | `reg. (UE) 2016/679` | `reg. (UE) 2016/679` | `reg. (UE) 2016/679` |
 | TFUE, art. 101 | `art. 101 TFUE` | `art. 101 TFUE` | `TFUE` | `TFUE` | `Trattato sul funzionamento dell'Unione europea` |
 
 **Status of each form.** The citation column for national acts is the owner's
@@ -230,7 +230,7 @@ lower case; codes, the Constitution, preleggi and disp. att. by their own name
 and with no comma; an aliased code cited by the act it is). The short forms, the
 EU forms and the new abbreviations were the questions of §9; the owner took
 every recommendation (4 October), so the golden file marks them `decided`. The
-act headings remain `proposed`.
+act headings follow the dossier spec the owner approved (§3.1); the strings of the named acts are the dossier's own table.
 
 ### 3.3 The tables
 

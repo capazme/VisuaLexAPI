@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "How VisuaLex identifies and writes legal sources. Specification: docs/superpowers/specs/2026-10-04-source-convention-design.md. Each expected value carries a status: decided (the owner's words exist), current (what the code does today, kept), proposed (Claude's low-impact call, stated in the spec), open:Qn (waits for question n of the spec, section 9). The owner took every recommendation on 4 October 2026 («per il 31 procedi con le raccomandazione»): no case is open.",
+  "about": "How VisuaLex identifies and writes legal sources. Specification: docs/superpowers/specs/2026-10-04-source-convention-design.md. Each expected value carries a status: decided (the owner's words exist), current (what the code does today, kept), proposed (Claude's low-impact call, stated in the spec), open:Qn (waits for question n of the spec, section 9). Act headings follow the dossier spec the owner approved on 4 October 2026 (2026-10-04-dossier-per-atto-design.md §2, interview Q6): the name for the acts cited by their own name, the act citation for every other act; the names are the dossier's own table (dossierLayout.ts CODE_NAMES), verbatim. The owner took every recommendation on 4 October 2026 («per il 31 procedi con le raccomandazione»): no case is open.",
   "norms": [
     {
       "id": "cc-2043",
@@ -11,7 +11,7 @@
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043", "status": "current"},
         "aliases": {"value": ["urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942-03-16;262~art2043", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043!vig=2024-01-15", "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043@originale"], "status": "proposed"}
       },
-      "labels": {"citation": {"value": "art. 2043 c.c.", "status": "decided"}, "short": {"value": "art. 2043 c.c.", "status": "proposed"}, "act_citation": {"value": "c.c.", "status": "proposed"}, "act_short": {"value": "c.c.", "status": "proposed"}, "act_heading": {"value": "Codice civile", "status": "proposed"}, "authority": {"value": "Re", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 2043 c.c.", "status": "decided"}, "short": {"value": "art. 2043 c.c.", "status": "proposed"}, "act_citation": {"value": "c.c.", "status": "proposed"}, "act_short": {"value": "c.c.", "status": "proposed"}, "act_heading": {"value": "Codice civile", "status": "decided"}, "authority": {"value": "Re", "status": "proposed"}}
     },
     {
       "id": "cc-2645-bis",
@@ -25,28 +25,28 @@
       "note": "The Constitution: cited by its abbreviation, with no comma (owner, 1 October 2026).",
       "input": {"tipo_atto": "costituzione", "numero_articolo": "81"},
       "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art81", "status": "current"}},
-      "labels": {"citation": {"value": "art. 81 Cost.", "status": "decided"}, "short": {"value": "art. 81 Cost.", "status": "proposed"}, "act_citation": {"value": "Cost.", "status": "proposed"}, "act_short": {"value": "Cost.", "status": "proposed"}, "act_heading": {"value": "Costituzione", "status": "proposed"}, "authority": {"value": "Assemblea costituente", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 81 Cost.", "status": "decided"}, "short": {"value": "art. 81 Cost.", "status": "proposed"}, "act_citation": {"value": "Cost.", "status": "proposed"}, "act_short": {"value": "Cost.", "status": "proposed"}, "act_heading": {"value": "Costituzione", "status": "decided"}, "authority": {"value": "Assemblea costituente", "status": "proposed"}}
     },
     {
       "id": "preleggi-12",
       "note": "Annex 1 of the r.d. 262/1942, cited by its own name: never the codice civile, whose decree it shares (round «Testo alla data», applied as recommended).",
       "input": {"tipo_atto": "preleggi", "tipo_atto_reale": "regio decreto", "numero_atto": "262", "data": "1942-03-16", "allegato": "1", "numero_articolo": "12"},
       "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:1", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:1~art12", "status": "current"}},
-      "labels": {"citation": {"value": "art. 12 preleggi", "status": "decided"}, "short": {"value": "art. 12 preleggi", "status": "proposed"}, "act_citation": {"value": "preleggi", "status": "proposed"}, "act_heading": {"value": "Disposizioni sulla legge in generale", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 12 preleggi", "status": "decided"}, "short": {"value": "art. 12 preleggi", "status": "proposed"}, "act_citation": {"value": "preleggi", "status": "proposed"}, "act_heading": {"value": "Preleggi", "status": "decided"}}
     },
     {
       "id": "dispatt-cc-3",
       "note": "The disposizioni di attuazione, in the palette's own spelling: cited by their own name (decided with the preleggi).",
       "input": {"tipo_atto": "disposizioni per l'attuazione del Codice civile e disposizioni transitorie", "tipo_atto_reale": "regio decreto", "numero_atto": "318", "data": "1942-03-30", "allegato": "1", "numero_articolo": "3"},
       "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-30;318:1", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-30;318:1~art3", "status": "current"}},
-      "labels": {"citation": {"value": "art. 3 disp. att. c.c.", "status": "decided"}, "short": {"value": "art. 3 disp. att. c.c.", "status": "proposed"}, "act_citation": {"value": "disp. att. c.c.", "status": "proposed"}, "act_heading": {"value": "Disposizioni per l'attuazione del codice civile", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 3 disp. att. c.c.", "status": "decided"}, "short": {"value": "art. 3 disp. att. c.c.", "status": "proposed"}, "act_citation": {"value": "disp. att. c.c.", "status": "proposed"}, "act_heading": {"value": "Disposizioni di attuazione del codice civile", "status": "decided"}}
     },
     {
       "id": "cpc-183-bis",
       "note": "A procedure code, annex 1 of its decree.",
       "input": {"tipo_atto": "codice di procedura civile", "tipo_atto_reale": "regio decreto", "numero_atto": "1443", "data": "1940-10-28", "allegato": "1", "numero_articolo": "183-bis"},
       "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1940-10-28;1443:1~art183bis", "status": "current"}},
-      "labels": {"citation": {"value": "art. 183-bis c.p.c.", "status": "decided"}, "short": {"value": "art. 183-bis c.p.c.", "status": "proposed"}, "act_heading": {"value": "Codice di procedura civile", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 183-bis c.p.c.", "status": "decided"}, "short": {"value": "art. 183-bis c.p.c.", "status": "proposed"}, "act_heading": {"value": "Codice di procedura civile", "status": "decided"}}
     },
     {
       "id": "cpp-191",
@@ -63,14 +63,14 @@
       "note": "The owner's model: «art. 2, l. 7 agosto 1990, n. 241» — art. in lower case, a comma after the number, the act in lower case (1 October 2026).",
       "input": {"tipo_atto": "legge", "numero_atto": "241", "data": "1990-08-07", "numero_articolo": "2"},
       "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art2", "status": "current"}},
-      "labels": {"citation": {"value": "art. 2, l. 7 agosto 1990, n. 241", "status": "decided"}, "short": {"value": "art. 2 l. 241/1990", "status": "decided"}, "act_citation": {"value": "l. 7 agosto 1990, n. 241", "status": "proposed"}, "act_short": {"value": "l. 241/1990", "status": "decided"}, "act_heading": {"value": "Legge 7 agosto 1990, n. 241", "status": "proposed"}, "authority": {"value": "Parlamento", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 2, l. 7 agosto 1990, n. 241", "status": "decided"}, "short": {"value": "art. 2 l. 241/1990", "status": "decided"}, "act_citation": {"value": "l. 7 agosto 1990, n. 241", "status": "proposed"}, "act_short": {"value": "l. 241/1990", "status": "decided"}, "act_heading": {"value": "l. 7 agosto 1990, n. 241", "status": "decided"}, "authority": {"value": "Parlamento", "status": "proposed"}}
     },
     {
       "id": "privacy-7",
       "note": "An aliased code is cited by the act it is, not by its name (round «Testo alla data»). Q3 asks whether its short label uses an abbreviation.",
       "input": {"tipo_atto": "codice in materia di protezione dei dati personali", "tipo_atto_reale": "decreto legislativo", "numero_atto": "196", "data": "2003-06-30", "numero_articolo": "7"},
       "identity": {"act": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2003-06-30;196", "status": "current"}, "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2003-06-30;196~art7", "status": "current"}},
-      "labels": {"citation": {"value": "art. 7, d.lgs. 30 giugno 2003, n. 196", "status": "decided"}, "short": {"value": "art. 7 d.lgs. 196/2003", "status": "decided"}, "act_citation": {"value": "d.lgs. 30 giugno 2003, n. 196", "status": "proposed"}, "act_short": {"value": "d.lgs. 196/2003", "status": "decided"}, "act_heading": {"value": "Codice in materia di protezione dei dati personali", "status": "proposed"}, "authority": {"value": "Governo", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 7, d.lgs. 30 giugno 2003, n. 196", "status": "decided"}, "short": {"value": "art. 7 d.lgs. 196/2003", "status": "decided"}, "act_citation": {"value": "d.lgs. 30 giugno 2003, n. 196", "status": "proposed"}, "act_short": {"value": "d.lgs. 196/2003", "status": "decided"}, "act_heading": {"value": "d.lgs. 30 giugno 2003, n. 196", "status": "decided"}, "authority": {"value": "Governo", "status": "proposed"}}
     },
     {
       "id": "consumo-33",
@@ -80,14 +80,14 @@
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2005-09-06;206~art33", "status": "current"},
         "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto legislativo:2005-09-06;206~art33"], "status": "proposed"}
       },
-      "labels": {"citation": {"value": "art. 33, d.lgs. 6 settembre 2005, n. 206", "status": "decided"}, "short": {"value": "art. 33 d.lgs. 206/2005", "status": "decided"}, "act_heading": {"value": "Codice del consumo", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 33, d.lgs. 6 settembre 2005, n. 206", "status": "decided"}, "short": {"value": "art. 33 d.lgs. 206/2005", "status": "decided"}, "act_heading": {"value": "d.lgs. 6 settembre 2005, n. 206", "status": "decided"}}
     },
     {
       "id": "dpr-445-2000-38",
       "note": "d.p.r. in lower case, like every act (round «Testo alla data», applied as recommended; the owner: «atto minuscolo»).",
       "input": {"tipo_atto": "decreto del presidente della repubblica", "numero_atto": "445", "data": "2000-12-28", "numero_articolo": "38"},
       "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.della.repubblica:2000-12-28;445~art38", "status": "current"}},
-      "labels": {"citation": {"value": "art. 38, d.p.r. 28 dicembre 2000, n. 445", "status": "decided"}, "short": {"value": "art. 38 d.p.r. 445/2000", "status": "decided"}, "act_heading": {"value": "Decreto del Presidente della Repubblica 28 dicembre 2000, n. 445", "status": "proposed"}, "authority": {"value": "Presidente della Repubblica", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 38, d.p.r. 28 dicembre 2000, n. 445", "status": "decided"}, "short": {"value": "art. 38 d.p.r. 445/2000", "status": "decided"}, "act_heading": {"value": "d.p.r. 28 dicembre 2000, n. 445", "status": "decided"}, "authority": {"value": "Presidente della Repubblica", "status": "proposed"}}
     },
     {
       "id": "dl-18-2020-1",
@@ -97,14 +97,14 @@
         "article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legge:2020-03-17;18~art1", "status": "current"},
         "aliases": {"value": ["https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto-legge:2020-03-17;18~art1"], "status": "proposed"}
       },
-      "labels": {"citation": {"value": "art. 1, d.l. 17 marzo 2020, n. 18", "status": "decided"}, "short": {"value": "art. 1 d.l. 18/2020", "status": "decided"}, "act_heading": {"value": "Decreto-legge 17 marzo 2020, n. 18", "status": "proposed"}, "authority": {"value": "Governo", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 1, d.l. 17 marzo 2020, n. 18", "status": "decided"}, "short": {"value": "art. 1 d.l. 18/2020", "status": "decided"}, "act_heading": {"value": "d.l. 17 marzo 2020, n. 18", "status": "decided"}, "authority": {"value": "Governo", "status": "proposed"}}
     },
     {
       "id": "rd-773-1931-86",
       "note": "A regio decreto that is not a code.",
       "input": {"tipo_atto": "regio decreto", "numero_atto": "773", "data": "1931-06-18", "numero_articolo": "86"},
       "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1931-06-18;773~art86", "status": "current"}},
-      "labels": {"citation": {"value": "art. 86, r.d. 18 giugno 1931, n. 773", "status": "decided"}, "short": {"value": "art. 86 r.d. 773/1931", "status": "decided"}, "act_heading": {"value": "Regio decreto 18 giugno 1931, n. 773", "status": "proposed"}, "authority": {"value": "Re", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 86, r.d. 18 giugno 1931, n. 773", "status": "decided"}, "short": {"value": "art. 86 r.d. 773/1931", "status": "decided"}, "act_heading": {"value": "r.d. 18 giugno 1931, n. 773", "status": "decided"}, "authority": {"value": "Re", "status": "proposed"}}
     },
     {
       "id": "dlgs-385-1993-127",
@@ -166,7 +166,7 @@
       "note": "An EU regulation: identified by its CELEX; the year comes first in the number since 2015 (2016/679).",
       "input": {"tipo_atto": "regolamento ue", "numero_atto": "679", "data": "2016", "numero_articolo": "5"},
       "identity": {"act": {"value": "celex:32016R0679", "status": "proposed"}, "article": {"value": "celex:32016R0679~art5", "status": "proposed"}},
-      "labels": {"citation": {"value": "art. 5, reg. (UE) 2016/679", "status": "decided"}, "short": {"value": "art. 5 reg. (UE) 2016/679", "status": "decided"}, "act_heading": {"value": "Regolamento (UE) 2016/679", "status": "proposed"}}
+      "labels": {"citation": {"value": "art. 5, reg. (UE) 2016/679", "status": "decided"}, "short": {"value": "art. 5 reg. (UE) 2016/679", "status": "decided"}, "act_heading": {"value": "reg. (UE) 2016/679", "status": "decided"}}
     },
     {
       "id": "nis2-21",
