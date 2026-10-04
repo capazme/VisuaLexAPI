@@ -443,6 +443,9 @@ export function DossierListView({ onSelect, showToast }: Props) {
                   <span>
                     {counts.note} {counts.note === 1 ? 'nota' : 'note'}
                   </span>
+                  {counts.sentenze > 0 && (
+                    <span>{counts.sentenze} {counts.sentenze === 1 ? 'sentenza' : 'sentenze'}</span>
+                  )}
                   {counts.important > 0 && (
                     <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400"
                           title={`${counts.important} element${counts.important === 1 ? 'o' : 'i'} importanti`}>

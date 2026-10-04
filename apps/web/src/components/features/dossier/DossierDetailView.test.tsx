@@ -16,6 +16,7 @@ vi.mock('../../../services/dossierService', () => ({
 }));
 
 import { appStore } from '../../../store/useAppStore';
+import { dossierService } from '../../../services/dossierService';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
 import { DossierDetailView } from './DossierDetailView';
 import type { Dossier } from '../../../types';
@@ -35,8 +36,8 @@ const dossier: Dossier = {
 let toast: UndoToast | null = null;
 let unregister: () => void = () => {};
 
-function renderView() {
-  appStore.setState({ dossiers: [structuredClone(dossier)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+function renderView(start: Dossier = dossier) {
+  appStore.setState({ dossiers: [structuredClone(start)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
   const current = () => appStore.getState().dossiers[0];
   const view = render(
     <MemoryRouter>
@@ -128,5 +129,40 @@ describe('DossierDetailView — the page by act', () => {
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
     expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: `Sposta ${L49}` })).toBeNull();
+  });
+});
+
+describe('DossierDetailView — decisions', () => {
+  const CITATION = 'Corte cost., sent. 13 gennaio 2014, n. 1';
+  // Stored with a label of an older style: the page shows the citation recomputed (source convention, Q9).
+  const withDecision: Dossier = { ...dossier, items: [...dossier.items,
+    { id: 's1', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, tipo: 'sentenza', data_deposito: '2014-01-13', etichetta: 'Corte cost. 1/2014' } }] };
+
+  it('lists a decision under «Giurisprudenza», after the acts, never among the notes', () => {
+    renderView(withDecision);
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    expect(within(decisions).getByRole('link', { name: CITATION })).toHaveAttribute('href', '/sentenze/corte-costituzionale/1/2014');
+    expect(within(screen.getByRole('region', { name: /Note \(1\)/ })).queryByText(CITATION)).toBeNull();
+    const lastAct = screen.getByRole('region', { name: L49 });
+    expect(lastAct.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Not a note: the header's count of decisions comes with the dossier-by-act round's PR 3.
+    expect(screen.getByText(/2 atti · 3 articoli · 1 nota/)).toBeInTheDocument();
+  });
+
+  it('finds a decision by its citation', () => {
+    renderView(withDecision);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: '13 gennaio 2014' } });
+    expect(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: L247 })).toBeNull();
+  });
+
+  it('removes a decision behind the undo toast, and puts it back as a decision', async () => {
+    renderView(withDecision);
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi sentenza dal dossier' }));
+    await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).not.toContain('s1');
+    await act(async () => { await toast?.onUndo(); });
+    expect(dossierService.addItem).toHaveBeenLastCalledWith('d1', expect.objectContaining({ itemType: 'sentenza', title: CITATION }));
+    expect(appStore.getState().dossiers[0].items.filter((i) => i.type === 'sentenza')).toHaveLength(1);
   });
 });

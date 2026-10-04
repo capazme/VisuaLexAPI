@@ -45,11 +45,12 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchesForGroups, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, decisionCitationOf, searchParamsFromNorma, searchesForGroups, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
+import { DossierDecisionsSection } from './DossierDecisionsSection';
 import { buildPdfBlocks, loadDossierTexts } from './dossierPdf';
 import { resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
@@ -62,7 +63,6 @@ import { AddNoteModal } from './AddNoteModal';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
 
 type ToastType = 'success' | 'error' | 'info';
-type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
 const SECONDARY_BUTTON =
   'min-h-[44px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:min-h-0 md:py-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700';
@@ -139,6 +139,8 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           !!item.actCitation?.toLowerCase().includes(q)
         );
       }
+      // A decision is found by its citation as the page shows it (source convention, Q9).
+      if (item.type === 'sentenza') return decisionCitationOf(item.data).toLowerCase().includes(q);
       return typeof item.data === 'string' && item.data.toLowerCase().includes(q);
     });
   }, [dossier.items, itemSearchQuery]);
@@ -715,7 +717,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           </div>
         ) : (
           <>
-            <DossierNotesSection notes={layout.notes as NoteItem[]} onRemove={handleRemoveSingle} />
+            <DossierNotesSection notes={layout.notes} onRemove={handleRemoveSingle} />
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -756,6 +758,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                 </div>
               </SortableContext>
             </DndContext>
+            <DossierDecisionsSection decisions={layout.decisions} onRemove={handleRemoveSingle} />
           </>
         )}
       </div>
