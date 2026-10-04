@@ -3,6 +3,13 @@ import { prisma } from '../lib/prisma';
 import { verifyToken, verifyTokenType } from '../utils/jwt';
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // An exchanged token was already verified, held to its table of routes and
+  // scopes, and its user loaded by `delegatedAuth` (middleware/delegated.ts).
+  // Only that middleware sets `req.delegation`; nothing from the request can.
+  if (req.delegation && req.user) {
+    next();
+    return;
+  }
   try {
     const authHeader = req.headers.authorization;
 

@@ -28,6 +28,7 @@ import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
 import oauthAccountRoutes from './routes/oauthAccount';
 import { oauthConfig } from './oauth/config';
+import { delegatedAuth } from './middleware/delegated';
 
 const app = express();
 
@@ -62,6 +63,11 @@ app.get('/api/auth/verify', ...createScrapeGate(config.scrape));
 // exchanges for all its users from one address, which the anonymous tier
 // (100 a minute per address) would throttle.
 app.use(createOAuthRouter(oauthConfig));
+
+// An exchanged token from the MCP server (spec section 5): verified, held to its
+// table of routes, scopes and daily quota, before the general limiter so that
+// it is counted per user rather than per address.
+app.use('/api', delegatedAuth);
 
 // Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory

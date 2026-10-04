@@ -10,6 +10,7 @@ const prisma = new PrismaClient();
 process.env.OAUTH_REGISTRATIONS_PER_HOUR ??= '100000';
 process.env.OAUTH_REQUESTS_PER_15_MINUTES ??= '100000';
 process.env.OAUTH_MCP_CLIENT_SECRET ??= 'test-mcp-client-secret';
+process.env.OAUTH_DELEGATION_SECRET ??= 'test-delegation-secret';
 
 // SAFETY GUARD: this setup resets the database (drops everything). If vitest is
 // run WITHOUT the `dotenv -e .env.test` wrapper (i.e. `npx vitest` instead of

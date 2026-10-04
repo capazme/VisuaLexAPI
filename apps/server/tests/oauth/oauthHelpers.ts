@@ -115,3 +115,30 @@ export async function connectedTokens(user: { token: string }) {
     body: response.body,
   };
 }
+
+export const API_AUDIENCE = 'http://localhost:3001/api';
+export const TOKEN_EXCHANGE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+export const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
+
+/** The MCP server's exchange of a client's access token for an API token (RFC 8693). */
+export function tokenExchange(subjectToken: string, extra: Record<string, string | undefined> = {}, authorization: string | null = mcpBasicAuth()) {
+  const form: Record<string, string | undefined> = {
+    grant_type: TOKEN_EXCHANGE,
+    subject_token: subjectToken,
+    subject_token_type: ACCESS_TOKEN_TYPE,
+    audience: API_AUDIENCE,
+    scope: 'dossier:read',
+    ...extra,
+  };
+  const call = request(app).post('/oauth/token').type('form');
+  if (authorization !== null) call.set('Authorization', authorization);
+  return call.send(Object.fromEntries(Object.entries(form).filter(([, v]) => v !== undefined)));
+}
+
+/** An API token for `user`, as the MCP server would hold it for one call. */
+export async function delegatedToken(user: { token: string }, scope = 'dossier:read dossier:write') {
+  const tokens = await connectedTokens(user);
+  const response = await tokenExchange(tokens.access, { scope });
+  if (response.status !== 200) throw new Error(`exchange failed: ${response.status} ${JSON.stringify(response.body)}`);
+  return { ...tokens, apiToken: response.body.access_token as string };
+}
