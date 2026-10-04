@@ -25,8 +25,10 @@ beforeEach(async () => {
           title: 'codice civile',
           citation: 'art. 2043 c.c.',
           content: { tipo_atto: 'codice civile', numero_articolo: '2043', numero_atto: '262', data: '1942-03-16', article_text: 'NON DEVE USCIRE' },
+          created_by: { clientName: 'Claude Code' },
+          about_item_id: null,
         },
-        { id: 'i2', item_type: 'note', title: 'Nota', citation: null, content: 'appunto' },
+        { id: 'i2', item_type: 'note', title: 'Nota', citation: null, content: 'appunto', created_by: null, about_item_id: 'i1' },
       ],
     },
     { id: 'd2', name: 'Doppio', items: [] },
@@ -42,10 +44,11 @@ const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.conten
 const json = (result: Awaited<ReturnType<Client['callTool']>>) => JSON.parse(text(result));
 
 describe('the tool list', () => {
-  it('has the five dossier tools, the read-only ones marked, and nothing that updates, moves or deletes', async () => {
+  it('has the six dossier tools, the read-only ones marked, and nothing that updates, moves or deletes', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       'omnilex_aggiungi_norme_dossier',
+      'omnilex_aggiungi_nota_dossier',
       'omnilex_crea_dossier',
       'omnilex_elenca_dossier',
       'omnilex_leggi_dossier',
@@ -78,8 +81,8 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
         id: 'd1',
         nome: 'Prova',
         voci: [
-          { id: 'i1', tipo: 'norm', titolo: 'codice civile', riferimento: 'art. 2043 c.c.' },
-          { id: 'i2', tipo: 'note', titolo: 'Nota', riferimento: null },
+          { id: 'i1', tipo: 'norm', titolo: 'codice civile', riferimento: 'art. 2043 c.c.', aggiunta_da: 'Claude Code', nota_su: null },
+          { id: 'i2', tipo: 'note', titolo: 'Nota', riferimento: null, aggiunta_da: null, nota_su: 'i1' },
         ],
       });
       expect(text(result)).not.toContain('NON DEVE USCIRE');
@@ -149,6 +152,44 @@ describe('omnilex_aggiungi_norme_dossier', () => {
       expect(result.isError).toBe(true);
     }
     expect(env.stub.apiCalls).toHaveLength(0);
+  });
+});
+
+describe('omnilex_aggiungi_nota_dossier', () => {
+  it('adds a note to the dossier named, through dossier:write, and answers with its id', async () => {
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'Prova', testo: 'Vedi Cass. 2020.' } });
+    expect(result.isError).toBeFalsy();
+    expect(json(result)).toEqual({ dossier: { id: 'd1', nome: 'Prova' }, nota: { id: 'n-new', nota_su: null } });
+    const call = env.stub.apiCalls.find((c) => c.method === 'POST');
+    expect(call).toMatchObject({ path: '/dossiers/d1/notes', bearer: 'api-token-for-dossier:write', body: { text: 'Vedi Cass. 2020.' } });
+  });
+
+  it('attaches the note to the article named by voce', async () => {
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'Sul danno.', voce: 'i1' } });
+    expect(json(result).nota).toEqual({ id: 'n-new', nota_su: 'i1' });
+    expect(env.stub.apiCalls.find((c) => c.method === 'POST')?.body).toEqual({ text: 'Sul danno.', aboutItemId: 'i1' });
+  });
+
+  it('refuses a note longer than 4000 characters before calling anything', async () => {
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'a'.repeat(4001) } });
+    expect(result.isError).toBe(true);
+    expect(env.stub.apiCalls).toEqual([]);
+  });
+
+  it("passes the server's reason for a refusal on, as one sentence", async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.endsWith('/notes') ? [400, { detail: 'La voce indicata non è un articolo di questo dossier.' }] : undefined;
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'x', voce: 'i2' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('Richiesta non valida: La voce indicata non è un articolo di questo dossier.');
+  });
+
+  it('says when the daily notes limit is reached and when it renews', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.endsWith('/notes') ? [429, { quota: 'note', resetsAt: '2026-10-05T10:00:00.000Z' }] : undefined;
+    const result = await client.callTool({ name: 'omnilex_aggiungi_nota_dossier', arguments: { dossier: 'd1', testo: 'una di troppo' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/^Hai raggiunto il limite giornaliero di note scritte tramite applicazioni collegate: si rinnova /);
   });
 });
 

@@ -13,11 +13,13 @@ export const TOOL_SCOPES: Record<string, string[]> = {
   omnilex_crea_dossier: ['dossier:write'],
   // Finds the dossier first (by id or name), then writes.
   omnilex_aggiungi_norme_dossier: ['dossier:read', 'dossier:write'],
+  omnilex_aggiungi_nota_dossier: ['dossier:read', 'dossier:write'],
   omnilex_stato_account: ['dossier:read'],
 };
 
 export const MAX_REFERENCES = 50;
 export const MAX_DOSSIER_NAME = 100;
+export const MAX_NOTE_LENGTH = 4000;
 
 interface ApiDossierItem {
   id: string;
@@ -26,6 +28,10 @@ interface ApiDossierItem {
   /** The server's citation of a norm, in the app's style ("art. 3, l. 31 dicembre 2012, n. 247"); null otherwise. */
   citation?: string | null;
   content: unknown;
+  /** The connected application that added the entry, or null for the user's own. */
+  created_by?: { clientName: string | null } | null;
+  /** For a note: the entry (an article) it is about, or null. */
+  about_item_id?: string | null;
 }
 interface ApiDossier {
   id: string;
@@ -95,6 +101,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
             titolo: item.title,
             // The server names the act in full: two laws in one dossier must never read alike.
             riferimento: item.citation ?? null,
+            aggiunta_da: item.created_by?.clientName ?? null,
+            nota_su: item.about_item_id ?? null,
           })),
         });
       }),
@@ -149,6 +157,34 @@ export function registerDossierTools(server: McpServer, config: McpConfig, calle
           { method: 'POST', body: { references: riferimenti } },
         );
         return data({ dossier: { id: found.id, nome: found.name }, esiti: answer.results });
+      }),
+  );
+
+  server.registerTool(
+    'omnilex_aggiungi_nota_dossier',
+    {
+      title: 'Aggiungi una nota a un dossier',
+      description:
+        `Aggiunge una nota (testo semplice, fino a ${MAX_NOTE_LENGTH} caratteri) a un dossier, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
+        'La nota resta segnata come scritta da questa applicazione. Aggiunge soltanto: non modifica né cancella note.',
+      inputSchema: {
+        dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
+        testo: z.string().trim().min(1).max(MAX_NOTE_LENGTH).describe('Il testo della nota'),
+        voce: z.string().min(1).max(64).optional().describe('L’id dell’articolo del dossier a cui si riferisce la nota'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    ({ dossier, testo, voce }) =>
+      run('omnilex_aggiungi_nota_dossier', async () => {
+        const found = await findDossier(config, caller, dossier);
+        const created = await callApi<ApiDossierItem>(
+          config,
+          caller,
+          'dossier:write',
+          `/dossiers/${encodeURIComponent(found.id)}/notes`,
+          { method: 'POST', body: { text: testo, ...(voce ? { aboutItemId: voce } : {}) } },
+        );
+        return data({ dossier: { id: found.id, nome: found.name }, nota: { id: created.id, nota_su: created.about_item_id ?? null } });
       }),
   );
 

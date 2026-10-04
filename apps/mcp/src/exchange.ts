@@ -3,6 +3,15 @@ import { basicAuthorization } from './auth.js';
 import type { McpConfig } from './config.js';
 import { ToolError, formatRenewal } from './errors.js';
 
+/** What each daily counter of the API counts, as the 429 message names it (apps/server, middleware/delegated.ts). */
+const QUOTA_WORDS: Record<string, string> = {
+  points: 'operazioni',
+  dossier_create: 'dossier creati',
+  note: 'note scritte',
+  trash: 'eliminazioni',
+  card: 'schede create',
+};
+
 const TOKEN_EXCHANGE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const ACCESS_TOKEN = 'urn:ietf:params:oauth:token-type:access_token';
 
@@ -80,14 +89,13 @@ export async function callApi<T>(
       throw new ToolError('Non trovato: il dossier non esiste o non è tuo.');
     case 429: {
       const renewal = formatRenewal(typeof body.resetsAt === 'string' ? body.resetsAt : null);
-      const what =
-        body.quota === 'dossier_create'
-          ? 'Hai raggiunto il limite giornaliero di dossier creati tramite applicazioni collegate'
-          : 'Hai raggiunto il limite giornaliero di operazioni tramite applicazioni collegate';
-      throw new ToolError(`${what}: si rinnova ${renewal}.`);
+      const what = typeof body.quota === 'string' ? QUOTA_WORDS[body.quota] ?? 'operazioni' : 'operazioni';
+      throw new ToolError(`Hai raggiunto il limite giornaliero di ${what} tramite applicazioni collegate: si rinnova ${renewal}.`);
     }
-    case 400:
-      throw new ToolError(`Richiesta non valida: ${typeof body.detail === 'string' ? body.detail : 'controlla i dati inviati'}.`);
+    case 400: {
+      const detail = typeof body.detail === 'string' ? body.detail.replace(/\.$/, '') : 'controlla i dati inviati';
+      throw new ToolError(`Richiesta non valida: ${detail}.`);
+    }
     default:
       console.error(`[mcp] API answered ${response.status} on ${init.method ?? 'GET'} ${path.split('?')[0]}`);
       throw new ToolError('VisuaLex ha avuto un problema: riprova tra poco.');
