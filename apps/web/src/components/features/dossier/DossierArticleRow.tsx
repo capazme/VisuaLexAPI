@@ -5,6 +5,7 @@ import { historicalItemLabel } from '../../../utils/versionDisplay';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
+import { shownAnnex } from './dossierLayout';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 
@@ -38,6 +39,7 @@ export function DossierArticleRow({
   }, []);
 
   const shownRubrica = rubrica ?? textRubrica;
+  const annex = shownAnnex(item.data);
   const isImportant = item.status === 'important';
   // "Testo al 29/12/2007": a row that holds a past text says so.
   const historicalLabel = historicalItemLabel(item.data);
@@ -103,9 +105,9 @@ export function DossierArticleRow({
               </span>
             )}
           </span>
-          {item.data.allegato && (
+          {annex && (
             <span className="flex-shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-              All. {item.data.allegato}
+              All. {annex}
             </span>
           )}
           {historicalLabel && (

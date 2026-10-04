@@ -48,6 +48,16 @@ export function codeName(tipoAtto: string): string | null {
   return CODE_NAMES[(tipoAtto || '').trim().toLowerCase()] ?? null;
 }
 
+/**
+ * The annex an article is shown and ordered by. A code is itself an annex of its
+ * decree (the codice civile is Allegato 2 of R.D. 262/1942): its items carry
+ * «2» when they come from a search and nothing when they come from the index,
+ * and neither is something a lawyer writes. So a code's articles have none.
+ */
+export function shownAnnex(norma: { tipo_atto: string; allegato?: string | null }): string {
+  return codeName(norma.tipo_atto) ? '' : (norma.allegato || '');
+}
+
 /** An act's identity: a code by its name (whatever number and date an item carries), any other act by type, number and date. */
 export function actKeyOf(norma: { tipo_atto: string; numero_atto?: string; data?: string }): string {
   const type = (norma.tipo_atto || '').trim().toLowerCase();
@@ -77,8 +87,8 @@ function articleRank(numero: string): [number, number, string] {
 
 /** The body before the annexes, then by article number and ordinal, then the text in force before past texts. */
 export function compareArticles(a: NormaVisitata, b: NormaVisitata): number {
-  const annexA = a.allegato || '';
-  const annexB = b.allegato || '';
+  const annexA = shownAnnex(a);
+  const annexB = shownAnnex(b);
   if (annexA !== annexB) {
     if (!annexA) return -1;
     if (!annexB) return 1;
@@ -102,12 +112,16 @@ export function compareArticles(a: NormaVisitata, b: NormaVisitata): number {
 /** "art. 3", or "All. A, art. 1" for an article of an annex. */
 export function articleLabel(norma: NormaVisitata): string {
   const article = `art. ${norma.numero_articolo}`;
-  return norma.allegato ? `All. ${norma.allegato}, ${article}` : article;
+  const annex = shownAnnex(norma);
+  return annex ? `All. ${annex}, ${article}` : article;
 }
 
 /** A folded block's one line: "artt. 1, 3, 25" (each article once, whatever its versions). */
 export function foldedArticleList(block: ActBlock): string {
-  const labels = block.articles.map((i) => (i.data.allegato ? `All. ${i.data.allegato} art. ${i.data.numero_articolo}` : i.data.numero_articolo));
+  const labels = block.articles.map((i) => {
+    const annex = shownAnnex(i.data);
+    return annex ? `All. ${annex} art. ${i.data.numero_articolo}` : i.data.numero_articolo;
+  });
   const unique = labels.filter((label, index) => labels.indexOf(label) === index);
   return `${unique.length === 1 ? 'art.' : 'artt.'} ${unique.join(', ')}`;
 }

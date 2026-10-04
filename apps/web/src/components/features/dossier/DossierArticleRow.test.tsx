@@ -40,9 +40,14 @@ describe('DossierArticleRow', () => {
   });
 
   it('shows the annex as a chip', () => {
-    renderRow({ ...normaItem, data: { ...normaItem.data, allegato: 'A', numero_articolo: '1' } });
-    expect(screen.getByText('All. A')).toBeInTheDocument();
+    renderRow({ ...normaItem, data: { tipo_atto: 'decreto legislativo', numero_atto: '36', data: '2023-03-31', allegato: 'I.1', numero_articolo: '1' } });
+    expect(screen.getByText('All. I.1')).toBeInTheDocument();
     expect(screen.getByText('art. 1')).toBeInTheDocument();
+  });
+
+  it("shows no annex for a code's article", () => {
+    renderRow({ ...normaItem, data: { ...normaItem.data, allegato: '2' } });
+    expect(screen.queryByText('All. 2')).toBeNull();
   });
 
   it('has no drag handle', () => {

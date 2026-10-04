@@ -32,7 +32,11 @@ export function useActDetails(block: ActBlock): ActDetails {
 
   // Primitives only, so a new block object for the same act does not load again.
   const knownUrn = actUrnForBlock(block);
-  const annexesKey = Array.from(new Set(block.articles.map((i) => i.data.allegato || ''))).join('|');
+  // A code's articles all sit in the code's own annex, whether an item says so
+  // («2» from a search) or not (nothing from the index): read them all from it.
+  const codeAnnex = block.isCode ? (block.articles.find((i) => i.data.allegato)?.data.allegato ?? '') : null;
+  const annexOf = (allegato: string | null | undefined) => codeAnnex ?? (allegato || '');
+  const annexesKey = Array.from(new Set(block.articles.map((i) => annexOf(i.data.allegato)))).join('|');
   const first = block.articles[0]?.data;
   const actType = first?.tipo_atto ?? '';
   const actNumber = first?.numero_atto;
@@ -76,7 +80,7 @@ export function useActDetails(block: ActBlock): ActDetails {
   }, [knownUrn, annexesKey, actType, actNumber, actDate, isCode]);
 
   const rubricaOf = (norma: NormaVisitata) =>
-    byAnnex[norma.allegato || '']?.[normalizeArticleId(norma.numero_articolo)] ?? null;
+    byAnnex[annexOf(norma.allegato)]?.[normalizeArticleId(norma.numero_articolo)] ?? null;
 
   return { title, rubricaOf };
 }

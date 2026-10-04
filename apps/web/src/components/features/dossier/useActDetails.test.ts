@@ -49,6 +49,22 @@ describe('useActDetails', () => {
     expect(fetchActTree).toHaveBeenCalledWith('urn:x;262:2');
   });
 
+  it("reads a code's article saved without its annex from the code's own part", async () => {
+    fetchActRubriche.mockResolvedValue({
+      title: '', rubriche: {},
+      parts: [{ name: 'CODICE CIVILE', keys: ['1218', '2043', '2044'], rubriche: { '1218': 'Responsabilità del debitore', '2043': 'Risarcimento per fatto illecito' }, abrogati: [] }],
+    });
+    fetchActTree.mockResolvedValue({ articles: [], metadata: { annexes: [{ number: '2', label: 'Codice civile', article_count: 3, article_numbers: ['1218', '2043', '2044'] }] } });
+    const cc = (id: string, numero_articolo: string, allegato?: string): DossierItem => ({
+      id, type: 'norma', addedAt: '', actCitation: 'c.c.',
+      data: { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo, urn: `urn:x;262:2~art${numero_articolo}`, ...(allegato ? { allegato } : {}) },
+    });
+    const [block] = layoutDossier([cc('a', '2043', '2'), cc('b', '1218')]).acts;
+    const { result } = renderHook(() => useActDetails(block));
+    await waitFor(() => expect(result.current.rubricaOf(block.articles[0].data)).toBe('Responsabilità del debitore'));
+    expect(result.current.rubricaOf(block.articles[1].data)).toBe('Risarcimento per fatto illecito');
+  });
+
   it('resolves the act when no item carries a urn', async () => {
     resolveAct.mockResolvedValue({ urn: `${URN}~art1`, norma: {} });
     fetchActRubriche.mockResolvedValue({ title: 'Nuova disciplina', rubriche: {}, parts: [] });

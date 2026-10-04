@@ -52,6 +52,16 @@ describe('layoutDossier', () => {
     ]);
   });
 
+  it("never shows or orders by a code's own annex (the codice civile is Allegato 2 of its decree)", () => {
+    const items = [
+      art({ tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043', allegato: '2' }, 'c.c.'),
+      art({ tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1218' }, 'c.c.'),
+    ];
+    const [block] = layoutDossier(items).acts;
+    expect(block.articles.map((i) => articleLabel(i.data))).toEqual(['art. 1218', 'art. 2043']);
+    expect(foldedArticleList(block)).toBe('artt. 1218, 2043');
+  });
+
   it('heads an act the server has not named yet with a muted fallback, never an empty heading', () => {
     const [block] = layoutDossier([art({ numero_articolo: '3' })]).acts;
     expect(block).toMatchObject({ heading: 'legge n. 247', headingIsFallback: true });
