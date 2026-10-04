@@ -136,4 +136,36 @@ describe('RassegnePanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Penale' }));
     await waitFor(() => expect(fetchRassegne).toHaveBeenLastCalledWith({ urn: URN, archivio: 'penale' }));
   });
+
+  it('keeps the panel and the focus while another archive loads', async () => {
+    let resolvePenale: (value: RassegneResponse) => void = () => {};
+    fetchRassegne
+      .mockResolvedValueOnce({ ...SUMMARY, archivi: ['civile', 'penale'] })
+      .mockImplementationOnce(() => new Promise<RassegneResponse>((resolve) => { resolvePenale = resolve; }));
+    renderPanel();
+    await openPanel();
+    const penale = await screen.findByRole('button', { name: 'Penale' });
+    penale.focus();
+    fireEvent.click(penale);
+    expect(screen.getByText('Nelle rassegne della Cassazione')).toBeInTheDocument();
+    expect(document.activeElement).toBe(penale);
+    resolvePenale({ ...SUMMARY, archivi: ['civile', 'penale'], items: [passo('p', 2024, 'Un passo penale.')] });
+    expect(await screen.findByText('Un passo penale.')).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Penale' }));
+  });
+
+  it('a failed archive keeps the filter, so the reader can go back', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchRassegne
+      .mockResolvedValueOnce({ ...SUMMARY, archivi: ['civile', 'penale'] })
+      .mockRejectedValueOnce(new Error('503'));
+    renderPanel();
+    await openPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Civile' }));
+    expect(await screen.findByText('Rassegne non disponibili ora.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte' }));
+    await waitFor(() => expect(screen.queryByText('Rassegne non disponibili ora.')).not.toBeInTheDocument());
+    expect(screen.getByText("Rassegna dell'anno 2024")).toBeInTheDocument();
+    error.mockRestore();
+  });
 });

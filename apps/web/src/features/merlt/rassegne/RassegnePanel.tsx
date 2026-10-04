@@ -101,6 +101,7 @@ export function RassegnePanel({ articleUrn }: RassegnePanelProps) {
     return <p className="mt-6 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>;
   }
   const { data } = summary;
+  const shownArchivio = summary.archivio; // the year sections follow the data on screen
   if (data.total === 0) return null;
 
   const toggle = () => setOpen((v) => !v);
@@ -128,7 +129,7 @@ export function RassegnePanel({ articleUrn }: RassegnePanelProps) {
       {open && (
         <div className="mt-3">
           {both && (
-            <div className="mb-2 flex gap-2" role="group" aria-label="Filtra per archivio">
+            <div className="mb-2 flex gap-2" role="group" aria-label="Filtra per archivio" aria-busy={summary.pending || undefined}>
               {([undefined, 'civile', 'penale'] as const).map((value) => (
                 <button key={value ?? 'tutte'} type="button" aria-pressed={archivio === value} onClick={() => setArchivio(value)}
                   className={cn('min-h-[44px] rounded px-2 text-xs md:min-h-0',
@@ -138,8 +139,9 @@ export function RassegnePanel({ articleUrn }: RassegnePanelProps) {
               ))}
             </div>
           )}
+          {summary.failed && <p className="mb-2 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
           {data.anni.map(({ anno, passi: count }) => (
-            <YearSection key={`${archivio ?? ''}-${anno}`} urn={articleUrn} archivio={archivio} anno={anno} count={count}
+            <YearSection key={`${shownArchivio ?? ''}-${anno}`} urn={articleUrn} archivio={shownArchivio} anno={anno} count={count}
               initial={anno === data.anno ? { items: data.items, next: data.next_cursor } : undefined} />
           ))}
         </div>

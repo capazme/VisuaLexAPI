@@ -27,16 +27,33 @@ export function loadRassegne(query: RassegneQuery): Promise<RassegneResponse> {
   return pending;
 }
 
+type Archivio = 'civile' | 'penale';
+
 export type RassegneState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; data: RassegneResponse }
+  | {
+      status: 'ready';
+      data: RassegneResponse;
+      /** the archive `data` was loaded for (the filter may already ask for another) */
+      archivio?: Archivio;
+      /** another archive is loading: `data` is the last summary of this article */
+      pending?: boolean;
+      /** another archive failed to load: `data` is the last summary of this article */
+      failed?: boolean;
+    }
   | { status: 'error' };
 
-export function useRassegneSummary(urn: string | undefined, archivio?: 'civile' | 'penale'): RassegneState {
+/**
+ * The article's summary for an archive filter. While another archive loads, or after it
+ * fails, the last summary of the same article stays: the panel never blanks under the
+ * reader's hand (nor loses the focus of the filter button they pressed).
+ */
+export function useRassegneSummary(urn: string | undefined, archivio?: Archivio): RassegneState {
   const key = urn ? `${urn}|${archivio ?? ''}` : null;
   const initial: RassegneState = key ? { status: 'loading' } : { status: 'idle' };
   const [state, setState] = useState<{ key: string | null; value: RassegneState }>({ key, value: initial });
+  const [shown, setShown] = useState<{ urn: string; archivio?: Archivio; data: RassegneResponse } | null>(null);
   if (state.key !== key) setState({ key, value: initial }); // reset during render (set-state-in-effect rule)
 
   useEffect(() => {
@@ -44,7 +61,9 @@ export function useRassegneSummary(urn: string | undefined, archivio?: 'civile' 
     let cancelled = false;
     loadRassegne(archivio ? { urn, archivio } : { urn }).then(
       (data) => {
-        if (!cancelled) setState({ key, value: { status: 'ready', data } });
+        if (cancelled) return;
+        setState({ key, value: { status: 'ready', data, archivio } });
+        setShown({ urn, archivio, data });
       },
       (err: unknown) => {
         console.error('[rassegne] load failed', { urn, archivio, err });
@@ -56,5 +75,10 @@ export function useRassegneSummary(urn: string | undefined, archivio?: 'civile' 
     };
   }, [urn, archivio, key]);
 
-  return state.key === key ? state.value : initial;
+  const value = state.key === key ? state.value : initial;
+  if (value.status === 'ready' || !urn || !shown || shown.urn !== urn) return value;
+  return {
+    status: 'ready', data: shown.data, archivio: shown.archivio,
+    pending: value.status === 'loading', failed: value.status === 'error',
+  };
 }

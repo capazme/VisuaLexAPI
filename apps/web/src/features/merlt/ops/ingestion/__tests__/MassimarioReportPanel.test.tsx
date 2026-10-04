@@ -46,17 +46,35 @@ describe('MassimarioReportPanel', () => {
     expect(screen.getByText('<b>testo</b> (Rv. 251820)')).toBeInTheDocument();
   });
 
-  it('offers to resume vectors that stopped, only when the caller can resume', () => {
+  it('offers to resume vectors only once they stopped, as MERL-T judges it', () => {
     const onResume = vi.fn();
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
     const { rerender } = render(
-      <MassimarioReportPanel report={REPORT} vectors={{ done: 300, total: 1360, error: 'ReadTimeout' }} onResume={onResume} />,
+      <MassimarioReportPanel report={REPORT} onResume={onResume}
+        vectors={{ done: 300, total: 1360, error: 'ReadTimeout', updated_at: hoursAgo(0) }} />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Riprendi i vettori' }));
     expect(onResume).toHaveBeenCalledTimes(1);
-    rerender(<MassimarioReportPanel report={REPORT} vectors={{ done: 1360, total: 1360 }} onResume={onResume} />);
+    rerender(<MassimarioReportPanel report={REPORT} onResume={onResume} vectors={{ done: 300, total: 1360, updated_at: hoursAgo(2) }} />);
+    expect(screen.getByRole('button', { name: 'Riprendi i vettori' })).toBeInTheDocument();
+    rerender(<MassimarioReportPanel report={REPORT} onResume={onResume} vectors={{ done: 300, total: 1360, error: 'x' }} resuming />);
+    expect(screen.getByRole('button', { name: 'Riprendi i vettori' })).toBeDisabled();
+    rerender(<MassimarioReportPanel report={REPORT} onResume={onResume} vectors={{ done: 1360, total: 1360 }} />);
     expect(screen.queryByRole('button', { name: 'Riprendi i vettori' })).not.toBeInTheDocument();
-    rerender(<MassimarioReportPanel report={REPORT} vectors={{ done: 300, total: 1360 }} />);
+    rerender(<MassimarioReportPanel report={REPORT} vectors={{ done: 300, total: 1360, error: 'x' }} />);
     expect(screen.queryByRole('button', { name: 'Riprendi i vettori' })).not.toBeInTheDocument();
+  });
+
+  it('a running chain says so and can be refreshed, never resumed', () => {
+    const onRefresh = vi.fn();
+    render(
+      <MassimarioReportPanel report={REPORT} onResume={vi.fn()} onRefresh={onRefresh}
+        vectors={{ done: 300, total: 1360, updated_at: new Date().toISOString() }} />,
+    );
+    expect(screen.getByText(/in corso/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Riprendi i vettori' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiorna' }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('shows the vector progress and its error', () => {

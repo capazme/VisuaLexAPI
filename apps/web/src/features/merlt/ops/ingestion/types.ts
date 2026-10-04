@@ -132,6 +132,8 @@ export interface VectorProgress {
   done: number;
   total: number;
   error?: string;
+  /** ISO time of the last progress write (MERL-T massimario_tasks.vector_progress) */
+  updated_at?: string;
 }
 
 export interface BatchDetail extends BatchSummary {

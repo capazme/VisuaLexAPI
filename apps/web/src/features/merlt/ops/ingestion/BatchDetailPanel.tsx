@@ -36,6 +36,7 @@ export function BatchDetailPanel({ batchId, onClose, onQueueRefreshNeeded }: Bat
   const [showPromote, setShowPromote] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [resumeFailed, setResumeFailed] = useState(false);
+  const [resuming, setResuming] = useState(false);
 
   const poll = useBatchPoll(batchId, { nodeLimit, edgeLimit, restartToken });
 
@@ -98,14 +99,22 @@ export function BatchDetailPanel({ batchId, onClose, onQueueRefreshNeeded }: Bat
               <MassimarioReportPanel
                 report={batch.conflict_report.massimario}
                 vectors={batch.stats?.vectors as VectorProgress | undefined}
+                resuming={resuming}
+                onRefresh={() => setRestartToken((t) => t + 1)}
                 onResume={
                   batch.status === 'promoted'
                     ? () => {
+                        if (resuming) return;
+                        setResuming(true);
                         setResumeFailed(false);
                         promoteBatch(batch.id).then(
-                          () => setRestartToken((t) => t + 1),
+                          () => {
+                            setResuming(false);
+                            setRestartToken((t) => t + 1);
+                          },
                           (err: unknown) => {
                             console.error('[ingestion] resume vectors failed', { batchId: batch.id, err });
+                            setResuming(false);
                             setResumeFailed(true);
                           },
                         );

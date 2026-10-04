@@ -11,14 +11,30 @@ const pct = (value: number | null): string =>
 export interface MassimarioReportPanelProps {
   report: MassimarioReport;
   vectors?: VectorProgress;
-  /** Promote the batch again to resume vectors that stopped (MERL-T allows it while they are incomplete). */
+  /** Promote the batch again to resume vectors that stopped (MERL-T accepts it only then). */
   onResume?: () => void;
+  /** A resume request is in flight. */
+  resuming?: boolean;
+  /** Fetch the batch again: the panel stops polling once a batch is promoted. */
+  onRefresh?: () => void;
+}
+
+/** MERL-T's STALE_AFTER_S (worker/massimario_tasks.py): a chain silent this long is dead. */
+const STALE_AFTER_MS = 3_600_000;
+
+/** Vectors that will not finish on their own, judged as MERL-T's router judges them. */
+function vectorsStopped(vectors: VectorProgress): boolean {
+  if (vectors.error) return true;
+  if (vectors.done >= vectors.total) return false;
+  const updated = vectors.updated_at ? Date.parse(vectors.updated_at) : NaN;
+  return Number.isNaN(updated) || Date.now() - updated > STALE_AFTER_MS;
 }
 
 /** The report of a Massimario batch: what the administrator reads before promoting it. */
-export function MassimarioReportPanel({ report, vectors, onResume }: MassimarioReportPanelProps) {
+export function MassimarioReportPanel({ report, vectors, onResume, resuming, onRefresh }: MassimarioReportPanelProps) {
   const { citazioni, pronunce, norme } = report;
-  const incomplete = vectors !== undefined && (Boolean(vectors.error) || vectors.done < vectors.total);
+  const stopped = vectors !== undefined && vectorsStopped(vectors);
+  const running = vectors !== undefined && !stopped && vectors.done < vectors.total;
   const below = citazioni.copertura_pct !== null && citazioni.copertura_pct < 95;
   return (
     <section className="space-y-3 rounded-lg border border-slate-200 p-4 text-sm dark:border-slate-700">
@@ -48,12 +64,19 @@ export function MassimarioReportPanel({ report, vectors, onResume }: MassimarioR
       {vectors && (
         <p className="text-slate-600 dark:text-slate-400">
           Vettori: {n(vectors.done)} su {n(vectors.total)}
+          {running && ' — in corso'}
           {vectors.error && <span className="text-amber-700 dark:text-amber-400"> — errore: {vectors.error}</span>}
         </p>
       )}
-      {incomplete && onResume && (
-        <button type="button" onClick={onResume}
+      {running && onRefresh && (
+        <button type="button" onClick={onRefresh}
           className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400">
+          Aggiorna
+        </button>
+      )}
+      {stopped && onResume && (
+        <button type="button" onClick={onResume} disabled={resuming}
+          className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50 md:min-h-0 dark:text-primary-400">
           Riprendi i vettori
         </button>
       )}
