@@ -273,6 +273,11 @@ HOSTILE = [
 ]
 
 
+# A linear scan of 1 MB takes under a second here; a quadratic one takes tens of seconds.
+# The ceiling leaves room for a loaded machine or a slow CI runner (2 s failed under load).
+LINEAR_CEILING_S = 6.0
+
+
 class TestHostileText:
     """About 1 MB of text built to make a backtracking pattern quadratic or worse."""
 
@@ -281,7 +286,7 @@ class TestHostileText:
         started = time.perf_counter()
         result = scan(text)
         elapsed = time.perf_counter() - started
-        assert elapsed < 2.0, f"{elapsed:.1f} s"
+        assert elapsed < LINEAR_CEILING_S, f"{elapsed:.1f} s"
         assert result.decisions == []
 
     def test_an_act_word_before_a_long_word_stays_linear(self):
@@ -291,7 +296,7 @@ class TestHostileText:
         started = time.perf_counter()
         result = scan(text)
         elapsed = time.perf_counter() - started
-        assert elapsed < 2.0, f"{elapsed:.1f} s"
+        assert elapsed < LINEAR_CEILING_S, f"{elapsed:.1f} s"
         assert len(result.decisions) <= 200
 
 
