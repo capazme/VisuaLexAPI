@@ -155,27 +155,31 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
         res.status(503).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Too many open sessions: retry later' }, id: null });
         return;
       }
-      const server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
-      registerDossierTools(server, config, runner);
-      // No JSON responses: a tool that asks the user to confirm sends that
-      // request back on the call's own SSE stream.
-      const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (newId) =>
-          store.add({ id: newId, userId: caller.userId, grantId: caller.grantId, transport, server, lastSeen: Date.now() }),
-      });
-      transport.onclose = () => {
-        if (transport.sessionId) void store.close(transport.sessionId);
-      };
+      let server: McpServer | undefined;
+      let transport: StreamableHTTPServerTransport | undefined;
       try {
-        await server.connect(transport);
-        await transport.handleRequest(req, res, req.body);
+        server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
+        registerDossierTools(server, config, runner);
+        const opened = server;
+        // No JSON responses: a tool that asks the user to confirm sends that
+        // request back on the call's own SSE stream.
+        const created: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (newId) =>
+            store.add({ id: newId, userId: caller.userId, grantId: caller.grantId, transport: created, server: opened, lastSeen: Date.now() }),
+        });
+        transport = created;
+        created.onclose = () => {
+          if (created.sessionId) void store.close(created.sessionId);
+        };
+        await server.connect(created);
+        await created.handleRequest(req, res, req.body);
       } finally {
         store.release();
-        // An initialize the transport refused never became a session: nothing may keep it alive.
-        if (!transport.sessionId) {
-          await transport.close();
-          await server.close();
+        // What did not become a session in the store (refused, failed, not taken) must not stay alive.
+        if (!transport?.sessionId || !store.has(transport.sessionId)) {
+          await transport?.close();
+          await server?.close();
         }
       }
     } catch (error) {

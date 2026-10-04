@@ -212,3 +212,39 @@ describe('the process cap under pressure (security review of 8482fe66)', () => {
     close.mockRestore();
   });
 });
+
+describe('review findings on PR 2', () => {
+  it('M1. a session that fails while being built gives its reserved place back', async () => {
+    const { createApp } = await import('../src/server.js');
+    const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
+    const store = new SessionStore({ maxSessions: 1 });
+    const server = await new Promise<import('node:http').Server>((resolve) => {
+      const s = createApp(env.config, { store }).listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const url = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}/mcp`;
+    const boom = vi.spyOn(McpServer.prototype, 'registerTool').mockImplementationOnce(() => {
+      throw new Error('boom');
+    });
+    const failed = await rpc(url, initialize(), bearer('a'));
+    boom.mockRestore();
+    expect(failed.status).toBe(500);
+    expect(store.hasRoom()).toBe(true);
+    const ok = await rpc(url, initialize(), bearer('a'));
+    await ok.text();
+    expect(ok.status).toBe(200);
+    await store.closeAll();
+    await new Promise((r) => server.close(r));
+  });
+
+  it('M2. a session the store could not take is closed, even with an id', async () => {
+    const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
+    const close = vi.spyOn(McpServer.prototype, 'close');
+    const add = vi.spyOn(env.store, 'add').mockRejectedValueOnce(new Error('could not close an old session'));
+    const refused = await rpc(env.mcpUrl, initialize(), bearer('a'));
+    await refused.text();
+    add.mockRestore();
+    expect(env.store.size()).toBe(0);
+    expect(close).toHaveBeenCalledTimes(1);
+    close.mockRestore();
+  });
+});

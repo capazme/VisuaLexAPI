@@ -80,6 +80,10 @@ export class SessionStore {
     for (const old of matching.slice(0, Math.max(0, matching.length - max + 1))) await this.close(old.id);
   }
 
+  has(id: string): boolean {
+    return this.sessions.has(id);
+  }
+
   async close(id: string): Promise<void> {
     const session = this.sessions.get(id);
     if (!session) return;
