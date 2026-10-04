@@ -359,7 +359,7 @@ The phase-2 work lists each with its count before it runs.
 |---|---|---|
 | TypeScript (web), norms | `apps/web/src/utils/sources/` — `normLabels.ts`, `actTypes.ts` (the tables), `normIdentity.ts` (act and article key from `norma_data`, EU CELEX) | `citation.ts`'s head, `normaMeta.formatCitation`, `abbreviateActType`, the tables in `citationParser`, `citationMatcher`, `normattivaParser`, `StudyMode`, `HistoryView`, every inline label in inventory §3.1, the Q&A chip |
 | TypeScript (web), decisions | `apps/web/src/utils/decisionLinks.ts` as the Sentenze plan extends it — `decisionKey`, `decisionPath`, `linkableDecisionPath`, `formatDecisionCitation`, `formatDecisionHeading` — plus a `formatDecisionShort` | the Massimario chip's `label`, the Brocardi chips, the Q&A chip's raw keys. No second decision module |
-| TypeScript (server) | `apps/server/src/norms/citation.ts` and a decision twin | stays a second implementation, pinned to the JSON golden file in place of the TS one |
+| TypeScript (server) | `apps/server/src/norms/citation.ts` (`citeArticle`, and `citeAct`, which already writes the act citation of §3.2 for the dossier's `act_citation`) | stays a second implementation, pinned to the JSON golden file in place of the TS one |
 | Python (API) | `visualex_api/tools/sources.py` | the year-only and no-number branches of `generate_urn`, `/parse_query`'s `display`, the URN normaliser |
 | Python (MERL-T) | `merlt/utils/sources.py` | `format_estremi`, `act_abbreviation`, `estremi_from_urn`'s label, `urn_parser`'s tables, the citation export's formats, the two authority tables, `urn_labels`' suffix table |
 

@@ -189,6 +189,7 @@ copy of the same article cite it in two styles.
 | Producer | Where | Used by | Output |
 |---|---|---|---|
 | `citeArticle` | `apps/server/src/norms/citation.ts` | `display` of `POST /dossiers/:id/norms`, `citation` of dossier items | owner's style, pinned to the web's golden file (`tests/norms/citation.test.ts`) |
+| `citeAct` (merged after this inventory was measured, `abc9aada`) | same | `act_citation` of dossier items (the dossier groups articles by act) | the act alone: `l. 7 agosto 1990, n. 241`, `c.c.`, `regolamento (UE) 2016/679`; `citeArticle` is built on it |
 | MCP tools | `apps/mcp/src/tools/dossier.ts:97` | `riferimento` | the server's `citation`, never rebuilt |
 | saved-norm watcher | `utils/normaWatcher.ts:105` | notification message (stored) | the raw `normaKey` |
 
