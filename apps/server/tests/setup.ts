@@ -62,6 +62,11 @@ beforeEach(async () => {
       "lingo_tracce",
       "lingo_card_ancore",
       "lingo_cards",
+      "oauth_tokens",
+      "oauth_authorization_codes",
+      "oauth_grants",
+      "oauth_authorization_requests",
+      "oauth_clients",
       "users"
     RESTART IDENTITY CASCADE;
   `);
