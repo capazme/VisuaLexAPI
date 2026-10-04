@@ -3,6 +3,7 @@ import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import { describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
 import { articleLabel, layoutDossier } from './dossierLayout';
+import { claudeMarkSentence } from './dossierUtils';
 
 /**
  * The dossier's PDF as the page is (spec §9): the notes, then each act named
@@ -35,8 +36,7 @@ export const PDF_TEXT_UNAVAILABLE = 'Testo non disponibile al momento';
 
 // A note as the PDF prints it: its text, then who wrote it when an application did.
 function noteLine(note: DossierItem): string {
-  const by = note.createdBy ? ` (scritta da ${note.createdBy.clientName?.trim() || "un'applicazione collegata"})` : '';
-  return `${String(note.data)}${by}`;
+  return note.createdBy ? `${String(note.data)} (${claudeMarkSentence(note.createdBy)})` : String(note.data);
 }
 
 function plain(html: string): string {

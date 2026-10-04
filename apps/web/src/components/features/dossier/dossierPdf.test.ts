@@ -71,6 +71,6 @@ describe('buildPdfBlocks — notes', () => {
     const blocks = buildPdfBlocks([a3, about, free], new Map([['a3', { text: 'tre' }]]), new Map());
     expect(blocks[0]).toEqual({ kind: 'notes', notes: ['Libera.'] });
     const act = blocks[1] as Extract<PdfBlock, { kind: 'act' }>;
-    expect(act.articles[0].notes).toEqual(['Sul dovere. (scritta da Claude Code)']);
+    expect(act.articles[0].notes).toEqual(['Sul dovere. (scritta da Claude Code (applicazione collegata))']);
   });
 });

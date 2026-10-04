@@ -273,14 +273,14 @@ describe('the order after a refusal, and after a restore', () => {
     appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
       { id: 'b', type: 'note', data: 'b', addedAt: '' },
     ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
-    vi.mocked(dossierService.addItem).mockResolvedValueOnce({ ...fakeDossierItemApi('srv-a'), item_type: 'note', content: 'a' });
+    vi.mocked(dossierService.addNote).mockResolvedValueOnce({ ...fakeDossierItemApi('srv-a'), item_type: 'note', content: 'a' });
     appStore.getState().restoreDossierItem('d1', { id: 'a', type: 'note', data: 'a', addedAt: '' }, 0);
     await vi.waitFor(() => expect(dossierService.reorderItems).toHaveBeenCalledWith('d1', ['srv-a', 'b']));
   });
 
   it('takes a restored item off the page when the server refuses it', async () => {
     appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
-    vi.mocked(dossierService.addItem).mockRejectedValueOnce(new Error('500'));
+    vi.mocked(dossierService.addNote).mockRejectedValueOnce(new Error('500'));
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     appStore.getState().restoreDossierItem('d1', { id: 'a', type: 'note', data: 'a', addedAt: '' }, 0);
     await vi.waitFor(() => expect(appStore.getState().dossiers[0].items).toHaveLength(0));
@@ -321,5 +321,31 @@ describe('notes through the notes route', () => {
     appStore.getState().restoreDossierItem('d1', { id: 'old', type: 'norma', data: norma, addedAt: '' }, 0);
     await vi.waitFor(() => expect(dossierService.updateItem).toHaveBeenCalledWith('d1', 'n1', { aboutItemId: 'new' }));
     expect(appStore.getState().dossiers[0].items.find((i) => i.id === 'n1')?.aboutItemId).toBe('new');
+  });
+
+  it('puts a note back where it was when reattaching it is refused, and says so', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'n1', type: 'note', data: 'Sul danno.', addedAt: '', aboutItemId: 'old' },
+    ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('new'));
+    vi.mocked(dossierService.updateItem).mockRejectedValueOnce(new Error('500'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    appStore.getState().restoreDossierItem('d1', { id: 'old', type: 'norma', data: norma, addedAt: '' }, 0);
+    await vi.waitFor(() => expect(appStore.getState().lastSyncError?.message).toMatch(/ricollegare/));
+    expect(appStore.getState().dossiers[0].items.find((i) => i.id === 'n1')?.aboutItemId).toBe('old');
+    error.mockRestore();
+  });
+
+  it('brings a note about an article back about it, through the notes route', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'a', type: 'norma', data: norma, addedAt: '' },
+    ] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.addNote).mockResolvedValueOnce({
+      id: 'srv-n', item_type: 'note', title: 'Nota', content: 'Sul danno.', position: 1, status: 'unread', created_at: '', about_item_id: 'a', created_by: null,
+    });
+    appStore.getState().restoreDossierItem('d1', { id: 'n-old', type: 'note', data: 'Sul danno.', addedAt: '', aboutItemId: 'a' }, 1);
+    await vi.waitFor(() => expect(dossierService.addNote).toHaveBeenCalledWith('d1', { text: 'Sul danno.', aboutItemId: 'a' }));
+    expect(dossierService.addItem).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[1]).toMatchObject({ id: 'srv-n', aboutItemId: 'a' }));
   });
 });

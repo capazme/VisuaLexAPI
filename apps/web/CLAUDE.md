@@ -269,8 +269,13 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   all'articolo»; a note whose article is no longer in the dossier shows among
   the free notes. An entry an application wrote carries `ClaudeMark` («scritta
   da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
-  gives the article a new id: `restoreDossierItem` reattaches its notes
-  (`PUT …/items/:noteId {aboutItemId}`).
+  gives the article a new id: `restoreDossierItem` reattaches its notes at once
+  (`PUT …/items/:noteId {aboutItemId}`, reverted with a sync error if refused);
+  an undone note comes back through the notes route, about its article if the
+  article is still there. It comes back as the user's: no web route sets
+  `created_by`, by design, so Claude's mark does not survive a web undo (the
+  MCP trash, which keeps ids, restores it). The note dialog closes only once
+  the server has the note, so a refused note keeps its text.
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da

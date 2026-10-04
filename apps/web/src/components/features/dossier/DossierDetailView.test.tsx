@@ -158,3 +158,25 @@ describe('DossierDetailView — notes about an article', () => {
     await waitFor(() => expect(appStore.getState().dossiers[0].items.some((i) => i.id === 'srv-note')).toBe(true));
   });
 });
+
+describe('DossierDetailView — search keeps an article and its notes together', () => {
+  const withNote = (): Dossier => {
+    const d = structuredClone(dossier);
+    d.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Termine di decadenza.', aboutItemId: 'b1' });
+    return d;
+  };
+  it('a note found keeps its article on screen, with the note under it', () => {
+    const d = withNote();
+    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: 'decadenza' } });
+    expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Note \(/ })).toBeNull();
+  });
+  it('the closed row names its notes for a screen reader', () => {
+    const d = withNote();
+    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: /^Espandi .*articolo 1, 1 nota$/ })).toBeInTheDocument();
+  });
+});

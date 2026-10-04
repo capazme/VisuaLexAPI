@@ -7,7 +7,7 @@ import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
 import { ClaudeMark } from './ClaudeMark';
-import { formatTimestampLong } from './dossierUtils';
+import { claudeMarkSentence, formatTimestampLong } from './dossierUtils';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
@@ -61,6 +61,10 @@ export function DossierArticleRow({
     + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '');
   const regionId = `dossier-item-content-${item.id}`;
   const byApp = notes.find((n) => n.createdBy)?.createdBy ?? null;
+  // The closed row's note count and mark sit inside the toggle, whose own name
+  // replaces them for a screen reader: the name has to say them.
+  const notesLabel = notes.length === 0 || isExpanded ? '' : `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}`
+    + (byApp ? `, ${notes.length === 1 ? '' : 'una '}${claudeMarkSentence(byApp)}` : '');
 
   return (
     <div
@@ -87,7 +91,7 @@ export function DossierArticleRow({
         <div
           role="button"
           tabIndex={0}
-          aria-label={rowLabel}
+          aria-label={rowLabel + notesLabel}
           aria-expanded={isExpanded}
           aria-controls={isExpanded ? regionId : undefined}
           onClick={onToggleExpand}

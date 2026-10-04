@@ -1577,17 +1577,36 @@ const appStore = createStore<AppState>()(
                     state.pendingDossierItemIds[localId] = true;
                     state.pendingDossierOrders[dossierId] = true;
                 });
-                dossierService.addItem(dossierId, {
-                    itemType: item.type === 'norma' ? 'norm' : 'note',
-                    title: item.type === 'norma' ? (item.data.tipo_atto || 'Nota') : 'Nota',
-                    content: packItemContent(item.data, item.status),
-                }).then(created => {
+                // A note comes back through the notes route, still about its
+                // article when the article is still here. The mark of the
+                // application that wrote it cannot come back: no web route sets it.
+                const articleStillHere = item.type === 'note' && !!item.aboutItemId
+                    && !!get().dossiers.find(d => d.id === dossierId)?.items.some(i => i.id === item.aboutItemId && i.type === 'norma');
+                const recreate = item.type === 'note'
+                    ? dossierService.addNote(dossierId, { text: item.data, ...(articleStillHere && item.aboutItemId ? { aboutItemId: item.aboutItemId } : {}) })
+                    : dossierService.addItem(dossierId, {
+                        itemType: 'norm',
+                        title: item.data.tipo_atto || 'Nota',
+                        content: packItemContent(item.data, item.status),
+                    });
+                recreate.then(created => {
+                    // The notes about a restored article still name its old id:
+                    // point them at the new one at once, then tell the server.
+                    const reattached: string[] = [];
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
                         const restored = dossier?.items.find(i => i.id === localId);
                         if (restored) {
                             restored.id = created.id;
                             Object.assign(restored, serverFieldsFromApi(created));
+                        }
+                        if (item.type === 'norma') {
+                            dossier?.items.forEach((i) => {
+                                if (i.type === 'note' && i.aboutItemId === localId) {
+                                    i.aboutItemId = created.id;
+                                    reattached.push(i.id);
+                                }
+                            });
                         }
                         delete state.pendingDossierItemIds[localId];
                     });
@@ -1599,20 +1618,17 @@ const appStore = createStore<AppState>()(
                             content: packItemContent(settled.data, settled.status),
                         }).catch(err => console.error('Failed to persist the star of a restored item:', err));
                     }
-                    // The notes about the article still name its old id: point them
-                    // at the id it comes back with, on the server and here.
-                    if (item.type === 'norma') {
-                        const notes = get().dossiers.find(d => d.id === dossierId)?.items
-                            .filter(i => i.type === 'note' && i.aboutItemId === localId) ?? [];
-                        notes.forEach((noteItem) => {
-                            dossierService.updateItem(dossierId, noteItem.id, { aboutItemId: created.id })
-                                .then(() => set((state) => {
-                                    const n = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === noteItem.id);
-                                    if (n) n.aboutItemId = created.id;
-                                }))
-                                .catch(err => console.error('Failed to reattach a note to its restored article:', err));
+                    reattached.forEach((noteId) => {
+                        dossierService.updateItem(dossierId, noteId, { aboutItemId: created.id }).catch(err => {
+                            console.error('Failed to reattach a note to its restored article:', err);
+                            // Back to what the server still says (gotcha 17), and say so.
+                            set((state) => {
+                                const n = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === noteId);
+                                if (n && n.aboutItemId === created.id) n.aboutItemId = localId;
+                            });
+                            get().pushSyncError('Impossibile ricollegare la nota al suo articolo. Riprova.');
                         });
-                    }
+                    });
                     get().flushDossierOrder(dossierId);
                 }).catch(err => {
                     console.error('Failed to restore item on server:', err);

@@ -108,6 +108,7 @@ describe('DossierArticleRow notes', () => {
   it('counts its notes on the closed row, with the mark of the application that wrote one', () => {
     renderRow(normaItem, { notes });
     expect(screen.getByTitle('2 note')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note, una scritta da Claude Code (applicazione collegata)' })).toBeInTheDocument();
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.queryByText('Sul danno ingiusto.')).toBeNull();
   });

@@ -5,17 +5,26 @@ import { Z_INDEX } from '../../../constants/zIndex';
 
 interface Props {
   onClose: () => void;
-  onSave: (text: string) => void;
+  /** Resolves true once the note is saved: only then the dialog closes, so a refused note keeps its text. */
+  onSave: (text: string) => void | boolean | Promise<boolean>;
   /** What the note is about, as the dialog's title; the dossier itself by default. */
   heading?: string;
+  confirmLabel?: string;
 }
 
 // The cap the MCP round sets for Claude's notes too (S11): one cap for every note of a dossier.
 const MAX_NOTE_LENGTH = 4000;
 
-export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al dossier' }: Props) {
+export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al dossier', confirmLabel = 'Aggiungi al dossier' }: Props) {
   const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus goes back where it came from («Aggiungi una nota all'articolo», the menu).
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    return () => opener?.focus?.();
+  }, []);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -26,17 +35,19 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    onSave(trimmed);
-    onClose();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    const saved = await onSave(trimmed);
+    setSaving(false);
+    if (saved !== false) onClose();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      handleSave();
+      void handleSave();
     }
   };
 
@@ -98,11 +109,11 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
           </button>
           <button
             type="button"
-            onClick={handleSave}
-            disabled={isEmpty}
+            onClick={() => void handleSave()}
+            disabled={isEmpty || saving}
             className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
           >
-            Aggiungi al dossier
+            {saving ? 'Salvo…' : confirmLabel}
           </button>
         </div>
       </div>

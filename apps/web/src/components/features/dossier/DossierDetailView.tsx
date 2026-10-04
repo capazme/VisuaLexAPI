@@ -128,8 +128,8 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   // the full `dossier.items` array, so indexes stay absolute even while filtered.
   const visibleItems = useMemo(() => {
     const q = itemSearchQuery.trim().toLowerCase();
-    return dossier.items.filter((item) => {
-      if (!q) return true;
+    if (!q) return dossier.items;
+    const matches = (item: DossierItem) => {
       if (item.type === 'norma') {
         const d = item.data;
         return (
@@ -142,7 +142,17 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         );
       }
       return typeof item.data === 'string' && item.data.toLowerCase().includes(q);
+    };
+    // An article and the notes about it are found together: a note found keeps
+    // its article on screen, an article found keeps its notes.
+    const found = new Set(dossier.items.filter(matches).map((i) => i.id));
+    dossier.items.forEach((i) => {
+      if (i.type === 'note' && i.aboutItemId && found.has(i.id)) found.add(i.aboutItemId);
     });
+    dossier.items.forEach((i) => {
+      if (i.type === 'note' && i.aboutItemId && found.has(i.aboutItemId)) found.add(i.id);
+    });
+    return dossier.items.filter((i) => found.has(i.id));
   }, [dossier.items, itemSearchQuery]);
 
   const hasFilter = itemSearchQuery.trim().length > 0;
@@ -348,10 +358,11 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   };
 
   // Every note of a dossier takes the notes route, the one Claude's notes take too.
-  const handleAddNote = async (text: string) => {
-    if (!noteTarget) return;
+  const handleAddNote = async (text: string): Promise<boolean> => {
+    if (!noteTarget) return false;
     const saved = await addNoteToDossier(dossier.id, text, noteTarget.aboutItemId);
     if (saved) showToast(noteTarget.aboutItemId ? "Nota aggiunta all'articolo" : 'Nota aggiunta al dossier', 'success');
+    return saved;
   };
 
   const handleTreeImport = (
@@ -801,8 +812,9 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
       {noteTarget && (
         <AddNoteModal
           heading={noteTarget.heading}
+          confirmLabel={noteTarget.aboutItemId ? "Aggiungi all'articolo" : 'Aggiungi al dossier'}
           onClose={() => setNoteTarget(null)}
-          onSave={(text) => void handleAddNote(text)}
+          onSave={handleAddNote}
         />
       )}
 

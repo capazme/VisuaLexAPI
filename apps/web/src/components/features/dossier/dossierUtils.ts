@@ -193,6 +193,12 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
     : { ...base, type: 'note', data: data as string };
 }
 
+/** «scritta da Claude Code (applicazione collegata)»: who wrote an entry, on screen (`ClaudeMark`) and in the PDF. */
+export function claudeMarkSentence(createdBy: NonNullable<DossierItem['createdBy']>): string {
+  const name = createdBy.clientName?.trim();
+  return name ? `scritta da ${name} (applicazione collegata)` : "scritta da un'applicazione collegata";
+}
+
 export function computeItemCounts(items: DossierItem[]): { norme: number; note: number; important: number } {
   let norme = 0, note = 0, important = 0;
   for (const i of items) {
