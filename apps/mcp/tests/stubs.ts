@@ -77,6 +77,20 @@ export async function startStubs() {
     if (req.method === 'POST' && norms) {
       return void res.json({ results: (req.body.references as string[]).map((reference) => ({ reference, outcome: 'added' })) });
     }
+    const trashItems = path.match(/^\/dossiers\/([^/]+)\/trash-items$/);
+    if (req.method === 'POST' && trashItems) {
+      const dossier = stub.dossiers.find((d) => d.id === trashItems[1]);
+      const ids = req.body.itemIds as string[];
+      const moved = ids.filter((id) => dossier?.items.some((i) => i.id === id));
+      if (dossier) dossier.items = dossier.items.filter((i) => !moved.includes(i.id));
+      return void res.json({ trashId: 't1', moved, notFound: ids.filter((id) => !moved.includes(id)) });
+    }
+    const trashDossier = path.match(/^\/dossiers\/([^/]+)\/trash$/);
+    if (req.method === 'POST' && trashDossier) {
+      const dossier = stub.dossiers.find((d) => d.id === trashDossier[1]);
+      stub.dossiers = stub.dossiers.filter((d) => d.id !== trashDossier[1]);
+      return void res.json({ trashId: 't2', itemCount: dossier?.items.length ?? 0 });
+    }
     const notes = path.match(/^\/dossiers\/([^/]+)\/notes$/);
     if (req.method === 'POST' && notes) {
       const item = {
@@ -109,6 +123,7 @@ export async function startStubs() {
     clientId: 'mcp-omnilex',
     clientSecret: SECRET,
     allowedOrigins: ['http://localhost:5173'],
+    confirmationTimeoutMs: 1500,
   };
   const store = new SessionStore();
   const mcpServer: Server = await new Promise((resolve) => {

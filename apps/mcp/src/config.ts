@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { CONFIRMATION_TIMEOUT_MS } from './confirm.js';
 
 /**
  * The MCP server's settings. Everything that names another process comes
@@ -20,6 +21,8 @@ export interface McpConfig {
   clientSecret: string;
   /** Origins a browser may call from; requests without an Origin header are not browsers. */
   allowedOrigins: string[];
+  /** How long a deletion waits for the user's answer to the confirmation dialog. */
+  confirmationTimeoutMs: number;
 }
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
@@ -43,5 +46,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
+    confirmationTimeoutMs: parseInt(env.MCP_CONFIRMATION_TIMEOUT_MS || String(CONFIRMATION_TIMEOUT_MS), 10),
   };
 }
