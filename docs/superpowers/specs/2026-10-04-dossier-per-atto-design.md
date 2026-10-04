@@ -303,7 +303,7 @@ plan's last task builds the row once the routes are merged, or is handed to the 
 | Per-article card with act name, date, icon, «Aggiunto il» | Rows expand in place with today's reader |
 | Dragging articles | The star, persisted in `_dossierMeta` |
 | Ten coloured header buttons | Undo on remove; danger confirm on delete |
-| Always-visible selection bar | Search within the dossier, now matching the citation and the rubrica too |
+| Always-visible selection bar | Search within the dossier, now matching the citation too |
 | PDF without the text of MCP-added articles | Share link, JSON, snapshot, «Apri tutto», the tour (its anchors are updated) |
 
 ## Error handling
