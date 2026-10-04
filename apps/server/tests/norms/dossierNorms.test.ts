@@ -309,6 +309,22 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(dossier.body.items[0].act_citation).toBeNull();
   });
 
+  it('answers an added item with its citations, so the web names the act at once', async () => {
+    const norm = await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({
+      itemType: 'norm', title: 'legge',
+      content: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' },
+    });
+    expect(norm.status).toBe(201);
+    expect(norm.body.citation).toBe('art. 3, l. 31 dicembre 2012, n. 247');
+    expect(norm.body.act_citation).toBe('l. 31 dicembre 2012, n. 247');
+
+    const note = await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({
+      itemType: 'note', title: 'Nota', content: 'appunto',
+    });
+    expect(note.body.citation).toBeNull();
+    expect(note.body.act_citation).toBeNull();
+  });
+
   it('takes 1 to 50 references, each a short string', async () => {
     const fiftyOne = Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`);
     expect((await addNorms(alice, dossierId, fiftyOne)).status).toBe(400);

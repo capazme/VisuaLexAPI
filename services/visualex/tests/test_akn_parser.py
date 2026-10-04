@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from visualex_api.services.akn_parser import ParsedAct, normalize_article_key, parse_akn
+from visualex_api.services.akn_parser import ParsedAct, normalize_article_key, parse_akn, presentable_title
 
 FIXTURES = Path(__file__).parent / "fixtures" / "akn"
 
@@ -245,3 +245,50 @@ class TestPerArticleDates:
         main = cp.parts["Codice Penale"]
         assert main.dates["3-bis"] == "2018-04-06"
         assert cp.dates == main.dates
+
+
+class TestPresentableTitle:
+    """The act's title as a heading. The raw strings are the AKN `docTitle`s read live on 4 Oct 2026."""
+
+    def test_the_gazzetta_code_goes(self):
+        raw = "Nuova disciplina dell'ordinamento della professione forense. (13G00018)"
+        assert presentable_title(raw) == "Nuova disciplina dell'ordinamento della professione forense"
+
+    def test_another_act_of_the_same_shape(self):
+        raw = "Disposizioni in materia di equo compenso delle prestazioni professionali. (23G00051)"
+        assert presentable_title(raw) == "Disposizioni in materia di equo compenso delle prestazioni professionali"
+
+    def test_amendment_brackets_are_unwrapped_and_accents_restored(self):
+        raw = ("Codice in materia di protezione dei dati personali ((, recante disposizioni per "
+               "l'adeguamento dell'ordinamento nazionale al regolamento (UE) n. 2016/679 del Parlamento "
+               "europeo e del Consiglio, del 27 aprile 2016, relativo alla protezione delle persone "
+               "fisiche con riguardo al trattamento dei dati personali, nonche' alla libera "
+               "circolazione di tali dati e che abroga la direttiva 95/46/CE)).")
+        assert presentable_title(raw) == (
+            "Codice in materia di protezione dei dati personali, recante disposizioni per "
+            "l'adeguamento dell'ordinamento nazionale al regolamento (UE) n. 2016/679 del Parlamento "
+            "europeo e del Consiglio, del 27 aprile 2016, relativo alla protezione delle persone "
+            "fisiche con riguardo al trattamento dei dati personali, nonché alla libera "
+            "circolazione di tali dati e che abroga la direttiva 95/46/CE")
+
+    def test_an_elision_is_not_an_accent(self):
+        assert presentable_title("Norme sull'attivita' dell'ente.") == "Norme sull'attività dell'ente"
+
+    def test_the_older_gazzetta_code_goes_too(self):
+        # The shape of the older acts' code, from the codice penale's own AKN fixture.
+        raw = "Approvazione del testo definitivo del Codice Penale. (030U1398)"
+        assert presentable_title(raw) == "Approvazione del testo definitivo del Codice Penale"
+
+    def test_brackets_closing_after_a_parenthesis_leave_no_space(self):
+        raw = "Recepimento ((della direttiva 2014/24/UE (Testo rilevante ai fini del SEE)))."
+        assert presentable_title(raw) == "Recepimento della direttiva 2014/24/UE (Testo rilevante ai fini del SEE)"
+
+    def test_only_the_final_full_stop_goes_never_an_abbreviation(self):
+        assert presentable_title("Modifiche al c.p.c.") == "Modifiche al c.p.c."
+        assert presentable_title("Norme sulle S.p.A.") == "Norme sulle S.p.A."
+        assert presentable_title("Norme generali..") == "Norme generali."
+
+    def test_nothing_gives_nothing(self):
+        assert presentable_title(None) == ""
+        assert presentable_title("   ") == ""
+        assert presentable_title("(13G00018)") == ""
