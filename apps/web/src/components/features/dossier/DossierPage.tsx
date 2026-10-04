@@ -7,6 +7,8 @@ import type { Dossier } from '../../../types';
 import { DossierListView } from './DossierListView';
 import { DossierDetailView } from './DossierDetailView';
 import { ImportDossierModal } from './ImportDossierModal';
+import { TrashPage } from './TrashPage';
+import { useTrash } from './useTrash';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null;
 
@@ -16,6 +18,8 @@ export function DossierPage() {
   const [importingDossier, setImportingDossier] = useState<Dossier | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const { tryStartTour } = useTour();
+  // One trash for the page: its count on the list, a dossier's own entries, the «Cestino».
+  const trash = useTrash();
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
@@ -67,19 +71,30 @@ export function DossierPage() {
   };
 
   const selectedDossier = dossiers.find((d) => d.id === selectedDossierId) ?? null;
+  const showTrash = searchParams.get('trash') === '1';
+  const setShowTrash = (on: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (on) next.set('trash', '1'); else next.delete('trash');
+    setSearchParams(next);
+  };
 
   return (
     <>
-      {selectedDossier ? (
+      {showTrash ? (
+        <TrashPage trash={trash} onBack={() => setShowTrash(false)} showToast={showToast} />
+      ) : selectedDossier ? (
         <DossierDetailView
           dossier={selectedDossier}
           onBack={() => setSelectedDossierId(null)}
           showToast={showToast}
+          trash={trash}
         />
       ) : (
         <DossierListView
           onSelect={(id) => setSelectedDossierId(id)}
           showToast={showToast}
+          trashCount={trash.entries?.length ?? 0}
+          onOpenTrash={() => setShowTrash(true)}
         />
       )}
 

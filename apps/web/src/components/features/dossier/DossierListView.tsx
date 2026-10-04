@@ -34,11 +34,14 @@ type ToastType = 'success' | 'error' | 'info';
 interface Props {
   onSelect: (dossierId: string) => void;
   showToast: (message: string, type?: ToastType) => void;
+  /** Entries in the trash; the «Cestino» link shows only when there are some. */
+  trashCount?: number;
+  onOpenTrash?: () => void;
 }
 
 type SortBy = 'date' | 'name' | 'items';
 
-export function DossierListView({ onSelect, showToast }: Props) {
+export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash }: Props) {
   const { dossiers, deleteDossier, updateDossier, triggerSearch, triggerMultiSearch, importDossier, addWorkspaceTab } = useAppStore();
   const navigate = useNavigate();
 
@@ -229,6 +232,15 @@ export function DossierListView({ onSelect, showToast }: Props) {
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
         <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">I tuoi Dossier</h2>
         <div className="flex gap-2">
+          {trashCount > 0 && onOpenTrash && (
+            <button
+              type="button"
+              onClick={onOpenTrash}
+              className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              <Trash2 size={18} aria-hidden /> Cestino ({trashCount})
+            </button>
+          )}
           <button
             onClick={triggerFileImport}
             className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
