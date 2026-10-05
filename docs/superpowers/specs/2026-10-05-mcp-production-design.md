@@ -1,6 +1,6 @@
-# The MCP server in the production stack — Design (DRAFT 1)
+# The MCP server in the production stack — Design
 
-Date: 5 October 2026. Status: draft, for the owner's approval before any code.
+Date: 5 October 2026. Status: **approved by the owner on 5 October 2026** («sì»).
 Builds on `2026-09-29-modular-deployment-design.md` (the stack, its networks and
 hardening) and `2026-10-02-mcp-spike-design.md` (the authorization server and
 `apps/mcp`). Changes `infra/`, authentication and the deploy scripts: areas the
@@ -244,10 +244,25 @@ are today.
   connections to the home network. It renders no third-party content, unlike
   the scrapers, so this is lower risk. The H1 script (D3) can take the subnet
   as a second argument.
-- **Admitting people beyond the owner** was conditioned by the deployment
-  design (section 4.5 and 12) on the MERL-T visibility switch and a privacy
-  notice. Both are still missing. That is the owner's decision, outside this
-  design.
+- **Admitting people beyond the owner.** The deployment design (sections 4.5
+  and 12) asked for a MERL-T visibility switch and a privacy notice before
+  anyone else is admitted. What exists covers the first condition's purpose,
+  though not in the form that design sketched:
+  - **`MERLT_ENABLED=false`** in `infra/.env` turns MERL-T off for everyone.
+    The server answers 404 on all of `/api/merlt` (`merltKillSwitch`). The
+    ingress builds the app with `VITE_FEATURE_MERLT` following it, so the app
+    shows nothing of MERL-T and sends no tracking. It takes a redeploy and
+    leaves no admins-only mode.
+  - **With MERL-T on, nothing is collected from a person who has not opted in.**
+    The consent level is `none` by default (`schema.prisma`). Tracking needs
+    `basic` or `full`, which each person chooses; contributing and validating
+    need `full`.
+  - **Still missing:**
+    - the three-valued runtime switch (`off` / `admins` / `everyone`, changed
+      from the app without a redeploy). It is a convenience now, not a
+      condition;
+    - **the privacy notice**, which remains open. It is legal work, the
+      owner's, outside this design.
 
 ## 10. Verification
 
