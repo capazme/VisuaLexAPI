@@ -26,7 +26,7 @@ describe('GET /.well-known/oauth-authorization-server', () => {
         'urn:ietf:params:oauth:grant-type:token-exchange',
       ],
       token_endpoint_auth_methods_supported: ['none', 'client_secret_basic'],
-      scopes_supported: ['dossier:read', 'dossier:write', 'content:delete'],
+      scopes_supported: ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write', 'content:delete'],
       authorization_response_iss_parameter_supported: true,
     });
     // No offline_access: Claude asks for it only when listed, and refresh tokens are always issued.

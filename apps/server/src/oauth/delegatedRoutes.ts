@@ -24,6 +24,25 @@ export interface DelegatedRoute {
   readScope?: string;
   /** A named daily counter beside the points, if any. */
   counter?: DelegatedCounter;
+  /** How much of the counter a call spends, when not one (cards: one per card). */
+  counterAmount?: (req: Request) => number;
+}
+
+function cardCount(req: Request): number {
+  const cards = (req.body as { cards?: unknown } | undefined)?.cards;
+  return Array.isArray(cards) ? Math.max(1, Math.min(cards.length, 10)) : 1;
+}
+
+/** Two points per distinct anchor reference of the call (each is checked against the sources), at least two per card. */
+function cardReferencesWeight(req: Request): number {
+  const cards = (req.body as { cards?: unknown } | undefined)?.cards;
+  if (!Array.isArray(cards)) return 2;
+  const references = new Set<string>();
+  for (const card of cards.slice(0, 10)) {
+    const anchors = (card as { ancore?: unknown } | null)?.ancore;
+    if (Array.isArray(anchors)) for (const a of anchors.slice(0, 10)) references.add(String((a as { riferimento?: unknown } | null)?.riferimento ?? ''));
+  }
+  return Math.max(references.size, cardCount(req)) * 2;
 }
 
 function referencesWeight(req: Request): number {
@@ -43,6 +62,11 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   // Into the trash, never deleted for good; content:delete is also read live from the grant (delegated.ts).
   { method: 'POST', path: '/dossiers/:id/trash', scope: DELETE_SCOPE, readScope: 'dossier:read', weight: 1, counter: 'trash' },
   { method: 'POST', path: '/dossiers/:id/trash-items', scope: DELETE_SCOPE, readScope: 'dossier:read', weight: 1, counter: 'trash' },
+  // LingoLex study cards (spec §6): always the author's drafts; two points per reference checked, one of the day's hundred per card.
+  { method: 'POST', path: '/lingo/cards', scope: 'lingo:cards:write', weight: cardReferencesWeight, counter: 'card', counterAmount: cardCount },
+  { method: 'GET', path: '/lingo/cards', scope: 'lingo:cards:read', weight: 1 },
+  { method: 'GET', path: '/lingo/cards/:id', scope: 'lingo:cards:read', weight: 1 },
+  { method: 'POST', path: '/lingo/cards/trash', scope: DELETE_SCOPE, readScope: 'lingo:cards:read', weight: 1, counter: 'trash' },
   // Reading the quota costs nothing: the MCP server asks it to tell the user what is left.
   { method: 'GET', path: '/oauth/quota', scope: 'dossier:read', weight: 0 },
 ];

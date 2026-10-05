@@ -9,7 +9,7 @@ import { prisma } from '../lib/prisma';
  * with its state and its anchors, and loses only its author (the foreign key
  * sets `autoreId` to NULL).
  */
-const PERSONAL_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'ARCHIVIATA'];
+export const PERSONAL_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'ARCHIVIATA'];
 
 /**
  * Deletes a user and, in the same transaction, the study cards that were only

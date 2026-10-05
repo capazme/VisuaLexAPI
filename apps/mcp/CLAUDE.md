@@ -4,7 +4,7 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 Spec: `docs/superpowers/specs/2026-10-02-mcp-spike-design.md`; plan:
 `docs/superpowers/plans/2026-10-02-mcp-spike.md`.
 
-VisuaLex's MCP server: the dossier tools for an application a user connected
+VisuaLex's MCP server: the dossier and LingoLex card tools for an application a user connected
 (Claude Code, LibreLex). A Node/TypeScript process of its own (decision D-037):
 **no database, no Prisma**, never the Python API. Everything goes through
 `apps/server`.
@@ -58,9 +58,20 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
   only; only Accept with the box ticked exchanges a delete token and moves
   exactly those ids. Decline, Cancel, an unticked box, a timeout or a client
   that declared no elicitation: nothing is deleted, never a fallback (owner's
-  decision «B»). `tests/tools.test.ts` fails if any other tool becomes
-  destructive. Adding a tool means adding its route to `apps/server`'s
+  decision «B»). `lingolex_elimina_card` is the third destructive tool
+  (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
+- **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —
+  `lingolex_schema_card` (the card's shape and the anchoring rules, as text),
+  `lingolex_salva_card` (1–10 cards, always the user's drafts; anchors as
+  references in words, which `apps/server` resolves and anchors with the
+  official URN and the AKN fingerprint — the model never handles a hash),
+  `lingolex_le_mie_card`, and `lingolex_elimina_card` (1–10 of the user's own
+  drafts or archived cards, refused before asking for a card the community has
+  taken up; confirmed and moved to the trash like the dossier deletions). In
+  the card dialog a card is named only by what the server set — its subject,
+  the article of its primary anchor, its state, its date and the start of its
+  id — never by its question or answer, which a model may have written.
 - **Hardening** — binds to `127.0.0.1` by default and refuses non-loopback
   `Host` headers there (DNS rebinding); refuses a browser `Origin` not in
   `MCP_ALLOWED_ORIGINS`. Logs one line per tool call (user, client, tool,

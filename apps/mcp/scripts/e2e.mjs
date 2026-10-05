@@ -70,7 +70,7 @@ const verifier = randomBytes(32).toString('base64url');
 const challengeS256 = createHash('sha256').update(verifier).digest('base64url');
 const state = randomBytes(8).toString('hex');
 const authorizeUrl = new URL(as.authorization_endpoint);
-for (const [k, v] of Object.entries({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challengeS256, code_challenge_method: 'S256', scope: 'dossier:read dossier:write', state, resource: MCP })) {
+for (const [k, v] of Object.entries({ response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, code_challenge: challengeS256, code_challenge_method: 'S256', scope: prm.scopes_supported.join(' '), state, resource: MCP })) {
   authorizeUrl.searchParams.set(k, v);
 }
 await fetch(authorizeUrl, { redirect: 'manual' });
@@ -117,7 +117,7 @@ const call = async (client, name, args = {}) => {
 let client = await connect(tokens.access_token);
 const { tools } = await client.listTools();
 const destructive = tools.filter((t) => t.annotations?.destructiveHint !== false).map((t) => t.name).sort().join(', ');
-check('eight tools, only the two deletions destructive', tools.length === 8 && destructive === 'omnilex_elimina_dossier, omnilex_elimina_voci_dossier', destructive);
+check('twelve tools, only the three deletions destructive', tools.length === 12 && destructive === 'lingolex_elimina_card, omnilex_elimina_dossier, omnilex_elimina_voci_dossier', destructive);
 const name = `E2E MCP ${new Date().toISOString().slice(0, 19)}`;
 const created = await call(client, 'omnilex_crea_dossier', { nome: name });
 must('omnilex_crea_dossier', !created.isError && created.data?.id, created.isError ? created.text : name);
@@ -160,6 +160,25 @@ check('the trash lists it, with its citation and the application that deleted it
 const restored = await fetch(`${VISUALEX}/api/trash/${entry?.id}/restore`, { method: 'POST', headers: session, body: '{}' });
 const back = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
 check('the user restores it from VisuaLex, with its note still about it', restored.status === 200 && back.data?.voci?.some((v) => v.id === article?.id) && back.data?.voci?.find((v) => v.tipo === 'note')?.nota_su === article?.id);
+// LingoLex cards (spec §6): a draft anchored on art. 1453 c.c., listed, deleted with Accept, restored.
+const savedCards = await call(client, 'lingolex_salva_card', { schede: [{
+  materia: 'DIRITTO_CIVILE', istituto: 'Risoluzione per inadempimento (e2e)',
+  domanda: 'Quando si può chiedere la risoluzione del contratto?', risposta: 'Quando l’inadempimento non è di scarsa importanza.',
+  ancore: [{ riferimento: 'art. 1453 c.c.' }],
+}] });
+const cardId = savedCards.data?.esiti?.[0]?.id;
+check('lingolex_salva_card: a draft anchored on art. 1453 c.c.', savedCards.data?.esiti?.[0]?.outcome === 'created', savedCards.isError ? savedCards.text : savedCards.data?.esiti?.[0]?.outcome);
+const myCards = await call(client, 'lingolex_le_mie_card');
+const listedCard = myCards.data?.schede?.find?.((c) => c.id === cardId);
+check('lingolex_le_mie_card lists it, as a draft with its official URN', listedCard?.stato === 'BOZZA_PERSONALE' && listedCard?.ancore?.[0]?.urn?.startsWith('urn:nir:'), listedCard?.ancore?.[0]?.urn);
+const askedBeforeCard = asked.length;
+const deletedCard = await call(client, 'lingolex_elimina_card', { schede: [cardId] });
+check('lingolex_elimina_card asks, then moves the card to the trash', asked.length === askedBeforeCard + 1 && deletedCard.data?.spostate_nel_cestino === 1, asked.at(-1)?.split('\n')[1]);
+const cardTrash = (await json(await fetch(`${VISUALEX}/api/trash`, { headers: session }))).find?.((t) => t.kind === 'LINGO_CARDS');
+const cardRestored = await fetch(`${VISUALEX}/api/trash/${cardTrash?.id}/restore`, { method: 'POST', headers: session, body: '{}' });
+const cardBack = await json(await fetch(`${VISUALEX}/api/lingo/cards/${cardId}`, { headers: session }));
+check('the card comes back from the trash, still a draft', cardRestored.status === 200 && cardBack.stato === 'BOZZA_PERSONALE');
+
 await fetch(`${VISUALEX}/api/oauth/grants/${grantNow?.id}`, { method: 'PATCH', headers: session, body: JSON.stringify({ canDelete: false }) });
 const offAgain = await call(client, 'omnilex_elimina_dossier', { dossier: created.data.id });
 check('switched off again, the next deletion is refused', offAgain.isError && offAgain.text.includes('non è autorizzata'));
@@ -193,6 +212,8 @@ check('after the revocation the next call fails', afterRevoke.isError, afterRevo
 
 // 9. Clean up: the dossier goes for good through the user session (MCP only moves things to the trash).
 const deleted = await fetch(`${VISUALEX}/api/dossiers/${created.data.id}`, { method: 'DELETE', headers: session });
+// The e2e card stays a draft of the test user: no route deletes a card for good, and the
+// test user's account deletion removes it (deleteUserAccount removes personal cards).
 check('cleanup: the e2e dossier deleted through the user session', deleted.status === 204 || deleted.status === 200);
 
 console.log(failures === 0 ? '\nEnd to end: all checks passed.' : `\nEnd to end: ${failures} check(s) failed.`);

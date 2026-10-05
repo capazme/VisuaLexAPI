@@ -9,6 +9,8 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 export const SCOPE_LABELS: Record<string, string> = {
   'dossier:read': 'Leggere i tuoi dossier: i nomi e le norme che contengono',
   'dossier:write': 'Creare dossier e aggiungervi norme e note (non può modificare nulla; per eliminare serve il permesso qui sotto)',
+  'lingo:cards:read': 'Leggere le tue schede di studio LingoLex',
+  'lingo:cards:write': 'Creare schede di studio LingoLex, sempre come tue bozze personali',
   [DELETE_SCOPE]: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
 };
 

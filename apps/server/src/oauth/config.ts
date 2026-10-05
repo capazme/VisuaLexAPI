@@ -4,7 +4,7 @@
  * build a router with other values.
  */
 
-export const SCOPES = ['dossier:read', 'dossier:write', 'content:delete'] as const;
+export const SCOPES = ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write', 'content:delete'] as const;
 export type Scope = (typeof SCOPES)[number];
 
 /**
