@@ -107,12 +107,12 @@ async def test_the_migration_converges_on_the_schema(graph):
         "MATCH (n:Norma {URN: $u}) RETURN n.estremi AS e, n.testo AS t, n.testo_sha256 AS h, n.provenance AS p, n.fonte AS f",
         {"u": ART},
     )
-    assert art == [{"e": "Art. 1321 c.c.", "t": TEXT, "h": text_fingerprint(TEXT), "p": "seed", "f": "Normattiva"}]
+    assert art == [{"e": "art. 1321 c.c.", "t": TEXT, "h": text_fingerprint(TEXT), "p": "seed", "f": "Normattiva"}]
     stub = await graph.query(
         "MATCH (n:Norma {URN: $u}) RETURN n.is_stub AS s, n.trust AS t, n.provenance AS p, n.node_id AS id, n.estremi AS e",
         {"u": STUB},
     )
-    assert stub == [{"s": True, "t": None, "p": "ingestion", "id": STUB, "e": "Art. 1322 c.c."}]
+    assert stub == [{"s": True, "t": None, "p": "ingestion", "id": STUB, "e": "art. 1322 c.c."}]
     assert await graph.query("MATCH (n:LiveSource) RETURN n.testo AS t, n.text AS old") == [{"t": "fonte live", "old": None}]
 
 
@@ -305,7 +305,7 @@ async def test_a_stub_the_seed_flagged_with_a_string_gets_the_one_shape(graph):
     assert await graph.query(
         "MATCH (n:Norma {URN: $u}) RETURN n.is_stub AS s, n.node_id AS id, n.estremi AS e, n.provenance AS p",
         {"u": seed_stub},
-    ) == [{"s": True, "id": seed_stub, "e": "Art. 771 c.c.", "p": "ingestion"}]
+    ) == [{"s": True, "id": seed_stub, "e": "art. 771 c.c.", "p": "ingestion"}]
     assert await _migrate(graph, SEED_KEYS | {seed_stub}) == NOTHING
 
 
@@ -440,7 +440,7 @@ async def test_a_stub_keeps_the_estremi_its_urn_cannot_give(graph):
     rows = await graph.query("MATCH (n:Norma {URN: $u}) RETURN properties(n) AS p", {"u": law})
     assert rows == [{"p": {**stub_properties(law, Provenance.INGESTION), "estremi": "Art. 5 LEGGE 8 marzo 1975, n. 39"}}]
     # a code's stub still takes the derived estremi (the fixture's 'Art. 1322')
-    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.estremi AS e", {"u": STUB}) == [{"e": "Art. 1322 c.c."}]
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.estremi AS e", {"u": STUB}) == [{"e": "art. 1322 c.c."}]
 
 
 async def test_a_reported_stub_without_provenance_is_stamped_ingestion_even_with_a_seed_key(graph):

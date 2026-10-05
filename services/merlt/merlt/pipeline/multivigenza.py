@@ -43,6 +43,7 @@ from merlt.clients import (
     NormattivaScraper,
 )
 from merlt.storage.graph.schema import Rel, canonical_urn, version_urn
+from merlt.utils.sources import act_heading, authority, cite_act, norm_from_urn, normalize_norm_urn, short_norm
 from merlt.utils.urn_labels import derive_article_fields_from_urn
 
 log = structlog.get_logger()
@@ -77,23 +78,6 @@ TIPO_ATTO_MAPPING = {
     "direttiva ue": "direttiva ue",
 }
 
-# Mapping tipo atto -> autorità emanante
-AUTORITA_EMANANTE_MAPPING = {
-    "legge": "Parlamento",
-    "legge costituzionale": "Parlamento",
-    "decreto-legge": "Governo",
-    "decreto legislativo": "Governo",
-    "decreto del presidente della repubblica": "Presidente della Repubblica",
-    "decreto ministeriale": "Ministero",
-    "regolamento": "Governo",
-    "direttiva": "Unione Europea",
-    "regolamento ue": "Unione Europea",
-    "direttiva ue": "Unione Europea",
-    "costituzione": "Assemblea Costituente",
-    "regio decreto": "Re d'Italia",
-}
-
-
 def _build_normattiva_url(urn: str) -> str:
     """
     Costruisce URL Normattiva da URN.
@@ -105,21 +89,6 @@ def _build_normattiva_url(urn: str) -> str:
         URL completo per Normattiva
     """
     return f"https://www.normattiva.it/uri-res/N2Ls?{urn}"
-
-
-def _derive_autorita_emanante(tipo_documento: str) -> str:
-    """
-    Deriva autorità emanante dal tipo documento.
-
-    Args:
-        tipo_documento: Tipo di atto normativo
-
-    Returns:
-        Autorità emanante (default: "Stato")
-    """
-    if not tipo_documento:
-        return "Stato"
-    return AUTORITA_EMANANTE_MAPPING.get(tipo_documento.lower(), "Stato")
 
 
 @lru_cache(maxsize=1)
@@ -199,17 +168,10 @@ def parse_estremi(estremi: str) -> Dict[str, Optional[str]]:
         anno = data_match.group(3)
         result["data"] = f"{anno}-{mese}-{giorno}"
 
-    # Genera titolo standard
+    # The act's heading in the source convention ("l. 7 agosto 1990, n. 241").
     if result["tipo_documento"] and result["numero"]:
-        data_str = ""
-        if result["data"]:
-            # Converti data in formato leggibile
-            try:
-                dt = datetime.strptime(result["data"], "%Y-%m-%d")
-                data_str = f" del {dt.strftime('%d/%m/%Y')}"
-            except ValueError:
-                data_str = ""
-        result["titolo"] = f"{result['tipo_documento'].title()} n. {result['numero']}{data_str}"
+        result["titolo"] = act_heading(
+            {"tipo_atto": result["tipo_documento"], "data": result["data"] or "", "numero_atto": result["numero"]})
 
     return result
 
@@ -860,10 +822,17 @@ class MultivigenzaPipeline:
             return
 
         target_article_urn = normavisitata.urn
-        atto_urn = modifica.atto_modificante_urn
+        # The identity of the modifying act (source convention §1): never a malformed key
+        # such as "decreto legislativo:" or "decreto-legge:" (34 nodes measured, 4 Oct 2026).
+        atto_urn = normalize_norm_urn(modifica.atto_modificante_urn)
 
         if not atto_urn:
             log.warning(f"Missing URN for modifying act: {modifica.atto_modificante_estremi}")
+            return
+        if norm_from_urn(atto_urn) is None:
+            # A year-only or unreadable URN is no identity (source convention §1.3): it never
+            # becomes a node.
+            log.warning("multivigenza.modifying_act_without_identity", urn=atto_urn)
             return
 
         # Parse estremi per informazioni sull'atto
@@ -876,8 +845,11 @@ class MultivigenzaPipeline:
         # 1. Create/merge ATTO MODIFICANTE (livello documento)
         # ========================================
         tipo_doc = parsed_estremi["tipo_documento"] or "atto normativo"
-        autorita = _derive_autorita_emanante(tipo_doc)
-        atto_url = _build_normattiva_url(atto_urn)
+        # Labels of the source convention, read from the act's identity, else from its estremi.
+        atto_norm = norm_from_urn(atto_urn) or {
+            "tipo_atto": tipo_doc, "data": parsed_estremi["data"], "numero_atto": parsed_estremi["numero"]}
+        autorita = authority(atto_norm)
+        atto_url = atto_urn if atto_urn.startswith("http") else _build_normattiva_url(atto_urn)
 
         await self.falkordb.query(
             """
@@ -903,9 +875,9 @@ class MultivigenzaPipeline:
             {
                 "urn": atto_urn,
                 "url": atto_url,
-                "estremi": modifica.atto_modificante_estremi,
+                "estremi": cite_act(atto_norm),
                 "tipo_documento": tipo_doc,
-                "titolo": parsed_estremi["titolo"] or modifica.atto_modificante_estremi,
+                "titolo": act_heading(atto_norm),
                 "data_gu": modifica.data_pubblicazione_gu,
                 "autorita": autorita,
                 "timestamp": self._timestamp,
@@ -926,10 +898,10 @@ class MultivigenzaPipeline:
             art_num = parsed_disp["numero_articolo"]
             art_num_normalized = art_num.replace("-", "")
             articolo_urn = f"{atto_urn}~art{art_num_normalized}"
-            articolo_url = _build_normattiva_url(articolo_urn)
+            articolo_url = articolo_urn if articolo_urn.startswith("http") else _build_normattiva_url(articolo_urn)
 
-            # Costruisci estremi articolo
-            articolo_estremi = f"Art. {art_num} {modifica.atto_modificante_estremi}"
+            # The article's short label (source convention): "art. 3 l. 154/1992".
+            articolo_estremi = short_norm({**atto_norm, "numero_articolo": art_num})
 
             await self.falkordb.query(
                 """

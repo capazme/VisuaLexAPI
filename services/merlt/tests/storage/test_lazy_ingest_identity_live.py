@@ -145,5 +145,5 @@ async def test_a_code_keeps_its_code_node(graph):
     assert result.fatal_error is None
     (code,) = await _properties(graph, CODE_CC)
     assert code["tipo_documento"] == "codice"
-    assert code["titolo"] == "Codice Civile"
+    assert code["titolo"] == "Codice civile"  # the act heading (source convention)
     assert "is_stub" not in code

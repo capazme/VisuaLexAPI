@@ -26,8 +26,11 @@ def test_ingestion_cuts_originale_too():
 
 
 def test_estremi_come_from_the_schema():
-    assert _meta().to_estremi() == "Art. 2043 c.c."
-    assert NormaMetadata(tipo_atto="Costituzione", data="", numero_atto="", numero_articolo="1").to_estremi() == "Art. 1 Cost."
+    # The short label of the source convention (utils/sources.py).
+    assert _meta().to_estremi() == "art. 2043 c.c."
+    assert NormaMetadata(tipo_atto="Costituzione", data="", numero_atto="", numero_articolo="1").to_estremi() == "art. 1 Cost."
+    assert NormaMetadata(tipo_atto="legge", data="1990-08-07", numero_atto="241", numero_articolo="2").to_estremi() \
+        == "art. 2 l. 241/1990"
 
 
 def test_multivigenza_writes_canonical_relations():

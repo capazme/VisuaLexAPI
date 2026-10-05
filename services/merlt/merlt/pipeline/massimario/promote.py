@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Optional
 
 from merlt.storage.graph.schema import Label
+from merlt.utils.sources import decision_node_estremi
 
 _ROWS = 500
 _EXISTING = (
@@ -53,6 +54,8 @@ def merge_decision_props(existing: Optional[dict], new: dict) -> dict:
         for name in _KEEP:
             if existing.get(name):
                 props[name] = existing[name]
+    # The label follows the merged sections (source convention): never the first volume's.
+    props["estremi"] = decision_node_estremi(props) or props.get("estremi")
     return _clean(props)
 
 

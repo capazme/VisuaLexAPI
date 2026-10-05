@@ -34,7 +34,9 @@ from merlt.citation.urn_parser import (
     parse_urn,
     get_codice_abbreviation,
     get_act_type_abbreviation,
+    cite_urn,
 )
+from merlt.citation.format_kinds import CitationFormat
 from merlt.citation.formatter import CitationFormatter, FormattedCitation
 
 __all__ = [
@@ -43,7 +45,9 @@ __all__ = [
     "parse_urn",
     "get_codice_abbreviation",
     "get_act_type_abbreviation",
+    "cite_urn",
     # Formatter
+    "CitationFormat",
     "CitationFormatter",
     "FormattedCitation",
 ]

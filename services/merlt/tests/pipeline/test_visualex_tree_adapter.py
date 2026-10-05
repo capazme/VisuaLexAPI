@@ -149,11 +149,12 @@ async def test_norma_node_shape_matches_seed_schema():
     assert art1["id"] == f"{_BASE_URN_WITH_ANNEX}~art1"
     assert art1["labels"] == ["Norma"]
     assert art1["properties"]["tipo_documento"] == "articolo"
-    assert art1["properties"]["estremi"] == "Art. 1 c.c."
-    assert art1["properties"]["titolo"] == "Art. 1 c.c."
+    assert art1["properties"]["estremi"] == "art. 1 c.c."
+    # An article's `titolo` is never its extremes (source convention §5.1).
+    assert "titolo" not in art1["properties"]
     assert art1["properties"]["rubrica"] == "(Delle persone)."
     assert art1["properties"]["vigenza"] == "vigente"
-    assert art1["properties"]["autorita_emanante"] == "Regio Decreto"
+    assert art1["properties"]["autorita_emanante"] == "Re"  # the authority of the type, not the type (convention §5.1)
     assert "Testo dell'articolo 1" in art1["properties"]["testo_vigente"]
 
     # Every emitted article carries the text under its graph name, the fingerprint of that
@@ -176,7 +177,7 @@ async def test_article_number_suffix_concatenated_in_urn_but_hyphenated_in_prope
     result = await adapter.parse('{"act_type": "codice civile"}')
     art_bis = next(n for n in result["nodes"] if n["properties"]["numero_articolo"] == "30-bis")
     assert art_bis["properties"]["URN"] == f"{_BASE_URN_WITH_ANNEX}~art30bis"
-    assert art_bis["properties"]["estremi"] == "Art. 30-bis c.c."
+    assert art_bis["properties"]["estremi"] == "art. 30-bis c.c."
     assert art_bis["properties"]["rubrica"] == ""  # no rubrica in source text — graceful empty
 
 

@@ -52,7 +52,7 @@ async def test_the_norm_stub_has_the_one_shape_and_the_existing_node_is_not_touc
     assert "art.created_at" not in cypher
     assert "coalesce(art.provenance" not in cypher and "art.trust" not in cypher
     assert params["stub"] == {
-        "URN": CC, "node_id": CC, "numero_articolo": "1322", "estremi": "Art. 1322 c.c.",
+        "URN": CC, "node_id": CC, "numero_articolo": "1322", "estremi": "art. 1322 c.c.",
         "is_stub": True, "provenance": "ingestion",
     }
     assert params["article_urn"] == CC
@@ -398,7 +398,7 @@ async def test_the_stub_of_a_bare_urn_is_keyed_by_its_normattiva_url():
     cypher, params = client.query.await_args.args
     assert params["article_urn"] == CC
     assert params["stub"]["URN"] == CC and params["stub"]["node_id"] == CC
-    assert params["stub"]["estremi"] == "Art. 1322 c.c."
+    assert params["stub"]["estremi"] == "art. 1322 c.c."
 
 
 # A new community entity carries a label of the schema -----------------------------------------

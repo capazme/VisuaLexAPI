@@ -2,7 +2,7 @@
 URN → human label / estremi derivation (data-quality plan A1 + A2).
 
 Single source of truth for turning a Normattiva/NIR URN into a display label
-("Art. N") and the ``numero_articolo`` / ``estremi`` pair used to backfill
+("art. N") and the ``numero_articolo`` / ``estremi`` pair used to backfill
 Norma stub nodes. Shared by:
 
 - ``api/graph_router.py`` (A1 — node serializer label chain)
@@ -23,16 +23,10 @@ URN article segment form (verified live against the seed graph):
 import re
 from typing import Any, Dict, Optional, Tuple
 
-# Recognised ordinal extensions for article suffixes (-bis, -ter, ...).
-# Kept explicit so a stray token after the digits (e.g. "-com3") is not
-# mistaken for a suffix.
-_ARTICLE_SUFFIXES = (
-    "bis", "ter", "quater", "quinquies", "sexies", "septies", "octies",
-    "novies", "decies", "undecies", "duodecies", "terdecies", "quaterdecies",
-    "quindecies", "quinquiesdecies", "sexdecies", "sexiesdecies",
-    "septiesdecies", "octiesdecies", "noviesdecies", "duodevicies",
-    "undevicies", "vicies",
-)
+# Recognised ordinal extensions for article suffixes (-bis, -ter, ...), from the one
+# table (a copy of the API's, pinned by tests/unit/test_sources_golden.py). Kept explicit
+# so a stray token after the digits (e.g. "-com3") is not mistaken for a suffix.
+from merlt.utils.article_suffixes import ARTICLE_ORDINAL_SUFFIXES as _ARTICLE_SUFFIXES  # noqa: E402
 
 # ~art<digits><optional-suffix>, anchored so trailing "-com3" / "!vig=" don't
 # bleed into the capture. Suffix is matched only against the known list,
@@ -88,18 +82,16 @@ def article_number_from_urn(urn: Optional[str]) -> Optional[str]:
 
 def article_label_from_urn(urn: Optional[str]) -> Optional[str]:
     """
-    Build an "Art. N" label from a URN's article segment.
+    The label of the article a URN keys: its short label ("art. 2043 c.c.",
+    ``utils/sources``), else the bare "art. N".
 
     Args:
         urn: Full URN or URL.
 
     Returns:
-        "Art. 467" / "Art. 30-bis" or ``None`` when no article segment exists.
+        "art. 2043 c.c." / "art. 30-bis" or ``None`` when no article segment exists.
     """
-    numero = article_number_from_urn(urn)
-    if numero is None:
-        return None
-    return f"Art. {numero}"
+    return derive_article_fields_from_urn(urn)[1]
 
 
 def derive_article_fields_from_urn(urn: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
@@ -116,23 +108,25 @@ def derive_article_fields_from_urn(urn: Optional[str]) -> Tuple[Optional[str], O
     Returns:
         ``(numero_articolo, estremi)`` — both ``None`` when the URN has no
         article segment (so the caller can skip the SET without inventing
-        bogus data). ``estremi`` is the minimal URN-derived identity
-        ("Art. N"): it deliberately omits the act, because the URN alone does
-        not say "c.c." vs "c.p.", and the mechanical-ingestion conflict report
-        recognises this bare form as a stub value rather than a conflict.
+        bogus data). ``estremi`` is the norm's short label of the source
+        convention, read from the key (``utils/sources.short_from_urn``: the
+        decree and annex say which code it is, "art. 2043 c.c."), or the bare
+        "art. N" when the key names no act the convention can read.
 
     Examples:
-        >>> derive_article_fields_from_urn("urn:nir:...~art467")
-        ('467', 'Art. 467')
+        >>> derive_article_fields_from_urn("https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043")
+        ('2043', 'art. 2043 c.c.')
         >>> derive_article_fields_from_urn("urn:nir:...~art30bis")
-        ('30-bis', 'Art. 30-bis')
+        ('30-bis', 'art. 30-bis')
         >>> derive_article_fields_from_urn("urn:nir:...:262")
         (None, None)
     """
     numero = article_number_from_urn(urn)
     if numero is None:
         return None, None
-    return numero, f"Art. {numero}"
+    from merlt.utils.sources import short_from_urn  # a leaf importing the labels lazily: no cycle
+
+    return numero, (short_from_urn(urn) or f"art. {numero}")
 
 
 def _truncate(text: str, max_len: int = _LABEL_MAX_LEN) -> str:
@@ -149,10 +143,11 @@ def build_node_label(props: Dict[str, Any], node_id: str) -> str:
 
     Priority chain (first non-empty wins):
         1. nome / estremi / rubrica / titolo  (existing rich fields)
-        2. Norma synth: "Art. {numero_articolo} — {rubrica}" when BOTH exist
-        3. numero_articolo alone  → "Art. {numero_articolo}"
+        2. Norma synth: "{estremi} — {rubrica}" when an article has a rubric
+           ("art. 2043 c.c. — Risarcimento per fatto illecito")
+        3. numero_articolo alone  → "art. {numero_articolo}"
         4. testo (truncated ~55 chars)         → e.g. Comma nodes
-        5. URN-derived "Art. N" (regex ~art(\\d+))
+        5. URN-derived label ("art. 2043 c.c.", else "art. N")
         6. node_id truncated (last resort, never the raw URL for an article)
 
     The synth in (2) and the URN fallback in (5) guarantee we never dump the
@@ -180,9 +175,9 @@ def build_node_label(props: Dict[str, Any], node_id: str) -> str:
     if nome:
         return nome
 
-    # 2. Norma synthesis: "Art. N — rubrica" when both present.
+    # 2. Norma synthesis: the short label and the rubric, when both are known.
     if numero_articolo and rubrica:
-        return f"Art. {numero_articolo} — {rubrica}"
+        return f"{_clean(props.get('estremi')) or f'art. {numero_articolo}'} — {rubrica}"
 
     # 1b. Remaining rich fields.
     for key in ("estremi", "rubrica", "titolo"):
@@ -192,14 +187,14 @@ def build_node_label(props: Dict[str, Any], node_id: str) -> str:
 
     # 3. numero_articolo alone.
     if numero_articolo:
-        return f"Art. {numero_articolo}"
+        return f"art. {numero_articolo}"
 
     # 4. Free text (Comma nodes carry only `testo`).
     testo = _clean(props.get("testo"))
     if testo:
         return _truncate(testo)
 
-    # 5. URN-derived "Art. N".
+    # 5. URN-derived label.
     art_label = article_label_from_urn(node_id) or article_label_from_urn(
         _clean(props.get("URN")) or _clean(props.get("urn"))
     )

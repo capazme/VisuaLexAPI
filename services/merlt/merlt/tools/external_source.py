@@ -309,7 +309,7 @@ class ExternalSourceTool(BaseTool):
             # Cerca per estremi o numero articolo
             cypher = """
             MATCH (a:Norma)
-            WHERE a.estremi CONTAINS $query
+            WHERE toLower(coalesce(a.estremi, '')) CONTAINS toLower($query)
                OR a.numero_articolo = $query
                OR toLower(coalesce(a.testo, a.testo_vigente, '')) CONTAINS toLower($query)
             RETURN coalesce(a.testo, a.testo_vigente) AS text, a.URN AS urn,
