@@ -28,6 +28,19 @@ _CODES: dict[str, tuple[tuple[str, ...], str | None, str | None]] = {
     "costituzione": (("Cost.",), "Costituzione", None),
     "preleggi": (("preleggi", "disp. prel."), None, None),
 }
+# Disposizioni di attuazione: text search only, never the index (they share `rnc-gen` "CC"/"PC"
+# with the code itself, plan Task 2). The API reaches them as the long name (tools/map.py,
+# search spelling), as the short form, or as the regio decreto (318/1942, 1368/1941).
+_DISP_ATT_NAMES = {
+    "disposizioni per l'attuazione del codice civile e disposizioni transitorie": "cc",
+    "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": "cpc",
+    "disp. att. c.c.": "cc", "disp. att. c.p.c.": "cpc",
+}
+_DISP_ATT_RD = {("318", "1942"): "cc", ("1368", "1941"): "cpc"}
+_DISP_ATT_PHRASES = {
+    "cc": ("disp. att. c.c.", "disp. att. cod. civ."),
+    "cpc": ("disp. att. c.p.c.", "disp. att. cod. proc. civ."),
+}
 _NUMBERED = ("legge", "decreto legislativo", "decreto legge", "decreto-legge",
              "decreto del presidente della repubblica")
 
@@ -43,8 +56,9 @@ _INDEX_CODES: dict[str, tuple[str, str | None]] = {
 #: rnc-art suffix codes: only "-bis" = "02" is established (five independent articles, plan Task 2).
 _INDEX_SUFFIXES = {"": "00", "bis": "02"}
 
-_ARTICLE = re.compile(r"^\d{1,5}(?:[- ][a-z]{2,15})?(?:\.\d{1,2})?$")
+_ARTICLE = re.compile(r"^\d{1,5}(?:[- ][a-z]{2,15})?(?:\.\d{1,2})?$", re.ASCII)
 _TOPIC_KEEP = re.compile(r"[^\w' -]", re.UNICODE)
+_APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'", "\u02bc": "'"})
 _TOPIC_MAX = 80
 
 
@@ -60,13 +74,26 @@ def _article_number(raw: object) -> str:
 
 
 def _year(data: object) -> str | None:
-    match = re.match(r"^(\d{4})", str(data or ""))
+    match = re.match(r"^(\d{4})", str(data or ""), re.ASCII)
     return match.group(1) if match else None
+
+
+def _disp_att(tipo: str, norma: dict) -> str | None:
+    named = _DISP_ATT_NAMES.get(tipo.translate(_APOSTROPHES))
+    if named or tipo != "regio decreto":
+        return named
+    number = str(norma.get("numero_atto") or "").strip()
+    return _DISP_ATT_RD.get((number, _year(norma.get("data")) or ""))
 
 
 def article_clause(norma: dict) -> tuple[str, str | None]:
     tipo = str(norma.get("tipo_atto") or "").strip().lower()
     numero = _article_number(norma.get("numero_articolo"))
+    disp = _disp_att(tipo, norma)
+    if disp:
+        phrases = [f"art. {numero} {_DISP_ATT_PHRASES[disp][0]}", f"art. {numero} {_DISP_ATT_PHRASES[disp][1]}",
+                   f"articolo {numero} {_DISP_ATT_PHRASES[disp][0]}"]
+        return " OR ".join(f'ocr:"{p}"' for p in phrases), "civile"
     if tipo in _CODES:
         abbreviations, name, archivio = _CODES[tipo]
         phrases = [f"art. {numero} {a}" for a in abbreviations]
@@ -77,7 +104,7 @@ def article_clause(norma: dict) -> tuple[str, str | None]:
         return " OR ".join(f'ocr:"{p}"' for p in phrases), archivio
     act_number = str(norma.get("numero_atto") or "").strip()
     year = _year(norma.get("data"))
-    if tipo in _NUMBERED and act_number.isdigit() and year:
+    if tipo in _NUMBERED and act_number.isascii() and act_number.isdigit() and year:
         return f'ocr:"art {numero} {act_number} {year}"~{PROXIMITY}', None
     raise UnsupportedAct(tipo or "no act type")
 
@@ -96,7 +123,7 @@ def index_clause(norma: dict) -> tuple[str, str | None, IndexCoordinates]:
     tipo = str(norma.get("tipo_atto") or "").strip().lower()
     if tipo not in _INDEX_CODES:
         raise UnsupportedAct(tipo or "no act type")
-    match = re.match(r"^(\d{1,4})(?:[- ]([a-z]{2,15}))?$", str(norma.get("numero_articolo") or "").strip().lower())
+    match = re.match(r"^(\d{1,4})(?:[- ]([a-z]{2,15}))?$", str(norma.get("numero_articolo") or "").strip().lower(), re.ASCII)
     if not match or match.group(2) not in (None, *(s for s in _INDEX_SUFFIXES if s)):
         raise UnsupportedAct(f"article {norma.get('numero_articolo')!r}")
     gen, archivio = _INDEX_CODES[tipo]
@@ -118,7 +145,7 @@ def cites(doc: dict, c: IndexCoordinates) -> bool:
 
 
 def topic_clause(raw: str) -> str:
-    words = " ".join(_TOPIC_KEEP.sub(" ", raw or "").replace("_", " ").split())
+    words = " ".join(_TOPIC_KEEP.sub(" ", (raw or "").translate(_APOSTROPHES)).replace("_", " ").split())
     words = words[:_TOPIC_MAX].strip()
     if not any(ch.isalnum() for ch in words):
         raise ValueError("no words in the topic")
@@ -130,5 +157,7 @@ def build_query(article: str | None, topic: str | None, archivio: str | None) ->
     if not parts:
         raise ValueError("an article or a topic is needed")
     if archivio:
+        if archivio not in KINDS:
+            raise ValueError(f"unknown archive {archivio!r}")
         parts.insert(0, f'kind:"{KINDS[archivio]}"')
     return " AND ".join(parts)

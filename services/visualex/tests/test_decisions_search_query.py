@@ -131,3 +131,83 @@ def test_cites_rejects_the_article_of_another_act_on_an_aligned_record():
 def test_cites_keeps_a_record_whose_lists_are_not_aligned():
     doc = {"rnc-gen": ["CC", "LS", "PC"], "rnc-art": ["1227 00", "2043 00"]}
     assert cites(doc, IndexCoordinates("CC", "2043 00"))
+
+
+# --- fix round 1 ----------------------------------------------------------------------------
+
+@pytest.mark.parametrize("norma, short, long_, archivio", [
+    ({"tipo_atto": "disposizioni per l'attuazione del Codice civile e disposizioni transitorie",
+      "numero_articolo": "66"}, "disp. att. c.c.", "disp. att. cod. civ.", "civile"),
+    ({"tipo_atto": "disposizioni per l’attuazione del Codice di procedura civile e disposizioni transitorie",
+      "numero_articolo": "118"}, "disp. att. c.p.c.", "disp. att. cod. proc. civ.", "civile"),
+    ({"tipo_atto": "regio decreto", "numero_atto": "318", "data": "1942-03-30",
+      "numero_articolo": "66"}, "disp. att. c.c.", "disp. att. cod. civ.", "civile"),
+    ({"tipo_atto": "regio decreto", "numero_atto": "1368", "data": "1941-12-18",
+      "numero_articolo": "118"}, "disp. att. c.p.c.", "disp. att. cod. proc. civ.", "civile"),
+    ({"tipo_atto": "disp. att. c.c.", "numero_articolo": "66"},
+     "disp. att. c.c.", "disp. att. cod. civ.", "civile"),
+])
+def test_the_disp_att_are_phrased_in_the_text(norma, short, long_, archivio):
+    clause, found = article_clause(norma)
+    n = norma["numero_articolo"]
+    assert found == archivio
+    for phrase in (f"art. {n} {short}", f"art. {n} {long_}", f"articolo {n} {short}"):
+        assert f'ocr:"{phrase}"' in clause
+
+
+def test_the_disp_att_never_reach_the_index():
+    for norma in ({"tipo_atto": "regio decreto", "numero_atto": "318", "data": "1942", "numero_articolo": "66"},
+                  {"tipo_atto": "disp. att. c.c.", "numero_articolo": "66"}):
+        with pytest.raises(UnsupportedAct):
+            index_clause(norma)
+
+
+def test_another_regio_decreto_is_unsupported():
+    with pytest.raises(UnsupportedAct):
+        article_clause({"tipo_atto": "regio decreto", "numero_atto": "262", "data": "1942-03-16",
+                        "numero_articolo": "1"})
+
+
+@pytest.mark.parametrize("number", ["2²", "２０４３"])
+def test_unicode_digits_are_not_article_numbers(number):
+    with pytest.raises(UnsupportedAct):
+        article_clause({"tipo_atto": "codice civile", "numero_articolo": number})
+    with pytest.raises(UnsupportedAct):
+        index_clause({"tipo_atto": "codice civile", "numero_articolo": number})
+
+
+def test_unicode_digits_are_not_an_act_number():
+    with pytest.raises(UnsupportedAct):
+        article_clause({"tipo_atto": "legge", "numero_atto": "²⁴", "data": "1990", "numero_articolo": "2"})
+
+
+def test_a_typographic_apostrophe_in_a_topic_is_kept_as_a_plain_one():
+    assert topic_clause("dell’avvocato") == 'ocr:"dell\'avvocato"'
+
+
+@pytest.mark.parametrize("raw", ["“danno” ingiusto", "„danno” ingiusto", "＂danno＂ ingiusto"])
+def test_lookalike_quotes_in_a_topic_cannot_close_the_phrase(raw):
+    assert topic_clause(raw) == 'ocr:"danno ingiusto"'
+
+
+def test_an_unknown_archive_is_a_value_error():
+    with pytest.raises(ValueError, match="unknown archive"):
+        build_query('ocr:"a"', None, "amministrativo")
+
+
+def test_a_dotted_number_is_phrased_in_the_text_and_not_in_the_index():
+    clause, _ = article_clause({"tipo_atto": "codice di procedura penale", "numero_articolo": "270-bis.1"})
+    assert 'ocr:"art. 270 bis.1 c.p.p."' in clause
+    with pytest.raises(UnsupportedAct):
+        index_clause({"tipo_atto": "codice di procedura penale", "numero_articolo": "270-bis.1"})
+
+
+def test_the_preleggi_are_phrased_in_the_text():
+    clause, archivio = article_clause({"tipo_atto": "preleggi", "numero_articolo": "12"})
+    assert archivio is None and 'ocr:"art. 12 preleggi"' in clause and 'ocr:"art. 12 disp. prel."' in clause
+
+
+def test_a_decreto_legge_is_a_proximity_phrase():
+    clause, _ = article_clause({"tipo_atto": "decreto legge", "numero_atto": "18", "data": "2020-03-17",
+                                "numero_articolo": "1"})
+    assert clause == f'ocr:"art 1 18 2020"~{PROXIMITY}'
