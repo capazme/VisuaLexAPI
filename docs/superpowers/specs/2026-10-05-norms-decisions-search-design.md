@@ -27,9 +27,9 @@ His answers, verbatim (5 October 2026):
 | 8 | On a phone the decision opens full screen, with a way back | «Sì» |
 | 9 | Notes and highlights on decisions stay out of this round | «No, includile» |
 
-Two answers leave a choice that only the owner can make; §2.2 (the layout) and
-§6 (the glossary) draw the readings and recommend one. They are listed in
-**Questions for the owner**.
+Four questions stayed open after the interview; the owner answered them on
+5 October 2026 with the spec («spec ok»). They are recorded under **Questions
+for the owner — answered**, and the sections below are written to the answers.
 
 ## Why
 
@@ -224,7 +224,7 @@ readings below give the decision a tab of its own; they differ in what «tab»
 means here.
 
 **Reading 1 — a tab of the workspace, placed beside the article's tab
-(recommended).** The decision becomes a tab like a norm's: it has its own entry
+(chosen by the owner).** The decision becomes a tab like a norm's: it has its own entry
 in the dock, and can be closed, brought forward and tiled. Opened from an
 article, the two tabs are laid out side by side, the article's on the left
 half, the decision's on the right; opened from the palette with nothing on
@@ -403,7 +403,7 @@ Answer 1: «C magari sfruttando il glossario». What exists (measured above):
 Brocardi's glossary under each article it covers — terms its dictionary
 defines, linked to brocardi.it.
 
-**Proposed (recommended):** the glossary becomes the way into a topic.
+**Chosen (the owner, «ok»):** the glossary becomes the way into a topic.
 
 - Under the article, the «Glossario» terms stay where they are; each term gains
   an action «Sentenze su questo tema» beside the link to Brocardi's definition.
@@ -421,14 +421,15 @@ defines, linked to brocardi.it.
   words as written (no synonyms, no stemming beyond Solr's); the glossary only
   where Brocardi covers the article (mostly the codes).
 
-**Alternatives, not recommended now:**
+**Alternatives, not built in this round:**
 
 - **A VisuaLex glossary built from Brocardi's dictionary** (term → definition →
   the articles that use it), which would also give norms by topic. It means
   crawling thousands of dictionary pages and keeping them: a stored corpus (the
-  08-29 design's D3 forbids one), a new table, and a use of Brocardi's content
-  beyond the sections shown with an article, which needs the source's consent
-  first. Several days, plus that consent.
+  08-29 design's D3 forbids one, so that design is amended first) and a new
+  table: several days. Brocardi's permission is not an obstacle: the owner
+  states that VisuaLex already has every permission it needs from Brocardi
+  (recorded as D-038). A possible later phase, not ruled out.
 - **MERL-T's concept layer** (`ConcettoGiuridico`, article→concept relations):
   norms by concept and decisions by concept through the graph. It covers the
   seed (Libro IV of the codice civile), lives behind the MERL-T flags, and the
@@ -544,11 +545,23 @@ sentence that says so.
 #### 8.6 Where the anchors travel
 
 Highlights and notes on decisions are user-owned and server-backed (gotcha 17)
-like any other. Environments copy the whole annotation and highlight slices, so
-they would carry them to the Forum too; the environment viewer labels them by
-the decision's short form instead of the raw key. Whether they should travel is
-a question for the owner (below), because a highlight quotes the decision's
-words.
+like any other, and they travel with environments and through the Forum as an
+article's do (the owner, answer 4: «sì con la cautela»). The environment viewer
+labels them by the decision's short form instead of the raw key.
+
+**The caution: VisuaLex never spreads words a court has withdrawn.** A note or
+highlight on a decision travels only if it still lands in the decision's
+current text. When an environment is created or published, or an item is
+offered to the Forum, each anchor keyed by a decision is checked with
+`resolveAnchors` against the decision's text fetched now (through the session
+cache); one that does not land — the text was obscured, anonymised or is
+missing — is left out, and so is every anchor of a decision that cannot be
+fetched at that moment (the source is down: nothing is sent on trust). The
+dialog says how many were left out and why («2 evidenziazioni su sentenze non
+incluse: il loro testo non è più presente nella fonte»). The anchors stay in
+the user's own account, in §8.4's box. A test covers each case: a landing
+anchor travels; an anchor on an obscured decision, one whose words changed, and
+one on a decision that cannot be fetched do not; the count is shown.
 
 ### 9. The Cronologia
 
@@ -598,8 +611,9 @@ round needs it, this round writes it to the golden cases and PR 1c adopts it.
 - **Personal data in user-owned excerpts.** A highlight stores the words it
   covers. When the court later withdraws or anonymises a decision, the user's
   highlights still hold the original words, including names. That is the user's
-  own data, but the court's anonymisation does not reach it, and §8.6 can spread
-  it. Raised to the owner below.
+  own data, and it stays so: the owner chose to do nothing more about it
+  (answer 3), beyond §8.4's box where the user sees and can delete it. What
+  VisuaLex must not do is spread those words: §8.6.
 - **Validation of keys**: the history's `decision_key` and the anchors' decision
   keys are validated server-side against the key's shape.
 
@@ -625,29 +639,25 @@ round needs it, this round writes it to the golden cases and PR 1c adopts it.
   unmatched anchor (forged on the test account) listed; the Cronologia; a phone
   width.
 
-## Questions for the owner
+## Questions for the owner — answered
 
-1. **«In una propria tab»** (§2.2). Reading 1 — a tab of the workspace placed
-   beside the article's tab (recommended) — or reading 2 — a second pane inside
-   the article's tab, with its own tabs?
-2. **The glossary** (§6). The glossary as the way into a topic, with decisions
-   narrowed to the article and «Solo il tema» (recommended), or one of the
-   alternatives?
-3. **Excerpts with personal data** (Security). When a decision is withdrawn or
-   anonymised at the source, should VisuaLex do something about the user's own
-   highlights of it: nothing (recommended for this round: they are the user's
-   data, listed in §8.4's box where they can be deleted), a notice in the box
-   suggesting deletion, or deletion?
-4. **Do notes and highlights on decisions travel with environments and the
-   Forum** (§8.6)? Recommended: yes, as an article's do, with the decision's
-   label; the alternative is to keep them out of environments until question 3
-   is settled.
+Answered by the owner on 5 October 2026 with the spec, verbatim: «spec ok, 39=1,
+40 ok, ma abbiamo già tutti i permessi, 41 nulla, 42 sì con la cautela» (39–42
+were the orchestrator's numbers for the four questions below).
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | «In una propria tab» (§2.2): reading 1 or 2 | Reading 1: a workspace tab placed beside the article's |
+| 2 | The glossary (§6) | The glossary as the way into a topic; the dictionary download is possible later — the permissions are there (D-038) |
+| 3 | Excerpts with personal data of a decision later withdrawn | Nothing more: the user's own data, visible and deletable in §8.4's box |
+| 4 | Notes and highlights on decisions in environments and the Forum | Yes, with the caution of §8.6: an anchor whose words are no longer in the decision's current text does not travel |
 
 ## Coordination
 
 - **Sentenze (PR C and later)**: `DecisionPage` becomes `DecisionView` in a tab,
-  and the route only redirects; the reader files become frozen (§8.5). The
-  Sentenze session reviews §8.5 before the plan's reader tasks run.
+  and the route only redirects; the reader files become frozen (§8.5) as they
+  are on `develop` when PR 1 merges. The Sentenze session reviews §8.5 when it
+  is back, through the orchestrator.
 - **Convention PR 1a** (web labels: `SearchPanel`, `ArticleTabContent`,
   `NormaCard`): this round touches `ArticleTabContent` (the «Giurisprudenza»
   section) and the palette; order agreed through the orchestrator.
@@ -664,6 +674,6 @@ round needs it, this round writes it to the golden cases and PR 1c adopts it.
 - Decision citations in the documents page.
 - The Corte costituzionale in the live list (its open data can be searched on
   disk, without the source).
-- Norms by topic (§6's alternatives).
+- Norms by topic: a VisuaLex glossary from Brocardi's dictionary (§6), or MERL-T's concept layer.
 - Notes and highlights in the dossier's decision reader (dossier PR 3).
 - Passage discussions on decisions.

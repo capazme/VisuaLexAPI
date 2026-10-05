@@ -25,16 +25,11 @@
 - Nothing private in the repository (no vault text, no personal paths, no infrastructure addresses).
 - Shared utilities first (`apps/web/CLAUDE.md`, «Shared utilities»): `resolveAnchors`, `getSelectionAnchor`, `wrapCitationsInHtml`, `ArticleBody`, `legalFetch`, `useIsDesktop`, `readingBackStack`.
 
-## Open owner questions this plan assumes
+## Owner answers after the spec
 
-The spec's «Questions for the owner» are answered here with the recommended option. If the owner answers otherwise, amend the named task before it runs.
+The owner approved the spec on 5 October 2026 and answered its four questions: «spec ok, 39=1, 40 ok, ma abbiamo già tutti i permessi, 41 nulla, 42 sì con la cautela» (spec, «Questions for the owner — answered»). Reading 1 (Tasks 8, 9); the glossary as written (Task 13); nothing more on excerpts (Task 16); annotations on decisions travel, except those whose words are no longer in the decision's current text (Task 17, spec §8.6).
 
-| Question | Assumed | Tasks it changes |
-|---|---|---|
-| 1. «In una propria tab» | Reading 1: a workspace tab placed beside the article's | 8, 9 |
-| 2. The glossary | Glossary terms as the way into a topic, narrowed to the article, «Solo il tema» | 13 |
-| 3. Excerpts with personal data | Nothing beyond §8.4's box | 16 |
-| 4. Annotations in environments | They travel, labelled | 17 |
+Sequencing (orchestrator, 5 October): PR 1 goes now. PR 2 onward touch the palette, `ArticleTabContent` and `SearchPanel`, which the convention's PR 1a also touches: ask the orchestrator before starting each. The test database and the PR 5 migration: ask first. The Sentenze session reviews spec §8.5 when it is back; PR 1 freezes the readers as they are on `develop`.
 
 ## Review Focus
 
@@ -1985,26 +1980,158 @@ git add apps/web/src
 git commit -m "feat(web): notes and highlights on decisions — anchored like an article's, and listed when the text changes"
 ```
 
-### Task 17: Annotations on decisions in environments and the Forum
+### Task 17: Annotations on decisions travel, but never words a court withdrew
 
 **Files:**
-- Modify: `apps/web/src/components/features/environments/EnvironmentContentViewer.tsx` (label a decision key with its short form)
-- Modify: `apps/web/src/components/features/bulletin/SuggestionItemCard.tsx` if it labels an annotation's `normaKey` (read it; same change)
-- Test: `EnvironmentContentViewer` test (create `__tests__/EnvironmentContentViewer.labels.test.tsx` if none exists)
+- Create: `apps/web/src/utils/decisionAnchorsTravel.ts`
+- Create: `apps/web/src/components/features/environments/annotationLabels.ts`
+- Modify: every place where the user's annotations and highlights leave the account — find them all first with `git grep -n "annotations\|highlights" -- apps/web/src/components/features/environments apps/web/src/components/features/bulletin apps/web/src/store/useAppStore.ts` and list them in the commit message. Known today: `store/useAppStore.ts` `createEnvironment` (`fromCurrent` copies the slices), `environments/CreateEnvironmentModal.tsx` (the selection given to `onCreate`), the environment export to a file if one exists, `bulletin/EditSharedEnvironmentModal.tsx` (publishing to the Forum), `bulletin/AddItemsDialog.tsx` (items offered as suggestions).
+- Modify: `apps/web/src/components/features/environments/EnvironmentContentViewer.tsx` and `bulletin/SuggestionItemCard.tsx` if it labels an annotation's `normaKey` (labels)
+- Test: `apps/web/src/utils/__tests__/decisionAnchorsTravel.test.ts`, `apps/web/src/components/features/environments/__tests__/annotationLabels.test.ts`, and one test per dialog showing the «non incluse» line
 
 **Interfaces:**
-- Consumes: `identityFromKey`, `formatDecisionShort` (Task 6).
-- Produces: `annotationTargetLabel(normaKey: string): string` in `environments/annotationLabels.ts`.
+- Consumes: `isDecisionKey`, `identityFromKey`, `formatDecisionShort` (Task 6); `fetchDecisionCached` (Task 8); `resolveAnchors` via `decisionProjection` (Task 14).
+- Produces:
+  - `travellingAnchors(input: { annotations: Annotation[]; highlights: Highlight[] }): Promise<{ annotations: Annotation[]; highlights: Highlight[]; leftOut: { annotations: number; highlights: number } }>`
+  - `leftOutMessage(leftOut): string | null`
+  - `annotationTargetLabel(normaKey: string): string`
 
-- [ ] **Step 1: Failing test.** `annotationTargetLabel('cassazione:civile:10787:2024')` → `'Cass. civ., n. 10787/2024'`; `annotationTargetLabel('codice-civile--2043')` → `'codice civile 2043'` (today's rendering: `normaKey.replace(/--/g, ' ').replace(/-/g, ' ')`); the viewer shows the decision label in its «per norma» list.
+- [ ] **Step 1: Failing tests** (spec §8.6: «VisuaLex never spreads words a court has withdrawn»)
 
-- [ ] **Step 2–4:** implement (`identityFromKey(key) ? formatDecisionShort(identity) : key.replace(/--/g, ' ').replace(/-/g, ' ')`), use it at the two `byNorm.map` sites, run tests/build/lint.
+```ts
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { leftOutMessage, travellingAnchors } from '../decisionAnchorsTravel';
+import { fetchDecisionCached } from '../decisionFetchCache';
+
+vi.mock('../decisionFetchCache', () => ({ fetchDecisionCached: vi.fn() }));
+const fetchMock = vi.mocked(fetchDecisionCached);
+
+const KEY = 'cassazione:civile:10787:2024';
+const found = (motivazione: string) => ({ esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }, attributi: {}, testo: { motivazione }, fonte: { nome: 'f' }, avvisi: [] }) as never;
+const hl = (normaKey: string, startOffset: number, text: string) => ({ id: `${normaKey}${startOffset}`, normaKey, articleId: '', text, startOffset, color: 'yellow' }) as never;
+const note = (normaKey: string, startOffset: number, anchorText: string) => ({ id: `n${startOffset}`, normaKey, articleId: '', text: 'nota', startOffset, anchorText }) as never;
+
+beforeEach(() => fetchMock.mockReset());
+
+describe('travellingAnchors', () => {
+  it('lets an anchor travel when its words are still in the current text', async () => {
+    fetchMock.mockResolvedValue(found('Il ricorso è fondato.'));
+    const out = await travellingAnchors({ annotations: [note(KEY, 3, 'ricorso')], highlights: [hl(KEY, 3, 'ricorso')] });
+    expect(out.highlights).toHaveLength(1);
+    expect(out.annotations).toHaveLength(1);
+    expect(out.leftOut).toEqual({ annotations: 0, highlights: 0 });
+  });
+  it('leaves out an anchor on a decision now without its text (obscured)', async () => {
+    fetchMock.mockResolvedValue({ ...found(''), testo: {}, avvisi: [{ tipo: 'testo_non_disponibile' }], attributi: { testo_assente: 'oscuramento' } } as never);
+    const out = await travellingAnchors({ annotations: [], highlights: [hl(KEY, 3, 'Mario Rossi')] });
+    expect(out.highlights).toEqual([]);
+    expect(out.leftOut.highlights).toBe(1);
+  });
+  it('leaves out an anchor whose words changed (anonymised)', async () => {
+    fetchMock.mockResolvedValue(found('Il sig. omissis ricorre.'));
+    const out = await travellingAnchors({ annotations: [note(KEY, 8, 'Mario Rossi')], highlights: [] });
+    expect(out.annotations).toEqual([]);
+    expect(out.leftOut.annotations).toBe(1);
+  });
+  it('sends nothing on trust when the decision cannot be fetched now', async () => {
+    fetchMock.mockResolvedValue({ esito: 'fonte_non_raggiungibile', fonte: 'cassazione' });
+    const out = await travellingAnchors({ annotations: [], highlights: [hl(KEY, 3, 'ricorso')] });
+    expect(out.leftOut.highlights).toBe(1);
+    fetchMock.mockRejectedValue(new Error('network'));
+    expect((await travellingAnchors({ annotations: [], highlights: [hl(KEY, 3, 'ricorso')] })).leftOut.highlights).toBe(1);
+  });
+  it('never touches an article\'s anchors and fetches each decision once', async () => {
+    fetchMock.mockResolvedValue(found('Il ricorso è fondato.'));
+    const article = hl('codice-civile--2043', 0, 'Qualunque');
+    const out = await travellingAnchors({ annotations: [], highlights: [article, hl(KEY, 3, 'ricorso'), hl(KEY, 13, 'fondato')] });
+    expect(out.highlights).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('says how many were left out and why', () => {
+    expect(leftOutMessage({ annotations: 0, highlights: 0 })).toBeNull();
+    expect(leftOutMessage({ annotations: 1, highlights: 2 }))
+      .toBe('1 nota e 2 evidenziazioni su sentenze non incluse: il loro testo non è più presente nella fonte, o la fonte non risponde.');
+  });
+});
+```
+
+`annotationLabels.test.ts`: `annotationTargetLabel('cassazione:civile:10787:2024')` → `'Cass. civ., n. 10787/2024'`; `annotationTargetLabel('codice-civile--2043')` → `'codice civile 2043'` (today's rendering).
+
+- [ ] **Step 2: Run to see them fail.**
+
+Run: `npm --prefix apps/web run test -- --run src/utils/__tests__/decisionAnchorsTravel.test.ts src/components/features/environments/__tests__/annotationLabels.test.ts`
+Expected: FAIL — modules not found.
+
+- [ ] **Step 3: Implement**
+
+```ts
+/**
+ * Which notes and highlights may leave the user's account (an environment, the Forum). On a
+ * decision, only those whose words are still in its current text: VisuaLex never spreads words a
+ * court has withdrawn (design 2026-10-05 §8.6, the owner's caution). A decision that cannot be
+ * fetched now sends nothing on trust. An article's anchors are not this function's business.
+ */
+import type { Annotation, Highlight } from '../types';
+import { resolveAnchors } from './articleAnnotations';
+import { fetchDecisionCached } from './decisionFetchCache';
+import { identityFromKey, isDecisionKey } from './decisionLinks';
+import { decisionProjection } from './decisionRender';
+
+async function currentText(key: string): Promise<string | null> {
+  const identity = identityFromKey(key);
+  if (!identity) return null;
+  try {
+    const answer = await fetchDecisionCached(identity);
+    return answer.esito === 'trovata' ? decisionProjection(answer.testo) : null;
+  } catch (error) {
+    console.error('travellingAnchors: the decision could not be fetched', { key, error });
+    return null;
+  }
+}
+
+export async function travellingAnchors(input: { annotations: Annotation[]; highlights: Highlight[] }) {
+  const keys = new Set([...input.annotations, ...input.highlights].map((a) => a.normaKey).filter(isDecisionKey));
+  const texts = new Map(await Promise.all([...keys].map(async (k) => [k, await currentText(k)] as const)));
+  const lands = (key: string, h: Highlight[], a: Annotation[]) => {
+    const plain = texts.get(key);
+    if (!plain) return { h: new Set<string>(), a: new Set<string>() };
+    const landed = resolveAnchors(plain, h, a);
+    return {
+      h: new Set(landed.flatMap((x) => (x.kind === 'highlight' ? [x.highlight.id] : []))),
+      a: new Set(landed.flatMap((x) => (x.kind === 'note' ? [x.note.id] : []))),
+    };
+  };
+  const keep = new Map([...keys].map((k) => [k, lands(k, input.highlights.filter((h) => h.normaKey === k), input.annotations.filter((a) => a.normaKey === k))]));
+  const highlights = input.highlights.filter((h) => !isDecisionKey(h.normaKey) || keep.get(h.normaKey)!.h.has(h.id));
+  const annotations = input.annotations.filter((a) => !isDecisionKey(a.normaKey) || keep.get(a.normaKey)!.a.has(a.id));
+  return {
+    annotations, highlights,
+    leftOut: { annotations: input.annotations.length - annotations.length, highlights: input.highlights.length - highlights.length },
+  };
+}
+
+export function leftOutMessage(leftOut: { annotations: number; highlights: number }): string | null {
+  const parts = [
+    leftOut.annotations ? `${leftOut.annotations} ${leftOut.annotations === 1 ? 'nota' : 'note'}` : null,
+    leftOut.highlights ? `${leftOut.highlights} ${leftOut.highlights === 1 ? 'evidenziazione' : 'evidenziazioni'}` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return `${parts.join(' e ')} su sentenze non incluse: il loro testo non è più presente nella fonte, o la fonte non risponde.`;
+}
+```
+
+A highlight saved without an offset (legacy) never exists on a decision (decisions' anchors always carry one), so `resolveAnchors`'s every-occurrence fallback does not apply. Then, at every exit point found in «Files»: run `travellingAnchors` on the annotations and highlights about to leave, before the request is sent (the dialogs already await their submit; the store's `createEnvironment` awaits it before its POST), send only what it returns, and show `leftOutMessage` in the dialog (or as a toast for the store path) when it is not null. One test per dialog: with one anchor on an obscured decision selected, the request body lacks it and the line is shown. `annotationTargetLabel(key)` = `identityFromKey(key) ? formatDecisionShort(identityFromKey(key)!) : key.replace(/--/g, ' ').replace(/-/g, ' ')`, used at the viewer's two `byNorm.map` sites and wherever a suggestion card labels a `normaKey`.
+
+- [ ] **Step 4: Run tests, build, lint.**
+
+Run: `npm --prefix apps/web run test -- --run && npm --prefix apps/web run build && npm --prefix apps/web run lint`
+Expected: pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/web/src/components/features/environments apps/web/src/components/features/bulletin
-git commit -m "feat(web): environments name the decision a note or highlight belongs to"
+git add apps/web/src
+git commit -m "feat(web): notes and highlights on decisions travel, never words a court withdrew"
 ```
 
 **PR 4:** title «feat: read, annotate and follow the norms of a decision»; body names the contract (root rule 23 now covers decisions) and the dossier PR 3 follow-up (adopt `renderDecisionHtml`). Merge: `merge: feat/decision-annotations — notes, highlights and norm links on decisions, never lost`.
