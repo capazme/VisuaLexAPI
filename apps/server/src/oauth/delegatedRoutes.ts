@@ -24,6 +24,13 @@ export interface DelegatedRoute {
   readScope?: string;
   /** A named daily counter beside the points, if any. */
   counter?: DelegatedCounter;
+  /** How much of the counter a call spends, when not one (cards: one per card). */
+  counterAmount?: (req: Request) => number;
+}
+
+function cardCount(req: Request): number {
+  const cards = (req.body as { cards?: unknown } | undefined)?.cards;
+  return Array.isArray(cards) ? Math.max(1, Math.min(cards.length, 10)) : 1;
 }
 
 function referencesWeight(req: Request): number {
@@ -43,6 +50,11 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   // Into the trash, never deleted for good; content:delete is also read live from the grant (delegated.ts).
   { method: 'POST', path: '/dossiers/:id/trash', scope: DELETE_SCOPE, readScope: 'dossier:read', weight: 1, counter: 'trash' },
   { method: 'POST', path: '/dossiers/:id/trash-items', scope: DELETE_SCOPE, readScope: 'dossier:read', weight: 1, counter: 'trash' },
+  // LingoLex study cards (spec §6): always the author's drafts, two points and one of the day's hundred each.
+  { method: 'POST', path: '/lingo/cards', scope: 'lingo:cards:write', weight: (req) => cardCount(req) * 2, counter: 'card', counterAmount: cardCount },
+  { method: 'GET', path: '/lingo/cards', scope: 'lingo:cards:read', weight: 1 },
+  { method: 'GET', path: '/lingo/cards/:id', scope: 'lingo:cards:read', weight: 1 },
+  { method: 'POST', path: '/lingo/cards/trash', scope: DELETE_SCOPE, readScope: 'lingo:cards:read', weight: 1, counter: 'trash' },
   // Reading the quota costs nothing: the MCP server asks it to tell the user what is left.
   { method: 'GET', path: '/oauth/quota', scope: 'dossier:read', weight: 0 },
 ];

@@ -71,10 +71,10 @@ export async function delegatedQuotaStatus(userId: string) {
   };
 }
 
-async function refund(userId: string, points: number, counter: DelegatedCounter | null): Promise<void> {
+async function refund(userId: string, points: number, counter: DelegatedCounter | null, amount = 1): Promise<void> {
   try {
     if (points > 0) await pointsLimiter().reward(userId, points);
-    if (counter) await counterLimiter(counter).reward(userId, 1);
+    if (counter) await counterLimiter(counter).reward(userId, amount);
   } catch (error) {
     console.error('delegatedAuth: refund failed:', error instanceof Error ? error.message : error);
   }
@@ -208,9 +208,10 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     console.error('delegatedAuth: quota limiter error (fail-open):', error instanceof Error ? error.message : error);
   }
   let counted: DelegatedCounter | null = null;
+  const counterAmount = route.counterAmount ? route.counterAmount(req) : 1;
   if (route.counter) {
     try {
-      await counterLimiter(route.counter).consume(user.id, 1);
+      await counterLimiter(route.counter).consume(user.id, counterAmount);
       counted = route.counter;
     } catch (error) {
       if (error instanceof RateLimiterRes) {
@@ -225,7 +226,7 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
   res.on('finish', () => {
     const back = res.statusCode >= 400 ? charged : Math.min(charged, Number(res.locals.delegatedRefund) || 0);
     const counterBack = res.statusCode >= 400 ? counted : null;
-    if (back > 0 || counterBack) void refund(user.id, back, counterBack);
+    if (back > 0 || counterBack) void refund(user.id, back, counterBack, counterAmount);
   });
 
   req.user = user;
