@@ -18,24 +18,52 @@ const ccArticle = (n: string) => ({
 });
 const HASH: Record<string, string> = { '1453': 'a'.repeat(64), '1455': 'b'.repeat(64) };
 
+const LONG_ACT = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1941-09-09;1023';
+// A real act name long enough to overflow the card schema's 100-character normaKey (code review of PR 5).
+const LONG_NAME = 'disposizioni di coordinamento, transitorie e di attuazione dei Codici penali militari di pace e di guerra';
+const GDPR = 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita';
+let pythonDown = false;
+const calls: Record<string, number> = {};
+
 function stubPythonApi() {
+  for (const key of Object.keys(calls)) delete calls[key];
+  const count = (path: string) => (calls[path] = (calls[path] ?? 0) + 1);
   nock(API).post('/parse_query').times(200).reply((_u: string, body: { query: string }) => {
+    count('/parse_query');
+    if (pythonDown) return [503, { error: 'down' }];
+    if (body.query === 'art. 5 gdpr') return [200, { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', article: '5' }, recognized: true }];
+    if (body.query === 'art. 7 coord. militari') return [200, { parsed: { act_type: LONG_NAME, article: '7' }, recognized: true }];
     const m = /^art\. (\d+) c\.c\.$/.exec(body.query);
     return [200, m ? { parsed: { act_type: 'codice civile', article: m[1] }, recognized: true } : { parsed: null, recognized: false }];
   });
-  nock(API).post('/fetch_norma_data').times(200).reply((_u: string, body: { article: string }) =>
-    body.article === '99999' ? [404, { error: 'Articolo 99999 non presente in codice civile' }] : [200, { norma_data: [ccArticle(body.article)] }],
-  );
-  nock(API).post('/fetch_act_fingerprints').times(200).reply(() => [200, {
-    available: true,
-    fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } },
-    parts: [
-      { name: 'Disposizioni sulla legge in generale', fingerprints: { '1': { fingerprint: 'f'.repeat(64), date: null } } },
-      { name: 'CODICE CIVILE', fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } } },
-    ],
-    count: 3,
-  }]);
-  nock(API).post('/fetch_tree').times(200).reply(() => [200, { articles: [{ allegato: '1', numero: '1' }, { allegato: '2', numero: '1453' }, { allegato: '2', numero: '1455' }] }]);
+  nock(API).post('/fetch_norma_data').times(200).reply((_u: string, body: { act_type: string; article: string }) => {
+    count('/fetch_norma_data');
+    if (body.act_type === 'regolamento UE') {
+      return [200, { norma_data: [{ tipo_atto: 'regolamento UE', tipo_atto_reale: null, data: '2016-04-27', numero_atto: '679', numero_articolo: '5', allegato: null, url: GDPR, urn: `${GDPR}~art5` }] }];
+    }
+    if (body.act_type === LONG_NAME) {
+      return [200, { norma_data: [{ tipo_atto: LONG_NAME, tipo_atto_reale: 'regio decreto', data: '1941-09-09', numero_atto: '1023', numero_articolo: '7', allegato: null, url: LONG_ACT, urn: `${LONG_ACT}~art7` }] }];
+    }
+    return body.article === '99999' ? [404, { error: 'Articolo 99999 non presente in codice civile' }] : [200, { norma_data: [ccArticle(body.article)] }];
+  });
+  nock(API).post('/fetch_act_fingerprints').times(200).reply((_u: string, body: { urn: string }) => {
+    count('/fetch_act_fingerprints');
+    if (body.urn === LONG_ACT) return [200, { available: true, fingerprints: { '7': { fingerprint: 'e'.repeat(64), date: null } }, parts: [], count: 1 }];
+    return [200, {
+      available: true,
+      fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } },
+      parts: [
+        { name: 'Disposizioni sulla legge in generale', fingerprints: { '1': { fingerprint: 'f'.repeat(64), date: null } } },
+        { name: 'CODICE CIVILE', fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } } },
+      ],
+      count: 3,
+    }];
+  });
+  nock(API).post('/fetch_tree').times(200).reply(() => {
+    count('/fetch_tree');
+    return [200, { articles: [{ allegato: '1', numero: '1' }, { allegato: '2', numero: '1453' }, { allegato: '2', numero: '1455' }] }];
+  });
+  nock(API).post('/fetch_article_text').times(200).reply(() => [200, [{ article_text: 'I dati personali sono trattati in modo lecito…', norma_data: {} }]]);
 }
 
 const CARD = {
@@ -65,6 +93,7 @@ describe('the study-card routes', () => {
   afterAll(() => nock.restore());
   beforeEach(async () => {
     process.env.LEGAL_API_URL = API;
+    pythonDown = false;
     stubPythonApi();
     alice = await createTestUser('cards-alice');
   });
@@ -127,6 +156,83 @@ describe('the study-card routes', () => {
     await create(write, [{ ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }, { riferimento: 'art. 1455 c.c.' }, { riferimento: 'art. 1453 c.c.' }] }]);
     // Two distinct references, two points each.
     expect(before - (await quota())).toBe(4);
+  });
+
+  describe('review findings on PR 5', () => {
+    it('CR1. a card the schema would refuse is refused in its result, never a 400 after earlier cards were written', async () => {
+      const response = await create(authHeader(alice), [CARD, { ...CARD, ancore: [{ riferimento: 'art. 7 coord. militari' }] }]);
+      expect(response.status).toBe(200);
+      expect(response.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['created', 'refused']);
+      expect(await prisma.lingoCard.count()).toBe(1);
+    });
+
+    it('CR1. two primary anchors on one card are refused before anything is written', async () => {
+      const response = await create(authHeader(alice), [CARD, { ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.', principale: true }, { riferimento: 'art. 1455 c.c.', principale: true }] }]);
+      expect(response.status).toBe(400);
+      expect(await prisma.lingoCard.count()).toBe(0);
+    });
+
+    it('CR2. sources down for every card: 503, nothing written, nothing spent', async () => {
+      pythonDown = true;
+      const write = await delegated(alice, 'lingo:cards:write');
+      const reader = await delegated(alice, 'dossier:read');
+      const before = (await request(app).get('/api/oauth/quota').set(reader)).body;
+      const response = await create(write, [CARD]);
+      expect(response.status).toBe(503);
+      const after = (await request(app).get('/api/oauth/quota').set(reader)).body;
+      expect(after.points.remaining).toBe(before.points.remaining);
+      expect(after.counters.card.remaining).toBe(before.counters.card.remaining);
+    });
+
+    it('CR3. anchors that resolve to the same official URN are one anchor', async () => {
+      const response = await create(authHeader(alice), [{ ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }, { riferimento: 'art. 1453 c.c.', principale: true }, { riferimento: 'art. 1455 c.c.' }] }]);
+      const card = await prisma.lingoCard.findUniqueOrThrow({ where: { id: response.body.results[0].id }, include: { ancore: true } });
+      expect(card.ancore).toHaveLength(2);
+      expect(card.ancore.find((a) => a.articleId === 'art_1453')?.isPrimary).toBe(true);
+    });
+
+    it('CR6. a call refused at the card limit does not use up the cards left', async () => {
+      const write = await delegated(alice, 'lingo:cards:write');
+      await spendDelegatedCounter(alice.id, 'card', 95);
+      expect((await create(write, Array.from({ length: 10 }, () => CARD))).status).toBe(429);
+      expect((await create(write, Array.from({ length: 5 }, () => CARD))).status).toBe(200);
+    });
+
+    it('CR7. one act is looked up once for its fingerprints, however many of its articles a call anchors', async () => {
+      await create(authHeader(alice), [CARD, { ...CARD, ancore: [{ riferimento: 'art. 1455 c.c.' }] }]);
+      // One lookup to confirm the articles exist, one to anchor them.
+      expect(calls['/fetch_act_fingerprints']).toBeLessThanOrEqual(2);
+    });
+
+    it('CR8. pages never repeat or skip a card when several share a creation time', async () => {
+      const ids = (await create(authHeader(alice), [CARD, CARD, CARD])).body.results.map((r: { id: string }) => r.id);
+      await prisma.lingoCard.updateMany({ where: { id: { in: ids } }, data: { createdAt: new Date('2026-10-05T10:00:00Z') } });
+      const page1 = (await request(app).get('/api/lingo/cards?limit=2').set(authHeader(alice))).body.cards.map((c: { id: string }) => c.id);
+      const page2 = (await request(app).get('/api/lingo/cards?limit=2&offset=2').set(authHeader(alice))).body.cards.map((c: { id: string }) => c.id);
+      expect([...page1, ...page2].sort()).toEqual([...ids].sort());
+    });
+
+    it('SR-M1. a refusal that will not change (an EU act) is paid for; only a source failure is handed back', async () => {
+      const write = await delegated(alice, 'lingo:cards:write');
+      const reader = await delegated(alice, 'dossier:read');
+      const before = (await request(app).get('/api/oauth/quota').set(reader)).body.points.remaining;
+      const response = await create(write, [{ ...CARD, ancore: [{ riferimento: 'art. 5 gdpr' }] }]);
+      expect(response.body.results[0].outcome).toBe('refused');
+      expect(before - (await request(app).get('/api/oauth/quota').set(reader)).body.points.remaining).toBe(2);
+    });
+
+    it('SR-M4. deleting cards needs the card read permission on the grant, not only content:delete', async () => {
+      const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      const flow = await startAuthorization({ scope: 'dossier:read dossier:write' });
+      await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
+      const decision = await request(app).post(`/api/oauth/requests/${flow.requestId}/decision`).set(authHeader(alice)).send({ approve: true, allowDelete: true });
+      const code = new URL(decision.body.redirectTo).searchParams.get('code')!;
+      const access = (await exchangeCode(flow.clientId, code, flow.verifier)).body.access_token as string;
+      const token = (await tokenExchange(access, { scope: 'content:delete' })).body.access_token as string;
+      const refused = await request(app).post('/api/lingo/cards/trash').set({ Authorization: `Bearer ${token}` }).send({ cardIds: [id] });
+      expect(refused.status).toBe(403);
+      expect(await prisma.lingoCard.count({ where: { id } })).toBe(1);
+    });
   });
 
   it('lists and reads only the user’s own cards', async () => {

@@ -1,4 +1,4 @@
-import { articleKey, postLegalApi, resolveReferences, SourceUnavailable, type NormaVisitata } from '../norms/resolveReference';
+import { articleKey, CONCURRENCY, mapLimited, postLegalApi, resolveReferences, SourceUnavailable, type NormaVisitata } from '../norms/resolveReference';
 
 /**
  * The anchors of a study card (MCP second round, spec §6). The owner's answers:
@@ -92,52 +92,82 @@ export function matchPart(parts: Part[], articleNumbers: string[]): Part | null 
   return top >= Math.max(1, Math.min(wanted.size, best[0].size) * 0.5) ? best[0].part : null;
 }
 
+/** What the Python API says of an act once: its fingerprints by part, and its tree when it has parts. */
+interface ActIndex {
+  available: boolean;
+  fingerprints: Fingerprints;
+  parts: Part[];
+  tree: { allegato?: unknown; numero?: unknown }[] | null;
+}
+
+/** One lookup per act and call (code review of PR 5): the act's index, and its tree when the act is in parts. */
+export type ActIndexCache = Map<string, Promise<ActIndex>>;
+
+async function actIndex(url: string, needsTree: boolean): Promise<ActIndex> {
+  const answer = await postLegalApi('/fetch_act_fingerprints', { urn: url });
+  if (answer.status !== 200 || answer.data.available !== true) return { available: false, fingerprints: {}, parts: [], tree: null };
+  const parts = (Array.isArray(answer.data.parts) ? answer.data.parts : []) as Part[];
+  let tree: ActIndex['tree'] = null;
+  if (parts.length > 1 || needsTree) {
+    const answerTree = await postLegalApi('/fetch_tree', { urn: url, return_metadata: false });
+    tree = answerTree.status === 200 && Array.isArray(answerTree.data.articles) ? (answerTree.data.articles as ActIndex['tree']) : null;
+  }
+  return { available: true, fingerprints: (answer.data.fingerprints as Fingerprints) ?? {}, parts, tree };
+}
+
+/** A refusal and whether it may pass by itself (a source down) or will be the same next time. */
+type Unavailable = { unavailable: string; transient: boolean };
+
 /** The SHA-256 of the article's AKN text, as the Python API computes it, or why there is none. */
-export async function fingerprintFor(norm: NormaVisitata): Promise<{ fingerprint: string } | { unavailable: string }> {
-  if (norm.url.includes('eur-lex')) return { unavailable: EU };
+export async function fingerprintFor(norm: NormaVisitata, cache: ActIndexCache = new Map()): Promise<{ fingerprint: string } | Unavailable> {
+  if (norm.url.includes('eur-lex')) return { unavailable: EU, transient: false };
   try {
-    const answer = await postLegalApi('/fetch_act_fingerprints', { urn: norm.url });
-    if (answer.status !== 200 || answer.data.available !== true) return { unavailable: NO_INDEX };
-    const parts = (Array.isArray(answer.data.parts) ? answer.data.parts : []) as Part[];
-    if (parts.length <= 1) {
-      const hash = fingerprintIn((answer.data.fingerprints as Fingerprints) ?? {}, norm.numero_articolo);
-      return hash ? { fingerprint: hash } : { unavailable: NO_INDEX };
+    const key = `${norm.url}|${norm.allegato ? 'tree' : ''}`;
+    if (!cache.has(key)) cache.set(key, actIndex(norm.url, Boolean(norm.allegato)));
+    const index = await cache.get(key)!;
+    if (!index.available) return { unavailable: NO_INDEX, transient: true };
+    if (index.parts.length <= 1) {
+      // An article of an annex with no part to match it to could only take the body's fingerprint: refused (S7).
+      if (norm.allegato) return { unavailable: UNMATCHED, transient: false };
+      const hash = fingerprintIn(index.fingerprints, norm.numero_articolo);
+      return hash ? { fingerprint: hash } : { unavailable: NO_INDEX, transient: true };
     }
-    const tree = await postLegalApi('/fetch_tree', { urn: norm.url, return_metadata: false });
-    const articles = tree.status === 200 && Array.isArray(tree.data.articles) ? (tree.data.articles as { allegato?: unknown; numero?: unknown }[]) : null;
-    if (!articles) return { unavailable: NO_INDEX };
+    if (!index.tree) return { unavailable: NO_INDEX, transient: true };
     const annex = String(norm.allegato ?? '');
-    const numbers = articles.filter((a) => String(a.allegato ?? '') === annex && typeof a.numero === 'string').map((a) => a.numero as string);
-    const part = matchPart(parts, numbers);
+    const numbers = index.tree.filter((a) => String(a.allegato ?? '') === annex && typeof a.numero === 'string').map((a) => a.numero as string);
+    const part = matchPart(index.parts, numbers);
     const hash = part ? fingerprintIn(part.fingerprints, norm.numero_articolo) : null;
-    return hash ? { fingerprint: hash } : { unavailable: UNMATCHED };
+    return hash ? { fingerprint: hash } : { unavailable: UNMATCHED, transient: false };
   } catch (error) {
-    if (error instanceof SourceUnavailable) return { unavailable: NO_INDEX };
+    if (error instanceof SourceUnavailable) return { unavailable: NO_INDEX, transient: true };
     throw error;
   }
 }
 
 export type AnchorOutcome =
   | { outcome: 'anchored'; reference: string; display?: string; anchor: AnchorKeys & { aknFingerprint: string } }
-  | { outcome: 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable'; reference: string; detail: string };
+  | {
+      outcome: 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
+      reference: string;
+      detail: string;
+      /** A source that failed: the same reference may anchor later (handed back, and a 503 when nothing else). */
+      transient?: boolean;
+    };
 
-export const MAX_ANCHOR_REFERENCES = 10;
 
-/** Resolves 1–10 references (as the dossier's norms route does) and takes each article's fingerprint. */
+/** Resolves the references (as the dossier's norms route does) and takes each article's fingerprint, one lookup per act. */
 export async function resolveAnchors(references: string[]): Promise<AnchorOutcome[]> {
   const resolutions = await resolveReferences(references);
-  return Promise.all(
-    resolutions.map(async (resolution, i): Promise<AnchorOutcome> => {
-      const reference = references[i];
-      if (resolution.outcome !== 'resolved' || !resolution.norm) {
-        const outcome = resolution.outcome === 'resolved' ? 'unavailable' : resolution.outcome;
-        return { outcome, reference, detail: resolution.detail ?? 'Riferimento non risolto.' };
-      }
-      const keys = anchorKeys(resolution.norm);
-      if (!keys) return { outcome: 'unavailable', reference, detail: EU };
-      const found = await fingerprintFor(resolution.norm);
-      if ('unavailable' in found) return { outcome: 'unavailable', reference, detail: found.unavailable };
-      return { outcome: 'anchored', reference, display: resolution.display, anchor: { ...keys, aknFingerprint: found.fingerprint } };
-    }),
-  );
+  const cache: ActIndexCache = new Map();
+  return mapLimited(resolutions.map((resolution, i) => ({ resolution, reference: references[i] })), CONCURRENCY, async ({ resolution, reference }): Promise<AnchorOutcome> => {
+    if (resolution.outcome !== 'resolved' || !resolution.norm) {
+      const outcome = resolution.outcome === 'resolved' ? 'unavailable' : resolution.outcome;
+      return { outcome, reference, detail: resolution.detail ?? 'Riferimento non risolto.', transient: outcome === 'unavailable' };
+    }
+    const keys = anchorKeys(resolution.norm);
+    if (!keys) return { outcome: 'unavailable', reference, detail: EU, transient: false };
+    const found = await fingerprintFor(resolution.norm, cache);
+    if ('unavailable' in found) return { outcome: 'unavailable', reference, detail: found.unavailable, transient: found.transient };
+    return { outcome: 'anchored', reference, display: resolution.display, anchor: { ...keys, aknFingerprint: found.fingerprint } };
+  });
 }

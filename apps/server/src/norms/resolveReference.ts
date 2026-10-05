@@ -53,7 +53,7 @@ export interface Resolution {
 }
 
 const TIMEOUT_MS = 30_000;
-const CONCURRENCY = 5;
+export const CONCURRENCY = 5;
 
 const apiBase = (): string => (process.env.LEGAL_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
 
@@ -79,7 +79,7 @@ export async function postLegalApi(path: string, body: unknown): Promise<{ statu
 }
 
 /** Runs `task` over `items` with at most `limit` in flight, keeping the order. */
-async function mapLimited<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+export async function mapLimited<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let next = 0;
   const worker = async () => {

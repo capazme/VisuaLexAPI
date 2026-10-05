@@ -99,7 +99,7 @@ describe('fingerprintFor', () => {
     };
     tree = { articles: [{ allegato: '2', numero: '1' }, { allegato: '2', numero: '2' }] };
     const result = await fingerprintFor(norm({ numero_articolo: '1' }));
-    expect(result).toEqual({ unavailable: 'Non riesco a verificare l’articolo nell’allegato: la scheda non può essere ancorata.' });
+    expect(result).toEqual({ unavailable: 'Non riesco a verificare l’articolo nell’allegato: la scheda non può essere ancorata.', transient: false });
   });
 
   it('refuses without the act\'s index, or without its tree when the act is in parts', async () => {
@@ -109,8 +109,15 @@ describe('fingerprintFor', () => {
     expect(await fingerprintFor(norm({}))).toHaveProperty('unavailable');
   });
 
+  it('refuses an article of an annex when the act\'s index has no parts to match it to (code review of PR 5, CR4)', async () => {
+    fingerprints = { available: true, fingerprints: { '3': fp('a') }, parts: [], count: 1 };
+    tree = { articles: [{ allegato: '', numero: '3' }, { allegato: '1', numero: '3' }] };
+    const result = await fingerprintFor(norm({ tipo_atto: 'decreto legislativo', tipo_atto_reale: null, numero_articolo: '3', allegato: '1', url: DLGS, urn: `${DLGS}:1~art3` }));
+    expect(result).toEqual({ unavailable: 'Non riesco a verificare l’articolo nell’allegato: la scheda non può essere ancorata.', transient: false });
+  });
+
   it('refuses an EU act: there is no AKN index', async () => {
     const result = await fingerprintFor(norm({ tipo_atto: 'regolamento UE', url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita', urn: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita~art5' }));
-    expect(result).toEqual({ unavailable: 'Per gli atti dell’Unione europea non c’è un’impronta del testo: la scheda non può essere ancorata.' });
+    expect(result).toEqual({ unavailable: 'Per gli atti dell’Unione europea non c’è un’impronta del testo: la scheda non può essere ancorata.', transient: false });
   });
 });

@@ -6,7 +6,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createLingoCard } from '../lingo/cards';
 import { resolveAnchors, type AnchorOutcome } from '../lingo/anchors';
-import { lingoCardCreateSchema, MAX_ANCHORS_PER_CARD } from '../schemas/lingo/card';
+import { lingoCardCreateSchema, MAX_ANCHORS_PER_CARD, type LingoCardAncoraInput } from '../schemas/lingo/card';
 import { trashLingoCards } from '../trash/trash';
 
 /**
@@ -33,7 +33,13 @@ const anchorReferenceSchema = z
   .strict();
 const cardInputSchema = lingoCardCreateSchema
   .omit({ ancore: true })
-  .extend({ ancore: z.array(anchorReferenceSchema).min(1).max(MAX_ANCHORS_PER_CARD) })
+  .extend({
+    ancore: z
+      .array(anchorReferenceSchema)
+      .min(1)
+      .max(MAX_ANCHORS_PER_CARD)
+      .refine((ancore) => ancore.filter((a) => a.principale).length <= 1, { message: 'Al massimo un’ancora principale per scheda.' }),
+  })
   .strict();
 const createSchema = z
   .object({ cards: z.array(cardInputSchema).min(1).max(MAX_CARDS_PER_CALL) })
@@ -69,27 +75,49 @@ router.post('/', async (req, res) => {
   const { cards } = createSchema.parse(req.body);
   const references = [...new Set(cards.flatMap((card) => card.ancore.map((a) => a.riferimento)))];
   const outcomes = new Map<string, AnchorOutcome>((await resolveAnchors(references)).map((o) => [o.reference, o]));
-  const results = [];
-  for (const card of cards) {
+  const failures = [...outcomes.values()].filter((o) => o.outcome !== 'anchored');
+
+  // Sources down for every reference: nothing could be checked, so nothing is written or spent (503).
+  if (failures.length === outcomes.size && failures.every((o) => o.transient)) {
+    throw new AppError(503, 'Le fonti non rispondono: nessuna scheda è stata creata, riprova più tardi.');
+  }
+
+  // Every card is decided before the first is written, so a call never stops halfway (code review of PR 5).
+  type Planned = { index: number; input: unknown } | { index: number; refused: { detail: string; anchors?: AnchorOutcome[] } };
+  const planned: Planned[] = cards.map((card, index) => {
     const anchors = card.ancore.map((a) => outcomes.get(a.riferimento)!);
     const failed = anchors.filter((a) => a.outcome !== 'anchored');
-    if (failed.length > 0) {
-      results.push({ outcome: 'refused' as const, detail: 'Un’ancora non è verificabile: la scheda non è stata creata.', anchors: failed });
-      continue;
-    }
-    const { ancore, ...fields } = card;
-    const created = await createLingoCard(req.user!.id, {
-      ...fields,
-      ancore: ancore.map((a, i) => {
-        const anchored = anchors[i] as Extract<AnchorOutcome, { outcome: 'anchored' }>;
-        return { ...anchored.anchor, isPrimary: a.principale ?? false };
-      }),
+    if (failed.length > 0) return { index, refused: { detail: 'Un’ancora non è verificabile: la scheda non è stata creata.', anchors: failed } };
+    // The URN is the identity (S6): two references to the same article are one anchor, primary if either was.
+    const byUrn = new Map<string, LingoCardAncoraInput>();
+    card.ancore.forEach((a, i) => {
+      const { anchor } = anchors[i] as Extract<AnchorOutcome, { outcome: 'anchored' }>;
+      const seen = byUrn.get(anchor.urn);
+      byUrn.set(anchor.urn, { ...anchor, isPrimary: Boolean(seen?.isPrimary || a.principale) });
     });
-    results.push({ outcome: 'created' as const, id: created.id });
-  }
+    const { ancore: _references, ...fields } = card;
+    const input = { ...fields, ancore: [...byUrn.values()] };
+    const valid = lingoCardCreateSchema.safeParse(input);
+    if (!valid.success) {
+      return { index, refused: { detail: `La scheda non rispetta il formato: ${valid.error.issues[0]?.message ?? 'dati non validi'}.` } };
+    }
+    return { index, input };
+  });
+
+  const created = await prisma.$transaction(async (tx) => {
+    const ids = new Map<number, string>();
+    for (const plan of planned) {
+      if ('input' in plan) ids.set(plan.index, (await createLingoCard(req.user!.id, plan.input, tx)).id);
+    }
+    return ids;
+  });
+
+  const results = planned.map((plan) =>
+    'input' in plan ? { outcome: 'created' as const, id: created.get(plan.index)! } : { outcome: 'refused' as const, ...plan.refused },
+  );
   // Under an exchanged token each distinct reference costs two points, as on the dossier's norms
-  // route; one the sources could not check is handed back.
-  res.locals.delegatedRefund = [...outcomes.values()].filter((o) => o.outcome === 'unavailable').length * 2;
+  // route; only one a source failed to check is handed back — a refusal that will not change is paid.
+  res.locals.delegatedRefund = failures.filter((o) => o.transient).length * 2;
   res.json({ results });
 });
 
@@ -105,7 +133,8 @@ router.get('/', async (req, res) => {
   const cards = await prisma.lingoCard.findMany({
     where: { autoreId: req.user!.id, ...(materia ? { materia } : {}), ...(stato ? { stato } : {}) },
     include: { ancore: true },
-    orderBy: { createdAt: 'desc' },
+    // The id breaks ties: restored cards keep their creation time, and pages must not repeat or skip one.
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
     skip: offset,
   });

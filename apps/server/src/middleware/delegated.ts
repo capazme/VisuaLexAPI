@@ -204,7 +204,11 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
       charged = weight;
     }
   } catch (error) {
-    if (error instanceof RateLimiterRes) return overQuota(res, 'points', error);
+    if (error instanceof RateLimiterRes) {
+      // A refused consume still counts in the limiter: give it back, so a refused call costs nothing.
+      await refund(user.id, weight, null);
+      return overQuota(res, 'points', error);
+    }
     console.error('delegatedAuth: quota limiter error (fail-open):', error instanceof Error ? error.message : error);
   }
   let counted: DelegatedCounter | null = null;
@@ -215,7 +219,8 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
       counted = route.counter;
     } catch (error) {
       if (error instanceof RateLimiterRes) {
-        await refund(user.id, charged, null);
+        // The limiter counts a refused consume too: give back both, so a refused call uses up nothing.
+        await refund(user.id, charged, route.counter, counterAmount);
         return overQuota(res, route.counter, error);
       }
       console.error('delegatedAuth: counter limiter error (fail-open):', error instanceof Error ? error.message : error);
