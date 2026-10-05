@@ -76,7 +76,7 @@ the public exposure (phase 2 of the deployment design).
 
 | Network | Members | Why |
 |---|---|---|
-| `edge` | `ingress` | as today; its subnet becomes fixed (`EDGE_SUBNET`, default `172.29.241.0/24`) because Caddy trusts it (section 5) |
+| `edge` | `ingress` | as today; its subnet becomes fixed (`EDGE_SUBNET`, default `172.29.241.0/24`) because Caddy trusts it, as it trusts `app`'s (section 5) |
 | `mcp` (new) | `mcp`, `server` | the MCP reaches the server and nothing else: not the scrapers, not MERL-T (whose `/admin` and `/ner` routes have no gate of their own, R2), not the stores |
 
 Published: `${MCP_BIND:-127.0.0.1}:${MCP_PORT:-8091}:3002`, on the loopback by
@@ -128,11 +128,18 @@ are today.
 
 ## 5. The real client address (its own pull request, merged first)
 
-- **Caddy** trusts `X-Forwarded-For` only from the `edge` subnet, which is where
-  a connection through the host's loopback appears: the global option
-  `servers { trusted_proxies static {$EDGE_SUBNET} }`. Anything else, such as a
-  device on the home network when `INGRESS_BIND` is a LAN address, still has
-  its header overwritten by the address Caddy sees, as today.
+- **Caddy** trusts `X-Forwarded-For` only from the stack's own two fixed
+  subnets, `edge` and `app`: the global option
+  `servers { trusted_proxies static {$APP_SUBNET} {$EDGE_SUBNET} }`. A
+  connection through the host's loopback (the overlay proxy) arrives from a
+  bridge gateway, and Docker may route a published port through either network
+  of a container on two, so both are listed. Inside them, besides the host's
+  own gateway addresses, sit only the stack's containers. A compromised scraper
+  could forge the header and spread its own requests over invented addresses;
+  it can already do worse (R2). Anything else, such as a device on the home
+  network when `INGRESS_BIND` is a LAN address, still has its header
+  overwritten by the address Caddy sees, as today. The trial (section 10)
+  records which gateway the connection actually comes from.
 - **The server** replaces `trust proxy 1` with `'loopback, uniquelocal'`. Express
   walks `X-Forwarded-For` from the right and stops at the first address that is
   not private. Overlay addresses (`100.64.0.0/10`) are not in those ranges, so
@@ -240,6 +247,10 @@ are today.
 - The overlay's identity headers (`Tailscale-User-*`) reach the server, and
   nothing reads them. Nothing may start trusting them without a design: anyone
   who reaches the ingress some other way could set them.
+- **`MCP_BIND` set to a LAN address.** The MCP trusts every private range
+  (`'loopback, uniquelocal'`). A device on the home network could then forge
+  `X-Forwarded-For` and spread its requests over invented addresses. The
+  ceiling is a backstop, not a gate, and the default bind is the loopback.
 - **H1 does not cover the `mcp` network.** A compromised MCP process could open
   connections to the home network. It renders no third-party content, unlike
   the scrapers, so this is lower risk. The H1 script (D3) can take the subnet
