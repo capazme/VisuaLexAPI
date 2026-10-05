@@ -20,7 +20,11 @@ the lookup of one decision:
   "oscuramento" is never the court's text: the decision is returned without one. A record with
   neither a text nor a notice is returned without a text and without a cause, and logged: the
   source said nothing about why.
-- the text arrives as one line (measured on 2026-10-04: 45 of 45 sampled texts, up to 82,322
+- the text comes from the court's original PDF (`pdf_text`) when the record has one and the PDF
+  can be had: the field is cut short at the source in about a third of the records. When it
+  cannot (no `filename`, a request that fails, a PDF refused, a text that is not the field's
+  decision), the field's text stands, `testo_origine` says "archivio" and the resolver says so.
+- the field's text arrives as one line (measured on 2026-10-04: 45 of 45 sampled texts, up to 82,322
   characters). `paragraphs` restores the paragraphs by inserting blank lines before the
   headings, "P.Q.M." and the numbered points, and changes nothing else: a note anchored to the
   text never moves.
@@ -35,16 +39,19 @@ import re
 
 import structlog
 
+from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from ...tools.tls import italgiure_ssl_context
 from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
+from .pdf_text import PdfRefused, text_from_pdf_async
 
 log = structlog.get_logger()
 
 BASE = "https://www.italgiure.giustizia.it/sncass"
 SELECT = f"{BASE}/isapi/hc.dll/sn.solr/sn-collection/select?app.query"
 KINDS = {"civile": "snciv", "penale": "snpen"}
-FIELDS = "id,numdec,anno,datdep,szdec,materia,tipoprov,ocr,ocrdis,relatore,presidente,kind"
+FIELDS = "id,numdec,anno,datdep,szdec,materia,tipoprov,ocr,ocrdis,relatore,presidente,kind,filename"
+ATTACH = "https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll"
 SOURCE = {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)"}
 # `tipoprov` holds a code or a label, depending on the record
 TIPI = {"s": "sentenza", "sentenza": "sentenza", "o": "ordinanza", "ordinanza": "ordinanza",
@@ -58,6 +65,14 @@ TIPI = {"s": "sentenza", "sentenza": "sentenza", "o": "ordinanza", "ordinanza": 
 _WITHHELD_MAX = 300
 _WITHHELD_CAUSES = (("in fase di valutazione oscuramento", "valutazione_oscuramento"),
                     ("in fase di oscuramento", "oscuramento"))
+
+# The fallback checks (plan Task 2 amendment, measured on 36 decisions, all of which pass): the
+# PDF's text is at least this share of the field's length (the field keeps every page's running
+# header and footer, so a long decision's PDF text is shorter: 0.761 at 27 pages), and the field's
+# first words share a longest common subsequence of this many with the PDF's first words (the
+# field is cut at its front too, so a greedy in-order scan would miss).
+MIN_LENGTH_RATIO = 0.70
+FIELD_WORDS, PDF_WORDS, MIN_COMMON_WORDS = 20, 250, 10
 
 # Italgiure's text arrives as one line (measured on 2026-10-04: 45 of 45 sampled texts, up to
 # 82,322 characters). Paragraphs are restored by inserting blank lines and nothing else: a note
@@ -121,6 +136,40 @@ def split_dispositivo(text: str, dispositivo: str) -> tuple[str, str]:
         if cut == 0 or text[cut - 1].isspace():  # a cut never falls inside a word
             return text[:cut].rstrip(), text[cut:]
     return (text, "") if tail in flat else (text, dispositivo)
+
+
+def pdf_url(doc: dict) -> str | None:
+    """The court's PDF of a record, in the form the archive serves within its session (the plain
+    `.pdf` name answers 500, measured on 2026-10-05)."""
+    name = _scalar(doc.get("filename")).strip()
+    kind = _scalar(doc.get("kind")).strip()
+    if not re.fullmatch(r"\./\d{8}/sn(?:civ|pen)@[\w@]+\.pdf", name) or kind not in KINDS.values():
+        return None
+    return f"{ATTACH}?verbo=attach&db={kind}&id={name[:-4]}.clean.pdf"
+
+
+def _words(text: dict[str, str]) -> list[str]:
+    return " ".join(text.values()).split()
+
+
+def _common_words(a: list[str], b: list[str]) -> int:
+    """Length of the longest common subsequence of two word lists, case aside."""
+    row = [0] * (len(b) + 1)
+    for x in a:
+        prev, row[0] = 0, 0
+        for j, y in enumerate(b, 1):
+            prev, row[j] = row[j], (prev + 1 if x.casefold() == y.casefold() else max(row[j], row[j - 1]))
+    return row[-1]
+
+
+def _plausible(pdf: dict[str, str], field: dict[str, str]) -> str | None:
+    """None when the PDF's text is the field's decision, else which check failed."""
+    pdf_words, field_words = _words(pdf), _words(field)
+    if len(" ".join(pdf_words)) < MIN_LENGTH_RATIO * len(" ".join(field_words)):
+        return "text shorter than the archive's"
+    if _common_words(field_words[:FIELD_WORDS], pdf_words[:PDF_WORDS]) < MIN_COMMON_WORDS:
+        return "opening words differ from the archive's"
+    return None
 
 
 class SourceAnswerError(Exception):
@@ -198,7 +247,13 @@ class ItalgiureReader:
         return data
 
     async def lookup(self, archivio: str, numero: int, anno: int) -> Decision | None:
-        # one query: with a homepage GET and a Solr POST per query, a search stays within the
+        found = await self.lookup_with_pdf(archivio, numero, anno)
+        return found[0] if found else None
+
+    async def lookup_with_pdf(self, archivio: str, numero: int,
+                              anno: int) -> tuple[Decision, bytes | None] | None:
+        """The decision and, when its text was read from it, the court's PDF."""
+        # a cold lookup is the homepage, one Solr query and the PDF: a search stays within the
         # owner's 10 requests (2026-10-04)
         data = await self._select({
             "q": f'kind:"{KINDS[archivio]}" AND numdec:{numero:05d} AND anno:{anno}',
@@ -207,10 +262,42 @@ class ItalgiureReader:
         if not docs:
             return None
         try:
-            return to_decision(docs[0], archivio)
+            decision = to_decision(docs[0], archivio)
         except ValueError as exc:  # a record without a readable number or year
             raise SourceAnswerError(
                 "Italgiure ha risposto con una decisione illeggibile") from exc
+        if not decision.testo:  # withheld, or no text: there is no PDF to read
+            return decision, None
+        data_pdf, reason = await self._read_pdf(docs[0], decision)
+        if data_pdf is None:
+            log.warning("Decision read from the archive's text, not the PDF",
+                        key=decision.identita.key(), reason=reason)
+            decision.testo_origine = "archivio"
+            return decision, None
+        return decision, data_pdf
+
+    async def _read_pdf(self, doc: dict, decision: Decision) -> tuple[bytes | None, str]:
+        """The PDF's bytes once its text is in `decision`, else (None, why not)."""
+        url = pdf_url(doc)
+        if url is None:
+            return None, "no usable filename"
+        try:
+            result = await decisions_http_client.request(
+                "GET", url, source="italgiure", ssl=italgiure_ssl_context(),
+                headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1")
+            if result.status != 200:
+                return None, f"PDF request answered {result.status}"
+            data = result.text.encode("latin-1")
+            text = await text_from_pdf_async(data)
+        except PdfRefused as exc:
+            return None, f"PDF refused: {exc}"
+        except (NetworkError, DocumentNotFoundError, OSError) as exc:
+            return None, f"PDF request failed: {type(exc).__name__}"
+        failed = _plausible(text, decision.testo)
+        if failed:
+            return None, failed
+        decision.testo, decision.testo_origine = text, "pdf"
+        return data, ""
 
     async def archive_start(self, archivio: str) -> tuple[int, str] | None:
         data = await self._select({"q": f'kind:"{KINDS[archivio]}"', "rows": "1",

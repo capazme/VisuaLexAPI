@@ -5,14 +5,18 @@ import ssl
 
 import pytest
 
+from tests.decisions_pdf_synth import Text, make_pdf
 from visualex_api.services.decisions import italgiure
 from visualex_api.services.decisions.italgiure import (
     ItalgiureReader,
     SourceAnswerError,
+    _plausible,
     paragraphs,
+    pdf_url,
     split_dispositivo,
     to_decision,
 )
+from visualex_api.services.decisions.pdf_text import text_from_pdf
 from visualex_api.services.http_client import HttpResult
 from visualex_api.tools.exceptions import NetworkError
 from visualex_api.tools.tls import italgiure_ssl_context
@@ -297,3 +301,122 @@ async def test_the_fixed_public_cases_still_answer():
     if start is not None and start[0] > 2021:
         pytest.skip("the archive window has passed 2021")
     assert "U" in {d.sezione for d in su if d is not None}  # civil or penal: both are read
+
+
+# --- the text from the court's PDF (design 2026-10-05 §11), on invented text ---
+
+FILENAME = "./20260101/snciv@s10@a2026@n12345@tO.pdf"
+
+
+def _sentences(prefix: str, count: int) -> list[str]:
+    return [f"{prefix} riga {i} del ragionamento svolto dal collegio sulla questione proposta."
+            for i in range(count)]
+
+
+def _pdf_of(lines: list[str]) -> bytes:
+    return make_pdf([[Text(85, 700 - 14 * i, line) for i, line in enumerate(lines)]])
+
+
+def _record(lines: list[str], **extra) -> dict:
+    return {"id": "snciv2026012345O", "numdec": "12345", "anno": "2026", "kind": "snciv",
+            "datdep": "20260101", "szdec": "1", "tipoprov": "Sentenza", "filename": FILENAME,
+            "ocr": " ".join(lines), **extra}
+
+
+def _serve_with_pdf(monkeypatch, record: dict, pdf: bytes | Exception = b""):
+    """Solr answers the record; the attach URL answers `pdf` (or raises it)."""
+    calls = []
+
+    async def fake_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if method == "POST":
+            return HttpResult(text=json.dumps({"response": {"numFound": 1, "docs": [record]}}),
+                              status=200, headers={})
+        if "verbo=attach" in url:
+            if isinstance(pdf, Exception):
+                raise pdf
+            return HttpResult(text=pdf.decode("latin-1"), status=200,
+                              headers={"Content-Type": "application/pdf"})
+        return HttpResult(text="", status=200, headers={})
+
+    monkeypatch.setattr(italgiure.decisions_http_client, "request", fake_request)
+    return calls
+
+
+LINES = _sentences("Prima", 40)
+
+
+async def test_the_text_comes_from_the_pdf_when_there_is_one(monkeypatch):
+    pdf = _pdf_of(LINES)
+    calls = _serve_with_pdf(monkeypatch, _record(LINES), pdf)
+    decision, data = await ItalgiureReader().lookup_with_pdf("civile", 12345, 2026)
+    assert decision.testo_origine == "pdf" and data == pdf
+    assert decision.testo["motivazione"] == text_from_pdf(pdf)["motivazione"]
+    assert calls[-1][1].endswith(".clean.pdf") and "verbo=attach" in calls[-1][1]
+    assert "db=snciv" in calls[-1][1] and calls[-1][2]["ssl"] is italgiure_ssl_context()
+    assert [c[0] for c in calls] == ["GET", "POST", "GET"]  # homepage, Solr, PDF
+
+
+@pytest.mark.parametrize("pdf_answer", ["refused", "error", "missing_filename", "too_short",
+                                        "other_decision"])
+async def test_without_a_usable_pdf_the_field_is_used_and_said(monkeypatch, pdf_answer):
+    record, pdf = _record(LINES), _pdf_of(LINES)
+    if pdf_answer == "refused":
+        pdf = b"<html>Accesso negato</html>"
+    elif pdf_answer == "error":
+        pdf = NetworkError("Exceeded retry budget")
+    elif pdf_answer == "missing_filename":
+        del record["filename"]
+    elif pdf_answer == "too_short":
+        pdf = _pdf_of(LINES[:10])
+    else:  # a whole PDF of another text: long enough, opening words unrelated
+        pdf = _pdf_of([" ".join(f"altra{i}x{j}" for j in range(12)) for i in range(40)])
+    calls = _serve_with_pdf(monkeypatch, record, pdf)
+    decision, data = await ItalgiureReader().lookup_with_pdf("civile", 12345, 2026)
+    assert decision.testo_origine == "archivio" and data is None
+    assert decision.testo["motivazione"].startswith("Prima riga 0")
+    assert any("verbo=attach" in c[1] for c in calls) == (pdf_answer != "missing_filename")
+
+
+async def test_a_fallback_is_logged_with_its_reason(monkeypatch):
+    _serve_with_pdf(monkeypatch, _record(LINES), b"<html>")
+    events = []
+    monkeypatch.setattr(italgiure.log, "warning", lambda event, **kw: events.append((event, kw)))
+    await ItalgiureReader().lookup_with_pdf("civile", 12345, 2026)
+    assert events and events[0][1]["key"] == "cassazione:civile:12345:2026"
+    assert "PDF refused" in events[0][1]["reason"]
+
+
+async def test_a_withheld_text_fetches_no_pdf(monkeypatch):
+    calls = _serve(monkeypatch, [_fixture("italgiure_snciv_10787_2024.json")])
+    decision, data = await ItalgiureReader().lookup_with_pdf("civile", 10787, 2024)
+    assert decision.testo == {} and data is None and decision.testo_origine is None
+    assert not any("verbo=attach" in c[1] for c in calls)
+
+
+async def test_lookup_returns_the_decision_alone(monkeypatch):
+    _serve_with_pdf(monkeypatch, _record(LINES), _pdf_of(LINES))
+    decision = await ItalgiureReader().lookup("civile", 12345, 2026)
+    assert decision.testo_origine == "pdf"
+
+
+def test_the_pdf_address_is_the_clean_attachment_or_none():
+    assert pdf_url({"filename": FILENAME, "kind": "snciv"}) == (
+        "https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll"
+        "?verbo=attach&db=snciv&id=./20260101/snciv@s10@a2026@n12345@tO.clean.pdf")
+    assert pdf_url({"filename": [FILENAME], "kind": ["snciv"]})
+    for doc in ({}, {"kind": "snciv"}, {"filename": FILENAME},
+                {"filename": "http://elsewhere/x.pdf", "kind": "snciv"},
+                {"filename": "./20260101/../../x.pdf", "kind": "snciv"},
+                {"filename": FILENAME, "kind": "other"}):
+        assert pdf_url(doc) is None
+
+
+def test_the_plausibility_checks_are_both_needed():
+    field = {"motivazione": " ".join(f"parola{i}" for i in range(100))}
+    assert _plausible(field, field) is None
+    # the field cut at its front: 3 words missing at the start still share more than ten
+    assert _plausible(field, {"motivazione": " ".join(f"parola{i}" for i in range(3, 100))}) is None
+    assert "shorter" in _plausible({"motivazione": "parola0 parola1"}, field)
+    unrelated = {"motivazione": " ".join(f"altra{i}" for i in range(100))}
+    assert "opening words" in _plausible(unrelated, field)

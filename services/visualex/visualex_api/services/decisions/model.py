@@ -23,7 +23,7 @@ _NAMED = {"SU": "U", "U": "U", "UNITE": "U", "SEZIONIUNITE": "U", "SSUU": "U",
           "L": "L", "LAV": "L", "LAVORO": "L", "F": "F", "FER": "F", "FERIALE": "F"}
 _TRIBUTARIA = {"T", "TRIB", "TRIBUTARIA"}
 _ATTRIBUTES = ("sezione", "tipo", "data_deposito", "data_decisione", "ecli", "relatore",
-               "presidente", "materia", "testo_assente")
+               "presidente", "materia", "testo_assente", "testo_origine")
 
 
 @dataclass(frozen=True)
@@ -91,6 +91,9 @@ class Decision:
     materia: str | None = None
     # why the source gives no text: "oscuramento" or "valutazione_oscuramento" when it said so; None otherwise
     testo_assente: str | None = None
+    # where the Cassazione's text was read: "pdf" (the court's original) or "archivio" (Italgiure's
+    # text field, possibly cut short); None for a source with one way to read
+    testo_origine: str | None = None
     testo: dict[str, str] = field(default_factory=dict)  # epigrafe?, motivazione, dispositivo?
     fonte: dict[str, str] = field(default_factory=dict)  # nome, licenza?, url?
 
