@@ -9,6 +9,7 @@ vi.mock('../../ui/Toast', async (importOriginal) => ({
     isVisible ? <div role="status" data-type={type}>{message}</div> : null,
 }));
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi.fn() }) }));
+vi.mock('../../../services/trashService', () => ({ trashService: { list: vi.fn(async () => []), restore: vi.fn(), purge: vi.fn() } }));
 
 import { appStore } from '../../../store/useAppStore';
 import { DossierPage } from './DossierPage';

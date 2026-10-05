@@ -335,6 +335,23 @@ describe('security review of PR 4', () => {
     expect(message).toMatch(/e altre 5: 2 norme, 3 note/);
   });
 
+  it('M2b. a decision has its own plural among the entries summed up by kind', () => {
+    const message = deletionMessage({
+      dossierName: 'Prova',
+      lines: Array.from({ length: 24 }, (_, i) => (i < 22 ? `art. ${i}` : 'Cass. civ., n. 1/2020')),
+      kinds: [...Array.from({ length: 22 }, () => 'norm'), 'sentenza', 'sentenza'],
+      total: 24,
+    });
+    expect(message).toMatch(/e altre 4: 2 norme, 2 sentenze/);
+    const single = deletionMessage({
+      dossierName: 'Prova',
+      lines: Array.from({ length: 21 }, (_, i) => (i < 20 ? `art. ${i}` : 'Cass. civ., n. 1/2020')),
+      kinds: [...Array.from({ length: 20 }, () => 'norm'), 'sentenza'],
+      total: 21,
+    });
+    expect(single).toMatch(/: 1 sentenza/);
+  });
+
   it('M3. a tool call the client cancels closes its question, and deletes nothing', async () => {
     // The user's Accept arrives, but only after the model's client cancelled the call.
     answer = async () => {

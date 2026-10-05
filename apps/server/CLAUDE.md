@@ -106,6 +106,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   session only, the route is not in the delegated table): the web app's undo
   restores an article with a new id and points its notes at it.
   `assertArticleOfDossier` is the one check behind both routes.
+- **Decisions in a dossier**: an item may be `sentenza`: a court decision's
+  identity and a label, never its text. Its content is checked by
+  `schemas/decisionItem.ts` (unknown keys refused) when an item is added and
+  when a decision's content is updated; it must stay aligned with the web's
+  `parseSentenzaContent`, so change both together. The item's `title` follows
+  `etichetta` (a copy the web recomputes on every write; the server bounds and
+  stores it). A Forum suggestion's `take` stores what each dossier entry carries
+  (`utils/suggestionEntries.ts`) and refuses a malformed proposal whole: a 400,
+  nothing applied.
 - **Deleting through a connected application, and the trash** (second-round
   spec §4.2–4.3). Scope `content:delete`: the consent page offers it apart and
   unticked, `PATCH /api/oauth/grants/:id {canDelete}` switches it, and
