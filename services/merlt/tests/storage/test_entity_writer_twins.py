@@ -215,7 +215,7 @@ async def test_the_stub_of_a_bare_urn_is_the_article_the_seed_keys(graph):
         "MATCH (a:Norma {URN: $u}) RETURN a.is_stub AS stub, a.node_id AS nid, a.estremi AS e",
         {"u": f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art1374"},
     )
-    assert stub == [{"stub": True, "nid": f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art1374", "e": "Art. 1374 c.c."}]
+    assert stub == [{"stub": True, "nid": f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art1374", "e": "art. 1374 c.c."}]
 
 
 class _Lent:

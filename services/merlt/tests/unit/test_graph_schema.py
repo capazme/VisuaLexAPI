@@ -159,50 +159,32 @@ def test_normalize_fonte(raw, fonte):
     assert s.normalize_fonte(raw) == fonte
 
 
-def test_estremi_use_the_one_abbreviation_table():
-    assert s.format_estremi("2043", "codice civile") == "Art. 2043 c.c."
-    assert s.format_estremi("2043", "Codice  Civile") == "Art. 2043 c.c."
-    assert s.format_estremi("1", "Costituzione") == "Art. 1 Cost."
-    assert s.format_estremi("33", "codice del consumo") == "Art. 33 cod. cons."
-    assert s.format_estremi("3", "legge sulla privacy") == "Art. 3 legge sulla privacy"
-
-
-def test_an_act_outside_the_abbreviation_table_is_logged_at_debug_not_info():
-    # It runs several times per article for any act the table does not know (to_estremi() is called
-    # three times in the ingestion): at info it filled the log of every lazy ingestion.
-    from structlog.testing import capture_logs
-
-    with capture_logs() as logs:
-        assert s.act_abbreviation("legge sulla privacy") == "legge sulla privacy"
-        assert s.format_estremi("3", "legge sulla privacy") == "Art. 3 legge sulla privacy"
-    fallbacks = [entry for entry in logs if entry["event"] == "graph_schema.abbrev_fallback"]
-    assert len(fallbacks) == 2 and {entry["log_level"] for entry in fallbacks} == {"debug"}
-    with capture_logs() as logs:
-        s.act_abbreviation("codice civile")  # a known act logs nothing
-    assert logs == []
-
-
-def test_the_act_is_read_from_the_urn_only_for_known_codes():
+def test_estremi_are_the_short_label_read_from_the_key():
+    # The source convention (utils/sources.py, golden file conventions/sources/golden.json):
+    # a code by its abbreviation, every other act by its type, number and year.
     assert s.act_name_from_urn(CC + "!vig=") == "codice civile"
     assert s.act_name_from_urn(COST) == "costituzione"
     assert s.act_name_from_urn(LEGGE) is None
-    assert s.estremi_from_urn(CC) == ("2043", "Art. 2043 c.c.")
-    assert s.estremi_from_urn(COST) == ("1", "Art. 1 Cost.")
-    assert s.estremi_from_urn(LEGGE) == ("5", "Art. 5")
+    assert s.estremi_from_urn(CC) == ("2043", "art. 2043 c.c.")
+    assert s.estremi_from_urn(COST) == ("1", "art. 1 Cost.")
+    assert s.estremi_from_urn(LEGGE) == ("5", "art. 5 l. 241/1990")
     assert s.estremi_from_urn(CC.split("~")[0]) == (None, None)
 
 
-def test_an_act_the_urn_table_lists_without_an_abbreviation_is_named_in_full():
-    # `Art. N` alone is for an act the URN table does not list (a numbered law, above); the preleggi
-    # are in the table and have no abbreviation, so the estremi carry the act's own name.
+def test_the_preleggi_are_never_the_codice_civile():
+    # They share the decree (r.d. 262/1942): the annex says which one.
     preleggi = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:1~art5"
     assert s.act_name_from_urn(preleggi) == "preleggi"
-    assert s.estremi_from_urn(preleggi) == ("5", "Art. 5 preleggi")
+    assert s.estremi_from_urn(preleggi) == ("5", "art. 5 preleggi")
+
+
+def test_a_key_the_convention_cannot_read_keeps_the_bare_article():
+    assert s.estremi_from_urn("urn:x~art7") == ("7", "art. 7")
 
 
 def test_the_one_stub_shape():
     assert s.stub_properties(CC + "@originale") == {
-        "URN": CC, "node_id": CC, "numero_articolo": "2043", "estremi": "Art. 2043 c.c.",
+        "URN": CC, "node_id": CC, "numero_articolo": "2043", "estremi": "art. 2043 c.c.",
         "is_stub": True, "provenance": "ingestion",
     }
     act = CC.split("~")[0]

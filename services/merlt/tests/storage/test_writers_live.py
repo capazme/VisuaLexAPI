@@ -39,7 +39,10 @@ ARTICLE_TEXT = (
     "b) immigrazione e condizione giuridica degli stranieri.\n\n"
     "Le Regioni hanno potesta legislativa in ogni materia non riservata."
 )
-ACT = "urn:nir:stato:decreto.legislativo:2001-01-01;1"
+# The graph keys an act by its identity (source convention): the Normattiva URL. The run
+# normalises the bare URN the source gives into it.
+ACT_URN = "urn:nir:stato:decreto.legislativo:2001-01-01;1"
+ACT = "https://www.normattiva.it/uri-res/N2Ls?" + ACT_URN
 
 
 @pytest_asyncio.fixture
@@ -86,7 +89,7 @@ async def test_a_multivigenza_run_gives_the_comma_lettera_and_numero_a_fonte_eve
     await graph.query("CREATE (:Comma {URN: $urn, node_id: $urn, testo: 'Testo del seed.'})", {"urn": comma})
     modifica = Modifica(
         tipo_modifica=TipoModifica.INSERISCE,
-        atto_modificante_urn=ACT,
+        atto_modificante_urn=ACT_URN,
         atto_modificante_estremi="D.Lgs. 1 gennaio 2001, n. 1",
         data_efficacia="2001-02-01",
         data_pubblicazione_gu="2001-01-15",

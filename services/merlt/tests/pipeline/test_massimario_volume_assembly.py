@@ -30,7 +30,7 @@ def test_decisions_are_one_node_each_with_unions():
     assert props["node_id"] == "cassazione:civile:1234:2024"
     assert props["rv"] == ["670001-01", "670001-02"]
     assert props["sezioni"] == ["U"] and props["anni_rassegna"] == [2024]
-    assert props["estremi"] == "Cass. civ., n. 1234/2024"
+    assert props["estremi"] == "Cass. civ., sez. un., n. 1234/2024"  # the short label (D2)
     assert props["fonte"] == "Ufficio del Massimario" and props["provenance"] == "ingestion"
     assert nodes["cassazione:civile:4321:2024"]["properties"]["anno_implicito"] is True
     assert "corte_costituzionale:12:2024" in nodes

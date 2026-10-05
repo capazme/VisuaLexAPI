@@ -8,7 +8,9 @@ import pytest
 from merlt.clients import Modifica, Norma, NormaVisitata, TipoModifica
 from merlt.pipeline.multivigenza import MultivigenzaPipeline, parse_disposizione
 
-ACT = "urn:nir:stato:decreto.legislativo:2001-01-01;1"
+ACT_URN = "urn:nir:stato:decreto.legislativo:2001-01-01;1"
+# The writer keys the act by its identity (source convention): the Normattiva URL.
+ACT = "https://www.normattiva.it/uri-res/N2Ls?" + ACT_URN
 
 
 def _parsed(numero_articolo, commi, lettere, numeri):
@@ -97,7 +99,7 @@ async def _write_modification(disposizione):
     client = _Recorder()
     modifica = Modifica(
         tipo_modifica=TipoModifica.MODIFICA,
-        atto_modificante_urn=ACT,
+        atto_modificante_urn=ACT_URN,  # bare, as the source gives it
         atto_modificante_estremi="D.Lgs. 1 gennaio 2001, n. 1",
         data_efficacia="2001-02-01",
         data_pubblicazione_gu="2001-01-15",

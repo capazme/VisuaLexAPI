@@ -35,6 +35,9 @@ class NormaMetadata:
     versione: Optional[str] = None
     data_versione: Optional[str] = None
     allegato: Optional[str] = None
+    # The act an aliased code is ("codice in materia di protezione dei dati personali" is a
+    # decreto legislativo); absent, the source convention reads it from the codes table.
+    tipo_atto_reale: Optional[str] = None
 
     def to_urn(self) -> str:
         """
@@ -81,11 +84,17 @@ class NormaMetadata:
             urn_flag=True
         )
 
-    def to_estremi(self) -> str:
-        """`Art. 1453 c.c.`, `Art. 1 Cost.`: the schema's one formatter."""
-        from merlt.storage.graph.schema import format_estremi
+    def norm(self) -> Dict[str, Any]:
+        """The norm as the source convention reads it (`utils/sources.py`)."""
+        return {"tipo_atto": self.tipo_atto, "tipo_atto_reale": self.tipo_atto_reale, "data": self.data,
+                "numero_atto": self.numero_atto, "allegato": self.allegato,
+                "numero_articolo": str(self.numero_articolo)}
 
-        return format_estremi(str(self.numero_articolo), self.tipo_atto)
+    def to_estremi(self) -> str:
+        """The norm's short label: `art. 1453 c.c.`, `art. 2 l. 241/1990`."""
+        from merlt.utils.sources import short_norm
+
+        return short_norm(self.norm())
 
 
 @dataclass

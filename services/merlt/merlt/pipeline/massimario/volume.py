@@ -10,6 +10,8 @@ from typing import Iterator, Optional
 
 from merlt.storage.graph.schema import Fonte, Label, Provenance, Rel, SourceType, point_id, stub_properties
 
+from merlt.utils.sources import decision_node_estremi
+
 from .citations import parse_citations
 from .identity import CitedDecision
 from .paragraphs import Paragraph, extract_paragraphs, split_for_vectors
@@ -256,6 +258,7 @@ class _Volume:
             props["sezioni"].append(d.sezione)
             if len(props["sezioni"]) > 1:
                 self.multi_section[key] = set(props["sezioni"])
+        props["estremi"] = decision_node_estremi(props) or d.estremi
         props["rv"] += [rv for rv in dict.fromkeys(d.rv) if rv not in props["rv"]]
         for name, value in (("relatore", d.relatore), ("data_udienza", d.data_udienza)):
             if value and not props.get(name):

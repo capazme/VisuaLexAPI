@@ -43,10 +43,10 @@ def _node(urn: str, *, estremi: str, tipo_documento: str = "articolo") -> dict:
 
 
 @pytest.mark.asyncio
-async def test_detects_urn_conflict_when_estremi_diverges():
-    """The CC-frammentata-su-decreti-origine case from the design doc §1:
-    the same article URN under the consolidated act (`1942;262:2`) reports
-    different `estremi` than what a stray fragment-decree batch would carry."""
+async def test_detects_urn_conflict_when_the_type_of_document_diverges():
+    """The same URN holds another kind of node in the graph. A different wording
+    of `estremi` is no conflict any more: it is a label derived from the key
+    (source convention §5.1), and the label backfill rewrites it."""
     urn = (
         "https://www.normattiva.it/uri-res/N2Ls?"
         "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1"
@@ -60,7 +60,7 @@ async def test_detects_urn_conflict_when_estremi_diverges():
                 {
                     "urn": urn,
                     "estremi": "Art. 1 R.D. 25 giugno 1938, n. 1852",
-                    "tipo_documento": "articolo",
+                    "tipo_documento": "capo",
                 }
             ],
             # external edge endpoints (none)

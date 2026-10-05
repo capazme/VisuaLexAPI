@@ -343,7 +343,7 @@ class CitationChainTool(BaseTool):
             MATCH (n:AttoGiudiziario)
             WHERE n.URN = $id
                OR n.node_id = $id
-               OR n.estremi = $id
+               OR toLower(n.estremi) = toLower($id)
                OR n.numero_atto = $id
             RETURN
                 COALESCE(n.URN, n.node_id) AS urn,

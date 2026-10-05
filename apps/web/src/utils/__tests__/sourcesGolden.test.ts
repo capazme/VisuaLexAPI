@@ -80,7 +80,7 @@ describe('the golden file of legal sources', () => {
     // fails too, so the list cannot go stale.
     const PENDING_ADOPTION = new Set([
       'l-184-1983-6-year-only', 'dpcm-2020-03-08-1', 'dm-55-2014-4', 'cpi-regolamento-1',
-      'lcost-1-2012-1', 'gdpr-5', 'nis2-21', 'tfue-101',
+      'lcost-1-2012-1', 'gdpr-5', 'nis2-21', 'tfue-101', 'consumo-33-stored-without-real-type',
     ]);
     const decided = golden.norms.filter((c) => c.labels.citation?.status === 'decided');
     it('covers the cases the owner decided', () => expect(decided.length).toBeGreaterThan(10));

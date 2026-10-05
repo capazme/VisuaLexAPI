@@ -1,7 +1,7 @@
 """Unit tests for the data-quality URN → label / estremi derivation.
 
 Covers:
-- A1 label builder: Norma with fields → "Art. N — rubrica"; empty stub → "Art. N";
+- A1 label builder: Norma with fields → "art. N c.c. — rubrica"; empty stub → its short label;
   Comma node (only `testo`) → truncated testo.
 - A2 estremi/numero_articolo derivation from URN, including -bis suffixes.
 
@@ -65,21 +65,21 @@ def test_article_number_none_for_empty_or_concept():
 
 
 def test_article_label_from_urn():
-    assert article_label_from_urn(URN_ART) == "Art. 467"
-    assert article_label_from_urn(URN_ART_BIS) == "Art. 30-bis"
+    assert article_label_from_urn(URN_ART) == "art. 467 c.c."
+    assert article_label_from_urn(URN_ART_BIS) == "art. 30-bis c.c."
     assert article_label_from_urn(URN_ACT_ONLY) is None
 
 
 def test_derive_article_fields_plain():
     numero, estremi = derive_article_fields_from_urn(URN_ART)
     assert numero == "467"
-    assert estremi == "Art. 467"
+    assert estremi == "art. 467 c.c."
 
 
 def test_derive_article_fields_bis():
     numero, estremi = derive_article_fields_from_urn(URN_ART_BIS)
     assert numero == "30-bis"
-    assert estremi == "Art. 30-bis"
+    assert estremi == "art. 30-bis c.c."
 
 
 def test_derive_article_fields_none_for_act():
@@ -92,13 +92,21 @@ def test_derive_article_fields_none_for_act():
 # build_node_label (A1)
 # ----------------------------------------------------------------------------
 
+def test_label_norma_synth_uses_the_estremi_and_the_rubrica():
+    label = build_node_label(
+        {"numero_articolo": "467", "estremi": "art. 467 c.c.", "rubrica": "(Rappresentazione)."},
+        "urn:...~art467",
+    )
+    assert label == "art. 467 c.c. — (Rappresentazione)."
+
+
 def test_label_norma_synth_with_numero_and_rubrica():
-    # Norma with both numero_articolo and rubrica → "Art. N — rubrica"
+    # Norma with both numero_articolo and rubrica → "art. N — rubrica" (no estremi stored)
     label = build_node_label(
         {"numero_articolo": "467", "rubrica": "(Rappresentazione)."},
         "urn:...~art467",
     )
-    assert label == "Art. 467 — (Rappresentazione)."
+    assert label == "art. 467 — (Rappresentazione)."
 
 
 def test_label_prefers_nome_when_present():
@@ -116,7 +124,7 @@ def test_label_estremi_when_no_nome():
 
 def test_label_numero_articolo_alone():
     label = build_node_label({"numero_articolo": "12-bis"}, "id")
-    assert label == "Art. 12-bis"
+    assert label == "art. 12-bis"
 
 
 def test_label_comma_truncated_testo():
@@ -137,19 +145,19 @@ def test_label_short_testo_not_truncated():
 
 
 def test_label_empty_stub_falls_back_to_urn_art():
-    # Empty stub Norma (no props) → URN-derived "Art. N", never the raw URL.
+    # Empty stub Norma (no props) → its short label read from the key, never the raw URL.
     label = build_node_label({}, URN_ART)
-    assert label == "Art. 467"
+    assert label == "art. 467 c.c."
 
 
 def test_label_empty_stub_bis():
     label = build_node_label({}, URN_ART_BIS)
-    assert label == "Art. 30-bis"
+    assert label == "art. 30-bis c.c."
 
 
 def test_label_urn_in_props_when_id_is_not_urn():
     label = build_node_label({"URN": URN_ART}, "12345")
-    assert label == "Art. 467"
+    assert label == "art. 467 c.c."
 
 
 def test_label_last_resort_truncated_id():
@@ -165,4 +173,4 @@ def test_label_never_empty():
 def test_label_whitespace_only_fields_are_ignored():
     # "   " must not win over the URN fallback.
     label = build_node_label({"nome": "   ", "rubrica": ""}, URN_ART)
-    assert label == "Art. 467"
+    assert label == "art. 467 c.c."
