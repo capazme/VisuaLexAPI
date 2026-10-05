@@ -129,7 +129,7 @@ git commit -m "test(api): record Italgiure search answers for the decision searc
 A measurement, no product code. It fixes the thresholds of the PDF reader (Task 3), the fallback checks (Task 4), the index coordinates and their re-check (Task 5), and records the fixtures those tasks replay. Spec §11, §5.2.
 
 **Files:**
-- Create: `services/visualex/tests/fixtures/decisions/pdf/` — four or five original PDFs (`<archive>_<numero>_<anno>.clean.pdf`) and, for each, the record as Solr gives it (`<archive>_<numero>_<anno>.json`, `fl=*`)
+- Create: `services/visualex/tests/fixtures/decisions/private/` (git-ignored: the repository is public) — four or five original PDFs (`<archive>_<numero>_<anno>.clean.pdf`) and, for each, the record as Solr gives it (`<archive>_<numero>_<anno>.json`, `fl=*`)
 - Create: `services/visualex/tests/fixtures/decisions/italgiure_index_2043_cc.json` (an index query page with `rnc-*` fields)
 - Modify: `services/visualex/tests/fixtures/decisions/README.md`
 - Modify: this plan, «Amendments during execution»
@@ -242,7 +242,7 @@ def test_the_text_is_whole_and_ends_in_the_dispositivo(path):
 
 
 def test_a_line_ending_in_a_hyphen_joins_without_a_space():
-    # the fixture whose text has «Lazare-David» — adapt to the fixture Task 2 recorded, and name it here
+    # the fixture whose text has «Emilia-Romagna» — a synthetic PDF, see tests/decisions_pdf_synth.py
     ...
 
 
@@ -3076,4 +3076,246 @@ someone, or a case detail), so no record needed replacing.
 
 **Rewrite, 2026-10-05 (afternoon) — the owner's additions «testo pulito» and «scaricarle in PDF».**
 Measured before proposing (about 20 requests, 2.5 s apart): Italgiure's `ocr` field ends mid-word in about a third of 34 whole decisions (one at exactly 8,000 characters; dispositivi missing), the court's original PDF (`filename` → `…hc.dll?verbo=attach&db=<kind>&id=<name>.clean.pdf`, in the archive's session) is whole, and the `rnc-*` fields index the cited norms (art. 2043 c.c.: 3,904 civil decisions against 939 by text). A controller prototype of the PDF reader (pdfminer.six) rebuilt three PDFs whole, with no furniture left, after two fixes the plan's code already carries (a footer present on one page only; pdfminer's `PSEOF` on a truncated file). Answers «43. 1a + 1d», «44. 2a + 2b». Added Tasks 2, 3, 4, 8, 22; changed Tasks 5, 6, 7, 9; renumbered every later task.
+
+**Task 2, 2026-10-05 — measured on Italgiure's public `sn.solr` endpoint and the attach
+endpoint for the original PDFs (54 live requests in all: 4 session-opening GETs across four
+script runs, 36 PDF fetches — 3 of them bytes already on disk from the controller's own probe,
+not refetched — and 14 Solr POSTs; every request ≥ 2.5 s after the one before it). Sample: 40
+decisions (20 `snciv`, 20 `snpen`), sections 1/2/U/L (civil) and 1/2/4/6 (penal), years
+2021–2026, sentenze and ordinanze for civil, sentenze only for penal (no penal ordinanza turned
+up in the queries drawn), 4 of the 40 withheld by the source (`oscuramento`, no `filename` to
+read a PDF from — confirms the design's own statement that a withheld text has no PDF). The
+prototype run was Task 3's own code (plan Task 3, Step 3), copied into the scratch venv and run
+unmodified before any tuning, then re-run after each fix below; every fix is a correction to
+that code, to be carried into Task 3 verbatim.**
+
+*The thresholds (`services/visualex/visualex_api/services/decisions/pdf_text.py`, replacing
+Task 3's drafted defaults):*
+
+| constant | plan's draft | measured value | why |
+|---|---|---|---|
+| `TOP_BAND` | 60 | **90** | a running header repeated on 15 of a document's pages, without the colon it carries on page 0 ("Data pubblicazione 21/02/2022"), sits at y=765 on a height-842 page — 77 pt from the top edge; 60 pt of band missed it by 17 pt, so it leaked into the body text verbatim. 90 pt leaves a 13 pt margin and introduced no new drop of real text (checked: no dropped line over 55 characters with 6 or more lowercase words, across all 36 PDFs, before or after). |
+| `BOTTOM_BAND` | 80 | **110** | two more leaks the 80 pt band missed: a running footer ("Ric. 2017 n. 30254 sez. SU - ud. 14-09-2021") repeated on 20 of 24 pages at y≈88–90, and bare page numbers ("2", "3", …) repeated on every page of two decisions at y≈99. Both are well inside the `_RUNNING` / `_PAGE_NUMBER` patterns the code already has — they were never tested against those patterns because they never reached the in-band check. 110 pt catches both with margin. |
+| `INDENT` | 8 | **8 (unchanged)** | correctly started a paragraph at every genuine first-line indent across all 36; no false start, no missed one. |
+| `GAP` | 30 | **30 (unchanged)** | correctly started a paragraph at every genuine vertical break across all 36. |
+| `CENTER_INDENT` | — (new) | **40** | the detail the plan's own Task 3 text flagged as unsettled: a centred heading ("RITENUTO IN FATTO E CONSIDERATO IN DIRITTO", measured x0 94–95 pt beyond the body's left edge) ends its own paragraph correctly, but the ordinary, left-aligned line right after it glued onto the heading's paragraph in 2 of 36 fixtures read closely, and — once the fix below was in place and I checked every paragraph break it added — at least 20 more headings across the sample that the narrower keyword-only check had not even been counting ("ORDINANZA", "FATTI DI CAUSA", "P.Q.M.", "RILEVATO CHE", party-designation lines like "- ricorrente -" and "contro"). A one-line paragraph in progress whose line's `x0` is beyond `left + CENTER_INDENT` forces the next line to start a new paragraph regardless of its own indent or the gap. |
+| `HEADING_MAX_CHARS` | — (new) | **60** | pairs with `CENTER_INDENT`: the measured headings were 42 characters; 60 keeps margin without reaching into an ordinary first line of prose that happens to sit far right. |
+| `REPEATED_ON` | 2 | **2 (unchanged)** | every genuine running header/footer in the sample repeated on at least 3 pages in practice; 2 is the safe floor the plan already chose. |
+| `OGGETTO_X` | 0.6 | **0.6 (unchanged)** | confirmed again on `snciv_26034_2026` (the fixture): the box's lines sit at x0 ≈ 407 of a 595-wide page, the title at y 393, every Oggetto line above it in y and past `width * 0.6` — dropped correctly, nothing else at that position on any of the 36 pages. |
+
+*The `_PQM` pattern* (same file) needs two more spellings or 3 of 36 decisions lose their
+dispositivo to the motivazione: `"PQM."` (no periods between the letters: `snciv_05628_2022`)
+and `"PER QUESTI MOTIVI"` (spelled out — an older civil-ordinanza template that does not use
+"P.Q.M." at all: `snciv_26052_2026`, `snciv_26054_2026`). With both added, all 36 non-withheld
+decisions split a `dispositivo` correctly, each one starting with "P." (or, now, "Dichiara" /
+"Accoglie" / "Annulla" / "Rigetta" / "La Corte …" right after one of the three headings) and
+every one of the 36 reads to a genuine closing line ("Così deciso …", a date, the President's
+or the extensor's name) — read by hand on all 36, not ten: none is cut, none stops short of its
+dispositivo. `_HEADER` and `_PAGE_NUMBER` needed no change; one PDF (`snciv_01674_2024` and its
+four `L`-section siblings) has *no* page-0 header or Oggetto box at all — a template without
+one, not a bug — so a decision missing that block is expected, not a failure.
+
+*A confirmed hyphen-join case*: `snciv_26034_2026` has a hyphenated compound broken at the end of
+one baseline, the rest starting the next (verified in the raw lines, not just the output); the
+joined text reads like "Emilia-Romagna", the example Task 3's own docstring names — pin `test_a_line_ending_in_a_hyphen_joins_
+without_a_space` against, and to assert `"RILEVATO CHE"` / `"CONSIDERATO CHE"` / `"P.Q.M."`
+each start their own paragraph in.
+
+*Furniture left over, by design, not a defect*: letter-spaced OCR noise around the judges'
+signatures in 5 of 36 (`snpen_05881/05882/05883/05884_2022`, `snpen_35166_2026` — e.g. "Vittori
+ìenza Gi iotallevi" for a name, "Massimo Perro Messini D'Agostini" merged) and stamp debris in
+1 of 36 (`snpen_35172_2026`: "p Q w Monica Boni eLz 2? - scrj g …"), confined to the closing
+signature block in every case, never the motivazione or dispositivo text itself — exactly the
+"OCR debris from stamps" and "digital signature printed letter by letter" faults the design
+already named for the text field; Task 3/4 should not try to remove these, they cost nothing to
+leave and trying would risk the real text next to them. One stray glyph, `_99_`, sits alone at
+the bottom margin of one page of `snciv_05624_2022`, appears once (not repeated, so `REPEATED_ON`
+never catches it) and is not `(cid:N)`-shaped either; left as a known, harmless residual (four
+characters inline, no word broken).
+
+*The fallback checks* (plan Task 4) — measured against all 36 non-withheld decisions' own field
+(`ocr`) text:
+
+- **Length ratio** (`len(pdf_text) / len(field_text)`): ranged **0.761–1.019**. The low end is
+  not the PDF losing text: `ocr` is a flat OCR dump that *keeps* every page's running
+  header/footer inline, so a 27-page decision's field is inflated by as many repeats as it has
+  pages, while the PDF reader strips them by design — the ratio falls with page count for this
+  reason alone, confirmed on the two 27-page fixtures (`snciv_05633_2022`, `snciv_05669_2022`,
+  both 0.761, both with 130 furniture lines correctly dropped, nothing of the body touched).
+  **Recommended floor: 0.70** (margin below the measured 0.761, so a legitimately long,
+  furniture-heavy decision never trips the fallback).
+- **Opening words**: the brief's own "do the field's first twenty words appear in order in the
+  PDF text" cannot be a simple left-to-right two-pointer subsequence scan — measured and then
+  fixed: the field's own text is *also* truncated at its **front** in most records, not only
+  cut short at the end, e.g. `ocr` starting "iato la seguente SENTENZA …" (missing the front of
+  "pronunciato"), "CC ha pronunciato la seguente ORDINANZA …" (extra words the PDF's own first
+  page never has, because that template has no header/judges paragraph at all), "osti da: …"
+  (missing the front of "proposti"). A strict two-pointer match on the literal first word
+  starves on this and returns near-zero even for a perfect PDF read. The fix: count the length
+  of the **longest common subsequence** between the field's first 20 words and the PDF's first
+  250 words (both tokenised on `[a-z0-9]+`, so "n.5672/2020" and "n. 5672/2020" tokenise
+  alike). Measured on the 36 genuine pairs: **14–20 of 20**. A negative control (each
+  decision's field matched against a *different*, unrelated decision's PDF, 36 random pairs)
+  scored **3–13**, because common boilerplate ("sul ricorso … proposto da … elettivamente
+  domiciliato … che lo rappresenta e difende … contro …") alone can reach into the teens even
+  across unrelated decisions. **Recommended floor: 10** — comfortably below the measured
+  true-positive floor of 14, comfortably above most (not all) of the false pairs; the fallback
+  must use **both** checks together (ratio ≥ 0.70 **and** opening-words ≥ 10), since the two
+  false-positive risks (boilerplate overlap; a coincidentally similar length) are close to
+  independent. Every one of the 36 passes both; the 40-decision outcome table below shows the
+  result per decision.
+
+*The index of cited norms* (plan Task 5), measured with 11 more Solr requests after the 40-
+sample's own `rnc-*` data was mined for free (no request): one decision already in the sample,
+`snciv2026126034O`, alone carries 8 citations across 3 different families (`rnc-gen`
+`CC`/`LS`/`PC`), which is most of the table below without asking Italgiure anything.
+
+| act | `rnc-gen` | `rnc-sp` | confidence |
+|---|---|---|---|
+| codice civile (c.c.) | `CC` | `COD` | confirmed (art. 2043, art. 1227, art. 1375, … in the 40-sample and the 100-row art. 2043 query) |
+| codice di procedura civile (c.p.c.) | `PC` | `COD` | confirmed (art. 360 — "motivi di ricorso" — by far the single most common citation in the whole sample, 139 of the sample's own citations) |
+| codice penale (c.p.) | `CP` | `COD` | confirmed (art. 62-bis, art. 416-bis — see the suffix table below) |
+| codice di procedura penale (c.p.p.) | `PV` | `COD` | confirmed (art. 606 "ricorso per cassazione", art. 568, art. 609 — all penal-only in the sample, all genuine c.p.p. articles) |
+| Costituzione | `LC` | `LC` | confirmed (every article seen is ≤ 139 — the Constitution's own range — and matched by hand against the decisions' own text: "artt. 3, 4 e 97 Cost.") |
+| legge ordinaria (l.) | `LS` | `LS` | confirmed (`rnc-num`/`rnc-dat` pairs land on a decision's own "l. 241/1990" and similar) |
+| decreto legislativo (d.lgs.) | `LS` | `DLG` | confirmed (d.lgs. 58/1998 art. 21, TUF, already in the 40-sample) |
+| decreto-legge (d.l.) | `LS` | `DL` | confirmed (seen in the 40-sample's own mined data; not independently re-queried, so weaker than the two above) |
+| d.P.R. | `LS` | `DPR` | confirmed (d.P.R. 115/2002 art. 13, the contributo-unificato article almost every decision cites, already in the 40-sample) |
+| preleggi (disp. prel. c.c.) | — | — | **not established within the budget.** Three decisions whose text names "disposizioni sulla legge in generale (preleggi)" with a specific article (art. 12, art. 15) do not carry a matching `rnc-art` entry at all — the citation is in the text but not, as far as three samples show, in the index. Task 5 should leave preleggi out of the index table and send it through the text search only. |
+| disp. att. c.c. | `CC` | `COD` | **confirmed indexed, but not distinguishable from the codice civile itself.** Three decisions citing "art. 66 disp. att. c.c.", "da 11 a 20 disp. att. c.c." and "art. 63 disp. att. c.c." carry those exact article numbers under `rnc-gen:"CC" AND rnc-sp:"COD"` — the same coordinates as codice civile proper. A query for a *low* article number (disp. att. c.c. runs to a few hundred articles; the codice civile to 2969) cannot tell the two apart from the index alone; Task 5 should say so if it offers disp. att. c.c. as a choice, or restrict it to numbers the codice civile itself does not reach. |
+| two more families seen, not asked for | `CR` / `DM` | `COD` / `DM` | seen a handful of times each (5 and 9 citations) with inconsistent article ranges; not one of the eleven families in the brief, and not pinned down — left unidentified, as the brief allows. |
+
+*How a suffix is written in `rnc-art`* (the "2043 00" / "-bis" question): confirmed **`02` =
+"-bis"**, independently, on five different articles across the sample and the follow-up
+queries: art. 416-bis c.p., art. 62-bis c.p. (both read directly from the decision's own text
+next to the matching index entry), art. 163-bis c.p.c., art. 380-bis c.p.c. and art. 348-bis
+c.p.c. (all four read from the mined 40-sample data). `03` and `04` are very likely "-ter" and
+"-quater" by the same sequence (a decision indexed as `"0391 04"` has, in its own text, "391
+bis, 391 nonies, 391 quater c.p.p." together in one sentence — consistent with `04` = "-quater"
+but, because that sentence names three suffixes of the same base article at once, not as fully
+independent a confirmation as the five "-bis" cases). **Recommendation: trust `02` = "-bis" for
+Task 5; treat `03`/`04` as a working hypothesis ("-ter"/"-quater") to verify with one more
+query before the index table is frozen, and fall back to the text search for any suffix beyond
+that (quinquies and up) until measured.**
+
+*How `rnc-num`/`rnc-dat` align with `rnc-gen`/`rnc-art`* — measured on far more than the
+brief's 20 records (every citation in the 40-sample plus the 100-, 100- and 29-row false-match
+samples below, several hundred citations in all): **`rnc-num` and `rnc-dat` align by position
+among only the entries of `rnc-gen` that are *not* a code (i.e. not tagged `rnc-sp:"COD"`), in
+the same left-to-right order as `rnc-gen` itself** — confirmed by hand on `snciv2026126034O`
+(2 non-code entries, 2 `rnc-num`/`rnc-dat` pairs, both match a real numbered act read from the
+decision's own text), on `snciv2026109211O` (2 non-code entries, 2 pairs, one of them the
+`d.lgs. 58/1998, art. 21` citation this plan needs), and on every one of the hand-checked
+records in the false-match tables below. This held in every record checked; I found no
+exception.
+
+*But `rnc-art` itself is not reliably the same length as `rnc-gen`/`rnc-sp`* — this is the
+measurement that changes Task 5's re-check (N15) the most. `rnc-gen` and `rnc-sp` are always
+the same length as each other (confirmed on every record read). `rnc-art` is shorter whenever
+one or more citations in the decision name an act with no specific article (a bare "ai sensi
+del d.lgs. 52/1998", with no article number) — that citation is simply missing from `rnc-art`,
+which shifts every citation after it out of naive same-index alignment with `rnc-gen`. Measured
+rate of `len(rnc-gen) != len(rnc-art)` among records that otherwise match a family query:
+
+| query | length-matched | length-mismatched |
+|---|---|---|
+| `rnc-gen:"CC" AND rnc-art:"2043 00"` (100 rows) | 51 | 49 (49%) |
+| `rnc-gen:"LS" AND rnc-sp:"DLG" AND rnc-num:"0058" AND rnc-dat:"1998" AND rnc-art:"0021 00"` (29 rows, the whole population) | 2 | 27 (93%) |
+| `rnc-gen:"LS" AND rnc-sp:"LS" AND rnc-num:"0241" AND rnc-dat:"1990" AND rnc-art:"0002 00"` (100 rows) | 4 | 96 (96%) |
+
+Manually reconstructed one mismatched record (`snciv2026109211O`, 5 `rnc-gen` entries, 4
+`rnc-art` entries) against its own `rnc-num`/`rnc-dat`: the citation the server actually wants
+(d.lgs. 58/1998 art. 21) **was** present, just not at the same raw index as its `rnc-gen` entry
+— a naive `zip()` would have called this one unverifiable, not wrongly matched, which is the
+safe failure direction, but the practical effect is the same: **a same-index check alone misses
+or discards the majority of genuine numbered-act citations and roughly half of the codes'.**
+
+*False-match rate, restricted to the length-matched records only* (where a same-index check is
+at least coherent — this is the rate Task 5's N15 re-check can actually trust today):
+
+| family | length-matched n | genuinely wrong | rate |
+|---|---|---|---|
+| `CC` art. 2043 | 51 | 1 | **2.0%** |
+| numbered acts (d.lgs. 58/1998 art. 21 + l. 241/1990 art. 2 pooled) | 6 | 2 | **33%** (small n — one record genuinely cites l. 241/1990 art. 31, another art. 3, not art. 2; both are real, different citations the query's five independent filters still matched because each filter alone is satisfied somewhere in the decision) |
+
+Both the code family and the numbered-act family, at the full (not length-matched-only) false-
+match rate implied by the mismatch table above, are **well past the plan's 5% "circa N"
+threshold** — not because the index is unreliable, but because most of its matches cannot be
+verified by position at all with the fields as given. **Recommendation for Task 5**: show every
+family's count as "circa N" (per the plan's own fallback rule) until a smarter re-check — one
+that accounts for citations with no article, not a raw `zip()` — is built and itself measured
+against a labelled sample; in the meantime, treat a length-mismatched record as *unconfirmed*
+rather than silently counting or silently discarding it.
+
+*`hl.q` on an index query* — confirmed it gives a passage: `q=kind:"snciv" AND rnc-gen:"CC" AND
+rnc-art:"2043 00"` with `hl.q=ocr:"art. 2043 c.c." OR ocr:"art. 2043 cod. civ."` highlighted 2 of
+5 rows with a real fragment ("… ex <em>art</em>.<em>2043</em> <em>cod</em>. <em>civ</em>. …") and
+answered the other 3 with an empty `{}` — never an error, exactly as spec §5.2 describes: a
+passage when the decision's text phrases the citation in a form `hl.q` knows, nothing otherwise.
+
+*Fixtures recorded* — four original PDFs and their full Solr record (`fl=*`), all civil (`snciv`):
+Cassazione civil nos. 26034/2026 and 26035/2026 (Sez. 1, the same template: header, Oggetto box,
+the hyphen join, the glued-words-with-no-space fault) and nos. 5626/2022 and 5628/2022 (Sez. U,
+both cut short in the field, both with a running footer, the second also the "PQM." spelling).
+Every one of the 20 penal decisions in the sample names its defendant by birth name and
+birthplace (Italian penal judgments always do), and no anonymised penal decision turned up in the
+one follow-up query the remaining budget allowed. Every party in the four civil ones is a company,
+a bank or a public administration; no other name appears anywhere in them (checked by extracting
+every capitalised multi-word run from the complete `ocr` text of each). The files are not in the
+repository, which is public: they live in `services/visualex/tests/fixtures/decisions/private/`
+(git-ignored), the reader is tested on synthetic PDFs, and the local tests that read the real
+ones are skipped without them (fixtures README).
+`italgiure_index_2043_cc.json` is the first five rows of the `rnc-gen:"CC" AND rnc-art:"2043 00"`
+query above (deterministic under `sort=pd desc`, so identical to a fresh `rows=5` request).
+
+*The forty decisions measured* (pages, whether the text reads whole to a genuine closing line —
+checked by hand on all 40, not ten — furniture lines dropped, paragraphs, and the two fallback
+checks together):
+
+| id | archive | numero | anno | pages | whole | furniture lines dropped | paragraphs | fallback check |
+|---|---|---|---|---|---|---|---|---|
+| snciv2026126034O | snciv | 26034 | 2026 | 7 | yes | 26 | 28 | pass |
+| snciv2026126035O | snciv | 26035 | 2026 | 7 | yes | 26 | 25 | pass |
+| snciv2026126036O | snciv | 26036 | 2026 | 7 | yes | 26 | 25 | pass |
+| snciv2026126039O | snciv | 26039 | 2026 | 10 | yes | 36 | 25 | pass |
+| snciv2026126052O | snciv | 26052 | 2026 | 12 | yes | 15 | 57 | pass |
+| snciv2026126054O | snciv | 26054 | 2026 | 25 | yes | 28 | 60 | pass |
+| snciv2026126055O | snciv | 26055 | 2026 | — | withheld (`oscuramento`, no filename) | — | — | — |
+| snciv2026226018O | snciv | 26018 | 2026 | 8 | yes | 11 | 34 | pass |
+| snciv2022U05624S | snciv | 05624 | 2022 | 24 | yes | 42 | 218 | pass |
+| snciv2022U05625S | snciv | 05625 | 2022 | 6 | yes | 9 | 34 | pass |
+| snciv2022U05626O | snciv | 05626 | 2022 | 8 | yes | 11 | 42 | pass |
+| snciv2022U05628O | snciv | 05628 | 2022 | 14 | yes | 17 | 19 | pass |
+| snciv2022U05633S | snciv | 05633 | 2022 | 27 | yes | 130 | 80 | pass |
+| snciv2022U05669S | snciv | 05669 | 2022 | 27 | yes | 130 | 80 | pass |
+| snciv2024L01674O | snciv | 01674 | 2024 | 27 | yes | 26 | 140 | pass |
+| snciv2024L01675O | snciv | 01675 | 2024 | 27 | yes | 26 | 140 | pass |
+| snciv2024L01676O | snciv | 01676 | 2024 | 25 | yes | 24 | 139 | pass |
+| snciv2024L01678O | snciv | 01678 | 2024 | 25 | yes | 24 | 139 | pass |
+| snciv2024L01680O | snciv | 01680 | 2024 | 25 | yes | 24 | 136 | pass |
+| snciv2024L01689O | snciv | 01689 | 2024 | 3 | yes | 11 | 13 | pass |
+| snpen2026135162S | snpen | 35162 | 2026 | 11 | yes | 12 | 62 | pass |
+| snpen2026135163S | snpen | 35163 | 2026 | — | withheld (`oscuramento`, no filename) | — | — | — |
+| snpen2026135164S | snpen | 35164 | 2026 | — | withheld (`oscuramento`, no filename) | — | — | — |
+| snpen2026135165S | snpen | 35165 | 2026 | 6 | yes | 7 | 36 | pass |
+| snpen2026135166S | snpen | 35166 | 2026 | 14 | yes | 13 | 114 | pass |
+| snpen2026135167S | snpen | 35167 | 2026 | 5 | yes | 6 | 32 | pass |
+| snpen2026135170S | snpen | 35170 | 2026 | — | withheld (`oscuramento`, no filename) | — | — | — |
+| snpen2026135172S | snpen | 35172 | 2026 | 9 | yes | 12 | 57 | pass |
+| snpen2022205881S | snpen | 05881 | 2022 | 3 | yes | 4 | 18 | pass |
+| snpen2022205882S | snpen | 05882 | 2022 | 4 | yes | 5 | 19 | pass |
+| snpen2022205883S | snpen | 05883 | 2022 | 5 | yes | 6 | 14 | pass |
+| snpen2022205884S | snpen | 05884 | 2022 | 4 | yes | 6 | 13 | pass |
+| snpen2022205886S | snpen | 05886 | 2022 | 9 | yes | 10 | 12 | pass |
+| snpen2022205888S | snpen | 05888 | 2022 | 4 | yes | 5 | 60 | pass |
+| snpen2021447002S | snpen | 47002 | 2021 | 3 | yes | 3 | 25 | pass |
+| snpen2021447004S | snpen | 47004 | 2021 | 4 | yes | 5 | 29 | pass |
+| snpen2021447006S | snpen | 47006 | 2021 | 5 | yes | 5 | 25 | pass |
+| snpen2024647649S | snpen | 47649 | 2024 | 3 | yes | 4 | 25 | pass |
+| snpen2024647652S | snpen | 47652 | 2024 | 6 | yes | 7 | 43 | pass |
+| snpen2024647653S | snpen | 47653 | 2024 | 2 | yes | 3 | 19 | pass |
+
+36 of 36 non-withheld decisions pass both fallback checks at the recommended thresholds — the
+thresholds were chosen with margin below this floor, not fitted exactly to it, so a decision
+Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 

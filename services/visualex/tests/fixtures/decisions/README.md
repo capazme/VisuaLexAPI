@@ -30,3 +30,35 @@ ocr:"art. 2043 c.c."` — 34 hits that day; the three most recent.
 
 `italgiure_search_empty.json`: `kind:"snciv" AND ocr:"art. 99999 c.c."` — no such article: 0
 hits, an empty `docs` and `highlighting`.
+
+## `private/` — real decisions, local only
+
+The repository is public, so the Cassazione's original PDFs (and their full Solr records, which
+name counsel and companies) are not committed. `private/` is git-ignored; the PDF reader is
+tested on synthetic PDFs (`tests/decisions_pdf_synth.py`, `tests/test_decisions_pdf_text.py`),
+and `tests/test_decisions_pdf_text_local.py` runs the same rules on the real files when they are
+there and is skipped when they are not.
+
+Expected there, as `<kind>_<numero>_<anno>.clean.pdf` (bytes exactly as Italgiure served them)
+and `<kind>_<numero>_<anno>.json` (the full Solr record, `fl=*`), four decisions identified by
+court, archive, number and year:
+
+- Corte di cassazione, civil (`snciv`), no. 26034 of 2026 — Sez. 1, Ordinanza, 7 pages;
+- Corte di cassazione, civil (`snciv`), no. 26035 of 2026 — Sez. 1, Ordinanza, 7 pages;
+- Corte di cassazione, civil (`snciv`), no. 5626 of 2022 — Sez. U, Ordinanza, 8 pages;
+- Corte di cassazione, civil (`snciv`), no. 5628 of 2022 — Sez. U, Ordinanza, 14 pages (the
+  dispositivo is headed «PQM.»).
+
+To fetch them again (plan `2026-10-05-norms-decisions-search`, Task 2, Step 1): GET the archive's
+homepage `https://www.italgiure.giustizia.it/sncass/` first, then a Solr query on `sn.solr` for
+`kind:"snciv" AND numdec:<numero> AND anno:<anno>` with `fl=*`; the PDF is at
+`https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll?verbo=attach&db=snciv&id=<filename with ".pdf" replaced by ".clean.pdf">`,
+in the same session. At least 2.5 s between requests. Read each file for a natural person's name
+before relying on it; never copy any of it into a committed file.
+
+`italgiure_index_2043_cc.json`: `kind:"snciv" AND rnc-gen:"CC" AND rnc-art:"2043 00"`,
+`sort=pd desc`, `fl=id,numdec,anno,datdep,kind,tipoprov,szdec,rnc-gen,rnc-art,rnc-sp,rnc-num,
+rnc-dat` — `numFound` 3,904 that day; the first five of that exact query (sliced from a
+`rows=100` read of the same query, used to measure the false-match rate; a `rows=5` request
+returns the same first five, since the sort is deterministic). No party's text is in this file:
+it is the index's own coordinate fields, nothing else.
