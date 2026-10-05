@@ -695,13 +695,24 @@ PDF (one more request, about 200 KB), and makes the text from the PDF:
    and bottom bands of every page, page numbers («2», «-2-», «Pag. 2») and lines
    that repeat on several pages once their digits are ignored (the running
    footer); unmapped glyphs («(cid:N)»).
-2. **Lines.** The pieces of one baseline are one line, left to right; runs of
-   spaces become one space.
-3. **Paragraphs.** A line indented from the body's left edge, or after a
-   vertical gap, starts a paragraph; a centred heading («RILEVATO CHE»,
-   «FATTI DI CAUSA», «P.Q.M.») is a paragraph of its own. Paragraphs are
-   separated by a blank line; the lines of a paragraph are joined by one space,
-   or by nothing after a line ending in «-» (the hyphen is kept: «Lazare-David»).
+2. **Lines.** The pieces of one baseline (within 3 pt of the first piece's y, or with
+   overlapping vertical extents when both boxes are at most 15 pt tall; never a
+   fixed grid) are one line, left to right; runs of spaces become one space. The
+   page-number and running-footer patterns also match a footer preceded by its page
+   number, and a repeated band line counts as a footer only when it sits at the same
+   height (within 6 pt) on at least two pages.
+3. **Paragraphs.** The body's left edge is read per page (the most common x0; a page
+   where no x0 occurs three times takes the document's). A line indented more than 8 pt
+   from it, an outdented numbered point («7. …», the number left of the body), or a line
+   more than 30 pt below the previous one starts a paragraph; an outdented line that is
+   not a numbered point does not. A short line (at most 60 characters) indented more than
+   40 pt, centred («RILEVATO CHE», «FATTI DI CAUSA», «P.Q.M.») or right-aligned
+   («- intimati -»), is a paragraph of its own: the next line starts one. A short line
+   whose left edge lies beyond the page's mirrored right margin is scan debris and is
+   dropped. Paragraphs are separated by a blank line; the lines of a paragraph are
+   joined by one space, or by nothing after a line ending in «-» when the character
+   before that «-» is a letter (a word broken at its hyphen: «Emilia-Romagna»); after a
+   spaced dash («CORTE DEI CONTI -») they are joined by one space.
 4. **Blocks.** Everything before the last paragraph that is «P.Q.M.» is the
    motivazione; from it on, the dispositivo — the same blocks the page shows
    today.

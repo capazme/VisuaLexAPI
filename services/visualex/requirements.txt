@@ -10,6 +10,9 @@ redis>=5.0
 pyyaml>=6.0
 lxml>=5.0
 hypercorn
+# Pinned to the version Task 2 (2026-10-05) measured Cassazione PDFs against — a later
+# release could re-wrap or re-space the text layer, moving every note anchored to it.
+pdfminer.six==20260107
 # Imported by visualex_api/tools/tls.py (the bundle the Italgiure context is built on).
 # The floor drops the compromised GLOBALTRUST root (CVE-2024-39689).
 certifi>=2024.7.4
