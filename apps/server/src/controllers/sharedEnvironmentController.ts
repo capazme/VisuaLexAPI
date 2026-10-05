@@ -3,6 +3,7 @@ import { Prisma, EnvironmentCategory, ReportReason } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
+import { dossierItemFromEntry, type EntryItem } from '../utils/suggestionEntries';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -1112,21 +1113,20 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
               },
             });
           case 'dossier': {
-            const entries = Array.isArray(payload.entries) ? payload.entries : [];
+            const entries: unknown[] = Array.isArray(payload.entries) ? payload.entries : [];
+            const items = entries.map((e, idx) => dossierItemFromEntry(e, idx));
+            const unreadable = items.filter((i) => i === null).length;
+            if (unreadable > 0) {
+              // Nothing partial: the transaction rolls back and the item stays pending.
+              throw new AppError(400, `La proposta contiene ${unreadable} voci non valide: non è stata applicata`);
+            }
             return tx.dossier.create({
               data: {
                 userId: req.user!.id,
                 name: payload.title,
                 description: payload.description,
                 ...attribution,
-                items: {
-                  create: entries.map((e: any, idx: number) => ({
-                    itemType: e.articleRef ? 'norm' : 'note',
-                    title: e.articleRef?.label ?? e.note?.slice(0, 60) ?? `Item ${idx + 1}`,
-                    content: e,
-                    position: idx,
-                  })),
-                },
+                items: { create: items as EntryItem[] },
               },
               include: { items: true },
             });
