@@ -367,6 +367,26 @@ Duplicating any of these is a defect, not a shortcut.
   `api.ts`'s single in-flight refresh) because the production ingress refuses those calls
   without one, and it returns fetch's own `Response`, so the NDJSON stream and the PDF
   work as before. `/version` and `/health` are the two that stay open.
+- `utils/decisionLinks.ts` — the addresses of court decisions (`decisionPath`,
+  `parseDecisionPath`, `decisionKey`) and their names (`formatDecisionHeading`,
+  `formatDecisionCitation`, pinned to `conventions/sources/golden.json`). The paths
+  `/sentenze/<corte>/<numero>/<anno>` are a contract with LibreLex and the MERL-T graph: never
+  rename them (spec `docs/superpowers/specs/2026-10-01-sentenze-design.md`). Its first block is
+  shared with the Massimario panel (`linkableDecisionPath`); `httpsUrl` keeps a source link to
+  https only.
+- `services/decisionService.ts` — `fetchDecision(reference)`: `POST /fetch_decision` through
+  `legalFetch`. Only the route's six `esito` values are read as its answer: a quota refusal, or
+  any other body (the rate limit's, the login gate's, a framework page), is "fonte non
+  raggiungibile", and `errore_interno` a generic error; neither is ever "non trovata".
+- `utils/decisionText.ts` + `features/decisions/DecisionTextView.tsx` — a decision's text, one
+  span per line: the text nodes spell the received text minus `\n` (the same contract as
+  gotcha 23), labels and the space between lines come from CSS, and a copy is composed by
+  `decisionClipboardText` so it reads as the page does. An epigrafe without a motivazione is
+  labelled «Testo» (the owner's decision); a decision found without its text draws no block
+  (`hasDecisionText`).
+- `utils/returnTo.ts` — where the login sends the reader back: router state or the
+  sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
+  URL parameter; a logout forgets it.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
   `findLiveBackIndex` for citation-jump undo.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
