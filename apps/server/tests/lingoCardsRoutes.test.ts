@@ -116,6 +116,19 @@ describe('the study-card routes', () => {
     expect((await create(authHeader(alice), [{ ...CARD, ancore: [] }])).status).toBe(400);
   });
 
+  it('checks at most 20 references a call, and charges each one like the dossier’s norms (security review of 89de00d2)', async () => {
+    const many = Array.from({ length: 21 }, (_, i) => ({ riferimento: `art. ${1400 + i} c.c.` }));
+    const tooMany = await create(authHeader(alice), [{ ...CARD, ancore: many.slice(0, 10) }, { ...CARD, ancore: many.slice(10, 20) }, { ...CARD, ancore: many.slice(20) }]);
+    expect(tooMany.status).toBe(400);
+    const write = await delegated(alice, 'lingo:cards:write');
+    const reader = await delegated(alice, 'dossier:read');
+    const quota = async () => (await request(app).get('/api/oauth/quota').set(reader)).body.points.remaining;
+    const before = await quota();
+    await create(write, [{ ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }, { riferimento: 'art. 1455 c.c.' }, { riferimento: 'art. 1453 c.c.' }] }]);
+    // Two distinct references, two points each.
+    expect(before - (await quota())).toBe(4);
+  });
+
   it('lists and reads only the user’s own cards', async () => {
     const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
     const bob = await createTestUser('cards-bob');

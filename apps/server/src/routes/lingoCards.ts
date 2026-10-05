@@ -25,6 +25,8 @@ const router = Router();
 router.use(authenticate);
 
 export const MAX_CARDS_PER_CALL = 10;
+/** Distinct anchor references checked against the sources in one call, as a cost cap (each one is fetched). */
+export const MAX_REFERENCES_PER_CALL = 20;
 
 const anchorReferenceSchema = z
   .object({ riferimento: z.string().trim().min(1).max(200), principale: z.boolean().optional() })
@@ -33,7 +35,12 @@ const cardInputSchema = lingoCardCreateSchema
   .omit({ ancore: true })
   .extend({ ancore: z.array(anchorReferenceSchema).min(1).max(MAX_ANCHORS_PER_CARD) })
   .strict();
-const createSchema = z.object({ cards: z.array(cardInputSchema).min(1).max(MAX_CARDS_PER_CALL) }).strict();
+const createSchema = z
+  .object({ cards: z.array(cardInputSchema).min(1).max(MAX_CARDS_PER_CALL) })
+  .strict()
+  .refine((body) => new Set(body.cards.flatMap((card) => card.ancore.map((a) => a.riferimento))).size <= MAX_REFERENCES_PER_CALL, {
+    message: `Al massimo ${MAX_REFERENCES_PER_CALL} riferimenti diversi per chiamata.`,
+  });
 const listSchema = z.object({
   materia: z.nativeEnum(LingoMateria).optional(),
   stato: z.nativeEnum(LingoCardStato).optional(),
@@ -80,8 +87,9 @@ router.post('/', async (req, res) => {
     });
     results.push({ outcome: 'created' as const, id: created.id });
   }
-  // Under an exchanged token each card costs two points; a refused one is handed back.
-  res.locals.delegatedRefund = results.filter((r) => r.outcome === 'refused').length * 2;
+  // Under an exchanged token each distinct reference costs two points, as on the dossier's norms
+  // route; one the sources could not check is handed back.
+  res.locals.delegatedRefund = [...outcomes.values()].filter((o) => o.outcome === 'unavailable').length * 2;
   res.json({ results });
 });
 
