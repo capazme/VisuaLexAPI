@@ -101,7 +101,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `aboutItemId` the note is about a norm entry of the same dossier as a whole
   (`about_item_id`, no foreign key), never a passage of its text (root rule 23).
   A note moved to another dossier loses its `about_item_id`; a client treats one
-  that points outside its dossier as a plain note.
+  that points outside its dossier as a plain note. `PUT /api/dossiers/:id/items/:itemId`
+  `{ aboutItemId: id | null }` reattaches or detaches a note (only a note; user
+  session only, the route is not in the delegated table): the web app's undo
+  restores an article with a new id and points its notes at it.
+  `assertArticleOfDossier` is the one check behind both routes.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
   norm as the reader stores it), then existence once per act: the

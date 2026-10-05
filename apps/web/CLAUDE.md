@@ -272,6 +272,30 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   temporary id, while an added or restored item is pending
   (`pendingDossierOrders`). Articles do not drag. The header has three actions
   and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
+- **Notes**: every note a dossier gets from the web takes the notes route
+  (`addNoteToDossier` → `POST /dossiers/:id/notes`), the one Claude's notes take
+  through MCP. A note about an article (`aboutItemId`) sits with it: a count on
+  the closed row, the notes above the text when open, «Aggiungi una nota
+  all'articolo»; a note whose article is no longer in the dossier shows among
+  the free notes. An entry an application wrote carries `ClaudeMark` («scritta
+  da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
+  gives the article a new id: `restoreDossierItem` reattaches its notes at once
+  (`PUT …/items/:noteId {aboutItemId}`, reverted with a sync error if refused);
+  an undone note comes back through the notes route, about its article if the
+  article is still there. It comes back as the user's: no web route sets
+  `created_by`, by design, so Claude's mark does not survive a web undo (the
+  MCP trash, which keeps ids, restores it). The note dialog closes only once
+  the server has the note, so a refused note keeps its text.
+- **The trash** (what a connected application deleted, 30 days; spec §10-11):
+  one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
+  when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
+  «Da «dossier»», «Schede LingoLex» by their first questions) and a dossier's
+  own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
+  entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
+  which dossier to restore into — or emptied behind a danger confirmation; a
+  restore reloads that dossier from the server (`refreshDossier`). The web never
+  moves anything to the trash: its own deletions stay immediate, with an undo.
+  A decision in the trash has no label until the convention's server PR.
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
@@ -419,8 +443,8 @@ Duplicating any of these is a defect, not a shortcut.
   (exact → whitespace-tolerant search → the occurrence whose context agrees;
   never guesses: ambiguous or missing = `detached`).
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
-  `packItemContent`/`unpackItemContent`, `dossierItemFromApi`/`citationsFromApi`
-  (a server item as the store holds it), `computeItemCounts`, `dossierRecency`,
+  `packItemContent`/`unpackItemContent`, `dossierItemFromApi`/`serverFieldsFromApi`
+  (a server item as the store holds it: citations, `aboutItemId`, `createdBy`), `computeItemCounts`, `dossierRecency`,
   `dossierContainsArticle`, `normaForDossier`, `computeNormaGroups`,
   `formatTimestampLong`.
 - `components/features/dossier/dossierLayout.ts` — `layoutDossier`, `actKeyOf`,

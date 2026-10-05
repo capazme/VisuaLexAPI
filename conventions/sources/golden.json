@@ -83,6 +83,13 @@
       "labels": {"citation": {"value": "art. 33, d.lgs. 6 settembre 2005, n. 206", "status": "decided"}, "short": {"value": "art. 33 d.lgs. 206/2005", "status": "decided"}, "act_heading": {"value": "d.lgs. 6 settembre 2005, n. 206", "status": "decided"}}
     },
     {
+      "id": "consumo-33-stored-without-real-type",
+      "note": "The same article as consumo-33, stored as some callers store it: the code's name with its date and number but no tipo_atto_reale. Still cited by the decree it is (decided with the aliased codes, D3), never «codice del consumo 6 settembre 2005, n. 206».",
+      "input": {"tipo_atto": "codice del consumo", "numero_atto": "206", "data": "2005-09-06", "numero_articolo": "33"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2005-09-06;206~art33", "status": "current"}},
+      "labels": {"citation": {"value": "art. 33, d.lgs. 6 settembre 2005, n. 206", "status": "decided"}, "short": {"value": "art. 33 d.lgs. 206/2005", "status": "decided"}}
+    },
+    {
       "id": "dpr-445-2000-38",
       "note": "d.p.r. in lower case, like every act (round «Testo alla data», applied as recommended; the owner: «atto minuscolo»).",
       "input": {"tipo_atto": "decreto del presidente della repubblica", "numero_atto": "445", "data": "2000-12-28", "numero_articolo": "38"},

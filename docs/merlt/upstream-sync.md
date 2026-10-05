@@ -174,7 +174,7 @@ Tutte in `services/merlt/`, già nell'immagine dopo il rebuild. `ALIS_CORE/merlt
 
 - **Retriever.** La lunghezza del path più corto è letta dal livello giusto del dict (`storage/retriever/retriever.py`). Prima ogni path valeva 0. (`af803d9`)
 - **Suffissi degli URN.** In `utils/urn_labels.py` la lista dei suffissi è completa, dalla più lunga alla più corta, con un confine a destra. Prima `2409-terdecies` diventava `2409-ter`. (`af803d9`)
-- **Abbreviazioni dei codici.** Il parser dell'ingestion meccanica usa una tabella esplicita, `_CODE_ABBREVIATIONS` in `pipeline/mechanical_ingestion/parser.py`, al posto delle iniziali: «codice del consumo» non è più «c.c.». (`af803d9`)
+- **Abbreviazioni dei codici.** Il parser dell'ingestion meccanica usa una tabella esplicita, `_CODE_ABBREVIATIONS` in `pipeline/mechanical_ingestion/parser.py`, al posto delle iniziali: «codice del consumo» non è più «c.c.». (`af803d9`) Superata dalla convenzione delle fonti (ottobre 2026): etichette e identità vengono da `merlt/utils/sources.py`, copia della convenzione dell'API fissata al file d'oro `conventions/sources/golden.json`.
 - **Tolleranza ai conflitti.** Un «Art. N» nudo di una Norma stub non è più un `urn_conflict` contro «Art. N c.c.» dell'adapter (`pipeline/mechanical_ingestion/conflict_report.py`). Le scritture di stato dei batch sono condizionali (`api/ingestion_mechanical_router.py`). (`af803d9`, `2a1d1f4`)
 
 **RLCF e Q&A**

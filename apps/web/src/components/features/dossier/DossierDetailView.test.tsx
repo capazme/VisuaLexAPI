@@ -12,6 +12,10 @@ vi.mock('../../../services/dossierService', () => ({
     deleteItem: vi.fn(async () => {}),
     updateItem: vi.fn(async () => ({})),
     reorderItems: vi.fn(async () => {}),
+    addNote: vi.fn(async (_d: string, body: { text: string; aboutItemId?: string }) => ({
+      id: 'srv-note', item_type: 'note', title: 'Nota', content: body.text, position: 9, status: 'unread', created_at: '2026-10-04T12:00:00Z',
+      about_item_id: body.aboutItemId ?? null, created_by: null,
+    })),
   },
 }));
 
@@ -164,5 +168,67 @@ describe('DossierDetailView — decisions', () => {
     await act(async () => { await toast?.onUndo(); });
     expect(dossierService.addItem).toHaveBeenLastCalledWith('d1', expect.objectContaining({ itemType: 'sentenza', title: CITATION }));
     expect(appStore.getState().dossiers[0].items.filter((i) => i.type === 'sentenza')).toHaveLength(1);
+  });
+});
+
+describe('DossierDetailView — notes about an article', () => {
+  it('shows a note about an article with it, not among the free notes', () => {
+    const withNote = structuredClone(dossier);
+    withNote.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Sul primo articolo.', aboutItemId: 'a1', createdBy: { clientName: 'Claude Code' } });
+    appStore.setState({ dossiers: [withNote], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={withNote} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const notes = screen.getByRole('region', { name: /Note \(1\)/ });
+    expect(within(notes).queryByText('Sul primo articolo.')).toBeNull();
+    expect(screen.getByTitle('1 nota')).toBeInTheDocument();
+    expect(screen.getByText(/2 atti · 3 articoli · 2 note/)).toBeInTheDocument();
+  });
+
+  it('writes a note to the dossier through the notes route', async () => {
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Nota' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Testo della nota' }), { target: { value: 'Nuova nota' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    await waitFor(() => expect(dossierService.addNote).toHaveBeenCalledWith('d1', { text: 'Nuova nota' }));
+    await waitFor(() => expect(appStore.getState().dossiers[0].items.some((i) => i.id === 'srv-note')).toBe(true));
+  });
+});
+
+describe('DossierDetailView — search keeps an article and its notes together', () => {
+  const withNote = (): Dossier => {
+    const d = structuredClone(dossier);
+    d.items.push({ id: 'n2', type: 'note', addedAt: '', data: 'Termine di decadenza.', aboutItemId: 'b1' });
+    return d;
+  };
+  it('a note found keeps its article on screen, with the note under it', () => {
+    const d = withNote();
+    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: 'decadenza' } });
+    expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Note \(/ })).toBeNull();
+  });
+  it('the closed row names its notes for a screen reader', () => {
+    const d = withNote();
+    appStore.setState({ dossiers: [d], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: /^Espandi .*articolo 1, 1 nota$/ })).toBeInTheDocument();
+  });
+});
+
+describe('DossierDetailView — what Claude removed from it', () => {
+  it("shows only this dossier's entries, never another dossier's or LingoLex cards", () => {
+    const at = { clientName: 'Claude Code', deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z' };
+    const trash = {
+      entries: [
+        { ...at, id: 'mine', kind: 'DOSSIER_ITEMS' as const, dossierId: 'd1', label: 'Ricorso Rossi', itemCount: 1, items: [{ itemType: 'note', citation: null, actCitation: null }] },
+        { ...at, id: 'other', kind: 'DOSSIER_ITEMS' as const, dossierId: 'd2', label: 'Altro', itemCount: 1, items: [] },
+        { ...at, id: 'cards', kind: 'LINGO_CARDS' as const, dossierId: null, label: 'Schede LingoLex', itemCount: 1, cards: [] },
+      ],
+      error: null, reload: vi.fn(), restore: vi.fn(), purge: vi.fn(),
+    };
+    appStore.setState({ dossiers: [structuredClone(dossier)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={dossier} onBack={() => {}} showToast={() => {}} trash={trash} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: 'Rimossi di recente (1) — ripristina' })).toBeInTheDocument();
   });
 });

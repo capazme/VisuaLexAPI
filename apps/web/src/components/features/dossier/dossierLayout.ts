@@ -27,7 +27,10 @@ export interface ActBlock {
 }
 
 export interface DossierLayout {
+  /** Free notes, and notes whose article is no longer in the dossier. */
   notes: NoteItem[];
+  /** Article item id → the notes about it (MCP second round, `about_item_id`). */
+  attached: Map<string, NoteItem[]>;
   acts: ActBlock[];
   /** «Giurisprudenza»: every `sentenza` item, in stored order, never among the notes. */
   decisions: SentenzaItem[];
@@ -137,8 +140,10 @@ function fallbackHeading(norma: NormaVisitata): string {
 
 export function layoutDossier(items: DossierItem[]): DossierLayout {
   const notes: NoteItem[] = [];
+  const attached = new Map<string, NoteItem[]>();
   const decisions: SentenzaItem[] = [];
   const byKey = new Map<string, NormaItem[]>();
+  const articleIds = new Set(items.filter((i) => i.type === 'norma').map((i) => i.id));
   for (const item of items) {
     switch (item.type) {
       case 'norma': {
@@ -150,9 +155,16 @@ export function layoutDossier(items: DossierItem[]): DossierLayout {
       case 'sentenza':
         decisions.push(item);
         break;
-      case 'note':
-        notes.push(item);
+      case 'note': {
+        // A note about an article still in the dossier sits with it; otherwise it is a free note.
+        if (item.aboutItemId && articleIds.has(item.aboutItemId)) {
+          const list = attached.get(item.aboutItemId);
+          if (list) list.push(item); else attached.set(item.aboutItemId, [item]);
+        } else {
+          notes.push(item);
+        }
         break;
+      }
       default:
         assertNever(item);
     }
@@ -170,7 +182,7 @@ export function layoutDossier(items: DossierItem[]): DossierLayout {
       groups: computeNormaGroups(sorted),
     };
   });
-  return { notes, acts, decisions };
+  return { notes, attached, acts, decisions };
 }
 
 /**

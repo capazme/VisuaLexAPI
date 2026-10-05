@@ -174,6 +174,7 @@ The RQ worker has no lifespan: every task that touches the enrichment DB calls
 | `storage/graph/entity_writer.py`, `relation_endpoints.py` | what consensus writes into FalkorDB; the `user_document` placeholder must never become a node |
 | `pipeline/provisional_writer.py`, `promotion.py`, `hygiene.py` | the graph co-evolution; match nodes by `URN OR node_id OR source_url` |
 | `utils/urn_labels.py` | URN → label, the article-suffix regex (longest-first) |
+| `utils/sources.py` | the source convention as MERL-T holds it: the URN normaliser, a node's `estremi` (`short_norm`, `short_from_urn`), an act's `titolo` (`act_heading`) and `autorita_emanante`, a decision's `estremi` (`decision_short`). A copy of the API's `visualex_api/tools/sources.py` (MERL-T does not import it), pinned by `tests/unit/test_sources_golden.py` to `conventions/sources/golden.json`, as are the copies of `NORMATTIVA_URN_CODICI` (`utils/map.py`) and of the ordinal table (`utils/article_suffixes.py`). `scripts/backfill_source_labels.py` rewrites the graph's labels (dry run by default) |
 | `api/experts_router.py`, `api/enrichment_router.py`, `api/graph_router.py` | the BFF-facing contract; see `docs/merlt/contract-matrix.md` |
 
 ## Running
@@ -252,7 +253,7 @@ that stack's own database, and the tests write rows. The Dockerfile copies
 `tests/` and installs pytest; this works only while
 `services/merlt/.dockerignore` does not exclude `tests/`.
 
-**Two test gotchas:**
+**Test gotchas:**
 
 - `merlt.api` re-exports every router under its module's name.
   `from merlt.api import graph_router` gives you the `APIRouter`, not the
@@ -260,6 +261,10 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   `importlib.import_module("merlt.api.graph_router")`.
 - Tests that pin shared vocabularies (the systemic relation floor, for
   example) must import the source list, not copy it.
+- `tests/unit/test_sources_golden.py` reads `conventions/sources/golden.json`
+  and two of the API's files above `services/merlt`; inside a throwaway
+  container mount `conventions/` and `services/visualex/visualex_api/tools/` at
+  the same place above `/app`, or deselect it by name.
 
 ## Conventions
 

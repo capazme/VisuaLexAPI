@@ -85,6 +85,10 @@ const updateDossierItemSchema = z.object({
   content: z.any().optional(),
   position: z.number().optional(),
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
+  // A note's article (or null to detach it): how the web app reattaches a note
+  // to an article it restored with a new id. User session only: this route is
+  // not in the delegated table, so a connected application cannot move notes.
+  aboutItemId: z.string().min(1).max(64).nullable().optional(),
 });
 
 const moveDossierItemSchema = z.object({
@@ -247,6 +251,16 @@ export const addDossierItem = async (req: Request, res: Response) => {
   res.status(201).json(serializeItem(item));
 };
 
+/**
+ * What a note may be about: an article of the same dossier, as a whole. The one
+ * check behind POST /notes and the PUT that reattaches a note; a new kind of
+ * target (a decision) is added here once.
+ */
+async function assertArticleOfDossier(dossierId: string, itemId: string): Promise<void> {
+  const article = await prisma.dossierItem.findFirst({ where: { id: itemId, dossierId, itemType: 'norm' } });
+  if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questo dossier.');
+}
+
 export const MAX_NOTE_LENGTH = 4000;
 // Plain text: new lines and tabs, nothing else below U+0020.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
@@ -276,10 +290,7 @@ export const addDossierNote = async (req: Request, res: Response) => {
   const dossier = await prisma.dossier.findFirst({ where: { id, userId: req.user!.id } });
   if (!dossier) throw new AppError(404, 'Dossier not found');
 
-  if (aboutItemId) {
-    const article = await prisma.dossierItem.findFirst({ where: { id: aboutItemId, dossierId: id, itemType: 'norm' } });
-    if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questo dossier.');
-  }
+  if (aboutItemId) await assertArticleOfDossier(id, aboutItemId);
 
   const item = await prisma.$transaction(async (tx) => {
     const last = await tx.dossierItem.aggregate({ where: { dossierId: id }, _max: { position: true } });
@@ -316,6 +327,13 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
+  if (data.aboutItemId !== undefined) {
+    const current = await prisma.dossierItem.findFirst({ where: { id: itemId, dossierId: id }, select: { itemType: true } });
+    if (!current) throw new AppError(404, 'Dossier item not found');
+    if (current.itemType !== 'note') throw new AppError(400, 'Solo una nota può riferirsi a un articolo.');
+    if (data.aboutItemId !== null) await assertArticleOfDossier(id, data.aboutItemId);
+  }
+
   let item;
   try {
     item = await prisma.dossierItem.update({
@@ -329,6 +347,7 @@ export const updateDossierItem = async (req: Request, res: Response) => {
         ...(data.content !== undefined && { content: data.content }),
         ...(data.position !== undefined && { position: data.position }),
         ...(data.status !== undefined && { status: data.status }),
+        ...(data.aboutItemId !== undefined && { aboutItemId: data.aboutItemId }),
       },
     });
   } catch (err) {

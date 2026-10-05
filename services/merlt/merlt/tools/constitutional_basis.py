@@ -44,7 +44,7 @@ class ConstitutionalBasis:
 
     Attributes:
         norm: URN della norma costituzionale
-        norm_estremi: Riferimento completo (es. "Art. 3 Cost.")
+        norm_estremi: Riferimento completo (es. "art. 3 Cost.")
         principle: Principio espresso dalla norma
         relation_path: Path di URN dalla norma di partenza alla costituzione
         strength: Tipo di collegamento ("diretta" | "indiretta")
@@ -148,7 +148,7 @@ class ConstitutionalBasisTool(BaseTool):
                 param_type=ParameterType.STRING,
                 description=(
                     "Estremi o chiave-nodo della norma di partenza. "
-                    "Es: 'Art. 1453 c.c.', il numero d'articolo '1453', oppure la "
+                    "Es: 'art. 1453 c.c.', il numero d'articolo '1453', oppure la "
                     "chiave-nodo completa fornita dalle fonti. NON inventare 'urn:norma:...'."
                 )
             ),
@@ -253,13 +253,13 @@ class ConstitutionalBasisTool(BaseTool):
 
         Cerca per:
         - URN completo
-        - Estremi (es. "Art. 1453 c.c.")
+        - Estremi (es. "art. 1453 c.c.", senza distinzione di maiuscole)
         - Numero articolo (es. "1453")
         """
         cypher = """
             MATCH (n)
             WHERE n.URN = $id
-               OR n.estremi = $id
+               OR toLower(n.estremi) = toLower($id)
                OR n.numero_articolo = $id
             RETURN
                 n.URN AS urn,

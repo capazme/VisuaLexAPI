@@ -2219,6 +2219,16 @@ Whole-branch review, then push, PR into `develop`, merge `merge: feat/dossier-by
 
 ### Task 14: «Giurisprudenza»
 
+**Amendment (4 Oct 2026, relayed by the orchestrator from the Sentenze session,
+the owner's decision):** PR C already ships a minimal «Giurisprudenza» list after
+the acts (the citation linking to the decision page), `DossierLayout.decisions`,
+`dossierItemOrder` putting decisions after the acts, a `DossierDecisionsSection`,
+the card's «N sentenze» count, and «Aggiungi al dossier» on the decision page.
+Once PR C is in `develop`, re-read it and cut this task down to what it lacks:
+the row shows `decisionCitationOf(item.data)`, never the stored `etichetta`; the
+reader in place (`DossierDecisionReader`); the PDF's decisions block; the counts
+line (a dossier of decisions alone reads «0 atti · 0 articoli» until then).
+
 **Precondition:** Sentenze PR C merged (`DossierItem` has a `sentenza` member, `DossierSentenzaData` with `etichetta`, `item_type: 'sentenza'` on the server). Re-read its Task 13 code and the Sentenze plan's Task 14 (the parts moved here by the orchestrator: `DossierDecisionReader`, the dossier's decision row, `dossierItemPdfSource`), then amend this task if a name differs.
 
 **Files:**
@@ -2246,6 +2256,15 @@ Whole-branch review, then push, PR into `develop`, merge `merge: feat/dossier-by
 
 ### Task 15: Attached notes, the mark, the composer
 
+**As built (4 Oct 2026):** a server change agreed with the orchestrator: `PUT
+/dossiers/:id/items/:itemId` takes `aboutItemId` (a note only, an article of
+the same dossier or null; user session only), with `assertArticleOfDossier`
+shared with `POST /notes`, so an undone removal reattaches an article's notes to
+its new id. «Aggiungi una nota all'articolo» sits with the article's notes above
+its text rather than in the reader's footer (the notes and the button read
+together). An undone note comes back through the notes route; Claude's mark does
+not survive a web undo, by design (no web route sets `created_by`).
+
 **Precondition:** the MCP second round's PR 1 (`feat/mcp-notes`) merged: `about_item_id` and `created_by: { clientName } | null` on every item in `GET /dossiers` and `GET /dossiers/:id`; `POST /api/dossiers/:id/notes { text, aboutItemId? }` open to the user's session; a note moved to another dossier loses its `about_item_id` (server side: the web only renders what it gets). Re-read the merged route and answers; amend names here if they differ.
 
 **Files:**
@@ -2269,6 +2288,10 @@ Whole-branch review, then push, PR into `develop`, merge `merge: feat/dossier-by
 ## PR 5 — the trash (`feat/dossier-trash`) — after the MCP round's trash
 
 ### Task 16: «Rimossi di recente» and «Cestino»
+
+**Amendment (4 Oct 2026, the owner's choice «Rinviare»):** a decision in the
+trash shows no label until the convention's server PR ports the decision
+citation.
 
 **Precondition:** the MCP second round's trash merged: `GET /api/trash` → `[{ id, kind: 'DOSSIER' | 'DOSSIER_ITEMS' | 'LINGO_CARDS', dossierId, label, itemCount, items?: { itemType, citation, actCitation }[], cards?: { istituto, domanda }[], clientName, deletedAt, expiresAt }]`; `POST /api/trash/:id/restore { targetDossierId? }` (409 when the dossier is gone and no target is given); `DELETE /api/trash/:id`. Re-read the merged routes and amend here if a name differs.
 

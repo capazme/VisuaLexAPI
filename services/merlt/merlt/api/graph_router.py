@@ -517,7 +517,9 @@ _SEARCH_LABEL_SPECS: List[Dict[str, Any]] = [
     },
     {
         "label": "AttoGiudiziario",
-        "match_fields": ["estremi", "massima"],
+        # `organo_emittente` keeps "cassazione" findable now that `estremi` reads
+        # "Cass. civ., …" (source convention).
+        "match_fields": ["estremi", "organo_emittente", "massima"],
         "name_fields": ["estremi"],
         "id_fields": ["node_id"],
         "article_filter_field": None,

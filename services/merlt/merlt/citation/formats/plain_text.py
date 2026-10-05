@@ -25,6 +25,7 @@ from typing import List, Dict, Any, Optional
 
 from merlt.citation.formats.base import BaseFormat
 from merlt.citation.urn_parser import (
+    cite_urn,
     ParsedURN,
     parse_urn,
     format_italian_date,
@@ -63,8 +64,7 @@ class PlainTextFormat(BaseFormat):
         urn = source.get("article_urn", source.get("urn", ""))
 
         if urn:
-            parsed = parse_urn(urn)
-            return self._format_parsed_urn(parsed)
+            return cite_urn(urn) or self._format_parsed_urn(parse_urn(urn))
         else:
             # Fallback: use title or raw text
             title = source.get("title", source.get("text", str(source)))

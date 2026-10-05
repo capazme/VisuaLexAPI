@@ -174,3 +174,43 @@ describe('decisions in the layout', () => {
     expect(dossierItemOrder([s, a, c, b], layout, [layout.acts[1].key, layout.acts[0].key])).toEqual([c.id, b.id, a.id, s.id]);
   });
 });
+
+describe('notes about an article', () => {
+  it("sit with their article; one whose article is gone is a plain note", () => {
+    const a = art({ numero_articolo: '3' }, L247);
+    const about: DossierItem = { id: 'n-a', type: 'note', data: 'Sul dovere', addedAt: '', aboutItemId: a.id };
+    const orphan: DossierItem = { id: 'n-o', type: 'note', data: 'Era su un articolo tolto', addedAt: '', aboutItemId: 'gone' };
+    const plain = note('libera');
+    const layout = layoutDossier([a, about, orphan, plain]);
+    expect(layout.attached.get(a.id)?.map((i) => i.id)).toEqual(['n-a']);
+    expect(layout.notes.map((i) => i.id)).toEqual(['n-o', 'n-libera']);
+    // A drag keeps every item, the attached note included.
+    expect(dossierItemOrder([a, about, orphan, plain], layout, [layout.acts[0].key]).sort()).toEqual([a.id, 'n-a', 'n-libera', 'n-o'].sort());
+  });
+});
+
+describe('every kind of item at once', () => {
+  it('puts each item in exactly one place, and a drag names every item once', () => {
+    const a = art({ numero_articolo: '3' }, L247);
+    const about: DossierItem = { id: 'n-a', type: 'note', data: 'Sul dovere', addedAt: '', aboutItemId: a.id };
+    const plain = note('libera');
+    const s: DossierItem = {
+      id: 's', type: 'sentenza', addedAt: '',
+      data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'Corte cost. n. 1/2014' },
+    };
+    const items = [s, a, about, plain];
+    const layout = layoutDossier(items);
+    const placed = [
+      ...layout.notes.map((i) => i.id),
+      ...[...layout.attached.values()].flat().map((i) => i.id),
+      ...layout.acts.flatMap((act) => act.articles.map((i) => i.id)),
+      ...layout.decisions.map((i) => i.id),
+    ];
+    expect(placed.sort()).toEqual(items.map((i) => i.id).sort());
+    expect(layout.attached.get(a.id)?.map((i) => i.id)).toEqual(['n-a']);
+    expect(layout.decisions.map((i) => i.id)).toEqual(['s']);
+    const order = dossierItemOrder(items, layout, [layout.acts[0].key]);
+    expect(order).toHaveLength(items.length);
+    expect(new Set(order)).toEqual(new Set(items.map((i) => i.id)));
+  });
+});

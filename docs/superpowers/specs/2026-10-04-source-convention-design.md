@@ -322,7 +322,8 @@ Italgiure does not tell sez. V from the tributaria. Lower case, like «art.».
 ### 5.1 Norm nodes
 
 - **Key:** the identity of §1 (unchanged for every well-formed node).
-- `estremi` = the short label (§3.2); `titolo` of an act node = the act heading;
+- `estremi` = the short label (§3.2) for an article, the act citation for an act
+  node that has one; `titolo` of an act node = the act heading;
   `titolo` of an article node is not the extremes (today «Art. 1 costituzione»):
   it is the rubric, or absent.
 - `autorita_emanante` is derived from the type through one table: `legge`,
@@ -443,7 +444,7 @@ rule 23; web gotcha 23).
 | `DossierItem.title` (the act type) | left as it is; every reader shows the derived citation |
 | `QuickNorm.label` | the user's text, untouched; new quick norms are suggested with the short label |
 | `NormaChangeNotification.message` (the raw key) | new messages carry the citation; old ones are already re-labelled from their snapshot (`normaChangeLabel`) |
-| decision dossier item `etichetta` and `title` (Sentenze PR C, not built) | the approved Sentenze design §6 stores the citation as `etichetta` (required) and as `title`. That freezes today's wording into user data: if Q1 or Q2 later changes, every saved decision keeps the old label. **Decided (Q9, 4 October 2026):** keep both fields, since sharing and export need a label without a lookup, but treat them as a cache: readers show `formatDecisionCitation` of the stored identity and attributes, and the stored copy is rewritten on read when it differs. Sentenze §6 is amended accordingly by the Sentenze session |
+| decision dossier item `etichetta` and `title` (Sentenze PR C, not built) | the approved Sentenze design §6 stores the citation as `etichetta` (required) and as `title`. That freezes today's wording into user data: if Q1 or Q2 later changes, every saved decision keeps the old label. **Decided (Q9, 4 October 2026):** keep both fields, since sharing and export need a label without a lookup, but treat them as a cache: readers show `formatDecisionCitation` of the stored identity and attributes. The owner then fixed how the copy is refreshed (4 October, in the Sentenze session): «A ogni scrittura (Raccomandata)» — the stored label is recomputed on every write of the item, and opening a dossier writes nothing; that is the agreed reading of «rewritten on read». Sentenze §6 is amended accordingly by the Sentenze session |
 | graph `estremi`, `titolo`, `autorita_emanante` | recomputed by the backfill (§5.3) |
 
 ## 9. Questions for the owner — answered

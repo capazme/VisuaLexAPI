@@ -75,7 +75,7 @@ class HierarchyNode:
     Attributes:
         urn: URN del nodo
         tipo: Tipo strutturale (`tipo_documento` della Norma: codice, libro, titolo, capo, sezione, articolo)
-        estremi: Riferimento completo (es. "Art. 1453 c.c.")
+        estremi: Riferimento completo (es. "art. 1453 c.c.")
         rubrica: Titolo/rubrica del nodo
         depth: Profondità nella gerarchia (0 = radice)
         order: Posizione tra i siblings
@@ -159,7 +159,7 @@ class HierarchyNavigationTool(BaseTool):
                 param_type=ParameterType.STRING,
                 description=(
                     "URN o estremi del nodo di partenza. "
-                    "Es: 'urn:norma:cc:art1453', 'Art. 1453 c.c.', '1453'"
+                    "Es: 'urn:norma:cc:art1453', 'art. 1453 c.c.', '1453'"
                 )
             ),
             ToolParameter(
@@ -319,14 +319,14 @@ class HierarchyNavigationTool(BaseTool):
 
         Cerca per:
         - URN completo
-        - Estremi (es. "Art. 1453 c.c.")
+        - Estremi (es. "art. 1453 c.c.", senza distinzione di maiuscole)
         - Numero articolo (es. "1453")
         """
         identifier = canonical_urn(identifier)  # the graph's key has no version marker
         cypher = f"""
             MATCH (n)
             WHERE n.URN = $id
-               OR n.estremi = $id
+               OR toLower(n.estremi) = toLower($id)
                OR n.numero_articolo = $id
                OR n.nome = $id
             RETURN

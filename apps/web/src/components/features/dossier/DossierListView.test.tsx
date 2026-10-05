@@ -132,3 +132,15 @@ describe('DossierListView — a card counts its decisions', () => {
     expect(screen.getByText('Pratica Rossi')).toBeInTheDocument();
   });
 });
+
+describe('DossierListView — the trash', () => {
+  it('shows «Cestino (n)» only when the trash holds something', () => {
+    const onOpenTrash = vi.fn();
+    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    const { rerender } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={0} onOpenTrash={onOpenTrash} /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: /Cestino/ })).toBeNull();
+    rerender(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={2} onOpenTrash={onOpenTrash} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Cestino (2)' }));
+    expect(onOpenTrash).toHaveBeenCalledTimes(1);
+  });
+});

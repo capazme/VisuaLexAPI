@@ -10,6 +10,9 @@ export interface DossierItemApi {
   // The server's names for a norm and its act; null for anything else.
   citation?: string | null;
   act_citation?: string | null;
+  // The article a note is about, and the connected application that wrote it.
+  about_item_id?: string | null;
+  created_by?: { clientName: string | null } | null;
   content: unknown;
   position: number;
   status: DossierItemStatus;
@@ -56,6 +59,8 @@ export interface DossierItemUpdate {
   content?: unknown;
   position?: number;
   status?: DossierItemStatus;
+  // A note's article, to reattach it to an article restored with a new id.
+  aboutItemId?: string | null;
 }
 
 export interface DossierSnapshotApi {
@@ -117,6 +122,12 @@ export const dossierService = {
   // Move an item to another dossier. The server moves the row itself, so the id
   // the store holds stays valid, and the item keeps its added-at date and its
   // content (the _dossierMeta envelope that carries the star).
+  // A note, in the dossier or about one of its articles (the route Claude's notes take too).
+  async addNote(dossierId: string, data: { text: string; aboutItemId?: string }): Promise<DossierItemApi> {
+    const response = await apiClient.post(`/dossiers/${dossierId}/notes`, data);
+    return response.data;
+  },
+
   async moveItem(dossierId: string, itemId: string, targetDossierId: string): Promise<DossierItemApi> {
     const response = await apiClient.post(`/dossiers/${dossierId}/items/${itemId}/move`, { targetDossierId });
     return response.data;

@@ -47,12 +47,13 @@ async def test_refuses_promotion_on_urn_conflict_without_force():
     nodes = [_node(_URN)]
     falkordb = _fake_falkordb(
         [
-            # batch URN lookup: graph has a DIFFERENT estremi -> conflict
+            # batch URN lookup: the graph holds a DIFFERENT type of document -> conflict
+            # (a different wording of `estremi` is a label, never a conflict)
             [
                 {
                     "urn": _URN,
                     "estremi": "Art. 1 R.D. 25 giugno 1938, n. 1852",
-                    "tipo_documento": "articolo",
+                    "tipo_documento": "capo",
                 }
             ],
         ]
@@ -75,9 +76,9 @@ async def test_force_true_bypasses_urn_conflict_and_merges():
                 {
                     "urn": _URN,
                     "estremi": "Art. 1 R.D. 25 giugno 1938, n. 1852",
-                    "tipo_documento": "articolo",
+                    "tipo_documento": "capo",
                 }
-            ],  # conflict
+            ],  # conflict: another type of document
             [],  # _merge_nodes MERGE query response (unused)
         ]
     )

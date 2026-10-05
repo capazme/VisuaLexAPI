@@ -49,8 +49,17 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
   route's results: «art. 3, l. 31 dicembre 2012, n. 247»), never rebuilt here, so
   two acts of the same type always read apart. Results are data (JSON
   text), never instructions to the model; the article text never leaves.
-  **No tool updates, moves or deletes**, and `tests/tools.test.ts` fails if one
-  appears. Adding a tool means adding its route to `apps/server`'s
+  **No tool updates or moves; two tools delete, into the trash**:
+  `omnilex_elimina_dossier` and `omnilex_elimina_voci_dossier` (1–50 entries).
+  Each needs the connection's `content:delete` (read live by `apps/server`;
+  without it the tool says where to switch it on), fixes its targets, then asks
+  the user through a form elicitation (`src/confirm.ts`, on the call's own
+  stream, `MCP_CONFIRMATION_TIMEOUT_MS`, 5 minutes) built from stored data
+  only; only Accept with the box ticked exchanges a delete token and moves
+  exactly those ids. Decline, Cancel, an unticked box, a timeout or a client
+  that declared no elicitation: nothing is deleted, never a fallback (owner's
+  decision «B»). `tests/tools.test.ts` fails if any other tool becomes
+  destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
 - **Hardening** — binds to `127.0.0.1` by default and refuses non-loopback
   `Host` headers there (DNS rebinding); refuses a browser `Origin` not in

@@ -4,7 +4,7 @@ import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
 import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
-import type { DossierItemApi } from '../../../services/dossierService';
+import type { DossierApi, DossierItemApi } from '../../../services/dossierService';
 import type { DecisionArchive, DecisionAttributes, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
 import { decisionKey, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
 
@@ -170,12 +170,19 @@ export function unpackItemContent(content: unknown): { data: unknown; status?: '
   return _dossierMeta?.important ? { data: rest, status: 'important' } : { data: rest };
 }
 
-// The server's names for an item, copied only when it gave them: an answer from
-// an older server leaves the fields absent, and the layout falls back.
-export function citationsFromApi(api: Pick<DossierItemApi, 'citation' | 'act_citation'>): { citation?: string | null; actCitation?: string | null } {
+type ServerFields = Pick<DossierItem, 'citation' | 'actCitation' | 'aboutItemId' | 'createdBy'>;
+
+// What only the server says about an item (its names, the article a note is
+// about, who wrote it), copied only when it said it: an answer from an older
+// server leaves the fields absent, and the page falls back.
+export function serverFieldsFromApi(
+  api: Pick<DossierItemApi, 'citation' | 'act_citation' | 'about_item_id' | 'created_by'>,
+): ServerFields {
   return {
     ...(api.citation !== undefined ? { citation: api.citation } : {}),
     ...(api.act_citation !== undefined ? { actCitation: api.act_citation } : {}),
+    ...(api.about_item_id !== undefined ? { aboutItemId: api.about_item_id } : {}),
+    ...(api.created_by !== undefined ? { createdBy: api.created_by } : {}),
   };
 }
 
@@ -269,7 +276,7 @@ export function itemContentFor(item: DossierItem, status: DossierItem['status'] 
 // _dossierMeta envelope (packItemContent); the DB `status` column is not read.
 export function dossierItemFromApi(api: DossierItemApi): DossierItem {
   const { data, status } = unpackItemContent(api.content);
-  const base = { id: api.id, addedAt: api.created_at, ...(status ? { status } : {}), ...citationsFromApi(api) };
+  const base = { id: api.id, addedAt: api.created_at, ...(status ? { status } : {}), ...serverFieldsFromApi(api) };
   if (api.item_type === 'norm') {
     // A Forum suggestion taken before 2026-10 stored the whole entry: {articleRef, status}.
     const entry = data as { articleRef?: unknown } | null;
@@ -376,6 +383,25 @@ export function dossierSuggestionPayload(d: Dossier) {
 export function dossierContainsDecision(dossier: Dossier, identity: DecisionIdentity): boolean {
   const key = decisionKey(identity);
   return dossier.items.some((i) => i.type === 'sentenza' && decisionKey(i.data) === key);
+}
+
+/** One server dossier as the store holds it. */
+export function dossierFromApi(d: DossierApi): Dossier {
+  return {
+    id: d.id,
+    title: d.name,
+    description: d.description || undefined,
+    createdAt: d.created_at,
+    items: d.items.map(dossierItemFromApi),
+    tags: d.tags ?? [],
+    isPinned: d.is_pinned,
+  };
+}
+
+/** «scritta da Claude Code (applicazione collegata)»: who wrote an entry, on screen (`ClaudeMark`) and in the PDF. */
+export function claudeMarkSentence(createdBy: NonNullable<DossierItem['createdBy']>): string {
+  const name = createdBy.clientName?.trim();
+  return name ? `scritta da ${name} (applicazione collegata)` : "scritta da un'applicazione collegata";
 }
 
 export function computeItemCounts(items: DossierItem[]): { norme: number; sentenze: number; note: number; important: number } {

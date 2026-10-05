@@ -16,7 +16,7 @@ import { normalizeArticleId } from '../utils/treeUtils';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
-import { dossierService, type DossierApi, type DossierItemApi } from '../services/dossierService';
+import { dossierService, type DossierItemApi } from '../services/dossierService';
 import { annotationService } from '../services/annotationService';
 import { highlightService } from '../services/highlightService';
 import { environmentService, type EnvironmentApi, type EnvironmentCreatePayload } from '../services/environmentService';
@@ -32,7 +32,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
-import { citationsFromApi, dossierItemFromApi, itemContentFor, serverItemFor, validateImportedDossier } from '../components/features/dossier/dossierUtils';
+import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor, validateImportedDossier } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -404,6 +404,10 @@ interface AppState {
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     setDossierItemOrder: (dossierId: string, itemIds: string[]) => void;
+    /** Reads one dossier again from the server (after a restore from the trash): replaces it, or adds it when it came back whole. */
+    refreshDossier: (dossierId: string) => Promise<void>;
+    /** A note through the notes route, about one article when `aboutItemId` is given; true once the server has it. */
+    addNoteToDossier: (dossierId: string, text: string, aboutItemId?: string) => Promise<boolean>;
     /** Saves a dossier's waiting order once none of its items is pending (see `pendingDossierOrders`). */
     flushDossierOrder: (dossierId: string) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
@@ -607,15 +611,7 @@ const appStore = createStore<AppState>()(
                     }));
 
                     // Transform API dossiers to local format
-                    const dossiers: Dossier[] = dossiersRes.map((d: DossierApi) => ({
-                        id: d.id,
-                        title: d.name,
-                        description: d.description || undefined,
-                        createdAt: d.created_at,
-                        items: d.items.map(dossierItemFromApi),
-                        tags: d.tags ?? [],
-                        isPinned: d.is_pinned,
-                    }));
+                    const dossiers: Dossier[] = dossiersRes.map(dossierFromApi);
 
                     const environments: Environment[] = environmentsRes.map(environmentApiToStore);
                     const quickNorms: QuickNorm[] = quickNormsRes.map(quickNormApiToStore);
@@ -1514,7 +1510,7 @@ const appStore = createStore<AppState>()(
                         const item = dossier?.items.find(i => i.id === tempId);
                         if (item) {
                             item.id = created.id;
-                            Object.assign(item, citationsFromApi(created));
+                            Object.assign(item, serverFieldsFromApi(created));
                         }
                         delete state.pendingDossierItemIds[tempId];
                     });
@@ -1622,16 +1618,36 @@ const appStore = createStore<AppState>()(
                     state.pendingDossierItemIds[localId] = true;
                     state.pendingDossierOrders[dossierId] = true;
                 });
-                dossierService.addItem(dossierId, {
-                    ...serverItemFor(item),
-                    content: itemContentFor(item),
-                }).then(created => {
+                // A note comes back through the notes route, still about its
+                // article when the article is still here. The mark of the
+                // application that wrote it cannot come back: no web route sets it.
+                // A norm or a decision comes back as itself, its label recomputed (Q9).
+                const articleStillHere = item.type === 'note' && !!item.aboutItemId
+                    && !!get().dossiers.find(d => d.id === dossierId)?.items.some(i => i.id === item.aboutItemId && i.type === 'norma');
+                const recreate = item.type === 'note'
+                    ? dossierService.addNote(dossierId, { text: item.data, ...(articleStillHere && item.aboutItemId ? { aboutItemId: item.aboutItemId } : {}) })
+                    : dossierService.addItem(dossierId, {
+                        ...serverItemFor(item),
+                        content: itemContentFor(item),
+                    });
+                recreate.then(created => {
+                    // The notes about a restored article still name its old id:
+                    // point them at the new one at once, then tell the server.
+                    const reattached: string[] = [];
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
                         const restored = dossier?.items.find(i => i.id === localId);
                         if (restored) {
                             restored.id = created.id;
-                            Object.assign(restored, citationsFromApi(created));
+                            Object.assign(restored, serverFieldsFromApi(created));
+                        }
+                        if (item.type === 'norma') {
+                            dossier?.items.forEach((i) => {
+                                if (i.type === 'note' && i.aboutItemId === localId) {
+                                    i.aboutItemId = created.id;
+                                    reattached.push(i.id);
+                                }
+                            });
                         }
                         delete state.pendingDossierItemIds[localId];
                     });
@@ -1643,6 +1659,17 @@ const appStore = createStore<AppState>()(
                             content: itemContentFor(settled),
                         }).catch(err => console.error('Failed to persist the star of a restored item:', err));
                     }
+                    reattached.forEach((noteId) => {
+                        dossierService.updateItem(dossierId, noteId, { aboutItemId: created.id }).catch(err => {
+                            console.error('Failed to reattach a note to its restored article:', err);
+                            // Back to what the server still says (gotcha 17), and say so.
+                            set((state) => {
+                                const n = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === noteId);
+                                if (n && n.aboutItemId === created.id) n.aboutItemId = localId;
+                            });
+                            get().pushSyncError('Impossibile ricollegare la nota al suo articolo. Riprova.');
+                        });
+                    });
                     get().flushDossierOrder(dossierId);
                 }).catch(err => {
                     console.error('Failed to restore item on server:', err);
@@ -1695,6 +1722,49 @@ const appStore = createStore<AppState>()(
                     });
                     get().pushSyncError('Impossibile salvare il nuovo ordine degli atti. Riprova.');
                 });
+            },
+
+            refreshDossier: async (dossierId) => {
+                try {
+                    const fresh = dossierFromApi(await dossierService.getById(dossierId));
+                    set((state) => {
+                        const index = state.dossiers.findIndex(d => d.id === dossierId);
+                        if (index < 0) {
+                            state.dossiers.unshift(fresh);
+                            return;
+                        }
+                        const local = state.dossiers[index];
+                        // An add, an undo or an order still on its way would be lost
+                        // by a wholesale replace: then only what came back is added
+                        // (a restore keeps its ids and is appended on the server too).
+                        const busy = !!state.pendingDossierOrders[dossierId]
+                            || local.items.some(i => state.pendingDossierItemIds[i.id]);
+                        if (!busy) {
+                            state.dossiers[index] = fresh;
+                            return;
+                        }
+                        const known = new Set(local.items.map(i => i.id));
+                        local.items.push(...fresh.items.filter(i => !known.has(i.id)));
+                    });
+                } catch (err) {
+                    console.error('Failed to reload the dossier:', dossierId, err);
+                    get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
+                }
+            },
+
+            // Server first (gotcha 17): a note has no optimistic window to undo.
+            addNoteToDossier: async (dossierId, text, aboutItemId) => {
+                try {
+                    const created = await dossierService.addNote(dossierId, { text, ...(aboutItemId ? { aboutItemId } : {}) });
+                    set((state) => {
+                        state.dossiers.find(d => d.id === dossierId)?.items.push(dossierItemFromApi(created));
+                    });
+                    return true;
+                } catch (err) {
+                    console.error('Failed to add a note to the dossier:', err);
+                    get().pushSyncError('Impossibile salvare la nota. Riprova.');
+                    return false;
+                }
             },
 
             flushDossierOrder: (dossierId) => {
@@ -1852,7 +1922,7 @@ const appStore = createStore<AppState>()(
                             ...r.value.original,
                             id: r.value.serverItem.id,
                             addedAt: r.value.serverItem.created_at,
-                            ...citationsFromApi(r.value.serverItem),
+                            ...serverFieldsFromApi(r.value.serverItem),
                         }));
 
                     const failedCount = itemResults.filter((r) => r.status === 'rejected').length;

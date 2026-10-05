@@ -167,11 +167,12 @@ def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
     if kind in _EU:
         year = date[:4]
         return (f"{_EU[kind]} {year}/{number}" if number and year.isdigit() else _EU[kind]), ", "
-    if not (real or number or date):
-        # An act the codes table names (the regulation of the c.p.i.): cited by its decree.
+    if not real:
+        # An act the codes table names (an aliased code, the regulation of the c.p.i.): cited by
+        # its decree, with the table's date and number where the norm carries none.
         details = extract_codice_details(_text(norm, "tipo_atto"))
         if details:
-            real, date, number = details["tipo_atto_reale"], details["data"], details["numero_atto"]
+            real, date, number = details["tipo_atto_reale"], date or details["data"], number or details["numero_atto"]
     real_key = _key(real) or kind
     act = _TYPES.get(real_key, real_key)
     day = _day(date)

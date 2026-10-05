@@ -29,6 +29,10 @@ export interface DossierActBlockProps {
   onRemoveItem: (item: DossierItem) => void;
   onToggleImportant: (item: DossierItem) => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  /** Article item id → the notes about it. */
+  attachedNotes?: Map<string, Extract<DossierItem, { type: 'note' }>[]>;
+  onAddNote?: (item: DossierItem) => void;
+  onRemoveNote?: (note: DossierItem) => void;
 }
 
 const ACTION_BUTTON =
@@ -148,6 +152,9 @@ export function DossierActBlock(props: DossierActBlockProps) {
               onRemove={() => props.onRemoveItem(item)}
               onToggleImportant={() => props.onToggleImportant(item)}
               showToast={props.showToast}
+              notes={props.attachedNotes?.get(item.id)}
+              onAddNote={props.onAddNote ? () => props.onAddNote?.(item) : undefined}
+              onRemoveNote={props.onRemoveNote}
             />
           ))}
         </div>

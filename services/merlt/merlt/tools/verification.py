@@ -310,7 +310,7 @@ class VerificationTool(BaseTool):
             MATCH (n{type_filter})
             WHERE (n.URN = $source_id
                OR n.nome = $source_id
-               OR n.estremi = $source_id
+               OR toLower(n.estremi) = toLower($source_id)
                OR n.numero_articolo = $source_id) {type_clause}
             RETURN {node_type_cypher('n')} AS node_type, n.URN AS urn
             LIMIT 1

@@ -298,6 +298,10 @@ interface DossierItemBase {
     // app's citation style; null for anything but a norm, absent before the server answered.
     citation?: string | null;
     actCitation?: string | null;
+    // A note about one article of the dossier as a whole (MCP second round): its id.
+    aboutItemId?: string | null;
+    // The connected application that wrote it (through MCP); null for the user.
+    createdBy?: { clientName: string | null } | null;
 }
 
 export type DossierItem =

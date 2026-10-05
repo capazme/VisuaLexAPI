@@ -77,3 +77,14 @@ describe('decisions in the PDF', () => {
     expect(texts.has('s')).toBe(false);
   });
 });
+
+describe('buildPdfBlocks — notes', () => {
+  it("prints an article's notes under it, and says who wrote a note", () => {
+    const about: DossierItem = { id: 'na', type: 'note', addedAt: '', data: 'Sul dovere.', aboutItemId: 'a3', createdBy: { clientName: 'Claude Code' } };
+    const free: DossierItem = { id: 'nf', type: 'note', addedAt: '', data: 'Libera.' };
+    const blocks = buildPdfBlocks([a3, about, free], new Map([['a3', { text: 'tre' }]]), new Map());
+    expect(blocks[0]).toEqual({ kind: 'notes', notes: ['Libera.'] });
+    const act = blocks[1] as Extract<PdfBlock, { kind: 'act' }>;
+    expect(act.articles[0].notes).toEqual(['Sul dovere. (scritta da Claude Code (applicazione collegata))']);
+  });
+});

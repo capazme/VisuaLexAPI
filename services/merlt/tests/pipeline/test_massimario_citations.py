@@ -30,7 +30,7 @@ class TestCivil:
         d = only("In tema di danno, Sez. U, n. 13319/2024, Rossi, Rv. 671516-02, ha affermato")
         assert d.identity.key == "cassazione:civile:13319:2024"
         assert (d.sezione, d.relatore, d.rv, d.forma) == ("U", "Rossi", ["671516-02"], "slash")
-        assert d.label == "Sez. U, n. 13319/2024 · Rv. 671516-02"
+        assert d.label == "Cass. civ., sez. un., n. 13319/2024 · Rv. 671516-02"  # D2, 4 Oct 2026
 
     def test_leading_zeros_and_no_rapporteur(self):
         d = only("un passato indirizzo (Sez. 1, n. 04912/2017, Rv. 644441-01), a dire")
@@ -126,7 +126,7 @@ class TestImplicitYear:
     def test_outside_the_range_is_a_reference_without_identity(self):
         d = only("con le pronunzie Sez. 3, n. 2103 (Rv. 599999) e", year=2012)
         assert d.identity is None and d.motivo_senza_identita == "anno_non_verificato"
-        assert d.anno is None and d.label == "Sez. 3, n. 2103 · Rv. 599999"
+        assert d.anno is None and d.label == "Cass. civ., sez. III, n. 2103 · Rv. 599999"
 
     def test_without_bands_nothing_is_assumed(self):
         d = only("Sez. 3, n. 2103 (Rv. 621670)", year=2012, bands=None)
