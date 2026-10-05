@@ -52,6 +52,7 @@ const SCHEMA_TEXT = [
   '- domanda (obbligatoria, fino a 2.000 caratteri) e risposta (obbligatoria, fino a 4.000);',
   '- spiegazione (facoltativa, fino a 8.000);',
   '- ancore (da 1 a 10): gli articoli su cui la scheda si fonda.',
+  'In una chiamata: da 1 a 10 schede, e al massimo 20 riferimenti diversi per chiamata tra tutte le ancore.',
   '',
   'Le ancore si scrivono come riferimenti a parole, uno per articolo: «art. 1453 c.c.», «art. 2 l. 241/1990». ',
   'VisuaLex li riconosce, verifica che l’articolo esista e lo ancora con il suo codice URN ufficiale e l’impronta del testo: ',

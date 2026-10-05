@@ -98,7 +98,7 @@ export function canAsk(server: McpServer): boolean {
  * Asks the user, through the client, to confirm (a form elicitation, spec §4.1).
  * The question travels on the tool call's own stream (`relatedRequestId`).
  * Only an explicit Accept with the box ticked confirms; Decline, Cancel, a
- * timeout or a failure are 'timeout' or 'failed'; an unticked box is 'declined'. A client that did
+ * Decline, Cancel and an unticked box are 'declined'; a timeout is 'timeout'; any other failure 'failed'. A client that did
  * not declare elicitation is 'unsupported' — never a fallback.
  */
 export async function confirmWithUser(

@@ -64,6 +64,8 @@ describe('lingolex_schema_card', () => {
     expect(text(result)).toMatch(/riferiment/i);
     expect(text(result)).toMatch(/bozz/i);
     expect(text(result)).toMatch(/DIRITTO_CIVILE/);
+    // The server's cap, so the model meets it in the instructions and not as a 400 (code review of PR 5, CR10).
+    expect(text(result)).toMatch(/al massimo 20 riferimenti diversi per chiamata/);
     expect(env.stub.apiCalls).toEqual([]);
     await client.close();
   });
