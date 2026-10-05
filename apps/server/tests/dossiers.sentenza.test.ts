@@ -35,6 +35,11 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     ['a label too long', { ...SENTENZA, etichetta: 'x'.repeat(201) }],
     ['a Corte costituzionale decision with a section',
       { corte: 'corte_costituzionale', numero: 1, anno: 2014, sezione: '3', etichetta: 'Corte cost. n. 1/2014' }],
+    ['a Corte costituzionale decision before 1956',
+      { corte: 'corte_costituzionale', numero: 1, anno: 1955, etichetta: 'Corte cost. n. 1/1955' }],
+    ['a Corte costituzionale decision with an archive',
+      { corte: 'corte_costituzionale', numero: 1, anno: 2014, archivio: 'civile', etichetta: 'Corte cost. n. 1/2014' }],
+    ['a star that is not a boolean', { ...SENTENZA, _dossierMeta: { important: 'x' } }],
   ])('refuses %s', async (_label, content) => {
     const res = await add({ itemType: 'sentenza', title: 'x', content });
     expect(res.status).toBe(400);
@@ -58,6 +63,8 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     expect(titleOnly.body.title).toBe(relabelled.etichetta);
     const broken = await request(app).put(url).set(authHeader(owner)).send({ content: { ...SENTENZA, numero: -1 } });
     expect(broken.status).toBe(400);
+    const row = await prisma.dossierItem.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(row).toMatchObject({ title: relabelled.etichetta, content: relabelled });
   });
 
   it('moves to another dossier, and goes into a snapshot, unchanged', async () => {

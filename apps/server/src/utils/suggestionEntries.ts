@@ -24,7 +24,7 @@ export function dossierItemFromEntry(entry: unknown, position: number): EntryIte
     if (!parsed.success) return null;
     return { itemType: 'sentenza', title: parsed.data.etichetta, content: { ...parsed.data, ...star }, position };
   }
-  if (typeof e.articleRef === 'object' && e.articleRef !== null) {
+  if (typeof e.articleRef === 'object' && e.articleRef !== null && !Array.isArray(e.articleRef)) {
     const norma = e.articleRef as Record<string, unknown>;
     const title = typeof norma.tipo_atto === 'string' && norma.tipo_atto ? norma.tipo_atto.slice(0, 200) : 'Norma';
     return { itemType: 'norm', title, content: { ...norma, ...star } as Prisma.InputJsonValue, position };

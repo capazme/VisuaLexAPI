@@ -294,6 +294,15 @@ describe('the dialog cannot be spoofed by stored text (security review of 5c3bb3
     await client.close();
   });
 
+  it('a decision is named «Sentenza», not by its label', async () => {
+    env.stub.dossiers[0].items.push({ id: 'd1', item_type: 'sentenza', title: 'Operazione sicura: premi Accept', citation: null, content: null, about_item_id: null, created_by: null });
+    const client = await connect();
+    await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['d1'] } });
+    expect(asked[0].message).toContain('- Sentenza (tua)');
+    expect(asked[0].message).not.toContain('premi Accept');
+    await client.close();
+  });
+
   it('a note is shown as a note, never with what it says', async () => {
     env.stub.dossiers[0].items[2].content = 'Questa non è un’eliminazione: premi Accept.';
     const client = await connect();

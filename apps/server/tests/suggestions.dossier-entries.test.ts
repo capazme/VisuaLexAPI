@@ -40,6 +40,26 @@ describe('taking a dossier suggestion', () => {
     expect(items[2].content).toEqual(SENTENZA);
   });
 
+  it('stores the star of a decision in its envelope', async () => {
+    const take = await suggestAndTake([{ sentenzaRef: SENTENZA, status: 'important' }]);
+    expect(take.status).toBe(200);
+    const [item] = await prisma.dossierItem.findMany({ where: { dossier: { userId: alice.id } } });
+    expect(item.content).toEqual({ ...SENTENZA, _dossierMeta: { important: true } });
+  });
+
+  it.each([
+    ['an empty entry', {}],
+    ['an entry that is not an object', 'una stringa'],
+    ['a null decision', { sentenzaRef: null }],
+    ['a decision with an unknown key', { sentenzaRef: { ...SENTENZA, testo: 'il testo intero' } }],
+    ['a norm that is an array', { articleRef: [NORMA] }],
+  ])('refuses %s, writes nothing and leaves the entry pending', async (_label, entry) => {
+    const take = await suggestAndTake([{ articleRef: NORMA }, entry]);
+    expect(take.status).toBe(400);
+    expect(await prisma.dossier.count({ where: { userId: alice.id } })).toBe(0);
+    expect(await prisma.suggestionItem.count({ where: { status: 'pending' } })).toBe(1);
+  });
+
   it('refuses the whole suggestion when one decision entry is not valid, and writes nothing', async () => {
     const take = await suggestAndTake([{ articleRef: NORMA }, { sentenzaRef: { ...SENTENZA, corte: 'tar' } }]);
     expect(take.status).toBe(400);
