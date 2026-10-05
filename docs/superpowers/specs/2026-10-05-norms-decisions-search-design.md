@@ -31,6 +31,15 @@ Four questions stayed open after the interview; the owner answered them on
 5 October 2026 with the spec («spec ok»). They are recorded under **Questions
 for the owner — answered**, and the sections below are written to the answers.
 
+**Additions of 5 October (afternoon).** The owner added: «Facciamo in modo che
+la ricerca delle sentenze ritorni testo pulito, e la possibilità di scaricarle
+in PDF». Measured (below), proposed, and answered: «43. 1a + 1d» — the
+Cassazione's text read from the court's original PDF, cleaned, with a declared
+fallback (§11), and the decisions on an article found through the Cassazione's
+index of cited norms (§5.2); «44. 2a + 2b» — a PDF of the decision made by
+VisuaLex, and the court's original PDF served by VisuaLex (§12). Cleaning the
+search fragments (1c) was not chosen: they are shown as the source gives them.
+
 ## Why
 
 Today a norm is searched in the command palette (⌘K) and read in the
@@ -87,6 +96,43 @@ All on 2026-10-05 unless stated.
   MERL-T graph has `ConcettoGiuridico` nodes and an article→concept relation
   (`MENZIONA`), seeded for Libro IV of the codice civile and shown only to
   validators. LingoLex cards carry an `istituto` string.
+- **Italgiure's text field is cut short at the source** (5 October, afternoon:
+  34 whole decisions, civil and penal, 2022–2026, read through the merged
+  reader). About one text in three ends mid-word: «…pari a quello dovuto per il
+  rico», «Così deciso in Roma il giorno 7 dicemb», «14. La Corte rigett» (the
+  dispositivo missing); one record stops at exactly 8,000 characters. Since the
+  dispositivo is cut from the end of that same field, a decision can show no
+  operative part at all. This is what the merged decision page shows today.
+- **The court's original PDF is whole.** Every record names it (`filename`,
+  e.g. `./20220221/snciv@sU0@a2022@n05625@tS.pdf`); the PDF is served at
+  `…/xway/application/nif/clean/hc.dll?verbo=attach&db=<snciv|snpen>&id=<filename
+  with .clean.pdf>` within the archive's session (the plain `.pdf` name answers
+  500). Checked on three decisions: n. 5625/2022, cut at 8,000 characters in the
+  field, reads to its last line in the PDF («… a norma del comma 1-bis del
+  citato art. 13. Roma, 14.12.2021»). The PDF has a text layer and page
+  furniture: «Corte di Cassazione - copia non ufficiale» printed vertically in
+  the margin of every page (rotated text), a header on the first page
+  («Civile Ord. Sez. 1 Num. 26034 Anno 2026», «Presidente:», «Relatore:»,
+  «Data pubblicazione:»), the «Oggetto» box in the right margin of the first
+  page, running footers («r.g. n. 27512/2022 Cons. est. …», «-2- Ric. 2021 n.
+  09083 sez. SU - ud. 14-12-2021»), page numbers, justified text with doubled
+  spaces, and the occasional unmapped glyph («(cid:9)»). Paragraphs start with
+  an indented first line. A prototype (pdfminer.six) that keeps upright text,
+  merges each baseline, drops the furniture by position and repetition and
+  starts a paragraph at each indent rebuilt the three texts whole and readable.
+- **Other faults of the text field**, in the same sample: words glued where the
+  source had a line break («CORTE APPELLO di BARIvisti», «ControBanca Monte dei
+  Paschi», «settembre2026.Il PresidenteEnrico Scoditti»); in 2 of 34, the
+  digital signature printed letter by letter («F i r m a t o D a : …», 364
+  times); OCR debris from stamps («P.Q.MILii;e. 119 lak0V--19Mb»). No HTML
+  entities and no control characters. The Corte costituzionale's open data are
+  clean.
+- **Italgiure indexes the norms each decision cites** (`rnc-gen` code family —
+  `CC`, `PC`, `LS` …; `rnc-art` article as `"2043 00"`; `rnc-sp` act type —
+  `COD`, `DLG`, `DPR` …; `rnc-num`, `rnc-dat` number and year of a numbered
+  act). Civil decisions indexed as citing art. 2043 c.c.: **3,904**, against 939
+  whose text contains «art. 2043 c.c.». The fields are parallel lists, so a
+  query on two of them can match two different citations of one decision.
 - **Decision texts already follow S6** (Sentenze design): the readers insert only
   `\n` (Italgiure's paragraphs, the Corte costituzionale's line breaks) and
   `DecisionTextView` draws each block, paragraph and line with no character
@@ -107,6 +153,10 @@ All on 2026-10-05 unless stated.
 - A decision can be highlighted and annotated like an article, and those anchors
   never disappear in silence.
 - Opened decisions are in the Cronologia.
+- A Cassazione decision reads whole, cleaned of the PDF's page furniture, and
+  says so when only the archive's shorter text could be had.
+- A decision can be downloaded as a PDF made by VisuaLex, and a Cassazione
+  decision also as the court's own PDF.
 
 ## Non-goals
 
@@ -132,7 +182,7 @@ All on 2026-10-05 unless stated.
 | N2 | **A decision is a tab of its own** (a tab whose `view` is `decision`), holding its identity only; the text is fetched, never persisted. Opened from an article, it is placed beside that article's tab. §2.2 draws the two readings of «beside». | Answer 3: «A, in una propria tab». |
 | N3 | **`/sentenze/<corte>/<numero>/<anno>` opens the search space with that decision's tab**, like `/?norma=` for a norm. The address does not change: LibreLex, the Massimario chips and every link already built keep working. | Answer 4. The paths are a contract (Sentenze design §2). |
 | N4 | **Under the article, one section «Giurisprudenza»**: Brocardi's massime with a link when they name the archive, the Massimario panel as it is, and «Cassazione — menzionano l'articolo», a live list asked for only when the reader opens it. | Answer 5 (A and B). Nothing is fetched from Italgiure unless the reader asks. |
-| N5 | **The live list says how a decision was found: «menzionato nel testo».** Never «citato», never a relevance score. | D2 of the 08-29 design: a text match is not a declared citation, and the reader must be able to tell. |
+| N5 | **Each row of a list says how the decision was found:** «norma citata (indice della Cassazione)» when the Cassazione's own index of cited norms matched it, «menzionato nel testo» when the words were found in the text. Never a relevance score. | D2 of the 08-29 design: a declared citation and a text match are different evidence, and the reader must be able to tell; answer 43 (1d). |
 | N6 | **One new Python route, `/search_decisions`**, serves both the article list (N4) and the topic search (§6), through the decision reader's own throttled client, with a cache and a bound on requests. | One way of asking Italgiure, one place to keep it polite. |
 | N7 | **A topic starts from Brocardi's glossary**, or from words typed in the palette; it finds decisions, narrowed by default to those that also mention the article. | Answer 1C, «magari sfruttando il glossario»; §6 lists the alternatives and their cost. |
 | N8 | **A decision's text links the norms it cites**, through the same matcher and preview as an article's text, wrapping characters and never changing one. | Answer 6; S6. |
@@ -141,6 +191,10 @@ All on 2026-10-05 unless stated.
 | N11 | **An anchor that no longer matches is shown, never dropped.** Unlike an article's, a decision's unmatched highlights and notes are listed with their quoted text and can be removed. | Italgiure withdraws texts for anonymisation (about 82,000 records at the last count); a note must not vanish when that happens. |
 | N12 | **Decisions enter `search_history`** through a nullable `decision_key` column; `act_type` becomes nullable, and a check constraint requires exactly one of the two. | Answer 7. One table keeps one ordered, paged history. |
 | N13 | **Labels come only from `utils/decisionLinks.ts`** (`formatDecisionCitation`, `formatDecisionHeading`, and the short form of convention §4.2). | Convention §6: no second decision module. |
+| N14 | **The Cassazione's text is read from the court's original PDF**, cleaned of page furniture by position and repetition, with the archive's text field as a declared fallback (the notice `testo_da_archivio`, §11). This happens before N10 freezes the text, so the frozen text is the cleaned one (§11). | Answer 43 (1a): about a third of the field's texts are cut short, some without their dispositivo. |
+| N15 | **The decisions on an article come from the Cassazione's index of cited norms** (`rnc-*`), re-checked per decision on the server because the index's fields are parallel lists; the text search stays for topics, for acts the index cannot express, and as a switch («Nel testo») (§5.2). | Answer 43 (1d): 3,904 decisions against 939 for art. 2043 c.c., and a citation the court indexed, not a word found. |
+| N16 | **«Scarica PDF»**: a PDF made in the browser (jsPDF, as the dossier's), headed by the citation, with the text in its blocks and paragraphs, the source and the day it was consulted at the foot, no licence line, and an option with the user's highlights and notes (§12.1). | Answer 44 (2a). |
+| N17 | **«PDF originale della Corte»** for the Cassazione, served by VisuaLex behind the login from the cache §11 fills (§12.2). | Answer 44 (2b): a direct link to Italgiure does not work outside the archive's session. |
 
 ## Detailed design
 
@@ -317,12 +371,15 @@ each with its own heading and its own empty or failure state (08-29 design,
 3. **«Cassazione — menzionano l'articolo»** — a button, «Cerca nell'archivio
    della Cassazione», and nothing fetched until it is pressed. Then a list from
    `/search_decisions` (§5): each row the short form, the type and date of
-   deposit, and the fragment Italgiure found, with «menzionato nel testo» as the
-   row's kind; twenty per page, «Altri risultati» for the next page. Above the
-   list, the count and the coverage: «312 decisioni nell'archivio pubblico della
-   Cassazione (dal 3 gennaio 2021)». A row opens the decision beside the
-   article. Supported for the acts §5.2 can phrase; for any other act the
-   section says the search is not available for this act.
+   deposit, how it was found («norma citata (indice della Cassazione)» or
+   «menzionato nel testo», N5) and, when Italgiure gives one, the passage where
+   the article is mentioned; twenty per page, «Altri risultati» for the next
+   page. A switch above the list, «Indice della Cassazione» (the default) /
+   «Nel testo», changes how the article is searched. Above the list, the count
+   and the coverage: «3.904 decisioni nell'archivio pubblico della Cassazione
+   (dal 3 gennaio 2021)». A row opens the decision beside the article. For an
+   act neither way can phrase, the section says the search is not available for
+   this act.
 
 A past text (gotcha 32) shows the section too: the decisions do not depend on
 the version, and the list searches the article as cited, which is the same in
@@ -343,21 +400,42 @@ scraping route (ADR-001: `vite.config.ts` proxy list, the ingress paths,
   "pagina": 1 }
 ```
 
-At least one of `norma` and `tema`. Answers, all JSON with `esito` like
-`/fetch_decision`: `risultati` 200 (`totale`, `archivio_dal`, `pagina`,
-`decisioni: [{ identita, attributi, frammento }]`), `non_supportata` 200 (an act
-§5.2 cannot phrase), `richiesta_non_valida` 400, `fonte_non_raggiungibile` 503,
-`errore_interno` 500.
+At least one of `norma` and `tema`; `modo` (`"indice"`, the default for an
+article, or `"testo"`) says how the article is searched, and a topic is always
+searched in the text. Answers, all JSON with `esito` like `/fetch_decision`:
+`risultati` 200 (`totale`, `archivio_dal`, `pagina`, `modo`,
+`decisioni: [{ identita, attributi, trovata: "indice" | "testo", frammento? }]`),
+`non_supportata` 200 (an act §5.2 cannot phrase in that `modo`),
+`richiesta_non_valida` 400, `fonte_non_raggiungibile` 503, `errore_interno` 500.
 
 `frammento` is plain text plus the ranges to emphasise
 (`{ testo, evidenziati: [[start, end], …] }`), built on the server from Solr's
 `<em>` markers. The client never receives or renders HTML from Italgiure.
 
-#### 5.2 How an article is phrased
+#### 5.2 How an article is searched
 
-The query is the decision text field (`ocr`) matched against the ways lawyers
-write the article, never the bare «art. N», which catches other acts (1,588 vs
-939 for art. 2043 c.c.):
+**By the index of cited norms (`modo: "indice"`, N15).** The article becomes the
+index's coordinates: the code family and the article for the codes and the
+Constitution (`rnc-gen:"CC" AND rnc-art:"2043 00"`), and for a numbered act the
+family, the act type, the number and the year with the article. The table of
+codes (`CC`, `PC`, `LS` …, act types `COD`, `DLG`, `DPR` …) and how a suffix
+(«-bis») is written in `rnc-art` are measured before they are frozen (plan
+Task 2). Because the index's fields are parallel lists, the query can match a
+decision that cites art. 2043 of one act and something else of the code; the
+server therefore asks for the `rnc-*` fields with each page and keeps only the
+decisions where one citation carries every coordinate (the lists are aligned
+position by position; how the number and year lists align with the others is
+measured in Task 2). The count is the archive's `numFound`; when Task 2
+measures more than 5 % of false matches for a family, that family's count is
+shown as «circa N». The passage shown with an index row comes from Solr's
+highlighting with the text phrasing below as its query (`hl.q`), when the text
+mentions the article in a form it knows; otherwise the row has no passage.
+
+**In the text (`modo: "testo"`).** The decision text field (`ocr`) matched
+against the ways lawyers write the article, never the bare «art. N», which
+catches other acts (1,588 vs 939 for art. 2043 c.c.). The field is cut short in
+about a third of the records (§11), so this way finds less; the switch says
+«Nel testo» and the rows «menzionato nel testo»:
 
 - **Codes, the Constitution, the preleggi, disp. att.**: «art. N <abbr>», «art. N
   <abbr. alternate>», «articolo N <abbr>», «art. N del <name>», «articolo N del
@@ -366,8 +444,8 @@ write the article, never the bare «art. N», which catches other acts (1,588 vs
   `Costituzione`; …), the abbreviations of convention §3.3.
 - **Numbered national acts**: «art. N» within a few words of the act's number and
   year in each written form («l. n. 241/1990», «legge 7 agosto 1990, n. 241»,
-  «l. 241 del 1990»), as a Solr proximity phrase. The proximity and forms are
-  fixed by plan Task 1, measured on a sample before they are frozen.
+  «l. 241 del 1990»), as a Solr proximity phrase of 6 positions (plan Task 1,
+  measured: 8 and 12 already let a wrong article in).
 - **EU acts**: not in this round (`non_supportata`).
 - Ordinal suffixes come from `article_suffixes.py`, written both joined and
   spaced («2051-bis», «2051 bis»).
@@ -396,6 +474,12 @@ A topic is user input placed in a Solr query: the route keeps letters, digits,
 spaces, apostrophes and hyphens, collapses spaces, caps the length at 80
 characters, and sends it as a quoted phrase with every Solr special character
 escaped. It never passes a field name, an operator or a wildcard through.
+
+#### 5.5 The fragments
+
+Shown as the source gives them (the owner did not choose to clean them, answer
+43): only Solr's `<em>` markers are turned into ranges, and nothing else is
+changed.
 
 ### 6. A topic, through the glossary
 
@@ -516,9 +600,11 @@ Nothing is deleted or moved automatically.
 From this round, root rule 23 covers decision texts too. Frozen — the output of
 each reader minus `\n`:
 
-- `services/visualex/visualex_api/services/decisions/italgiure.py`: which fields
-  make the text (`ocr`, `ocrdis`), `split_dispositivo`'s cut, the withheld-text
-  detection (`_WITHHELD_*`); `paragraphs` may insert only `\n`;
+- the Cassazione's text from the original PDF (§11): what is kept of a page,
+  how lines and paragraphs are joined, where the dispositivo starts — frozen as
+  §11 leaves it; and the fallback from the text field (`italgiure.py`: which
+  fields make the text, `split_dispositivo`'s cut, the withheld-text detection
+  `_WITHHELD_*`; `paragraphs` may insert only `\n`);
 - `corte_cost.py`: the fields that make each block and the order; the epigrafe
   split may move, never drop or change a character;
 - the caches (the resolver's `italgiure:v2:` and `corte_cost:v2:` entries): the
@@ -597,6 +683,79 @@ tab's heading the page line. The short form is `formatDecisionShort`, which the
 convention names and the golden file pins; if PR 1c has not written it when this
 round needs it, this round writes it to the golden cases and PR 1c adopts it.
 
+### 11. The Cassazione's text, from the original PDF
+
+The Cassazione reader reads the decision's record as today, then its original
+PDF (one more request, about 200 KB), and makes the text from the PDF:
+
+1. **What is kept of a page.** Upright text only (the vertical «copia non
+   ufficiale» goes); on the first page, the header lines (court and number,
+   «Presidente:», «Relatore:», «Data pubblicazione:» — already the record's
+   attributes) and the «Oggetto» box (right margin, above the title); in the top
+   and bottom bands of every page, page numbers («2», «-2-», «Pag. 2») and lines
+   that repeat on several pages once their digits are ignored (the running
+   footer); unmapped glyphs («(cid:N)»).
+2. **Lines.** The pieces of one baseline are one line, left to right; runs of
+   spaces become one space.
+3. **Paragraphs.** A line indented from the body's left edge, or after a
+   vertical gap, starts a paragraph; a centred heading («RILEVATO CHE»,
+   «FATTI DI CAUSA», «P.Q.M.») is a paragraph of its own. Paragraphs are
+   separated by a blank line; the lines of a paragraph are joined by one space,
+   or by nothing after a line ending in «-» (the hyphen is kept: «Lazare-David»).
+4. **Blocks.** Everything before the last paragraph that is «P.Q.M.» is the
+   motivazione; from it on, the dispositivo — the same blocks the page shows
+   today.
+5. **Withheld texts.** A record the source withholds (§ «oscuramento») has no
+   PDF to read and stays as today: no text, the notice.
+6. **The fallback.** No `filename`, a PDF that cannot be fetched or parsed, or a
+   text that fails the checks of plan Task 2 (shorter than the field's, missing
+   the field's opening words): the text field as today, with a notice
+   `testo_da_archivio` — «Testo dell'archivio della Cassazione: potrebbe essere
+   incompleto. Il PDF originale non era disponibile.» — and the field's faults.
+7. **Requests and caches.** One request more per decision found (the PDF), so a
+   lookup stays within the owner's ten requests (2026-10-04). The PDF's bytes
+   are kept 30 days (a cache namespace of their own) for §12.2; the text is
+   cached under a new key version (`italgiure:v3:`), so the texts cached from
+   the field are not served again.
+8. **Dependency.** `pdfminer.six` (MIT), pure Python, accepted by the owner.
+
+The thresholds of 1 and 3 (bands, indent, gap) and the fallback checks of 6 are
+measured on about forty PDFs of both archives and several years before they are
+frozen (plan Task 2), and the reader is then frozen with the rest (§8.5).
+
+### 12. Downloads
+
+#### 12.1 «Scarica PDF»
+
+In the decision tab's actions. Made in the browser with jsPDF, as the dossier's
+PDF (`DossierDetailView`), with the same typeface and margins:
+
+- the citation (`formatDecisionCitation`) as the heading, the page line
+  (`formatDecisionHeading`) under it;
+- the notices, if any (as on screen, with `describeNotice`);
+- the text in its blocks («Epigrafe», «Motivazione», «Dispositivo», or «Testo»)
+  and paragraphs, the characters of the screen;
+- at the foot of the last page: «Fonte: <source name> · consultata il <day>»
+  (the day the text was read, `todayInRome`), and no licence line, for the
+  Corte costituzionale too (the owner's decision for the dossier, «sì togli
+  anche quella»);
+- an option «Con le mie evidenziazioni e note»: highlights printed as marked
+  passages, notes after the paragraph they anchor to, the unmatched ones of
+  §8.4 listed at the end under their heading.
+
+File name: the short form made safe (`Cass_civ_sez_III_n_10787_2024.pdf`).
+
+#### 12.2 «PDF originale della Corte»
+
+For the Cassazione only, when the record names a PDF: `POST /fetch_decision_pdf`
+with the identity, behind the login (proxy and ingress lists, `legalFetch`).
+It serves the bytes §11 cached, or fetches them once (one request, rate-limited
+like the lookup) and caches them. Answers `application/pdf` with
+`Content-Disposition: attachment`, or JSON `{ esito }`: `non_disponibile` 404
+(no PDF named, or a withheld text), `fonte_non_raggiungibile` 503,
+`richiesta_non_valida` 400, `errore_interno` 500. The Corte costituzionale keeps
+«Apri sulla fonte».
+
 ## Security and data
 
 - **Query injection (OWASP A03).** Topic words go into a Solr query: §5.4's
@@ -614,17 +773,27 @@ round needs it, this round writes it to the golden cases and PR 1c adopts it.
   own data, and it stays so: the owner chose to do nothing more about it
   (answer 3), beyond §8.4's box where the user sees and can delete it. What
   VisuaLex must not do is spread those words: §8.6.
+- **Parsing a PDF from outside.** The original PDF is untrusted input to a
+  parser: at most 5 MB and 200 pages, parsed in a worker thread under a time
+  limit, refused if it does not start with `%PDF-`; a failure falls back to the
+  text field, never to an error page. The PDF route serves only bytes that came
+  from Italgiure's allowlisted host for that identity, with
+  `Content-Type: application/pdf` and `Content-Disposition: attachment`.
 - **Validation of keys**: the history's `decision_key` and the anchors' decision
   keys are validated server-side against the key's shape.
 
 ## Verification
 
-- Web: the palette parser's golden cases; the store actions (open, focus, place
+- Web: «Scarica PDF» (heading, blocks, source line, no licence line, the
+  option with highlights) and «PDF originale della Corte»; the palette parser's golden cases; the store actions (open, focus, place
   beside, drain the queue once under StrictMode); `DecisionView`'s outcomes
   (moved tests of `DecisionPage.test.tsx`); `decisionRender.test.ts` (§8.5);
   unmatched anchors listed, not dropped; history labels and reopening;
   `npm --prefix apps/web run build`, tests, lint.
-- API: `/search_decisions` offline over recorded Solr answers (phrasing per act
+- API: the PDF reader over recorded PDFs (furniture gone, paragraphs, blocks,
+  the fallback and its notice, a hostile PDF refused within the limits);
+  `/fetch_decision_pdf` (cached bytes, `non_disponibile`, headers);
+  `/search_decisions` offline over recorded Solr answers (phrasing per act
   family, archive choice, paging bound, `non_supportata`, fragments to ranges,
   the injection cases); the frozen-text test; one `live` test that the endpoint
   still answers the article query; the full Python suite.
@@ -665,11 +834,16 @@ were the orchestrator's numbers for the four questions below).
   `formatDecisionShort` are the same work; one of the two writes them.
 - **Dossier PR 3** (decision rows and reader): adopts `renderDecisionHtml` so
   notes made in a tab show in the dossier.
+- **The Cassazione reader** (`italgiure.py`, the resolver's cache keys) is the
+  Sentenze session's area. §11 changes it on the owner's answer 43 while that
+  session is unreachable; the orchestrator routes the change to it, and PR 1
+  says so.
 - **Prisma**: one migration, after every migration on `develop`, announced
   before it is written.
 
 ## Later
 
+- Cleaning the search fragments (proposal 1c, not chosen on 5 October).
 - Decision citations inside a decision's text, linked to their decision.
 - Decision citations in the documents page.
 - The Corte costituzionale in the live list (its open data can be searched on
