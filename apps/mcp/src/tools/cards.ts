@@ -196,8 +196,11 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
         if (missing.length > 0) throw new ToolError(`Schede non trovate: ${missing.join(', ')}. Nulla è stato eliminato.`);
         const community = found.filter((card) => !PERSONAL.has(card.stato));
         if (community.length > 0) {
+          const ids = community.map((card) => card.id).join(', ');
           throw new ToolError(
-            `${community.map((card) => card.id).join(', ')}: è stata proposta alla community: non si può eliminare. Nulla è stato eliminato.`,
+            community.length === 1
+              ? `La scheda ${ids} è stata proposta alla community: non si può eliminare. Nulla è stato eliminato.`
+              : `Queste schede sono state proposte alla community e non si possono eliminare: ${ids}. Nulla è stato eliminato.`,
           );
         }
         const answer = await confirmWithUser(server, cardDeletionMessage(found.map(cardLine)), {

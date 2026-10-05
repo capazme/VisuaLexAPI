@@ -119,15 +119,34 @@ it may do. **Autorizza** returns to Claude Code. The connection lasts until you
 revoke it in **Impostazioni → Applicazioni collegate**; a revoked connection
 stops at its next call.
 
-What it can and cannot do: read your dossiers (names and the norms they hold,
-never the article text), create dossiers (ten a day), add 1–50 norms per call,
-each checked against the sources (a made-up article is refused), and report
-the day's remaining quota. It cannot change, move or delete anything. It works
-on `localhost` only: claude.ai needs a public address, which is a later round.
+What it can do: read your dossiers (names, the norms they hold and their
+notes, never the article text), create dossiers (ten a day), add 1–50 norms
+per call, each checked against the sources (a made-up article is refused), add
+notes to a dossier or to one of its articles (marked as written by the
+application), save and list your LingoLex study cards (always drafts, anchored
+on articles checked against the sources), and report the day's remaining
+quota. It never changes or moves anything.
+
+**Deleting** is off until you switch it on, per connection: tick «Eliminare
+dossier, voci e schede» on the consent page, or switch «Può eliminare…» in
+**Impostazioni → Applicazioni collegate** (it takes effect at the next call).
+Even then every deletion opens a dialog in Claude Code that only you can
+answer (Accept with «Confermo» ticked, or Decline); nothing goes without it,
+and a client that cannot show the dialog cannot delete. What is deleted goes to
+the trash for 30 days: **Cestino** in the dossier list, or **Rimossi di
+recente** at the bottom of a dossier, restores it. Only your own drafts and
+archived cards can be deleted, never a card proposed to the community.
+
+A connection made before the card tools existed lacks their permission: Claude
+Code answers that it is not authorised; reconnect from `/mcp`. If you had
+switched deletion on, its box on the consent page is already ticked: leave it
+to keep it. It works on
+`localhost` only: claude.ai needs a public address, which is a later round.
 
 The environment variables: `OAUTH_*` in `apps/server/.env` (see its
 `.env.example`), `MCP_*` in `apps/mcp/.env` (see `apps/mcp/.env.example`).
-`OAUTH_MCP_CLIENT_SECRET` and `MCP_CLIENT_SECRET` must be the same value.
+`OAUTH_MCP_CLIENT_SECRET` and `MCP_CLIENT_SECRET` must be the same value;
+`MCP_CONFIRMATION_TIMEOUT_MS` (5 minutes) is how long a deletion waits for your answer.
 `apps/mcp/scripts/e2e.mjs` runs the whole flow headlessly against a running
 stack, with an active user: `E2E_EMAIL=… E2E_PASSWORD=… node apps/mcp/scripts/e2e.mjs`.
 

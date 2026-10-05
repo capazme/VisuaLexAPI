@@ -128,8 +128,25 @@ describe('lingolex_elimina_card', () => {
     const client = await connect();
     const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k2'] } });
     expect(result.isError).toBe(true);
-    expect(text(result)).toMatch(/proposta alla community: non si può eliminare/);
+    expect(text(result)).toBe('La scheda k2 è stata proposta alla community: non si può eliminare. Nulla è stato eliminato.');
     expect(asked).toEqual([]);
+    await client.close();
+  });
+
+  it('several cards taken up by the community are named in one plural sentence (final review)', async () => {
+    env.stub.cards.push({ id: 'k3', materia: 'DIRITTO_CIVILE', stato: 'VALIDATA', istituto: 'x', domanda: 'y', createdAt: '2026-10-04T10:00:00.000Z' });
+    const client = await connect();
+    const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k2', 'k3'] } });
+    expect(text(result)).toBe('Queste schede sono state proposte alla community e non si possono eliminare: k2, k3. Nulla è stato eliminato.');
+    await client.close();
+  });
+
+  it('sources down when saving: the server’s own reason reaches the user (final review)', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path === '/lingo/cards' ? [503, { detail: 'Le fonti non rispondono: nessuna scheda è stata creata, riprova più tardi.' }] : undefined;
+    const client = await connect();
+    const result = await client.callTool({ name: 'lingolex_salva_card', arguments: { schede: [CARD] } });
+    expect(text(result)).toBe('Le fonti non rispondono: nessuna scheda è stata creata, riprova più tardi.');
     await client.close();
   });
 

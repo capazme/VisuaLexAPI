@@ -80,6 +80,15 @@ describe('ConnectPage', () => {
     expect(decide).toHaveBeenCalledWith('req-1', true, false);
   });
 
+  it('starts the deletion box ticked when the connection already may delete, so reconnecting keeps it (final review)', async () => {
+    getRequest.mockResolvedValue({ ...REQUEST, deletion: { ...REQUEST.deletion, granted: true } });
+    decide.mockResolvedValue({ redirectTo: 'http://127.0.0.1:33418/callback?code=abc' });
+    renderAt('/connect?request=req-1');
+    expect(await screen.findByRole('checkbox', { name: REQUEST.deletion.label })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /autorizza/i }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('req-1', true, true));
+  });
+
   it('offers the deletion apart, unticked, and sends it only when ticked', async () => {
     getRequest.mockResolvedValue(REQUEST);
     decide.mockResolvedValue({ redirectTo: 'http://127.0.0.1:33418/callback?code=abc' });
