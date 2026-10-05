@@ -5,6 +5,8 @@ import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
 import type { ArticleData, MassimaStructured } from '../../types';
 import { DOCTRINE_ATTRIBUTION, LATIN_MAXIMS_LABEL } from '../../utils/doctrineLabel';
+import { citeNorm, inForceCitation, shortNorm } from '../../utils/sources';
+import { todayInRome } from '../../utils/dateUtils';
 
 interface ExportSection {
   id: string;
@@ -130,7 +132,7 @@ export function AdvancedExportModal({
 
     if (isSectionEnabled('citation')) {
       parts.push('\n--- Citazione ---');
-      parts.push(`${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}`);
+      parts.push(inForceCitation(norma_data, todayInRome()));
       parts.push('');
     }
 
@@ -196,14 +198,14 @@ export function AdvancedExportModal({
 
     let rtf = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Arial;}{\\f1 Times New Roman;}}';
 
-    rtf += `\\f0\\fs28\\b ${escape(norma_data.tipo_atto)}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''} - Art. ${escape(norma_data.numero_articolo)}\\b0\\par\\par`;
+    rtf += `\\f0\\fs28\\b ${escape(citeNorm(norma_data))}\\b0\\par\\par`;
 
     if (isSectionEnabled('text') && article_text) {
       rtf += `\\f1\\fs22 ${plainText(article_text)}\\par\\par`;
     }
 
     if (isSectionEnabled('citation')) {
-      rtf += `\\f0\\fs18\\i Tratto da: ${escape(norma_data.tipo_atto)}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${escape(norma_data.data)}` : ''}, Art. ${escape(norma_data.numero_articolo)}\\i0\\par\\par`;
+      rtf += `\\f0\\fs18\\i ${escape(inForceCitation(norma_data, todayInRome()))}\\i0\\par\\par`;
     }
 
     if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
@@ -275,8 +277,7 @@ export function AdvancedExportModal({
     const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim();
     const lines: string[] = [];
 
-    const citation = `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`;
-    lines.push(`# ${citation} — Art. ${norma_data.numero_articolo}`);
+    lines.push(`# ${citeNorm(norma_data)}`);
     lines.push('');
 
     if (isSectionEnabled('text') && article_text) {
@@ -289,7 +290,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('citation')) {
-      lines.push(`> Tratto da: ${citation}, Art. ${norma_data.numero_articolo}`);
+      lines.push(`> ${inForceCitation(norma_data, todayInRome())}`);
       lines.push('');
     }
 
@@ -416,8 +417,7 @@ export function AdvancedExportModal({
     };
 
     // Title
-    const citation = `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`;
-    writeParagraph(`${citation} — Art. ${norma_data.numero_articolo}`, { size: 18, bold: true, color: [15, 23, 42], gapAfter: 14 });
+    writeParagraph(citeNorm(norma_data), { size: 18, bold: true, color: [15, 23, 42], gapAfter: 14 });
 
     if (isSectionEnabled('text') && article_text) {
       writeHeading('Testo');
@@ -425,7 +425,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('citation')) {
-      writeParagraph(`Tratto da: ${citation}, Art. ${norma_data.numero_articolo}`, { size: 10, italic: true, color: [82, 82, 91] });
+      writeParagraph(inForceCitation(norma_data, todayInRome()), { size: 10, italic: true, color: [82, 82, 91] });
     }
 
     if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
@@ -551,7 +551,7 @@ export function AdvancedExportModal({
       onClose={onClose}
       size="lg"
       title="Esporta Articolo"
-      description={`Art. ${norma_data.numero_articolo} - ${norma_data.tipo_atto}`}
+      description={shortNorm(norma_data)}
       icon={<Download size={20} />}
       variant="info"
       footer={

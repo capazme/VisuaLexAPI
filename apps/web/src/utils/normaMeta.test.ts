@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Norma } from '../types';
-import { formatNormaMeta } from './normaMeta';
+import { formatNormaMeta, formatNormaTitle } from './normaMeta';
 
 const norma = (data?: string, over: Partial<Norma> = {}): Norma => ({
   tipo_atto: 'legge',
@@ -9,29 +9,30 @@ const norma = (data?: string, over: Partial<Norma> = {}): Norma => ({
   ...over,
 } as Norma);
 
+describe('formatNormaTitle', () => {
+  it('heads an act by its citation, a code by its name', () => {
+    expect(formatNormaTitle(norma('1990-08-07'))).toBe('l. 7 agosto 1990, n. 241');
+    expect(formatNormaTitle(norma('1942-03-16', { tipo_atto: 'Codice Civile', numero_atto: '262' }))).toBe('Codice civile');
+  });
+});
+
 describe('formatNormaMeta', () => {
-  it('writes the edition of a card the way Italian writes a date after "del"', () => {
-    expect(formatNormaMeta(norma('1990-08-07'), { variant: 'card-desktop' })).toBe('Edizione del 7 agosto 1990');
+  it('says nothing the title already says', () => {
+    for (const variant of ['card-desktop', 'card-mobile', 'block'] as const) {
+      expect(formatNormaMeta(norma('1990-08-07'), { variant })).toBe('');
+    }
+    expect(formatNormaMeta(norma('2010-03-08'), { variant: 'block', articleCount: 3 })).toBe('3 articoli');
   });
 
-  it.each([
-    ['2010-03-08', "Edizione dell'8 marzo 2010"],
-    ['2014-09-11', "Edizione dell'11 settembre 2014"],
-    ['2014-09-18', 'Edizione del 18 settembre 2014'],
-    ['2014-09-28', 'Edizione del 28 settembre 2014'],
-  ])('elides "del" before the 8th and the 11th only (%s)', (day, expected) => {
-    expect(formatNormaMeta(norma(day), { variant: 'card-desktop' })).toBe(expected);
-  });
-
-  it('keeps the other placements as they were, a bare date needing no preposition', () => {
-    expect(formatNormaMeta(norma('2010-03-08'), { variant: 'card-mobile' })).toBe('Data: 8 marzo 2010');
-    expect(formatNormaMeta(norma('2010-03-08'), { variant: 'block', articleCount: 3 })).toBe('8 marzo 2010 · 3 articoli');
-  });
-
-  it('keeps the fallbacks and the aliased form', () => {
-    expect(formatNormaMeta(norma(), { variant: 'card-desktop' })).toBe('Data non disponibile');
-    expect(formatNormaMeta(norma(), { variant: 'card-mobile' })).toBe('Estremi non disponibili');
+  it('names the decree a code is, and the code an aliased act is', () => {
     expect(formatNormaMeta(norma('1942-03-16', { tipo_atto: 'codice civile', tipo_atto_reale: 'regio decreto', numero_atto: '262' }), { variant: 'card-desktop' }))
-      .toBe('R.D. 16 marzo 1942, n. 262');
+      .toBe('r.d. 16 marzo 1942, n. 262');
+    expect(formatNormaMeta(norma('2005-09-06', { tipo_atto: 'codice del consumo', numero_atto: '206' }), { variant: 'block', articleCount: 2 }))
+      .toBe('Codice del consumo · 2 articoli');
+  });
+
+  it('says when an act has neither date nor number', () => {
+    expect(formatNormaMeta(norma(undefined, { numero_atto: undefined }), { variant: 'card-mobile' })).toBe('Estremi non disponibili');
+    expect(formatNormaMeta(norma(undefined, { tipo_atto: 'costituzione', numero_atto: undefined }), { variant: 'card-mobile' })).toBe('');
   });
 });

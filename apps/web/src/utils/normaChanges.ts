@@ -1,6 +1,6 @@
 import type { NormaChangeNotification } from '../services/notificationService';
 import type { NormaVisitata } from '../types';
-import { formatCitation } from './normaMeta';
+import { citeNorm } from './sources';
 
 /**
  * The norm a change notification is about, read from the snapshot the
@@ -33,5 +33,5 @@ export function normaFromChangeNotification(notification: NormaChangeNotificatio
 /** Label for the list: the citation when the snapshot allows it, else the server's message. */
 export function normaChangeLabel(notification: NormaChangeNotification): string {
   const norma = normaFromChangeNotification(notification);
-  return norma ? formatCitation(norma) : notification.message;
+  return norma ? citeNorm(norma) : notification.message;
 }

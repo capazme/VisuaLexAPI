@@ -1,5 +1,6 @@
 import type { ArticleValidity, NormaVisitata } from '../types';
-import { abbreviateActType, formatDateForCitation, withPreposition } from './dateUtils';
+import { formatDateForCitation, withPreposition } from './dateUtils';
+import { citeNorm } from './sources';
 import { isEuropeanAct } from './versionDisplay';
 
 /**
@@ -38,40 +39,10 @@ export interface CitationContext {
   consultedAt?: string;
 }
 
-// The codes and the Constitution are cited by their abbreviation, with no number
-// and no date; any other act by its type, date and number. Keys are lower case:
-// the palette spells `Codice Civile`, the resolver `codice civile` (gotcha 28).
-const ACT_ABBREVIATIONS: Record<string, string> = {
-  'codice civile': 'c.c.',
-  'codice penale': 'c.p.',
-  'codice di procedura civile': 'c.p.c.',
-  'codice di procedura penale': 'c.p.p.',
-  'costituzione': 'Cost.',
-  // Part of R.D. 262/1942 and cited by their own name: "art. 12 preleggi" is not
-  // "art. 12, r.d. 16 marzo 1942, n. 262", which would name an article of the decree.
-  'preleggi': 'preleggi',
-  "disposizioni per l'attuazione del codice civile e disposizioni transitorie": 'disp. att. c.c.',
-  "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": 'disp. att. c.p.c.',
-};
-
-function actDesignation(norma: CitedNorma): { text: string; isCode: boolean } {
-  const abbreviation = ACT_ABBREVIATIONS[(norma.tipo_atto || '').trim().toLowerCase()];
-  if (abbreviation) return { text: abbreviation, isCode: true };
-  // An aliased act ("codice in materia di protezione dei dati personali") is
-  // cited by the act it is: "d.lgs. 30 giugno 2003, n. 196".
-  const type = abbreviateActType(norma.tipo_atto_reale || norma.tipo_atto).toLowerCase();
-  const date = norma.data ? ` ${formatDateForCitation(norma.data)}` : '';
-  const number = norma.numero_atto ? `, n. ${norma.numero_atto}` : '';
-  return { text: `${type}${date}${number}`, isCode: false };
-}
-
+// The head is the source convention's citation (utils/sources): «art. 2, l. 7 agosto 1990,
+// n. 241», «art. 1284 c.c.». This file adds the version clause.
 function articleHead(norma: CitedNorma): string {
-  const act = actDesignation(norma);
-  // A code's default annex is how Normattiva files its text, not part of how it is cited.
-  const annex = !act.isCode && norma.allegato ? ` (Allegato ${norma.allegato})` : '';
-  return act.isCode
-    ? `art. ${norma.numero_articolo} ${act.text}`
-    : `art. ${norma.numero_articolo}, ${act.text}${annex}`;
+  return citeNorm(norma);
 }
 
 /**
@@ -121,10 +92,11 @@ export function formatNormCitation(context: CitationContext): NormCitation | nul
 }
 
 /**
- * The text a copy action puts on the clipboard. A past text starts with its
- * citation, so the quotation cannot travel without the version it quotes; the
- * text in force keeps the trailer it always had.
+ * The text a copy action puts on the clipboard: it starts with its citation, so a
+ * quotation never travels without what it quotes. A past text by its version
+ * (`citation`), the text in force by `inForce` (`inForceCitation` of utils/sources: D8,
+ * owner, 4 October 2026).
  */
-export function withCitation(text: string, citation: NormCitation | null, trailer: string): string {
-  return citation ? `${citation.long}\n\n${text}` : `${text}${trailer}`;
+export function withCitation(text: string, citation: NormCitation | null, inForce: string): string {
+  return [citation ? citation.long : inForce, text].filter(Boolean).join('\n\n');
 }

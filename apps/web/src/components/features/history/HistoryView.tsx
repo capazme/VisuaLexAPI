@@ -12,6 +12,7 @@ import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } from '../../../services/historyService';
 import { NormaChangesSection } from './NormaChangesSection';
+import { shortNorm } from '../../../utils/sources';
 
 // Stripe color per act_type — keyed on lowercased exact match. Codes get
 // distinct colors so the user can scan the timeline visually; everything
@@ -69,26 +70,9 @@ function historyToSearchParams(item: SearchHistoryItem): SearchParams {
     };
 }
 
-// Genera una label per QuickNorm
+// A quick norm is suggested with the norm's short label (source convention).
 function generateQuickNormLabel(item: SearchHistoryItem): string {
-    const parts = [`Art. ${item.article}`];
-    if (item.act_type) {
-        // Abbrevia il tipo atto
-        const abbrev = item.act_type
-            .replace('codice civile', 'CC')
-            .replace('codice penale', 'CP')
-            .replace('codice di procedura civile', 'CPC')
-            .replace('codice di procedura penale', 'CPP')
-            .replace('costituzione', 'Cost.')
-            .replace(/^decreto legislativo$/i, 'D.Lgs.')
-            .replace(/^decreto legge$/i, 'D.L.')
-            .replace(/^legge$/i, 'L.');
-        parts.push(abbrev);
-    }
-    if (item.act_number) {
-        parts.push(`n. ${item.act_number}`);
-    }
-    return parts.join(' ');
+    return shortNorm({ tipo_atto: item.act_type, numero_atto: item.act_number, data: item.date, numero_articolo: item.article ?? '' });
 }
 
 export function HistoryView() {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircleQuestion, Sparkles } from 'lucide-react';
 import { ConsentDialog } from '../../../features/merlt/consent/ConsentDialog';
+import { shortNorm } from '../../../utils/sources';
 
 /**
  * Snooze for the consent-none teaser chip. Namespaced like the other MERL-T
@@ -31,11 +32,9 @@ function persistAskTeaserSnooze(): void {
     }
 }
 
-/** Human article heading, e.g. "Art. 2043 codice civile". */
-function buildHeading(articleNumber: string, actType: string, actNumber?: string, annex?: string): string {
-    return `Art. ${articleNumber}${annex ? ` (All. ${annex})` : ''} ${actType}${actNumber ? ` n. ${actNumber}` : ''}`
-        .replace(/\s+/g, ' ')
-        .trim();
+/** The article's short label (source convention): «art. 2043 c.c.», «art. 2 l. 241/1990». */
+function buildHeading(articleNumber: string, actType: string, actNumber?: string, annex?: string, actDate?: string, actRealType?: string): string {
+    return shortNorm({ tipo_atto: actType, tipo_atto_reale: actRealType, numero_atto: actNumber, data: actDate, allegato: annex, numero_articolo: articleNumber });
 }
 
 export interface AskMerltEntryProps {
@@ -48,6 +47,10 @@ export interface AskMerltEntryProps {
     articleNumber: string;
     actType: string;
     actNumber?: string;
+    /** The act's date, for its short label («art. 2 l. 241/1990»). */
+    actDate?: string;
+    /** The act's real type when `actType` is an aliased code's name. */
+    actRealType?: string;
     annex?: string;
 }
 
@@ -71,6 +74,8 @@ export function AskMerltEntry({
     articleNumber,
     actType,
     actNumber,
+    actDate,
+    actRealType,
     annex,
 }: AskMerltEntryProps): React.ReactElement | null {
     const navigate = useNavigate();
@@ -78,7 +83,7 @@ export function AskMerltEntry({
     // Lazy initializer honours a persisted (unexpired) dismissal on mount.
     const [teaserDismissed, setTeaserDismissed] = useState(isAskTeaserSnoozed);
 
-    const heading = buildHeading(articleNumber, actType, actNumber, annex);
+    const heading = buildHeading(articleNumber, actType, actNumber, annex, actDate, actRealType);
     const prefillQuery = `Spiegami l'${heading.charAt(0).toLowerCase()}${heading.slice(1)}`;
 
     if (!merltEnabled) return null;

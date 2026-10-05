@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { formatNormaMeta } from '../../../utils/normaMeta';
+import { formatNormaMeta, formatNormaTitle } from '../../../utils/normaMeta';
 import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
 import { AnnexSuggestion } from './AnnexSuggestion';
@@ -217,7 +217,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
           </div>
           <div className="min-w-0 flex-1">
             <h4 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
-              {norma.tipo_atto}
+              {formatNormaTitle(norma)}
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Scegli un articolo dall'indice
@@ -290,7 +290,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
-        aria-label={`${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''} — ${isOpen ? 'comprimi' : 'espandi'}`}
+        aria-label={`${formatNormaTitle(norma)} — ${isOpen ? 'comprimi' : 'espandi'}`}
         onClick={() => setIsOpen(!isOpen)}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;
@@ -307,9 +307,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-bold text-slate-900 dark:text-white text-base leading-tight">
-                {norma.tipo_atto}
-                {/* Show number only if NOT an alias */}
-                {!norma.tipo_atto_reale && norma.numero_atto && ` ${norma.numero_atto}`}
+                {formatNormaTitle(norma)}
               </h3>
               {isNew && (
                 <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase bg-primary-600 text-white rounded-full shadow-sm">
@@ -317,9 +315,11 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">
-              {formatNormaMeta(norma, { variant: 'card-mobile' })}
-            </p>
+            {formatNormaMeta(norma, { variant: 'card-mobile' }) && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">
+                {formatNormaMeta(norma, { variant: 'card-mobile' })}
+              </p>
+            )}
             <span className="inline-block text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
               {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'} caricati
             </span>
@@ -375,7 +375,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
-        aria-label={`${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''} — ${isOpen ? 'comprimi' : 'espandi'}`}
+        aria-label={`${formatNormaTitle(norma)} — ${isOpen ? 'comprimi' : 'espandi'}`}
         onClick={() => setIsOpen(!isOpen)}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;
@@ -392,9 +392,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
           <div>
             <div className="flex items-center gap-3">
               <h3 className="font-bold text-slate-900 dark:text-white text-xl leading-tight">
-                {norma.tipo_atto}
-                {/* Show number only if NOT an alias */}
-                {!norma.tipo_atto_reale && norma.numero_atto && ` ${norma.numero_atto}`}
+                {formatNormaTitle(norma)}
               </h3>
               {isNew && (
                 <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-primary-600 text-white rounded-full shadow-sm tracking-wider">
@@ -403,10 +401,14 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               )}
             </div>
             <div className="flex items-center gap-3 mt-1.5">
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                {formatNormaMeta(norma, { variant: 'card-desktop' })}
-              </p>
-              <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+              {formatNormaMeta(norma, { variant: 'card-desktop' }) && (
+                <>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                    {formatNormaMeta(norma, { variant: 'card-desktop' })}
+                  </p>
+                  <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+                </>
+              )}
               <span className="text-xs bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
                 {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'}
               </span>
@@ -732,7 +734,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
             article={studyModeArticle}
             articles={articles}
             allArticleIds={allArticleIds}
-            normaLabel={`${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''}`}
+            normaLabel={formatNormaTitle(norma)}
             onNavigate={(articleNumber) => {
               const uniqueId = currentAnnex ? `all${currentAnnex}:${articleNumber}` : articleNumber;
               const target = articles.find(a => getUniqueArticleId(a) === uniqueId);

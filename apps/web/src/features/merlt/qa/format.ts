@@ -1,6 +1,7 @@
 /** Shared non-component helpers for the Q&A feature (react-refresh boundary). */
 
 import type { QaRetrievedSource } from './types';
+import { normFromUrn, shortNorm } from '../../../utils/sources';
 
 export const CANON_LABEL: Record<string, string> = {
   literal: 'Letterale',
@@ -31,13 +32,6 @@ export function toolLabel(toolName: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-/** The codice civile's date+number marker (R.D. 16 marzo 1942, n. 262), independent of the act-type label used in the urn ("codice.civile:" vs "regio.decreto:"). */
-const CODICE_CIVILE_MARKER = '1942-03-16;262';
-
-function isCodiceCivileUrn(urn: string): boolean {
-  return urn.includes(CODICE_CIVILE_MARKER);
-}
-
 function capitalizeFirst(s: string): string {
   return s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
@@ -50,19 +44,23 @@ function humanizeConceptId(id: string, prefix: string): string {
 /** Best-effort readable label for a graph URN / node id (no server-resolved title). */
 export function formatRetrievedUrn(urn: string): string {
   if (urn.startsWith('live:')) return 'Fonte provvisoria';
-  // Generic massima_* shape: optional "cassazione_" segment, optional branch
-  // word (civile/penale/…, abbreviated to 3 letters; defaults to "civ" when
-  // absent, e.g. a bare massima_<num>_<year>), then <num>_<year>.
-  const massima = urn.match(/massima_(?:cassazione_)?(?:([a-z]+)_)?(\d+)_(\d{4})/i);
+  // A decision, by its key or Brocardi's legacy one: the short label (D2) with no section,
+  // which the key does not carry. A legacy key with no archive is «Cass.».
+  const keyed = urn.match(/^cassazione:(civile|penale):(\d+):(\d{4})$/);
+  if (keyed) return `Cass. ${keyed[1] === 'civile' ? 'civ.' : 'pen.'}, n. ${keyed[2]}/${keyed[3]}`;
+  const court = urn.match(/^corte_costituzionale:(\d+):(\d{4})$/);
+  if (court) return `Corte cost., n. ${court[1]}/${court[2]}`;
+  const massima = urn.match(/massima_(?:cassazione_)?(?:(civile|penale)_)?(\d+)_(\d{4})/i);
   if (massima) {
-    const branch = massima[1] ? massima[1].slice(0, 3) : 'civ';
-    return `Cass. ${branch}. ${massima[2]}/${massima[3]}`;
+    const head = massima[1] ? `Cass. ${massima[1].toLowerCase() === 'civile' ? 'civ.' : 'pen.'}` : 'Cass.';
+    return `${head}, n. ${massima[2]}/${massima[3]}`;
   }
+  // A norm, read from its key (source convention): «art. 2043 c.c.», «art. 12 preleggi».
+  const norm = normFromUrn(urn);
+  if (norm?.numero_articolo) return shortNorm(norm);
+  // An article of an act no table reads: its number alone, never a guessed act.
   const art = urn.match(/~art([0-9a-z-]+)/i);
-  if (art) {
-    const num = art[1].replace(/-/g, ' ');
-    return isCodiceCivileUrn(urn) ? `art. ${num} c.c.` : `art. ${num}`;
-  }
+  if (art) return `art. ${art[1].replace(/-/g, ' ')}`;
   if (urn.startsWith('concetto:')) return humanizeConceptId(urn, 'concetto:');
   if (urn.startsWith('modalita:')) return humanizeConceptId(urn, 'modalita:');
   return urn.length > 60 ? `${urn.slice(0, 57)}…` : urn;

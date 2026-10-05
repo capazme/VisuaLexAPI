@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { formatCitation } from './normaMeta';
 import { formatNormCitation, withCitation } from './citation';
 import { CITATION_GOLDEN } from './__fixtures__/citationGolden';
 
@@ -58,12 +57,11 @@ describe('withCitation', () => {
   const citation = { short: 'S', long: 'art. 1284 c.c., nel testo in vigore al 29 dicembre 2007 (Normattiva)' };
 
   it('puts the citation of a past text first, so the quotation cannot travel without its version', () => {
-    expect(withCitation('Il testo.', citation, '\n\n---\nTratto da: x')).toBe(`${citation.long}\n\nIl testo.`);
+    expect(withCitation('Il testo.', citation, 'x')).toBe(`${citation.long}\n\nIl testo.`);
   });
 
-  it('keeps the trailer the text in force always had, byte for byte', () => {
-    const norma = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043', allegato: '2' };
-    expect(withCitation('Il testo.', null, `\n\n---\nTratto da: ${formatCitation(norma)}`))
-      .toBe('Il testo.\n\n---\nTratto da: codice civile n. 262 del 1942-03-16, Art. 2043 (Allegato 2)');
+  it('starts the text in force with its citation too (D8)', () => {
+    const inForce = 'art. 2043 c.c. (Normattiva, testo vigente, consultato il 5 ottobre 2026)';
+    expect(withCitation('Il testo.', null, inForce)).toBe(`${inForce}\n\nIl testo.`);
   });
 });

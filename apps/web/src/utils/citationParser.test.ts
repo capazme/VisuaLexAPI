@@ -7,17 +7,17 @@ describe('formatParsedCitation — date shown in a citation', () => {
     // The server resolver returns "2012-06-28" for acts it knows by name; a
     // citation names the year. The full date stays in the search params.
     expect(formatParsedCitation({ article: '18', act_type: 'legge', act_number: '92', date: '2012-06-28', confidence: 1 }))
-      .toBe('Art. 18 L. 92/2012');
+      .toBe('art. 18 l. 92/2012');
   });
 
   it('leaves a year-only date alone', () => {
     expect(formatParsedCitation({ article: '5', act_type: 'regolamento ue', act_number: '679', date: '2016', confidence: 1 }))
-      .toBe('Art. 5 Reg. UE 679/2016');
+      .toBe('art. 5 reg. (UE) 2016/679');
   });
 
   it('keeps a codice without number or date unchanged', () => {
     expect(formatParsedCitation({ article: '2043', act_type: 'codice civile', confidence: 1 }))
-      .toBe('Art. 2043 C.C.');
+      .toBe('art. 2043 c.c.');
   });
 });
 
@@ -192,7 +192,7 @@ describe('parseLegalCitation — full dates and article lists', () => {
   });
 
   it('shows only the year of a full date in the preview', () => {
-    expect(formatParsedCitation(parse('art. 1 legge 7/8/1990 n. 241')!)).toBe('Art. 1 L. 241/1990');
+    expect(formatParsedCitation(parse('art. 1 legge 7/8/1990 n. 241')!)).toBe('art. 1 l. 241/1990');
   });
 
   it('collects an "e"-separated list of articles', () => {
