@@ -69,8 +69,9 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   `lingolex_le_mie_card`, and `lingolex_elimina_card` (1–10 of the user's own
   drafts or archived cards, refused before asking for a card the community has
   taken up; confirmed and moved to the trash like the dossier deletions). In
-  the card dialog a card is named only by its subject, state and date: its
-  question and answer are text a model may have written.
+  the card dialog a card is named only by what the server set — its subject,
+  the article of its primary anchor, its state, its date and the start of its
+  id — never by its question or answer, which a model may have written.
 - **Hardening** — binds to `127.0.0.1` by default and refuses non-loopback
   `Host` headers there (DNS rebinding); refuses a browser `Origin` not in
   `MCP_ALLOWED_ORIGINS`. Logs one line per tool call (user, client, tool,

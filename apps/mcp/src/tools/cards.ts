@@ -81,12 +81,35 @@ interface ApiCard {
   istituto: string;
   domanda: string;
   createdAt: string;
+  ancore?: { normaKey: string; articleId: string; isPrimary: boolean }[];
 }
 
 const data = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
 
-const cardLine = (card: ApiCard): string =>
-  `Scheda di ${MATERIA_WORDS[card.materia] ?? 'materia non indicata'}, ${STATO_WORDS[card.stato] ?? 'stato non indicato'}, creata il ${new Date(card.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+/** «art_2_bis» → «art. 2-bis»; «all_1_art_3» → «all. 1, art. 3». Derived by the server from a verified reference. */
+const articleWords = (articleId: string): string =>
+  articleId
+    .replace(/^all_([a-z0-9]+)_art_/, 'all. $1, art_')
+    .replace(/^art_|, art_/, (m) => (m.startsWith(',') ? ', art. ' : 'art. '))
+    .replace(/_/g, '-');
+/** «codice_civile» → «codice civile»; «legge_1990_08_07_241» → «legge 7/8/1990 n. 241». */
+const actWords = (normaKey: string): string => {
+  const dated = /^(.+?)_(\d{4})_(\d{2})_(\d{2})_(.+)$/.exec(normaKey);
+  if (dated) return `${dated[1].replace(/_/g, ' ')} ${Number(dated[4])}/${Number(dated[3])}/${dated[2]} n. ${dated[5].replace(/_/g, ' ')}`;
+  return normaKey.replace(/_/g, ' ');
+};
+
+/**
+ * How a card reads in the deletion dialog: its subject, the article of its primary anchor, its state,
+ * its date and the start of its id — all set by the server, none written by the model, and enough to
+ * tell ten of today's drafts apart (security review of PR 5).
+ */
+const cardLine = (card: ApiCard): string => {
+  const primary = card.ancore?.find((a) => a.isPrimary) ?? card.ancore?.[0];
+  const anchor = primary ? ` su ${articleWords(primary.articleId)}, ${actWords(primary.normaKey)}` : '';
+  const date = new Date(card.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  return `Scheda di ${MATERIA_WORDS[card.materia] ?? 'materia non indicata'}${anchor}, ${STATO_WORDS[card.stato] ?? 'stato non indicato'}, creata il ${date} (${card.id.slice(0, 8)})`;
+};
 
 export function registerCardTools(server: McpServer, config: McpConfig, run: RunTool): void {
   server.registerTool(

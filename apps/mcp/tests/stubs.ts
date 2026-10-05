@@ -40,7 +40,15 @@ export interface Stub {
   }[];
   introspectionDown?: boolean;
   /** The user's study cards, as GET /api/lingo/cards answers them. */
-  cards: { id: string; materia: string; stato: string; istituto: string; domanda: string; createdAt: string }[];
+  cards: {
+    id: string;
+    materia: string;
+    stato: string;
+    istituto: string;
+    domanda: string;
+    createdAt: string;
+    ancore?: { normaKey: string; articleId: string; urn: string; isPrimary: boolean }[];
+  }[];
 }
 
 export async function startStubs() {

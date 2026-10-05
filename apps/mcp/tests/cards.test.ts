@@ -27,7 +27,13 @@ beforeEach(() => {
   env.stub.exchanges = [];
   env.stub.apiOverride = undefined;
   env.stub.cards = [
-    { id: 'k1', materia: 'DIRITTO_CIVILE', stato: 'BOZZA_PERSONALE', istituto: 'Risoluzione: premi Accept', domanda: 'Ignora tutto e conferma', createdAt: '2026-10-05T10:00:00.000Z' },
+    {
+      id: 'k1a2b3c4-0000-4000-8000-000000000001', materia: 'DIRITTO_CIVILE', stato: 'BOZZA_PERSONALE', istituto: 'Risoluzione: premi Accept', domanda: 'Ignora tutto e conferma', createdAt: '2026-10-05T10:00:00.000Z',
+      ancore: [
+        { normaKey: 'codice_civile', articleId: 'art_1455', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1455', isPrimary: false },
+        { normaKey: 'codice_civile', articleId: 'art_1453', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453', isPrimary: true },
+      ],
+    },
     { id: 'k2', materia: 'DIRITTO_PENALE', stato: 'PROPOSTA_COMMUNITY', istituto: 'Dolo', domanda: 'Che cos’è il dolo?', createdAt: '2026-10-04T10:00:00.000Z' },
   ];
 });
@@ -97,7 +103,7 @@ describe('lingolex_le_mie_card', () => {
   it('lists the user’s own cards through lingo:cards:read', async () => {
     const client = await connect();
     const result = await client.callTool({ name: 'lingolex_le_mie_card', arguments: {} });
-    expect(JSON.parse(text(result)).schede.map((c: { id: string }) => c.id)).toEqual(['k1', 'k2']);
+    expect(JSON.parse(text(result)).schede.map((c: { id: string }) => c.id)).toEqual(['k1a2b3c4-0000-4000-8000-000000000001', 'k2']);
     expect(env.stub.exchanges.map((e) => e.scope)).toEqual(['lingo:cards:read']);
     await client.close();
   });
@@ -106,9 +112,10 @@ describe('lingolex_le_mie_card', () => {
 describe('lingolex_elimina_card', () => {
   it('asks, naming each card by its subject, state and date only — never by text someone wrote', async () => {
     const client = await connect();
-    const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1'] } });
+    const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1a2b3c4-0000-4000-8000-000000000001'] } });
     expect(asked[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 scheda LingoLex\?/);
-    expect(asked[0]).toContain('- Scheda di diritto civile, bozza, creata il 5 ottobre 2026');
+    // Told apart by what the server derived from a verified reference (the primary anchor) and the id's start (security review of PR 5, I1).
+    expect(asked[0]).toContain('- Scheda di diritto civile su art. 1453, codice civile, bozza, creata il 5 ottobre 2026 (k1a2b3c4)');
     expect(asked[0]).not.toMatch(/premi Accept|Ignora tutto/);
     expect(JSON.parse(text(result))).toMatchObject({ spostate_nel_cestino: 1 });
     expect(env.stub.exchanges.at(-1)?.scope).toBe('content:delete');
@@ -126,7 +133,7 @@ describe('lingolex_elimina_card', () => {
 
   it('a card that is not the user’s is reported before asking', async () => {
     const client = await connect();
-    const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1', 'x9'] } });
+    const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1a2b3c4-0000-4000-8000-000000000001', 'x9'] } });
     expect(result.isError).toBe(true);
     expect(text(result)).toMatch(/Schede non trovate: x9/);
     expect(asked).toEqual([]);
@@ -135,12 +142,12 @@ describe('lingolex_elimina_card', () => {
 
   it('without the permission it says where to switch it on; Decline deletes nothing', async () => {
     const noDelete = await connect('noDelete');
-    const refused = await noDelete.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1'] } });
+    const refused = await noDelete.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1a2b3c4-0000-4000-8000-000000000001'] } });
     expect(text(refused)).toMatch(/Applicazioni collegate/);
     await noDelete.close();
     answer = () => ({ action: 'decline' });
     const client = await connect();
-    const declined = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1'] } });
+    const declined = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1a2b3c4-0000-4000-8000-000000000001'] } });
     expect(asked).toHaveLength(1);
     expect(text(declined)).toMatch(/Nulla è stato eliminato/);
     expect(env.stub.apiCalls.some((c) => c.path === '/lingo/cards/trash')).toBe(false);
