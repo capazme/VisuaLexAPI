@@ -1,6 +1,6 @@
 # The MCP server, second round — design
 
-**Status:** built — the owner answered all eight questions on 4 October 2026 (§10); merged in #70, #73, #75, #77, #85 (plan `docs/superpowers/plans/2026-10-04-mcp-second-round.md`). The owner's manual check in Claude Code is recorded on #77.
+**Status:** built — the owner answered all eight questions on 4 October 2026 (§10); merged in #70, #73, #75, #77, #85 (plan `docs/superpowers/plans/2026-10-04-mcp-second-round.md`). The owner's manual check in Claude Code (§1, deletion and cards) is pending: the steps are with the orchestrator, the result goes on #77 and #85.
 **Follows:** `docs/superpowers/specs/2026-10-02-mcp-spike-design.md` (phase 1, in `develop`: #53, #57, #58, #60, #64). Where this document and that one differ, this one wins; that spec's E8, §6 "Prompt injection", §8, §12 and Review Focus 5 of its plan now point here.
 **Decisions it rests on** (the owners' private workspace, cited by ID only): D-036, D-037, D-046, D-050.
 

@@ -6,7 +6,7 @@ export interface AuthorizationRequestView {
   client: { name: string | null; redirectHost: string; registeredAutomatically: boolean };
   scopes: { scope: string; label: string }[];
   /** The permission to delete, offered apart and unticked (MCP second round). */
-  deletion?: { label: string };
+  deletion?: { label: string; /** The connection already may delete: the box starts ticked, so a reconnect keeps it. */ granted?: boolean };
   expiresAt: string;
 }
 

@@ -87,7 +87,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and the counter it spent. Then it sets `req.user` and `req.delegation`, and `authenticate` lets
   the request through; nothing else sets `req.delegation`. **Adding a route to
   the table is a security decision**: every entry is reachable by any MCP
-  client the user connected, and none may update, move or delete.
+  client the user connected. None updates or moves, and none deletes for
+  good: the three trash routes (below) move rows to a trash only the user's
+  session restores or empties.
   `GET /api/oauth/quota` reports what is left (`{ points, counters }`).
 - **Provenance and notes** (MCP second round; spec
   `docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` §5). Dossiers

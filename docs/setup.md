@@ -138,7 +138,9 @@ recente** at the bottom of a dossier, restores it. Only your own drafts and
 archived cards can be deleted, never a card proposed to the community.
 
 A connection made before the card tools existed lacks their permission: Claude
-Code answers that it is not authorised; reconnect from `/mcp`. It works on
+Code answers that it is not authorised; reconnect from `/mcp`. If you had
+switched deletion on, its box on the consent page is already ticked: leave it
+to keep it. It works on
 `localhost` only: claude.ai needs a public address, which is a later round.
 
 The environment variables: `OAUTH_*` in `apps/server/.env` (see its
