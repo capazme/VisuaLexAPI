@@ -57,12 +57,12 @@ const CONCURRENCY = 5;
 
 const apiBase = (): string => (process.env.LEGAL_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
 
-class SourceUnavailable extends Error {}
+export class SourceUnavailable extends Error {}
 
 /** A status that says nothing about the reference: the source is down, slow or limiting us. */
 const sourceFailed = (status: number): boolean => status === 429 || status >= 500 || status === 0;
 
-async function post(path: string, body: unknown): Promise<{ status: number; data: Record<string, unknown> }> {
+export async function postLegalApi(path: string, body: unknown): Promise<{ status: number; data: Record<string, unknown> }> {
   let response: Response;
   try {
     response = await fetch(`${apiBase()}${path}`, {
@@ -97,12 +97,12 @@ const SEVERAL_ARTICLES = /[,;]|\s(e|ed)\s|^\d+\s*-\s*\d+$/i;
 const NOT_PRESENT = /non presente/i;
 
 // "2645-bis", "2645 bis", "2645bis" → "2645-bis": the fingerprints, the tree and the norm write it differently.
-const articleKey = (article: string): string =>
+export const articleKey = (article: string): string =>
   article.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2');
 
 /** Steps 1 and 2 for one reference: what it names, or why not. */
 async function identify(reference: string): Promise<Resolution> {
-  const parsed = await post('/parse_query', { query: reference });
+  const parsed = await postLegalApi('/parse_query', { query: reference });
   if (parsed.status !== 200) throw new SourceUnavailable(`parse_query ${parsed.status}`);
   const params = parsed.data.parsed as Record<string, string> | null | undefined;
   if (!parsed.data.recognized || !params?.act_type) {
@@ -119,7 +119,7 @@ async function identify(reference: string): Promise<Resolution> {
     return { outcome: 'ambiguous', display, detail: 'Il riferimento indica più articoli: scrivine uno per riferimento.' };
   }
 
-  const fetched = await post('/fetch_norma_data', params);
+  const fetched = await postLegalApi('/fetch_norma_data', params);
   if (NOT_PRESENT.test(String(fetched.data.error ?? ''))) {
     return { outcome: 'does_not_exist', display, detail: String(fetched.data.error) };
   }
@@ -170,7 +170,7 @@ async function confirmExistence(resolutions: Resolution[]): Promise<void> {
 
 /** Fingerprints for a single-part act; the tree, annex by annex, otherwise. */
 async function normattivaVerdicts(act: string, norms: NormaVisitata[]): Promise<Verdict[]> {
-  const answer = await post('/fetch_act_fingerprints', { urn: act });
+  const answer = await postLegalApi('/fetch_act_fingerprints', { urn: act });
   const fingerprints =
     answer.status === 200 && answer.data.available === true && answer.data.fingerprints && typeof answer.data.fingerprints === 'object'
       ? (answer.data.fingerprints as Record<string, unknown>)
@@ -181,7 +181,7 @@ async function normattivaVerdicts(act: string, norms: NormaVisitata[]): Promise<
     return norms.map((norm) => (keys.has(articleKey(norm.numero_articolo)) ? 'exists' : 'missing'));
   }
 
-  const tree = await post('/fetch_tree', { urn: act, return_metadata: false });
+  const tree = await postLegalApi('/fetch_tree', { urn: act, return_metadata: false });
   const articles = tree.status === 200 && Array.isArray(tree.data.articles) ? (tree.data.articles as unknown[]) : null;
   if (!articles) return norms.map(() => 'unknown');
   const pairs = new Set(
@@ -198,7 +198,7 @@ async function normattivaVerdicts(act: string, norms: NormaVisitata[]): Promise<
 const EU_NOT_FOUND = /not found|non trovat|non presente|DocumentNotFound/i;
 
 async function euArticleVerdict(norm: NormaVisitata): Promise<Verdict> {
-  const answer = await post('/fetch_article_text', {
+  const answer = await postLegalApi('/fetch_article_text', {
     act_type: norm.tipo_atto,
     act_number: norm.numero_atto ?? '',
     date: norm.data ?? '',
