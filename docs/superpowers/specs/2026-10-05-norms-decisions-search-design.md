@@ -550,16 +550,22 @@ before the choice) takes no notes.
 #### 8.2 The projection
 
 A decision's text, for anchoring, is **its blocks in reading order — epigrafe,
-motivazione, dispositivo — concatenated, minus every `\n`**. Offsets count
-characters in that string, as an article's count characters in
-`article_text` minus `\n` (rule 23). Two properties follow:
+motivazione, dispositivo — each with the whitespace at its two edges removed
+(`strip()`), then concatenated, then every `\n` removed**. Offsets count
+characters in that string, as an article's count characters in `article_text`
+minus `\n` (rule 23). Two properties follow:
 
 - the readers may add or move `\n` freely (paragraph rules can still be
   refined);
-- moving a boundary between blocks without changing a character — the Corte
+- moving a boundary between blocks to a point of whitespace — the Corte
   costituzionale's split of the epigrafe at «Ritenuto» or «Considerato», the
-  Cassazione's cut of the dispositivo off the end of the reasons — moves no
-  anchor, because the concatenation is the same.
+  Cassazione's cut of the dispositivo at «P.Q.M.» — moves no anchor. The
+  readers trim at a split (`split_epigrafe` keeps `epigrafe[:cut].rstrip()` and
+  starts the motivazione after `[ \t]*`; `split_dispositivo` keeps
+  `text[:cut].rstrip()`), so without the edge `strip()` the spaces at a split
+  would be counted on one side and not the other (the Sentenze session's
+  review, 5 October). The web's `decisionProjection` and the API's freeze test
+  compute the same string.
 
 #### 8.3 The renderer
 
@@ -584,8 +590,11 @@ no discussions (non-goals).
 A decision's text changes under its anchors in three known ways: Italgiure
 withdraws a text while personal data are removed (the decision then comes back
 without its text: `testo_assente`); Italgiure replaces it with an anonymised
-version (names become «omissis»); a reader is changed against N10. The 30-day
-cache delays the first two; it does not prevent them.
+version (names become «omissis»); the Corte costituzionale corrects a published
+text in its open data (the 2001–today bundle is regenerated every day); a
+decision first read from the archive's text field (§11.6) is read again, later,
+from its PDF; a reader is changed against N10. The caches delay the first ones;
+they do not prevent them.
 
 None of them may lose a note in silence (N11). The decision tab computes, from
 `resolveAnchors`, which anchors did not land, and shows them under the text in
@@ -597,8 +606,12 @@ Nothing is deleted or moved automatically.
 
 #### 8.5 The contract, and what it freezes
 
-From this round, root rule 23 covers decision texts too. Frozen — the output of
-each reader minus `\n`:
+From this round, root rule 23 covers decision texts too. **When:** the freeze
+takes effect with the pull request that first stores notes or highlights on
+decisions (plan PR 4); until then readers may still change, and the bump to
+`italgiure:v3:` (§11.7) is the last change of characters allowed. Notes on
+decisions never ship before the PDF reader they anchor to (PR 1 before PR 4).
+Frozen — the output of each reader, as projected (§8.2):
 
 - the Cassazione's text from the original PDF (§11): what is kept of a page,
   how lines and paragraphs are joined, where the dispositivo starts — frozen as
@@ -607,7 +620,11 @@ each reader minus `\n`:
   `_WITHHELD_*`; `paragraphs` may insert only `\n`);
 - `corte_cost.py`: the fields that make each block and the order; the epigrafe
   split may move, never drop or change a character;
-- the caches (the resolver's `italgiure:v2:` and `corte_cost:v2:` entries): the
+- what may still change, because it inserts only `\n`:
+  `corte_cost.line_paragraphs` and `italgiure.paragraphs`, and the paragraph
+  breaks of §11 (a `\n\n` where a space was would change a character: only a
+  break between two characters already separated by a `\n` may move);
+- the caches (the resolver's `italgiure:v3:` and `corte_cost:v2:` entries): the
   resolver's rule «raise the version whenever the reader changes the shape of
   what it returns» stays for shape (blocks, `\n`); a change of characters is
   refused, so no bump of a cache key may serve as a way to change texts already
@@ -615,15 +632,17 @@ each reader minus `\n`:
 
 Tests that hold it:
 
-- **web**: `decisionRender.test.ts` renders real decision texts (fixtures: a
-  civil and a penal Cassazione decision, a Corte costituzionale sentenza after
-  2001, a typewritten one before 2001, an ordinanza split at «Ritenuto») with
-  highlights and links on, and asserts that the rendered text nodes spell the
-  projection — the same check as `articleRender.test.ts`;
-- **API**: `test_decisions_text_frozen.py` runs each reader on recorded raw
-  records (Solr JSON, open-data JSON) and compares the projection of its output
-  with a stored golden string, so any change of character fails before it
-  reaches a user.
+- **web**: `decisionRender.test.ts` renders decision texts with highlights and
+  links on, and asserts that the rendered text nodes spell the projection — the
+  same check as `articleRender.test.ts`. The texts are synthetic, or Corte
+  costituzionale texts checked to name no private person (the repository is
+  public: fixtures hold only courts, magistrates, institutions and provisions);
+- **API**: `test_decisions_text_frozen.py` runs each reader on synthetic records
+  and PDFs that exercise every rule (in CI) and on real records and PDFs kept
+  locally in the git-ignored `tests/fixtures/decisions/private/` (skipped in
+  CI), and compares the projection of each output with a stored **SHA-256 and
+  length**, never the text, so any change of character fails before it reaches
+  a user.
 
 The root `CLAUDE.md` rule 23 and `services/visualex/CLAUDE.md` gain the
 sentence that says so.
@@ -721,8 +740,12 @@ PDF (one more request, about 200 KB), and makes the text from the PDF:
 6. **The fallback.** No `filename`, a PDF that cannot be fetched or parsed, or a
    text that fails the checks of plan Task 2 (shorter than the field's, missing
    the field's opening words): the text field as today, with a notice
-   `testo_da_archivio` — «Testo dell'archivio della Cassazione: potrebbe essere
-   incompleto. Il PDF originale non era disponibile.» — and the field's faults.
+   `testo_da_archivio` — «Testo dell'archivio della Cassazione, provvisorio:
+   potrebbe essere incompleto, e le note potrebbero non ritrovarsi nel testo
+   completo.» — and the field's faults. Such a decision is cached like one
+   without its text (24 hours, never 30 days), so it is read again from its PDF
+   soon; notes stay allowed on it, and when the text then changes they are
+   listed in §8.4's box, never lost (the Sentenze session's ruling, 5 October).
 7. **Requests and caches.** One request more per decision found (the PDF), so a
    lookup stays within the owner's ten requests (2026-10-04). The PDF's bytes
    are kept 30 days (a cache namespace of their own) for §12.2; the text is

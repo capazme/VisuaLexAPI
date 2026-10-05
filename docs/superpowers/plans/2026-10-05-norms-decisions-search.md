@@ -440,6 +440,9 @@ git commit -m "feat(api): read a Cassazione decision's text from its original PD
 
 ### Task 4: The reader reads the PDF, and says when it could not
 
+> **Amended 5 October (the Sentenze session's review; privacy).** The repository is public: fixtures hold only courts, magistrates, institutions and provisions, never a party's or a lawyer's name. Real PDFs and records live only in the git-ignored `services/visualex/tests/fixtures/decisions/private/` (see its README section); tests that need them go in a `*_local.py` module skipped when that folder is absent (as `test_decisions_pdf_text_local.py` does). CI tests use synthetic PDFs from `services/visualex/tests/decisions_pdf_synth.py` (`make_pdf`, `Text`) and synthetic Solr records. Wherever this task says `FIX / "pdf" / "<fixture>…"`, read: a synthetic record and PDF in CI, the private ones in the local module.
+> Also amended: a decision read from the text field (`testo_origine == "archivio"`) is cached like a pending one — the resolver's `decisions_pending` namespace, 24 hours — never in `decisions_found` (30 days), so it is read again from its PDF soon; test it. The notice copy is the one below.
+
 **Files:**
 - Modify: `services/visualex/visualex_api/services/decisions/italgiure.py` (`FIELDS` gains `filename`; `lookup` fetches the PDF; `pdf_url`)
 - Modify: `services/visualex/visualex_api/services/decisions/model.py` (`Decision.testo_origine`: `"pdf"` | `"archivio"` | None, in `_ATTRIBUTES`)
@@ -455,7 +458,7 @@ git commit -m "feat(api): read a Cassazione decision's text from its original PD
   - `def pdf_url(doc: dict) -> str | None` — the `.clean.pdf` address of a record, or None.
   - `ItalgiureReader.lookup(...)` returns a `Decision` whose `testo` comes from the PDF (`testo_origine="pdf"`) or from the field (`"archivio"`); the PDF's bytes are available to the resolver as `ItalgiureReader.last_pdf(identity) -> bytes | None` **or**, simpler and stateless, `lookup` returns `(Decision, bytes | None)` through a new method `lookup_with_pdf` that `lookup` wraps. Use the second form.
   - Notice `{"tipo": "testo_da_archivio"}` when `testo_origine == "archivio"` and there is a text.
-  - Web copy: «Testo dell'archivio della Cassazione: potrebbe essere incompleto. Il PDF originale non era disponibile.»
+  - Web copy: «Testo dell'archivio della Cassazione, provvisorio: potrebbe essere incompleto, e le note potrebbero non ritrovarsi nel testo completo.»
 
 - [ ] **Step 1: Failing tests (API).**
 
@@ -1435,6 +1438,9 @@ git commit -m "feat(api): POST /fetch_decision_pdf — the court's own PDF of a 
 
 ### Task 9: A decision's text is frozen
 
+> **Amended 5 October (the Sentenze session's review; privacy).** The repository is public: fixtures hold only courts, magistrates, institutions and provisions, never a party's or a lawyer's name. Real PDFs and records live only in the git-ignored `services/visualex/tests/fixtures/decisions/private/` (see its README section); tests that need them go in a `*_local.py` module skipped when that folder is absent (as `test_decisions_pdf_text_local.py` does). CI tests use synthetic PDFs from `services/visualex/tests/decisions_pdf_synth.py` (`make_pdf`, `Text`) and synthetic Solr records. Wherever this task says `FIX / "pdf" / "<fixture>…"`, read: a synthetic record and PDF in CI, the private ones in the local module.
+> Also amended: the projection is each block `strip()`ped at its edges, then concatenated, then every `\n` removed (spec §8.2): `"".join((testo.get(k) or "").strip() for k in ("epigrafe", "motivazione", "dispositivo")).replace("\n", "")`. The golden file stores, per case, `{"sha256": <hex of the projection's UTF-8>, "length": <len>}` — never the text — in `frozen_projections.json`; the synthetic cases run in CI, the private ones in `test_decisions_text_frozen_local.py`. The freeze takes effect with PR 4 (spec §8.5): this task writes the test and the contract now so that every later change is caught.
+
 **Files:**
 - Create: `services/visualex/tests/test_decisions_text_frozen.py`
 - Create: `services/visualex/tests/fixtures/decisions/frozen_projections.json`
@@ -2404,6 +2410,8 @@ git commit -m "feat(web): a topic from Brocardi's glossary or the palette finds 
 
 ### Task 18: The decision renderer and its contract
 
+> **Amended 5 October (the Sentenze session's review; privacy).** `decisionTexts.ts` holds synthetic decision texts that exercise every shape (blocks with edge whitespace, single `\n` line wraps, `\n\n` paragraphs, an epigrafe without a motivazione) and, if wanted, Corte costituzionale texts checked to name no private person — never a Cassazione text read from a real record. `decisionProjection` strips each block's edges before concatenating (spec §8.2), and the renderer renders each block's stripped text, so the rendered text nodes still spell the projection; add a test with a block whose edges carry spaces.
+
 **Files:**
 - Create: `apps/web/src/utils/decisionRender.ts`
 - Create: `apps/web/src/utils/__fixtures__/decisionTexts.ts` (the texts Task 9 freezes — the Cassazione PDF fixtures read by `text_from_pdf`, the two text-field fallbacks, the Corte costituzionale sample — as `DecisionText` objects: copy them from the readers' outputs, recorded by a scratch run of the Python readers, byte for byte — compare SHA-256 of each string between the Python output and the TS fixture before committing, memory `subagent_byte_fidelity`)
@@ -2490,7 +2498,8 @@ describe('renderDecisionHtml', () => {
 const BLOCKS: Array<[keyof DecisionText, string]> = [['epigrafe', 'Epigrafe'], ['motivazione', 'Motivazione'], ['dispositivo', 'Dispositivo']];
 
 export function decisionProjection(testo: DecisionText): string {
-  return BLOCKS.map(([k]) => testo[k] ?? '').join('').replace(/\n/g, '');
+  // each block trimmed at its edges (spec §8.2), as the API's freeze test computes it
+  return BLOCKS.map(([k]) => (testo[k] ?? '').trim()).join('').replace(/\n/g, '');
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -3318,4 +3327,6 @@ checks together):
 36 of 36 non-withheld decisions pass both fallback checks at the recommended thresholds — the
 thresholds were chosen with margin below this floor, not fitted exactly to it, so a decision
 Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
+
+**Amendment, 2026-10-05 (evening) — the Sentenze session's review of §8, and privacy.** Accepted in full (spec §8.2, §8.4, §8.5, §11.6): the projection strips each block's edges; a decision read from the text field is cached 24 h with a «provvisorio» notice; the freeze takes effect with PR 4 and `italgiure:v3:` is the last change of characters; `line_paragraphs`/`paragraphs` may still change; Corte costituzionale corrections are a cause in §8.4. Privacy: real decisions stay in the git-ignored `private/` folder, CI tests run on synthetic PDFs and records, freeze goldens are SHA-256 and length. With the owner's «46 sì» the branch was rebuilt from c98e1f40 so that no commit holds a real PDF or record (Tasks 2–3 now in 5d6d11dd and e42ad740). Tasks 4, 9 and 18 carry the amendment at their head.
 
