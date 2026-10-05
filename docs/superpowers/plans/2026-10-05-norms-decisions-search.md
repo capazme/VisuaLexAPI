@@ -2273,4 +2273,48 @@ git commit -m "feat(web): the Cronologia lists the decisions opened and reopens 
 
 ## Amendments during execution
 
-(Empty until Task 1 runs.)
+**Task 1, 2026-10-05 — measured on Italgiure's public `sn.solr` endpoint (20 live requests: 1
+session GET, 19 POSTs, each ≥2 s apart).**
+
+Counts for how a decision writes an article (`rows=0`, counting only):
+- `kind:"snciv" AND ocr:"art. 2043 c.c."` — 939
+- `kind:"snciv" AND ocr:"art. 2043 cod. civ."` — 583
+- `kind:"snciv" AND ocr:"art. 2043 del codice civile"` — 7
+- `kind:"snciv" AND ocr:"art. 360 c.p.c."` — 6,373
+- `kind:"snpen" AND ocr:"art. 640 c.p."` — 72
+- `ocr:"art. 3 Cost."` — 2,338
+- `ocr:"art. 3 della Costituzione"` — 313
+- `kind:"snciv" AND ocr:"art. 2051 bis c.c."` — 0 (the ordinal spacing is exercised correctly by
+  the regex; there is simply no such article, which is why the test for it checks phrasing, not
+  a result count)
+- `sort=pd desc` — 200 OK; `sort=datdep desc` — 400 Bad Request (confirms the known behaviour;
+  `search.py`/`italgiure.py` must sort by `pd`, never `datdep`).
+
+Proximity for a numbered act's article (`kind:"snciv" AND ocr:"art 2 241 1990"~N`, `rows=10`,
+`hl.fl=ocr`, ten fragments read by hand per N, per Step 2):
+- `~6` — 173 hits; all ten fragments genuinely cite art. 2 of l. 241/1990 (durata del
+  procedimento, termine di conclusione, diritto di accesso).
+- `~8` — 251 hits; nine of ten are right, but one fragment highlights «dell'art. 13, comma 2,
+  t.u.imm., e dell'art. 21 octies l. 241/1990» — the decision cites art. 21-octies of l.
+  241/1990, not art. 2; the "2" that matched is "comma 2" of a different article. Wrong hit.
+- `~12` — 354 hits; the same wrong hit (art. 21-octies) is still in the top ten.
+
+**Chosen `PROXIMITY = 6`**, not the plan's assumed default of 8: 6, 8 and 12 do not agree (the
+brief's fallback rule for 8 only applies when they do), and 6 is the largest value whose ten
+results are all correct. Task 2's draft code sets `PROXIMITY = 8` and its docstring's own
+measurement note — these must be corrected to 6 when Task 2 is implemented, including the
+`test_a_numbered_act_is_a_proximity_phrase` expectation (the proximity is read from the
+constant, so the test itself does not need a literal change, only the constant's value and its
+docstring).
+
+Fixtures recorded (`rows=3`, `fl=id,numdec,anno,datdep,szdec,tipoprov,kind`, `sort=pd desc`,
+highlighting on, one fragment of ≤200 characters per hit; bodies saved exactly as received):
+- `italgiure_search_2043_cc.json` — `kind:"snciv" AND (ocr:"art. 2043 c.c." OR ocr:"art. 2043
+  cod. civ.")` — numFound 1,430.
+- `italgiure_search_topic_chance_2043.json` — `kind:"snciv" AND ocr:"perdita di chance" AND
+  ocr:"art. 2043 c.c."` — numFound 34.
+- `italgiure_search_empty.json` — `kind:"snciv" AND ocr:"art. 99999 c.c."` — numFound 0.
+
+Every fragment in the three fixtures was read by hand: none names a private person (each is a
+point of law — a *motivo di ricorso* or a holding — never a party, a fact pattern naming
+someone, or a case detail), so no record needed replacing.
