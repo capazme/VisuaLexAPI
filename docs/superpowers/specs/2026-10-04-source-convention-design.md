@@ -206,9 +206,9 @@ built now.
 |---|---|---|
 | **citation** | how a lawyer cites the article | copy and export of any text (with the version clause, §3.5), dossier `citation`, MCP `riferimento`, norms route `display`, notifications |
 | **short** | the article in little room | tabs of a single article, dossier rows, comparison headers, chips (Q&A, links), quick-norm suggestions, the graph's `estremi`, PDF headings |
-| **act citation** | the act alone, as cited | workspace block subtitle, «Fonte:» lines |
+| **act citation** | the act alone, as cited | «Fonte:» lines; under a code's heading, the decree it is («r.d. 16 marzo 1942, n. 262» under «Codice civile») |
 | **act short** | the act in little room | workspace tabs, dossier groups |
-| **act heading** | the act as a title: the name for the acts cited by their own name (the codes cited by name, the Constitution, the preleggi, the disp. att.), the act citation for every other act (decided: the dossier spec `2026-10-04-dossier-per-atto-design.md` §2, interview Q6) | the dossier's act block, the graph's act node `titolo`, the index window title |
+| **act heading** | the act as a title: the name for the acts cited by their own name (the codes cited by name, the Constitution, the preleggi, the disp. att.), the act citation for every other act (decided: the dossier spec `2026-10-04-dossier-per-atto-design.md` §2, interview Q6) | the dossier's act block, the search card and the workspace block titles, the graph's act node `titolo`, the index window title |
 
 ### 3.2 The forms
 
@@ -231,6 +231,10 @@ and with no comma; an aliased code cited by the act it is). The short forms, the
 EU forms and the new abbreviations were the questions of §9; the owner took
 every recommendation (4 October), so the golden file marks them `decided`. The
 act headings follow the dossier spec the owner approved (§3.1); the strings of the named acts are the dossier's own table.
+A card's or a block's line under the heading says only what the heading does not:
+the decree a code is, an aliased code's name («Codice del consumo» under «d.lgs.
+6 settembre 2005, n. 206»), «Estremi non disponibili» for an act with neither date
+nor number, else nothing (web PR 1a: the old «Edizione del …» repeated the heading's date).
 
 ### 3.3 The tables
 

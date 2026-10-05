@@ -8,7 +8,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-04-source-convention-design.md`. **Evidence:** `docs/superpowers/specs/2026-10-04-source-convention-inventory.md` (every site to replace is listed there with `file:line`).
 
-**Approved** (4 October 2026): the owner approved the spec and took every recommendation of its §9, «per il 31 procedi con le raccomandazione». **Each PR starts on the orchestrator's go**: several running sessions share these files (Sentenze PR B: `decisionLinks.ts`; the dossier UI round: dossier rows and PDF; the MCP second round: `citeAct`/`citeArticle` and the MCP labels), so the orchestrator sequences every adoption PR with them. Each adoption PR removes its cases from the web test's `PENDING_ADOPTION` list.
+**Approved** (4 October 2026): the owner approved the spec and took every recommendation of its §9, «per il 31 procedi con le raccomandazione». **Each PR starts on the orchestrator's go**: several running sessions share these files (Sentenze PR B: `decisionLinks.ts`; the dossier UI round: dossier rows and PDF; the MCP second round: `citeAct`/`citeArticle` and the MCP labels), so the orchestrator sequences every adoption PR with them. Each adoption PR removes its cases from the web test's `PENDING_ADOPTION` list (emptied and removed by PR 1a).
 
 ## Global Constraints
 
@@ -43,16 +43,18 @@
 
 ## PR 1 — Web: one label module (`refactor/web-source-labels`)
 
-**Files:** create `apps/web/src/utils/sources/{actTypes,normLabels,normIdentity,index}.ts` and `apps/web/src/utils/sources/__tests__/golden.test.ts`; modify `utils/citation.ts` (head from `normLabels`), `utils/normaMeta.ts`, `utils/dateUtils.ts` (`abbreviateActType` goes), `utils/citationParser.ts`, `utils/citationMatcher.ts`, `utils/normattivaParser.ts`, `features/merlt/qa/format.ts`, and every inline site of inventory §3.1 (`SearchPanel`, `ArticleTabContent`, `SortableDossierItem`, `dossierUtils`, `DossierDetailView`, `StudyMode`, `StudyModeContent`, `HistoryView`, `CompareView`, `AdvancedExportModal`, `AskMerltEntry`, `NormaCard`, `NormaBlockComponent`); `apps/web/CLAUDE.md` (Shared utilities).
+**Files:** create `apps/web/src/utils/sources/{actTypes,normLabels,normIdentity,index}.ts` (`normIdentity` in 1b) and `apps/web/src/utils/sources/__tests__/golden.test.ts`; modify `utils/citation.ts` (head from `normLabels`), `utils/normaMeta.ts`, `utils/dateUtils.ts` (`abbreviateActType` goes), `utils/citationParser.ts`, `utils/citationMatcher.ts`, `utils/normattivaParser.ts`, `features/merlt/qa/format.ts`, and every inline site of inventory §3.1 (`SearchPanel`, `ArticleTabContent`, `SortableDossierItem`, `dossierUtils`, `DossierDetailView`, `StudyMode`, `StudyModeContent`, `HistoryView`, `CompareView`, `AdvancedExportModal`, `AskMerltEntry`, `NormaCard`, `NormaBlockComponent`); `apps/web/CLAUDE.md` (Shared utilities).
 
-- [ ] **Golden test** over every norm case: `citation`, `short`, `act_*` labels from `normLabels`; act and article identity from `normIdentity` (from `norma_data.url`/`urn` for Normattiva acts, CELEX for EU acts); decision `key`, `path`, `citation`, `short` from `decisionLinks` (`decisionKey`, `linkableDecisionPath`, `formatDecisionCitation`, the new `formatDecisionShort`), which Sentenze PR B extends first. Run: red on the cases the code does not meet yet.
-- [ ] **`actTypes.ts`**: the type table and the codes-by-name table (spec §3.3), case-insensitive lookup (web gotcha 28).
-- [ ] **`normLabels.ts`**: `citeNorm`, `shortNorm`, `citeAct`, `shortAct`, `actHeading`; never `None`, never an ISO date, year-only per Q7.
-- [ ] **`citation.ts`** calls `citeNorm` for its head; `citationGolden.ts` stays green unchanged.
-- [ ] **Replace the inline sites**, one commit per surface; each commit names the inventory rows it removes. Copy trailers follow Q8.
-- [ ] **Q&A chip**: from the server's `title`, else `shortNorm` of what the URN identifies; never `art. 12 c.c.` for the preleggi; a decision key becomes its short label.
-- [ ] **Massimario and Brocardi chips** (`DecisionChip`, `MassimeSection`) use `formatDecisionShort` once Q2 is answered; the Massimario's server-side `label` is then dropped from the wire or ignored.
-- [ ] **Suites:** `npm --prefix apps/web run test -- --run`, `run build`, `run lint`. **Browser pass** on `http://localhost:5173`: a tab of the l. 241/1990, the c.c., the preleggi, the GDPR; a dossier with two laws; the comparison; copy of a text in force and of a past text; the Massimario panel of art. 2043 c.c.
+The orchestrator split PR 1 in three (5 October 2026): **1a** the labels of norms (this branch), **1b** the dossier's labels and the web identity module (`normIdentity.ts`, the year-only keys below), **1c** the decision chips, after the Sentenze PRs.
+
+- [x] **Golden test** (1a) over every norm case: `citation`, `short`, `act_citation`, `act_short`, `act_heading` from `normLabels`; `short` again from the norm `normFromUrn` reads back from its Normattiva identity; the codes table pinned to the API's `map.py`. Identity from `normIdentity` and the decision labels → 1b and 1c.
+- [x] **`actTypes.ts`** (1a): the type table (D4), the named acts and their headings (the dossier's table), the EU acts (D6), the codes table (copy of `NORMATTIVA_URN_CODICI`); case-insensitive lookup (web gotcha 28).
+- [x] **`normLabels.ts`** (1a): `citeNorm`, `shortNorm`, `citeAct`, `shortAct`, `actHeading`, plus `actSubtitle` (the line under a card's or block's title), `inForceCitation` (D8), `labelFromParams` (parsers and quick norms), `normFromUrn` (the Q&A chip); never `None`, never an ISO date, year-only per D7.
+- [x] **`citation.ts`** (1a) calls `citeNorm` for its head; `citationGolden.ts` green, one case changed: its «type with no abbreviation» was the d.m., which D4 now abbreviates, so it uses a decreto interministeriale.
+- [x] **Inline sites** (1a): tabs (`SearchPanel`: act short), article labels (`ArticleTabContent`, `CompareView`, `StudyMode`, `HistoryView`'s quick norm, `AskMerltEntry`, `AdvancedExportModal`), card and block titles (`NormaCard`, `NormaBlockComponent`: act heading, then `actSubtitle`), notifications (`normaChanges`), the parsers' previews (`citationParser`, `citationMatcher`, `normattivaParser`), `abbreviateActType` and `formatCitation` removed. Copies of the text in force start with `inForceCitation` (D8) in the tab, the dossier reader and Study Mode. **Not in 1a:** `HistoryView`'s rows, `SortableDossierItem`, `dossierUtils`, `DossierDetailView` → 1b.
+- [x] **Q&A chip** (1a): `shortNorm` of what the URN identifies (the preleggi are never «c.c.»); `cassazione:<archivio>:<n>:<anno>`, `corte_costituzionale:<n>:<anno>` and the `massima_…` keys become the short label (D2), «Cass., n. …» when the key names no archive.
+- [ ] **Massimario and Brocardi chips** (`DecisionChip`, `MassimeSection`) use `formatDecisionShort` → **1c**; the Massimario's server-side `label` is then dropped from the wire or ignored.
+- [x] **Suites** (1a): `npm --prefix apps/web run test -- --run`, `run build`, `run lint`; `sourcesGolden.test.ts`'s `PENDING_ADOPTION` is gone (EU cases checked against `citeNorm`: `citation.ts` never cites a past text of the Union). **Browser pass** on the branch's own Vite.
 
 ## PR 2 — Server and MCP (`refactor/server-source-labels`)
 
@@ -107,6 +109,6 @@ Owned by the graph phase-2 work; this plan gives the rules (spec §5.3) and the 
 
 Not a PR of this plan: Sentenze PR B builds `decisionLinks.ts`'s wording (its plan, Task 8), which is the web implementation of spec §4; its tests take the golden decision cases. PR C stores `etichetta` and `title` as its spec says until the owner answers Q9 (spec §8.3).
 
-## Year-only keys at rest (inside PR 1)
+## Year-only keys at rest (inside PR 1b)
 
 - [ ] When an act's date becomes known (the resolver or a later search), the reader loads annotations, highlights, bookmarks, saved-norm watches (`NormaWatch`), discussions and study-card anchors (`LingoCardAncora`) under **both** `buildItemKey` of the year-only norm and of the dated one, and writes new ones under the dated key. No row is rewritten. Test with two stored highlights, one under each key.
