@@ -11,7 +11,7 @@ import pytest
 
 from visualex_api.services.decisions import italgiure
 from visualex_api.services.decisions.italgiure import ItalgiureReader, _plausible, pdf_url, to_decision
-from visualex_api.services.decisions.pdf_text import text_from_pdf
+from visualex_api.services.decisions.pdf_text import read_decision_pdf, text_from_pdf
 from visualex_api.services.http_client import HttpResult
 
 PRIVATE = pathlib.Path(__file__).parent / "fixtures" / "decisions" / "private"
@@ -57,3 +57,11 @@ async def test_a_real_record_reads_from_its_pdf(monkeypatch, path):
     assert decision.testo_origine == "pdf" and data == pdf
     assert decision.testo == text_from_pdf(pdf)
     assert "motivazione" in decision.testo and len(calls) == 3
+
+
+@pytest.mark.parametrize("path", RECORDS, ids=lambda p: p.name)
+def test_the_header_names_the_records_own_number_and_the_text_is_unchanged(path):
+    doc, pdf = _record(path), _pdf(path)
+    text, header = read_decision_pdf(pdf)
+    assert text == text_from_pdf(pdf)
+    assert header == (int(doc["numdec"]), int(doc["anno"]))

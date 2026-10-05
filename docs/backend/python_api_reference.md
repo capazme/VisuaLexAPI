@@ -260,10 +260,12 @@ never cut. Cassazione decisions come from Italgiure's public archive (SentenzeWe
 costituzionale decisions from the court's open data. Behind the ingress the route needs a
 login like the other scraping routes, and a call costs two points of the user's quota,
 whatever it sends upstream.
-A Cassazione lookup sends a homepage `GET` and a Solr `POST` per query, at most 10 requests
-in all: a reference without the archive queries both archives (4), a miss adds the query for
+A Cassazione lookup sends a homepage `GET` and a Solr `POST` per query, and one `GET` for the
+court's PDF per decision found (the text is read from it; without it the archive's text field
+stands, with the notice `testo_da_archivio`), at most 10 requests in all: a reference without the archive queries both archives (4), a miss adds the query for
 each archive's start, once a day (4), and, for the penal archive, the next year's lookup (2).
-A later miss the same day sends at most 6, a hit in a named archive 2; retries of a failed
+A later miss the same day sends at most 6, a hit in a named archive 3 (the suggestion of the
+penal next year reads the record only, no PDF); retries of a failed
 request come on top. A Corte costituzionale call makes at most one
 download, shared by concurrent callers.
 Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.

@@ -469,14 +469,25 @@ Breaking one of these breaks the product. Read before editing.
     from it. A record with neither a text nor a notice (a missing `ocr`, a renamed field)
     comes back with `testo == {}`, no `testo_assente` and a logged warning: never present it
     as the source's anonymisation. The resolver keeps a decision without its text 24 hours
-    (`decisions_pending`), never 30 days, and adds the notice `testo_non_disponibile`. Never
+    (`decisions_pending`), never 30 days, and adds the notice `testo_non_disponibile`; one read
+    from the archive's field instead of the PDF is kept the same way. Never
     pass a notice on as `motivazione`: the page would show it as the court's reasons and a
     note could anchor to it (the first reader did, with the second notice and the stub, and
     the caches kept them 30 days). The decision caches hold whole texts, with whatever
     personal data the source left: `sweep_decision_caches` deletes their expired entries at
     start and every six hours, since the filesystem cache deletes one only when its key is
     read again.
-    Italgiure's text is one line (45 of 45 sampled texts): `paragraphs` inserts blank lines
+    The Cassazione's text is read from the court's original PDF (`decisions/pdf_text.py`, then
+    `italgiure.py`): one more request per decision found, with a budget of its own (one try, 8 s,
+    parse 6 s, the whole step 15 s of the resolver's 25) so a slow PDF falls back instead of
+    failing the lookup. The PDF is accepted only when its filename and its first-page header name
+    the record's number and year, its text is at least 70% of the field's length and shares 10 of
+    the field's first 20 words with its first 250 (`_plausible`). Otherwise the field's text
+    stands, `testo_origine` is `"archivio"`, a warning logs the reason, and the resolver adds the
+    notice `testo_da_archivio` and keeps the decision 24 hours in `decisions_pending`, so the PDF
+    is tried again soon; a text from the PDF is kept 30 days and its bytes under `decisions_pdf`
+    (30 days). A suggestion (the penal next year) reads the record only and keeps nothing. The
+    field's text is one line (45 of 45 sampled texts): `paragraphs` inserts blank lines
     before the headings, «P.Q.M.» and the numbered points and changes nothing else (a combined
     heading, «RITENUTO IN FATTO E CONSIDERATO IN DIRITTO», stays one; a point keeps the words
     it opens, so there is no break between «3.» and a «P.Q.M.» right after it), and line
@@ -488,6 +499,6 @@ Breaking one of these breaks the product. Read before editing.
     characters (the texts before about 2001): the page draws a paragraph only between blank
     lines, so without it a block is one paragraph. Both add line breaks and nothing else.
     Whatever changes the shape of what a reader returns must raise the version in its cache
-    key (`italgiure:v2:…`, `corte_cost:v2:…`), or the entries cached before are served for up
-    to 30 days. The `v2` keys cover the readers of Tasks 7a to 7c, none of which had shipped,
+    key (`italgiure:v3:…`, `corte_cost:v2:…`), or the entries cached before are served for up
+    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.

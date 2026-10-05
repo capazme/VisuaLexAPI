@@ -105,7 +105,8 @@ class Resolver:
         self._starts: dict[tuple[str, date], tuple[int, str] | None] = {}
 
     async def _lookup(self, key: str, fonte: str, timeout: float,
-                      call: Callable[[], Awaitable[Decision | None]]) -> Decision | None:
+                      call: Callable[[], Awaitable[Decision | None]],
+                      store: bool = True) -> Decision | None:
         cached = await self.found.get(key)
         if cached is None:
             cached = await self.pending.get(key)
@@ -121,6 +122,8 @@ class Resolver:
             raise SourceUnavailable(fonte, str(exc)) from exc
         if decision is None:
             await self.absent.set(key, True)
+        elif not store:
+            pass  # a record read without its PDF is not the decision's text: never kept
         elif decision.testo and decision.testo_origine != "archivio":
             await self.found.set(key, decision.to_dict())
         else:
@@ -131,24 +134,36 @@ class Resolver:
             await self.pending.set(key, decision.to_dict())
         return decision
 
-    def _cass(self, archivio: str, numero: int, anno: int) -> Awaitable[Decision | None]:
+    async def _cass(self, archivio: str, numero: int, anno: int,
+                    with_pdf: bool = True) -> Decision | None:
         # v3 since the text comes from the court's original PDF (2026-10-05): the v2 entries hold
         # the archive's field, cut short in about a third of the records, and are not served
         # again. v2 since the reader recognises every notice Italgiure gives in place of a text
         # and restores paragraphs (2026-10-04); a new key never serves the entries cached before
         # (the sweep deletes them once expired). Raise the version whenever the reader changes the
         # shape of what it returns.
+        pdf: list[bytes] = []
+
         async def read() -> Decision | None:
-            found = await self.italgiure.lookup_with_pdf(archivio, numero, anno)
+            found = await self.italgiure.lookup_with_pdf(archivio, numero, anno, with_pdf)
             if found is None:
                 return None
             decision, data = found
             if data:
-                await self.pdfs.set(decision.identita.key(), base64.b64encode(data).decode())
+                pdf.append(data)
             return decision
 
-        return self._lookup(f"italgiure:v3:{archivio}:{numero}:{anno}", "cassazione",
-                            ITALGIURE_TIMEOUT, read)
+        decision = await self._lookup(f"italgiure:v3:{archivio}:{numero}:{anno}", "cassazione",
+                                      ITALGIURE_TIMEOUT, read, store=with_pdf)
+        if decision is not None and pdf:
+            # outside the source's limit and errors: a cache that cannot be written is not an
+            # unreachable court, and the text it read stands
+            try:
+                await self.pdfs.set(decision.identita.key(), base64.b64encode(pdf[0]).decode())
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Decision PDF not cached", key=decision.identita.key(),
+                            error_type=type(exc).__name__)
+        return decision
 
     async def _start(self, archivio: str) -> tuple[int, str] | None:
         key = (archivio, self.today())
@@ -226,7 +241,7 @@ class Resolver:
             try:
                 # a penal number belongs to the year of deposit: a December hearing is
                 # deposited the next year
-                hit = await self._cass("penale", ref.numero, ref.anno + 1)
+                hit = await self._cass("penale", ref.numero, ref.anno + 1, with_pdf=False)
                 suggestion = hit.identita if hit else None
             except SourceUnavailable:
                 suggestion = None  # the answer stands without its suggestion

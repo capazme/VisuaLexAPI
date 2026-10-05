@@ -31,6 +31,7 @@ class FakeItalgiure:
                           for d in decisions}
         # down: True for the whole source, or the archives that fail
         self.start, self.down, self.calls, self.start_calls = start, down, [], 0
+        self.with_pdf_calls = []
         self.pdfs = pdfs or {}  # the PDF bytes of the decisions that were read from theirs
 
     async def lookup(self, archivio, numero, anno):
@@ -39,7 +40,8 @@ class FakeItalgiure:
             raise NetworkError("Exceeded retry budget")
         return self.decisions.get((archivio, numero, anno))
 
-    async def lookup_with_pdf(self, archivio, numero, anno):
+    async def lookup_with_pdf(self, archivio, numero, anno, with_pdf=True):
+        self.with_pdf_calls.append(with_pdf)
         decision = await self.lookup(archivio, numero, anno)
         return None if decision is None else (decision, self.pdfs.get((archivio, numero, anno)))
 
@@ -325,6 +327,55 @@ async def test_a_text_from_the_archive_says_so_and_is_kept_a_day_only():
     again = await resolver.resolve(ref(numero=5, anno=2022, archivio="civile"))
     assert again.avvisi == [{"tipo": "testo_da_archivio"}]  # the notice survives the cache
     assert len(italgiure.calls) == 1
+
+
+async def test_a_pdf_cache_that_cannot_be_written_is_not_an_unreachable_court():
+    d = _cass("civile", 5, 2022, "1")
+    d.testo_origine = "pdf"
+
+    class Broken(FakeStore):
+        async def set(self, key, value):
+            raise OSError("disk full")
+
+    cache = FakeCache()
+    cache.stores["decisions_pdf"] = Broken()
+    out = await _resolver(FakeItalgiure([d], pdfs={("civile", 5, 2022): b"%PDF"}),
+                          cache=cache).resolve(ref(numero=5, anno=2022, archivio="civile"))
+    assert out.esito == "trovata" and out.decisione.testo
+
+
+async def test_a_suggestion_reads_the_record_only_and_keeps_nothing():
+    d = _cass("penale", 1399, 2025, "1")
+    cache, italgiure = FakeCache(), FakeItalgiure([d])
+    out = await _resolver(italgiure, cache=cache).resolve(ref(numero=1399, anno=2024, archivio="penale"))
+    assert out.suggerimento == d.identita
+    assert italgiure.with_pdf_calls[-1] is False
+    assert "italgiure:v3:penale:1399:2025" not in cache.stores.get("decisions_found", {})
+    assert "italgiure:v3:penale:1399:2025" not in cache.stores.get("decisions_pending", {})
+
+
+async def test_a_search_with_a_suggestion_hit_stays_within_ten_requests(monkeypatch):
+    # the worst cold case ends in a hit of the penal next year: the record is read, its PDF is not
+    methods, urls = [], []
+    start = json.dumps({"response": {"docs": [{"datdep": "20210217"}]}})
+    empty = json.dumps({"response": {"numFound": 0, "docs": []}})
+    hit = json.dumps({"response": {"numFound": 1, "docs": [{
+        "numdec": "00123", "anno": "2024", "kind": "snpen", "szdec": "1", "ocr": "testo " * 100,
+        "filename": "./20240101/snpen@s10@a2024@n123@tO.pdf"}]}})
+
+    async def fake_request(method, url, **kwargs):
+        methods.append(method)
+        urls.append(url)
+        if method == "GET":
+            return HttpResult(text="", status=200, headers={})
+        data = kwargs["data"]
+        body = start if "sort" in data else hit if "anno:2024" in data["q"] else empty
+        return HttpResult(text=body, status=200, headers={})
+
+    monkeypatch.setattr(decisions_http_client, "request", fake_request)
+    out = await _resolver(ItalgiureReader()).resolve(ref(numero=123, anno=2023))
+    assert out.esito == "non_trovata" and out.suggerimento is not None
+    assert len(methods) <= 10 and not any("verbo=attach" in u for u in urls)
 
 
 def test_the_outcomes_as_json():

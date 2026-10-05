@@ -1,4 +1,5 @@
 """The Cassazione reader (design 2026-10-01 §3)."""
+import asyncio
 import json
 import pathlib
 import ssl
@@ -16,9 +17,10 @@ from visualex_api.services.decisions.italgiure import (
     split_dispositivo,
     to_decision,
 )
-from visualex_api.services.decisions.pdf_text import text_from_pdf
+from visualex_api.services.decisions.pdf_text import (
+    read_decision_pdf, read_decision_pdf_async, text_from_pdf)
 from visualex_api.services.http_client import HttpResult
-from visualex_api.tools.exceptions import NetworkError
+from visualex_api.tools.exceptions import DocumentNotFoundError, NetworkError
 from visualex_api.tools.tls import italgiure_ssl_context
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "decisions"
@@ -313,8 +315,11 @@ def _sentences(prefix: str, count: int) -> list[str]:
             for i in range(count)]
 
 
-def _pdf_of(lines: list[str]) -> bytes:
-    return make_pdf([[Text(85, 700 - 14 * i, line) for i, line in enumerate(lines)]])
+def _pdf_of(lines: list[str], header: str | None = None) -> bytes:
+    page = [Text(85, 700 - 14 * i, line) for i, line in enumerate(lines)]
+    if header:
+        page.append(Text(85, 800, header))
+    return make_pdf([page])
 
 
 def _record(lines: list[str], **extra) -> dict:
@@ -323,7 +328,7 @@ def _record(lines: list[str], **extra) -> dict:
             "ocr": " ".join(lines), **extra}
 
 
-def _serve_with_pdf(monkeypatch, record: dict, pdf: bytes | Exception = b""):
+def _serve_with_pdf(monkeypatch, record: dict, pdf: bytes | Exception = b"", status: int = 200):
     """Solr answers the record; the attach URL answers `pdf` (or raises it)."""
     calls = []
 
@@ -335,7 +340,9 @@ def _serve_with_pdf(monkeypatch, record: dict, pdf: bytes | Exception = b""):
         if "verbo=attach" in url:
             if isinstance(pdf, Exception):
                 raise pdf
-            return HttpResult(text=pdf.decode("latin-1"), status=200,
+            if pdf == "hang":
+                await asyncio.sleep(3600)
+            return HttpResult(text=pdf.decode("latin-1"), status=status,
                               headers={"Content-Type": "application/pdf"})
         return HttpResult(text="", status=200, headers={})
 
@@ -358,9 +365,10 @@ async def test_the_text_comes_from_the_pdf_when_there_is_one(monkeypatch):
 
 
 @pytest.mark.parametrize("pdf_answer", ["refused", "error", "missing_filename", "too_short",
-                                        "other_decision"])
+                                        "other_decision", "not_found", "status_204",
+                                        "header_other_decision", "other_number_in_name"])
 async def test_without_a_usable_pdf_the_field_is_used_and_said(monkeypatch, pdf_answer):
-    record, pdf = _record(LINES), _pdf_of(LINES)
+    record, pdf, status = _record(LINES), _pdf_of(LINES), 200
     if pdf_answer == "refused":
         pdf = b"<html>Accesso negato</html>"
     elif pdf_answer == "error":
@@ -369,13 +377,21 @@ async def test_without_a_usable_pdf_the_field_is_used_and_said(monkeypatch, pdf_
         del record["filename"]
     elif pdf_answer == "too_short":
         pdf = _pdf_of(LINES[:10])
+    elif pdf_answer == "not_found":
+        pdf = DocumentNotFoundError("Document not found")
+    elif pdf_answer == "status_204":
+        status = 204
+    elif pdf_answer == "header_other_decision":
+        pdf = _pdf_of(LINES, "Civile Ord. Sez. 1 Num. 12346 Anno 2026")
+    elif pdf_answer == "other_number_in_name":
+        record["filename"] = FILENAME.replace("n12345", "n99999")
     else:  # a whole PDF of another text: long enough, opening words unrelated
         pdf = _pdf_of([" ".join(f"altra{i}x{j}" for j in range(12)) for i in range(40)])
-    calls = _serve_with_pdf(monkeypatch, record, pdf)
+    calls = _serve_with_pdf(monkeypatch, record, pdf, status)
     decision, data = await ItalgiureReader().lookup_with_pdf("civile", 12345, 2026)
     assert decision.testo_origine == "archivio" and data is None
     assert decision.testo["motivazione"].startswith("Prima riga 0")
-    assert any("verbo=attach" in c[1] for c in calls) == (pdf_answer != "missing_filename")
+    assert any("verbo=attach" in c[1] for c in calls) == (pdf_answer not in ("missing_filename", "other_number_in_name"))
 
 
 async def test_a_fallback_is_logged_with_its_reason(monkeypatch):
@@ -401,11 +417,12 @@ async def test_lookup_returns_the_decision_alone(monkeypatch):
 
 
 def test_the_pdf_address_is_the_clean_attachment_or_none():
-    assert pdf_url({"filename": FILENAME, "kind": "snciv"}) == (
+    assert pdf_url({"filename": FILENAME, "kind": "snciv", "numdec": "12345", "anno": "2026"}) == (
         "https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll"
         "?verbo=attach&db=snciv&id=./20260101/snciv@s10@a2026@n12345@tO.clean.pdf")
-    assert pdf_url({"filename": [FILENAME], "kind": ["snciv"]})
+    assert pdf_url({"filename": [FILENAME], "kind": ["snciv"], "numdec": ["12345"], "anno": ["2026"]})
     for doc in ({}, {"kind": "snciv"}, {"filename": FILENAME},
+                {"filename": FILENAME, "kind": "snciv"},  # a name with a number, a record without
                 {"filename": "http://elsewhere/x.pdf", "kind": "snciv"},
                 {"filename": "./20260101/../../x.pdf", "kind": "snciv"},
                 {"filename": FILENAME, "kind": "other"}):
@@ -420,3 +437,56 @@ def test_the_plausibility_checks_are_both_needed():
     assert "shorter" in _plausible({"motivazione": "parola0 parola1"}, field)
     unrelated = {"motivazione": " ".join(f"altra{i}" for i in range(100))}
     assert "opening words" in _plausible(unrelated, field)
+
+
+def test_the_pdf_step_leaves_room_in_the_resolvers_limit():
+    from visualex_api.services.decisions.resolver import ITALGIURE_TIMEOUT
+    assert italgiure.PDF_REQUEST_TIMEOUT + italgiure.PDF_PARSE_TIMEOUT <= italgiure.PDF_STEP_TIMEOUT
+    assert italgiure.PDF_STEP_TIMEOUT + 10 <= ITALGIURE_TIMEOUT
+
+
+async def test_a_pdf_that_hangs_falls_back_and_says_why(monkeypatch):
+    monkeypatch.setattr(italgiure, "PDF_STEP_TIMEOUT", 0.05)
+    calls = _serve_with_pdf(monkeypatch, _record(LINES), "hang")
+    events = []
+    monkeypatch.setattr(italgiure.log, "warning", lambda event, **kw: events.append(kw))
+    decision, data = await ItalgiureReader().lookup_with_pdf("civile", 12345, 2026)
+    assert decision.testo_origine == "archivio" and data is None
+    assert events[0]["reason"] == "PDF step timed out"
+    # one try and a short timeout of its own, so the resolver's limit is not used up
+    kwargs = calls[-1][2]
+    assert kwargs["max_retries"] == italgiure.PDF_RETRIES == 0
+    assert kwargs["timeout"].total == italgiure.PDF_REQUEST_TIMEOUT
+
+
+@pytest.mark.parametrize("header", [None, "Civile Ord. Sez. 1 Num. 12345 Anno 2026",
+                                    "Penale   Sent.  Sez. 3   Num.  12345   Anno 2026"])
+async def test_a_pdf_without_a_header_or_with_the_right_one_is_accepted(monkeypatch, header):
+    pdf = _pdf_of(LINES, header)
+    _serve_with_pdf(monkeypatch, _record(LINES), pdf)
+    decision, data = await ItalgiureReader().lookup_with_pdf("civile", 12345, 2026)
+    assert decision.testo_origine == "pdf" and data == pdf
+
+
+async def test_the_header_year_is_checked_too(monkeypatch):
+    _serve_with_pdf(monkeypatch, _record(LINES), _pdf_of(LINES, "Civile Ord. Sez. 1 Num. 12345 Anno 2025"))
+    decision, _ = await ItalgiureReader().lookup_with_pdf("civile", 12345, 2026)
+    assert decision.testo_origine == "archivio"
+
+
+async def test_the_header_is_read_and_the_text_is_unchanged():
+    pdf = _pdf_of(LINES, "Civile Ord. Sez. 1 Num. 12345 Anno 2026")
+    text, header = read_decision_pdf(pdf)
+    assert header == (12345, 2026) and text == text_from_pdf(pdf)
+    assert await read_decision_pdf_async(pdf) == (text, header)
+    assert read_decision_pdf(_pdf_of(LINES))[1] is None
+
+
+def test_a_filename_naming_another_decision_has_no_pdf():
+    ok = {"filename": FILENAME, "kind": "snciv", "numdec": "12345", "anno": "2026"}
+    assert pdf_url(ok)
+    assert pdf_url({**ok, "numdec": "00012345"})  # zero-padded, same number
+    assert pdf_url({**ok, "numdec": "12346"}) is None
+    assert pdf_url({**ok, "anno": "2025"}) is None
+    assert pdf_url({**ok, "filename": FILENAME.replace("n12345", "nx")}) is not None  # no digits: not a number tag
+    assert pdf_url({**ok, "filename": "./20260101/snciv@s10@a2026@n12345@t\u00e8.pdf"}) is None  # ASCII only

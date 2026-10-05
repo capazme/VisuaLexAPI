@@ -34,16 +34,18 @@ archive, never written here.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 
+import aiohttp
 import structlog
 
 from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from ...tools.tls import italgiure_ssl_context
 from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
-from .pdf_text import PdfRefused, text_from_pdf_async
+from .pdf_text import PdfRefused, read_decision_pdf_async
 
 log = structlog.get_logger()
 
@@ -71,6 +73,11 @@ _WITHHELD_CAUSES = (("in fase di valutazione oscuramento", "valutazione_oscurame
 # header and footer, so a long decision's PDF text is shorter: 0.761 at 27 pages), and the field's
 # first words share a longest common subsequence of this many with the PDF's first words (the
 # field is cut at its front too, so a greedy in-order scan would miss).
+# The PDF step has a budget of its own, so a slow PDF falls back to the field instead of using up
+# the resolver's ITALGIURE_TIMEOUT (25 s) and turning a decision the record already gave into
+# "source unreachable": request (one try) + parse fit in PDF_STEP_TIMEOUT, which leaves at least
+# 10 s of the 25 for the homepage and the Solr query.
+PDF_REQUEST_TIMEOUT, PDF_RETRIES, PDF_PARSE_TIMEOUT, PDF_STEP_TIMEOUT = 8.0, 0, 6.0, 15.0
 MIN_LENGTH_RATIO = 0.70
 FIELD_WORDS, PDF_WORDS, MIN_COMMON_WORDS = 20, 250, 10
 
@@ -140,11 +147,18 @@ def split_dispositivo(text: str, dispositivo: str) -> tuple[str, str]:
 
 def pdf_url(doc: dict) -> str | None:
     """The court's PDF of a record, in the form the archive serves within its session (the plain
-    `.pdf` name answers 500, measured on 2026-10-05)."""
+    `.pdf` name answers 500, measured on 2026-10-05). A name that carries the number and the year
+    (`@n26034`, `@a2026`) must carry the record's own, else there is no PDF."""
     name = _scalar(doc.get("filename")).strip()
     kind = _scalar(doc.get("kind")).strip()
-    if not re.fullmatch(r"\./\d{8}/sn(?:civ|pen)@[\w@]+\.pdf", name) or kind not in KINDS.values():
+    if (not re.fullmatch(r"\./[0-9]{8}/sn(?:civ|pen)@[A-Za-z0-9_@]+\.pdf", name)
+            or kind not in KINDS.values()):
         return None
+    for tag, field in (("n", "numdec"), ("a", "anno")):
+        m = re.search(rf"@{tag}([0-9]+)(?=@|\.)", name)
+        value = _scalar(doc.get(field)).strip()
+        if m and (not value.isascii() or not value.isdigit() or int(m.group(1)) != int(value)):
+            return None
     return f"{ATTACH}?verbo=attach&db={kind}&id={name[:-4]}.clean.pdf"
 
 
@@ -250,9 +264,10 @@ class ItalgiureReader:
         found = await self.lookup_with_pdf(archivio, numero, anno)
         return found[0] if found else None
 
-    async def lookup_with_pdf(self, archivio: str, numero: int,
-                              anno: int) -> tuple[Decision, bytes | None] | None:
-        """The decision and, when its text was read from it, the court's PDF."""
+    async def lookup_with_pdf(self, archivio: str, numero: int, anno: int,
+                              with_pdf: bool = True) -> tuple[Decision, bytes | None] | None:
+        """The decision and, when its text was read from it, the court's PDF. `with_pdf=False`
+        reads the record only (a suggestion shows an identity, not a text)."""
         # a cold lookup is the homepage, one Solr query and the PDF: a search stays within the
         # owner's 10 requests (2026-10-04)
         data = await self._select({
@@ -266,9 +281,15 @@ class ItalgiureReader:
         except ValueError as exc:  # a record without a readable number or year
             raise SourceAnswerError(
                 "Italgiure ha risposto con una decisione illeggibile") from exc
+        if not with_pdf:
+            return decision, None
         if not decision.testo:  # withheld, or no text: there is no PDF to read
             return decision, None
-        data_pdf, reason = await self._read_pdf(docs[0], decision)
+        try:
+            data_pdf, reason = await asyncio.wait_for(
+                self._read_pdf(docs[0], decision), PDF_STEP_TIMEOUT)
+        except asyncio.TimeoutError:
+            data_pdf, reason = None, "PDF step timed out"
         if data_pdf is None:
             log.warning("Decision read from the archive's text, not the PDF",
                         key=decision.identita.key(), reason=reason)
@@ -284,15 +305,19 @@ class ItalgiureReader:
         try:
             result = await decisions_http_client.request(
                 "GET", url, source="italgiure", ssl=italgiure_ssl_context(),
-                headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1")
+                headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1",
+                max_retries=PDF_RETRIES, timeout=aiohttp.ClientTimeout(total=PDF_REQUEST_TIMEOUT))
             if result.status != 200:
                 return None, f"PDF request answered {result.status}"
             data = result.text.encode("latin-1")
-            text = await text_from_pdf_async(data)
+            text, header = await read_decision_pdf_async(data, PDF_PARSE_TIMEOUT)
         except PdfRefused as exc:
             return None, f"PDF refused: {exc}"
         except (NetworkError, DocumentNotFoundError, OSError) as exc:
             return None, f"PDF request failed: {type(exc).__name__}"
+        ident = decision.identita
+        if header is not None and header != (ident.numero, ident.anno):
+            return None, "header names another decision"
         failed = _plausible(text, decision.testo)
         if failed:
             return None, failed

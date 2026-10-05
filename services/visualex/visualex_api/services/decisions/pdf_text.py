@@ -328,8 +328,29 @@ def _paragraphs(body: list[dict]) -> list[str]:
     return [join(p) for p in paragraphs]
 
 
+_HEADER_NUMBER = re.compile(r"^(?:Civile|Penale)\b.*?\bNum\.?\s*(\d+)\s+Anno\s+(\d{4})\b")
+
+
+def _header_identity(lines: list[dict]) -> tuple[int, int] | None:
+    """The (numero, anno) the first page's header line gives («Civile Ord. Sez. 1 Num. 26034
+    Anno 2026»), or None when the page has no such line."""
+    for line in lines:
+        if line["page"] > 0:
+            break
+        m = _HEADER_NUMBER.match(line["text"])
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    return None
+
+
 def text_from_pdf(data: bytes) -> dict[str, str]:
+    return read_decision_pdf(data)[0]
+
+
+def read_decision_pdf(data: bytes) -> tuple[dict[str, str], tuple[int, int] | None]:
+    """The text exactly as `text_from_pdf` gives it, and the (numero, anno) its header names."""
     lines = _lines(data)
+    identity = _header_identity(lines)
     drop = _furniture(lines)
     body = [l for i, l in enumerate(lines) if i not in drop]
     if not body:
@@ -342,12 +363,21 @@ def text_from_pdf(data: bytes) -> dict[str, str]:
     pqm = max((i for i, p in enumerate(paragraphs)
                if _PQM.match(p) or p.startswith(_PQM_PREFIX)), default=None)
     if pqm is None or pqm == 0:
-        return {"motivazione": "\n\n".join(paragraphs)}
-    return {"motivazione": "\n\n".join(paragraphs[:pqm]), "dispositivo": "\n\n".join(paragraphs[pqm:])}
+        return {"motivazione": "\n\n".join(paragraphs)}, identity
+    return {"motivazione": "\n\n".join(paragraphs[:pqm]),
+            "dispositivo": "\n\n".join(paragraphs[pqm:])}, identity
 
 
 async def text_from_pdf_async(data: bytes, timeout: float = 20.0) -> dict[str, str]:
     try:
         return await asyncio.wait_for(asyncio.to_thread(text_from_pdf, data), timeout)
+    except asyncio.TimeoutError as exc:
+        raise PdfRefused("parsing took too long") from exc
+
+
+async def read_decision_pdf_async(
+        data: bytes, timeout: float = 20.0) -> tuple[dict[str, str], tuple[int, int] | None]:
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(read_decision_pdf, data), timeout)
     except asyncio.TimeoutError as exc:
         raise PdfRefused("parsing took too long") from exc
