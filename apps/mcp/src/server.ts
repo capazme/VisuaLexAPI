@@ -133,6 +133,8 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
     if (missing.length > 0) {
       // The scopes the token has plus the ones it lacks: a client that signs in
       // again with exactly this list keeps what it had (MCP 2025-11-25, step-up).
+      // Deletion is not a token scope here: the consent page shows its box ticked
+      // when the connection already may delete, so the user keeps it by leaving it.
       const scope = [...new Set([...caller.scopes, ...needed])].join(' ');
       res.setHeader('WWW-Authenticate', challenge(config, { error: 'insufficient_scope', scope }));
       res.status(403).json({ error: 'insufficient_scope' });

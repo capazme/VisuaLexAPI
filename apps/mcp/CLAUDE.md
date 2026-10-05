@@ -1,8 +1,10 @@
 # MCP server — apps/mcp
 
 Loaded when Claude works in this folder; the root `CLAUDE.md` holds the repository-wide rules.
-Spec: `docs/superpowers/specs/2026-10-02-mcp-spike-design.md`; plan:
-`docs/superpowers/plans/2026-10-02-mcp-spike.md`.
+Specs: `docs/superpowers/specs/2026-10-02-mcp-spike-design.md` (phase 1) and
+`docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` (notes,
+sessions, deletion into the trash, cards); plans beside them in
+`docs/superpowers/plans/`.
 
 VisuaLex's MCP server: the dossier and LingoLex card tools for an application a user connected
 (Claude Code, LibreLex). A Node/TypeScript process of its own (decision D-037):
@@ -30,11 +32,13 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   stops at the next call. No token: 401 with `WWW-Authenticate` pointing at
   the protected resource metadata (RFC 9728,
   `/.well-known/oauth-protected-resource/mcp`). A tool whose scope the token
-  lacks: 403 `insufficient_scope` (`TOOL_SCOPES` in `src/tools/dossier.ts`),
+  lacks: 403 `insufficient_scope` (`TOOL_SCOPES` in `src/tools/dossier.ts`,
+  `CARD_TOOL_SCOPES` in `src/tools/cards.ts`),
   decided before the request reaches the tools.
 - **Calling the API** (`src/exchange.ts`) — `callApi` exchanges the client's
   token for a two-minute API token for every call (RFC 8693), with the
-  narrowest scope, and maps the API's 401/403/404/429 to Italian tool errors
+  narrowest scope, and maps the API's 400/401/403/404/409/429/503 to Italian
+  tool errors, passing the server's own Italian reason on where it gives one
   (the 429 says when the daily quota renews). The client's token never reaches
   the API; the exchanged token never reaches the client.
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
