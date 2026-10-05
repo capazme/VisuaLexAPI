@@ -108,6 +108,31 @@ describe('DossierListView — a card names its acts', () => {
   });
 });
 
+describe('DossierListView — a card counts its decisions', () => {
+  it('says how many decisions a dossier keeps, apart from its notes', () => {
+    appStore.setState({ dossiers: [{
+      id: 'd1', title: 'Pratica Rossi', createdAt: '2026-08-01T10:00:00.000Z',
+      items: [
+        { id: 'n', type: 'note', addedAt: '2026-08-01T10:00:00.000Z', data: 'appunto' },
+        { id: 's', type: 'sentenza', addedAt: '2026-08-01T10:00:00.000Z', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' } },
+      ],
+    }], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByText('1 nota')).toBeInTheDocument();
+    expect(screen.getByText('1 sentenza')).toBeInTheDocument();
+  });
+
+  it('finds a dossier by the citation of a decision it keeps', () => {
+    appStore.setState({ dossiers: [{
+      id: 'd1', title: 'Pratica Rossi', createdAt: '2026-08-01T10:00:00.000Z',
+      items: [{ id: 's', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' } }],
+    }], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    fireEvent.change(screen.getByPlaceholderText(/cerca/i), { target: { value: 'corte cost.' } });
+    expect(screen.getByText('Pratica Rossi')).toBeInTheDocument();
+  });
+});
+
 describe('DossierListView — the trash', () => {
   it('shows «Cestino (n)» only when the trash holds something', () => {
     const onOpenTrash = vi.fn();

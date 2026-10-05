@@ -32,7 +32,7 @@ export const restorableUntil = (): string =>
  * structured fields; anything else by its kind. Titles and note texts may have been
  * written by a model, and must never speak in the dialog.
  */
-const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione' };
+const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione', sentenza: 'Sentenza' };
 /** Who wrote it, from the server's mark; never the application's own (self-chosen) name. */
 const author = (item: ApiDossierItem): string =>
   item.created_by ? (item.item_type === 'note' ? ' (scritta da un’applicazione collegata)' : ' (di un’applicazione collegata)') : ' (tua)';

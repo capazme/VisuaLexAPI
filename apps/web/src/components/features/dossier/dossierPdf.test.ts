@@ -17,6 +17,8 @@ const a3 = norm('a3', '3');
 const b1 = norm('b1', '1', {}, { numero_atto: '49', data: '2023-04-21' }, 'l. 21 aprile 2023, n. 49');
 const past = norm('p3', '3', { versione: 'originale', data_versione: '2013-01-01' });
 const note: DossierItem = { id: 'n', type: 'note', addedAt: '', data: 'Verificare la decorrenza' };
+const decision: DossierItem = { id: 's', type: 'sentenza', addedAt: '',
+  data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'Corte cost., n. 1/2014' } };
 
 beforeEach(() => { vi.clearAllMocks(); });
 
@@ -61,6 +63,18 @@ describe('buildPdfBlocks', () => {
     const blocks = buildPdfBlocks([past], new Map([['p3', { text: null, blockedReason: 'Non disponibile' }]]), new Map());
     const act = blocks[0] as Extract<PdfBlock, { kind: 'act' }>;
     expect(act.articles[0]).toMatchObject({ versionLabel: 'Testo al 01/01/2013', missing: 'blocked', text: 'Non disponibile' });
+  });
+});
+
+describe('decisions in the PDF', () => {
+  it('leaves a decision out until the dossier-by-act round prints it: never as a note, never fetched', async () => {
+    const blocks = buildPdfBlocks([note, decision, a1], new Map([['a1', { text: 'uno' }]]), new Map());
+    expect(blocks.map((b) => b.kind)).toEqual(['notes', 'act']);
+    expect(blocks[0]).toEqual({ kind: 'notes', notes: ['Verificare la decorrenza'] });
+    fetchArticleForNorma.mockResolvedValue({ article_text: 'x', norma_data: {}, validity: { state: 'current' } });
+    const texts = await loadDossierTexts([decision, a1], () => {});
+    expect(fetchArticleForNorma).toHaveBeenCalledTimes(1);
+    expect(texts.has('s')).toBe(false);
   });
 });
 

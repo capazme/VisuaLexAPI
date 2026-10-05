@@ -24,6 +24,7 @@ const KIND_PLURALS: Record<string, [string, string]> = {
   norm: ['norma', 'norme'],
   note: ['nota', 'note'],
   section: ['sezione', 'sezioni'],
+  sentenza: ['sentenza', 'sentenze'],
 };
 
 /** «: 2 norme, 3 note» for the entries the dialog does not list one by one (they follow the model's order). */

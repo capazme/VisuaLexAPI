@@ -14,38 +14,41 @@ import {
 import { Folder, FolderPlus, Check, X, Search } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
-import { dossierRecency, dossierContainsArticle } from './dossierUtils';
+import { dossierRecency, dossierContainsArticle, dossierContainsDecision } from './dossierUtils';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import type { NormaVisitata } from '../../../types';
+import type { Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
 
 export interface AddToDossierPopoverProps {
     isOpen: boolean;
     /** Desktop anchor; when null (or the viewport is mobile-sized) the popover renders as a bottom sheet. */
     anchorEl: HTMLElement | null;
     onClose: () => void;
-    norma: NormaVisitata;
+    /** What is added: an article, or a court decision (design 2026-10-01 §6). Pass exactly one. */
+    norma?: NormaVisitata;
+    sentenza?: DossierSentenzaData;
     /** Fired after a successful add (existing or newly-created dossier); parent toasts + offers "Apri". */
     onAdded: (dossierId: string, dossierTitle: string) => void;
     /**
-     * Fired when the user picks a dossier that already contains this article.
+     * Fired when the user picks a dossier that already contains this article or decision.
      * Per spec, the click does nothing except a neutral toast — the popover
      * stays open and no add happens.
      */
     onDuplicate?: (dossierTitle: string) => void;
 }
 
-export function AddToDossierPopover({ isOpen, anchorEl, onClose, norma, onAdded, onDuplicate }: AddToDossierPopoverProps) {
+export function AddToDossierPopover({ isOpen, anchorEl, onClose, norma, sentenza, onAdded, onDuplicate }: AddToDossierPopoverProps) {
     const isDesktopViewport = useIsDesktop();
     if (!isOpen) return null;
     return isDesktopViewport && anchorEl
-        ? <DesktopPopover anchorEl={anchorEl} onClose={onClose} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />
-        : <MobileSheet onClose={onClose} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />;
+        ? <DesktopPopover anchorEl={anchorEl} onClose={onClose} norma={norma} sentenza={sentenza} onAdded={onAdded} onDuplicate={onDuplicate} />
+        : <MobileSheet onClose={onClose} norma={norma} sentenza={sentenza} onAdded={onAdded} onDuplicate={onDuplicate} />;
 }
 
 type BodyProps = {
-    norma: NormaVisitata;
+    norma?: NormaVisitata;
+    sentenza?: DossierSentenzaData;
     onClose: () => void;
     onAdded: (dossierId: string, dossierTitle: string) => void;
     onDuplicate?: (dossierTitle: string) => void;
@@ -53,7 +56,7 @@ type BodyProps = {
 
 // ───────────────────────── DESKTOP POPOVER ─────────────────────────
 
-function DesktopPopover({ anchorEl, onClose, norma, onAdded, onDuplicate }: BodyProps & { anchorEl: HTMLElement }) {
+function DesktopPopover({ anchorEl, onClose, norma, sentenza, onAdded, onDuplicate }: BodyProps & { anchorEl: HTMLElement }) {
     // Pass the anchor through `elements.reference` so the FIRST render
     // already has a valid position — see the identical comment in
     // NotesPeekPanel.tsx / InlineNotePopover.tsx (gotcha #13).
@@ -97,7 +100,7 @@ function DesktopPopover({ anchorEl, onClose, norma, onAdded, onDuplicate }: Body
                             'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
                         )}
                     >
-                        <PopoverBody norma={norma} onClose={onClose} onAdded={onAdded} onDuplicate={onDuplicate} />
+                        <PopoverBody norma={norma} sentenza={sentenza} onClose={onClose} onAdded={onAdded} onDuplicate={onDuplicate} />
                     </div>
                 </div>
             </FloatingFocusManager>
@@ -107,7 +110,7 @@ function DesktopPopover({ anchorEl, onClose, norma, onAdded, onDuplicate }: Body
 
 // ───────────────────────── MOBILE BOTTOM SHEET ─────────────────────────
 
-function MobileSheet({ onClose, norma, onAdded, onDuplicate }: BodyProps) {
+function MobileSheet({ onClose, norma, sentenza, onAdded, onDuplicate }: BodyProps) {
     // Close on Escape even on mobile (useful for external keyboards).
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -132,7 +135,7 @@ function MobileSheet({ onClose, norma, onAdded, onDuplicate }: BodyProps) {
                     Z_INDEX.citationPreview,
                 )}
             >
-                <PopoverBody norma={norma} onClose={onClose} onAdded={onAdded} onDuplicate={onDuplicate} />
+                <PopoverBody norma={norma} sentenza={sentenza} onClose={onClose} onAdded={onAdded} onDuplicate={onDuplicate} />
             </div>
         </FloatingPortal>
     );
@@ -140,7 +143,7 @@ function MobileSheet({ onClose, norma, onAdded, onDuplicate }: BodyProps) {
 
 // ───────────────────────── SHARED BODY ─────────────────────────
 
-function PopoverBody({ norma, onClose, onAdded, onDuplicate }: BodyProps) {
+function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyProps) {
     const { dossiers, addToDossier, createDossier } = useAppStore(useShallow((s) => ({
         dossiers: s.dossiers, addToDossier: s.addToDossier, createDossier: s.createDossier,
     })));
@@ -157,16 +160,23 @@ function PopoverBody({ norma, onClose, onAdded, onDuplicate }: BodyProps) {
     }, [dossiers, query]);
     const visible = query.trim() ? sorted : sorted.slice(0, 5);
 
+    const contains = (d: Dossier) =>
+        sentenza ? dossierContainsDecision(d, sentenza) : norma ? dossierContainsArticle(d, norma) : false;
+    const add = (dossierId: string) => {
+        if (sentenza) addToDossier(dossierId, sentenza, 'sentenza');
+        else if (norma) addToDossier(dossierId, norma, 'norma');
+    };
+
     const handlePick = (dossierId: string) => {
         const target = dossiers.find(d => d.id === dossierId);
         if (!target) return;
-        if (dossierContainsArticle(target, norma)) {
+        if (contains(target)) {
             // Per spec: clicking a dossier that already has this article does
             // nothing except a neutral toast. Popover stays open.
             onDuplicate?.(target.title);
             return;
         }
-        addToDossier(dossierId, norma, 'norma');
+        add(dossierId);
         onAdded(dossierId, target.title);
         onClose();
     };
@@ -179,7 +189,7 @@ function PopoverBody({ norma, onClose, onAdded, onDuplicate }: BodyProps) {
         const id = await createDossier(title);
         setBusy(false);
         if (!id) return; // creation failed: stay open, the name is not lost
-        addToDossier(id, norma, 'norma');
+        add(id);
         onAdded(id, title);
         onClose();
     };
@@ -225,7 +235,7 @@ function PopoverBody({ norma, onClose, onAdded, onDuplicate }: BodyProps) {
                     </p>
                 ) : (
                     visible.map((d) => {
-                        const alreadyPresent = dossierContainsArticle(d, norma);
+                        const alreadyPresent = contains(d);
                         return (
                             <button
                                 key={d.id}

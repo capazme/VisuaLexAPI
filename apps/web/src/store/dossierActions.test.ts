@@ -159,9 +159,9 @@ describe('importDossier', () => {
       ],
     };
 
-    const id = await appStore.getState().importDossier(importedDossier);
+    const outcome = await appStore.getState().importDossier(importedDossier);
 
-    expect(id).toBe('srv-1');
+    expect(outcome).toEqual({ id: 'srv-1', imported: 1, failed: 0 });
     expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', expect.objectContaining({
       content: { ...norma, _dossierMeta: { important: true } },
     }));
@@ -289,6 +289,59 @@ describe('the order after a refusal, and after a restore', () => {
   });
 });
 
+describe('decision items in the store', () => {
+  // As stored before a change of style: the store writes the citation recomputed (source convention, Q9).
+  const sentenza = { corte: 'corte_costituzionale' as const, numero: 1, anno: 2014, tipo: 'sentenza',
+    data_deposito: '2014-01-13', etichetta: 'Corte cost. 1/2014' };
+  const current = { ...sentenza, etichetta: 'Corte cost., sent. 13 gennaio 2014, n. 1' };
+
+  it('addToDossier sends a sentenza item titled by its citation', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [] }] });
+    appStore.getState().addToDossier('d1', sentenza, 'sentenza');
+    expect(dossierService.addItem).toHaveBeenCalledWith('d1', { itemType: 'sentenza', title: current.etichetta, content: current });
+    expect(appStore.getState().dossiers[0].items[0]).toMatchObject({ type: 'sentenza', data: sentenza });
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-1'));
+  });
+
+  it('a decision can be starred, and the star is written with the citation recomputed', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [
+      { id: 's1', type: 'sentenza', data: sentenza, addedAt: '' },
+    ] }] });
+    appStore.getState().updateDossierItemStatus('d1', 's1', 'important');
+    await vi.waitFor(() => expect(dossierService.updateItem).toHaveBeenCalledWith(
+      'd1', 's1', { content: { ...current, _dossierMeta: { important: true } } },
+    ));
+  });
+
+  it('importDossier says how many items the server refused', async () => {
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('ok')).mockRejectedValueOnce(new Error('400'));
+    const outcome = await appStore.getState().importDossier({ id: 'x', title: 'I', createdAt: '', items: [
+      { id: 'a', type: 'sentenza', data: sentenza, addedAt: '' },
+      { id: 'b', type: 'note', data: 'n', addedAt: '' },
+    ] });
+    expect(outcome).toEqual({ id: 'srv-1', imported: 1, failed: 1 });
+    expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', { itemType: 'sentenza', title: current.etichetta, content: current });
+  });
+
+  it('restoreDossierItem puts a decision back as a decision, its citation recomputed', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().restoreDossierItem('d1', { id: 'x', type: 'sentenza', data: sentenza, addedAt: '' }, 0);
+    expect(dossierService.addItem).toHaveBeenCalledWith('d1', { itemType: 'sentenza', title: current.etichetta, content: current });
+    expect(appStore.getState().dossiers[0].items[0]).toMatchObject({ type: 'sentenza', data: sentenza });
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-1'));
+    expect(appStore.getState().dossiers[0].items[0].type).toBe('sentenza');
+  });
+
+  it('restoreDossierItem carries the star of a decision in its content', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'D', createdAt: '', items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    appStore.getState().restoreDossierItem('d1', { id: 'x', type: 'sentenza', data: sentenza, addedAt: '', status: 'important' }, 0);
+    expect(dossierService.addItem).toHaveBeenCalledWith('d1', {
+      itemType: 'sentenza', title: current.etichetta, content: { ...current, _dossierMeta: { important: true } },
+    });
+    await vi.waitFor(() => expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-1'));
+  });
+});
+
 describe('notes through the notes route', () => {
   it('adds a note about an article once the server has it', async () => {
     appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
@@ -374,5 +427,18 @@ describe('refreshDossier', () => {
     vi.mocked(dossierService.getById).mockResolvedValueOnce(api(['a', 'b']));
     await appStore.getState().refreshDossier('d1');
     expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['tmp', 'a', 'b']);
+  });
+  it('reads a decision restored from the trash back as a decision', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    const content = { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'Corte cost., sent. n. 1/2014', _dossierMeta: { important: true } };
+    vi.mocked(dossierService.getById).mockResolvedValueOnce({
+      ...api([]),
+      items: [{ id: 's', item_type: 'sentenza' as const, title: 'Corte cost.', content, position: 0, status: 'unread' as const, created_at: '' }],
+    });
+    await appStore.getState().refreshDossier('d1');
+    expect(appStore.getState().dossiers[0].items).toEqual([expect.objectContaining({
+      id: 's', type: 'sentenza', status: 'important',
+      data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'Corte cost., sent. n. 1/2014' },
+    })]);
   });
 });
