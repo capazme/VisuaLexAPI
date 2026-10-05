@@ -4,7 +4,7 @@
 
 **Goal:** One search space where a lawyer finds a norm or a decision from the same box, opens a decision in a tab of its own beside the article it applies, follows links both ways, annotates decisions, and finds them again in the Cronologia.
 
-**Architecture:** One new Python route (`/search_decisions`) asks Italgiure for the decisions that mention an article or a topic, politely and cached. On the web, a decision becomes a kind of workspace tab (`WorkspaceTab.view`), the `/sentenze/…` address opens that tab inside the search space, the article gains a «Giurisprudenza» section, and the decision's text is rendered as escaped HTML by a renderer held to the same contract as `article_text` (root rule 23), which makes notes, highlights and norm links possible. The history gains a nullable `decision_key`.
+**Architecture:** The Cassazione's text is read from the court's original PDF (the archive's text field is cut short in about a third of the records), cleaned of page furniture, with a declared fallback. One new Python route (`/search_decisions`) asks Italgiure for the decisions that cite an article (through the Cassazione's index of cited norms) or mention it or a topic (in the text), politely and cached; another (`/fetch_decision_pdf`) serves the court's own PDF. On the web, a decision becomes a kind of workspace tab (`WorkspaceTab.view`), the `/sentenze/…` address opens that tab inside the search space, the article gains a «Giurisprudenza» section, and the decision's text is rendered as escaped HTML by a renderer held to the same contract as `article_text` (root rule 23), which makes notes, highlights and norm links possible. The history gains a nullable `decision_key`.
 
 **Tech Stack:** Python 3 / Quart / aiohttp / pytest (services/visualex); React 19 / TypeScript / Zustand + Immer / Vitest / Testing Library (apps/web); Express / Prisma / PostgreSQL / Vitest (apps/server).
 
@@ -18,6 +18,10 @@
 - Every scraping route goes through `legalFetch` on the client, the Vite proxy list and the ingress `@legal` path list (ADR-001, gotcha 30).
 - Italgiure: the decision reader's own `decisions_http_client`, honest User-Agent, verified TLS, one Solr request per page, 24 h cache, at most 10 pages per query, nothing fetched without a user's gesture (spec §5.3).
 - Text from Italgiure is never rendered as HTML on the client (spec §5.1, Security).
+- An original PDF is untrusted input: at most 5 MB and 200 pages, `%PDF-` checked, parsed in a worker thread under a time limit; any failure falls back to the text field with the notice `testo_da_archivio` (spec §11, Security).
+- New Python dependency: `pdfminer.six` (MIT), pinned; nothing else.
+- Each row of a decision list says how it was found: «norma citata (indice della Cassazione)» or «menzionato nel testo» (spec N5). Fragments are shown as the source gives them (only `<em>` becomes ranges).
+- The decision PDF has no licence line, for the Corte costituzionale too (spec §12.1).
 - Topic words: letters, digits, spaces, `'` and `-` only; at most 80 characters; sent as one quoted phrase (spec §5.4).
 - Prisma: one hand-written migration dated after every migration on `develop` (today the last is `20261005120000_add_trash_entries`), announced to the orchestrator before it is written; never `prisma migrate dev` or `reset`.
 - `npm --prefix apps/server test` only after the orchestrator's go (shared test database).
@@ -27,17 +31,20 @@
 
 ## Owner answers after the spec
 
-The owner approved the spec on 5 October 2026 and answered its four questions: «spec ok, 39=1, 40 ok, ma abbiamo già tutti i permessi, 41 nulla, 42 sì con la cautela» (spec, «Questions for the owner — answered»). Reading 1 (Tasks 8, 9); the glossary as written (Task 13); nothing more on excerpts (Task 16); annotations on decisions travel, except those whose words are no longer in the decision's current text (Task 17, spec §8.6).
+The owner approved the spec on 5 October 2026 and answered its four questions: «spec ok, 39=1, 40 ok, ma abbiamo già tutti i permessi, 41 nulla, 42 sì con la cautela» (spec, «Questions for the owner — answered»). Reading 1 (Tasks 12, 13); the glossary as written (Task 17); nothing more on excerpts (Task 20); annotations on decisions travel, except those whose words are no longer in the decision's current text (Task 21, spec §8.6).
+
+Afternoon additions (5 October): «Facciamo in modo che la ricerca delle sentenze ritorni testo pulito, e la possibilità di scaricarle in PDF»; answers «43. 1a + 1d» and «44. 2a + 2b» (spec, «Additions of 5 October»). They add Tasks 2, 3, 4 and 8 to PR 1, change Tasks 5–7 and 9, and add Task 22 to PR 4; every later task was renumbered (old 6–17 → 10–21, old 18–20 → 23–25). The Cassazione reader is the Sentenze session's area: PR 1 says so, and the orchestrator routes it to that session.
 
 Sequencing (orchestrator, 5 October): PR 1 goes now. PR 2 onward touch the palette, `ArticleTabContent` and `SearchPanel`, which the convention's PR 1a also touches: ask the orchestrator before starting each. The test database and the PR 5 migration: ask first. The Sentenze session reviews spec §8.5 when it is back; PR 1 freezes the readers as they are on `develop`.
 
 ## Review Focus
 
-1. **A decision whose text the source withdrew after the user annotated it** — the tab must show the notice and list every note and highlight in «Non ritrovate nel testo attuale», never an empty page. Test in Task 16.
-2. **A topic typed with Solr syntax** (`ocr:*`, `kind:"snpen" OR x`, `{!lucene}`, `\`, `"`) — the route must search those words as words, or refuse, never run them. Test in Task 2.
-3. **The same decision opened twice** (palette, then a chip, then a reload with the tab persisted) — one tab, focused, never two; a reload refetches by identity. Test in Task 8.
-4. **A `/sentenze/…` link opened while logged out** — after the login the decision's tab opens; the address is not lost and the queue is drained once under StrictMode. Test in Task 10.
-5. **A highlight dragged across two blocks or two paragraphs of a decision** — stored with the projection's offset, rendered back in both, and the HTML stays well-formed. Test in Task 14.
+1. **A decision whose text the source withdrew after the user annotated it** — the tab must show the notice and list every note and highlight in «Non ritrovate nel testo attuale», never an empty page. Test in Task 20.
+2. **A topic typed with Solr syntax** (`ocr:*`, `kind:"snpen" OR x`, `{!lucene}`, `\`, `"`) — the route must search those words as words, or refuse, never run them. Test in Task 5.
+3. **The same decision opened twice** (palette, then a chip, then a reload with the tab persisted) — one tab, focused, never two; a reload refetches by identity. Test in Task 12.
+4. **A `/sentenze/…` link opened while logged out** — after the login the decision's tab opens; the address is not lost and the queue is drained once under StrictMode. Test in Task 14.
+5. **A highlight dragged across two blocks or two paragraphs of a decision** — stored with the projection's offset, rendered back in both, and the HTML stays well-formed. Test in Task 18.
+6. **An original PDF that is not what it should be** (an anti-bot page, a truncated file, a 5 MB file of zeros, a PDF whose text is shorter than the field's) — the decision still reads, from the text field, with the notice that says so; never an error page, never a hang. Tests in Tasks 3 and 4.
 
 ---
 
@@ -117,20 +124,420 @@ git add services/visualex/tests/fixtures/decisions/ docs/superpowers/plans/2026-
 git commit -m "test(api): record Italgiure search answers for the decision search route"
 ```
 
-### Task 2: How an article and a topic become a Solr query
+### Task 2: Measure the original PDFs and the index of cited norms
+
+A measurement, no product code. It fixes the thresholds of the PDF reader (Task 3), the fallback checks (Task 4), the index coordinates and their re-check (Task 5), and records the fixtures those tasks replay. Spec §11, §5.2.
+
+**Files:**
+- Create: `services/visualex/tests/fixtures/decisions/pdf/` — four or five original PDFs (`<archive>_<numero>_<anno>.clean.pdf`) and, for each, the record as Solr gives it (`<archive>_<numero>_<anno>.json`, `fl=*`)
+- Create: `services/visualex/tests/fixtures/decisions/italgiure_index_2043_cc.json` (an index query page with `rnc-*` fields)
+- Modify: `services/visualex/tests/fixtures/decisions/README.md`
+- Modify: this plan, «Amendments during execution»
+
+**Interfaces:**
+- Produces (in the amendment, as exact values Tasks 3–5 copy):
+  - the PDF thresholds: `TOP_BAND`, `BOTTOM_BAND` (points), `INDENT` (points beyond the body's left edge), `GAP` (points between baselines that start a paragraph), the header patterns, the page-number patterns, the footer-repetition rule (on how many pages);
+  - the fallback checks: the minimum ratio of the PDF text's length to the field's, and how many of the field's opening words must appear in the PDF text;
+  - the index table: for c.c., c.p.c., c.p., c.p.p., Cost., preleggi, disp. att. c.c., l., d.lgs., d.l., d.P.R. — the `rnc-gen` and `rnc-sp` values, and how `rnc-art` writes an article with and without a suffix (`"2043 00"`, «-bis» → ?);
+  - how `rnc-num` / `rnc-dat` align with `rnc-gen` / `rnc-art` (by position among the entries that carry a number? measured on at least 20 records);
+  - the false-match rate of the two-field query per family (codes; numbered acts), measured on 100 records each;
+  - whether `hl.q` gives a passage on an index query.
+
+- [ ] **Step 1: Choose the sample.** Forty decisions: twenty civil, twenty penal, spread over 2021–2026, over sections (1–6, L, U), sentenze and ordinanze, short and long. Get them with a few Solr queries returning `fl=id,numdec,anno,kind,filename,ocr,ocrdis,rnc-gen,rnc-art,rnc-sp,rnc-num,rnc-dat` (rows up to 10 per query). Then fetch each PDF: `https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll?verbo=attach&db=<kind>&id=<filename with ".pdf" replaced by ".clean.pdf">`, in the same session as the Solr requests (GET the archive's homepage first). At least 2.5 s between requests; at most 60 requests in all. Probe script in the session scratchpad, never in the repository; PDFs downloaded to the scratchpad.
+
+- [ ] **Step 2: Run the prototype over the forty.** The spec's §11 rules, as the controller's prototype implements them (this skeleton, with pdfminer.six installed in a scratch venv, never in the shared one):
+
+```python
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LAParams, LTChar, LTTextContainer, LTTextLine
+
+def visual_lines(path):
+    out = []
+    for pno, page in enumerate(extract_pages(path, laparams=LAParams())):
+        rows = {}
+        for el in page:
+            if not isinstance(el, LTTextContainer):
+                continue
+            for ln in el:
+                if not isinstance(ln, LTTextLine):
+                    continue
+                chars = [c for c in ln if isinstance(c, LTChar)]
+                if not chars or not all(c.upright for c in chars):
+                    continue  # the vertical «copia non ufficiale»
+                rows.setdefault(round(ln.y0 / 3), []).append((ln.x0, ln.x1, ln.y0, ln.get_text().replace("\n", "")))
+        for key in sorted(rows, reverse=True):
+            parts = sorted(rows[key])
+            text = " ".join(" ".join(p[3] for p in parts).split())
+            if text:
+                out.append({"page": pno, "x0": parts[0][0], "y": parts[0][2], "text": text, "height": page.height})
+    return out
+```
+
+For each decision record: pages; whether the text was whole (its last paragraph against the PDF's last lines, read by hand on ten); which lines the furniture rules removed (list them all: no court text may be among them); paragraphs (read three per decision); the length of the PDF text against the field's; whether the field's first twenty words appear in order in the PDF text; anything left over (`(cid:`, letter-spaced signatures, stamps). Tune the thresholds until the forty pass; record every tuning and why.
+
+- [ ] **Step 3: Measure the index.** With the records of Step 1 and a few `rows=0` queries (≤ 15 requests): the `rnc-gen` / `rnc-sp` values for each act family above (query a decision known to cite it, e.g. `rnc-art:"0360 00"` for c.p.c. art. 360); how «-bis» is written (`rnc-art:"2051 01"`? search a decision citing art. 2051-bis… or art. 360-bis c.p.c., which is cited often); the alignment of `rnc-num` / `rnc-dat`; the false-match rate of `rnc-gen:"CC" AND rnc-art:"2043 00"` and of a numbered act's query on 100 records each (count the records where no single aligned entry carries every coordinate); one query with `hl=true&hl.q=ocr:"art. 2043 c.c." OR ocr:"art. 2043 cod. civ."&hl.fl=ocr` to see whether index rows get a passage.
+
+- [ ] **Step 4: Record the fixtures.** Pick four or five decisions for the PDF fixtures: both archives; one cut short in the field; one with a running footer; one whose first page has the «Oggetto» box; one short (≤ 4 pages). **Only decisions whose parties are not natural persons** (companies, public bodies) or whose text the court has anonymised — read each PDF's first page; the repository is public. Copy each PDF byte for byte and its record. Record one index page (`rows=5`, the `rnc-*` fields, `q=kind:"snciv" AND rnc-gen:"CC" AND rnc-art:"2043 00"`, `sort=pd desc`) as `italgiure_index_2043_cc.json`. README: one line per fixture (what, when recorded, why chosen).
+
+- [ ] **Step 5: Write the amendment** with every value listed under «Produces», the forty decisions' outcome table (identity, pages, whole y/n, furniture lines removed, paragraphs, fallback check result), and the request count.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add services/visualex/tests/fixtures/decisions/ docs/superpowers/plans/2026-10-05-norms-decisions-search.md
+git commit -m "test(api): record original Cassazione PDFs and an index page; measure the PDF and index rules" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### Task 3: The Cassazione's text from its original PDF
+
+The pure part of spec §11: bytes in, blocks out. No network.
+
+**Files:**
+- Create: `services/visualex/visualex_api/services/decisions/pdf_text.py`
+- Modify: `services/visualex/requirements.txt` (`pdfminer.six==<the version Task 2 used>`)
+- Test: `services/visualex/tests/test_decisions_pdf_text.py`
+
+**Interfaces:**
+- Consumes: Task 2's fixtures and values.
+- Produces:
+  - `class PdfRefused(ValueError)` — not a PDF, over the limits, unparsable.
+  - `def text_from_pdf(data: bytes) -> dict[str, str]` — `{"motivazione": …, "dispositivo"?: …}`, paragraphs separated by `"\n\n"`; raises `PdfRefused`.
+  - `MAX_BYTES = 5 * 1024 * 1024`, `MAX_PAGES = 200`.
+  - `async def text_from_pdf_async(data: bytes, timeout: float = 20.0) -> dict[str, str]` — the same in a worker thread under a time limit (raises `PdfRefused` on timeout).
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+"""The Cassazione's text from its original PDF (design 2026-10-05 §11)."""
+import asyncio
+import pathlib
+
+import pytest
+
+from visualex_api.services.decisions.pdf_text import (
+    MAX_BYTES, PdfRefused, text_from_pdf, text_from_pdf_async)
+
+PDF = pathlib.Path(__file__).parent / "fixtures" / "decisions" / "pdf"
+FIXTURES = sorted(PDF.glob("*.clean.pdf"))
+
+
+def _text(name: str) -> dict:
+    return text_from_pdf((PDF / name).read_bytes())
+
+
+@pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.name)
+def test_no_page_furniture_is_left(path):
+    out = text_from_pdf(path.read_bytes())
+    whole = "\n".join(out.values())
+    for furniture in ("copia non ufficiale", "Data pubblicazione:", "Relatore:", "(cid:", "Oggetto:"):
+        assert furniture not in whole, furniture
+    assert "  " not in whole.replace("\n\n", "")
+
+
+@pytest.mark.parametrize("path", FIXTURES, ids=lambda p: p.name)
+def test_the_text_is_whole_and_ends_in_the_dispositivo(path):
+    out = text_from_pdf(path.read_bytes())
+    assert out["motivazione"] and out.get("dispositivo", "").startswith("P.")
+    assert "\n\n" in out["motivazione"]  # paragraphs
+
+
+def test_a_line_ending_in_a_hyphen_joins_without_a_space():
+    # the fixture whose text has «Lazare-David» — adapt to the fixture Task 2 recorded, and name it here
+    ...
+
+
+def test_not_a_pdf_is_refused():
+    with pytest.raises(PdfRefused):
+        text_from_pdf(b"<html>Verifica di sicurezza</html>")
+
+
+def test_a_pdf_over_the_size_limit_is_refused_before_parsing():
+    with pytest.raises(PdfRefused):
+        text_from_pdf(b"%PDF-1.4\n" + b"0" * MAX_BYTES)
+
+
+def test_a_truncated_pdf_is_refused_not_crashed():
+    data = FIXTURES[0].read_bytes()
+    with pytest.raises(PdfRefused):
+        text_from_pdf(data[: len(data) // 3])
+
+
+async def test_the_async_form_runs_in_a_thread_with_a_time_limit():
+    out = await text_from_pdf_async(FIXTURES[0].read_bytes())
+    assert out["motivazione"]
+```
+
+Replace the `...` test with a concrete assertion on a fixture Task 2 recorded (a word joined across a line-ending hyphen, quoted from that PDF), and add one test per fixture that pins a paragraph start Task 2 read by hand (e.g. `assert "\n\nRILEVATO CHE\n\n" in out["motivazione"]` where the fixture has that heading).
+
+- [ ] **Step 2: Run to see them fail**
+
+Run: `(cd services/visualex && <python> -m pytest tests/test_decisions_pdf_text.py -q)`
+Expected: FAIL — module not found. (`pdfminer.six` must be installed in the interpreter that runs the tests: install it there with `<python> -m pip install pdfminer.six==<version>` — the shared venv is the main checkout's; installing one pinned package there is part of this task, say so in the report.)
+
+- [ ] **Step 3: Implement** with Task 2's values in place of the defaults below:
+
+```python
+"""The Cassazione's text from the court's original PDF (design 2026-10-05 §11).
+
+Italgiure's text field is cut short at the source in about a third of the records (measured on
+2026-10-05), sometimes before the dispositivo; the court's PDF is whole. This module turns the
+PDF's text layer into the blocks the page shows, dropping only page furniture: the rotated
+«copia non ufficiale», the first page's header and «Oggetto» box, running headers and footers,
+page numbers, unmapped glyphs. The output is frozen with every reader (design §8.5): change the
+rules and every note anchored to a Cassazione text moves.
+"""
+from __future__ import annotations
+
+import asyncio
+import io
+import re
+import statistics
+
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LAParams, LTChar, LTTextContainer, LTTextLine
+
+MAX_BYTES = 5 * 1024 * 1024
+MAX_PAGES = 200
+TOP_BAND = 60      # points from the top edge (Task 2)
+BOTTOM_BAND = 80   # points from the bottom edge (Task 2)
+INDENT = 8         # points beyond the body's left edge that start a paragraph (Task 2)
+GAP = 30           # points between two baselines that start a paragraph (Task 2)
+REPEATED_ON = 2    # a band line on this many pages, digits ignored, is a running header/footer
+OGGETTO_X = 0.6    # the «Oggetto» box starts beyond this share of the page width (measured x0 407 of 595)
+
+_HEADER = re.compile(r"^(?:Civile|Penale)\b.*\bNum\.|^Presidente:|^Relatore:|^Data pubblicazione:")
+_TITLE = re.compile(r"^(?:ORDINANZA|SENTENZA|DECRETO)(?:\s+INTERLOCUTORIA)?\s*$")
+_PAGE_NUMBER = re.compile(r"^(?:-\s*\d{1,3}\s*-|\d{1,3}|Pag\.?\s*\d{1,3}(?:\s*(?:di|/)\s*\d{1,3})?)$", re.I)
+_CID = re.compile(r"\(cid:\d+\)")
+# running headers and footers whose shape is known even on a page where they appear once
+# (measured on 2026-10-05: «Ric. 2021 n. 09083 sez. SU - ud. 14-12-2021», «r.g. n. 27512/2022»,
+# «Cons. est. Paolo Fraulini»)
+_RUNNING = re.compile(r"^(?:Ric\.\s*\d{4}\s+n\.\s*\d+\b.*\bsez\.|r\.\s?g\.\s*n\.\s*\d+/\d{4}$|Cons\.\s*est\.)", re.I)
+_PQM = re.compile(r"^P\.\s?Q\.\s?M\.?$")
+
+
+class PdfRefused(ValueError):
+    """Not a PDF this reader will read: the caller falls back to the text field."""
+
+
+def _lines(data: bytes) -> list[dict]:
+    if not data.startswith(b"%PDF-"):
+        raise PdfRefused("not a PDF")
+    if len(data) > MAX_BYTES:
+        raise PdfRefused("over the size limit")
+    out: list[dict] = []
+    try:
+        for pno, page in enumerate(extract_pages(io.BytesIO(data), laparams=LAParams())):
+            if pno >= MAX_PAGES:
+                raise PdfRefused("over the page limit")
+            rows: dict[int, list] = {}
+            for element in page:
+                if not isinstance(element, LTTextContainer):
+                    continue
+                for line in element:
+                    if not isinstance(line, LTTextLine):
+                        continue
+                    chars = [c for c in line if isinstance(c, LTChar)]
+                    if not chars or not all(c.upright for c in chars):
+                        continue
+                    rows.setdefault(round(line.y0 / 3), []).append(
+                        (line.x0, line.y0, line.get_text().replace("\n", "")))
+            for key in sorted(rows, reverse=True):
+                parts = sorted(rows[key])
+                text = " ".join(_CID.sub("", " ".join(p[2] for p in parts)).split())
+                if text:
+                    out.append({"page": pno, "x0": parts[0][0], "y": parts[0][1],
+                                "text": text, "height": page.height, "width": page.width})
+    except PdfRefused:
+        raise
+    except Exception as exc:  # noqa: BLE001 — untrusted input to a parser: any failure is a refusal
+        # (measured: a PDF cut at a third raises pdfminer's PSEOF), and the caller falls back
+        raise PdfRefused(f"unparsable: {type(exc).__name__}") from exc
+    return out
+
+
+def _furniture(lines: list[dict]) -> set[int]:
+    drop: set[int] = set()
+    in_band = [i for i, l in enumerate(lines)
+               if l["y"] < BOTTOM_BAND or l["y"] > l["height"] - TOP_BAND]
+    pages_of: dict[str, set[int]] = {}
+    for i in in_band:
+        pages_of.setdefault(re.sub(r"\d+", "#", lines[i]["text"]), set()).add(lines[i]["page"])
+    for i in in_band:
+        key = re.sub(r"\d+", "#", lines[i]["text"])
+        if (_PAGE_NUMBER.match(lines[i]["text"]) or _RUNNING.match(lines[i]["text"])
+                or len(pages_of[key]) >= REPEATED_ON):
+            drop.add(i)
+    title_y = next((l["y"] for l in lines if l["page"] == 0 and _TITLE.match(l["text"])), None)
+    for i, l in enumerate(lines):
+        if l["page"] != 0:
+            continue
+        if _HEADER.search(l["text"]):
+            drop.add(i)
+        elif title_y is not None and l["y"] > title_y + 1 and l["x0"] > l["width"] * OGGETTO_X:
+            drop.add(i)  # the «Oggetto» box: right margin, above the title
+    return drop
+
+
+def _paragraphs(body: list[dict]) -> list[str]:
+    left = statistics.mode(round(l["x0"]) for l in body)
+    paragraphs: list[list[str]] = []
+    current: list[str] = []
+    for i, line in enumerate(body):
+        previous = body[i - 1] if i else None
+        starts = (line["x0"] > left + INDENT
+                  or (previous is not None and previous["page"] == line["page"]
+                      and previous["y"] - line["y"] > GAP))
+        if current and starts:
+            paragraphs.append(current)
+            current = []
+        current.append(line["text"])
+    if current:
+        paragraphs.append(current)
+
+    def join(lines: list[str]) -> str:
+        text = lines[0]
+        for nxt in lines[1:]:
+            text = text + nxt if text.endswith("-") else f"{text} {nxt}"
+        return text
+
+    return [join(p) for p in paragraphs]
+
+
+def text_from_pdf(data: bytes) -> dict[str, str]:
+    lines = _lines(data)
+    drop = _furniture(lines)
+    body = [l for i, l in enumerate(lines) if i not in drop]
+    if not body:
+        raise PdfRefused("no text layer")
+    paragraphs = _paragraphs(body)
+    pqm = max((i for i, p in enumerate(paragraphs) if _PQM.match(p) or p.startswith("P.Q.M.")), default=None)
+    if pqm is None or pqm == 0:
+        return {"motivazione": "\n\n".join(paragraphs)}
+    return {"motivazione": "\n\n".join(paragraphs[:pqm]), "dispositivo": "\n\n".join(paragraphs[pqm:])}
+
+
+async def text_from_pdf_async(data: bytes, timeout: float = 20.0) -> dict[str, str]:
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(text_from_pdf, data), timeout)
+    except asyncio.TimeoutError as exc:
+        raise PdfRefused("parsing took too long") from exc
+```
+
+The «Oggetto» box measured at x0 ≈ 407 on an A4 page of width 595, body lines at 85–103, and «- ricorrente -» at 424 *below* the title, which the `y > title_y` condition keeps. One detail to settle with Task 2's numbers, not by guesswork: whether a centred heading needs its own rule (a centred line has a large `x0`, so `INDENT` already starts a paragraph at it — and the next, left-aligned line, must start one too: add `or (previous is not None and previous["x0"] > left + INDENT and line["x0"] <= left + INDENT and previous_was_short)` only if Task 2 found headings glued to the next paragraph, with a test).
+
+- [ ] **Step 4: Run the tests**
+
+Run: `(cd services/visualex && <python> -m pytest tests/test_decisions_pdf_text.py -q)`
+Expected: pass. Then the hostile shapes, by hand, timed: a 5 MB file of `%PDF-` + zeros (refused fast), a PDF with 201 blank pages (generate it in the scratchpad with any tool; refused), a fixture cut at a third (refused). Each under one second; write the timings in the report.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add services/visualex/visualex_api/services/decisions/pdf_text.py services/visualex/tests/test_decisions_pdf_text.py services/visualex/requirements.txt
+git commit -m "feat(api): read a Cassazione decision's text from its original PDF, page furniture removed" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### Task 4: The reader reads the PDF, and says when it could not
+
+**Files:**
+- Modify: `services/visualex/visualex_api/services/decisions/italgiure.py` (`FIELDS` gains `filename`; `lookup` fetches the PDF; `pdf_url`)
+- Modify: `services/visualex/visualex_api/services/decisions/model.py` (`Decision.testo_origine`: `"pdf"` | `"archivio"` | None, in `_ATTRIBUTES`)
+- Modify: `services/visualex/visualex_api/services/decisions/resolver.py` (the notice `testo_da_archivio`; key `italgiure:v3:`; the PDF bytes cached under `decisions_pdf`)
+- Modify: `services/visualex/visualex_api/tools/cache_manager.py` (`"decisions_pdf"`, 30 days)
+- Modify: `apps/web/src/types/decisions.ts` (`DecisionNotice` gains `{ tipo: 'testo_da_archivio' }`; `DecisionAttributes.testo_origine?`)
+- Modify: `apps/web/src/utils/decisionLinks.ts` (`describeNotice` for it)
+- Test: `services/visualex/tests/test_decisions_italgiure.py` (add), `test_decisions_resolver.py` (add), `apps/web/src/utils/__tests__/decisionLinks.test.ts` (add; find the existing file name first)
+
+**Interfaces:**
+- Consumes: Task 3 (`text_from_pdf_async`, `PdfRefused`); Task 2's fallback-check values.
+- Produces:
+  - `def pdf_url(doc: dict) -> str | None` — the `.clean.pdf` address of a record, or None.
+  - `ItalgiureReader.lookup(...)` returns a `Decision` whose `testo` comes from the PDF (`testo_origine="pdf"`) or from the field (`"archivio"`); the PDF's bytes are available to the resolver as `ItalgiureReader.last_pdf(identity) -> bytes | None` **or**, simpler and stateless, `lookup` returns `(Decision, bytes | None)` through a new method `lookup_with_pdf` that `lookup` wraps. Use the second form.
+  - Notice `{"tipo": "testo_da_archivio"}` when `testo_origine == "archivio"` and there is a text.
+  - Web copy: «Testo dell'archivio della Cassazione: potrebbe essere incompleto. Il PDF originale non era disponibile.»
+
+- [ ] **Step 1: Failing tests (API).**
+
+```python
+async def test_the_text_comes_from_the_pdf_when_there_is_one(monkeypatch):
+    record = json.loads((FIX / "pdf" / "<fixture>.json").read_text())   # Task 2's record, fl=*
+    pdf = (FIX / "pdf" / "<fixture>.clean.pdf").read_bytes()
+    calls = _serve_with_pdf(monkeypatch, solr=[json.dumps({"response": {"numFound": 1, "docs": [record]}})], pdf=pdf)
+    decision, data = await ItalgiureReader().lookup_with_pdf("civile", int(record["numdec"]), int(record["anno"]))
+    assert decision.testo_origine == "pdf" and data == pdf
+    assert decision.testo["motivazione"] == text_from_pdf(pdf)["motivazione"]
+    assert calls[-1][1].endswith(".clean.pdf") and "verbo=attach" in calls[-1][1]
+
+
+@pytest.mark.parametrize("pdf_answer", ["refused", "error", "missing_filename", "too_short"])
+async def test_without_a_usable_pdf_the_field_is_used_and_said(monkeypatch, pdf_answer):
+    # refused: the PDF bytes are «<html>…»; error: the PDF request raises NetworkError;
+    # missing_filename: the record has no `filename` (no PDF request at all);
+    # too_short: a PDF whose text is shorter than the field's by more than Task 2's ratio
+    ...
+    assert decision.testo_origine == "archivio" and decision.testo["motivazione"]
+
+
+async def test_a_withheld_text_fetches_no_pdf(monkeypatch):
+    calls = _serve_with_pdf(monkeypatch, solr=[_fixture("italgiure_snciv_10787_2024.json")], pdf=b"")
+    decision, data = await ItalgiureReader().lookup_with_pdf("civile", 10787, 2024)
+    assert decision.testo == {} and data is None
+    assert not any("verbo=attach" in c[1] for c in calls)
+```
+
+Write `_serve_with_pdf` beside `_serve`: Solr POSTs answer from `solr`, a GET whose URL contains `verbo=attach` answers `HttpResult(text=pdf.decode("latin-1"), status=200, headers={"Content-Type": "application/pdf"})`, the homepage GET answers empty. Fill the four parametrised cases concretely. Resolver: a found decision from the field carries `avvisi == [{"tipo": "testo_da_archivio"}]`; one from the PDF carries none; the PDF bytes are stored under `decisions_pdf` keyed by the decision key; the text under `italgiure:v3:…`.
+
+Web: `describeNotice({ tipo: 'testo_da_archivio' })` returns the copy above.
+
+- [ ] **Step 2: Run to see them fail.** `(cd services/visualex && <python> -m pytest tests/test_decisions_italgiure.py tests/test_decisions_resolver.py -q)` and `npm --prefix apps/web run test -- --run src/utils/__tests__/` → FAIL.
+
+- [ ] **Step 3: Implement.**
+
+```python
+FIELDS = "id,numdec,anno,datdep,szdec,materia,tipoprov,ocr,ocrdis,relatore,presidente,kind,filename"
+ATTACH = "https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll"
+
+
+def pdf_url(doc: dict) -> str | None:
+    """The court's PDF of a record, in the form the archive serves within its session (the plain
+    `.pdf` name answers 500, measured on 2026-10-05)."""
+    name = _scalar(doc.get("filename")).strip()
+    kind = _scalar(doc.get("kind")).strip()
+    if not re.fullmatch(r"\./\d{8}/sn(?:civ|pen)@[\w@]+\.pdf", name) or kind not in KINDS.values():
+        return None
+    return f"{ATTACH}?verbo=attach&db={kind}&id={name[:-4]}.clean.pdf"
+```
+
+`lookup_with_pdf(archivio, numero, anno) -> tuple[Decision, bytes | None] | None`: the Solr query as `lookup` today; `decision = to_decision(doc, archivio)`; if `decision.testo` is empty (withheld or no text) return `(decision, None)`; else `url = pdf_url(doc)`; if url: `result = await decisions_http_client.request("GET", url, source="italgiure", ssl=ctx, headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1")`, `data = result.text.encode("latin-1")`, `testo = await text_from_pdf_async(data)`; accept it only if it passes Task 2's checks against the field's text (`_plausible(testo, decision.testo)`: length ratio and the field's first words in order); then `decision.testo, decision.testo_origine = testo, "pdf"` and return `(decision, data)`. On `PdfRefused`, a network error on the PDF request, or a failed check: log a warning with the identity and the reason, set `testo_origine = "archivio"`, return `(decision, None)`. `lookup` returns `(await self.lookup_with_pdf(...))[0]` (or None). The request counts against the owner's ten per search: a cold lookup is homepage + Solr + PDF.
+
+In the resolver, `_cass` calls `lookup_with_pdf`, stores the decision as today under `italgiure:v3:{archivio}:{numero}:{anno}` and, when bytes came back, `await self.pdfs.set(decision.identita.key(), base64.b64encode(data).decode())` (`self.pdfs = manager.get_persistent(PDF_NS)`, `PDF_NS = "decisions_pdf"`, in the sweep list). Update the comment above the key: v3 since the text comes from the original PDF (2026-10-05); the v2 entries hold the field's text and are not served again. `_withheld` becomes `_text_notices(decision)`: `[{"tipo": "testo_non_disponibile"}]` without a text, `[{"tipo": "testo_da_archivio"}]` with a text from the field, `[]` otherwise.
+
+`describeNotice` gains the case (the `never` check forces it). Add `testo_origine` to `DecisionAttributes` (`'pdf' | 'archivio'`).
+
+- [ ] **Step 4: Run the decision tests, the whole Python suite, and the web unit tests touched.** Expected: pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add services/visualex apps/web/src/types/decisions.ts apps/web/src/utils/decisionLinks.ts apps/web/src/utils/__tests__/
+git commit -m "feat(api): a Cassazione decision reads from the court's PDF, and says when only the archive's text was had" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### Task 5: How an article and a topic become a Solr query — by the index and in the text
 
 **Files:**
 - Create: `services/visualex/visualex_api/services/decisions/search.py`
 - Test: `services/visualex/tests/test_decisions_search_query.py`
 
 **Interfaces:**
-- Consumes: `visualex_api/tools/article_suffixes.py` (`ARTICLE_SUFFIXES` or the module's table; read it first and use its exported name).
+- Consumes: Task 1's proximity (6) and Task 2's index table (amendment).
 - Produces:
   - `class UnsupportedAct(ValueError)`
   - `def article_clause(norma: dict) -> tuple[str, str | None]` — the Solr clause for the article and the default archive (`"civile"`, `"penale"` or `None`); raises `UnsupportedAct`.
   - `def topic_clause(raw: str) -> str` — `ocr:"<words>"`; raises `ValueError` when nothing is left.
   - `def build_query(article: str | None, topic: str | None, archivio: str | None) -> str`
-  - `PROXIMITY: int` (Task 1's value)
+  - `PROXIMITY: int` (6, Task 1's measurement)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -232,8 +639,8 @@ from __future__ import annotations
 import re
 
 #: Solr proximity for an article of a numbered act: «art. 2 … l. … 241 … 1990» within this many
-#: positions (fixed by plan Task 1, 2026-10-05).
-PROXIMITY = 8
+#: positions (measured by plan Task 1, 2026-10-05: 8 and 12 already let art. 21-octies in).
+PROXIMITY = 6
 
 KINDS = {"civile": "snciv", "penale": "snpen"}
 
@@ -310,25 +717,56 @@ The Costituzione phrase reads «art. 3 della Costituzione»; the codes «art. 20
 Run: `(cd services/visualex && <python> -m pytest tests/test_decisions_search_query.py -q)`
 Expected: all pass. If `test_a_topic_keeps_only_words` fails on `ocr:* OR kind:"snpen"`: the expected words are the input with every non-word character turned into a space and spaces collapsed; fix the regex, not the test.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: The index of cited norms (spec §5.2, N15).** Add to the same module, with tests first:
+
+```python
+@dataclass(frozen=True)
+class IndexCoordinates:
+    """One citation as the Cassazione's index writes it (`rnc-*` fields, measured by plan Task 2)."""
+    gen: str               # code family: "CC", "PC", "LS" …
+    art: str               # article as "2043 00": four digits, a space, the suffix code
+    sp: str | None = None  # act type of a numbered act: "DLG", "DPR" …
+    num: str | None = None # its number, four digits
+    dat: str | None = None # its year
+
+
+def index_clause(norma: dict) -> tuple[str, str | None, IndexCoordinates]:
+    """The index query for an article, its default archive, and the coordinates the server
+    re-checks on each record. UnsupportedAct for an act or a suffix Task 2 did not establish:
+    the route then searches the text."""
+
+
+def cites(doc: dict, c: IndexCoordinates) -> bool:
+    """Whether one citation of the record carries every coordinate. The index's fields are
+    parallel lists, so `rnc-gen:"CC" AND rnc-art:"2043 00"` can match a record citing art. 2043
+    of another act and something else of the code."""
+```
+
+The table `_INDEX_CODES: dict[str, tuple[str, str | None]]` (tipo_atto → (`gen`, default archive)) and `_INDEX_ACTS: dict[str, str]` (tipo_atto of a numbered act → `sp`) hold exactly the values Task 2's amendment lists; measured already on 2026-10-05: `CC` for the codice civile (`rnc-art "1227 00"`), `PC` for the codice di procedura civile (`"0360 00"`), `LS` for numbered acts with `sp` `DLG` and `DPR` (d.lgs. 58/1998 and d.P.R. 115/2002 in one record). An act missing from the tables raises `UnsupportedAct`. The article: `f"{int(base):04d} {suffix_code}"` with `"00"` for no suffix and Task 2's codes for «-bis» and the others; a suffix Task 2 did not establish raises `UnsupportedAct`. The query: `rnc-gen:"<gen>" AND rnc-art:"<art>"`, plus `AND rnc-sp:"<sp>" AND rnc-num:"<num>" AND rnc-dat:"<dat>"` for a numbered act. `cites`: true when some position `i` has `rnc-gen[i] == gen and rnc-art[i] == art`, and for a numbered act the number and year aligned with `i` as Task 2 measured (write that alignment exactly as the amendment states it, with a comment quoting the measurement).
+
+Tests: `index_clause({"tipo_atto": "codice civile", "numero_articolo": "2043"})` → `('rnc-gen:"CC" AND rnc-art:"2043 00"', "civile", IndexCoordinates("CC", "2043 00"))`; a numbered act's clause; an act not in the tables and an unestablished suffix → `UnsupportedAct`; `cites` true on the fixture `italgiure_index_2043_cc.json`'s records that cite it, false on a hand-made record `{"rnc-gen": ["CC", "LS"], "rnc-art": ["1227 00", "2043 00"], "rnc-sp": ["COD", "DLG"]}` (art. 2043 of a law, not of the code).
+
+- [ ] **Step 6: Run the tests.** `(cd services/visualex && <python> -m pytest tests/test_decisions_search_query.py -q)` → pass.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add services/visualex/visualex_api/services/decisions/search.py services/visualex/tests/test_decisions_search_query.py
-git commit -m "feat(api): phrase an article and a topic as an Italgiure query, words only"
+git commit -m "feat(api): phrase an article for the Cassazione's index and for the text, and a topic as words only" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-### Task 3: The reader searches, once per session, and returns fragments as ranges
+### Task 6: The reader searches, once per session, re-checks index matches, and returns fragments as ranges
 
 **Files:**
 - Modify: `services/visualex/visualex_api/services/decisions/italgiure.py`
 - Test: `services/visualex/tests/test_decisions_italgiure_search.py`
 
 **Interfaces:**
-- Consumes: Task 1's fixtures; `KINDS` from `search.py`.
+- Consumes: Task 1's and Task 2's fixtures; `KINDS`, `IndexCoordinates`, `cites` from `search.py` (Task 5).
 - Produces:
   - `@dataclass(frozen=True) class SearchHit: identita: Identity; attributi: dict; frammento: dict` (`{"testo": str, "evidenziati": list[list[int]]}`)
   - `@dataclass(frozen=True) class SearchPage: totale: int; decisioni: list[SearchHit]`
-  - `async def ItalgiureReader.search(self, q: str, pagina: int, rows: int = 20) -> SearchPage`
+  - `async def ItalgiureReader.search(self, q: str, pagina: int, rows: int = 20, *, coords: IndexCoordinates | None = None, hl_query: str | None = None) -> SearchPage` — with `coords`, the page asks for the `rnc-*` fields and keeps only the records `cites(doc, coords)` accepts; `hl_query` is sent as `hl.q` (the text phrasing, so an index row can carry a passage); each `SearchHit` has `trovata: "indice" | "testo"`
   - `def fragment_ranges(snippet: str) -> dict`
   - The homepage GET runs once per reader instance and again only after a non-Solr answer.
 
@@ -381,6 +819,24 @@ async def test_the_request_is_sorted_paged_and_highlighted(monkeypatch):
     assert "ocr" not in data["fl"].split(",")  # never the whole text in a list
 
 
+async def test_an_index_page_keeps_only_records_that_cite_the_article(monkeypatch):
+    calls = _serve(monkeypatch, [(FIX / "italgiure_index_2043_cc.json").read_text()])
+    coords = IndexCoordinates("CC", "2043 00")
+    page = await ItalgiureReader().search('kind:"snciv" AND (rnc-gen:"CC" AND rnc-art:"2043 00")', pagina=1,
+                                          coords=coords, hl_query='ocr:"art. 2043 c.c."')
+    data = calls[-1][2]["data"]
+    assert "rnc-art" in data["fl"] and data["hl.q"] == 'ocr:"art. 2043 c.c."'
+    assert page.decisioni and all(h.trovata == "indice" for h in page.decisioni)
+
+
+async def test_a_record_matching_two_different_citations_is_dropped(monkeypatch):
+    doc = {"id": "x", "numdec": "1", "anno": "2025", "kind": "snciv", "datdep": ["20250101"],
+           "rnc-gen": ["CC", "LS"], "rnc-art": ["1227 00", "2043 00"], "rnc-sp": ["COD", "DLG"]}
+    _serve(monkeypatch, [json.dumps({"response": {"numFound": 1, "docs": [doc]}})])
+    page = await ItalgiureReader().search("q", pagina=1, coords=IndexCoordinates("CC", "2043 00"))
+    assert page.decisioni == [] and page.totale == 1
+
+
 async def test_the_homepage_is_fetched_once_per_reader(monkeypatch):
     empty = (FIX / "italgiure_search_empty.json").read_text()
     calls = _serve(monkeypatch, [empty, empty])
@@ -427,7 +883,8 @@ _EM_SPLIT = re.compile(r"(</?em>)")
 class SearchHit:
     identita: Identity
     attributi: dict
-    frammento: dict
+    trovata: str          # "indice" | "testo" (design N5)
+    frammento: dict | None
 
 
 @dataclass(frozen=True)
@@ -485,11 +942,16 @@ class ItalgiureReader:
             raise SourceAnswerError("Italgiure non ha risposto con i suoi dati")
         return data
 
-    async def search(self, q: str, pagina: int, rows: int = 20) -> SearchPage:
-        data = await self._select({
-            "q": q, "rows": str(rows), "start": str((pagina - 1) * rows), "fl": SEARCH_FIELDS,
+    async def search(self, q: str, pagina: int, rows: int = 20, *,
+                     coords: IndexCoordinates | None = None, hl_query: str | None = None) -> SearchPage:
+        params = {
+            "q": q, "rows": str(rows), "start": str((pagina - 1) * rows),
+            "fl": SEARCH_FIELDS + (",rnc-gen,rnc-art,rnc-sp,rnc-num,rnc-dat" if coords else ""),
             "sort": "pd desc", "hl": "true", "hl.fl": "ocr", "hl.snippets": "1",
-            "hl.fragsize": "200"})
+            "hl.fragsize": "200"}
+        if hl_query:
+            params["hl.q"] = hl_query
+        data = await self._select(params)
         highlights = data.get("highlighting") or {}
         hits = []
         for doc in data["response"]["docs"]:
@@ -500,13 +962,16 @@ class ItalgiureReader:
                 summary = to_decision({**doc, "ocr": "", "ocrdis": ""}, archivio)
             except ValueError:
                 continue  # a record without a readable number or year is skipped, as a lookup refuses it
-            snippet = (highlights.get(_scalar(doc.get("id"))) or {}).get("ocr") or [""]
+            if coords is not None and not cites(doc, coords):
+                continue  # matched two different citations of the record (design §5.2)
+            snippet = (highlights.get(_scalar(doc.get("id"))) or {}).get("ocr")
             hits.append(SearchHit(summary.identita, summary.attributes_dict(),
-                                  fragment_ranges(snippet[0])))
+                                  "indice" if coords else "testo",
+                                  fragment_ranges(snippet[0]) if snippet else None))
         return SearchPage(int(data["response"].get("numFound") or 0), hits)
 ```
 
-Before writing `summary.attributes_dict()`, read `model.py`'s `Decision.to_dict()` and use the part of it that writes `attributi` (extract a method `attributes_dict()` there if none exists, covered by the existing `test_decisions_model.py`). `to_decision` with empty `ocr` returns a decision without text and logs «Italgiure record without text»: pass a flag or call a smaller helper that builds identity and attributes only, so the search does not log a warning per row. Name it `to_summary(doc, archivio) -> tuple[Identity, dict]` and use it here; `to_decision` calls it too, so both read the record the same way.
+Before writing `summary.attributes_dict()`, read `model.py`'s `Decision.to_dict()` and use the part of it that writes `attributi` (extract a method `attributes_dict()` there if none exists, covered by the existing `test_decisions_model.py`). Note that Task 4 already factored the record query into `record(...)` and gave the reader its session handling may differ: read the reader as Task 4 left it, and add the session flag to the one `_select`. `to_decision` with empty `ocr` returns a decision without text and logs «Italgiure record without text»: pass a flag or call a smaller helper that builds identity and attributes only, so the search does not log a warning per row. Name it `to_summary(doc, archivio) -> tuple[Identity, dict]` and use it here; `to_decision` calls it too, so both read the record the same way.
 
 Existing tests of `lookup` and `archive_start` must stay green: the session flag changes the number of GETs per lookup from one per call to one per reader. `test_decisions_italgiure.py`'s `_serve` answers any GET, so the tests that count calls (`calls`) must be read: update only assertions that counted a GET per lookup, and say so in the commit.
 
@@ -519,10 +984,10 @@ Expected: all pass.
 
 ```bash
 git add services/visualex/visualex_api/services/decisions/ services/visualex/tests/
-git commit -m "feat(api): search Italgiure by text, sorted by deposit, fragments as ranges, one session per reader"
+git commit -m "feat(api): search Italgiure by index or text, sorted by deposit, fragments as ranges, one session per reader" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-### Task 4: The route `/search_decisions`, its cache and its gate
+### Task 7: The route `/search_decisions`, its cache and its gate
 
 **Files:**
 - Modify: `services/visualex/app.py` (route registration next to `/fetch_decision`, handler next to `fetch_decision`)
@@ -535,9 +1000,9 @@ git commit -m "feat(api): search Italgiure by text, sorted by deposit, fragments
 - Test: `services/visualex/tests/test_search_decisions.py`
 
 **Interfaces:**
-- Consumes: Task 2 (`article_clause`, `topic_clause`, `build_query`, `UnsupportedAct`), Task 3 (`ItalgiureReader.search`, `SearchPage`).
-- Produces: `POST /search_decisions`, body `{norma?, tema?, archivio?, pagina?}`, answers:
-  - `{"esito": "risultati", "totale": int, "pagina": int, "archivio": "civile"|"penale"|null, "archivio_dal": "YYYY-MM-DD"|null, "decisioni": [{"identita": {...}, "attributi": {...}, "frammento": {"testo": str, "evidenziati": [[int,int]]}}]}` 200
+- Consumes: Task 5 (`article_clause`, `index_clause`, `topic_clause`, `build_query`, `UnsupportedAct`, `IndexCoordinates`), Task 6 (`ItalgiureReader.search`, `SearchPage`, `SearchHit.trovata`).
+- Produces: `POST /search_decisions`, body `{norma?, tema?, archivio?, pagina?, modo?}` (`modo`: `"indice"`, the default with an article, or `"testo"`; a topic is always searched in the text), answers:
+  - `{"esito": "risultati", "totale": int, "pagina": int, "modo": "indice"|"testo", "archivio": "civile"|"penale"|null, "archivio_dal": "YYYY-MM-DD"|null, "decisioni": [{"identita": {...}, "attributi": {...}, "trovata": "indice"|"testo", "frammento": {"testo": str, "evidenziati": [[int,int]]} | null}]}` 200. With `modo: "indice"` and an act the index cannot express, the route searches the text instead and answers `modo: "testo"` — the client shows what was actually done.
   - `{"esito": "non_supportata"}` 200
   - `{"esito": "richiesta_non_valida", "errori": {field: message}}` 400
   - `{"esito": "fonte_non_raggiungibile", "fonte": "cassazione"}` 503
@@ -555,7 +1020,7 @@ from visualex_api.services.decisions.model import Identity
 from visualex_api.tools.exceptions import NetworkError
 
 HIT = SearchHit(Identity("cassazione", 24908, 2026, "civile"),
-                {"sezione": "L", "tipo": "ordinanza", "data_deposito": "2026-09-01"},
+                {"sezione": "L", "tipo": "ordinanza", "data_deposito": "2026-09-01"}, "indice",
                 {"testo": "ex art. 2043 c.c.", "evidenziati": [[3, 17]]})
 
 
@@ -563,8 +1028,8 @@ class FakeSearcher:
     def __init__(self, page=None, error=None):
         self.page, self.error, self.queries = page, error, []
 
-    async def search(self, q, pagina, rows=20):
-        self.queries.append((q, pagina))
+    async def search(self, q, pagina, rows=20, *, coords=None, hl_query=None):
+        self.queries.append((q, pagina, coords, hl_query))
         if self.error:
             raise self.error
         return self.page
@@ -593,7 +1058,24 @@ async def test_an_article_gives_a_page(client, monkeypatch):
     assert body["archivio"] == "civile" and body["archivio_dal"] == "2021-01-04"
     assert body["decisioni"][0]["identita"] == {"corte": "cassazione", "numero": 24908,
                                                 "anno": 2026, "archivio": "civile"}
-    assert s.queries[0][0].startswith('kind:"snciv" AND (')
+    assert s.queries[0][0] == 'kind:"snciv" AND (rnc-gen:"CC" AND rnc-art:"2043 00")'
+    assert s.queries[0][2] is not None and 'art. 2043 c.c.' in s.queries[0][3]
+    assert body["modo"] == "indice" and body["decisioni"][0]["trovata"] == "indice"
+
+
+async def test_the_text_way_is_chosen_on_request(client, monkeypatch):
+    s = _use(monkeypatch, FakeSearcher(SearchPage(939, [])))
+    resp = await client.post("/search_decisions", json={
+        "norma": {"tipo_atto": "codice civile", "numero_articolo": "2043"}, "modo": "testo"})
+    body = await resp.get_json()
+    assert body["modo"] == "testo" and s.queries[0][2] is None and 'ocr:"art. 2043 c.c."' in s.queries[0][0]
+
+
+async def test_an_act_the_index_cannot_express_is_searched_in_the_text(client, monkeypatch):
+    s = _use(monkeypatch, FakeSearcher(SearchPage(5, [])))
+    resp = await client.post("/search_decisions", json={
+        "norma": {"tipo_atto": "codice civile", "numero_articolo": "2051-bis"}})  # suffix not in Task 2's table
+    assert (await resp.get_json())["modo"] == "testo" and s.queries[0][2] is None
 
 
 async def test_an_act_that_cannot_be_phrased_is_unsupported(client, monkeypatch):
@@ -661,7 +1143,7 @@ import structlog
 
 from ...tools.cache_manager import get_cache_manager
 from .resolver import _SOURCE_ERRORS, get_resolver
-from .search import UnsupportedAct, article_clause, build_query, topic_clause
+from .search import UnsupportedAct, article_clause, build_query, index_clause, topic_clause
 
 log = structlog.get_logger()
 MAX_PAGE = 10
@@ -698,6 +1180,8 @@ def _errors(body: Any) -> tuple[dict, dict]:
     archivio = body.get("archivio")
     if archivio not in (None, "civile", "penale"):
         errors["archivio"] = "Archivio non riconosciuto"
+    if body.get("modo") not in (None, "indice", "testo"):
+        errors["modo"] = "Modo non riconosciuto"
     return errors, body
 
 
@@ -705,12 +1189,24 @@ async def search_decisions(body: Any) -> tuple[dict, int]:
     errors, body = _errors(body)
     if errors:
         return {"esito": "richiesta_non_valida", "errori": errors}, 400
-    article, archivio_default = None, None
+    article, archivio_default, coords, hl_query = None, None, None, None
+    modo = "testo"
     if body.get("norma") is not None:
+        text_clause = None
         try:
-            article, archivio_default = article_clause(body["norma"])
+            text_clause, archivio_default = article_clause(body["norma"])
         except UnsupportedAct:
-            return {"esito": "non_supportata"}, 200
+            pass
+        if body.get("modo", "indice") == "indice":
+            try:
+                article, archivio_default, coords = index_clause(body["norma"])
+                modo, hl_query = "indice", text_clause
+            except UnsupportedAct:
+                pass  # the text way, said in the answer's `modo`
+        if article is None:
+            if text_clause is None:
+                return {"esito": "non_supportata"}, 200
+            article = text_clause
     topic = None
     if body.get("tema") is not None:
         try:
@@ -720,27 +1216,27 @@ async def search_decisions(body: Any) -> tuple[dict, int]:
     archivio = body.get("archivio") or archivio_default
     pagina = body.get("pagina", 1)
     q = build_query(article, topic, archivio)
-    key = hashlib.sha256(json.dumps([q, pagina]).encode()).hexdigest()
+    key = hashlib.sha256(json.dumps([q, pagina, hl_query]).encode()).hexdigest()
     cache = get_cache()
     cached = await cache.get(key)
     if cached is not None:
         return cached, 200
     try:
-        page = await get_searcher().search(q, pagina)
+        page = await get_searcher().search(q, pagina, coords=coords, hl_query=hl_query)
     except _SOURCE_ERRORS as exc:
         log.warning("Decision search failed", error=str(exc), error_type=type(exc).__name__)
         return {"esito": "fonte_non_raggiungibile", "fonte": "cassazione"}, 503
     answer = {
-        "esito": "risultati", "totale": page.totale, "pagina": pagina, "archivio": archivio,
+        "esito": "risultati", "totale": page.totale, "pagina": pagina, "modo": modo, "archivio": archivio,
         "archivio_dal": await archive_start(archivio or "civile"),
         "decisioni": [{"identita": h.identita.to_dict(), "attributi": h.attributi,
-                       "frammento": h.frammento} for h in page.decisioni],
+                       "trovata": h.trovata, "frammento": h.frammento} for h in page.decisioni],
     }
     await cache.set(key, answer)
     return answer, 200
 ```
 
-Add to `Resolver` a public `archive_start_of(archivio)` that returns `await self._start(archivio)` (the cached start) and make sure `get_resolver().italgiure` is the reader instance (read `get_resolver` and the constructor first; if the reader is stored under another name, use it). In `cache_manager.py` add `"decisions_search": _create_cache("decisions_search", ttl=24 * 3600),` beside the three decision namespaces, and add `"decisions_search"` to the sweep loop in `resolver.py` (`for namespace in (FOUND_NS, ABSENT_NS, PENDING_NS, SEARCH_NS)`, with `SEARCH_NS = "decisions_search"` defined next to the others and imported by `search_route.py` instead of the literal).
+The `count` of an index page is the archive's `numFound`; Task 2's amendment says for which families the false-match rate exceeds 5 %: for those, add `"totale_approssimato": true` to the answer (the client writes «circa N»), with a test. Add to `Resolver` a public `archive_start_of(archivio)` that returns `await self._start(archivio)` (the cached start) and make sure `get_resolver().italgiure` is the reader instance (read `get_resolver` and the constructor first; if the reader is stored under another name, use it). In `cache_manager.py` add `"decisions_search": _create_cache("decisions_search", ttl=24 * 3600),` beside the three decision namespaces, and add `"decisions_search"` to the sweep loop in `resolver.py` (`for namespace in (FOUND_NS, ABSENT_NS, PENDING_NS, SEARCH_NS)`, with `SEARCH_NS = "decisions_search"` defined next to the others and imported by `search_route.py` instead of the literal).
 
 In `app.py`, register `self.app.add_url_rule('/search_decisions', view_func=self.search_decisions, methods=['POST'])` next to `/fetch_decision`, and:
 
@@ -779,10 +1275,165 @@ Expected: all pass (the count rises by the new tests; no other change).
 
 ```bash
 git add services/visualex apps/web/vite.config.ts infra/ingress/Caddyfile docs/backend/python_api_reference.md
-git commit -m "feat(api): POST /search_decisions — decisions mentioning an article or a topic, cached, behind the login"
+git commit -m "feat(api): POST /search_decisions — decisions citing or mentioning an article, or a topic, cached, behind the login" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-### Task 5: A decision's text is frozen
+### Task 8: The court's original PDF, served behind the login
+
+Spec §12.2.
+
+**Files:**
+- Create: `services/visualex/visualex_api/services/decisions/pdf_route.py`
+- Modify: `services/visualex/app.py` (register `POST /fetch_decision_pdf`)
+- Modify: `services/visualex/visualex_api/services/decisions/resolver.py` (`async def original_pdf(identity) -> bytes | None`)
+- Modify: `apps/web/vite.config.ts`, `infra/ingress/Caddyfile` (`/fetch_decision_pdf`)
+- Modify: `docs/backend/python_api_reference.md`
+- Test: `services/visualex/tests/test_fetch_decision_pdf.py`
+
+**Interfaces:**
+- Consumes: Task 4 (`pdf_url`, the `decisions_pdf` cache, `ItalgiureReader`).
+- Produces: `POST /fetch_decision_pdf` with an identity body (`{corte: "cassazione", archivio, numero, anno}`): `200 application/pdf` with `Content-Disposition: attachment; filename="Cass_<civ|pen>_n_<numero>_<anno>.pdf"`; JSON `{"esito": "non_disponibile"}` 404, `{"esito": "richiesta_non_valida", "errori": …}` 400 (the Corte costituzionale, a missing archive, a bad field), `{"esito": "fonte_non_raggiungibile", "fonte": "cassazione"}` 503, `{"esito": "errore_interno"}` 500.
+
+- [ ] **Step 1: Failing tests** (pattern of `test_fetch_decision.py`)
+
+```python
+"""POST /fetch_decision_pdf (design 2026-10-05 §12.2)."""
+import pytest
+
+from app import NormaController
+from visualex_api.tools.exceptions import NetworkError
+
+PDF = b"%PDF-1.4\n%fake but shaped\n"
+
+
+class FakeResolver:
+    def __init__(self, data=None, error=None):
+        self.data, self.error, self.asked = data, error, []
+
+    async def original_pdf(self, identity):
+        self.asked.append(identity)
+        if self.error:
+            raise self.error
+        return self.data
+
+
+@pytest.fixture
+def client():
+    return NormaController().app.test_client()
+
+
+def _use(monkeypatch, resolver):
+    monkeypatch.setattr("visualex_api.services.decisions.pdf_route.get_resolver", lambda: resolver)
+    return resolver
+
+
+async def test_the_pdf_is_served_as_an_attachment(client, monkeypatch):
+    _use(monkeypatch, FakeResolver(PDF))
+    resp = await client.post("/fetch_decision_pdf", json={"corte": "cassazione", "archivio": "civile", "numero": 5625, "anno": 2022})
+    assert resp.status_code == 200
+    assert resp.headers["Content-Type"] == "application/pdf"
+    assert resp.headers["Content-Disposition"] == 'attachment; filename="Cass_civ_n_5625_2022.pdf"'
+    assert await resp.get_data() == PDF
+
+
+async def test_no_pdf_is_404(client, monkeypatch):
+    _use(monkeypatch, FakeResolver(None))
+    resp = await client.post("/fetch_decision_pdf", json={"corte": "cassazione", "archivio": "penale", "numero": 1, "anno": 2024})
+    assert resp.status_code == 404 and await resp.get_json() == {"esito": "non_disponibile"}
+
+
+@pytest.mark.parametrize("body", [
+    {"corte": "corte_costituzionale", "numero": 71, "anno": 2020},
+    {"corte": "cassazione", "numero": 1, "anno": 2024},            # no archive: not an identity
+    {"corte": "cassazione", "archivio": "civile", "numero": 0, "anno": 2024},
+    [],
+])
+async def test_only_a_cassazione_identity_is_accepted(client, monkeypatch, body):
+    _use(monkeypatch, FakeResolver(PDF))
+    resp = await client.post("/fetch_decision_pdf", json=body)
+    assert resp.status_code == 400 and (await resp.get_json())["esito"] == "richiesta_non_valida"
+
+
+async def test_bytes_that_are_not_a_pdf_are_never_served(client, monkeypatch):
+    _use(monkeypatch, FakeResolver(b"<html>Verifica</html>"))
+    resp = await client.post("/fetch_decision_pdf", json={"corte": "cassazione", "archivio": "civile", "numero": 1, "anno": 2024})
+    assert resp.status_code == 404
+
+
+async def test_a_source_that_does_not_answer_is_503(client, monkeypatch):
+    _use(monkeypatch, FakeResolver(error=NetworkError("down")))
+    resp = await client.post("/fetch_decision_pdf", json={"corte": "cassazione", "archivio": "civile", "numero": 1, "anno": 2024})
+    assert resp.status_code == 503
+```
+
+Resolver tests (in `test_decisions_resolver.py`): `original_pdf` returns the cached bytes without a request when `decisions_pdf` holds the key; otherwise it reads the record (one Solr request), and when `pdf_url(doc)` is not None fetches it (one request), caches it and returns it; a withheld record or one without `filename` returns None and caches nothing.
+
+- [ ] **Step 2: Run to see them fail.**
+
+- [ ] **Step 3: Implement.** `pdf_route.py`:
+
+```python
+"""POST /fetch_decision_pdf: the court's own PDF of a Cassazione decision (design 2026-10-05 §12.2)."""
+from __future__ import annotations
+
+from typing import Any
+
+import structlog
+
+from .model import MAX_NUMERO, FIRST_YEAR, Identity
+from .resolver import _SOURCE_ERRORS, get_resolver
+
+log = structlog.get_logger()
+
+
+def _identity(body: Any, current_year: int) -> Identity | dict[str, str]:
+    if not isinstance(body, dict):
+        return {"body": "atteso un oggetto JSON"}
+    errors: dict[str, str] = {}
+    if body.get("corte") != "cassazione":
+        errors["corte"] = "solo la Corte di cassazione ha il PDF originale"
+    if body.get("archivio") not in ("civile", "penale"):
+        errors["archivio"] = "atteso civile o penale"
+    numero, anno = body.get("numero"), body.get("anno")
+    if not isinstance(numero, int) or isinstance(numero, bool) or not 1 <= numero <= MAX_NUMERO:
+        errors["numero"] = "atteso un numero da 1 a 999999"
+    if not isinstance(anno, int) or isinstance(anno, bool) or not FIRST_YEAR["cassazione"] <= anno <= current_year:
+        errors["anno"] = "anno non valido"
+    return errors or Identity("cassazione", numero, anno, body["archivio"])
+
+
+async def fetch_decision_pdf(body: Any, current_year: int) -> tuple[bytes | dict, int, dict[str, str]]:
+    identity = _identity(body, current_year)
+    if isinstance(identity, dict):
+        return {"esito": "richiesta_non_valida", "errori": identity}, 400, {}
+    try:
+        data = await get_resolver().original_pdf(identity)
+    except _SOURCE_ERRORS as exc:
+        log.warning("Original PDF unreachable", key=identity.key(), error=str(exc))
+        return {"esito": "fonte_non_raggiungibile", "fonte": "cassazione"}, 503, {}
+    if not data or not data.startswith(b"%PDF-"):
+        return {"esito": "non_disponibile"}, 404, {}
+    short = "civ" if identity.archivio == "civile" else "pen"
+    return data, 200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": f'attachment; filename="Cass_{short}_n_{identity.numero}_{identity.anno}.pdf"',
+    }
+```
+
+In `app.py`, the handler reads the JSON body as `fetch_decision` does, calls `fetch_decision_pdf(body, date.today().year)` inside `try/except Exception` (→ fixed 500 `errore_interno`, logged), and returns `Response(data, status=status, headers=headers)` for bytes, `jsonify(answer), status` otherwise. Resolver `original_pdf(identity)`: the cache, then `self.italgiure.record(archivio, numero, anno)` (factor the Solr query of `lookup_with_pdf` into `record(...) -> dict | None`, which `lookup_with_pdf` also uses), then the PDF request through the reader's own client (`fetch_pdf(url) -> bytes`, also used by `lookup_with_pdf`), checking `%PDF-` and `MAX_BYTES` before caching.
+
+- [ ] **Step 4: The gate**: proxy line and ingress path (`/fetch_decision_pdf*`), then `node --test infra/ingress/paths.test.mjs && npm --prefix apps/web run test -- --run src/services/__tests__/legalFetch.guard.test.ts`. Document the route in `docs/backend/python_api_reference.md`.
+
+- [ ] **Step 5: Run the decision tests and the whole Python suite.** Expected: pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add services/visualex apps/web/vite.config.ts infra/ingress/Caddyfile docs/backend/python_api_reference.md
+git commit -m "feat(api): POST /fetch_decision_pdf — the court's own PDF of a Cassazione decision, behind the login" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### Task 9: A decision's text is frozen
 
 **Files:**
 - Create: `services/visualex/tests/test_decisions_text_frozen.py`
@@ -791,7 +1442,7 @@ git commit -m "feat(api): POST /search_decisions — decisions mentioning an art
 - Modify: `CLAUDE.md` (root rule 23), `services/visualex/CLAUDE.md` (the decisions section)
 
 **Interfaces:**
-- Consumes: the existing fixtures `italgiure_snciv_10787_2024.json`, `italgiure_snpen_10787_2024.json`, `corte_cost_2014_sample.json`; `to_decision` and the Corte costituzionale reader's record → decision function (read `corte_cost.py` for its name).
+- Consumes: Task 2's PDF fixtures and `text_from_pdf` (Task 3) — the Cassazione's text as it is read now; the existing fixtures `italgiure_snciv_10787_2024.json`, `italgiure_snpen_10787_2024.json` for the fallback path (`to_decision`); `corte_cost_2014_sample.json` and the Corte costituzionale reader's record → decision function (read `corte_cost.py` for its name).
 - Produces: `projection(testo: dict) -> str` in the test module (blocks epigrafe, motivazione, dispositivo concatenated, `\n` removed) — the web's `decisionProjection` (Task 14) mirrors it.
 
 - [ ] **Step 1: Write the test that records, then freezes**
@@ -800,8 +1451,9 @@ git commit -m "feat(api): POST /search_decisions — decisions mentioning an art
 """A decision's text is a data contract (design 2026-10-05 §8.5, root rule 23): anchors are
 pinned by offset and text over the projection — the blocks in reading order, concatenated, with
 every \n removed. A reader may add or move \n and move a boundary between blocks; it may never
-add, drop or change another character. The golden projections were recorded on 2026-10-05 from
-the fixtures, by the readers as merged then."""
+add, drop or change another character. The golden projections were recorded when this round's
+PR 1 merged: the Cassazione's text read from the original PDF (design §11), the fallback from the
+text field, and the Corte costituzionale's open data."""
 import json
 import pathlib
 
@@ -809,6 +1461,7 @@ import pytest
 
 from visualex_api.services.decisions.corte_cost import record_to_decision  # read the module: use its real name
 from visualex_api.services.decisions.italgiure import to_decision
+from visualex_api.services.decisions.pdf_text import text_from_pdf
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "decisions"
 GOLDEN = json.loads((FIX / "frozen_projections.json").read_text())
@@ -829,11 +1482,16 @@ def _corte_cost_cases():
     return [(f"corte_cost_{r['numero_pronuncia']}", r) for r in records["elenco_pronunce"]]
 
 
+@pytest.mark.parametrize("path", sorted((FIX / "pdf").glob("*.clean.pdf")), ids=lambda p: p.name)
+def test_the_cassazione_text_from_the_pdf_is_frozen(path):
+    assert projection(text_from_pdf(path.read_bytes())) == GOLDEN[path.name]
+
+
 @pytest.mark.parametrize("name, archivio", [
     ("italgiure_snciv_10787_2024.json", "civile"),
     ("italgiure_snpen_10787_2024.json", "penale"),
 ])
-def test_italgiure_text_is_frozen(name, archivio):
+def test_the_fallback_from_the_text_field_is_frozen(name, archivio):
     assert projection(_italgiure(name, archivio)) == GOLDEN[name]
 
 
@@ -842,15 +1500,15 @@ def test_corte_cost_text_is_frozen(key, record):
     assert projection(record_to_decision(record).testo) == GOLDEN[key]
 ```
 
-- [ ] **Step 2: Record the golden file once** with a scratch script that imports the same functions and writes `frozen_projections.json` (`{name: projection}`), from the tree as merged on `develop` before this task — check `git diff origin/develop -- services/visualex/visualex_api/services/decisions/` shows only Task 3's `search` additions and the `to_summary` extraction, and that `to_decision`'s output is unchanged (`test_decisions_italgiure.py` green). Do not record from a tree where a reader's text changed.
+- [ ] **Step 2: Record the golden file once**, from this branch as Tasks 3–4 left it (the PDF reader is the text this round freezes; the fallback and the Corte costituzionale reader are unchanged from `develop`). Before recording, prove the unchanged parts are unchanged: `git diff origin/develop -- services/visualex/visualex_api/services/decisions/corte_cost.py` is empty, and `to_decision`'s output on the two text-field fixtures equals what `origin/develop`'s `to_decision` gives (run both: export `services/visualex` of `origin/develop` with `git archive origin/develop services/visualex | tar -x -C <scratch>` and import from there in a scratch script; compare the projections; they must be equal). Write `frozen_projections.json` as `{fixture name: projection}` with a scratch script; never by hand.
 
 - [ ] **Step 3: Run it**
 
 Run: `(cd services/visualex && <python> -m pytest tests/test_decisions_text_frozen.py -q)`
-Expected: pass. Then prove it bites: temporarily change one character in `paragraphs` (e.g. insert `" "` instead of `"\n\n"`), run again, expect FAIL, revert.
+Expected: pass. Then prove it bites twice: temporarily change one character in `paragraphs` (insert `" "` instead of `"\n\n"`) and, separately, join a PDF paragraph's lines with `"  "` in `pdf_text.py`; each time run again, expect FAIL, revert.
 
 - [ ] **Step 4: Write the contract down**
-  - Root `CLAUDE.md`, rule 23: after the sentence about `articleRender.test.ts`, add: «Decision texts are held to the same contract since 2026-10-05 (notes and highlights on decisions): the readers in `services/visualex/visualex_api/services/decisions/` may add or move `\n` and move a boundary between blocks, never change another character; `test_decisions_text_frozen.py` and `decisionRender.test.ts` check it, and an anchor that no longer matches is listed in the decision tab, never dropped.»
+  - Root `CLAUDE.md`, rule 23: after the sentence about `articleRender.test.ts`, add: «Decision texts are held to the same contract since 2026-10-05 (notes and highlights on decisions): the readers in `services/visualex/visualex_api/services/decisions/` — the Cassazione's text from the court's PDF (`pdf_text.py`), its fallback from the text field, the Corte costituzionale's open data — may add or move `\n` and move a boundary between blocks, never change another character; `test_decisions_text_frozen.py` and `decisionRender.test.ts` check it, and an anchor that no longer matches is listed in the decision tab, never dropped.»
   - `services/visualex/CLAUDE.md`, decisions section: the same in two lines, naming the test.
   - `resolver.py`, both «Raise the version whenever the reader changes the shape of what it returns» comments: append «— the shape only (blocks, `\n`): a change of characters is refused by test_decisions_text_frozen.py (design 2026-10-05 §8.5)».
 
@@ -858,10 +1516,10 @@ Expected: pass. Then prove it bites: temporarily change one character in `paragr
 
 ```bash
 git add services/visualex/tests/ services/visualex/visualex_api/services/decisions/resolver.py CLAUDE.md services/visualex/CLAUDE.md
-git commit -m "test(api): freeze decision texts — the projection anchors are pinned to"
+git commit -m "test(api): freeze decision texts — the projection anchors are pinned to" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-**PR 1:** push, open the PR into `develop` titled «feat: search decisions by article or topic, and freeze decision texts», body naming the infra line (`Caddyfile`) for the other developer's area, the measurements of Task 1 and the frozen readers (the Sentenze session reviews §8.5 through the orchestrator before merge). Merge at green CI: `merge: feat/decision-search-route — decisions mentioning an article or a topic, from Italgiure; decision texts frozen`.
+**PR 1:** push, open the PR into `develop` titled «feat: decisions read whole from the court's PDF, searched by cited norm or text, and frozen», body naming: the Cassazione reader's change (the Sentenze session's area, changed on the owner's answer 43 while that session was unreachable — the orchestrator routes it), the infra lines (`Caddyfile`, the other developer's area), the new dependency, Tasks 1–2's measurements, and the freeze (the readers as this PR leaves them). Merge at green CI: `merge: feat/decision-search-route — decisions whole from the court's PDF, search by cited norm or text, original PDF, texts frozen`.
 
 ---
 
@@ -869,7 +1527,7 @@ git commit -m "test(api): freeze decision texts — the projection anchors are p
 
 Worktree from `origin/develop` after PR 1 merged: `.claude/worktrees/decision-tabs`, branch `feat/decision-tabs`.
 
-### Task 6: The short label and keys of a decision
+### Task 10: The short label and keys of a decision
 
 **Files:**
 - Modify: `apps/web/src/utils/decisionLinks.ts`
@@ -972,7 +1630,7 @@ git add apps/web/src/utils/decisionLinks.ts apps/web/src/utils/__tests__/
 git commit -m "feat(web): the short label of a decision and its key read back"
 ```
 
-### Task 7: The palette reads decision citations
+### Task 11: The palette reads decision citations
 
 **Files:**
 - Create: `apps/web/src/utils/decisionCitationParser.ts`
@@ -1112,7 +1770,7 @@ git add apps/web/src/utils/decisionCitationParser.ts apps/web/src/utils/__tests_
 git commit -m "feat(web): read a decision citation typed or pasted in the palette"
 ```
 
-### Task 8: Decision tabs in the store
+### Task 12: Decision tabs in the store
 
 **Files:**
 - Modify: `apps/web/src/store/useAppStore.ts` (types `TabView`, `WorkspaceTab.view`, `pendingDecision`; actions below; `partialize` keeps `view`, drops `pendingDecision`)
@@ -1123,7 +1781,7 @@ git commit -m "feat(web): read a decision citation typed or pasted in the palett
 **Interfaces:**
 - Consumes: `decisionPath`, `formatDecisionShort`, `identityOf` (`decisionLinks.ts`); `fetchDecision` (`services/decisionService.ts`).
 - Produces (store):
-  - `type TabView = { kind: 'decision'; reference: DecisionReference } | { kind: 'decision-search'; query: DecisionSearchQuery }` (`DecisionSearchQuery` from Task 11's types — declare it in `types/decisions.ts` now: `{ norma?: DecisionSearchNorma; normaLabel?: string; tema?: string; archivio?: DecisionArchive }`, with `DecisionSearchNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo' | 'allegato'>`)
+  - `type TabView = { kind: 'decision'; reference: DecisionReference } | { kind: 'decision-search'; query: DecisionSearchQuery }` (`DecisionSearchQuery` from Task 15's types — declare it in `types/decisions.ts` now: `{ norma?: DecisionSearchNorma; normaLabel?: string; tema?: string; archivio?: DecisionArchive }`, with `DecisionSearchNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo' | 'allegato'>`)
   - `openDecisionTab(reference: DecisionReference, options?: { besideTabId?: string }): string`
   - `openDecisionSearchTab(query: DecisionSearchQuery, label: string, options?: { besideTabId?: string }): string`
   - `setDecisionTabIdentity(tabId: string, identity: DecisionIdentity, label: string): void`
@@ -1339,24 +1997,24 @@ git add apps/web/src/store apps/web/src/utils/decisionFetchCache.ts apps/web/src
 git commit -m "feat(web): decision tabs in the workspace — one per decision, beside the article, persisted by identity"
 ```
 
-### Task 9: The decision in its tab, on desktop and on a phone
+### Task 13: The decision in its tab, on desktop and on a phone
 
 **Files:**
 - Create: `apps/web/src/components/features/decisions/DecisionView.tsx` (the page's body: identity line, notices, actions, text, source, every outcome)
 - Create: `apps/web/src/components/features/decisions/DecisionTabView.tsx` (fetches with `fetchDecisionCached`, records the identity, renders `DecisionView`)
-- Modify: `apps/web/src/components/features/decisions/DecisionPage.tsx` (deleted at Task 10; until then a thin wrapper over `DecisionView` so its tests keep passing)
+- Modify: `apps/web/src/components/features/decisions/DecisionPage.tsx` (deleted at Task 14; until then a thin wrapper over `DecisionView` so its tests keep passing)
 - Modify: `apps/web/src/components/features/workspace/WorkspaceTabPanel.tsx` (a tab with `view` renders `DecisionTabView`; header hides the content actions)
 - Modify: `apps/web/src/components/features/search/SearchPanel.tsx` (the phone view draws a tab with `view`; opening a decision shows its tab)
 - Test: `apps/web/src/components/features/decisions/DecisionView.test.tsx` (moved from `DecisionPage.test.tsx`, every outcome kept)
 - Test: `apps/web/src/components/features/decisions/DecisionTabView.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 8's store actions and `fetchDecisionCached`.
+- Consumes: Task 12's store actions and `fetchDecisionCached`.
 - Produces:
-  - `DecisionView({ answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions? }: DecisionViewProps)` — `answer: FetchDecisionAnswer | null` (null = loading), `onChooseCandidate(identity)`, `actions?: React.ReactNode` (extra buttons, e.g. PR C's «Aggiungi al dossier»), `textSlot?: React.ReactNode` (Task 15 replaces the plain text with the reading surface).
+  - `DecisionView({ answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions? }: DecisionViewProps)` — `answer: FetchDecisionAnswer | null` (null = loading), `onChooseCandidate(identity)`, `actions?: React.ReactNode` (extra buttons, e.g. PR C's «Aggiungi al dossier»), `textSlot?: React.ReactNode` (Task 19 replaces the plain text with the reading surface).
   - `DecisionTabView({ tabId, reference }: { tabId: string; reference: DecisionReference })`
 
-- [ ] **Step 1: Move the tests.** `git mv DecisionPage.test.tsx DecisionView.test.tsx`, then rewrite each test to render `<DecisionView answer={…} reference={…} onRetry={vi.fn()} onChooseCandidate={vi.fn()} onOpenPalette={vi.fn()} />` with the answer it used to get from a mocked `fetchDecision`. Keep every assertion on copy and roles: the copy is the Sentenze design's and must not change. Tests that were about the page's URL rewrite move to Task 10. Add:
+- [ ] **Step 1: Move the tests.** `git mv DecisionPage.test.tsx DecisionView.test.tsx`, then rewrite each test to render `<DecisionView answer={…} reference={…} onRetry={vi.fn()} onChooseCandidate={vi.fn()} onOpenPalette={vi.fn()} />` with the answer it used to get from a mocked `fetchDecision`. Keep every assertion on copy and roles: the copy is the Sentenze design's and must not change. Tests that were about the page's URL rewrite move to Task 14. Add:
 
 ```tsx
 it('opens a candidate in the same tab', async () => {
@@ -1374,7 +2032,7 @@ it('opens a candidate in the same tab', async () => {
 Run: `npm --prefix apps/web run test -- --run src/components/features/decisions/`
 Expected: FAIL — `DecisionView` not found.
 
-- [ ] **Step 3: Implement `DecisionView`** by moving `FoundView`, `Alert`, `unreachableMessage` and the outcome switch out of `DecisionPage.tsx` unchanged, with three differences: candidates call `onChooseCandidate(c.identita)` (rendered as `<a href={decisionPath(c.identita)} onClick={e => { e.preventDefault(); onChooseCandidate(c.identita); }}>` so the address still shows and middle-click works); the invalid-address branch shows the alert and a button «Cerca nella barra di ricerca» calling `onOpenPalette`; `DecisionLookupForm` is no longer rendered (it goes in Task 10) — the not-found branch keeps the reason and the penal suggestion (as a `DecisionLink`-like anchor calling `onChooseCandidate(answer.suggerimento)`). «Copia collegamento» joins «Copia citazione»: it copies `window.location.origin + decisionPath(identity)`.
+- [ ] **Step 3: Implement `DecisionView`** by moving `FoundView`, `Alert`, `unreachableMessage` and the outcome switch out of `DecisionPage.tsx` unchanged, with three differences: candidates call `onChooseCandidate(c.identita)` (rendered as `<a href={decisionPath(c.identita)} onClick={e => { e.preventDefault(); onChooseCandidate(c.identita); }}>` so the address still shows and middle-click works); the invalid-address branch shows the alert and a button «Cerca nella barra di ricerca» calling `onOpenPalette`; `DecisionLookupForm` is no longer rendered (it goes in Task 14) — the not-found branch keeps the reason and the penal suggestion (as a `DecisionLink`-like anchor calling `onChooseCandidate(answer.suggerimento)`). «Copia collegamento» joins «Copia citazione»: it copies `window.location.origin + decisionPath(identity)`.
 
 `DecisionTabView`:
 
@@ -1418,7 +2076,7 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
 }
 ```
 
-In `WorkspaceTabPanel.tsx`, where the content list renders (around the `item.type === 'norma'` map), branch first: `tab.view?.kind === 'decision' ? <DecisionTabView tabId={tab.id} reference={tab.view.reference} /> : tab.view?.kind === 'decision-search' ? null /* Task 13 */ : (existing list)`. In the header, render «Aggiungi al dossier», the collection button and the rename only when `!tab.view`. Leave a typed exhaustive check so Task 13 cannot forget its branch:
+In `WorkspaceTabPanel.tsx`, where the content list renders (around the `item.type === 'norma'` map), branch first: `tab.view?.kind === 'decision' ? <DecisionTabView tabId={tab.id} reference={tab.view.reference} /> : tab.view?.kind === 'decision-search' ? null /* Task 17 */ : (existing list)`. In the header, render «Aggiungi al dossier», the collection button and the rename only when `!tab.view`. Leave a typed exhaustive check so Task 17 cannot forget its branch:
 
 ```tsx
 function assertNever(x: never): never { throw new Error(`unhandled tab view ${JSON.stringify(x)}`); }
@@ -1440,7 +2098,7 @@ git add apps/web/src/components/features/decisions apps/web/src/components/featu
 git commit -m "feat(web): a decision reads in its own tab, every outcome kept, and on a phone"
 ```
 
-### Task 10: The address, the links, the sidebar and the palette
+### Task 14: The address, the links, the sidebar and the palette
 
 **Files:**
 - Create: `apps/web/src/components/features/decisions/DecisionAddress.tsx` (the route element)
@@ -1455,7 +2113,7 @@ git commit -m "feat(web): a decision reads in its own tab, every outcome kept, a
 - Test: `apps/web/src/components/features/search/CommandPalette.test.tsx` (add cases)
 
 **Interfaces:**
-- Consumes: Tasks 6–9.
+- Consumes: Tasks 10–13.
 - Produces: `DecisionLink({ to: LooseDecisionRef; besideTabId?: string; className?: string; title?: string; children })` — renders `<a href={linkableDecisionPath(to)}>`; a plain left click on the search page calls `openDecisionTab(ref, { besideTabId })` and prevents navigation; otherwise it navigates (react-router `useNavigate`). Renders children in a `<span>` when `linkableDecisionPath` is null.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1559,13 +2217,13 @@ git add -A apps/web/src apps/web/CLAUDE.md
 git commit -m "feat(web): /sentenze opens the search space, one box for norms and decisions, links that open beside"
 ```
 
-**PR 2:** title «feat: decisions open in the search space, in a tab of their own beside the article»; body: what the Sentenze page became, screenshots from a browser pass (Task 20's checklist for this PR's part: palette, `/sentenze/…` cold and after login, a Massimario chip, a phone width). Merge: `merge: feat/decision-tabs — decisions in the search space, from the palette, the address and the links`.
+**PR 2:** title «feat: decisions open in the search space, in a tab of their own beside the article»; body: what the Sentenze page became, screenshots from a browser pass (Task 25's checklist for this PR's part: palette, `/sentenze/…` cold and after login, a Massimario chip, a phone width). Merge: `merge: feat/decision-tabs — decisions in the search space, from the palette, the address and the links`.
 
 ---
 
 ## PR 3 — `feat/article-case-law` (apps/web)
 
-### Task 11: The search service and the result list
+### Task 15: The search service and the result list
 
 **Files:**
 - Modify: `apps/web/src/types/decisions.ts` (`DecisionSearchHit`, `SearchDecisionsAnswer`)
@@ -1575,16 +2233,30 @@ git commit -m "feat(web): /sentenze opens the search space, one box for norms an
 
 **Interfaces:**
 - Produces:
-  - `interface DecisionSearchHit { identita: DecisionIdentity; attributi: DecisionAttributes; frammento: { testo: string; evidenziati: Array<[number, number]> } }`
-  - `type SearchDecisionsAnswer = { esito: 'risultati'; totale: number; pagina: number; archivio: DecisionArchive | null; archivio_dal: string | null; decisioni: DecisionSearchHit[] } | { esito: 'non_supportata' } | { esito: 'richiesta_non_valida'; errori: Record<string, string> } | { esito: 'fonte_non_raggiungibile'; fonte: string } | { esito: 'errore_interno' }`
-  - `searchDecisions(query: DecisionSearchQuery, pagina: number): Promise<SearchDecisionsAnswer>` (same handling of 429 and non-answers as `fetchDecision`)
-  - `DecisionResultList({ query, besideTabId, onArchiveChange? })` — loads page 1 on mount, «Altri risultati» appends the next page (up to 10), shows the count line, the archive switch (Civile / Penale / Entrambi), per-state messages.
+  - `interface DecisionSearchHit { identita: DecisionIdentity; attributi: DecisionAttributes; trovata: 'indice' | 'testo'; frammento: { testo: string; evidenziati: Array<[number, number]> } | null }`
+  - `type SearchDecisionsAnswer = { esito: 'risultati'; totale: number; totale_approssimato?: boolean; pagina: number; modo: 'indice' | 'testo'; archivio: DecisionArchive | null; archivio_dal: string | null; decisioni: DecisionSearchHit[] } | { esito: 'non_supportata' } | { esito: 'richiesta_non_valida'; errori: Record<string, string> } | { esito: 'fonte_non_raggiungibile'; fonte: string } | { esito: 'errore_interno' }`
+  - `searchDecisions(query: DecisionSearchQuery, pagina: number, modo?: 'indice' | 'testo'): Promise<SearchDecisionsAnswer>` (same handling of 429 and non-answers as `fetchDecision`)
+  - `DecisionResultList({ query, besideTabId, onArchiveChange? })` — loads page 1 on mount, «Altri risultati» appends the next page (up to 10), shows the count line, the archive switch (Civile / Penale / Entrambi), and, when the query has an article, the switch «Indice della Cassazione» / «Nel testo» (`aria-pressed`, default the index; it shows the `modo` the answer reports, so an act searched in the text because the index cannot express it shows «Nel testo» pressed and the index button disabled with the title «L'indice della Cassazione non esprime questo atto»), per-state messages. Each row's kind is the label of its `trovata`: «norma citata (indice della Cassazione)» or «menzionato nel testo»; a row without a fragment shows none. With `totale_approssimato` the count reads «circa N».
 
 - [ ] **Step 1: Failing tests.** Service: posts to `/search_decisions` through `legalFetch` with `{ norma, tema, archivio, pagina }` (no `normaLabel`); 429 → `fonte_non_raggiungibile` `quota`; a body without a known `esito` → `fonte_non_raggiungibile` `risposta <status>`. List:
 
 ```tsx
+it('labels each row by how it was found', async () => {
+  mockSearch({ esito: 'risultati', totale: 3904, pagina: 1, modo: 'indice', archivio: 'civile', archivio_dal: '2021-01-04', decisioni: [{ ...HIT, trovata: 'indice', frammento: null }] });
+  render(<Wrapper><DecisionResultList query={{ norma: NORMA, normaLabel: 'art. 2043 c.c.' }} /></Wrapper>);
+  expect(await screen.findByText('norma citata (indice della Cassazione)')).toBeInTheDocument();
+  expect(screen.getByText('3.904 decisioni nell’archivio pubblico della Cassazione (dal 4 gennaio 2021)')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Indice della Cassazione' })).toHaveAttribute('aria-pressed', 'true');
+});
+it('switches to the text and says so', async () => {
+  mockSearch(PAGE_INDEX); mockSearch({ ...PAGE_TEXT, modo: 'testo' });
+  render(<Wrapper><DecisionResultList query={{ norma: NORMA, normaLabel: 'art. 2043 c.c.' }} /></Wrapper>);
+  await userEvent.click(await screen.findByRole('button', { name: 'Nel testo' }));
+  expect(searchMock).toHaveBeenLastCalledWith(expect.anything(), 1, 'testo');
+  expect(await screen.findByText('menzionato nel testo')).toBeInTheDocument();
+});
 it('shows the count, the coverage and each row as «menzionato nel testo»', async () => {
-  mockSearch({ esito: 'risultati', totale: 312, pagina: 1, archivio: 'civile', archivio_dal: '2021-01-04', decisioni: [HIT] });
+  mockSearch({ esito: 'risultati', totale: 312, pagina: 1, modo: 'testo', archivio: 'civile', archivio_dal: '2021-01-04', decisioni: [{ ...HIT, trovata: 'testo' }] });
   render(<Wrapper><DecisionResultList query={{ norma: NORMA, normaLabel: 'art. 2043 c.c.' }} /></Wrapper>);
   expect(await screen.findByText('312 decisioni nell’archivio pubblico della Cassazione (dal 4 gennaio 2021)')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /Cass\. civ\., sez\. lav\., n\. 24908\/2026/ })).toHaveAttribute('href', '/sentenze/cassazione-civile/24908/2026');
@@ -1600,7 +2272,7 @@ it('says the act is not supported, and a source that is down, with «Riprova»',
 it('appends the next page and stops at the tenth', async () => { /* totale 400: «Altri risultati» until pagina 10, then absent, with «Mostrate le prime 200: restringi la ricerca con un tema.» */ });
 ```
 
-Write the two elided tests in full, in the same style, before running.
+Write the two elided tests in full, in the same style, before running. At the top of the file define the shared values these tests use: `NORMA` (`{ tipo_atto: 'codice civile', numero_articolo: '2043' }`), `HIT` (a `DecisionSearchHit` for n. 24908/2026 civile, sez. L, ordinanza deposited 2026-09-01, `trovata: 'indice'`, a fragment `{ testo: 'ex art. 2043 c.c.', evidenziati: [[3, 17]] }`), `PAGE`, `PAGE_INDEX` and `PAGE_TEXT` (risultati pages with `modo` 'indice' and 'testo'), `searchMock = vi.mocked(searchDecisions)` after `vi.mock('../../../../services/decisionSearchService')`, and `mockSearch(answer)` = `searchMock.mockResolvedValueOnce(answer)`; `Wrapper` = a `MemoryRouter`.
 
 - [ ] **Step 2: Run to see them fail.** `npm --prefix apps/web run test -- --run src/services/__tests__/decisionSearchService.test.ts src/components/features/decisions/DecisionResultList.test.tsx` → FAIL.
 
@@ -1621,7 +2293,7 @@ function Fragment({ testo, evidenziati }: DecisionSearchHit['frammento']) {
 }
 ```
 
-and the chip «menzionato nel testo» (`text-xs` slate pill). The count line: `${totale.toLocaleString('it-IT', { useGrouping: 'always' } as Intl.NumberFormatOptions)} decisioni nell’archivio pubblico della Cassazione` + ` (${withPreposition('dal', formatDateItalianLong(archivio_dal))})` when known (memory gotcha: `Intl` it-IT groups 4 digits only with `useGrouping: 'always'`). Zero results: «Nessuna decisione negli ultimi cinque anni dell’archivio pubblico della Cassazione.» — never «nessuna decisione». The archive switch is a three-button segmented control (`aria-pressed`), defaulting to the answer's `archivio`.
+and the chip with the row's kind (`text-xs` slate pill: «norma citata (indice della Cassazione)» or «menzionato nel testo»). The count line: `${totale.toLocaleString('it-IT', { useGrouping: 'always' } as Intl.NumberFormatOptions)} decisioni nell’archivio pubblico della Cassazione` + ` (${withPreposition('dal', formatDateItalianLong(archivio_dal))})` when known (memory gotcha: `Intl` it-IT groups 4 digits only with `useGrouping: 'always'`). Zero results: «Nessuna decisione negli ultimi cinque anni dell’archivio pubblico della Cassazione.» — never «nessuna decisione». The archive switch is a three-button segmented control (`aria-pressed`), defaulting to the answer's `archivio`.
 
 - [ ] **Step 4: Run tests, build, lint.** Expected: pass.
 
@@ -1632,7 +2304,7 @@ git add apps/web/src/types/decisions.ts apps/web/src/services apps/web/src/compo
 git commit -m "feat(web): the list of decisions that mention an article or a topic"
 ```
 
-### Task 12: «Giurisprudenza» under the article
+### Task 16: «Giurisprudenza» under the article
 
 **Files:**
 - Create: `apps/web/src/components/features/search/CaseLawSection.tsx`
@@ -1643,7 +2315,7 @@ git commit -m "feat(web): the list of decisions that mention an article or a top
 - Test: `apps/web/src/components/features/search/CaseLawSection.test.tsx`, `MassimeSection.test.tsx` (new)
 
 **Interfaces:**
-- Consumes: Task 10 `DecisionLink`, Task 11 `DecisionResultList`, `linkableDecisionPath`, `formatDecisionShort`.
+- Consumes: Task 14 `DecisionLink`, Task 15 `DecisionResultList`, `linkableDecisionPath`, `formatDecisionShort`.
 - Produces: `CaseLawSection({ norma, massime, articleUrn, tabId, isHistorical })`; `massimaDecisionRef(m: MassimaStructured): LooseDecisionRef | null` (exported from `MassimeSection.tsx`'s sibling `massimaRef.ts` for testing).
 
 - [ ] **Step 1: Failing tests.**
@@ -1696,7 +2368,7 @@ git add apps/web/src
 git commit -m "feat(web): «Giurisprudenza» under the article — massime as links, the Massimario, the Cassazione on request"
 ```
 
-### Task 13: A topic, from the glossary or the palette
+### Task 17: A topic, from the glossary or the palette
 
 **Files:**
 - Create: `apps/web/src/components/features/decisions/DecisionSearchTabView.tsx`
@@ -1706,14 +2378,14 @@ git commit -m "feat(web): «Giurisprudenza» under the article — massime as li
 - Test: `DecisionSearchTabView.test.tsx`; `BrocardiDisplay.test.tsx` (add); `CommandPalette.test.tsx` (add)
 
 **Interfaces:**
-- Consumes: Task 8 `openDecisionSearchTab`, Task 11 `DecisionResultList`.
+- Consumes: Task 12 `openDecisionSearchTab`, Task 15 `DecisionResultList`.
 - Produces: `DecisionSearchTabView({ tabId, query })` — heading «Tema: {tema}», the article named when the query has one («… e art. 2043 c.c.»), the switch «Solo il tema» (`aria-pressed`) that re-runs the list without `norma`, the limits line «Solo la Cassazione, ultimi cinque anni; le parole come sono scritte.», and `DecisionResultList`.
 
 - [ ] **Step 1: Failing tests.** Glossary: each term shows a link to Brocardi (unchanged) and a button «Sentenze su questo tema» that calls `openDecisionSearchTab({ tema: 'danno ingiusto', norma, normaLabel }, 'Tema: danno ingiusto', { besideTabId })`. Tab view: renders the heading and the article; pressing «Solo il tema» re-queries without `norma` (assert the service's second call). Palette: «perdita di chance» (no norm, no decision) shows the line «Cerca "perdita di chance" nelle sentenze della Cassazione»; Enter on it opens a search tab with `{ tema: 'perdita di chance' }`; «art 2043 cc» never shows that line.
 
 - [ ] **Step 2: Run to see them fail.**
 
-- [ ] **Step 3: Implement.** `BrocardiDisplay` needs the article and the tab: pass `currentNorma` (it already gets the act; add `numero_articolo` and `tabId` props from `ArticleTabContent`). In the palette, the topic line is a `Command.Item` rendered when `inputValue.trim().length >= 3 && !parsedCitation && !decisionRef && !resolvingRemotely`, value `cerca-sentenze ${inputValue}`, `onSelect` → `openDecisionSearchTab({ tema: inputValue.trim() }, `Tema: ${inputValue.trim()}`)` then `onClose()`. Replace Task 9's `null` branch with `<DecisionSearchTabView tabId={tab.id} query={tab.view.query} />` in both the window and the phone view.
+- [ ] **Step 3: Implement.** `BrocardiDisplay` needs the article and the tab: pass `currentNorma` (it already gets the act; add `numero_articolo` and `tabId` props from `ArticleTabContent`). In the palette, the topic line is a `Command.Item` rendered when `inputValue.trim().length >= 3 && !parsedCitation && !decisionRef && !resolvingRemotely`, value `cerca-sentenze ${inputValue}`, `onSelect` → `openDecisionSearchTab({ tema: inputValue.trim() }, `Tema: ${inputValue.trim()}`)` then `onClose()`. Replace Task 13's `null` branch with `<DecisionSearchTabView tabId={tab.id} query={tab.view.query} />` in both the window and the phone view.
 
 - [ ] **Step 4: Run tests, build, lint.**
 
@@ -1730,11 +2402,11 @@ git commit -m "feat(web): a topic from Brocardi's glossary or the palette finds 
 
 ## PR 4 — `feat/decision-annotations` (apps/web)
 
-### Task 14: The decision renderer and its contract
+### Task 18: The decision renderer and its contract
 
 **Files:**
 - Create: `apps/web/src/utils/decisionRender.ts`
-- Create: `apps/web/src/utils/__fixtures__/decisionTexts.ts` (the same five texts as Task 5's fixtures, as `DecisionText` objects: copy them from the readers' outputs, recorded by a scratch run of the Python readers, byte for byte — compare SHA-256 of each string between the Python output and the TS fixture before committing, memory `subagent_byte_fidelity`)
+- Create: `apps/web/src/utils/__fixtures__/decisionTexts.ts` (the texts Task 9 freezes — the Cassazione PDF fixtures read by `text_from_pdf`, the two text-field fallbacks, the Corte costituzionale sample — as `DecisionText` objects: copy them from the readers' outputs, recorded by a scratch run of the Python readers, byte for byte — compare SHA-256 of each string between the Python output and the TS fixture before committing, memory `subagent_byte_fidelity`)
 - Test: `apps/web/src/utils/__tests__/decisionRender.test.ts`
 
 **Interfaces:**
@@ -1883,7 +2555,7 @@ git add apps/web/src/utils/decisionRender.ts apps/web/src/utils/__fixtures__/dec
 git commit -m "feat(web): render a decision's text with marks, under the same contract as article_text"
 ```
 
-### Task 15: The decision's reading surface and its links to norms
+### Task 19: The decision's reading surface and its links to norms
 
 **Files:**
 - Create: `apps/web/src/components/features/decisions/DecisionReadingSurface.tsx`
@@ -1895,7 +2567,7 @@ git commit -m "feat(web): render a decision's text with marks, under the same co
 - Test: `DecisionReadingSurface.test.tsx`, `apps/web/src/hooks/__tests__/useCitationLinks.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 14; `ArticleBody`; `wrapCitationsInHtml`; `CitationPreviewPopup` + `useCitationPreview`; `pushReadingBack`.
+- Consumes: Task 18; `ArticleBody`; `wrapCitationsInHtml`; `CitationPreviewPopup` + `useCitationPreview`; `pushReadingBack`.
 - Produces: `DecisionReadingSurface({ tabId, identity, testo })`; `useCitationLinks(containerRef, { onOpen(parsed): void, origin?: ReadingBackEntry })`.
 
 - [ ] **Step 1: Failing tests.** Surface: «art. 2043 c.c.» in a decision's text renders as `.citation-hover`; clicking it calls `triggerSearch` with `{ act_type: 'codice civile', article: '2043', besideTabId: tabId }` and pushes a back entry labelled with the decision's short form; the text nodes of the rendered surface spell `decisionProjection(testo)` (the citation spans wrap, never add); `useCitationLinks` keeps the article tab's behaviour (its existing tests in `ArticleTabContent` stay green).
@@ -1914,7 +2586,7 @@ const html = useMemo(() => wrapCitationsInHtml(renderDecisionHtml({ testo, highl
 
 `wrapCitationsInHtml(html)` with no `defaultNorma`: a bare «art. 5» with no act stays text. `copySelectionAsRead` reads `window.getSelection()` and returns `decisionClipboardText(range.cloneContents())` (the existing `DecisionTextView` copy rule). Back entry: `{ tabId, blockId: tabId, articleId: '', label: formatDecisionShort(identity, attrs) }` — read `ReadingBackEntry` and `popReadingBack`/`findLiveBackIndex`: a decision tab has no block; if the back-stack requires a live block, extend `findLiveBackIndex` to accept a tab whose `view` is a decision when `blockId === tabId`, with a test. In `SearchPanel`, where a search's destination tab is created (`processResult` / the `targetTabId` logic around «workspaceTabs[workspaceTabs.length - 1].id»), once the tab exists and the params carry `besideTabId`, call `placeTabsSideBySide(params.besideTabId, newTabId)`: the decision the reader came from goes to the left half, the article to the right. Add a `SearchPanel` test for it if the file has a test harness; otherwise test `placeTabsSideBySide` in the store test and check the placement in the browser pass.
 
-`DecisionView` renders `textSlot ?? <DecisionTextView testo={…} />`; `DecisionTabView` passes `<DecisionReadingSurface …/>` (Task 16 adds the marks; this task passes empty arrays).
+`DecisionView` renders `textSlot ?? <DecisionTextView testo={…} />`; `DecisionTabView` passes `<DecisionReadingSurface …/>` (Task 20 adds the marks; this task passes empty arrays).
 
 - [ ] **Step 4: Run tests, build, lint.**
 
@@ -1925,7 +2597,7 @@ git add apps/web/src
 git commit -m "feat(web): a decision's text links the norms it cites, and they open beside it"
 ```
 
-### Task 16: Notes and highlights on a decision, never lost
+### Task 20: Notes and highlights on a decision, never lost
 
 **Files:**
 - Modify: `apps/web/src/components/features/decisions/DecisionReadingSurface.tsx`
@@ -1980,7 +2652,7 @@ git add apps/web/src
 git commit -m "feat(web): notes and highlights on decisions — anchored like an article's, and listed when the text changes"
 ```
 
-### Task 17: Annotations on decisions travel, but never words a court withdrew
+### Task 21: Annotations on decisions travel, but never words a court withdrew
 
 **Files:**
 - Create: `apps/web/src/utils/decisionAnchorsTravel.ts`
@@ -1990,7 +2662,7 @@ git commit -m "feat(web): notes and highlights on decisions — anchored like an
 - Test: `apps/web/src/utils/__tests__/decisionAnchorsTravel.test.ts`, `apps/web/src/components/features/environments/__tests__/annotationLabels.test.ts`, and one test per dialog showing the «non incluse» line
 
 **Interfaces:**
-- Consumes: `isDecisionKey`, `identityFromKey`, `formatDecisionShort` (Task 6); `fetchDecisionCached` (Task 8); `resolveAnchors` via `decisionProjection` (Task 14).
+- Consumes: `isDecisionKey`, `identityFromKey`, `formatDecisionShort` (Task 10); `fetchDecisionCached` (Task 12); `resolveAnchors` via `decisionProjection` (Task 18).
 - Produces:
   - `travellingAnchors(input: { annotations: Annotation[]; highlights: Highlight[] }): Promise<{ annotations: Annotation[]; highlights: Highlight[]; leftOut: { annotations: number; highlights: number } }>`
   - `leftOutMessage(leftOut): string | null`
@@ -2134,15 +2806,96 @@ git add apps/web/src
 git commit -m "feat(web): notes and highlights on decisions travel, never words a court withdrew"
 ```
 
+### Task 22: «Scarica PDF» and «PDF originale della Corte»
+
+Spec §12. In the decision tab's actions.
+
+**Files:**
+- Create: `apps/web/src/components/features/decisions/decisionPdf.ts` (pure: what the PDF holds)
+- Create: `apps/web/src/components/features/decisions/DecisionDownloads.tsx` (the two buttons and the option)
+- Create: `apps/web/src/services/decisionPdfService.ts` (`fetchOriginalPdf(identity): Promise<Blob | { esito: string }>`)
+- Modify: `apps/web/src/components/features/decisions/DecisionView.tsx` (renders `DecisionDownloads` among the actions for a found decision)
+- Test: `apps/web/src/components/features/decisions/__tests__/decisionPdf.test.ts`, `DecisionDownloads.test.tsx`, `apps/web/src/services/__tests__/decisionPdfService.test.ts`
+
+**Interfaces:**
+- Consumes: `formatDecisionCitation`, `formatDecisionHeading`, `formatDecisionShort`, `describeNotice` (`decisionLinks.ts`); `decisionParagraphs` (`decisionText.ts`); `decisionProjection`, `unmatchedAnchors` (Task 18); `resolveAnchors`; `todayInRome`, `formatDateItalianLong`, `withPreposition` (`dateUtils.ts`); jsPDF as `DossierDetailView` uses it (`new jsPDF({ unit: 'pt', format: 'a4' })`, Times, margins — read its PDF code and reuse its layout helpers if they are exported; if they are not, extract the paragraph writer into `utils/pdfWriter.ts` and use it from both, with the dossier's PDF test still green).
+- Produces:
+  - `decisionPdfModel(answer: FoundDecision, options: { annotations?: { highlights: Highlight[]; notes: Annotation[] }; consultedOn: string }): DecisionPdfModel` — `{ heading: string; subheading: string; notices: string[]; blocks: Array<{ label: string; paragraphs: Array<{ text: string; marks: Array<[number, number]>; notes: string[] }> }>; unmatched: string[]; footer: string; fileName: string }`
+  - `writeDecisionPdf(model): jsPDF`
+  - `DecisionDownloads({ answer, identity })`
+
+- [ ] **Step 1: Failing tests**
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { decisionPdfModel } from '../decisionPdf';
+
+const FOUND = {
+  esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 },
+  attributi: { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-22', testo_origine: 'pdf' },
+  testo: { motivazione: 'Primo paragrafo.\n\nSecondo paragrafo.', dispositivo: 'P.Q.M.\n\nRigetta.' },
+  fonte: { nome: 'Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)' }, avvisi: [],
+} as const;
+
+describe('decisionPdfModel', () => {
+  it('heads with the citation, keeps blocks and paragraphs, and names the source and the day', () => {
+    const m = decisionPdfModel(FOUND as never, { consultedOn: '2026-10-05' });
+    expect(m.heading).toBe('Cass. civ., sez. III, ord. 22 aprile 2024, n. 10787');
+    expect(m.blocks.map((b) => b.label)).toEqual(['Motivazione', 'Dispositivo']);
+    expect(m.blocks[0].paragraphs.map((p) => p.text)).toEqual(['Primo paragrafo.', 'Secondo paragrafo.']);
+    expect(m.footer).toBe('Fonte: Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure) · consultata il 5 ottobre 2026');
+    expect(m.fileName).toBe('Cass_civ_sez_III_n_10787_2024.pdf');
+  });
+  it('never writes a licence line, for the Corte costituzionale too', () => {
+    const cc = { ...FOUND, identita: { corte: 'corte_costituzionale', numero: 71, anno: 2020 }, fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'CC BY-SA 3.0' } };
+    const m = decisionPdfModel(cc as never, { consultedOn: '2026-10-05' });
+    expect(JSON.stringify(m)).not.toMatch(/CC BY|licenz/i);
+  });
+  it('prints the notices, the archive fallback included', () => {
+    const m = decisionPdfModel({ ...FOUND, avvisi: [{ tipo: 'testo_da_archivio' }] } as never, { consultedOn: '2026-10-05' });
+    expect(m.notices[0]).toMatch(/^Testo dell'archivio della Cassazione/);
+  });
+  it('with annotations: marks in their paragraph, notes after it, the unmatched listed at the end', () => {
+    const plainStart = 'Primo paragrafo.'.length; // «Secondo» starts here in the projection
+    const m = decisionPdfModel(FOUND as never, {
+      consultedOn: '2026-10-05',
+      annotations: {
+        highlights: [{ id: 'h', text: 'Secondo', startOffset: plainStart, color: 'yellow' } as never,
+                     { id: 'g', text: 'parole sparite', startOffset: 3, color: 'yellow' } as never],
+        notes: [{ id: 'n', text: 'Vedi anche Cass. 2019', anchorText: 'Rigetta', startOffset: 'Primo paragrafo.Secondo paragrafo.P.Q.M.'.length } as never],
+      },
+    });
+    expect(m.blocks[0].paragraphs[1].marks).toEqual([[0, 7]]);
+    expect(m.blocks[1].paragraphs[1].notes).toEqual(['Vedi anche Cass. 2019']);
+    expect(m.unmatched).toEqual(['«parole sparite»']);
+  });
+});
+```
+
+`DecisionDownloads.test.tsx`: «Scarica PDF» saves a file named by the model (spy on `jsPDF.prototype.save`); the checkbox «Con le mie evidenziazioni e note» passes the decision's anchors (from the store, keyed by `decisionKey`, `articleId ''`); «PDF originale della Corte» appears only for the Cassazione, calls the service and triggers a download of the blob (an object URL and a click on a temporary anchor, revoked after); a `non_disponibile` answer shows «Il PDF originale non è disponibile per questa decisione.»; a failure shows «Download non riuscito: riprova.». `decisionPdfService.test.ts`: posts the identity to `/fetch_decision_pdf` through `legalFetch`; a `200 application/pdf` gives a `Blob`; a JSON body gives `{ esito }`; a 429 gives `{ esito: 'fonte_non_raggiungibile' }`.
+
+- [ ] **Step 2: Run to see them fail.**
+
+- [ ] **Step 3: Implement.** The model walks the blocks as `renderDecisionHtml` does (Task 18): a running offset over the projection (`\n` not counted), so each highlight lands in its paragraph as a range local to it and each note after the paragraph its anchor ends in; anchors that do not land go to `unmatched` as their quoted text (notes: «nota: <content> — su «<passage>»»). The writer: heading bold 13 pt, subheading 10 pt, notices italic, block labels small caps, paragraphs 11 pt Times justified left with a 1.5 line height, marks drawn as a light rectangle behind the marked words (measure the words with `doc.getTextWidth` on the wrapped line), notes indented in grey after their paragraph, the unmatched under the heading «Non ritrovate nel testo attuale» at the end, the footer at the bottom of the last page. File name: `formatDecisionShort(identity, attributi)` with every run of non-alphanumerics replaced by `_`, plus `.pdf`.
+
+- [ ] **Step 4: Run tests, build, lint.** Then open the PDF of a long decision (60 pages) in the browser pass (Task 25) and check it does not freeze the tab for more than a few seconds; if it does, write the PDF in chunks with `await new Promise(r => setTimeout(r))` between blocks.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src
+git commit -m "feat(web): download a decision as a PDF of ours, or the court's own" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
 **PR 4:** title «feat: read, annotate and follow the norms of a decision»; body names the contract (root rule 23 now covers decisions) and the dossier PR 3 follow-up (adopt `renderDecisionHtml`). Merge: `merge: feat/decision-annotations — notes, highlights and norm links on decisions, never lost`.
 
 ---
 
 ## PR 5 — `feat/decision-history` (apps/server, apps/web)
 
-Announce the migration to the orchestrator before Step 3 of Task 18, and ask its go before any `npm --prefix apps/server test`.
+Announce the migration to the orchestrator before Step 3 of Task 23, and ask its go before any `npm --prefix apps/server test`.
 
-### Task 18: Decisions in `search_history`
+### Task 23: Decisions in `search_history`
 
 **Files:**
 - Modify: `apps/server/prisma/schema.prisma` (`SearchHistory.actType String?`, `decisionKey String? @map("decision_key")`)
@@ -2218,7 +2971,7 @@ git add apps/server
 git commit -m "feat(server): decisions in the search history — decision_key, one kind per row"
 ```
 
-### Task 19: The Cronologia shows and reopens decisions
+### Task 24: The Cronologia shows and reopens decisions
 
 **Files:**
 - Modify: `apps/web/src/services/historyService.ts` (types; `addDecisionToHistory(decisionKey)`)
@@ -2227,7 +2980,7 @@ git commit -m "feat(server): decisions in the search history — decision_key, o
 - Test: `HistoryView` decision rows test; `DecisionTabView.test.tsx` (records once)
 
 **Interfaces:**
-- Consumes: Task 18; `identityFromKey`, `formatDecisionShort`; `openDecisionTab`.
+- Consumes: Task 23; `identityFromKey`, `formatDecisionShort`; `openDecisionTab`.
 - Produces: `SearchHistoryItem.act_type: string | null; decision_key: string | null`.
 
 - [ ] **Step 1: Failing tests.** A history item `{ decision_key: 'cassazione:civile:10787:2024', act_type: null }` renders «Cass. civ., n. 10787/2024» with a gavel icon; clicking it calls `openDecisionTab(identity)` and navigates to `/`; a norm item renders as before; an item with an unreadable key renders «Sentenza» and is not clickable (logged with context, gotcha 18). `DecisionTabView` calls `addDecisionToHistory` once when the answer is `trovata`, not again on re-render, again after the tab is closed and reopened.
@@ -2249,7 +3002,7 @@ git commit -m "feat(web): the Cronologia lists the decisions opened and reopens 
 
 ---
 
-## Task 20: Close the round
+## Task 25: Close the round
 
 **Files:**
 - Modify: `apps/web/CLAUDE.md` (Reading surface: «A decision is read like an article»; Shared utilities: `decisionRender.ts`, `useCitationLinks.ts`, `decisionSearchService.ts`, `massimaRef.ts`; Gotchas: a decision's anchors are keyed by `decisionKey` with `articleId ''`)
@@ -2266,7 +3019,9 @@ git commit -m "feat(web): the Cronologia lists the decisions opened and reopens 
   7. a highlight across two paragraphs and a note; reload; still there;
   8. a forged unmatched highlight (created through the API on the test account with a wrong offset) listed in «Non ritrovate nel testo attuale»;
   9. the Cronologia: the decision listed, reopened;
-  10. a phone width (390 px): the decision tab full width, the back control.
+  10. a phone width (390 px): the decision tab full width, the back control;
+  11. a Cassazione decision whose archive text is cut short (n. 5625/2022 civile) reads to «Roma, 14.12.2021», with no «copia non ufficiale», header or footer in it;
+  12. «Scarica PDF» with and without «Con le mie evidenziazioni e note»; «PDF originale della Corte» downloads the court's file; a Corte costituzionale decision has no original button and no licence line.
 - [ ] **Step 2: All suites** — `npm --prefix apps/web run test -- --run`, `run build`, `run lint`; `(cd services/visualex && <python> -m pytest tests/ -q)`; `node --test infra/ingress/paths.test.mjs`; the server suite with the orchestrator's go.
 - [ ] **Step 3: Docs** as listed above; commit on a `docs/norms-decisions-search-closing` branch, PR, merge `merge: docs/norms-decisions-search-closing — the round's notes`.
 - [ ] **Step 4: Handoff** to the orchestrator: done, left, the owner's decisions verbatim, the PRs, the test account deleted.
@@ -2318,3 +3073,7 @@ highlighting on, one fragment of ≤200 characters per hit; bodies saved exactly
 Every fragment in the three fixtures was read by hand: none names a private person (each is a
 point of law — a *motivo di ricorso* or a holding — never a party, a fact pattern naming
 someone, or a case detail), so no record needed replacing.
+
+**Rewrite, 2026-10-05 (afternoon) — the owner's additions «testo pulito» and «scaricarle in PDF».**
+Measured before proposing (about 20 requests, 2.5 s apart): Italgiure's `ocr` field ends mid-word in about a third of 34 whole decisions (one at exactly 8,000 characters; dispositivi missing), the court's original PDF (`filename` → `…hc.dll?verbo=attach&db=<kind>&id=<name>.clean.pdf`, in the archive's session) is whole, and the `rnc-*` fields index the cited norms (art. 2043 c.c.: 3,904 civil decisions against 939 by text). A controller prototype of the PDF reader (pdfminer.six) rebuilt three PDFs whole, with no furniture left, after two fixes the plan's code already carries (a footer present on one page only; pdfminer's `PSEOF` on a truncated file). Answers «43. 1a + 1d», «44. 2a + 2b». Added Tasks 2, 3, 4, 8, 22; changed Tasks 5, 6, 7, 9; renumbered every later task.
+
