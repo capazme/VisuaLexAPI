@@ -12,7 +12,7 @@ export type NormaMetaVariant = 'card-mobile' | 'card-desktop' | 'block';
 export interface FormatNormaMetaOptions {
   variant: NormaMetaVariant;
   /**
-   * When set, appended as " · N articoli" at the end of the meta string.
+   * When set, appended as " · N articoli" ("1 articolo") at the end of the meta string.
    * Used by the workspace block variant where the count lives inline;
    * card variants surface the count through a separate badge and should
    * leave this undefined.
@@ -33,6 +33,6 @@ export function formatNormaMeta(norma: Norma, options: FormatNormaMetaOptions): 
   const { articleCount } = options;
   const bare = !isNamedAct(norma) && !norma.data?.trim() && !norma.numero_atto?.trim();
   const parts = [actSubtitle(norma) || (bare ? 'Estremi non disponibili' : '')];
-  if (articleCount !== undefined) parts.push(`${articleCount} articoli`);
+  if (articleCount !== undefined) parts.push(`${articleCount} ${articleCount === 1 ? 'articolo' : 'articoli'}`);
   return parts.filter(Boolean).join(' · ');
 }

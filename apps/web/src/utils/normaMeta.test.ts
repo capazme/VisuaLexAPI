@@ -22,6 +22,7 @@ describe('formatNormaMeta', () => {
       expect(formatNormaMeta(norma('1990-08-07'), { variant })).toBe('');
     }
     expect(formatNormaMeta(norma('2010-03-08'), { variant: 'block', articleCount: 3 })).toBe('3 articoli');
+    expect(formatNormaMeta(norma('2010-03-08'), { variant: 'block', articleCount: 1 })).toBe('1 articolo');
   });
 
   it('names the decree a code is, and the code an aliased act is', () => {
