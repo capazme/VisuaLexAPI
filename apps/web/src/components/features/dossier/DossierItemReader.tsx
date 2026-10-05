@@ -11,8 +11,7 @@ import { LooseHighlightsList } from '../search/LooseHighlightsList';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import { inForceCitation } from '../../../utils/sources';
-import { formatNormCitation, withCitation } from '../../../utils/citation';
+import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
 import { todayInRome } from '../../../utils/dateUtils';
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
@@ -210,7 +209,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
       return;
     }
     try {
-      await navigator.clipboard.writeText(withCitation(text, citationNow(), inForceCitation(norma, todayInRome())));
+      await navigator.clipboard.writeText(withCitation(text, citationNow(), unversionedCitation(norma, todayInRome())));
       showToast('Testo copiato con citazione', 'success');
     } catch {
       showToast('Errore durante la copia', 'error');
@@ -227,7 +226,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
       // An act of the Union has none by design (the server ignores the day), and the plain one is true.
       const citation = citationNow();
       if (historical && !citation && !isEuropeanAct(norma.tipo_atto)) return;
-      await navigator.clipboard.writeText(citation ? citation.long : inForceCitation(norma, todayInRome()));
+      await navigator.clipboard.writeText(citation ? citation.long : unversionedCitation(norma, todayInRome()));
       showToast('Citazione copiata', 'success');
     } catch {
       showToast('Errore durante la copia', 'error');

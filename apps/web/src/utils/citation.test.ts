@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatNormCitation, withCitation } from './citation';
+import { formatNormCitation, unversionedCitation, withCitation } from './citation';
 import { CITATION_GOLDEN } from './__fixtures__/citationGolden';
 
 describe('formatNormCitation — the golden file', () => {
@@ -63,5 +63,24 @@ describe('withCitation', () => {
   it('starts the text in force with its citation too (D8)', () => {
     const inForce = 'art. 2043 c.c. (Normattiva, testo vigente, consultato il 5 ottobre 2026)';
     expect(withCitation('Il testo.', null, inForce)).toBe(`${inForce}\n\nIl testo.`);
+  });
+});
+
+describe('unversionedCitation', () => {
+  const norma = { tipo_atto: 'codice civile', numero_articolo: '1284' };
+
+  it('cites the text in force with its source and the day (D8)', () => {
+    expect(unversionedCitation({ ...norma, versione: 'vigente', data_versione: '' }, '2026-10-05'))
+      .toBe('art. 1284 c.c. (Normattiva, testo vigente, consultato il 5 ottobre 2026)');
+  });
+
+  it('never calls a past text «testo vigente»', () => {
+    expect(unversionedCitation({ ...norma, versione: 'vigente', data_versione: '2005-06-01' }, '2026-10-05')).toBe('art. 1284 c.c.');
+    expect(unversionedCitation({ ...norma, versione: 'originale', data_versione: '' }, '2026-10-05')).toBe('art. 1284 c.c.');
+  });
+
+  it('cites an act of the Union as its text in force: the server ignores the day', () => {
+    expect(unversionedCitation({ tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', numero_articolo: '5', versione: 'vigente', data_versione: '2007-10-12' }, '2026-10-05'))
+      .toBe('art. 5, reg. (UE) 2016/679 (EUR-Lex, testo vigente, consultato il 5 ottobre 2026)');
   });
 });

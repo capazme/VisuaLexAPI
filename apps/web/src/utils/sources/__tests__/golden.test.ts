@@ -59,10 +59,26 @@ describe('a norm read back from its identity gets the same short label', () => {
       .toBe('art. 33 d.lgs. 206/2005');
     expect(shortNorm(normFromUrn('urn:nir:stato:codice.civile:1942-03-16;262~art2043!vig=2024-01-15') ?? {})).toBe('art. 2043 c.c.');
   });
+  it('an article written with a hyphen keeps its ordinal', () => {
+    expect(shortNorm(normFromUrn('urn:nir:stato:legge:1990-08-07;241~art2-bis') ?? {})).toBe('art. 2-bis l. 241/1990');
+  });
+  it('a code\'s decree with its annex left out names no act: preleggi or codice civile is not said', () => {
+    expect(normFromUrn('urn:nir:stato:regio.decreto:1942-03-16;262~art1218')).toBeNull();
+    expect(normFromUrn('urn:nir:stato:regio.decreto:1930-10-19;1398~art52')).toBeNull();
+  });
   it('what names no norm is null', () => {
     for (const value of ['cassazione:civile:31310:2024', 'concetto:buona_fede', '', 'urn:nir:regione.veneto:legge:2017-11-03;39~art25']) {
       expect(normFromUrn(value)).toBeNull();
     }
+  });
+});
+
+describe('an aliased code stored without its decree', () => {
+  it('takes date and number from the codes table only when it has neither', () => {
+    expect(citeNorm({ tipo_atto: 'codice del consumo', numero_articolo: '33' })).toBe('art. 33, d.lgs. 6 settembre 2005, n. 206');
+    // Half of the norm and half of the table would name an act that does not exist.
+    expect(citeNorm({ tipo_atto: 'codice dei contratti pubblici', data: '2016-04-18', numero_articolo: '1' }))
+      .toBe('art. 1, d.lgs. 18 aprile 2016');
   });
 });
 

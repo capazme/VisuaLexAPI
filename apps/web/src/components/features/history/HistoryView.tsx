@@ -12,7 +12,7 @@ import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } from '../../../services/historyService';
 import { NormaChangesSection } from './NormaChangesSection';
-import { shortNorm } from '../../../utils/sources';
+import { labelFromParams } from '../../../utils/sources';
 
 // Stripe color per act_type — keyed on lowercased exact match. Codes get
 // distinct colors so the user can scan the timeline visually; everything
@@ -70,9 +70,9 @@ function historyToSearchParams(item: SearchHistoryItem): SearchParams {
     };
 }
 
-// A quick norm is suggested with the norm's short label (source convention).
+// A quick norm is suggested with the norm's short label, the act's with no article (source convention).
 function generateQuickNormLabel(item: SearchHistoryItem): string {
-    return shortNorm({ tipo_atto: item.act_type, numero_atto: item.act_number, data: item.date, numero_articolo: item.article ?? '' });
+    return labelFromParams({ act_type: item.act_type, act_number: item.act_number, date: item.date, article: item.article?.toString() });
 }
 
 export function HistoryView() {

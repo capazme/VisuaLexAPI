@@ -39,7 +39,7 @@ import type { NerReference } from '../../../features/merlt/ner/NerReferenceEdito
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
 import type { Annotation, Highlight, ThreadPassage } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import { citeNorm, inForceCitation, shortNorm } from '../../../utils/sources';
+import { citeNorm, shortNorm } from '../../../utils/sources';
 import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
@@ -48,7 +48,7 @@ import { plainText, locatePassage, buildPassage, textFingerprint } from '../../.
 import { revealAnnotation } from '../../../utils/revealAnnotation';
 import { VersionBanner } from './VersionBanner';
 import { TextAtDateDialog } from './TextAtDateDialog';
-import { formatNormCitation, withCitation } from '../../../utils/citation';
+import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
 import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
 import {
     READ_ONLY_REASON,
@@ -414,7 +414,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
             if (options.includeCitation) {
                 // Every copy starts with its citation: a past text's version, or the text in force (D8).
-                textToCopy = withCitation(textToCopy, citationNow(), inForceCitation(norma_data, todayInRome()));
+                textToCopy = withCitation(textToCopy, citationNow(), unversionedCitation(norma_data, todayInRome()));
             }
 
             if (options.includeNotes && !readOnly && allPanelAnnotations.length > 0) {
@@ -439,7 +439,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
         try {
             const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-            await navigator.clipboard.writeText(withCitation(plainText, citationNow(), inForceCitation(norma_data, todayInRome())));
+            await navigator.clipboard.writeText(withCitation(plainText, citationNow(), unversionedCitation(norma_data, todayInRome())));
             showToast('Testo copiato', 'success');
         } catch {
             showToast('Errore durante la copia', 'error');
@@ -609,7 +609,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             return;
         }
         try {
-            await navigator.clipboard.writeText(withCitation(text, citationNow(), inForceCitation(norma_data, todayInRome())));
+            await navigator.clipboard.writeText(withCitation(text, citationNow(), unversionedCitation(norma_data, todayInRome())));
             showToast('Testo copiato con citazione', 'success');
         } catch {
             showToast('Errore durante la copia', 'error');

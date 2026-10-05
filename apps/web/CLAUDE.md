@@ -392,9 +392,10 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/citation.ts` — `formatNormCitation` (null when there is nothing honest
   to cite: the text in force with no day, an act of the Union, an article that did
   not exist, a version that does not contain the day, a repealed article with no
-  repeal day stated; its head is `citeNorm`) and `withCitation(text, citation,
-  inForce)`, which puts the citation first — the version's, else `inForce`
-  (`inForceCitation`); the wording is the golden file's.
+  repeal day stated; its head is `citeNorm`), `unversionedCitation` (what a copy
+  starts with when no version is cited: the text in force's, never on a past text)
+  and `withCitation(text, citation, inForce)`, which puts the citation first — the
+  version's, else `inForce` (`unversionedCitation`); the wording is the golden file's.
 - `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
   then number, "679/2016" the reverse, "2006/2004" number first), shared by
   the palette parser and the in-text matcher and mirrored by
@@ -426,7 +427,7 @@ Duplicating any of these is a defect, not a shortcut.
   fails when the two differ. Never write a norm's label inline: a new surface
   picks one of these.
 - `utils/normaMeta.ts` — `formatNormaTitle(norma)` (the act heading) and
-  `formatNormaMeta(norma, { variant, articleCount })`, the line under it: only
+  `formatNormaMeta(norma, articleCount?)`, the line under it: only
   what the title does not say (a code's decree, an aliased code's name, «Estremi
   non disponibili»), often empty.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.

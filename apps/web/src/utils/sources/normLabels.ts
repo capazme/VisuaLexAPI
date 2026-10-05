@@ -11,6 +11,7 @@
  */
 import type { NormaVisitata } from '../../types';
 import { formatDateForCitation, withPreposition } from '../dateUtils';
+import { isEuropeanAct } from '../versionDisplay';
 import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS, NAMED_HEADINGS } from './actTypes';
 
 /** The fields a label reads: a stored `norma_data`, or what a parser or a search gives. */
@@ -32,7 +33,8 @@ function day(iso: string): string | null {
 }
 
 /** The act's type, date and number: an aliased code by the decree it is, from the codes table
- * when the norm does not say. */
+ * when the norm says neither its date nor its number (half of one and half of the table would
+ * name an act that does not exist). */
 function realType(norm: LabelledNorm): { type: string; date: string; number: string } {
   let type = key(norm.tipo_atto_reale);
   let date = text(norm.data);
@@ -41,8 +43,10 @@ function realType(norm: LabelledNorm): { type: string; date: string; number: str
     const match = NIR_ACT.exec(CODES_BY_NAME.get(key(norm.tipo_atto)) ?? '');
     if (match) {
       type = match[1].replace(/\./g, ' ');
-      date = date || match[2];
-      number = number || match[3];
+      if (!date && !number) {
+        date = match[2];
+        number = match[3];
+      }
     }
   }
   return { type: type || key(norm.tipo_atto), date, number };
@@ -153,7 +157,7 @@ export function actSubtitle(norm: LabelledNorm): string {
  * An act of the Union names EUR-Lex, its source.
  */
 export function inForceCitation(norm: LabelledNorm, consultedAt?: string): string {
-  const source = EU_ACTS[key(norm.tipo_atto)] || ['tue', 'tfue', 'cdfue'].includes(key(norm.tipo_atto)) ? 'EUR-Lex' : 'Normattiva';
+  const source = isEuropeanAct(key(norm.tipo_atto)) ? 'EUR-Lex' : 'Normattiva';
   const consulted = consultedAt ? `, consultato ${withPreposition('il', formatDateForCitation(consultedAt))}` : '';
   return `${citeNorm(norm)} (${source}, testo vigente${consulted})`;
 }
@@ -166,8 +170,14 @@ const CODE_ALIASES: Readonly<Record<string, string>> = {
   'codice.procedura.penale:1988-09-22;447': 'decreto.del.presidente.della.repubblica:1988-09-22;447',
   'costituzione:1947-12-27': 'costituzione',
 };
+// A code's enacting decree with its annex left out ("regio.decreto:1942-03-16;262~art1218"):
+// the article is the code's, but which annex (the preleggi or the codice civile) is not said.
+const DECREES_OF_ANNEXED_CODES: ReadonlySet<string> = new Set(
+  Object.values(CODES_TABLE).filter((urn) => /;\d+[a-z]*:[^:]+$/.test(urn)).map((urn) => urn.toLowerCase().replace(/:[^:;]+$/, '')),
+);
 const ELI = /\/eli\/(reg|dir)\/(\d{4})\/(\d+)/i;
-const ARTICLE = /^art(\d+)([a-z]*)((?:\.\d+)?)/;
+// "art2bis" as Normattiva writes it, "art2-bis" as some keys do.
+const ARTICLE = /^art(\d+)-?([a-z]*)((?:\.\d+)?)/;
 
 /**
  * The norm a URN names (a Normattiva URN, bare or in its URL, or an EUR-Lex ELI page), or
@@ -192,6 +202,8 @@ export function normFromUrn(urn: string | null | undefined): LabelledNorm | null
   const article = ARTICLE.exec(body);
   const numero = article ? `${article[1]}${article[2] ? `-${article[2]}` : ''}${article[3]}` : undefined;
   const name = ACT_BY_URN.get(actPart.toLowerCase());
+  // Never a guessed act: an article of "r.d. 262/1942" is the preleggi's or the codice civile's.
+  if (!name && DECREES_OF_ANNEXED_CODES.has(actPart.toLowerCase())) return null;
   if (actPart.split(':')[0] === 'costituzione') return { tipo_atto: 'costituzione', numero_articolo: numero };
   const match = NIR_ACT.exec(actPart);
   if (!match) {

@@ -1,7 +1,7 @@
 import type { ArticleValidity, NormaVisitata } from '../types';
 import { formatDateForCitation, withPreposition } from './dateUtils';
-import { citeNorm } from './sources';
-import { isEuropeanAct } from './versionDisplay';
+import { citeNorm, inForceCitation } from './sources';
+import { isEuropeanAct, requestIsHistorical, type VersionRequest } from './versionDisplay';
 
 /**
  * How a lawyer cites a norm "in the text in force at …".
@@ -99,4 +99,14 @@ export function formatNormCitation(context: CitationContext): NormCitation | nul
  */
 export function withCitation(text: string, citation: NormCitation | null, inForce: string): string {
   return [citation ? citation.long : inForce, text].filter(Boolean).join('\n\n');
+}
+
+/**
+ * The citation a copy starts with when `formatNormCitation` cites no version: the text in
+ * force's (`inForceCitation`, D8); for a past text that has none (a repealed article with no
+ * repeal day stated) the bare citation, never «testo vigente» on a text that is not. An act of
+ * the Union is always its text in force: the server ignores the day.
+ */
+export function unversionedCitation(norma: CitedNorma & VersionRequest, consultedAt: string): string {
+  return requestIsHistorical(norma) && !isEuropeanAct(norma.tipo_atto) ? citeNorm(norma) : inForceCitation(norma, consultedAt);
 }

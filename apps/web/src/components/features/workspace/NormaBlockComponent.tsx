@@ -274,10 +274,7 @@ export function NormaBlockComponent({
                 {formatNormaTitle(normaBlock.norma)}
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {formatNormaMeta(normaBlock.norma, {
-                  variant: 'block',
-                  articleCount: normaBlock.articles.length,
-                })}
+                {formatNormaMeta(normaBlock.norma, normaBlock.articles.length)}
               </p>
             </div>
           </div>

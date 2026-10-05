@@ -315,9 +315,9 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                 </span>
               )}
             </div>
-            {formatNormaMeta(norma, { variant: 'card-mobile' }) && (
+            {formatNormaMeta(norma) && (
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">
-                {formatNormaMeta(norma, { variant: 'card-mobile' })}
+                {formatNormaMeta(norma)}
               </p>
             )}
             <span className="inline-block text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
@@ -401,10 +401,10 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               )}
             </div>
             <div className="flex items-center gap-3 mt-1.5">
-              {formatNormaMeta(norma, { variant: 'card-desktop' }) && (
+              {formatNormaMeta(norma) && (
                 <>
                   <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                    {formatNormaMeta(norma, { variant: 'card-desktop' })}
+                    {formatNormaMeta(norma)}
                   </p>
                   <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
                 </>
