@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
 
@@ -12,11 +13,11 @@ import { lingoCardCreateSchema } from '../schemas/lingo/card';
  * `BOZZA_PERSONALE` whatever the input says (the schema refuses one that tries).
  * When no anchor is marked primary the first one is.
  */
-export async function createLingoCard(authorId: string, input: unknown) {
+export async function createLingoCard(authorId: string, input: unknown, client: Prisma.TransactionClient = prisma) {
   const card = lingoCardCreateSchema.parse(input);
   const markFirstPrimary = !card.ancore.some((a) => a.isPrimary);
 
-  return prisma.lingoCard.create({
+  return client.lingoCard.create({
     data: {
       autoreId: authorId,
       materia: card.materia,

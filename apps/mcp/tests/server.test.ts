@@ -49,7 +49,7 @@ describe('discovery and authentication', () => {
     const header = response.headers.get('www-authenticate') ?? '';
     expect(header).toMatch(/^Bearer /);
     expect(header).toContain('resource_metadata="http://localhost:3002/.well-known/oauth-protected-resource/mcp"');
-    expect(header).toContain('scope="dossier:read dossier:write"');
+    expect(header).toContain('scope="dossier:read dossier:write lingo:cards:read lingo:cards:write"');
   });
 
   it('publishes its protected resource metadata (RFC 9728)', async () => {
@@ -58,7 +58,7 @@ describe('discovery and authentication', () => {
     expect(await response.json()).toEqual({
       resource: RESOURCE,
       authorization_servers: [env.config.issuer],
-      scopes_supported: ['dossier:read', 'dossier:write'],
+      scopes_supported: ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write'],
       bearer_methods_supported: ['header'],
       resource_name: 'VisuaLex',
     });

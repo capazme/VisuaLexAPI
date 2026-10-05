@@ -24,6 +24,7 @@ import notificationRoutes from './routes/notifications';
 import articleDiscussionRoutes from './routes/articleDiscussions';
 import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
+import lingoCardsRoutes from './routes/lingoCards';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -123,6 +124,7 @@ app.use('/api/merlt', merltKillSwitch, merltRoutes);
 // Same reason for LingoLex: a prefixed router authenticates once, here, instead
 // of passing through every catch-all router below first.
 app.use('/api/lingo/simulazioni', lingoSimulazioniRoutes);
+app.use('/api/lingo/cards', lingoCardsRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 app.use('/api', authRoutes);
