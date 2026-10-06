@@ -9,6 +9,8 @@
 #   app   the request path: ingress, server, scrapers, MERL-T
 #   data  the stores, reachable only by the server and MERL-T
 #
+# edge and app have fixed subnets: the host firewall and the ingress key on them.
+#
 # Hardening (spec section 8, H2): the application modules and MERL-T run with every
 # capability dropped and no way to gain privileges (measured: MERL-T is healthy that
 # way). The stores keep the defaults: their entrypoints chown and then drop privileges

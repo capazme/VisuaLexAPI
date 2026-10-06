@@ -32,6 +32,10 @@ describe('trust proxy: the real client address', () => {
     expect(await ipFor('203.0.113.9, 100.64.1.2, 172.29.241.1')).toBe('100.64.1.2');
   });
 
+  it('walks past private hops between the client and the ingress', async () => {
+    expect(await ipFor('100.64.1.2, 10.0.0.9, 172.29.241.1')).toBe('100.64.1.2');
+  });
+
   it('takes a public address', async () => {
     expect(await ipFor('198.51.100.7')).toBe('198.51.100.7');
   });

@@ -44,8 +44,9 @@ B2=http://127.0.0.1:18082
 for port in 13001 15000; do
   i=0; until curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/__seen"; do i=$((i + 1)); [ "$i" -gt 20 ] && { echo "the stand-in on port $port did not start"; exit 1; }; sleep 1; done
 done
-for url in "$B" "$B2"; do
-  i=0; until curl -s -o /dev/null -m 2 "$url/version"; do i=$((i + 1)); [ "$i" -gt 30 ] && { echo "the ingress at $url did not start"; docker logs "$name" 2>&1 | tail -20; exit 1; }; sleep 1; done
+for pair in "$B $name" "$B2 $name2"; do
+  url="${pair% *}"; container="${pair#* }"
+  i=0; until curl -s -o /dev/null -m 2 "$url/version"; do i=$((i + 1)); [ "$i" -gt 30 ] && { echo "the ingress at $url did not start"; docker logs "$container" 2>&1 | tail -20; exit 1; }; sleep 1; done
 done
 
 code()   { curl -s -o /dev/null -m 10 -w '%{http_code}' "$@"; }
