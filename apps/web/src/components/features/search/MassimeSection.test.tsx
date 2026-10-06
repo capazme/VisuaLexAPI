@@ -20,6 +20,16 @@ describe('MassimeSection — the decision a Brocardi massima is headed with', ()
     expect(screen.getByText('Cass., n. 2633/1982').closest('a')).toHaveAttribute('href', '/sentenze/cassazione/2633/1982');
   });
 
+  it('links the Sezioni Unite with their section, for the page to find the archive', () => {
+    show([{ autorita: 'Cass. sez. un.', numero: '8', anno: '2018', massima: 'Il contrasto.' }]);
+    expect(screen.getByText('Cass., sez. un., n. 8/2018').closest('a')).toHaveAttribute('href', '/sentenze/cassazione/8/2018?sezione=U');
+  });
+
+  it('names a decision with no year and links nothing: a page needs the year', () => {
+    show([{ autorita: 'Cass. civ.', numero: '2633', anno: null, massima: 'Il nesso.' }]);
+    expect(screen.getByText('Cass. civ., n. 2633').closest('a')).toBeNull();
+  });
+
   it('leaves another court as the source writes it', () => {
     show([{ autorita: 'Cons. Stato', numero: '10', anno: '2020', massima: 'Il provvedimento.' }]);
     expect(screen.getByText('Cons. Stato')).toBeInTheDocument();

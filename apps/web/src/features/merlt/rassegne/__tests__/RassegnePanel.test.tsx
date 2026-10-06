@@ -83,8 +83,8 @@ describe('RassegnePanel', () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel();
     await openPanel();
-    expect(screen.queryByText('Sez. U, n. 1234/2024 · Rv. 670001-01')).toBeNull();
     const chip = await screen.findByText('Cass. civ., sez. un., n. 1234/2024 · Rv. 670001-01');
+    expect(screen.queryByText('Sez. U, n. 1234/2024 · Rv. 670001-01')).toBeNull();
     expect(chip.closest('a')).toHaveAttribute('href', '/sentenze/cassazione-civile/1234/2024');
   });
 

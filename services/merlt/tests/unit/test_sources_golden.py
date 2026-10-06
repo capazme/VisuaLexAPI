@@ -186,6 +186,18 @@ def test_decision_short_label_with_its_massime(case):
     assert _decision(case, with_rv=True) == case["labels"]["short_with_rv"]["value"]
 
 
+@pytest.mark.parametrize("sezione, expected", [
+    ("T", "Cass. civ., sez. trib., n. 5/2020"),
+    ("6-1", "Cass. civ., sez. VI-1, n. 5/2020"),
+    (" u. ", "Cass. civ., sez. un., n. 5/2020"),
+    (" ", "Cass. civ., n. 5/2020"),
+    (".", "Cass. civ., n. 5/2020"),
+])
+def test_decision_short_section_codes(sezione, expected):
+    # The section codes the golden file does not list, as the web's formatDecisionShort writes them.
+    assert decision_short("cassazione", 5, 2020, "civile", sezione) == expected
+
+
 @pytest.mark.parametrize("case", _DECISION_SHORT, ids=_ids(_DECISION_SHORT))
 def test_the_massimario_writes_the_short_label(case):
     ref, attrs = case["input"]["reference"], case["input"]["attributes"]
