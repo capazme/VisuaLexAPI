@@ -23,7 +23,8 @@ show() { sed 's/^/     /' "$1" | head -8; }
 mkrepo() { # mkrepo <name>: prints its path
   d="$work/$1"
   mkdir -p "$d/scripts/prod" "$d/infra" "$d/apps/server" "$d/vendor/mcp-legal-it" "$d/bin"
-  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$here"/update.sh "$d/scripts/prod/"
+  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$here"/update.sh \
+     "$here"/firewall.sh "$d/scripts/prod/"
   cp "$root/infra/.env.example" "$d/infra/.env.example"
   sed "s/^INGRESS_PORT=.*/INGRESS_PORT=$FREE_PORT/" "$d/infra/.env.example" >"$d/infra/.env.example.t" && mv "$d/infra/.env.example.t" "$d/infra/.env.example"
   cp "$root/apps/server/.env.example" "$d/apps/server/.env.example"
@@ -450,6 +451,46 @@ expect_status 0 "--stop stops"
 expect_log "$d" "compose -f infra/compose.yml" "through the same Compose files"
 expect_log "$d" " stop" "with stop"
 if grep -E ' (up|down|build|rm)( |$)' "$d/docker.log" >/dev/null; then bad "and nothing else (no up, down, build or rm)"; show "$d/docker.log"; else ok "and nothing else (no up, down, build or rm)"; fi
+
+# --- the host firewall, H1 (firewall.sh) ------------------------------------------------------
+d="$(mkrepo h1)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+outcome "$d" scripts/prod/firewall.sh apply --dry-run
+expect_status 0 "the H1 rules can be printed without root"
+grep '^iptables' "$work/out" >"$work/rules"
+[ "$(wc -l <"$work/rules" | tr -d ' ')" = 9 ] && ok "nine rules" || bad "nine rules (got $(wc -l <"$work/rules"))"
+[ "$(grep -c -- '-I DOCKER-USER ' "$work/rules")" = 9 ] && [ "$(grep -c -- '--comment visualex-h1:visualex$' "$work/rules")" = 9 ] \
+  && ok "all in DOCKER-USER, all tagged with this stack's comment" || bad "all in DOCKER-USER, all tagged"
+sed -n 1p "$work/rules" | grep -q -- '-I DOCKER-USER 1 -s 172.29.240.0/24 -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN' \
+  && ok "replies to connections from outside come first" || bad "replies first: $(sed -n 1p "$work/rules")"
+sed -n 2p "$work/rules" | grep -q -- '-s 172.29.240.0/24 -d 172.29.240.0/24 -j RETURN' && ok "then the subnet's own traffic" || bad "then the subnet's own traffic"
+for range in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10; do
+  grep -q -- "-s 172.29.240.0/24 -d $range -j DROP" "$work/rules" && ok "new connections to $range are dropped" || bad "new connections to $range are dropped"
+done
+last_return="$(grep -n -- '-j RETURN' "$work/rules" | tail -1 | cut -d: -f1)"; first_drop="$(grep -n -- '-j DROP' "$work/rules" | head -1 | cut -d: -f1)"
+[ "$last_return" -lt "$first_drop" ] && ok "every exception before the first drop" || bad "every exception before the first drop"
+# remove: only this stack's rules, against a stub iptables listing them beside someone else's
+cat >"$d/bin/iptables" <<'STUB'
+#!/bin/sh
+echo "iptables $*" >>"$STUB_LOG"
+if [ "$1" = -S ]; then
+  echo "-N DOCKER-USER"
+  echo "-A DOCKER-USER -s 172.29.240.0/24 -d 10.0.0.0/8 -m comment --comment visualex-h1:visualex -j DROP"
+  echo "-A DOCKER-USER -s 10.9.0.0/16 -j DROP -m comment --comment someone-else"
+  echo "-A DOCKER-USER -s 172.29.240.0/24 -d 100.64.0.0/10 -m comment --comment visualex-h1:other -j DROP"
+  echo "-A DOCKER-USER -j RETURN"
+fi
+exit 0
+STUB
+printf '#!/bin/sh\necho 0\n' >"$d/bin/id"; chmod +x "$d/bin/iptables" "$d/bin/id"
+: >"$d/docker.log"
+outcome "$d" scripts/prod/firewall.sh remove
+expect_status 0 "remove runs"
+[ "$(grep -c '^iptables -D' "$d/docker.log")" = 1 ] && expect_log "$d" "iptables -D DOCKER-USER -s 172.29.240.0/24 -d 10.0.0.0/8 -m comment --comment visualex-h1:visualex -j DROP" \
+  "remove deletes exactly this stack's rule, not another program's or another stack's"
+printf '#!/bin/sh\necho 1000\n' >"$d/bin/id"
+outcome "$d" scripts/prod/firewall.sh apply
+expect_status nonzero "apply without root is refused"; expect_out "sudo" "and says so"
 
 # --- the pull: --branch main|develop (update.sh) --------------------------------------------
 # A repo as mkrepo makes it, with an origin (a bare clone) on which develop is one commit ahead
