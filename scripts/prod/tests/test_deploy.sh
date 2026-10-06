@@ -23,7 +23,8 @@ show() { sed 's/^/     /' "$1" | head -8; }
 mkrepo() { # mkrepo <name>: prints its path
   d="$work/$1"
   mkdir -p "$d/scripts/prod" "$d/infra" "$d/apps/server" "$d/vendor/mcp-legal-it" "$d/bin"
-  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$here"/update.sh "$d/scripts/prod/"
+  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$here"/update.sh \
+     "$here"/backup-daily.sh "$here"/backup-timer.sh "$d/scripts/prod/"
   cp "$root/infra/.env.example" "$d/infra/.env.example"
   sed "s/^INGRESS_PORT=.*/INGRESS_PORT=$FREE_PORT/" "$d/infra/.env.example" >"$d/infra/.env.example.t" && mv "$d/infra/.env.example.t" "$d/infra/.env.example"
   cp "$root/apps/server/.env.example" "$d/apps/server/.env.example"
@@ -450,6 +451,55 @@ expect_status 0 "--stop stops"
 expect_log "$d" "compose -f infra/compose.yml" "through the same Compose files"
 expect_log "$d" " stop" "with stop"
 if grep -E ' (up|down|build|rm)( |$)' "$d/docker.log" >/dev/null; then bad "and nothing else (no up, down, build or rm)"; show "$d/docker.log"; else ok "and nothing else (no up, down, build or rm)"; fi
+
+# --- the daily backup (backup-daily.sh) and its timer (backup-timer.sh) -------------------------
+d="$(mkrepo daily)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+mkdir -p "$d/home/visualex-backups"
+for n in 1 2 3 4 5 6 7 8 9; do mkdir "$d/home/visualex-backups/visualex-2026100${n}T033000Z"; done
+mkdir "$d/home/visualex-backups/other-20260101T000000Z" "$d/home/visualex-backups/visualex-notes"
+# the backup tool, as a stub that takes one more backup, or fails
+cat >"$d/scripts/backup.sh" <<'STUB'
+#!/bin/sh
+[ "${BACKUP_EXIT:-0}" = 0 ] || exit "$BACKUP_EXIT"
+mkdir "$HOME/visualex-backups/visualex-20261010T033000Z"
+STUB
+EXTRA_ENV="HOME=$d/home"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status 0 "the daily backup runs"
+kept="$(ls -1 "$d/home/visualex-backups" | grep '^visualex-2' | sort | tr '\n' ' ')"
+[ "$kept" = "visualex-20261004T033000Z visualex-20261005T033000Z visualex-20261006T033000Z visualex-20261007T033000Z visualex-20261008T033000Z visualex-20261009T033000Z visualex-20261010T033000Z " ] \
+  && ok "it keeps the newest seven of this stack, the one it just took included" || bad "it keeps the newest seven of this stack (kept: $kept)"
+[ -d "$d/home/visualex-backups/other-20260101T000000Z" ] && [ -d "$d/home/visualex-backups/visualex-notes" ] \
+  && ok "and never touches another stack's folders or anything not named as the tool names it" || bad "and never touches another stack's folders or other names"
+expect_out "removed the old backup visualex-20261001T033000Z" "it says what it removed"
+before="$(ls -1 "$d/home/visualex-backups" | wc -l)"
+EXTRA_ENV="HOME=$d/home BACKUP_EXIT=3"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status nonzero "a failed backup fails the run"
+[ "$(ls -1 "$d/home/visualex-backups" | wc -l)" = "$before" ] && ok "and deletes nothing" || bad "and deletes nothing"
+EXTRA_ENV="HOME=$d/home BACKUP_KEEP=0"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status nonzero "a BACKUP_KEEP of 0 is refused, before anything is taken or removed"
+
+# The timer, against stub systemctl and loginctl that record their calls.
+for tool in systemctl loginctl; do
+  printf '#!/bin/sh\necho "%s $*" >>"$STUB_LOG"\n[ "$1" = show-user ] && echo no\nexit 0\n' "$tool" >"$d/bin/$tool"
+  chmod +x "$d/bin/$tool"
+done
+: >"$d/docker.log"
+EXTRA_ENV="HOME=$d/home XDG_CONFIG_HOME=$d/home/.config"; outcome "$d" scripts/prod/backup-timer.sh install; EXTRA_ENV=""
+expect_status 0 "the timer installs"
+u="$d/home/.config/systemd/user"
+[ -f "$u/visualex-backup.service" ] && [ -f "$u/visualex-backup.timer" ] && ok "as a service and a timer named after the stack" || bad "as a service and a timer named after the stack"
+grep -q "^ExecStart=/bin/sh $d/scripts/prod/backup-daily.sh\$" "$u/visualex-backup.service" && ok "the service runs the daily backup of this checkout" || bad "the service runs the daily backup of this checkout"
+grep -q '^OnCalendar=\*-\*-\* 03:30:00$' "$u/visualex-backup.timer" && grep -q '^Persistent=true$' "$u/visualex-backup.timer" \
+  && ok "every day at 03:30, and a run missed while the machine was off happens at the next start" || bad "daily at 03:30, persistent"
+expect_log "$d" "systemctl --user enable --now visualex-backup.timer" "it starts the timer as the user, not as root"
+expect_out "enable-linger" "and says how to keep it running while nobody is logged in"
+: >"$d/docker.log"
+EXTRA_ENV="HOME=$d/home XDG_CONFIG_HOME=$d/home/.config"; outcome "$d" scripts/prod/backup-timer.sh remove; EXTRA_ENV=""
+expect_status 0 "the timer is removed"
+[ ! -e "$u/visualex-backup.service" ] && [ ! -e "$u/visualex-backup.timer" ] && ok "its unit files are gone" || bad "its unit files are gone"
+expect_log "$d" "systemctl --user disable --now visualex-backup.timer" "and it is stopped first"
+[ -d "$d/home/visualex-backups/visualex-20261010T033000Z" ] && ok "the backups already taken stay" || bad "the backups already taken stay"
 
 # --- the pull: --branch main|develop (update.sh) --------------------------------------------
 # A repo as mkrepo makes it, with an origin (a bare clone) on which develop is one commit ahead
