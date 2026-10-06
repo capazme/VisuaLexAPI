@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { formatNormCitation } from '../citation';
+import { citeNorm } from '../sources';
+import { isEuropeanAct } from '../versionDisplay';
 import { decisionKey, formatDecisionCitation, linkableDecisionPath, type LooseDecisionRef } from '../decisionLinks';
 import type { DecisionAttributes, DecisionIdentity } from '../../types/decisions';
 
 // The convention for legal sources (docs/superpowers/specs/2026-10-04-source-convention-design.md)
 // lives in one neutral file every suite reads. Until each area adopts it, this test keeps the
 // file honest: its shape, the citations the owner decided, the decision paths, keys and citations
-// the app builds.
+// the app builds. The labels of norms are checked in full by utils/sources/__tests__/golden.test.ts.
 
 function findGolden(from: string): string {
   for (let dir = from; ; dir = dirname(dir)) {
@@ -77,24 +79,19 @@ describe('the golden file of legal sources', () => {
   });
 
   describe('decided citations of norms are what citation.ts writes', () => {
-    // Decided by the owner on 4 October 2026 and not written by citation.ts yet: the web
-    // adoption PR (plan, PR 1) empties this list. A case listed here that starts passing
-    // fails too, so the list cannot go stale.
-    const PENDING_ADOPTION = new Set([
-      'l-184-1983-6-year-only', 'dpcm-2020-03-08-1', 'dm-55-2014-4', 'cpi-regolamento-1',
-      'lcost-1-2012-1', 'gdpr-5', 'nis2-21', 'tfue-101', 'consumo-33-stored-without-real-type',
-    ]);
+    // A past text of an act of the Union is never cited by version (the server ignores the
+    // day): its citation is the convention's own (utils/sources), which a copy starts with.
     const decided = golden.norms.filter((c) => c.labels.citation?.status === 'decided');
     it('covers the cases the owner decided', () => expect(decided.length).toBeGreaterThan(10));
-    it('lists only decided cases as pending', () => {
-      for (const id of PENDING_ADOPTION) expect(decided.map((c) => c.id), id).toContain(id);
-    });
     for (const c of decided) {
-      if (PENDING_ADOPTION.has(c.id)) {
-        it(`${c.id} (pending adoption)`, () => expect(citationHead(c.input)).not.toBe(c.labels.citation.value));
-      } else {
-        it(c.id, () => expect(citationHead(c.input)).toBe(c.labels.citation.value));
-      }
+      it(c.id, () => {
+        if (isEuropeanAct(c.input.tipo_atto)) {
+          expect(citationHead(c.input)).toBeNull();
+          expect(citeNorm(c.input)).toBe(c.labels.citation.value);
+        } else {
+          expect(citationHead(c.input)).toBe(c.labels.citation.value);
+        }
+      });
     }
   });
 

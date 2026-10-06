@@ -8,6 +8,7 @@ import type { CustomAlias } from '../types';
 import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
 import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
+import { labelFromParams } from './sources';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -589,52 +590,9 @@ export function isSearchReady(parsed: ParsedCitation | null): boolean {
   return !!(parsed.act_number && parsed.date);
 }
 
-/**
- * Genera un label leggibile dal parsing
- */
+/** The palette's preview of what it read: the short label of the source convention. */
 export function formatParsedCitation(parsed: ParsedCitation): string {
-  const parts: string[] = [];
-
-  if (parsed.article) {
-    parts.push(`Art. ${parsed.article}`);
-  }
-
-  if (parsed.act_type) {
-    // Abbrevia il tipo atto per la visualizzazione
-    const shortNames: Record<string, string> = {
-      'legge': 'L.',
-      'decreto legge': 'D.L.',
-      'decreto legislativo': 'D.Lgs.',
-      'decreto del presidente della repubblica': 'D.P.R.',
-      'regio decreto': 'R.D.',
-      'codice civile': 'C.C.',
-      'codice penale': 'C.P.',
-      'codice di procedura civile': 'C.P.C.',
-      'codice di procedura penale': 'C.P.P.',
-      'costituzione': 'Cost.',
-      'Regolamento UE': 'Reg. UE',
-      'regolamento ue': 'Reg. UE',
-      'Direttiva UE': 'Dir. UE',
-      'direttiva ue': 'Dir. UE',
-    };
-    parts.push(shortNames[parsed.act_type] || parsed.act_type);
-  }
-
-  if (parsed.act_number && parsed.date) {
-    // A citation names the year, not the day: "L. 92/2012", never
-    // "L. 92/2012-06-28". The client's own aliases carry a year already, but
-    // the server resolver answers with the full ISO date for acts it knows by
-    // name, and that date is worth keeping in the params even though the
-    // preview should not show it.
-    const year = /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? parsed.date.slice(0, 4) : parsed.date;
-    parts.push(`${parsed.act_number}/${year}`);
-  } else if (parsed.act_number) {
-    parts.push(`n. ${parsed.act_number}`);
-  } else if (parsed.date) {
-    parts.push(parsed.date);
-  }
-
-  return parts.join(' ');
+  return labelFromParams(parsed);
 }
 
 /**

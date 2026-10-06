@@ -13,6 +13,7 @@ import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, hasEuMarker,
 import { expandTwoDigitYear } from './dateUtils';
 import { FULL_ACT_NAMES, toApiArticleNumber } from './citationParser';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
+import { labelFromParams } from './sources';
 
 // Minimal interface for norma context (subset of NormaVisitata)
 interface NormaContext {
@@ -581,37 +582,9 @@ export function deserializeCitation(data: string): ParsedCitationData | null {
   }
 }
 
-/**
- * Formatta una citazione per la visualizzazione
- */
+/** A detected citation, as its link names it: the short label of the source convention. */
 export function formatCitationLabel(parsed: ParsedCitationData): string {
-  const shortNames: Record<string, string> = {
-    'legge': 'L.',
-    'decreto legge': 'D.L.',
-    'decreto legislativo': 'D.Lgs.',
-    'decreto del presidente della repubblica': 'D.P.R.',
-    'regio decreto': 'R.D.',
-    'codice civile': 'C.C.',
-    'codice penale': 'C.P.',
-    'codice di procedura civile': 'C.P.C.',
-    'codice di procedura penale': 'C.P.P.',
-    'costituzione': 'Cost.',
-    'codice della strada': 'C.d.S.',
-    'codice della navigazione': 'C.N.',
-    'preleggi': 'Prel.',
-    'TUE': 'TUE',
-    'TFUE': 'TFUE',
-    'CDFUE': 'CDFUE',
-  };
-
-  const parts: string[] = [`Art. ${parsed.article}`];
-  parts.push(shortNames[parsed.act_type] || parsed.act_type);
-
-  if (parsed.act_number && parsed.date) {
-    parts.push(`${parsed.act_number}/${parsed.date}`);
-  }
-
-  return parts.join(' ');
+  return labelFromParams(parsed);
 }
 
 /**

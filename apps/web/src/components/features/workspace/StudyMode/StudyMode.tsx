@@ -12,6 +12,7 @@ import { AdvancedExportModal } from '../../../ui/AdvancedExportModal';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData, NormaVisitata, SearchParams } from '../../../../types';
 import { useTour } from '../../../../hooks/useTour';
+import { actHeading, shortNorm } from '../../../../utils/sources';
 
 export interface StudyModeProps {
   /** When true (default), the component is visible */
@@ -58,25 +59,9 @@ function normaToSearchParams(norma: NormaVisitata): SearchParams {
   };
 }
 
-// Generate a label for QuickNorm from NormaVisitata
+// A quick norm is suggested with the norm's short label (source convention).
 function generateQuickNormLabel(norma: NormaVisitata): string {
-  const parts = [`Art. ${norma.numero_articolo}`];
-  if (norma.tipo_atto) {
-    const abbrev = norma.tipo_atto
-      .replace('codice civile', 'CC')
-      .replace('codice penale', 'CP')
-      .replace('codice di procedura civile', 'CPC')
-      .replace('codice di procedura penale', 'CPP')
-      .replace('costituzione', 'Cost.')
-      .replace(/^decreto legislativo$/i, 'D.Lgs.')
-      .replace(/^decreto legge$/i, 'D.L.')
-      .replace(/^legge$/i, 'L.');
-    parts.push(abbrev);
-  }
-  if (norma.numero_atto) {
-    parts.push(`n. ${norma.numero_atto}`);
-  }
-  return parts.join(' ');
+  return shortNorm(norma);
 }
 
 export function StudyMode({
@@ -93,7 +78,7 @@ export function StudyMode({
   const articles = useMemo(() => articlesProp ?? [article], [articlesProp, article]);
 
   // Generate norma label if not provided
-  const normaLabel = normaLabelProp ?? `${article.norma_data.tipo_atto}${article.norma_data.numero_atto ? ` ${article.norma_data.numero_atto}` : ''}`;
+  const normaLabel = normaLabelProp ?? actHeading(article.norma_data);
 
   // Typography state — persisted via the studyMode slice in AppSettings,
   // so font size / line height / theme survive reopening Study Mode and

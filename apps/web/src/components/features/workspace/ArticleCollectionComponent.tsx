@@ -9,6 +9,7 @@ import { ArticleMinimap } from './ArticleMinimap';
 import { LazyStudyMode as StudyMode } from './LazyStudyMode';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
+import { shortAct } from '../../../utils/sources';
 
 interface ArticleCollectionComponentProps {
   tabId: string;
@@ -229,7 +230,7 @@ export function ArticleCollectionComponent({
                   <div className="flex flex-col min-w-0">
                     <span className="truncate">Art. {article.norma_data.numero_articolo}</span>
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[100px]">
-                      {sourceNorma.tipo_atto} {sourceNorma.numero_atto}
+                      {shortAct(sourceNorma)}
                     </span>
                   </div>
                   <button

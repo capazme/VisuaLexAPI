@@ -57,7 +57,7 @@ describe('normaChangeLabel', () => {
   it('uses the citation when the snapshot allows it', () => {
     expect(normaChangeLabel(notification({
       norma_data: { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '2043' },
-    }))).toBe('codice civile n. 262 del 1942-03-16, Art. 2043');
+    }))).toBe('art. 2043 c.c.');
   });
 
   it('falls back to the server message otherwise', () => {

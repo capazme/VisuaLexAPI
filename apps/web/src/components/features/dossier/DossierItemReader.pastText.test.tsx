@@ -8,7 +8,6 @@ import { DossierItemReader } from './DossierItemReader';
 import { appStore } from '../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
-import { formatCitation } from '../../../utils/normaMeta';
 import { UNRELIABLE_REASON } from '../../../utils/versionDisplay';
 import type { ArticleValidity, Highlight, NormaVisitata } from '../../../types';
 
@@ -132,11 +131,11 @@ describe('DossierItemReader — the citation', () => {
     expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\., nel testo in vigore al 1° giugno 2005 \(Normattiva/);
   });
 
-  it('keeps the citation a text in force always had, byte for byte', async () => {
+  it('cites the text in force as the source convention does (D8)', async () => {
     read(CURRENT_ITEM, { ...MIDDLE, state: 'current', valid_to: null });
     fireEvent.click(await screen.findByRole('button', { name: /Copia citazione/ }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText).toHaveBeenCalledWith('codice civile n. 262 del 1942-03-16, Art. 1284 (Allegato 2)');
+    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\. \(Normattiva, testo vigente, consultato il .+\)$/);
   });
 });
 
@@ -161,7 +160,7 @@ describe('DossierItemReader — an act of the Union opened with a stale day', ()
     expect(button).toBeEnabled();
     fireEvent.click(button);
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText).toHaveBeenCalledWith(formatCitation(EU_ITEM));
+    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 5, reg\. \(UE\) 2016\/679 \(EUR-Lex, testo vigente, consultato il .+\)$/);
   });
 });
 

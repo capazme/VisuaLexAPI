@@ -39,7 +39,7 @@ import type { NerReference } from '../../../features/merlt/ner/NerReferenceEdito
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
 import type { Annotation, Highlight, ThreadPassage } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import { formatCitation } from '../../../utils/normaMeta';
+import { citeNorm, shortNorm } from '../../../utils/sources';
 import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
@@ -48,7 +48,7 @@ import { plainText, locatePassage, buildPassage, textFingerprint } from '../../.
 import { revealAnnotation } from '../../../utils/revealAnnotation';
 import { VersionBanner } from './VersionBanner';
 import { TextAtDateDialog } from './TextAtDateDialog';
-import { formatNormCitation, withCitation } from '../../../utils/citation';
+import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
 import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
 import {
     READ_ONLY_REASON,
@@ -389,7 +389,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             showToast('Rimosso dalle norme rapide', 'info');
             return;
         }
-        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+        const label = shortNorm(norma_data);
         addQuickNorm(label, quickNormParams);
         publishMerltEvent({
             interaction_type: MERLT_EVENT_TYPES.bookmarkCreated,
@@ -413,8 +413,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             }
 
             if (options.includeCitation) {
-                // A past text starts with its citation; the text in force keeps its trailer.
-                textToCopy = withCitation(textToCopy, citationNow(), `\n\n---\nTratto da: ${formatCitation(norma_data)}`);
+                // Every copy starts with its citation: a past text's version, or the text in force (D8).
+                textToCopy = withCitation(textToCopy, citationNow(), unversionedCitation(norma_data, todayInRome()));
             }
 
             if (options.includeNotes && !readOnly && allPanelAnnotations.length > 0) {
@@ -439,7 +439,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
         try {
             const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-            await navigator.clipboard.writeText(withCitation(plainText, citationNow(), `\n\n---\n${formatCitation(norma_data)}`));
+            await navigator.clipboard.writeText(withCitation(plainText, citationNow(), unversionedCitation(norma_data, todayInRome())));
             showToast('Testo copiato', 'success');
         } catch {
             showToast('Errore durante la copia', 'error');
@@ -491,8 +491,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         slugify(`${norma_data.tipo_atto}-art-${norma_data.numero_articolo}`) || 'articolo';
 
     const articleHeader = (kind: 'Evidenziazioni' | 'Note') => [
-        `${kind} — Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`,
-        `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}`,
+        `${kind} — ${citeNorm(norma_data)}`,
         `Esportato il ${new Date().toLocaleString('it-IT')}`,
         '─'.repeat(60),
         '',
@@ -610,7 +609,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             return;
         }
         try {
-            await navigator.clipboard.writeText(withCitation(text, citationNow(), `\n\n---\nTratto da: ${formatCitation(norma_data)}`));
+            await navigator.clipboard.writeText(withCitation(text, citationNow(), unversionedCitation(norma_data, todayInRome())));
             showToast('Testo copiato con citazione', 'success');
         } catch {
             showToast('Errore durante la copia', 'error');
@@ -732,7 +731,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleCompare = () => {
-        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${versionTabSuffix({ version: norma_data.versione, versionDate: norma_data.data_versione })}`;
+        const label = `${shortNorm(norma_data)}${versionTabSuffix({ version: norma_data.versione, versionDate: norma_data.data_versione })}`;
         openCompareWithArticle({
             article: data,
             sourceNorma: {
@@ -885,7 +884,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                                 tabId: originTabId,
                                 blockId: originBlockId,
                                 articleId: uniqueArticleIdFromNorma(norma_data),
-                                label: `Art. ${norma_data.numero_articolo} — ${norma_data.tipo_atto}`,
+                                label: shortNorm(norma_data),
                             });
                         }
                         // Navigate within same norma if possible
@@ -991,7 +990,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isOpen={isPeekOpen}
                 anchorEl={notesButtonEl}
                 annotations={allPanelAnnotations}
-                articleLabel={`Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`}
+                articleLabel={shortNorm(norma_data)}
                 noteAnchor={noteAnchor}
                 onClose={() => setIsPeekOpen(false)}
                 onAddNote={handleAddNote}
@@ -1156,6 +1155,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     articleNumber={norma_data.numero_articolo}
                     actType={norma_data.tipo_atto}
                     actNumber={norma_data.numero_atto}
+                    actDate={norma_data.data}
+                    actRealType={norma_data.tipo_atto_reale}
                     annex={norma_data.allegato}
                 />
             )}

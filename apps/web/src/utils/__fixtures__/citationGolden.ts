@@ -168,14 +168,14 @@ export const CITATION_GOLDEN: CitationCase[] = [
   {
     name: 'a type of act the app has no abbreviation for is written in full, in lower case',
     context: {
-      norma: { tipo_atto: 'decreto ministeriale', numero_atto: '5', data: '2000-02-15', numero_articolo: '3' },
+      norma: { tipo_atto: 'Decreto Interministeriale', numero_atto: '5', data: '2000-02-15', numero_articolo: '3' },
       validity: { state: 'historical', valid_from: '2003-01-01', valid_to: '2008-12-31', version_number: 2, act_updated: null, request_in_window: true },
       requestedDate: '2005-03-10',
       consultedAt: CONSULTED,
     },
     expected: {
-      short: 'art. 3, decreto ministeriale 15 febbraio 2000, n. 5, nel testo in vigore al 10 marzo 2005',
-      long: 'art. 3, decreto ministeriale 15 febbraio 2000, n. 5, nel testo in vigore dal 1° gennaio 2003 al 31 dicembre 2008 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
+      short: 'art. 3, decreto interministeriale 15 febbraio 2000, n. 5, nel testo in vigore al 10 marzo 2005',
+      long: 'art. 3, decreto interministeriale 15 febbraio 2000, n. 5, nel testo in vigore dal 1° gennaio 2003 al 31 dicembre 2008 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)',
     },
   },
   {
