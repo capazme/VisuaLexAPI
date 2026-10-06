@@ -37,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from dataclasses import dataclass
 
 import aiohttp
 import structlog
@@ -45,6 +46,7 @@ from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from ...tools.tls import italgiure_ssl_context
 from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
+from .search import IndexCoordinates, cites
 from .pdf_text import PdfRefused, read_decision_pdf_async
 
 log = structlog.get_logger()
@@ -209,7 +211,24 @@ def _iso(raw: str) -> str | None:
     return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else None
 
 
+def to_summary(doc: dict, archivio: str) -> tuple[Identity, dict]:
+    """The identity and the attributes a record carries without its text, read once for the
+    lookup and for the search. ValueError for a record without a readable number or year."""
+    identity = Identity("cassazione", int(_scalar(doc.get("numdec"))),
+                        int(_scalar(doc.get("anno"))), archivio)
+    attributes = {
+        "sezione": _scalar(doc.get("szdec")).strip().upper() or None,
+        "tipo": TIPI.get(_scalar(doc.get("tipoprov")).strip().lower()),
+        "data_deposito": _iso(_scalar(doc.get("datdep"))),
+        "relatore": _scalar(doc.get("relatore")).strip() or None,
+        "presidente": _scalar(doc.get("presidente")).strip() or None,
+        "materia": _scalar(doc.get("materia")).strip() or None,
+    }
+    return identity, attributes
+
+
 def to_decision(doc: dict, archivio: str) -> Decision:
+    identity, attributes = to_summary(doc, archivio)
     motivazione = _text(doc.get("ocr")).strip()
     flat = " ".join(motivazione.lower().split())
     testo_assente = None
@@ -221,14 +240,8 @@ def to_decision(doc: dict, archivio: str) -> Decision:
         testo = {key: paragraphs(value) for key, value in (
             ("motivazione", motivazione), ("dispositivo", dispositivo)) if value}
     decision = Decision(
-        identita=Identity("cassazione", int(_scalar(doc.get("numdec"))),
-                          int(_scalar(doc.get("anno"))), archivio),
-        sezione=_scalar(doc.get("szdec")).strip().upper() or None,
-        tipo=TIPI.get(_scalar(doc.get("tipoprov")).strip().lower()),
-        data_deposito=_iso(_scalar(doc.get("datdep"))),
-        relatore=_scalar(doc.get("relatore")).strip() or None,
-        presidente=_scalar(doc.get("presidente")).strip() or None,
-        materia=_scalar(doc.get("materia")).strip() or None,
+        identita=identity,
+        **attributes,
         testo_assente=testo_assente,
         testo=testo,
         fonte=dict(SOURCE),
@@ -240,23 +253,73 @@ def to_decision(doc: dict, archivio: str) -> Decision:
     return decision
 
 
+SEARCH_FIELDS = "id,numdec,anno,datdep,szdec,tipoprov,kind"
+INDEX_FIELDS = ",rnc-gen,rnc-art,rnc-sp,rnc-num,rnc-dat"
+_KIND_ARCHIVE = {kind: archivio for archivio, kind in KINDS.items()}
+_EM_SPLIT = re.compile(r"(</?em>)")
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    identita: Identity
+    attributi: dict
+    trovata: str          # "indice" | "testo"
+    frammento: dict | None
+
+
+@dataclass(frozen=True)
+class SearchPage:
+    totale: int
+    decisioni: list[SearchHit]
+
+
+def fragment_ranges(snippet: str) -> dict:
+    """Solr's highlighted fragment as plain text and the ranges to emphasise: the client never
+    receives markup from the source (design 2026-10-05 §5.1). Only <em> marks a range; any other
+    markup stays as literal characters."""
+    text, ranges, start, pos = [], [], None, 0
+    for piece in _EM_SPLIT.split(snippet):
+        if piece == "<em>":
+            start = pos
+        elif piece == "</em>":
+            if start is not None:
+                ranges.append([start, pos])
+            start = None
+        else:
+            text.append(piece)
+            pos += len(piece)
+    return {"testo": "".join(text), "evidenziati": ranges}
+
+
 class ItalgiureReader:
-    async def _select(self, params: dict[str, str]) -> dict:
-        ctx = italgiure_ssl_context()
+    def __init__(self) -> None:
+        # the archive's session (the cookie its homepage sets) is opened once per reader and
+        # reopened after an answer that shows it was lost; the PDF is served within it too
+        self._session_open = False
+
+    async def _open_session(self, ctx) -> None:
         # The endpoint refuses a cold session: the homepage sets the cookie the client keeps.
         await decisions_http_client.request("GET", f"{BASE}/", source="italgiure", ssl=ctx,
                                             headers=http_headers())
+        self._session_open = True
+
+    async def _select(self, params: dict[str, str]) -> dict:
+        ctx = italgiure_ssl_context()
+        if not self._session_open:
+            await self._open_session(ctx)
         result = await decisions_http_client.request(
             "POST", SELECT, source="italgiure", ssl=ctx, data={**params, "wt": "json"},
             headers=http_headers({"Referer": f"{BASE}/", "X-Requested-With": "XMLHttpRequest"}))
         try:
             data = json.loads(result.text)
         except json.JSONDecodeError as exc:
+            self._session_open = False  # an anti-bot page: the next call starts a new session
             raise SourceAnswerError("Italgiure non ha risposto con i suoi dati") from exc
         response = data.get("response") if isinstance(data, dict) else None
         docs = response.get("docs") if isinstance(response, dict) else None
         if not isinstance(docs, list) or not all(isinstance(doc, dict) for doc in docs):
             # a 200 that is not Solr's answer (an error object, null, a list): never "absent"
+            self._session_open = False
             raise SourceAnswerError("Italgiure non ha risposto con i suoi dati")
         return data
 
@@ -308,10 +371,12 @@ class ItalgiureReader:
                 headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1",
                 max_retries=PDF_RETRIES, timeout=aiohttp.ClientTimeout(total=PDF_REQUEST_TIMEOUT))
             if result.status != 200:
+                self._session_open = False  # the PDF is served only within the session
                 return None, f"PDF request answered {result.status}"
             data = result.text.encode("latin-1")
             text, header = await read_decision_pdf_async(data, PDF_PARSE_TIMEOUT)
         except PdfRefused as exc:
+            self._session_open = False  # an anti-bot page where the PDF should be
             return None, f"PDF refused: {exc}"
         except (NetworkError, DocumentNotFoundError, OSError) as exc:
             return None, f"PDF request failed: {type(exc).__name__}"
@@ -330,3 +395,33 @@ class ItalgiureReader:
         docs = data.get("response", {}).get("docs", [])
         iso = _iso(_scalar(docs[0].get("datdep"))) if docs else None
         return (int(iso[:4]), iso) if iso else None
+
+    async def search(self, q: str, pagina: int, rows: int = 20, *,
+                     coords: IndexCoordinates | None = None, hl_query: str | None = None) -> SearchPage:
+        """One Solr query for a page, sorted by deposit; the fragments are highlighted from the
+        text. With `coords` the records are index matches and each is re-checked with `cites`."""
+        params = {
+            "q": q, "rows": str(rows), "start": str((pagina - 1) * rows),
+            "fl": SEARCH_FIELDS + (INDEX_FIELDS if coords else ""),
+            "sort": "pd desc", "hl": "true", "hl.fl": "ocr", "hl.snippets": "1",
+            "hl.fragsize": "200"}
+        if hl_query:
+            params["hl.q"] = hl_query
+        data = await self._select(params)
+        highlights = data.get("highlighting") or {}
+        hits = []
+        for doc in data["response"]["docs"]:
+            archivio = _KIND_ARCHIVE.get(_scalar(doc.get("kind")))
+            if archivio is None:
+                continue
+            try:
+                identity, attributes = to_summary(doc, archivio)
+            except ValueError:
+                continue  # a record without a readable number or year is skipped, as a lookup refuses it
+            if coords is not None and not cites(doc, coords):
+                continue  # matched two different citations of the record (design §5.2)
+            snippet = (highlights.get(_scalar(doc.get("id"))) or {}).get("ocr")
+            hits.append(SearchHit(identity, {k: v for k, v in attributes.items() if v},
+                                  "indice" if coords else "testo",
+                                  fragment_ranges(_scalar(snippet)) if snippet else None))
+        return SearchPage(int(data["response"].get("numFound") or 0), hits)

@@ -262,10 +262,11 @@ async def test_a_search_sends_at_most_ten_requests_to_italgiure(monkeypatch):
     resolver = _resolver(ItalgiureReader())
     out = await resolver.resolve(ref(numero=123, anno=2023))
     assert (out.esito, out.motivo) == ("non_trovata", "inesistente")
-    assert len(methods) == 10
+    # one homepage GET per reader and five Solr queries: the ceiling is 10
+    assert len(methods) == 6 and methods.count("GET") == 1
     methods.clear()
     await resolver.resolve(ref(numero=124, anno=2023))  # each archive's start: once a day
-    assert len(methods) == 6
+    assert methods == ["POST"] * 3  # the session is already open
 
 
 async def test_a_corte_costituzionale_decision_cached_before_the_split_is_never_served():
