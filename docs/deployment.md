@@ -130,6 +130,11 @@ stops that: new connections from the stack's `app` subnet to private ranges outs
 in Docker's `DOCKER-USER` chain only. The internet stays reachable. So do replies on the
 published ports and the private DNS resolvers Docker forwards to.
 
+**Every rule matches only traffic whose source is the stack's own `app` subnet**
+(`-s $APP_SUBNET`). Other programs' containers on the same machine, on their own Docker
+networks, are never matched: neither their outgoing traffic nor their replies. The one
+effect on them is the intended one: VisuaLex's containers cannot open connections to them.
+
 **This is the last step, and on a shared machine it needs the machine owner's agreement.**
 
 ```sh

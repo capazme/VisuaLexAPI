@@ -461,6 +461,8 @@ EXTRA_ENV="FIREWALL_RESOLV_CONF=$d/resolv-public"; outcome "$d" scripts/prod/fir
 expect_status 0 "the H1 rules can be printed without root"
 grep '^iptables' "$work/out" >"$work/rules"
 [ "$(wc -l <"$work/rules" | tr -d ' ')" = 7 ] && ok "seven rules with a public resolver" || bad "seven rules with a public resolver (got $(wc -l <"$work/rules"))"
+[ "$(grep -c -- ' -s 172.29.240.0/24 ' "$work/rules")" = 7 ] && ok "every rule matches only traffic FROM the stack's app subnet: other containers on the machine are never matched" \
+  || bad "every rule matches only traffic from the app subnet"
 [ "$(grep -c -- '-I DOCKER-USER ' "$work/rules")" = 7 ] && [ "$(grep -c -- '--comment visualex-h1-visualex$' "$work/rules")" = 7 ] \
   && ok "all in DOCKER-USER, all tagged with this stack's comment (no character iptables would quote)" || bad "all in DOCKER-USER, all tagged"
 sed -n 1p "$work/rules" | grep -q -- '-I DOCKER-USER 1 -s 172.29.240.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN' \
