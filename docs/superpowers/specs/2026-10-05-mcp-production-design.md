@@ -193,7 +193,8 @@ are today.
   (added after Task 5's review).
 - `/connect` is the single-page app. It cannot be framed (clickjacking):
   `X-Frame-Options: DENY` is enforced. `frame-ancestors 'none'` is in the
-  CSP too, but that header is still report-only (item 4 of the brief).
+  CSP too, but that header is still report-only until a separate change makes
+  it enforcing.
 - `paths.test.mjs` asserts the two OAuth routes, and that they are not behind
   `forward_auth`.
 - `checks/gate.sh` asserts:
