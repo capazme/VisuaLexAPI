@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { request, app, createTestUser, authHeader, type TestUser } from './helpers';
+import { request, app, createTestUser, authHeader, prisma, type TestUser } from './helpers';
 
 describe('publish shared environment — content round-trip', () => {
   let alice: TestUser;
@@ -101,5 +101,17 @@ describe('publish shared environment — content round-trip', () => {
       .send({ content: contentWith([{ id: 'n1', type: 'norma', addedAt: 'x', data: { tipo_atto: 'premi Accept', numero_articolo: '1' } }]) });
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Tipo di atto non riconosciuto .*l'ambiente non può essere aggiornato$/);
+  });
+
+  it('rebuilds an older version\'s norms when it is restored, and refuses one it cannot rebuild', async () => {
+    const published = await publish([{ id: 'n1', type: 'norma', addedAt: 'x', data: { tipo_atto: 'codice civile', numero_articolo: '2043' } }]);
+    // A version stored before the check, as it was.
+    const version = await prisma.sharedEnvironmentVersion.create({ data: {
+      sharedEnvironmentId: published.body.id, version: 99,
+      content: contentWith([{ id: 'n1', type: 'norma', addedAt: 'x', data: { tipo_atto: 'premi Accept', numero_articolo: '1' } }]),
+    } });
+    const res = await request(app).post(`/api/shared-environments/${published.body.id}/versions/${version.id}/restore`).set(authHeader(alice));
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Tipo di atto non riconosciuto .*l'ambiente non può essere ripristinato$/);
   });
 });

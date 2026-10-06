@@ -1375,11 +1375,16 @@ export const restoreVersion = async (req: Request, res: Response) => {
     // Create snapshot of current state before restoring
     await createVersionSnapshot(tx, id, env.content, 'Prima del ripristino');
 
-    // Restore the content
+    // Restore the content: an old version's norms are rebuilt like a publication's (a version
+    // stored before the check would otherwise put them back as they were).
+    const restored = version.content as { dossiers?: unknown } | null;
+    const content = restored && Array.isArray(restored.dossiers)
+      ? { ...restored, dossiers: rebuildEnvironmentDossiers(restored.dossiers, 'ripristinato') }
+      : restored;
     const updated = await tx.sharedEnvironment.update({
       where: { id },
       data: {
-        content: version.content as object,
+        content: content as object,
         currentVersion: env.currentVersion + 1,
       },
       include: {

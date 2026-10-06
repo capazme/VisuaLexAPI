@@ -375,6 +375,13 @@ export function importCounts(imported: number, lost: number): string {
   return `${imported} ${imported === 1 ? 'voce importata' : 'voci importate'}, ${lost} ${lost === 1 ? 'scartata' : 'scartate'}`;
 }
 
+/** Why items were left out, after the counts: the first reason, and how many others («… e altri 2 motivi»). */
+export function importReasonsText(reasons: string[]): string {
+  if (reasons.length === 0) return '';
+  const others = reasons.length - 1;
+  return ` — ${reasons[0]}${others > 0 ? ` e ${others === 1 ? 'un altro motivo' : `altri ${others} motivi`}` : ''}`;
+}
+
 /** The toast after an import: whole, or how many items were left out (not importable, or refused by the server). */
 export function importReport(imported: number, lost: number): string {
   if (lost === 0) return 'Dossier importato';

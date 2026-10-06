@@ -128,6 +128,32 @@
       }
     },
     {
+      "id": "nonies",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_atto": "241",
+        "data": "1990-08-07",
+        "numero_articolo": "21-nonies"
+      },
+      "entry": {
+        "tipo_atto": "legge",
+        "numero_articolo": "21-nonies",
+        "numero_atto": "241",
+        "data": "1990-08-07"
+      }
+    },
+    {
+      "id": "nonies-spaced",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "21 nonies"
+      },
+      "entry": {
+        "tipo_atto": "legge",
+        "numero_articolo": "21 nonies"
+      }
+    },
+    {
       "id": "version-case",
       "input": {
         "tipo_atto": "TFUE",

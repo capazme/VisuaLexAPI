@@ -32,9 +32,10 @@ const KNOWN_TYPES: ReadonlySet<string> = new Set(
 );
 
 const ISO_DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
-// The ordinals the courts print ("bis" … "vicies semel"), and "sex" of the compound "sex-decies":
-// an article's suffix is one of them, never a word a proposer chose.
-const ORDINAL = `(?:${ARTICLE_SUFFIX_ALTERNATION}|sex)`;
+// The ordinals the courts print ("bis" … "vicies semel"), "sex" of the compound "sex-decies" and
+// "nonies", Normattiva's ninth (art. 21-nonies l. 241/1990), which the shared ordinal table spells
+// only "novies": an article's suffix is one of them, never a word a proposer chose.
+const ORDINAL = `(?:${ARTICLE_SUFFIX_ALTERNATION}|sex|nonies|noniesdecies)`;
 // An annex: a number, a Roman numeral or a single letter, in up to three parts ("I.1", "A", "2-A").
 const ANNEX_PART = '(?:\\d{1,3}|[IVXLC]{1,6}|[A-Z])';
 const PATTERNS = {

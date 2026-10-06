@@ -5,7 +5,7 @@ import {
   computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
   dossierItemFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
-  validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importToastType,
+  validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importReasonsText, importToastType,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -528,6 +528,10 @@ describe('an imported dossier is rebuilt from what was checked', () => {
 
   it('words the counts, and picks the toast type from what came in and what was lost', () => {
     expect(importCounts(1, 2)).toBe('1 voce importata, 2 scartate');
+    expect(importReasonsText([])).toBe('');
+    expect(importReasonsText(['Tipo di atto non riconosciuto («legge regionale»)'])).toBe(' — Tipo di atto non riconosciuto («legge regionale»)');
+    expect(importReasonsText(['a', 'b'])).toBe(' — a e un altro motivo');
+    expect(importReasonsText(['a', 'b', 'c'])).toBe(' — a e altri 2 motivi');
     expect(importToastType(3, 0)).toBe('success');
     expect(importToastType(0, 0)).toBe('success');
     expect(importToastType(2, 1)).toBe('info');
