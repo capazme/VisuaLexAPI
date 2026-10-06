@@ -4,6 +4,7 @@
 #   preflight.sh host [--allow-branch]   the machine and the checkout
 #   preflight.sh docker                  the machine alone (before a pull)
 #   preflight.sh env                     the two env files
+#   preflight.sh ports                   the ports the stack publishes, before a build
 #
 # A value is never printed: a message names the KEY and the file, and that is all.
 set -eu
@@ -62,6 +63,25 @@ is_development_value() {
   esac
 }
 
+# The host of an origin or a URL (no scheme, port or path).
+host_of() { printf '%s' "$1" | sed -n 's#^[a-z]*://\([^/:]*\).*#\1#p'; }
+
+# https, or http on this machine (throwaway trials). Anything else would send OAuth tokens in clear.
+secure_or_local() {
+  case "$1" in
+    https://*) return 0 ;;
+    http://localhost|http://localhost:*|http://localhost/*|http://127.0.0.1|http://127.0.0.1:*|http://127.0.0.1/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# A secret fit for production: set, not a development value, 32 characters or more.
+check_secret() { # check_secret <file> <KEY> <label>
+  value="$(env_get "$1" "$2")"
+  if [ -z "$value" ]; then err "$2 is not set in $3"; return 1; fi
+  if is_development_value "$value" || [ "${#value}" -lt 32 ]; then err "$2 in $3 is a placeholder or shorter than 32 characters"; return 1; fi
+}
+
 check_env() {
   infra="$root/infra/.env"
   server="$root/apps/server/.env"
@@ -98,6 +118,60 @@ check_env() {
   elif is_development_value "$admin" || [ "${#admin}" -lt 12 ]; then
     err "ADMIN_PASSWORD in apps/server/.env is a placeholder or shorter than 12 characters"; bad=1
   fi
+
+  # The MCP module, when it is on: its addresses are what clients compare tokens against.
+  mcp_url="$(env_get "$infra" MCP_PUBLIC_URL)"
+  if [ -n "$mcp_url" ]; then
+    origin="$(env_get "$infra" PUBLIC_ORIGIN)"
+    case "$origin" in
+      ""|*,*|*://*/*) err "PUBLIC_ORIGIN in infra/.env must be one origin, scheme://host[:port] with no path or trailing slash, when MCP_PUBLIC_URL is set: it is the OAuth issuer"; bad=1 ;;
+      *) secure_or_local "$origin" || { err "PUBLIC_ORIGIN in infra/.env must be https (or http on localhost) when MCP_PUBLIC_URL is set"; bad=1; } ;;
+    esac
+    secure_or_local "$mcp_url" || { err "MCP_PUBLIC_URL in infra/.env must be https (or http on localhost)"; bad=1; }
+    [ "$(host_of "$mcp_url")" = "$(host_of "$origin")" ] || { err "MCP_PUBLIC_URL in infra/.env must be on the same host as PUBLIC_ORIGIN"; bad=1; }
+    case "$mcp_url" in */mcp) ;; *) err "MCP_PUBLIC_URL in infra/.env must end in /mcp"; bad=1 ;; esac
+    # Compose sets the issuer, the consent page and the resource from infra/.env; the API
+    # audience it leaves to the server's default (the issuer + /api), which a value pinned in
+    # apps/server/.env would override, and every token exchange would then be refused.
+    audience="$(env_get "$server" OAUTH_API_AUDIENCE)"
+    if [ -n "$audience" ] && [ "$audience" != "$origin/api" ]; then
+      err "OAUTH_API_AUDIENCE in apps/server/.env must be PUBLIC_ORIGIN/api or absent: the MCP asks for that audience"; bad=1
+    fi
+    check_secret "$infra" MCP_CLIENT_SECRET infra/.env || bad=1
+    if check_secret "$server" OAUTH_DELEGATION_SECRET apps/server/.env; then
+      [ "$(env_get "$server" OAUTH_DELEGATION_SECRET)" != "$jwt" ] \
+        || { err "OAUTH_DELEGATION_SECRET in apps/server/.env must differ from JWT_SECRET"; bad=1; }
+    else
+      bad=1
+    fi
+  fi
+  if [ "$(env_get "$infra" MERLT_ENABLED)" != false ] && [ -z "$(env_get "$infra" OPENROUTER_API_KEY)" ]; then
+    warn "OPENROUTER_API_KEY is empty in infra/.env: MERL-T's experts will not answer (the key is not generated: copy it in by hand)"
+  fi
+  return "$bad"
+}
+
+# A port the stack publishes must be free before minutes of building, unless this stack's
+# own container holds it (the deploy replaces that container).
+check_port() { # check_port <container> <bind> <port> <KEY>
+  if [ -n "$(docker ps -q --filter "name=^$1\$" 2>/dev/null)" ]; then return 0; fi
+  if ! command -v python3 >/dev/null 2>&1; then warn "python3 is missing: port $3 was not checked before the build"; return 0; fi
+  if ! python3 -c 'import socket,sys; s=socket.socket(); s.bind((sys.argv[1], int(sys.argv[2])))' "$2" "$3" 2>/dev/null; then
+    err "port $3 on $2 is taken by another program: set $4 in infra/.env to a free port"
+    return 1
+  fi
+}
+
+check_ports() {
+  infra="$root/infra/.env"
+  stack="$(env_get "$infra" VISUALEX_STACK)"; stack="${stack:-visualex}"
+  bind="$(env_get "$infra" INGRESS_BIND)"; port="$(env_get "$infra" INGRESS_PORT)"
+  bad=0
+  check_port "$stack-ingress" "${bind:-127.0.0.1}" "${port:-8080}" INGRESS_PORT || bad=1
+  if [ -n "$(env_get "$infra" MCP_PUBLIC_URL)" ]; then
+    port="$(env_get "$infra" MCP_PORT)"
+    check_port "$stack-mcp" 127.0.0.1 "${port:-8091}" MCP_PORT || bad=1
+  fi
   return "$bad"
 }
 
@@ -105,5 +179,6 @@ case "${1:-}" in
   host) shift; check_host "$@" ;;
   docker) check_docker ;;
   env)  check_env ;;
-  *)    err "usage: preflight.sh host [--allow-branch] | docker | env"; exit 2 ;;
+  ports) check_ports ;;
+  *)    err "usage: preflight.sh host [--allow-branch] | docker | env | ports"; exit 2 ;;
 esac

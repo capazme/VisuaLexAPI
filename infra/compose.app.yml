@@ -88,7 +88,8 @@ services:
     tmpfs:
       - /tmp
 
-  # The one module that faces the network. The only published port of the stack.
+  # The app's door, the one module that faces the network; the MCP's loopback port (below) is
+  # the only other published one.
   ingress:
     <<: *hardening
     build:
