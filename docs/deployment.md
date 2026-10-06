@@ -98,7 +98,8 @@ logins stay blocked for 15 minutes after the check.
 
 ## 5. Backups
 
-- **Before every deploy**, automatically, into `~/visualex-backups/<stack>-<UTC time>/`
+- **Before each deploy of an existing stack** (not the first; `--no-backup` skips it),
+  automatically, into `~/visualex-backups/<stack>-<UTC time>/`
   (folders readable by their owner only).
 - **Daily**, once it is switched on:
 
@@ -109,8 +110,10 @@ logins stay blocked for 15 minutes after the check.
   sh scripts/prod/backup-timer.sh remove     # stop it (the backups stay)
   ```
 
-  The seven kept are the newest of the stack, whoever took them: the deploys' backups
-  count too. `BACKUP_KEEP` changes the number for a manual run of
+  The seven kept are the newest complete backups of the stack, whoever took them: the
+  deploys' backups count too. A folder left half-written by a failure is removed once a
+  newer complete backup exists. The user must already be in the `docker` group when the
+  timer starts; if it was added later, log out and in again (or reboot) first. `BACKUP_KEEP` changes the number for a manual run of
   `scripts/prod/backup-daily.sh`.
 - **Restore:** `scripts/restore.sh ~/visualex-backups/<folder>` into the stack of
   `infra/.env`, with only the stores running. Read `scripts/datakit/README.md` first. A

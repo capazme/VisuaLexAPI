@@ -14,7 +14,8 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=lib.sh
 . "$root/scripts/prod/lib.sh"
 
-stack="$(env_get "$root/infra/.env" VISUALEX_STACK)"; stack="${stack:-visualex}"
+stack="${VISUALEX_STACK:-$(env_get "$root/infra/.env" VISUALEX_STACK)}"; stack="${stack:-visualex}"
+case "$stack" in ''|*[!a-z0-9_-]*) err "the stack name '$stack' is not a Compose project name"; exit 2 ;; esac
 unit="$stack-backup"
 units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
@@ -22,6 +23,9 @@ case "${1:-}" in
   install)
     command -v systemctl >/dev/null 2>&1 || { err "systemctl is missing: the timer needs systemd (the Linux host)"; exit 1; }
     command -v python3 >/dev/null 2>&1 || { err "python3 is needed by the backup tool: install it first"; exit 1; }
+    # systemd splits ExecStart on spaces and expands % and $: a checkout path with any of them
+    # would make the service fail every night, unseen.
+    case "$root" in *[!A-Za-z0-9/._-]*) err "the checkout's path ($root) has characters a systemd unit cannot carry as written: move the checkout to a plain path"; exit 1 ;; esac
     mkdir -p "$units"
     cat >"$units/$unit.service" <<UNIT
 [Unit]
@@ -60,8 +64,11 @@ UNIT
     ;;
   status)
     systemctl --user list-timers "$unit.timer" --all || true
-    newest="$(ls -1 "$HOME/visualex-backups" 2>/dev/null | grep -E "^${stack}-[0-9]{8}T[0-9]{6}Z\$" | sort -r | head -1 || true)"
-    say "newest backup: ${newest:-none}"
+    newest=""
+    for name in $(ls -1 "$HOME/visualex-backups" 2>/dev/null | grep -E "^${stack}-[0-9]{8}T[0-9]{6}Z\$" | sort -r); do
+      if [ -f "$HOME/visualex-backups/$name/manifest.json" ]; then newest="$name"; break; fi
+    done
+    say "newest complete backup: ${newest:-none}"
     ;;
   *)
     err "usage: backup-timer.sh install | remove | status"; exit 2 ;;

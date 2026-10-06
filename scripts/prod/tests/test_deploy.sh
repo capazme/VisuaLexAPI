@@ -455,27 +455,37 @@ if grep -E ' (up|down|build|rm)( |$)' "$d/docker.log" >/dev/null; then bad "and 
 # --- the daily backup (backup-daily.sh) and its timer (backup-timer.sh) -------------------------
 d="$(mkrepo daily)"
 run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
-mkdir -p "$d/home/visualex-backups"
-for n in 1 2 3 4 5 6 7 8 9; do mkdir "$d/home/visualex-backups/visualex-2026100${n}T033000Z"; done
-mkdir "$d/home/visualex-backups/other-20260101T000000Z" "$d/home/visualex-backups/visualex-notes"
-# the backup tool, as a stub that takes one more backup, or fails
+B="$d/home/visualex-backups"
+mkdir -p "$B"
+complete() { mkdir "$B/$1" && echo '{}' >"$B/$1/manifest.json"; } # a finished backup: its manifest is written last
+for n in 1 2 3 4 5 6 7 8 9; do complete "visualex-2026100${n}T033000Z"; done
+mkdir "$B/other-20260101T000000Z" "$B/visualex-notes"
+# the backup tool, as a stub: takes the backup BACKUP_NAME, or leaves it half-written and fails
 cat >"$d/scripts/backup.sh" <<'STUB'
 #!/bin/sh
+mkdir "$HOME/visualex-backups/$BACKUP_NAME"
 [ "${BACKUP_EXIT:-0}" = 0 ] || exit "$BACKUP_EXIT"
-mkdir "$HOME/visualex-backups/visualex-20261010T033000Z"
+echo '{}' >"$HOME/visualex-backups/$BACKUP_NAME/manifest.json"
 STUB
-EXTRA_ENV="HOME=$d/home"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+ours() { ls -1 "$B" | grep '^visualex-2' | sort | sed 's/T033000Z//' | tr '\n' ' '; }
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261010T033000Z"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
 expect_status 0 "the daily backup runs"
-kept="$(ls -1 "$d/home/visualex-backups" | grep '^visualex-2' | sort | tr '\n' ' ')"
-[ "$kept" = "visualex-20261004T033000Z visualex-20261005T033000Z visualex-20261006T033000Z visualex-20261007T033000Z visualex-20261008T033000Z visualex-20261009T033000Z visualex-20261010T033000Z " ] \
-  && ok "it keeps the newest seven of this stack, the one it just took included" || bad "it keeps the newest seven of this stack (kept: $kept)"
-[ -d "$d/home/visualex-backups/other-20260101T000000Z" ] && [ -d "$d/home/visualex-backups/visualex-notes" ] \
+[ "$(ours)" = "visualex-20261004 visualex-20261005 visualex-20261006 visualex-20261007 visualex-20261008 visualex-20261009 visualex-20261010 " ] \
+  && ok "it keeps the newest seven of this stack, the one it just took included" || bad "it keeps the newest seven of this stack (kept: $(ours))"
+[ -d "$B/other-20260101T000000Z" ] && [ -d "$B/visualex-notes" ] \
   && ok "and never touches another stack's folders or anything not named as the tool names it" || bad "and never touches another stack's folders or other names"
 expect_out "removed the old backup visualex-20261001T033000Z" "it says what it removed"
-before="$(ls -1 "$d/home/visualex-backups" | wc -l)"
-EXTRA_ENV="HOME=$d/home BACKUP_EXIT=3"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+# Eight complete now: a rotation after a failure would remove one. It must not.
+complete visualex-20261011T033000Z
+before="$(ours)"
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261012T033000Z BACKUP_EXIT=3"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
 expect_status nonzero "a failed backup fails the run"
-[ "$(ls -1 "$d/home/visualex-backups" | wc -l)" = "$before" ] && ok "and deletes nothing" || bad "and deletes nothing"
+[ "$(ours)" = "${before}visualex-20261012 " ] && ok "and deletes nothing (its half-written folder stays, for now)" || bad "and deletes nothing (now: $(ours))"
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261013T033000Z"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status 0 "the next night's backup runs"
+[ "$(ours)" = "visualex-20261006 visualex-20261007 visualex-20261008 visualex-20261009 visualex-20261010 visualex-20261011 visualex-20261013 " ] \
+  && ok "the half-written folder never counted as one of the seven, and goes once a newer backup is complete" || bad "half-written folders do not count (kept: $(ours))"
+expect_out "a backup left half-written" "it says so"
 EXTRA_ENV="HOME=$d/home BACKUP_KEEP=0"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
 expect_status nonzero "a BACKUP_KEEP of 0 is refused, before anything is taken or removed"
 
