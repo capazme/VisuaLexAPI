@@ -455,39 +455,69 @@ if grep -E ' (up|down|build|rm)( |$)' "$d/docker.log" >/dev/null; then bad "and 
 # --- the host firewall, H1 (firewall.sh) ------------------------------------------------------
 d="$(mkrepo h1)"
 run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
-outcome "$d" scripts/prod/firewall.sh apply --dry-run
+printf 'nameserver 8.8.8.8\n' >"$d/resolv-public"
+printf 'nameserver 192.168.1.1\nnameserver 8.8.8.8\n' >"$d/resolv-router"
+EXTRA_ENV="FIREWALL_RESOLV_CONF=$d/resolv-public"; outcome "$d" scripts/prod/firewall.sh apply --dry-run; EXTRA_ENV=""
 expect_status 0 "the H1 rules can be printed without root"
 grep '^iptables' "$work/out" >"$work/rules"
-[ "$(wc -l <"$work/rules" | tr -d ' ')" = 9 ] && ok "nine rules" || bad "nine rules (got $(wc -l <"$work/rules"))"
-[ "$(grep -c -- '-I DOCKER-USER ' "$work/rules")" = 9 ] && [ "$(grep -c -- '--comment visualex-h1:visualex$' "$work/rules")" = 9 ] \
-  && ok "all in DOCKER-USER, all tagged with this stack's comment" || bad "all in DOCKER-USER, all tagged"
-sed -n 1p "$work/rules" | grep -q -- '-I DOCKER-USER 1 -s 172.29.240.0/24 -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN' \
+[ "$(wc -l <"$work/rules" | tr -d ' ')" = 7 ] && ok "seven rules with a public resolver" || bad "seven rules with a public resolver (got $(wc -l <"$work/rules"))"
+[ "$(grep -c -- '-I DOCKER-USER ' "$work/rules")" = 7 ] && [ "$(grep -c -- '--comment visualex-h1-visualex$' "$work/rules")" = 7 ] \
+  && ok "all in DOCKER-USER, all tagged with this stack's comment (no character iptables would quote)" || bad "all in DOCKER-USER, all tagged"
+sed -n 1p "$work/rules" | grep -q -- '-I DOCKER-USER 1 -s 172.29.240.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN' \
   && ok "replies to connections from outside come first" || bad "replies first: $(sed -n 1p "$work/rules")"
 sed -n 2p "$work/rules" | grep -q -- '-s 172.29.240.0/24 -d 172.29.240.0/24 -j RETURN' && ok "then the subnet's own traffic" || bad "then the subnet's own traffic"
 for range in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10; do
   grep -q -- "-s 172.29.240.0/24 -d $range -j DROP" "$work/rules" && ok "new connections to $range are dropped" || bad "new connections to $range are dropped"
 done
+EXTRA_ENV="FIREWALL_RESOLV_CONF=$d/resolv-router"; outcome "$d" scripts/prod/firewall.sh apply --dry-run; EXTRA_ENV=""
+grep '^iptables' "$work/out" >"$work/rules"
+grep -q -- '-d 192.168.1.1/32 -p udp --dport 53 -j RETURN' "$work/rules" && grep -q -- '-d 192.168.1.1/32 -p tcp --dport 53 -j RETURN' "$work/rules" \
+  && ok "a private resolver Docker forwards to keeps answering the containers' lookups" || bad "a private resolver keeps answering"
+grep -q -- '-d 8.8.8.8' "$work/rules" && bad "a public resolver needs no exception" || ok "a public resolver needs no exception"
 last_return="$(grep -n -- '-j RETURN' "$work/rules" | tail -1 | cut -d: -f1)"; first_drop="$(grep -n -- '-j DROP' "$work/rules" | head -1 | cut -d: -f1)"
 [ "$last_return" -lt "$first_drop" ] && ok "every exception before the first drop" || bad "every exception before the first drop"
-# remove: only this stack's rules, against a stub iptables listing them beside someone else's
+for wide in 0.0.0.0/0 8.8.8.0/24 10.0.0.0/8; do
+  EXTRA_ENV="APP_SUBNET=$wide"; outcome "$d" scripts/prod/firewall.sh apply --dry-run; EXTRA_ENV=""
+  expect_status nonzero "APP_SUBNET $wide is refused (not a private block between /16 and /28)"
+done
+
+# A stub iptables that keeps its rules and prints them as iptables -S does (the target last),
+# beside another program's rule (its comment quoted) and a stack whose name extends this one's.
 cat >"$d/bin/iptables" <<'STUB'
 #!/bin/sh
 echo "iptables $*" >>"$STUB_LOG"
-if [ "$1" = -S ]; then
-  echo "-N DOCKER-USER"
-  echo "-A DOCKER-USER -s 172.29.240.0/24 -d 10.0.0.0/8 -m comment --comment visualex-h1:visualex -j DROP"
-  echo "-A DOCKER-USER -s 10.9.0.0/16 -j DROP -m comment --comment someone-else"
-  echo "-A DOCKER-USER -s 172.29.240.0/24 -d 100.64.0.0/10 -m comment --comment visualex-h1:other -j DROP"
-  echo "-A DOCKER-USER -j RETURN"
-fi
+f="$STUB_RULES"
+case "$1" in
+  -S) echo "-N DOCKER-USER"; cat "$f"; echo "-A DOCKER-USER -j RETURN" ;;
+  -I) shift 3; line="$*"
+      target="$(printf '%s' "$line" | sed -n 's/.*\(-j [A-Z]*\).*/\1/p')"
+      rest="$(printf '%s' "$line" | sed 's/ -j [A-Z]*//')"
+      { echo "-A DOCKER-USER $rest $target"; cat "$f"; } >"$f.t" && mv "$f.t" "$f" ;;
+  -D) shift; want="-A $*"
+      grep -vxF -- "$want" "$f" >"$f.t" || true
+      [ "$(wc -l <"$f.t")" -lt "$(wc -l <"$f")" ] || { mv "$f.t" "$f"; echo "iptables: Bad rule" >&2; exit 1; }
+      mv "$f.t" "$f" ;;
+esac
 exit 0
 STUB
 printf '#!/bin/sh\necho 0\n' >"$d/bin/id"; chmod +x "$d/bin/iptables" "$d/bin/id"
-: >"$d/docker.log"
-outcome "$d" scripts/prod/firewall.sh remove
+cat >"$d/iptables-rules" <<'RULES'
+-A DOCKER-USER -s 10.9.0.0/16 -m comment --comment "someone else: keep" -j DROP
+-A DOCKER-USER -s 172.29.240.0/24 -d 100.64.0.0/10 -m comment --comment visualex-h1-visualex-dev -j DROP
+RULES
+mine() { grep -c -- '--comment visualex-h1-visualex -j ' "$d/iptables-rules" || true; }
+EXTRA_ENV="STUB_RULES=$d/iptables-rules FIREWALL_RESOLV_CONF=$d/resolv-router"; outcome "$d" scripts/prod/firewall.sh apply; EXTRA_ENV=""
+expect_status 0 "apply runs"
+[ "$(mine)" = 9 ] && ok "it adds its nine rules" || bad "it adds its nine rules (found $(mine))"
+EXTRA_ENV="STUB_RULES=$d/iptables-rules FIREWALL_RESOLV_CONF=$d/resolv-router"; outcome "$d" scripts/prod/firewall.sh apply; EXTRA_ENV=""
+[ "$(mine)" = 9 ] && ok "a second apply replaces them, never doubles them" || bad "a second apply replaces them (found $(mine))"
+EXTRA_ENV="STUB_RULES=$d/iptables-rules"; outcome "$d" scripts/prod/firewall.sh status; EXTRA_ENV=""
+expect_out "--comment visualex-h1-visualex -j DROP" "status lists them"
+EXTRA_ENV="STUB_RULES=$d/iptables-rules"; outcome "$d" scripts/prod/firewall.sh remove; EXTRA_ENV=""
 expect_status 0 "remove runs"
-[ "$(grep -c '^iptables -D' "$d/docker.log")" = 1 ] && expect_log "$d" "iptables -D DOCKER-USER -s 172.29.240.0/24 -d 10.0.0.0/8 -m comment --comment visualex-h1:visualex -j DROP" \
-  "remove deletes exactly this stack's rule, not another program's or another stack's"
+[ "$(mine)" = 0 ] && ok "remove deletes every one of them" || bad "remove deletes every one of them (left $(mine))"
+grep -q 'someone else: keep' "$d/iptables-rules" && grep -q 'visualex-h1-visualex-dev' "$d/iptables-rules" \
+  && ok "and neither another program's rule nor the rule of a stack whose name extends this one's" || bad "another program's and a prefix stack's rules survive"
 printf '#!/bin/sh\necho 1000\n' >"$d/bin/id"
 outcome "$d" scripts/prod/firewall.sh apply
 expect_status nonzero "apply without root is refused"; expect_out "sudo" "and says so"
