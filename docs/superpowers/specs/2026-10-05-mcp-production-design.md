@@ -69,7 +69,7 @@ the public exposure (phase 2 of the deployment design).
 - **Image:** the server's pattern — Node 24 slim, `npm ci` in a build stage, the runtime with production dependencies only, user `node`, exec-form `CMD`.
 - **Hardening** as every application module (H2/H3): `init`, `cap_drop: ALL`, `no-new-privileges`, `read_only` with a `tmpfs` on `/tmp`, log rotation, `restart: unless-stopped`.
 - **Health check:** `GET /.well-known/oauth-protected-resource` on `127.0.0.1`. It is unauthenticated and needs no new route.
-- **Started only when `MCP_PUBLIC_URL` is set** in `infra/.env`: a Compose profile `mcp` that `deploy.sh` turns on. Without the variable the stack is exactly today's.
+- **Started only when `MCP_PUBLIC_URL` is set** in `infra/.env`: a Compose profile `mcp` that `deploy.sh` turns on. Without the variable no MCP container runs; the ingress still routes `/oauth/*` to the server, which issues nothing usable without the MCP (the exchange needs its credential). Accepted after the security review.
 - **`./start.sh --prod --stop` stops it** whatever the setting.
 
 ### 4.2 Networks and what is published
@@ -191,9 +191,9 @@ are today.
 - `/oauth/introspect` answers 404 at the ingress: only the MCP calls it, from
   inside the stack, so it has no reason to be reachable from the network
   (added after Task 5's review).
-- `/connect` is the single-page app. It already gets `frame-ancestors 'none'`
-  and `X-Frame-Options: DENY`, so the consent page cannot be framed
-  (clickjacking).
+- `/connect` is the single-page app. It cannot be framed (clickjacking):
+  `X-Frame-Options: DENY` is enforced. `frame-ancestors 'none'` is in the
+  CSP too, but that header is still report-only (item 4 of the brief).
 - `paths.test.mjs` asserts the two OAuth routes, and that they are not behind
   `forward_auth`.
 - `checks/gate.sh` asserts:
@@ -260,6 +260,15 @@ are today.
 - The review checks this against the code, not this document.
 
 **Remaining risks, stated:**
+- **IPv6 on the overlay.** Overlay IPv6 addresses share one /48. The MCP counts
+  each address on its own (`ipv6Subnet: false`). The server's limiters, merged
+  in PR 1, still group IPv6 by /56, so over IPv6 every overlay peer would share
+  one count. Clients prefer the overlay's IPv4 address (RFC 6724), so this is a
+  follow-up, not a blocker.
+- **The loopback is the host's alone.** That holds on Docker Engine 28 or newer,
+  or with the userland proxy on. With an older engine and `userland-proxy:
+  false`, a LAN device could reach ports published on 127.0.0.1. The owner
+  checks the engine once (`docker version`).
 - The overlay's identity headers (`Tailscale-User-*`) reach the server, and
   nothing reads them. Nothing may start trusting them without a design: anyone
   who reaches the ingress some other way could set them.

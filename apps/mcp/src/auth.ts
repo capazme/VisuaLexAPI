@@ -24,6 +24,15 @@ const basic = (config: McpConfig) =>
  * request, so a connection the user revoked stops at the next call. The token
  * must be live and issued for this server (its audience is our resource URI).
  */
+/** A URL however it was written (the host's case, a default port): the server stores the resource canonical. */
+const canonical = (url: string): string => {
+  try {
+    return new URL(url).href;
+  } catch {
+    return url;
+  }
+};
+
 export async function authenticate(config: McpConfig, authorization: string | undefined): Promise<AuthResult> {
   if (!authorization?.startsWith('Bearer ')) return { ok: false, status: 401 };
   const token = authorization.slice(7).trim();
@@ -47,7 +56,9 @@ export async function authenticate(config: McpConfig, authorization: string | un
     return { ok: false, status: 503 };
   }
 
-  if (body.active !== true || body.aud !== config.resource) return { ok: false, status: 401, error: 'invalid_token' };
+  if (body.active !== true || typeof body.aud !== 'string' || canonical(body.aud) !== canonical(config.resource)) {
+    return { ok: false, status: 401, error: 'invalid_token' };
+  }
   if (typeof body.sub !== 'string' || typeof body.client_id !== 'string' || typeof body.grant !== 'string') {
     return { ok: false, status: 401, error: 'invalid_token' };
   }

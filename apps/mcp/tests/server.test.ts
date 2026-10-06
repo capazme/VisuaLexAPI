@@ -285,14 +285,29 @@ describe('exposure (production stack)', () => {
     }
   });
 
+  it('takes the token audience as the server stores it, whatever the case of the configured host', async () => {
+    const { url, server } = await listen(createApp({ ...env.config, resource: 'http://LocalHost:3002/mcp' }));
+    try {
+      const client = new Client({ name: 'test-client', version: '1.0.0' });
+      await client.connect(new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { Authorization: 'Bearer good' } } }));
+      expect((await client.listTools()).tools.length).toBeGreaterThan(0);
+      await client.close();
+    } finally {
+      server.close();
+    }
+  });
+
   it('counts requests per forwarded address and refuses past the ceiling', async () => {
     const { url, server } = await listen(createApp(env.config, { requestsPerMinute: 3 }));
     try {
       const from = (ip: string) => rawPost(url, 'localhost', { 'x-forwarded-for': ip });
       for (let i = 0; i < 3; i += 1) expect(await from('100.64.1.2')).toBe(401);
       expect(await from('100.64.1.2')).toBe(429);
-      // another person behind the same proxy is not affected
+      // another person behind the same proxy is not affected, over IPv6 too (one address, one count)
       expect(await from('100.64.1.3')).toBe(401);
+      for (let i = 0; i < 3; i += 1) expect(await from('fd7a:115c:a1e0::1')).toBe(401);
+      expect(await from('fd7a:115c:a1e0::1')).toBe(429);
+      expect(await from('fd7a:115c:a1e0::2')).toBe(401);
       // every method on the endpoint is counted: a stream cannot be opened past the ceiling
       const stream = await fetch(url, { headers: { 'x-forwarded-for': '100.64.1.2', accept: 'text/event-stream' } });
       expect(stream.status).toBe(429);

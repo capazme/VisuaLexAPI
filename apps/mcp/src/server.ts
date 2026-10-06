@@ -120,6 +120,9 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
     rateLimit({
       windowMs: 60_000,
       limit: options.requestsPerMinute ?? REQUESTS_PER_MINUTE,
+      // One address, one count: overlay IPv6 addresses share a /48, so grouping by
+      // subnet (the library's default /56) would put every IPv6 peer in one bucket.
+      ipv6Subnet: false,
       standardHeaders: 'draft-7',
       legacyHeaders: false,
       message: { jsonrpc: '2.0', error: { code: -32000, message: 'Too many requests: retry in a minute' }, id: null },
