@@ -43,8 +43,17 @@ def all_on_loopback(services):
     return all(ip == LOOPBACK for ips in published_hosts(services).values() for ip in ips)
 
 
+def postgres_has_start_margin(services):
+    # Compose renders durations as Go strings ("1m0s"); the first deploy needs a margin.
+    check(
+        (services["postgres"].get("healthcheck") or {}).get("start_period") == "1m0s",
+        "postgres has a 60-second start margin, so a first start on an empty volume is not unhealthy",
+    )
+
+
 def dev(cfg):
     services = cfg["services"]
+    postgres_has_start_margin(services)
     check(set(services) == STORES, "the base file alone is the four stores")
     check(set(cfg.get("networks", {})) == {"default"}, "and no network beyond the default one")
     check(all_on_loopback(services), "every published port is on the loopback")
@@ -58,6 +67,7 @@ def dev_merlt(cfg):
 
 def prod(cfg, lan_bind):
     services = cfg["services"]
+    postgres_has_start_margin(services)
     check(set(services) == STORES | MERLT | MODULES, "the production set is the stores, MERL-T and the four modules")
 
     hosts = published_hosts(services)
