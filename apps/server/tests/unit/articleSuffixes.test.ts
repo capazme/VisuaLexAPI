@@ -36,3 +36,10 @@ describe('ARTICLE_ORDINAL_SUFFIXES (server mirror)', () => {
     expect([...ARTICLE_ORDINAL_SUFFIXES].sort()).toEqual([...web].sort());
   });
 });
+
+describe('the ninth, as Normattiva prints it', () => {
+  it('knows «nonies» (art. 21-nonies l. 241/1990) beside «novies»', () => {
+    expect(ARTICLE_ORDINAL_SUFFIXES).toContain('nonies');
+    expect(ARTICLE_ORDINAL_SUFFIXES).toContain('novies');
+  });
+});

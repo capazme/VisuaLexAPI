@@ -29,8 +29,9 @@ export const ARTICLE_ORDINAL_SUFFIXES = [
   // 11-20
   'undecies', 'duodecies', 'terdecies', 'quaterdecies', 'quinquiesdecies',
   'sexiesdecies', 'septiesdecies', 'octiesdecies', 'noviesdecies', 'vicies',
-  // variant spellings of 15, 16, 18, 19, 20
-  'quindecies', 'sexdecies', 'duodevicies', 'undevicies', 'vices',
+  // variant spellings of 9, 15, 16, 18, 19, 20 (nonies: art. 21-nonies l. 241/1990,
+  // art. 25-nonies d.lgs. 231/2001, as Normattiva prints them)
+  'nonies', 'quindecies', 'sexdecies', 'duodevicies', 'undevicies', 'vices',
   // second word of the compound forms ("vicies semel", 21)
   'semel',
 ] as const;

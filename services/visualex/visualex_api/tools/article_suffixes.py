@@ -16,10 +16,12 @@ plausible link to the wrong text rather than an error. Mirrored by
 ``apps/server/src/utils/articleSuffixes.ts``; change all three together (the
 server's ``tests/unit/articleSuffixes.test.ts`` fails when a mirror drifts).
 
-Two spellings circulate for 15, 16, 18 and 19 ("quinquiesdecies" /
-"quindecies", "sexiesdecies" / "sexdecies", "octiesdecies" / "duodevicies",
-"noviesdecies" / "undevicies"); both are listed because Normattiva returns
-both. The table covers 2 to 20 — a suffix past that needs a new entry here and
+Two spellings circulate for 9, 15, 16, 18 and 19 ("novies" / "nonies",
+"quinquiesdecies" / "quindecies", "sexiesdecies" / "sexdecies", "octiesdecies"
+/ "duodevicies", "noviesdecies" / "undevicies"); both are listed because
+Normattiva returns both — "nonies" in art. 21-nonies l. 241/1990 and art.
+25-nonies d.lgs. 231/2001 (tests/fixtures/akn), which a table that knew only
+"novies" read as art. 21 and art. 25. The table covers 2 to 20 — a suffix past that needs a new entry here and
 nowhere else.
 
 This module imports nothing on purpose: every layer (services, tools, the
@@ -33,8 +35,9 @@ ARTICLE_ORDINAL_SUFFIXES = (
     # 11-20
     "undecies", "duodecies", "terdecies", "quaterdecies", "quinquiesdecies",
     "sexiesdecies", "septiesdecies", "octiesdecies", "noviesdecies", "vicies",
-    # variant spellings of 15, 16, 18, 19, 20
-    "quindecies", "sexdecies", "duodevicies", "undevicies", "vices",
+    # variant spellings of 9, 15, 16, 18, 19, 20 (nonies: art. 21-nonies l. 241/1990,
+    # art. 25-nonies d.lgs. 231/2001, as Normattiva prints them)
+    "nonies", "quindecies", "sexdecies", "duodevicies", "undevicies", "vices",
     # second word of the compound forms ("vicies semel", 21)
     "semel",
 )

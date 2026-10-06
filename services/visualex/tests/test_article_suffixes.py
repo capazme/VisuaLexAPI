@@ -30,6 +30,8 @@ LIVE_SUFFIXES = [
     "novies", "decies", "undecies", "terdecies", "quaterdecies",
     "quinquiesdecies", "septiesdecies", "octiesdecies", "noviesdecies",
     "duodevicies", "undevicies",
+    # tests/fixtures/akn: art. 21-nonies l. 241/1990, art. 25-nonies d.lgs. 231/2001
+    "nonies",
 ]
 
 
@@ -67,6 +69,8 @@ class TestNormalizeArticleKey:
         ("art. 25 quinquiesdecies", "25-quinquiesdecies"),
         ("2409 NOVIESDECIES", "2409-noviesdecies"),
         ("25undevicies", "25-undevicies"),
+        ("21 nonies", "21-nonies"),
+        ("21-nonies", "21-nonies"),
     ])
     def test_canonical_form(self, raw, expected):
         assert normalize_article_key(raw) == expected

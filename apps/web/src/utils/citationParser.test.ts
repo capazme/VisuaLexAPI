@@ -300,10 +300,15 @@ describe('parseLegalCitation — article suffixes past decies', () => {
 
   it.each([
     'undecies', 'duodecies', 'terdecies', 'quaterdecies',
-    'quinquiesdecies', 'sexiesdecies', 'septiesdecies', 'undevicies',
+    'quinquiesdecies', 'sexiesdecies', 'septiesdecies', 'undevicies', 'nonies',
   ])('keeps "art. 25-%s d.lgs. 231/2001" whole', (suffix) => {
     expect(parse(`art. 25-${suffix} d.lgs. 231/2001`))
       .toMatchObject({ act_type: 'decreto legislativo', act_number: '231', date: '2001', article: `25-${suffix}` });
+  });
+
+  it('reads art. 21-nonies l. 241/1990 as itself, never as art. 21 (Normattiva spells the ninth «nonies»)', () => {
+    expect(parse('art. 21-nonies l. 241/1990')).toMatchObject({ act_type: 'legge', act_number: '241', article: '21-nonies' });
+    expect(parse('art. 21 nonies legge 241/1990')).toMatchObject({ article: '21-nonies' });
   });
 
   it('normalises the spaced spelling to the API form', () => {
