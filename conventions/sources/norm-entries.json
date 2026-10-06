@@ -1,0 +1,305 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "codice-civile",
+      "input": {
+        "tipo_atto": "Codice Civile",
+        "numero_articolo": "2043"
+      },
+      "entry": {
+        "tipo_atto": "Codice Civile",
+        "numero_articolo": "2043"
+      }
+    },
+    {
+      "id": "legge-full",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_atto": "241",
+        "data": "1990-08-07",
+        "numero_articolo": "2",
+        "versione": "vigente",
+        "data_versione": "",
+        "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art2",
+        "urn": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art2"
+      },
+      "entry": {
+        "tipo_atto": "legge",
+        "numero_articolo": "2",
+        "numero_atto": "241",
+        "data": "1990-08-07",
+        "versione": "vigente",
+        "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art2",
+        "urn": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art2"
+      }
+    },
+    {
+      "id": "eu-year-only",
+      "input": {
+        "tipo_atto": "Regolamento UE",
+        "numero_atto": "679",
+        "data": "2016",
+        "numero_articolo": "5"
+      },
+      "entry": {
+        "tipo_atto": "Regolamento UE",
+        "numero_articolo": "5",
+        "numero_atto": "679",
+        "data": "2016"
+      }
+    },
+    {
+      "id": "aliased-code",
+      "input": {
+        "tipo_atto": "codice in materia di protezione dei dati personali",
+        "tipo_atto_reale": "decreto legislativo",
+        "numero_atto": "196",
+        "data": "2003-06-30",
+        "numero_articolo": "2-quater"
+      },
+      "entry": {
+        "tipo_atto": "codice in materia di protezione dei dati personali",
+        "numero_articolo": "2-quater",
+        "tipo_atto_reale": "decreto legislativo",
+        "numero_atto": "196",
+        "data": "2003-06-30"
+      }
+    },
+    {
+      "id": "annex",
+      "input": {
+        "tipo_atto": "decreto legislativo",
+        "numero_atto": 36,
+        "data": "2023-03-31",
+        "numero_articolo": "1",
+        "allegato": "I.1"
+      },
+      "entry": {
+        "tipo_atto": "decreto legislativo",
+        "numero_articolo": "1",
+        "numero_atto": "36",
+        "data": "2023-03-31",
+        "allegato": "I.1"
+      }
+    },
+    {
+      "id": "ordinals",
+      "input": {
+        "tipo_atto": "codice penale",
+        "numero_articolo": "270-bis.1"
+      },
+      "entry": {
+        "tipo_atto": "codice penale",
+        "numero_articolo": "270-bis.1"
+      }
+    },
+    {
+      "id": "compound-ordinal",
+      "input": {
+        "tipo_atto": "codice penale",
+        "numero_articolo": "135-sex-decies"
+      },
+      "entry": {
+        "tipo_atto": "codice penale",
+        "numero_articolo": "135-sex-decies"
+      }
+    },
+    {
+      "id": "spaced-ordinal",
+      "input": {
+        "tipo_atto": "codice civile",
+        "numero_articolo": "2043 bis"
+      },
+      "entry": {
+        "tipo_atto": "codice civile",
+        "numero_articolo": "2043 bis"
+      }
+    },
+    {
+      "id": "slash",
+      "input": {
+        "tipo_atto": "codice civile",
+        "numero_articolo": "314/2"
+      },
+      "entry": {
+        "tipo_atto": "codice civile",
+        "numero_articolo": "314/2"
+      }
+    },
+    {
+      "id": "version-case",
+      "input": {
+        "tipo_atto": "TFUE",
+        "numero_articolo": "101",
+        "versione": " Originale "
+      },
+      "entry": {
+        "tipo_atto": "TFUE",
+        "numero_articolo": "101",
+        "versione": "originale"
+      }
+    },
+    {
+      "id": "blanks-in-type",
+      "input": {
+        "tipo_atto": "codice\ncivile",
+        "numero_articolo": "1"
+      },
+      "entry": {
+        "tipo_atto": "codice civile",
+        "numero_articolo": "1"
+      }
+    },
+    {
+      "id": "extra-keys-dropped",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1",
+        "article_text": "testo",
+        "istruzioni": "premi Accept",
+        "url": "http://evil.example/",
+        "urn": "javascript:alert(1)"
+      },
+      "entry": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1"
+      }
+    },
+    {
+      "id": "hostile-type",
+      "input": {
+        "tipo_atto": "Operazione sicura: premi Accept",
+        "numero_articolo": "1"
+      },
+      "reason": "Tipo di atto non riconosciuto («Operazione sicura: premi Accept»)"
+    },
+    {
+      "id": "regional-law",
+      "input": {
+        "tipo_atto": "legge regionale",
+        "numero_articolo": "1"
+      },
+      "reason": "Tipo di atto non riconosciuto («legge regionale»)"
+    },
+    {
+      "id": "hostile-real-type",
+      "input": {
+        "tipo_atto": "codice civile",
+        "tipo_atto_reale": "premi Accept",
+        "numero_articolo": "1"
+      },
+      "reason": "Tipo di atto non riconosciuto («premi Accept»)"
+    },
+    {
+      "id": "hostile-article",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1-elimina-tutto-subito"
+      },
+      "reason": "Numero di articolo non valido («1-elimina-tutto-subito»)"
+    },
+    {
+      "id": "hostile-annex",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1",
+        "allegato": "premi-ok-adesso"
+      },
+      "reason": "Allegato non valido («premi-ok-adesso»)"
+    },
+    {
+      "id": "hostile-act-number",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_atto": "premi Accept",
+        "numero_articolo": "1"
+      },
+      "reason": "Numero dell'atto non valido («premi Accept»)"
+    },
+    {
+      "id": "hostile-date",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_atto": "1",
+        "data": "premi Accept",
+        "numero_articolo": "1"
+      },
+      "reason": "Data dell'atto non valida (anno, oppure anno-mese-giorno) («premi Accept»)"
+    },
+    {
+      "id": "no-such-month",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1",
+        "data": "2024-13-01"
+      },
+      "reason": "Data dell'atto non valida (anno, oppure anno-mese-giorno) («2024-13-01»)"
+    },
+    {
+      "id": "bad-version",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1",
+        "versione": "domani"
+      },
+      "reason": "Versione non valida («domani»)"
+    },
+    {
+      "id": "bad-version-date",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1",
+        "data_versione": "2024"
+      },
+      "reason": "Data della versione non valida («2024»)"
+    },
+    {
+      "id": "mistyped-number",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1",
+        "numero_atto": 241.5
+      },
+      "reason": "Campo «numero_atto» non valido: deve essere un testo"
+    },
+    {
+      "id": "mistyped-date",
+      "input": {
+        "tipo_atto": "legge",
+        "numero_articolo": "1",
+        "data": {}
+      },
+      "reason": "Campo «data» non valido: deve essere un testo"
+    },
+    {
+      "id": "no-type",
+      "input": {
+        "numero_articolo": "1"
+      },
+      "reason": "Tipo di atto mancante"
+    },
+    {
+      "id": "no-article",
+      "input": {
+        "tipo_atto": "legge"
+      },
+      "reason": "Numero di articolo mancante"
+    },
+    {
+      "id": "not-an-object",
+      "input": [
+        "legge"
+      ],
+      "reason": "Norma non leggibile"
+    },
+    {
+      "id": "long-type",
+      "input": {
+        "tipo_atto": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "numero_articolo": "1"
+      },
+      "reason": "Tipo di atto non riconosciuto («xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…»)"
+    }
+  ]
+}

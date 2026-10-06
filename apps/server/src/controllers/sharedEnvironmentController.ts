@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { dossierItemFromEntry, rebuildDossierPayload, type EntryItem } from '../utils/suggestionEntries';
+import { rebuildEnvironmentDossiers } from '../utils/environmentDossiers';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -325,6 +326,7 @@ export const getSharedEnvironmentDetail = async (req: Request, res: Response) =>
  */
 export const publishEnvironment = async (req: Request, res: Response) => {
   const data = publishEnvironmentSchema.parse(req.body);
+  data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'pubblicato');
 
   // Check daily limit
   const today = new Date();
@@ -821,6 +823,7 @@ export const republishEnvironment = async (req: Request, res: Response) => {
 export const updateEnvironmentWithVersion = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = updateWithVersionSchema.parse(req.body);
+  if (data.content) data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'aggiornato');
 
   // Check ownership
   const existing = await prisma.sharedEnvironment.findFirst({

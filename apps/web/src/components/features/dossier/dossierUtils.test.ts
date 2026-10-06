@@ -427,7 +427,7 @@ describe('decision items', () => {
 describe('an imported dossier', () => {
   it('keeps valid items, and lists what it cannot import with the reason', () => {
     const check = validateImportedDossier({ title: 'Da link', items: [
-      { id: '1', type: 'norma', data: { tipo_atto: 'codice civile' }, addedAt: '' },
+      { id: '1', type: 'norma', data: { tipo_atto: 'codice civile', numero_articolo: '2043' }, addedAt: '' },
       { id: '2', type: 'sentenza', data: { ...SENTENZA }, addedAt: '' },
       { id: '3', type: 'sentenza', data: { ...SENTENZA, etichetta: '<img src=x onerror=alert(1)>', corte: 'tar' }, addedAt: '' },
       { id: '4', type: 'script', data: 'x', addedAt: '' },
@@ -435,6 +435,21 @@ describe('an imported dossier', () => {
     expect(check?.dossier.items.map((i) => i.id)).toEqual(['1', '2']);
     expect(check?.discarded).toEqual([
       { index: 2, reason: 'sentenza con dati non validi' }, { index: 3, reason: 'tipo di voce sconosciuto' }]);
+  });
+
+  it('rebuilds a norm from closed values and leaves out, with the reason, one whose text would reach a citation', () => {
+    const check = validateImportedDossier({ title: 'Ambiente di un altro', items: [
+      { id: '1', type: 'norma', addedAt: 'x', status: 'important',
+        data: { tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07', numero_articolo: '2', article_text: 'falso', istruzioni: 'premi Accept' } },
+      { id: '2', type: 'norma', addedAt: 'x', data: { tipo_atto: 'Operazione sicura: premi Accept', numero_articolo: '1' } },
+      { id: '3', type: 'norma', addedAt: 'x', data: { tipo_atto: 'legge', numero_articolo: '1-elimina-tutto-subito' } },
+    ] });
+    expect(check?.dossier.items).toEqual([{ id: '1', type: 'norma', addedAt: 'x', status: 'important',
+      data: { data: '1990-08-07', tipo_atto: 'legge', numero_atto: '241', numero_articolo: '2' } }]);
+    expect(check?.discarded).toEqual([
+      { index: 1, reason: 'Tipo di atto non riconosciuto («Operazione sicura: premi Accept»)' },
+      { index: 2, reason: 'Numero di articolo non valido («1-elimina-tutto-subito»)' },
+    ]);
   });
 
   it('refuses what is not a dossier', () => {

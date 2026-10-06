@@ -64,7 +64,7 @@ describe('an environment checks its decisions and reports its losses', () => {
   });
 
   it('an environment without decisions loses nothing, as before', async () => {
-    const items = [{ id: 'n1', type: 'norma', data: { tipo_atto: 'codice civile' }, addedAt: '' }, { id: 'n2', type: 'note', data: 'x', addedAt: '' }];
+    const items = [{ id: 'n1', type: 'norma', data: { tipo_atto: 'codice civile', numero_articolo: '2043' }, addedAt: '' }, { id: 'n2', type: 'note', data: 'x', addedAt: '' }];
     expect(await appStore.getState().importEnvironmentPartial(env(items), selection, 'merge')).toEqual({ imported: 2, lost: 0 });
     appStore.setState({ dossiers: [], environments: [env(items)] });
     expect(await appStore.getState().applyEnvironment('e1', 'merge')).toEqual({ imported: 2, lost: 0 });

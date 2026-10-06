@@ -462,6 +462,11 @@ Duplicating any of these is a defect, not a shortcut.
   `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and the golden test
   fails when the two differ. Never write a norm's label inline: a new surface
   picks one of these.
+- `utils/sources/normEntry.ts` — `rebuildNormEntry`: a norm from someone else (a shared
+  environment, a file, a share link) rebuilt from closed values — a known act type, fixed forms,
+  unknown keys dropped — or refused with an Italian reason. `validateImportedDossier` runs it on
+  every imported norm and counts what it leaves out. A copy of the server's, both pinned to
+  `conventions/sources/norm-entries.json`.
 - `utils/normaMeta.ts` — `formatNormaTitle(norma)` (the act heading) and
   `formatNormaMeta(norma, articleCount?)`, the line under it: only
   what the title does not say (a code's decree, an aliased code's name, «Estremi

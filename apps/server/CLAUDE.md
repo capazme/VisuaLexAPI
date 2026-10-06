@@ -177,6 +177,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
+- **Published environments** carry dossiers; their norms are rebuilt from closed values when
+  an environment is published or its content updated (`utils/environmentDossiers.ts`, through
+  `schemas/normEntry.ts`), and one that cannot be rebuilt refuses the publication with an
+  Italian 400 naming the dossier, the entry and why: whoever applies the environment has those
+  norms cited to them, in the MCP deletion dialog too. The web rebuilds them again on import.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
