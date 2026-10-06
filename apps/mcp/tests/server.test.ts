@@ -278,6 +278,8 @@ describe('exposure (production stack)', () => {
     try {
       expect(await rawPost(url, 'evil.example')).toBe(403);
       expect(await rawPost(url, 'mcp.example:8443')).toBe(401);
+      // the health check still gets through
+      expect(await rawPost(url, '127.0.0.1:3002')).toBe(401);
     } finally {
       server.close();
     }
@@ -291,6 +293,12 @@ describe('exposure (production stack)', () => {
       expect(await from('100.64.1.2')).toBe(429);
       // another person behind the same proxy is not affected
       expect(await from('100.64.1.3')).toBe(401);
+      // every method on the endpoint is counted: a stream cannot be opened past the ceiling
+      const stream = await fetch(url, { headers: { 'x-forwarded-for': '100.64.1.2', accept: 'text/event-stream' } });
+      expect(stream.status).toBe(429);
+      // the metadata is not: the health check reads it every 30 seconds
+      const metadata = url.replace('/mcp', '/.well-known/oauth-protected-resource');
+      for (let i = 0; i < 5; i += 1) expect((await fetch(metadata, { headers: { 'x-forwarded-for': '100.64.1.2' } })).status).toBe(200);
     } finally {
       server.close();
     }

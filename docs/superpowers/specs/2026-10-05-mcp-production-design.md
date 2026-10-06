@@ -79,9 +79,12 @@ the public exposure (phase 2 of the deployment design).
 | `edge` | `ingress` | as today; its subnet becomes fixed (`EDGE_SUBNET`, default `172.29.241.0/24`) because Caddy trusts it, as it trusts `app`'s (section 5) |
 | `mcp` (new) | `mcp`, `server` | the MCP reaches the server and nothing else: not the scrapers, not MERL-T (whose `/admin` and `/ner` routes have no gate of their own, R2), not the stores |
 
-Published: `${MCP_BIND:-127.0.0.1}:${MCP_PORT:-8091}:3002`, on the loopback by
-default, like the ingress. The overlay reaches it through a second `tailscale
-serve` mapping (`--https=8443`). No other port is published.
+Published: `127.0.0.1:${MCP_PORT:-8091}:3002`, **on the loopback only**,
+with no setting to move it. Its door is the host's proxy: the overlay reaches
+it through a second `tailscale serve` mapping (`--https=8443`). A LAN bind
+would let a device of the home network forge its address past the
+per-address ceiling (section 5), so it is not offered. No other port is
+published.
 
 ### 4.3 The addresses, from one place
 
@@ -247,10 +250,9 @@ are today.
 - The overlay's identity headers (`Tailscale-User-*`) reach the server, and
   nothing reads them. Nothing may start trusting them without a design: anyone
   who reaches the ingress some other way could set them.
-- **`MCP_BIND` set to a LAN address.** The MCP trusts every private range
-  (`'loopback, uniquelocal'`). A device on the home network could then forge
-  `X-Forwarded-For` and spread its requests over invented addresses. The
-  ceiling is a backstop, not a gate, and the default bind is the loopback.
+- **A process on the host itself** reaches the MCP's loopback port, and can
+  forge `X-Forwarded-For` past the per-address ceiling. The host is trusted,
+  as it is for the ingress. A LAN bind is not offered for this reason (4.2).
 - **H1 does not cover the `mcp` network.** A compromised MCP process could open
   connections to the home network. It renders no third-party content, unlike
   the scrapers, so this is lower risk. The H1 script (D3) can take the subnet

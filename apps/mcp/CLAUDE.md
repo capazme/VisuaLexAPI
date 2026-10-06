@@ -76,9 +76,15 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   the card dialog a card is named only by what the server set — its subject,
   the article of its primary anchor, its state, its date and the start of its
   id — never by its question or answer, which a model may have written.
-- **Hardening** — binds to `127.0.0.1` by default and refuses non-loopback
-  `Host` headers there (DNS rebinding); refuses a browser `Origin` not in
-  `MCP_ALLOWED_ORIGINS`. Logs one line per tool call (user, client, tool,
+- **Hardening** — binds to `127.0.0.1` by default. On every bind it refuses a
+  `Host` other than `MCP_RESOURCE`'s hostname or the loopback names (DNS
+  rebinding; the port does not count). It refuses a browser `Origin` not in
+  `MCP_ALLOWED_ORIGINS`. It caps each address at 300 requests a minute on the
+  endpoint (`REQUESTS_PER_MINUTE`; the metadata is not counted), reading the
+  address past loopback and private hops (`trust proxy`), so one caller cannot
+  spend the introspection ceiling every user shares. Introspection and the
+  exchange go to `MCP_AUTH_URL`, which defaults to the issuer; in a container
+  it is the server's own address. Logs one line per tool call (user, client, tool,
   outcome), never a token or an argument.
 
 ## Commands
