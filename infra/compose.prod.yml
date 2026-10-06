@@ -36,7 +36,12 @@ x-hardening: &hardening
   security_opt: ["no-new-privileges:true"]
 
 networks:
-  edge: {}
+  edge:
+    ipam:
+      config:
+        # Fixed, because the ingress keeps a forwarded client address only from this
+        # subnet and the app one. Change it (infra/.env) if it collides with yours.
+        - subnet: "${EDGE_SUBNET:-172.29.241.0/24}"
   app:
     ipam:
       config:

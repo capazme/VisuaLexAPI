@@ -96,6 +96,10 @@ services:
     environment:
       SERVER_UPSTREAM: "server:3001"
       SCRAPERS_UPSTREAM: "${SCRAPERS_ADDR:-scrapers:5000}"
+      # The subnets Caddy keeps a forwarded client address from: the same values that
+      # compose.prod.yml gives the two networks.
+      APP_SUBNET: "${APP_SUBNET:-172.29.240.0/24}"
+      EDGE_SUBNET: "${EDGE_SUBNET:-172.29.241.0/24}"
     # Loopback by default; INGRESS_BIND is the home-network address to reach it from
     # other devices. The container listens on 8080 as a normal user.
     ports:
