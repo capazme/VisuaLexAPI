@@ -8,10 +8,12 @@ set -eu
 here="$(cd "$(dirname "$0")/.." && pwd)"
 root="$(cd "$here/../.." && pwd)"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+holder=""
+trap 'if [ -n "$holder" ]; then kill "$holder" 2>/dev/null; fi; rm -rf "$work"' EXIT
 fail=0
 # A port nothing listens on, so the port check passes wherever the tests run.
 FREE_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+FREE_PORT2="$(python3 -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", 0)); p=s.getsockname()[1]; print(p if p != int(sys.argv[1]) else p + 1)' "$FREE_PORT")"
 
 ok()   { echo "ok   $1"; }
 bad()  { echo "FAIL $1"; fail=1; }
@@ -166,6 +168,7 @@ for f in infra/.env apps/server/.env; do
 done
 rm -f "$d/t"
 before_jwt="$(value_of "$d/apps/server/.env" JWT_SECRET)"; before_pg="$(value_of "$d/infra/.env" POSTGRES_PASSWORD)"
+chmod 644 "$d/infra/.env" "$d/apps/server/.env"
 outcome "$d" scripts/prod/init-env.sh
 expect_status 0 "an existing host's env files are completed"
 m="$(value_of "$d/infra/.env" MCP_CLIENT_SECRET)"
@@ -177,7 +180,7 @@ o="$(value_of "$d/apps/server/.env" OAUTH_DELEGATION_SECRET)"
 expect_out "MCP_CLIENT_SECRET" "it says which key it added"
 if grep -qF -- "$m" "$work/out" || grep -qF -- "$o" "$work/out"; then bad "and never prints the value"; else ok "and never prints the value"; fi
 [ "$(mode_of "$d/infra/.env")" = "-rw-------" ] && [ "$(mode_of "$d/apps/server/.env")" = "-rw-------" ] \
-  && ok "the files keep their owner-only mode" || bad "the files keep their owner-only mode ($(mode_of "$d/infra/.env"))"
+  && ok "the files it completes are left readable by their owner only" || bad "the files it completes are left readable by their owner only ($(mode_of "$d/infra/.env"))"
 
 # The MCP's addresses and secrets: checked only when MCP_PUBLIC_URL is set.
 d="$(mkrepo mcpenv)"
@@ -197,7 +200,9 @@ mcp_case "http://localhost:8080" "" 0 "without MCP_PUBLIC_URL nothing about the 
 mcp_case "https://vlx.example" "https://vlx.example:8443/mcp" 0 "an https origin and an endpoint on the same host pass"
 mcp_case "http://localhost:18080" "http://localhost:18091/mcp" 0 "http on localhost passes (throwaway trials)"
 mcp_case "https://vlx.example/" "https://vlx.example:8443/mcp" nonzero "a trailing slash on PUBLIC_ORIGIN is refused (it is the issuer)" PUBLIC_ORIGIN
-mcp_case "https://vlx.example,http://localhost:8080" "https://vlx.example:8443/mcp" nonzero "a list in PUBLIC_ORIGIN is refused" PUBLIC_ORIGIN
+mcp_case "https://vlx.example,http://localhost:8080" "https://vlx.example:8443/mcp" nonzero "a list in PUBLIC_ORIGIN is refused" "must be one origin"
+mcp_case "https://vlx.example" "http://localhost:8091@evil.example/mcp" nonzero "a user@ part is refused (it would fool the host check)" "no user@ part"
+mcp_case "https://[2001:db8::1]" "https://[2001:db8::2]:8443/mcp" nonzero "an IPv6 literal is refused (it would fool the host check)" "no user@ part"
 mcp_case "http://192.0.2.10:8080" "http://192.0.2.10:8091/mcp" nonzero "plain http beyond the loopback is refused" PUBLIC_ORIGIN
 mcp_case "https://vlx.example" "https://other.example:8443/mcp" nonzero "an endpoint on another host is refused" MCP_PUBLIC_URL
 mcp_case "https://vlx.example" "https://vlx.example:8443/" nonzero "an endpoint not ending in /mcp is refused" MCP_PUBLIC_URL
@@ -230,19 +235,23 @@ run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
 outcome "$d" scripts/prod/preflight.sh ports
 expect_status 0 "a free ingress port passes"
 python3 -c 'import socket,sys,time; s=socket.socket(); s.bind(("127.0.0.1",int(sys.argv[1]))); s.listen(); time.sleep(30)' "$FREE_PORT" & holder=$!
-sleep 1
+i=0; while python3 -c 'import socket,sys; socket.create_connection(("127.0.0.1",int(sys.argv[1])),1)' "$FREE_PORT" 2>/dev/null; [ $? != 0 ] && [ "$i" -lt 50 ]; do i=$((i + 1)); sleep 0.1; done
 outcome "$d" scripts/prod/preflight.sh ports
 expect_status nonzero "a port another program holds is refused"
 expect_out "INGRESS_PORT" "naming the key to change"
 : >"$d/docker.log"
 outcome "$d" scripts/prod/deploy.sh --no-backup
 expect_no_log "$d" "--build" "and the deploy stops before it builds anything"
-kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null || true
+expect_out "INGRESS_PORT" "and says it was the port"
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null || true; holder=""
+printf 'MCP_PUBLIC_URL=https://vlx.example:8443/mcp\nMCP_PORT=%s\n' "$FREE_PORT" >>"$d/infra/.env"
+outcome "$d" scripts/prod/preflight.sh ports
+expect_status nonzero "the MCP on the ingress's own port is refused"; expect_out "same port" "saying so"
 
 # The mcp profile follows MCP_PUBLIC_URL; a stop stops every module whatever the settings.
 d="$(mkrepo mcpdeploy)"
 run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
-printf 'PUBLIC_ORIGIN=https://vlx.example\nMCP_PUBLIC_URL=https://vlx.example:8443/mcp\nMCP_PORT=%s\n' "$FREE_PORT" >>"$d/infra/.env"
+printf 'PUBLIC_ORIGIN=https://vlx.example\nMCP_PUBLIC_URL=https://vlx.example:8443/mcp\nMCP_PORT=%s\n' "$FREE_PORT2" >>"$d/infra/.env"
 outcome "$d" scripts/prod/deploy.sh
 expect_status 0 "a deploy with the MCP on runs to the end"
 expect_log "$d" "--profile merlt --profile mcp up -d --build --wait" "it starts the mcp profile too"

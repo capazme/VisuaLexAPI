@@ -63,12 +63,13 @@
 	# endpoints where a client registers, asks for consent and gets its tokens. Not behind
 	# the login check: a client starts here before anyone has signed in. The consent page
 	# itself (/connect) is the app's, and frame-ancestors 'none' keeps it out of frames.
-	# Introspection answers only to the MCP server's credential, and the MCP calls the server
-	# from inside the stack: it has no reason to be reachable from the network.
-	handle /oauth/introspect {
-		respond 404
-	}
 	handle /oauth/* {
+		# Introspection answers only to the MCP server's credential, and the MCP calls the
+		# server from inside the stack: it has no reason to be reachable from the network.
+		# Every spelling the server would route there (a trailing slash, another case) is
+		# matched here too: Caddy's path matcher is case-insensitive on the cleaned path.
+		@introspect path /oauth/introspect /oauth/introspect/*
+		respond @introspect 404
 		request_body {
 			max_size 64KB
 		}

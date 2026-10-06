@@ -123,6 +123,12 @@ check_env() {
   mcp_url="$(env_get "$infra" MCP_PUBLIC_URL)"
   if [ -n "$mcp_url" ]; then
     origin="$(env_get "$infra" PUBLIC_ORIGIN)"
+    # A user@ part or an IPv6 literal would fool the host comparison below: not supported here.
+    for value in "$origin" "$mcp_url"; do
+      case "$value" in
+        *@*|*\[*) err "PUBLIC_ORIGIN and MCP_PUBLIC_URL in infra/.env take a host name or an IPv4 address, with no user@ part"; bad=1 ;;
+      esac
+    done
     case "$origin" in
       ""|*,*|*://*/*) err "PUBLIC_ORIGIN in infra/.env must be one origin, scheme://host[:port] with no path or trailing slash, when MCP_PUBLIC_URL is set: it is the OAuth issuer"; bad=1 ;;
       *) secure_or_local "$origin" || { err "PUBLIC_ORIGIN in infra/.env must be https (or http on localhost) when MCP_PUBLIC_URL is set"; bad=1; } ;;
@@ -156,7 +162,15 @@ check_env() {
 check_port() { # check_port <container> <bind> <port> <KEY>
   if [ -n "$(docker ps -q --filter "name=^$1\$" 2>/dev/null)" ]; then return 0; fi
   if ! command -v python3 >/dev/null 2>&1; then warn "python3 is missing: port $3 was not checked before the build"; return 0; fi
-  if ! python3 -c 'import socket,sys; s=socket.socket(); s.bind((sys.argv[1], int(sys.argv[2])))' "$2" "$3" 2>/dev/null; then
+  # SO_REUSEADDR as Docker sets it: a connection still in TIME_WAIT after a stop is not a
+  # program holding the port, while a listening socket still makes the bind fail.
+  if ! python3 -c '
+import socket, sys
+host = sys.argv[1].strip("[]")
+family = socket.getaddrinfo(host, None)[0][0]
+s = socket.socket(family)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind((host, int(sys.argv[2])))' "$2" "$3" 2>/dev/null; then
     err "port $3 on $2 is taken by another program: set $4 in infra/.env to a free port"
     return 1
   fi
@@ -169,8 +183,13 @@ check_ports() {
   bad=0
   check_port "$stack-ingress" "${bind:-127.0.0.1}" "${port:-8080}" INGRESS_PORT || bad=1
   if [ -n "$(env_get "$infra" MCP_PUBLIC_URL)" ]; then
+    ingress_port="${port:-8080}"
     port="$(env_get "$infra" MCP_PORT)"
-    check_port "$stack-mcp" 127.0.0.1 "${port:-8091}" MCP_PORT || bad=1
+    if [ "${port:-8091}" = "$ingress_port" ]; then
+      err "INGRESS_PORT and MCP_PORT in infra/.env are the same port ($ingress_port): give the MCP another one"; bad=1
+    else
+      check_port "$stack-mcp" 127.0.0.1 "${port:-8091}" MCP_PORT || bad=1
+    fi
   fi
   return "$bad"
 }

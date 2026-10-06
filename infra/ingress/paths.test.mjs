@@ -128,5 +128,7 @@ test('any other well-known name is a 404, not the app', () => {
 });
 
 test('introspection is not reachable through the ingress: only the MCP calls it, from inside', () => {
-  assert.match(handleBlock('/oauth/introspect'), /respond 404/);
+  const block = handleBlock('/oauth/*');
+  assert.match(block, /@introspect path \/oauth\/introspect \/oauth\/introspect\/\*/, 'the exact path and anything under it');
+  assert.match(block, /respond @introspect 404/);
 });
