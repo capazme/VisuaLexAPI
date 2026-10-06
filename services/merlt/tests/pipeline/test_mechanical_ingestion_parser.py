@@ -97,7 +97,7 @@ def test_article_number_suffix_concatenated_in_urn_but_hyphenated_in_property():
 
 def test_the_ninth_spelled_nonies_is_its_own_article():
     """Normattiva prints the ninth «nonies» (art. 21-nonies l. 241/1990): a table that knew only
-    «novies» read "### Art. 21-nonies" as no article at all."""
+    «novies» read "### Art. 21-nonies" as art. 21, with «nonies» left in its rubrica."""
     md = """---
 tipo_documento: legge
 estremi: "Legge 7 agosto 1990, n. 241"

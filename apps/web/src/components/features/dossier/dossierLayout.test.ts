@@ -84,6 +84,11 @@ describe('compareArticles', () => {
       .sort(compareArticles).map(articleLabel);
     expect(sorted).toEqual(['art. 2', 'art. 2-bis', 'art. 2 ter', 'art. 10', 'art. 25-ter', 'art. 25-terdecies', 'All. A, art. 1']);
   });
+
+  it('ranks the ninth by its value in either spelling (art. 21-nonies l. 241/1990)', () => {
+    const sorted = [nv('21-decies'), nv('21-nonies'), nv('21-octies')].sort(compareArticles).map((i) => articleLabel(i));
+    expect(sorted).toEqual(['art. 21-octies', 'art. 21-nonies', 'art. 21-decies']);
+  });
   it('reads a suffix written without a hyphen, and sub-numbers as numbers', () => {
     const sorted = [nv('2bis'), nv('2-bis.10'), nv('2'), nv('2-bis.2'), nv('2ter'), nv('270-bis.1')]
       .sort(compareArticles).map((x) => x.numero_articolo);

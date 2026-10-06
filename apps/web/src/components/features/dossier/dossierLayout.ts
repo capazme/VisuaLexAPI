@@ -77,7 +77,7 @@ export function actKeyOf(norma: { tipo_atto: string; numero_atto?: string; data?
 // Ordinal suffixes by value (2 = bis … 20 = vicies), with the variant spellings
 // of `utils/articleSuffixes.ts`.
 const ORDINALS: Record<string, number> = {
-  bis: 2, ter: 3, quater: 4, quinquies: 5, sexies: 6, septies: 7, octies: 8, novies: 9, decies: 10,
+  bis: 2, ter: 3, quater: 4, quinquies: 5, sexies: 6, septies: 7, octies: 8, novies: 9, nonies: 9, decies: 10,
   undecies: 11, duodecies: 12, terdecies: 13, quaterdecies: 14, quinquiesdecies: 15, quindecies: 15,
   sexiesdecies: 16, sexdecies: 16, septiesdecies: 17, octiesdecies: 18, duodevicies: 18,
   noviesdecies: 19, undevicies: 19, vicies: 20, vices: 20,
