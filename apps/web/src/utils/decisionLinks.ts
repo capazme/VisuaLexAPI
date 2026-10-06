@@ -125,11 +125,19 @@ export function sectionName(code: string): string {
   return `Sez. ${ROMAN[code] ?? code}`;
 }
 
-function citationSection(code: string): string {
-  if (code === 'U') return 'sez. un.';
-  if (code === 'L') return 'sez. lav.';
-  if (code === 'F') return 'sez. fer.';
-  return `sez. ${ROMAN[code] ?? code}`;
+const CITATION_SECTIONS: Record<string, string> = { U: 'sez. un.', L: 'sez. lav.', F: 'sez. fer.', T: 'sez. trib.' };
+
+/**
+ * A section as a citation writes it (source convention §4.3, as MERL-T's `_section`): `U` →
+ * "sez. un.", `3` → "sez. III", `6-1` → "sez. VI-1"; null for none.
+ */
+function citationSection(raw: string | null | undefined): string | null {
+  const code = (raw ?? '').replace(/\s+/g, '').toUpperCase().replace(/\.+$/, '');
+  if (!code) return null;
+  if (Object.hasOwn(CITATION_SECTIONS, code)) return CITATION_SECTIONS[code];
+  const [head, ...tail] = code.split('-');
+  // A sub-section keeps its own writing ("sez. VI-1", "sez. VI-L").
+  return `sez. ${ROMAN[head] ?? head}${tail.length ? `-${tail.join('-')}` : ''}`;
 }
 
 /** The identity line: "Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata il …". */
@@ -163,9 +171,52 @@ export function formatDecisionCitation(identity: DecisionIdentity, attrs: Decisi
   }
   const head = identity.archivio === 'penale' ? 'Cass. pen.' : identity.archivio === 'civile' ? 'Cass. civ.' : 'Cass.';
   const when = identity.archivio === 'penale' && date ? `dep. ${date}` : date;
-  return [head, attrs.sezione ? citationSection(attrs.sezione) : null, [tipo, when].filter(Boolean).join(' ') || null, numero]
+  return [head, citationSection(attrs.sezione), [tipo, when].filter(Boolean).join(' ') || null, numero]
     .filter(Boolean)
     .join(', ');
+}
+
+/**
+ * A decision in little room (source convention D2, decided 4 October 2026): chips, lists, the
+ * graph's `estremi` — "Cass. civ., sez. un., n. 31310/2024", "Corte cost., n. 71/2020"; with the
+ * massime, "… · Rv. 673165-01". No type, no date. A reference with no archive is "Cass.", one with
+ * no year "n. 2633": never a guess. MERL-T's `decision_short` writes the same; the golden file
+ * pins both.
+ */
+export function formatDecisionShort(ref: LooseDecisionRef, rv?: readonly string[] | null): string {
+  const numero = ref.anno ? `n. ${ref.numero}/${ref.anno}` : `n. ${ref.numero}`;
+  const head = ref.corte === 'corte_costituzionale'
+    ? ['Corte cost.']
+    : [ref.archivio === 'civile' ? 'Cass. civ.' : ref.archivio === 'penale' ? 'Cass. pen.' : 'Cass.', citationSection(ref.sezione)];
+  const label = [...head, numero].filter(Boolean).join(', ');
+  return rv && rv.length > 0 ? `${label} · Rv. ${rv.join(', ')}` : label;
+}
+
+/**
+ * The decision a Brocardi massima is headed with ("Cass. civ.", "Cass. pen.", "Cass. lav.",
+ * "Cass. sez. un.", "Cass.", "Corte cost.", then "n. 31191/2025"), or null for another court
+ * or no number. A bare «Cass.» names no archive and «Cass. sez. un.» only its section: the page
+ * resolves them (Sentenze design §2), never a guess here. «Cass. lav.» is the civil labour section.
+ */
+export function brocardiDecisionRef(
+  autorita: string | null | undefined,
+  numero: string | null | undefined,
+  anno: string | null | undefined,
+): LooseDecisionRef | null {
+  const n = /^\d{1,7}$/.test(numero?.trim() ?? '') ? Number(numero!.trim()) : NaN;
+  if (!(n >= 1)) return null;
+  const year = /^\d{4}$/.test(anno?.trim() ?? '') ? Number(anno!.trim()) : null;
+  const words = (autorita ?? '').toLowerCase().replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+  if (/^(corte cost|c cost)/.test(words) || words.includes('costituzionale')) {
+    return { corte: 'corte_costituzionale', numero: n, anno: year };
+  }
+  const cass = /^cass(?:azione)?(?: (civ|pen|lav|sez un))?$/.exec(words);
+  if (!cass) return null;
+  if (cass[1] === 'civ') return { corte: 'cassazione', archivio: 'civile', numero: n, anno: year };
+  if (cass[1] === 'pen') return { corte: 'cassazione', archivio: 'penale', numero: n, anno: year };
+  if (cass[1] === 'lav') return { corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: n, anno: year };
+  if (cass[1] === 'sez un') return { corte: 'cassazione', sezione: 'U', numero: n, anno: year };
+  return { corte: 'cassazione', numero: n, anno: year };
 }
 
 /**

@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Scale, ChevronDown, Filter } from 'lucide-react';
 import type { MassimaStructured } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { brocardiDecisionRef, DECISION_PAGE_AVAILABLE, formatDecisionShort, linkableDecisionPath } from '../../../utils/decisionLinks';
 
 interface MassimeSectionProps {
   massime: (string | MassimaStructured)[] | null;
@@ -190,6 +192,8 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
             const displayText = isLongText && !isExpanded
               ? m.massima.slice(0, 300) + '...'
               : m.massima;
+            const decision = brocardiDecisionRef(m.autorita, m.numero, m.anno);
+            const decisionPath = decision && DECISION_PAGE_AVAILABLE ? linkableDecisionPath(decision) : null;
 
             return (
               <div
@@ -206,7 +210,22 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
                     {/* Header with authority and case number */}
                     {hasStructuredData && (m.autorita || m.numero || m.anno) && (
                       <div className="flex flex-wrap items-center gap-2 mb-2">
-                        {m.autorita && (
+                        {decision ? (
+                          // A decision of the Cassazione or the Corte costituzionale: its short label
+                          // (source convention, D2), a link to its page when the data make one.
+                          decisionPath ? (
+                            <Link
+                              to={decisionPath}
+                              className={cn('px-2 py-0.5 rounded text-xs font-medium hover:underline', getAuthorityColor(m.autorita))}
+                            >
+                              {formatDecisionShort(decision)}
+                            </Link>
+                          ) : (
+                            <span className={cn('px-2 py-0.5 rounded text-xs font-medium', getAuthorityColor(m.autorita))}>
+                              {formatDecisionShort(decision)}
+                            </span>
+                          )
+                        ) : m.autorita && (
                           <span className={cn(
                             "px-2 py-0.5 rounded text-xs font-medium",
                             getAuthorityColor(m.autorita)
@@ -214,7 +233,7 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
                             {m.autorita}
                           </span>
                         )}
-                        {m.numero && m.anno && (
+                        {!decision && m.numero && m.anno && (
                           <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                             n. {m.numero}/{m.anno}
                           </span>

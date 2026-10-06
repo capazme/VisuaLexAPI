@@ -2,6 +2,7 @@
 
 import type { QaRetrievedSource } from './types';
 import { normFromUrn, shortNorm } from '../../../utils/sources';
+import { formatDecisionShort } from '../../../utils/decisionLinks';
 
 export const CANON_LABEL: Record<string, string> = {
   literal: 'Letterale',
@@ -47,13 +48,12 @@ export function formatRetrievedUrn(urn: string): string {
   // A decision, by its key or Brocardi's legacy one: the short label (D2) with no section,
   // which the key does not carry. A legacy key with no archive is «Cass.».
   const keyed = urn.match(/^cassazione:(civile|penale):(\d+):(\d{4})$/);
-  if (keyed) return `Cass. ${keyed[1] === 'civile' ? 'civ.' : 'pen.'}, n. ${keyed[2]}/${keyed[3]}`;
+  if (keyed) return formatDecisionShort({ corte: 'cassazione', archivio: keyed[1], numero: Number(keyed[2]), anno: Number(keyed[3]) });
   const court = urn.match(/^corte_costituzionale:(\d+):(\d{4})$/);
-  if (court) return `Corte cost., n. ${court[1]}/${court[2]}`;
+  if (court) return formatDecisionShort({ corte: 'corte_costituzionale', numero: Number(court[1]), anno: Number(court[2]) });
   const massima = urn.match(/massima_(?:cassazione_)?(?:(civile|penale)_)?(\d+)_(\d{4})/i);
   if (massima) {
-    const head = massima[1] ? `Cass. ${massima[1].toLowerCase() === 'civile' ? 'civ.' : 'pen.'}` : 'Cass.';
-    return `${head}, n. ${massima[2]}/${massima[3]}`;
+    return formatDecisionShort({ corte: 'cassazione', archivio: massima[1]?.toLowerCase(), numero: Number(massima[2]), anno: Number(massima[3]) });
   }
   // A norm, read from its key (source convention): «art. 2043 c.c.», «art. 12 preleggi».
   const norm = normFromUrn(urn);
