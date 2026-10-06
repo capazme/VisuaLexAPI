@@ -23,7 +23,7 @@ const ACCESS_TOKEN = 'urn:ietf:params:oauth:token-type:access_token';
 async function exchange(config: McpConfig, caller: Caller, scope: string): Promise<string> {
   let response: Response;
   try {
-    response = await fetch(`${config.issuer}/oauth/token`, {
+    response = await fetch(`${config.authUrl}/oauth/token`, {
       method: 'POST',
       headers: { authorization: basicAuthorization(config), 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({

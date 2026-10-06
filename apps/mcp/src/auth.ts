@@ -31,7 +31,7 @@ export async function authenticate(config: McpConfig, authorization: string | un
 
   let body: Record<string, unknown>;
   try {
-    const response = await fetch(`${config.issuer}/oauth/introspect`, {
+    const response = await fetch(`${config.authUrl}/oauth/introspect`, {
       method: 'POST',
       headers: { authorization: basic(config), 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ token }),

@@ -1,7 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { RESOURCE, rpc, rpcBody, startStubs } from './stubs.js';
+import { createApp } from '../src/server.js';
+import { readConfig } from '../src/config.js';
 
 let env: Awaited<ReturnType<typeof startStubs>>;
 beforeAll(async () => {
@@ -208,6 +212,87 @@ describe('review findings on PR #60', () => {
       expect(lines.join('\n')).not.toContain('Pratica');
     } finally {
       spies.forEach((spy) => spy.mockRestore());
+    }
+  });
+});
+
+/** A raw request with a chosen Host header (fetch does not let a caller set it). */
+function rawPost(url: string, host: string, headers: Record<string, string> = {}): Promise<number> {
+  const target = new URL(url);
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        path: target.pathname,
+        method: 'POST',
+        headers: { host, 'content-type': 'application/json', ...headers },
+      },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      },
+    );
+    req.on('error', reject);
+    req.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }));
+  });
+}
+
+/** An app of its own on an ephemeral loopback port; closed by the caller. */
+async function listen(app: ReturnType<typeof createApp>): Promise<{ url: string; server: http.Server }> {
+  const server = await new Promise<http.Server>((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`, server };
+}
+
+describe('exposure (production stack)', () => {
+  it('calls the server at MCP_AUTH_URL, not at the issuer', async () => {
+    // stubs.ts sets an unreachable issuer: a good token only works through authUrl.
+    const client = await connect('good');
+    const tools = await client.listTools();
+    expect(tools.tools.length).toBeGreaterThan(0);
+    await client.close();
+  });
+
+  it('defaults MCP_AUTH_URL to the issuer, so development needs nothing new', () => {
+    expect(readConfig({ MCP_CLIENT_SECRET: 's', MCP_AUTH_ISSUER: 'http://localhost:3001/' }).authUrl).toBe('http://localhost:3001');
+    expect(readConfig({ MCP_CLIENT_SECRET: 's', MCP_AUTH_URL: 'http://server:3001/' }).authUrl).toBe('http://server:3001');
+  });
+
+  it("refuses a Host that is not the endpoint's", async () => {
+    expect(await rawPost(env.mcpUrl, 'evil.example')).toBe(403);
+  });
+
+  it("accepts the endpoint's own hostname, with any port", async () => {
+    // RESOURCE is http://localhost:3002/mcp: the hostname is what counts, as behind the overlay proxy (<host>:8443).
+    expect(await rawPost(env.mcpUrl, 'localhost:8443')).toBe(401);
+  });
+
+  it('accepts the loopback names (the health check)', async () => {
+    expect(await rawPost(env.mcpUrl, '127.0.0.1:3002')).toBe(401);
+  });
+
+  it('checks Host even when listening on every interface', async () => {
+    const { url, server } = await listen(createApp({ ...env.config, host: '0.0.0.0', resource: 'https://mcp.example:8443/mcp' }));
+    try {
+      expect(await rawPost(url, 'evil.example')).toBe(403);
+      expect(await rawPost(url, 'mcp.example:8443')).toBe(401);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('counts requests per forwarded address and refuses past the ceiling', async () => {
+    const { url, server } = await listen(createApp(env.config, { requestsPerMinute: 3 }));
+    try {
+      const from = (ip: string) => rawPost(url, 'localhost', { 'x-forwarded-for': ip });
+      for (let i = 0; i < 3; i += 1) expect(await from('100.64.1.2')).toBe(401);
+      expect(await from('100.64.1.2')).toBe(429);
+      // another person behind the same proxy is not affected
+      expect(await from('100.64.1.3')).toBe(401);
+    } finally {
+      server.close();
     }
   });
 });
