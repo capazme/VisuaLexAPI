@@ -295,9 +295,10 @@ _SECTIONS = {"U": "sez. un.", "L": "sez. lav.", "F": "sez. fer.", "T": "sez. tri
 
 def _section(code: Optional[str]) -> Optional[str]:
     """`U` → "sez. un.", `3` → "sez. III", `6-1` → "sez. VI-1" (the section in Roman numerals, as the courts print it)."""
+    code = re.sub(r"\s+", "", str(code or "")).upper().rstrip(".")
+    # Normalised first: a section of blanks or dots is none ("sez. ," never), as the web's citationSection.
     if not code:
         return None
-    code = re.sub(r"\s+", "", str(code)).upper().rstrip(".")
     if code in _SECTIONS:
         return _SECTIONS[code]
     head, dash, tail = code.partition("-")
