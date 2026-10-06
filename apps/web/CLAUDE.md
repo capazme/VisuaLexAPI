@@ -407,8 +407,8 @@ Duplicating any of these is a defect, not a shortcut.
   `_expand_year`: "90" → 1990, "23" → 2023), `formatDateDashed` ("29-12-2007",
   the way Normattiva writes a day), `formatDateForCitation` ("1° ottobre 2026"),
   `withPreposition` (a preposition and the date it governs, elided before 8 and
-  11: "dall'11 giugno", "all'8 settembre"; the version banners, the citations and
-  the cards' "Edizione del …" go through it, and so does any new sentence that
+  11: "dall'11 giugno", "all'8 settembre"; the version banners and the citations
+  (`consultato il …`) go through it, and so does any new sentence that
   puts a spelled-out date after "il", "del", "dal", "al" or "nel"),
   `addDaysToIsoDate`, and `todayInRome` (the day the server compares a
   `version_date` with; the browser's own day can differ).
@@ -424,7 +424,10 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/citation.ts` — `formatNormCitation` (null when there is nothing honest
   to cite: the text in force with no day, an act of the Union, an article that did
   not exist, a version that does not contain the day, a repealed article with no
-  repeal day stated) and `withCitation`; the wording is the golden file's.
+  repeal day stated; its head is `citeNorm`), `unversionedCitation` (what a copy
+  starts with when no version is cited: the text in force's, never on a past text)
+  and `withCitation(text, citation, inForce)`, which puts the citation first — the
+  version's, else `inForce` (`unversionedCitation`); the wording is the golden file's.
 - `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
   then number, "679/2016" the reverse, "2006/2004" number first), shared by
   the palette parser and the in-text matcher and mirrored by
@@ -442,9 +445,23 @@ Duplicating any of these is a defect, not a shortcut.
   vocabulary. An article the prose gives to an act no pattern can read
   ("art. 17 della legge 23 agosto 1988, n. 400") gets no link on the
   client rather than one to the act being read.
-- `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
-  (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
-  copyable citation string.
+- `utils/sources/` — how a norm is written, for each use (the source convention,
+  `docs/superpowers/specs/2026-10-04-source-convention-design.md`; pinned to
+  `conventions/sources/golden.json` by `sources/__tests__/golden.test.ts`):
+  `citeNorm` («art. 2, l. 7 agosto 1990, n. 241», «art. 2043 c.c.»), `shortNorm`
+  («art. 2 l. 241/1990»: tabs of an article, comparison, chips, quick norms),
+  `citeAct`, `shortAct` (workspace tabs), `actHeading` (a code's name, else the act
+  citation: card and block titles), `actSubtitle`, `inForceCitation` (what a copy
+  of the text in force starts with, D8), `labelFromParams` (the parsers'
+  previews), `normFromUrn` (a Normattiva URN or an ELI read back into a norm; the
+  preleggi are never the codice civile). `actTypes.ts` holds the tables; its
+  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and the golden test
+  fails when the two differ. Never write a norm's label inline: a new surface
+  picks one of these.
+- `utils/normaMeta.ts` — `formatNormaTitle(norma)` (the act heading) and
+  `formatNormaMeta(norma, articleCount?)`, the line under it: only
+  what the title does not say (a code's decree, an aliased code's name, «Estremi
+  non disponibili»), often empty.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
 - `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
   reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,

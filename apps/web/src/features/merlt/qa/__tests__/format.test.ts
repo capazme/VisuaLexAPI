@@ -54,20 +54,31 @@ describe('formatRetrievedUrn', () => {
     ).toBe('art. 1453 c.c.');
   });
 
-  it('formats a non-codice-civile article as plain "art. N"', () => {
-    expect(formatRetrievedUrn('urn:nir:stato:legge:1990-08-07;241~art1')).toBe('art. 1');
+  it('formats any other article by its act, in the source convention', () => {
+    expect(formatRetrievedUrn('urn:nir:stato:legge:1990-08-07;241~art1')).toBe('art. 1 l. 241/1990');
+    expect(formatRetrievedUrn('urn:nir:stato:regio.decreto:1942-03-16;262:1~art12')).toBe('art. 12 preleggi');
   });
 
-  it('formats a Cassazione civile massima as "Cass. civ. N/YYYY"', () => {
-    expect(formatRetrievedUrn('massima_cassazione_civile_4022_2018')).toBe('Cass. civ. 4022/2018');
+  it('keeps the bare number of an article whose act it cannot read', () => {
+    expect(formatRetrievedUrn('urn:nir:..~art1453')).toBe('art. 1453');
+  });
+
+  it('formats a decision key as its short label (D2)', () => {
+    expect(formatRetrievedUrn('cassazione:civile:31310:2024')).toBe('Cass. civ., n. 31310/2024');
+    expect(formatRetrievedUrn('cassazione:penale:12:2023')).toBe('Cass. pen., n. 12/2023');
+    expect(formatRetrievedUrn('corte_costituzionale:131:2022')).toBe('Corte cost., n. 131/2022');
+  });
+
+  it('formats a Cassazione civile massima as "Cass. civ., n. N/YYYY"', () => {
+    expect(formatRetrievedUrn('massima_cassazione_civile_4022_2018')).toBe('Cass. civ., n. 4022/2018');
   });
 
   it('formats a generic massima_<branch>_<num>_<year> shape', () => {
-    expect(formatRetrievedUrn('massima_penale_1234_2020')).toBe('Cass. pen. 1234/2020');
+    expect(formatRetrievedUrn('massima_penale_1234_2020')).toBe('Cass. pen., n. 1234/2020');
   });
 
-  it('defaults the branch abbreviation to "civ" for a bare massima_<num>_<year>', () => {
-    expect(formatRetrievedUrn('massima_9999_2021')).toBe('Cass. civ. 9999/2021');
+  it('names no archive for a bare massima_<num>_<year>: the key does not say it', () => {
+    expect(formatRetrievedUrn('massima_9999_2021')).toBe('Cass., n. 9999/2021');
   });
 
   it('humanizes a concetto: node id', () => {
@@ -106,7 +117,7 @@ describe('sourceLabel (server title takes priority over urn humanization)', () =
   });
 
   it('falls back to urn humanization when title is absent', () => {
-    expect(sourceLabel({ urn: 'massima_cassazione_civile_4022_2018' })).toBe('Cass. civ. 4022/2018');
+    expect(sourceLabel({ urn: 'massima_cassazione_civile_4022_2018' })).toBe('Cass. civ., n. 4022/2018');
   });
 
   it('prefers source_url over the opaque live: hash when no title is known', () => {

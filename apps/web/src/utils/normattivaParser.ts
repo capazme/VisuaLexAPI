@@ -1,4 +1,5 @@
 import type { SearchParams } from '../types';
+import { labelFromParams } from './sources';
 
 /**
  * Parses a Normattiva URL and extracts search parameters
@@ -160,76 +161,9 @@ export function parseNormattivaUrl(url: string): ParseResult {
   }
 }
 
-/**
- * Generate a label from search params
- */
+/** A quick norm's suggested label: the short label of the source convention. */
 export function generateLabelFromParams(params: Partial<SearchParams>): string {
-  const parts: string[] = [];
-
-  if (params.article) {
-    parts.push(`Art. ${params.article}`);
-  }
-
-  if (params.act_type) {
-    // Abbreviate common act types
-    const abbrev: Record<string, string> = {
-      // Fonti Primarie
-      'costituzione': 'Cost.',
-      'legge': 'L.',
-      'decreto legge': 'D.L.',
-      'decreto legislativo': 'D.Lgs.',
-      'decreto del presidente della repubblica': 'D.P.R.',
-      'regio decreto': 'R.D.',
-      // Codici Fondamentali
-      'codice civile': 'C.C.',
-      'codice penale': 'C.P.',
-      'codice di procedura civile': 'C.P.C.',
-      'codice di procedura penale': 'C.P.P.',
-      'preleggi': 'Prel.',
-      "disposizioni per l'attuazione del codice civile e disposizioni transitorie": 'Disp. Att. C.C.',
-      "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": 'Disp. Att. C.P.C.',
-      // Codici Settoriali
-      'codice della strada': 'C.d.S.',
-      'codice della navigazione': 'Cod. Nav.',
-      'codice del consumo': 'Cod. Cons.',
-      'codice in materia di protezione dei dati personali': 'Cod. Privacy',
-      'norme in materia ambientale': 'Cod. Amb.',
-      'codice dei contratti pubblici': 'Cod. Appalti',
-      'codice dei beni culturali e del paesaggio': 'Cod. Beni Cult.',
-      'codice delle assicurazioni private': 'Cod. Ass.',
-      'codice del processo tributario': 'C.P.Tr.',
-      'codice del processo amministrativo': 'C.P.A.',
-      "codice dell'amministrazione digitale": 'CAD',
-      'codice della proprietà industriale': 'C.P.I.',
-      'codice delle comunicazioni elettroniche': 'CCE',
-      'codice delle pari opportunità': 'CPO',
-      "codice dell'ordinamento militare": 'COM',
-      'codice del turismo': 'Cod. Tur.',
-      'codice antimafia': 'Cod. Antim.',
-      'codice di giustizia contabile': 'CGC',
-      'codice del terzo settore': 'CTS',
-      'codice della protezione civile': 'Cod. Prot. Civ.',
-      "codice della crisi d'impresa e dell'insolvenza": 'CCI',
-      'codice della nautica da diporto': 'CND',
-    };
-
-    const actAbbrev = abbrev[params.act_type.toLowerCase()] || params.act_type;
-    parts.push(actAbbrev);
-  }
-
-  if (params.act_number) {
-    parts.push(`n. ${params.act_number}`);
-  }
-
-  if (params.date) {
-    // Format date as year only if it's a full date
-    const year = params.date.split('-')[0];
-    if (year) {
-      parts.push(`/${year}`);
-    }
-  }
-
-  return parts.join(' ') || 'Norma senza titolo';
+  return params.act_type ? labelFromParams(params) : 'Norma senza titolo';
 }
 
 /**

@@ -320,12 +320,12 @@ describe('ArticleTabContent — copying a past text', () => {
     expect(copied).not.toContain('Tratto da');
   });
 
-  it('keeps the trailer the text in force always had', async () => {
+  it('starts the text in force with its citation too (D8)', async () => {
     show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
     fireEvent.click(copyButton());
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied: string = writeText.mock.calls[0][0];
-    expect(copied.endsWith('\n\n---\ncodice civile n. 262 del 1942-03-16, Art. 1284 (Allegato 2)')).toBe(true);
+    expect(copied).toMatch(/^art\. 1284 c\.c\. \(Normattiva, testo vigente, consultato il [^)]+\)\n\nArt\. 1284\./);
   });
 
   it('cites the window of a historical version reached with no day asked for, in a copy and from the banner', async () => {
@@ -347,12 +347,12 @@ describe('ArticleTabContent — copying a past text', () => {
     expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\., nel testo originale, in vigore dal 25 dicembre 2003/);
   });
 
-  it('copies the copy of an act of the Union with the plain trailer: the day was ignored, the text is the current one', async () => {
+  it('cites an act of the Union as its text in force, from EUR-Lex: the day was ignored, the text is the current one', async () => {
     show(article(undefined, { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016-04-27', numero_articolo: '5', allegato: undefined, versione: 'vigente', data_versione: '2007-10-12' }));
     fireEvent.click(copyButton());
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied: string = writeText.mock.calls[0][0];
-    expect(copied.endsWith('\n\n---\nregolamento ue n. 679 del 2016-04-27, Art. 5')).toBe(true);
+    expect(copied).toMatch(/^art\. 5, reg\. \(UE\) 2016\/679 \(EUR-Lex, testo vigente, consultato il [^)]+\)\n\n/);
     expect(copied).not.toContain('nel testo in vigore');
   });
 
@@ -492,16 +492,16 @@ describe('ArticleTabContent — "Confronta con..." names the version it compares
   afterEach(() => closeCompare());
 
   it('labels the text in force with the plain article and act, as it always did', () => {
-    expect(compareLabel(article(CURRENT, { versione: 'vigente', data_versione: '' }))).toBe('Art. 1284 (All. 2) - codice civile n. 262');
+    expect(compareLabel(article(CURRENT, { versione: 'vigente', data_versione: '' }))).toBe('art. 1284 c.c.');
   });
 
   it('labels a past text with its day, so it cannot pass for the text in force', () => {
     expect(compareLabel(article(MIDDLE, { versione: 'vigente', data_versione: '2007-12-29' })))
-      .toBe('Art. 1284 (All. 2) - codice civile n. 262 — testo al 29/12/2007');
+      .toBe('art. 1284 c.c. — testo al 29/12/2007');
   });
 
   it('labels the original text as such', () => {
     expect(compareLabel(article(MIDDLE, { versione: 'originale' })))
-      .toBe('Art. 1284 (All. 2) - codice civile n. 262 — testo originale');
+      .toBe('art. 1284 c.c. — testo originale');
   });
 });

@@ -131,3 +131,19 @@ describe('AdvancedExportModal — the doctrine is credited to its source', () =>
     expect(writeText.mock.calls[0][0]).not.toContain('Brocardi.it');
   });
 });
+
+describe('AdvancedExportModal — the citation', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('cites the text in force in the source convention, with its source and the day (D8)', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    renderModal();
+    fireEvent.click(screen.getByRole('button', { name: /Copia negli appunti/ }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(writeText.mock.calls[0][0] as string)
+      .toMatch(/--- Citazione ---\nart\. 2043 c\.c\. \(Normattiva, testo vigente, consultato il [^)]+\)/);
+  });
+});

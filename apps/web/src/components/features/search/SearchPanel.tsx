@@ -27,6 +27,7 @@ import { matchesSearchFilters } from '../../../utils/searchFilters';
 import { deriveVersionInfo, requestIsHistorical, versionTabSuffix } from '../../../utils/versionDisplay';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
+import { shortAct } from '../../../utils/sources';
 
 // Estimate the number of articles a search will return based on the `article`
 // field. Used both for the streaming progress bar and the loading skeleton.
@@ -231,7 +232,7 @@ export function SearchPanel() {
           streamingTabRef.current = { normaKey: key, tabId: mergeTarget.id };
         } else {
           const versionSuffix = isHistorical ? versionTabSuffix({ version, versionDate }) : '';
-          const label = tabLabel || `${norma.tipo_atto}${norma.numero_atto ? ` ${norma.numero_atto}` : ''}${versionSuffix}`;
+          const label = tabLabel || `${shortAct(norma)}${versionSuffix}`;
           const newTabId = addWorkspaceTab(label, norma, [result], { isCustom: !!tabLabel });
           streamingTabRef.current = { normaKey: key, tabId: newTabId };
         }
@@ -437,7 +438,7 @@ export function SearchPanel() {
           }) || ' — testo storico';
           const label = isCustomForThisGroup
             ? customTabLabel!
-            : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionSuffix}`;
+            : `${shortAct(group.norma)}${versionSuffix}`;
           addWorkspaceTab(label, group.norma, group.articles, { isCustom: isCustomForThisGroup });
         } else {
           // R3 (streaming-ux): merge into an existing tab that holds the
@@ -474,7 +475,7 @@ export function SearchPanel() {
           } else {
             const label = isCustomForThisGroup
               ? customTabLabel!
-              : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}`;
+              : shortAct(group.norma);
             addWorkspaceTab(label, group.norma, group.articles, { isCustom: isCustomForThisGroup });
           }
         }

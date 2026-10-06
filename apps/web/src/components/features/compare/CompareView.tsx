@@ -12,6 +12,7 @@ import { versionTabSuffix } from '../../../utils/versionDisplay';
 import { SafeHTML } from '../../../utils/sanitize';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
+import { shortNorm } from '../../../utils/sources';
 
 function stripHtml(html: string): string {
   return html
@@ -88,7 +89,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
               data: item.norma.data,
               urn: item.norma.urn,
             },
-            label: `Art. ${article.norma_data.numero_articolo} - ${item.norma.tipo_atto}${item.norma.numero_atto ? ` n. ${item.norma.numero_atto}` : ''}${versionSuffixOf(article)}`,
+            label: `${shortNorm(article.norma_data)}${versionSuffixOf(article)}`,
             source: 'tab',
             tabName: tab.label,
           });
@@ -98,7 +99,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
           id: `${tab.id}-${item.id}`,
           article: item.article,
           sourceNorma: item.sourceNorma,
-          label: `Art. ${item.article.norma_data.numero_articolo} - ${item.sourceNorma.tipo_atto}${item.sourceNorma.numero_atto ? ` n. ${item.sourceNorma.numero_atto}` : ''}${versionSuffixOf(item.article)}`,
+          label: `${shortNorm(item.article.norma_data)}${versionSuffixOf(item.article)}`,
           source: 'tab',
           tabName: tab.label,
         });
@@ -108,7 +109,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             id: `${tab.id}-${item.id}-${article.norma_data.numero_articolo}`,
             article,
             sourceNorma,
-            label: `Art. ${article.norma_data.numero_articolo} - ${sourceNorma.tipo_atto}${sourceNorma.numero_atto ? ` n. ${sourceNorma.numero_atto}` : ''}${versionSuffixOf(article)}`,
+            label: `${shortNorm(article.norma_data)}${versionSuffixOf(article)}`,
             source: 'tab',
             tabName: tab.label,
           });
@@ -194,7 +195,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             numero_atto: params.act_number,
             data: params.date,
           },
-          label: `Art. ${art.norma_data.numero_articolo} - ${params.act_type}${params.act_number ? ` n. ${params.act_number}` : ''}${versionLabel}`,
+          label: `${shortNorm(art.norma_data)}${versionLabel}`,
           source: 'search' as const,
         })));
       } else {
