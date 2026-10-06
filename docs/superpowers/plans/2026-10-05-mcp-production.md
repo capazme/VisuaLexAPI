@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-05-mcp-production-design.md` (approved 5 October 2026).
 
+**Execution:** native (owner, 6 October 2026: «a — li eseguo io»). The controller implements each task, a fresh code-reviewer checks each task, and a security review runs before PR 2 merges.
+
 ## Global Constraints
 
 - **Branches:** off `develop`, in a worktree, never in the main checkout:
@@ -34,6 +36,7 @@
   - per-address ceiling on the MCP endpoint: 300 requests a minute;
   - generated secrets: 48 characters; a secret is accepted only at 32 characters or more;
   - OAuth body cap at the ingress: 64 KB.
+- **Trust settings:** only Express's named presets (`loopback`, `uniquelocal`) or plain IPv4 CIDRs, never IPv4-mapped IPv6 notation. `proxy-addr` must be 2.0.8 or newer in `apps/server` and `apps/mcp` (GHSA-jqcg-44mw-7w3h: a short IPv4-mapped trust subnet matches every address). PR 1 branches from `develop` after the audit fix (`chore/npm-audit-oct6`) merges; Task 1 checks `npm ls proxy-addr`.
 - **Unchanged:**
   - `--dev` behaves exactly as before;
   - `apps/mcp` defaults keep the dev stack working with no new variable.
