@@ -119,7 +119,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   cited to the owner (the web, the MCP reads and deletion dialog): every entry is rebuilt
   from closed values when the proposal is stored and again when it is taken
   (`utils/suggestionEntries.ts`) — a norm through `schemas/normEntry.ts` (an act type the
-  convention's tables know, fixed patterns for article, number, date, annex, version; the
+  convention's tables know; an article's suffix one of the printed ordinals, an annex a number,
+  a Roman numeral or a letter, fixed forms for number, date and version; the
   sources' addresses kept only when they are Normattiva's or EUR-Lex's; unknown keys dropped),
   a decision through the item schema with its label recomputed. One refused entry refuses the
   proposal whole, with an Italian 400 naming the entry, the field and why; nothing applied.
