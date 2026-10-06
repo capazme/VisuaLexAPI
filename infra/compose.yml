@@ -71,6 +71,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # A first start on an empty volume runs initdb and init/01-databases.sh, which on a host
+      # busy building images took longer than five failed checks (measured on the first
+      # production deploy). Failures inside this window do not count; a passing check
+      # still reports healthy at once, so a warm start waits no longer than before.
+      start_period: 60s
 
   redis:
     image: redis:7-alpine

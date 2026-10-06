@@ -199,6 +199,23 @@ jobs:
       - run: node --test '.claude/hooks/*.test.mjs'
       - run: sh scripts/ci/tests/test_checks.sh
 
+  deploy:
+    name: Production deploy scripts and stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # start.sh and scripts/prod against a stub docker; /bin/sh is dash here, as on the host.
+      - run: sh scripts/prod/tests/test_deploy.sh
+      # The Compose files rendered and checked for what the design promises (no container runs).
+      - run: sh scripts/prod/tests/test_compose.sh
+      # The ingress: its routes against the web app's proxy list, then the real Caddyfile in
+      # front of stand-in upstreams (the login gate, the OAuth routes, the forwarded address).
+      - run: node --test infra/ingress/paths.test.mjs
+      - run: sh infra/ingress/checks/gate.sh
+
   release-source:
     name: Release source
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
