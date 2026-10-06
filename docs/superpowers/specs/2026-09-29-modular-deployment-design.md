@@ -61,11 +61,12 @@ itself (invites, password reset).
 
 | Module | Image | Talks to | State | Notes |
 |---|---|---|---|---|
-| `ingress` | Caddy, with the built web app | `server`, `scrapers` | none | The only module facing the network. Routes `/api/*` to `server`, the scraping paths to `scrapers`, everything else to the static app with the single-page fallback. The scraping path list is the one in `apps/web/vite.config.ts`, prefix semantics included (`/health` also covers `/health/detailed`); a test keeps the two in step. Everything else in the Python API (its own `/history`, `/dossiers…`, circuit-breaker status) stays unrouted. |
+| `ingress` | Caddy, with the built web app | `server`, `scrapers` | none | The app's door (the MCP server, when on, is the second). Routes `/api/*` to `server`, the scraping paths to `scrapers`, everything else to the static app with the single-page fallback. The scraping path list is the one in `apps/web/vite.config.ts`, prefix semantics included (`/health` also covers `/health/detailed`); a test keeps the two in step. Everything else in the Python API (its own `/history`, `/dossiers…`, circuit-breaker status) stays unrouted. |
 | `server` | Node (built from `apps/server`) | stores, `scrapers`, MERL-T | none | A one-shot `migrate` service runs `prisma migrate deploy` first; `server` starts when it has finished. |
 | `scrapers` | Python + Chromium (from `services/visualex`) | the internet | cache and state folders | Runs under Hypercorn with **one worker** (the rate limiter, circuit breaker and fetch queue are in-memory per instance). Filesystem cache, no Redis (section 4.2). The movable module. |
 | stores | as `infra/compose.yml` | — | volumes | Postgres, Redis, FalkorDB, Qdrant. Already pinned. |
 | MERL-T | as `infra/compose.yml` | stores, `scrapers` | volumes | `mcp-legal-it`, `merlt-api`, `merlt-worker`. On in production (D9). |
+| `mcp` | Node (built from `apps/mcp`) | `server` | none | The MCP server for Claude Code, a second door on the loopback, started when `MCP_PUBLIC_URL` is set (profile `mcp`). Design: `2026-10-05-mcp-production-design.md`. |
 
 Compose is split so that modularity is real, not nominal:
 
@@ -82,9 +83,10 @@ Three internal networks and nothing else:
 
 | Network | Members | Why |
 |---|---|---|
-| `edge` | `ingress` | The only door; in phase 2 the router forwards to it. |
+| `edge` | `ingress` | The app's door; in phase 2 the router forwards to it. Fixed subnet (`EDGE_SUBNET`): the ingress trusts a forwarded client address from it. |
 | `app` | `ingress`, `server`, `scrapers`, MERL-T | The request path. |
 | `data` | `server`, MERL-T, the stores | The stores are reachable only by the two modules that need them. |
+| `mcp` | `mcp`, `server` | The MCP server reaches the server and nothing else (added on 5 October 2026). |
 
 `scrapers` sits on `app` only and needs outbound internet, so `app` is not an `internal`
 network. It has **no Redis**: MERL-T's job queues live in Redis as pickled objects, so a

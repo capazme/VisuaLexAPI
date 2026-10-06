@@ -95,5 +95,9 @@ npm --prefix apps/mcp test         # against stub servers, no database
 npm --prefix apps/mcp run build    # tsc
 ```
 
-Not packaged in the Compose stack and not exposed publicly: that is the
-exposure round, not the spike.
+In the production stack it is the `mcp` module (`apps/mcp/Dockerfile`,
+`infra/compose.app.yml`, profile `mcp`): started by `./start.sh --prod` when
+`MCP_PUBLIC_URL` is set in `infra/.env`, published on the host's loopback only
+and reached through the host's HTTPS proxy, on a network it shares with the
+server alone. Its OAuth endpoints are the server's, behind the ingress. Spec:
+`docs/superpowers/specs/2026-10-05-mcp-production-design.md`.
