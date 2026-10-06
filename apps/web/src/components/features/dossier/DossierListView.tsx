@@ -20,7 +20,8 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeNormaGroups, computeItemCounts, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, importToastType, searchParamsFromGroup, searchesForGroups,
+  tabLabelForGroup, validateImportedDossier, type ImportCheck, type NormaGroup,
 } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
@@ -29,7 +30,7 @@ import type { Dossier } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { actsSummary, layoutDossier } from './dossierLayout';
 
-type ToastType = 'success' | 'error' | 'info';
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface Props {
   onSelect: (dossierId: string) => void;
@@ -53,7 +54,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [deletingDossier, setDeletingDossier] = useState<Dossier | null>(null);
   const [openPickerGroups, setOpenPickerGroups] = useState<{ dossier: Dossier; groups: NormaGroup[] } | null>(null);
-  const [importingDossier, setImportingDossier] = useState<Dossier | null>(null);
+  const [importing, setImporting] = useState<ImportCheck | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +77,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             return item.data.tipo_atto?.toLowerCase().includes(q) ||
                    item.data.numero_articolo?.includes(q);
           }
+          if (item.type === 'sentenza') return decisionCitationOf(item.data).toLowerCase().includes(q);
           return item.data?.toLowerCase?.().includes(q);
         })
       );
@@ -169,7 +171,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       isModalOpen ||
       editingDossier !== null ||
       deletingDossier !== null ||
-      importingDossier !== null ||
+      importing !== null ||
       openPickerGroups !== null;
 
     const onKey = (e: KeyboardEvent) => {
@@ -195,7 +197,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isModalOpen, editingDossier, deletingDossier, importingDossier, openPickerGroups]);
+  }, [isModalOpen, editingDossier, deletingDossier, importing, openPickerGroups]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -203,11 +205,12 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     if (!file) return;
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text) as Dossier;
-      if (!parsed || typeof parsed !== 'object' || !parsed.title || !Array.isArray(parsed.items)) {
+      // A file is untrusted: its decision items are checked, and what cannot be imported is listed.
+      const check = validateImportedDossier(JSON.parse(text));
+      if (!check) {
         throw new Error('Struttura non riconosciuta');
       }
-      setImportingDossier(parsed);
+      setImporting(check);
     } catch (err) {
       console.error('JSON import failed:', err);
       showToast(`File JSON non valido${err instanceof Error && err.message ? `: ${err.message}` : ''}`, 'error');
@@ -215,16 +218,17 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   };
 
   const handleConfirmJsonImport = async () => {
-    if (!importingDossier) return;
-    const snapshot = importingDossier;
-    setImportingDossier(null);
-    const newId = await importDossier(snapshot);
-    if (newId) {
-      showToast('Dossier importato', 'success');
-      onSelect(newId);
-    } else {
+    if (!importing) return;
+    const { dossier, discarded } = importing;
+    setImporting(null);
+    const outcome = await importDossier(dossier);
+    if (!outcome) {
       showToast('Impossibile importare il dossier: errore server', 'error');
+      return;
     }
+    const lost = outcome.failed + discarded.length;
+    showToast(importReport(outcome.imported, lost), importToastType(outcome.imported, lost));
+    onSelect(outcome.id);
   };
 
   return (
@@ -454,6 +458,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   <span>
                     {counts.note} {counts.note === 1 ? 'nota' : 'note'}
                   </span>
+                  {counts.sentenze > 0 && (
+                    <span>{counts.sentenze} {counts.sentenze === 1 ? 'sentenza' : 'sentenze'}</span>
+                  )}
                   {counts.important > 0 && (
                     <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400"
                           title={`${counts.important} element${counts.important === 1 ? 'o' : 'i'} importanti`}>
@@ -510,10 +517,11 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
         />
       )}
 
-      {importingDossier && (
+      {importing && (
         <ImportDossierModal
-          dossier={importingDossier}
-          onClose={() => setImportingDossier(null)}
+          dossier={importing.dossier}
+          discarded={importing.discarded}
+          onClose={() => setImporting(null)}
           onConfirm={handleConfirmJsonImport}
         />
       )}

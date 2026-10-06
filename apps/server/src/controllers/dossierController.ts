@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
 import { citeStoredAct, citeStoredNorm } from '../norms/citation';
+import { parseDecisionItemContent } from '../schemas/decisionItem';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -73,7 +74,7 @@ const updateDossierSchema = z.object({
 });
 
 const createDossierItemSchema = z.object({
-  itemType: z.enum(['norm', 'note', 'section']),
+  itemType: z.enum(['norm', 'note', 'section', 'sentenza']),
   title: z.string().min(1),
   content: z.any().optional(),
   position: z.number().optional(),
@@ -221,6 +222,9 @@ export const addDossierItem = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = createDossierItemSchema.parse(req.body);
 
+  // A decision's content is its identity: checked before anything is written (design 2026-10-01 §6).
+  const decision = data.itemType === 'sentenza' ? parseDecisionItemContent(data.content) : null;
+
   // Check ownership
   const dossier = await prisma.dossier.findFirst({
     where: { id, userId: req.user!.id },
@@ -240,8 +244,8 @@ export const addDossierItem = async (req: Request, res: Response) => {
     data: {
       dossierId: id,
       itemType: data.itemType as DossierItemType,
-      title: data.title,
-      content: data.content || null,
+      title: decision ? decision.etichetta : data.title,
+      content: decision ?? (data.content || null),
       position: data.position ?? (maxPos._max.position ?? -1) + 1,
       ...(data.status !== undefined && { status: data.status }),
       ...provenanceFromRequest(req),
@@ -332,6 +336,23 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     if (!current) throw new AppError(404, 'Dossier item not found');
     if (current.itemType !== 'note') throw new AppError(400, 'Solo una nota può riferirsi a un articolo.');
     if (data.aboutItemId !== null) await assertArticleOfDossier(id, data.aboutItemId);
+  }
+
+  // A decision is checked like a creation, and its title is its label: never set apart from it.
+  if (data.content !== undefined || data.title !== undefined) {
+    const existing = await prisma.dossierItem.findFirst({
+      where: { id: itemId, dossierId: id },
+      select: { itemType: true },
+    });
+    if (existing?.itemType === 'sentenza') {
+      if (data.content !== undefined) {
+        const decision = parseDecisionItemContent(data.content);
+        data.content = decision;
+        data.title = decision.etichetta;
+      } else {
+        delete data.title;
+      }
+    }
   }
 
   let item;

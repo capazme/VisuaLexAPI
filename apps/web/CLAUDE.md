@@ -260,7 +260,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
   the notes first (`DossierNotesSection`), then one `DossierActBlock` per act in
-  the order the acts entered the dossier. An act's identity is a code's name
+  the order the acts entered the dossier, then «Giurisprudenza»
+  (`DossierDecisionsSection`, the decisions in stored order). An act's identity is a code's name
   (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
@@ -296,6 +297,16 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   restore reloads that dossier from the server (`refreshDossier`). The web never
   moves anything to the trash: its own deletions stay immediate, with an undo.
   A decision in the trash has no label until the convention's server PR.
+- **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
+  schema accepts and a label, never the text. They are added from the decision's page
+  («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
+  «Giurisprudenza» (`DossierDecisionsSection`: each citation links to the decision's page, and
+  each row can be removed). The stored `etichetta` is a copy (source convention, Q9):
+  `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
+  sends it (`itemContentFor`, `serverItemFor`) and every screen shows it, never the copy.
+  `parseSentenzaContent` (dossierUtils) mirrors `apps/server/src/schemas/decisionItem.ts`:
+  change both together. Every switch over item types ends in `assertNever`, so a new type cannot
+  fall silently into "note".
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
@@ -314,8 +325,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   and defers the PUT while an item is still in `pendingDossierItemIds` (its
   `addItem` POST hasn't returned a server id yet), replaying it once settled.
   Legacy status values still hydrate and simply render as unstarred.
-- **Collection**: `AddToDossierPopover.tsx` is the only add-from-reading entry
-  point (from `ReadingToolbar` and `LooseArticleCard`). It lists recent dossiers,
+- **Collection**: `AddToDossierPopover.tsx` is the add-from-reading entry
+  point for articles (from `ReadingToolbar` and `LooseArticleCard`) and for
+  decisions (`DecisionPage`, with `sentenza`). It lists recent dossiers,
   guards duplicates, and its inline "Nuovo dossier" waits for the server id
   before adding — `createDossier()` returns `Promise<string | null>`.
   `DossierModal` is create-only.
@@ -355,6 +367,26 @@ Duplicating any of these is a defect, not a shortcut.
   `api.ts`'s single in-flight refresh) because the production ingress refuses those calls
   without one, and it returns fetch's own `Response`, so the NDJSON stream and the PDF
   work as before. `/version` and `/health` are the two that stay open.
+- `utils/decisionLinks.ts` — the addresses of court decisions (`decisionPath`,
+  `parseDecisionPath`, `decisionKey`) and their names (`formatDecisionHeading`,
+  `formatDecisionCitation`, pinned to `conventions/sources/golden.json`). The paths
+  `/sentenze/<corte>/<numero>/<anno>` are a contract with LibreLex and the MERL-T graph: never
+  rename them (spec `docs/superpowers/specs/2026-10-01-sentenze-design.md`). Its first block is
+  shared with the Massimario panel (`linkableDecisionPath`); `httpsUrl` keeps a source link to
+  https only.
+- `services/decisionService.ts` — `fetchDecision(reference)`: `POST /fetch_decision` through
+  `legalFetch`. Only the route's six `esito` values are read as its answer: a quota refusal, or
+  any other body (the rate limit's, the login gate's, a framework page), is "fonte non
+  raggiungibile", and `errore_interno` a generic error; neither is ever "non trovata".
+- `utils/decisionText.ts` + `features/decisions/DecisionTextView.tsx` — a decision's text, one
+  span per line: the text nodes spell the received text minus `\n` (the same contract as
+  gotcha 23), labels and the space between lines come from CSS, and a copy is composed by
+  `decisionClipboardText` so it reads as the page does. An epigrafe without a motivazione is
+  labelled «Testo» (the owner's decision); a decision found without its text draws no block
+  (`hasDecisionText`).
+- `utils/returnTo.ts` — where the login sends the reader back: router state or the
+  sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
+  URL parameter; a logout forgets it.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
   `findLiveBackIndex` for citation-jump undo.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
@@ -682,9 +714,13 @@ meant to stay split; add new features as new files, not inside the shells:
     (`increment: 1`), never a read-modify-write PUT. Client pattern: bump locally
     for instant feedback, then fire-and-forget `service.use(id)`; the next
     `fetchUserData` is the source of truth.
-20. **SuggestionItem payloads are server-trusted** — the `take` handler trusts the
-    stored shape, so any rename must happen before storage. That is why the alias
-    Rename path is deferred; Replace and Skip cover the flows.
+20. **SuggestionItem payloads are server-trusted, except a dossier's entries** —
+    the `take` handler trusts the stored shape, so any rename must happen before
+    storage. That is why the alias Rename path is deferred; Replace and Skip cover
+    the flows. A dossier proposal is the exception: the take checks each entry
+    (`apps/server/src/utils/suggestionEntries.ts`; a decision's through the item
+    schema) and, if any is malformed, refuses the whole proposal with a 400 and
+    applies nothing.
 21. **`sourceSuggestionId` + `originalAuthorId` are the attribution contract** —
     never mutate or filter them out. If a row has an author, the UI shows the
     `AttributionChip`; a deleted author renders "@utente-rimosso" by design.

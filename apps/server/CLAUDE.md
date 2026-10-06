@@ -87,7 +87,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and the counter it spent. Then it sets `req.user` and `req.delegation`, and `authenticate` lets
   the request through; nothing else sets `req.delegation`. **Adding a route to
   the table is a security decision**: every entry is reachable by any MCP
-  client the user connected, and none may update, move or delete.
+  client the user connected. None updates or moves, and none deletes for
+  good: the three trash routes (below) move rows to a trash only the user's
+  session restores or empties.
   `GET /api/oauth/quota` reports what is left (`{ points, counters }`).
 - **Provenance and notes** (MCP second round; spec
   `docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` §5). Dossiers
@@ -106,6 +108,31 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   session only, the route is not in the delegated table): the web app's undo
   restores an article with a new id and points its notes at it.
   `assertArticleOfDossier` is the one check behind both routes.
+- **Decisions in a dossier**: an item may be `sentenza`: a court decision's
+  identity and a label, never its text. Its content is checked by
+  `schemas/decisionItem.ts` (unknown keys refused) when an item is added and
+  when a decision's content is updated; it must stay aligned with the web's
+  `parseSentenzaContent`, so change both together. The item's `title` follows
+  `etichetta` (a copy the web recomputes on every write; the server bounds and
+  stores it). A Forum suggestion's `take` stores what each dossier entry carries
+  (`utils/suggestionEntries.ts`) and refuses a malformed proposal whole: a 400,
+  nothing applied.
+- **Deleting through a connected application, and the trash** (second-round
+  spec §4.2–4.3). Scope `content:delete`: the consent page offers it apart and
+  unticked, `PATCH /api/oauth/grants/:id {canDelete}` switches it, and
+  introspection, the exchange and `delegatedAuth` read it **live from the
+  grant** (`effectiveScopes`), so switching it off stops a token exchanged
+  before; a deletion route also needs the read scope of what it deletes
+  (`readScope` in the delegated table). `trash/trash.ts` copies the rows into
+  `trash_entries` and deletes them in one transaction, the dossier row locked
+  (`FOR UPDATE`): `POST /dossiers/:id/trash {itemIds}` (the entries the user
+  saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
+  `/lingo/cards/trash` — exchanged tokens only, never the web app, whose own
+  deletions stay immediate. `GET /api/trash`, `POST /api/trash/:id/restore
+  {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
+  Restore brings every column back with the original ids; entries 30 days,
+  then swept (awaited, at most every ten minutes). No route reachable by an
+  exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
   norm as the reader stores it), then existence once per act: the
@@ -227,7 +254,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   No learning steps in minutes. Every exported function refuses what is not a
   finite number in range with a `RangeError`, including a custom set of weights
   that overflows: a NaN must never reach a stored row.
-- **LingoLex cards** (data layer only; no route writes them yet): `LingoCard` and
+- **LingoLex card routes** (`routes/lingoCards.ts`, `/api/lingo/cards`; second-round
+  spec §6): `POST` (1–10 cards, at most 20 distinct anchor references a call,
+  anchors given in words and resolved by `lingo/anchors.ts` — the official
+  `urn:nir:…` as identity, `normaKey`/`articleId` derived in one place, the AKN
+  fingerprint from the part matched to the annex by article numbers, refused
+  when ambiguous; a card with an unverifiable anchor is refused, the others
+  created; always the author's draft), `GET /` and `GET /:id` (own cards only),
+  `POST /trash` (personal states only, `PERSONAL_STATES`). Scopes
+  `lingo:cards:read` / `lingo:cards:write`; two points per reference, one of
+  the day's hundred per card.
+- **LingoLex cards** (data layer): `LingoCard` and
   `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
   is the strict contract: one to ten anchors, a lower-case SHA-256 fingerprint,
   at most one primary, and the caller cannot set state, score, author or id.

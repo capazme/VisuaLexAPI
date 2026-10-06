@@ -431,6 +431,7 @@ enum DossierItemType {
   norm
   note
   section
+  sentenza
 }
 
 enum DossierItemStatus {

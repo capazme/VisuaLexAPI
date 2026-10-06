@@ -8,23 +8,23 @@ import { ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
 import { TRASH_DAYS, canAsk, confirmWithUser, deletionMessage, type Confirmation } from '../confirm.js';
 
-const DELETE_SCOPE = 'content:delete';
+export const DELETE_SCOPE = 'content:delete';
 export const MAX_DELETIONS = 50;
 
-const NO_PERMISSION =
+export const NO_PERMISSION =
   'Questa applicazione non è autorizzata a eliminare. Puoi abilitarlo in VisuaLex: Impostazioni → Applicazioni collegate → «Può eliminare dossier, voci e schede».';
-const CANNOT_ASK =
+export const CANNOT_ASK =
   'Questo client non può chiederti conferma, quindi da qui non si elimina nulla. Puoi eliminare dalla pagina del dossier in VisuaLex.';
 const NOTHING_DELETED = 'Nulla è stato eliminato: l’eliminazione non è stata confermata.';
 /** What the user reads when the question did not end in a confirmation. */
-const NOT_CONFIRMED: Record<Exclude<Confirmation, 'confirmed' | 'unsupported'>, string> = {
+export const NOT_CONFIRMED: Record<Exclude<Confirmation, 'confirmed' | 'unsupported'>, string> = {
   declined: NOTHING_DELETED,
   timeout: 'Nessuna risposta alla richiesta di conferma in tempo. Nulla è stato eliminato.',
   failed: 'La richiesta di conferma non è arrivata all’utente. Nulla è stato eliminato.',
 };
 
 /** Until when what goes to the trash today can be restored, in Italian. */
-const restorableUntil = (): string =>
+export const restorableUntil = (): string =>
   new Date(Date.now() + TRASH_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /**
@@ -32,7 +32,7 @@ const restorableUntil = (): string =>
  * structured fields; anything else by its kind. Titles and note texts may have been
  * written by a model, and must never speak in the dialog.
  */
-const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione' };
+const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione', sentenza: 'Sentenza' };
 /** Who wrote it, from the server's mark; never the application's own (self-chosen) name. */
 const author = (item: ApiDossierItem): string =>
   item.created_by ? (item.item_type === 'note' ? ' (scritta da un’applicazione collegata)' : ' (di un’applicazione collegata)') : ' (tua)';

@@ -10,9 +10,11 @@ import type { McpConfig } from './config.js';
 import { ToolError } from './errors.js';
 import { SessionStore } from './sessions.js';
 import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier.js';
+import { CARD_TOOL_SCOPES, registerCardTools } from './tools/cards.js';
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const ALL_SCOPES = ['dossier:read', 'dossier:write'];
+// What a client asks for at sign-in; deletion (content:delete) is never asked: the user switches it on in VisuaLex.
+const ALL_SCOPES = ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write'];
 
 /** The protected resource metadata URL for the endpoint (RFC 9728 §3.1). */
 export function resourceMetadataUrl(config: McpConfig): string {
@@ -49,7 +51,7 @@ function scopesNeeded(message: unknown): string[] {
   if (!message || typeof message !== 'object') return [];
   const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
   if (method !== 'tools/call' || typeof params?.name !== 'string') return [];
-  return TOOL_SCOPES[params.name] ?? [];
+  return TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? [];
 }
 
 type AuthedRequest = Request & { auth?: AuthInfo };
@@ -131,6 +133,8 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
     if (missing.length > 0) {
       // The scopes the token has plus the ones it lacks: a client that signs in
       // again with exactly this list keeps what it had (MCP 2025-11-25, step-up).
+      // Deletion is not a token scope here: the consent page shows its box ticked
+      // when the connection already may delete, so the user keeps it by leaving it.
       const scope = [...new Set([...caller.scopes, ...needed])].join(' ');
       res.setHeader('WWW-Authenticate', challenge(config, { error: 'insufficient_scope', scope }));
       res.status(403).json({ error: 'insufficient_scope' });
@@ -160,6 +164,7 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
       try {
         server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
         registerDossierTools(server, config, runner);
+        registerCardTools(server, config, runner);
         const opened = server;
         // No JSON responses: a tool that asks the user to confirm sends that
         // request back on the call's own SSE stream.

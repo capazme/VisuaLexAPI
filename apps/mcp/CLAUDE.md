@@ -1,10 +1,12 @@
 # MCP server — apps/mcp
 
 Loaded when Claude works in this folder; the root `CLAUDE.md` holds the repository-wide rules.
-Spec: `docs/superpowers/specs/2026-10-02-mcp-spike-design.md`; plan:
-`docs/superpowers/plans/2026-10-02-mcp-spike.md`.
+Specs: `docs/superpowers/specs/2026-10-02-mcp-spike-design.md` (phase 1) and
+`docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` (notes,
+sessions, deletion into the trash, cards); plans beside them in
+`docs/superpowers/plans/`.
 
-VisuaLex's MCP server: the dossier tools for an application a user connected
+VisuaLex's MCP server: the dossier and LingoLex card tools for an application a user connected
 (Claude Code, LibreLex). A Node/TypeScript process of its own (decision D-037):
 **no database, no Prisma**, never the Python API. Everything goes through
 `apps/server`.
@@ -30,11 +32,13 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
   stops at the next call. No token: 401 with `WWW-Authenticate` pointing at
   the protected resource metadata (RFC 9728,
   `/.well-known/oauth-protected-resource/mcp`). A tool whose scope the token
-  lacks: 403 `insufficient_scope` (`TOOL_SCOPES` in `src/tools/dossier.ts`),
+  lacks: 403 `insufficient_scope` (`TOOL_SCOPES` in `src/tools/dossier.ts`,
+  `CARD_TOOL_SCOPES` in `src/tools/cards.ts`),
   decided before the request reaches the tools.
 - **Calling the API** (`src/exchange.ts`) — `callApi` exchanges the client's
   token for a two-minute API token for every call (RFC 8693), with the
-  narrowest scope, and maps the API's 401/403/404/429 to Italian tool errors
+  narrowest scope, and maps the API's 400/401/403/404/409/429/503 to Italian
+  tool errors, passing the server's own Italian reason on where it gives one
   (the 429 says when the daily quota renews). The client's token never reaches
   the API; the exchanged token never reaches the client.
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
@@ -58,9 +62,20 @@ VisuaLex's MCP server: the dossier tools for an application a user connected
   only; only Accept with the box ticked exchanges a delete token and moves
   exactly those ids. Decline, Cancel, an unticked box, a timeout or a client
   that declared no elicitation: nothing is deleted, never a fallback (owner's
-  decision «B»). `tests/tools.test.ts` fails if any other tool becomes
-  destructive. Adding a tool means adding its route to `apps/server`'s
+  decision «B»). `lingolex_elimina_card` is the third destructive tool
+  (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
+- **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —
+  `lingolex_schema_card` (the card's shape and the anchoring rules, as text),
+  `lingolex_salva_card` (1–10 cards, always the user's drafts; anchors as
+  references in words, which `apps/server` resolves and anchors with the
+  official URN and the AKN fingerprint — the model never handles a hash),
+  `lingolex_le_mie_card`, and `lingolex_elimina_card` (1–10 of the user's own
+  drafts or archived cards, refused before asking for a card the community has
+  taken up; confirmed and moved to the trash like the dossier deletions). In
+  the card dialog a card is named only by what the server set — its subject,
+  the article of its primary anchor, its state, its date and the start of its
+  id — never by its question or answer, which a model may have written.
 - **Hardening** — binds to `127.0.0.1` by default and refuses non-loopback
   `Host` headers there (DNS rebinding); refuses a browser `Origin` not in
   `MCP_ALLOWED_ORIGINS`. Logs one line per tool call (user, client, tool,

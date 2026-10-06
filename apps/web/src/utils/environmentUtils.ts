@@ -17,7 +17,7 @@ export interface DetailedEnvironmentStats {
   dossiers: {
     count: number;
     totalArticles: number;
-    items: Array<{ id: string; name: string; articleCount: number; description?: string }>;
+    items: Array<{ id: string; name: string; articleCount: number; decisionCount: number; description?: string }>;
   };
   quickNorms: {
     count: number;
@@ -229,8 +229,10 @@ export function getEnvironmentStats(env: Environment): {
   annotations: number;
   highlights: number;
   articles: number;
+  decisions: number;
 } {
   const articles = env.dossiers.reduce((acc, d) => acc + d.items.filter(i => i.type === 'norma').length, 0);
+  const decisions = env.dossiers.reduce((acc, d) => acc + d.items.filter(i => i.type === 'sentenza').length, 0);
 
   return {
     dossiers: env.dossiers.length,
@@ -238,6 +240,7 @@ export function getEnvironmentStats(env: Environment): {
     annotations: env.annotations.length,
     highlights: env.highlights.length,
     articles,
+    decisions,
   };
 }
 
@@ -291,6 +294,7 @@ export function getDetailedEnvironmentStats(env: Partial<Environment>): Detailed
         id: d.id,
         name: d.title,
         articleCount: d.items.filter(i => i.type === 'norma').length,
+        decisionCount: d.items.filter(i => i.type === 'sentenza').length,
         description: d.description,
       })),
     },
