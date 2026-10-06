@@ -721,10 +721,11 @@ meant to stay split; add new features as new files, not inside the shells:
 20. **SuggestionItem payloads are server-trusted, except a dossier's entries** —
     the `take` handler trusts the stored shape, so any rename must happen before
     storage. That is why the alias Rename path is deferred; Replace and Skip cover
-    the flows. A dossier proposal is the exception: the take checks each entry
-    (`apps/server/src/utils/suggestionEntries.ts`; a decision's through the item
-    schema) and, if any is malformed, refuses the whole proposal with a 400 and
-    applies nothing.
+    the flows. A dossier proposal is the exception: the server rebuilds each entry from
+    closed values when it is stored and when it is taken
+    (`apps/server/src/utils/suggestionEntries.ts`: a norm of a known act type, a decision
+    through the item schema) and, if any is not accepted, refuses the whole proposal with an
+    Italian 400 naming the entry and the field, and applies nothing.
 21. **`sourceSuggestionId` + `originalAuthorId` are the attribution contract** —
     never mutate or filter them out. If a row has an author, the UI shows the
     `AttributionChip`; a deleted author renders "@utente-rimosso" by design.
