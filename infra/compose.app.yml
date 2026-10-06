@@ -1,4 +1,5 @@
-# The application modules: the server (with its one-shot migrate step) and the ingress.
+# The application modules: the server (with its one-shot migrate step), the ingress, and
+# the MCP server (profile "mcp", started when MCP_PUBLIC_URL is set in infra/.env).
 #
 # One of the files of the production stack; compose.prod.yml wires them together
 # (networks, restart, logs). ./start.sh --prod runs:
@@ -63,6 +64,14 @@ services:
       REDIS_ENABLED: "true"
       # The browser's address of the app: the CORS allow-list. Comma-separated.
       ALLOWED_ORIGINS: "${PUBLIC_ORIGIN:-http://localhost:8080}"
+      # The OAuth authorization server for MCP clients. Its identity is the public origin,
+      # exactly as clients see it; the resource is the MCP endpoint as people type it. The
+      # MCP's credential lives in infra/.env, shared with the mcp module (below). Without
+      # the mcp profile none of this is used.
+      OAUTH_ISSUER: "${PUBLIC_ORIGIN:-http://localhost:8080}"
+      OAUTH_CONSENT_URL: "${PUBLIC_ORIGIN:-http://localhost:8080}/connect"
+      OAUTH_MCP_RESOURCE: "${MCP_PUBLIC_URL:-http://localhost:8091/mcp}"
+      OAUTH_MCP_CLIENT_SECRET: "${MCP_CLIENT_SECRET:-}"
       LEGAL_API_URL: "http://${SCRAPERS_ADDR:-scrapers:5000}"
       MERLT_ENABLED: "${MERLT_ENABLED:-true}"
       MERLT_API_URL: "http://merlt-api:8000"
@@ -104,6 +113,36 @@ services:
     # other devices. The container listens on 8080 as a normal user.
     ports:
       - "${INGRESS_BIND:-127.0.0.1}:${INGRESS_PORT:-8080}:8080"
+    depends_on:
+      server: {condition: service_healthy}
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  # The MCP server (profile "mcp": started only when MCP_PUBLIC_URL is set in infra/.env).
+  # A second door, on the loopback only: the host's overlay proxy publishes it. It reaches
+  # the server and nothing else. Spec: docs/superpowers/specs/2026-10-05-mcp-production-design.md
+  mcp:
+    <<: *hardening
+    profiles: [mcp]
+    build:
+      context: ../apps/mcp
+    container_name: ${VISUALEX_STACK:-visualex}-mcp
+    environment:
+      NODE_ENV: production
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "3002"
+      MCP_RESOURCE: "${MCP_PUBLIC_URL:-http://localhost:8091/mcp}"
+      MCP_AUTH_ISSUER: "${PUBLIC_ORIGIN:-http://localhost:8080}"
+      MCP_AUTH_URL: "http://server:3001"
+      MCP_API_BASE: "http://server:3001/api"
+      MCP_API_AUDIENCE: "${PUBLIC_ORIGIN:-http://localhost:8080}/api"
+      MCP_CLIENT_SECRET: "${MCP_CLIENT_SECRET:-}"
+      MCP_ALLOWED_ORIGINS: ""
+    # The loopback only, never a LAN address: a device there could forge its client
+    # address past the per-address ceiling. MCP_PORT here is the port on the host.
+    ports:
+      - "127.0.0.1:${MCP_PORT:-8091}:3002"
     depends_on:
       server: {condition: service_healthy}
     read_only: true
