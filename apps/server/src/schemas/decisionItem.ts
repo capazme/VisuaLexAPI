@@ -4,13 +4,14 @@
  * (apps/web/src/components/features/dossier/dossierUtils.ts): change both together. Imported
  * items and Forum suggestions are untrusted, so unknown keys are refused.
  *
- * `etichetta` is a convenience copy of the decision's citation (source convention §8.3, Q9): the
- * web app recomputes it from the identity and the attributes whenever it writes the item, and
- * shows the recomputed one. The server only bounds it and stores it, and the item's `title`
- * follows it.
+ * `etichetta` is a convenience copy of the decision's citation (source convention §8.3, D9, «A
+ * ogni scrittura»): whatever the client sent, every write stores the citation the server
+ * recomputes from the identity and the attributes (`norms/decisionCitation.ts`), and the item's
+ * `title` follows it. Reading a dossier writes nothing.
  */
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
+import { citeDecision } from '../norms/decisionCitation';
 
 const SEZIONI = ['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F'] as const;
 const TIPI = ['sentenza', 'ordinanza', 'ordinanza interlocutoria', 'decreto'] as const;
@@ -23,7 +24,8 @@ export const decisionItemContentSchema = z
     archivio: z.enum(['civile', 'penale']).optional(),
     sezione: z.enum(SEZIONI).optional(),
     tipo: z.enum(TIPI).optional(),
-    data_deposito: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    // A real month and day: the citation spells the date, so «2024-13-05» would read differently here and on the web.
+    data_deposito: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/).optional(),
     etichetta: z.string().trim().min(1).max(200),
     _dossierMeta: z.object({ important: z.boolean() }).strict().optional(),
   })
@@ -53,5 +55,10 @@ export function parseDecisionItemContent(content: unknown): DecisionItemContent 
     const detail = parsed.error.issues.map((i) => `${i.path.join('.') || 'voce'}: ${i.message}`).join('; ');
     throw new AppError(400, `Contenuto della sentenza non valido: ${detail}`);
   }
-  return parsed.data;
+  return withDecisionLabel(parsed.data);
+}
+
+/** The content with its `etichetta` recomputed: the copy never drifts from the identity (D9). */
+export function withDecisionLabel(content: DecisionItemContent): DecisionItemContent {
+  return { ...content, etichetta: citeDecision(content) };
 }

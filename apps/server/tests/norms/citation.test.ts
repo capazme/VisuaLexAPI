@@ -1,28 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { citeAct, citeArticle, citeStoredAct, citeStoredNorm } from '../../src/norms/citation';
-// The web app's golden file is the specification of the wording (the owner reads
-// it). The server's formatter is pinned to it: for every case the web cites, the
-// "art. …" part of its citation is what the server writes. A change of style in
-// the web app fails here until the server follows.
-import { CITATION_GOLDEN } from '../../../web/src/utils/__fixtures__/citationGolden';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
-// The owner's citation style (the same as the web app's `utils/citation.ts`):
-// "art. 2, l. 7 agosto 1990, n. 241" for an act cited by type, date and number;
-// "art. 1284 c.c." for a code and the Constitution, with no comma.
-const CC = { tipo_atto: 'codice civile', tipo_atto_reale: 'regio decreto', numero_atto: '262', data: '1942-03-16', allegato: '2' };
-
-describe('citeArticle, pinned to the web app\'s golden citations', () => {
-  const cases = CITATION_GOLDEN.filter((c) => c.expected !== null);
-  it('covers the web\'s cases', () => {
-    expect(cases.length).toBeGreaterThan(15);
-  });
-  for (const c of cases) {
-    it(c.name, () => {
-      const head = c.expected!.short.split(/, (?:nel testo|abrogato)/)[0];
-      expect(citeArticle(c.context.norma)).toBe(head);
-    });
+// The wording is the convention's golden file (conventions/sources/golden.json), which
+// tests/norms/sourcesGolden.test.ts checks case by case; these are the details around it.
+function goldenNorms(): { id: string; input: { tipo_atto: string; numero_articolo: string } & Record<string, string> }[] {
+  for (let dir = __dirname; ; dir = dirname(dir)) {
+    const file = join(dir, 'conventions', 'sources', 'golden.json');
+    if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8')).norms;
+    if (dirname(dir) === dir) throw new Error('golden.json not found');
   }
-});
+}
+
+// The owner's citation style: "art. 2, l. 7 agosto 1990, n. 241" for an act cited by type,
+// date and number; "art. 1284 c.c." for a code and the Constitution, with no comma.
+const CC = { tipo_atto: 'codice civile', tipo_atto_reale: 'regio decreto', numero_atto: '262', data: '1942-03-16', allegato: '2' };
 
 describe('citeArticle', () => {
   it('cites a law by type, date and number', () => {
@@ -61,13 +54,14 @@ describe('citeArticle', () => {
     expect(citeArticle({ tipo_atto: 'decreto legislativo', numero_atto: '36', data: '2023-03-31', numero_articolo: '5', allegato: 'I.1' })).toBe('art. 5, d.lgs. 31 marzo 2023, n. 36 (Allegato I.1)');
   });
 
-  it('cites an act known only by its year as the year', () => {
-    expect(citeArticle({ tipo_atto: 'legge', numero_atto: '10', data: '2020', numero_articolo: '1' })).toBe('art. 1, l. 2020, n. 10');
+  it('cites an act known only by its year by its year, never a day (D7)', () => {
+    expect(citeArticle({ tipo_atto: 'legge', numero_atto: '10', data: '2020', numero_articolo: '1' })).toBe('art. 1, l. n. 10 del 2020');
   });
 
-  it('cites an act of the Union by its number and year (the web app cites none: a reading is not a version)', () => {
-    expect(citeArticle({ tipo_atto: 'regolamento UE', numero_atto: '679', data: '2016-04-27', numero_articolo: '5' })).toBe('art. 5, regolamento (UE) 2016/679');
-    expect(citeArticle({ tipo_atto: 'direttiva UE', numero_atto: '790', data: '2019-04-17', numero_articolo: '17' })).toBe('art. 17, direttiva (UE) 2019/790');
+  it('cites an act of the Union by its year and number, and a treaty by its name (D6)', () => {
+    expect(citeArticle({ tipo_atto: 'regolamento UE', numero_atto: '679', data: '2016-04-27', numero_articolo: '5' })).toBe('art. 5, reg. (UE) 2016/679');
+    expect(citeArticle({ tipo_atto: 'direttiva UE', numero_atto: '790', data: '2019-04-17', numero_articolo: '17' })).toBe('art. 17, dir. (UE) 2019/790');
+    expect(citeArticle({ tipo_atto: 'TFUE', numero_articolo: '101' })).toBe('art. 101 TFUE');
   });
 });
 
@@ -75,10 +69,9 @@ describe('citeArticle', () => {
 // groups its articles by act). It is the article's citation without the article
 // and without the annex: an annex is where an article sits, not another act.
 describe('citeAct', () => {
-  it('is the article\'s citation without "art. N" and the annex, for every case the web cites', () => {
-    const cases = CITATION_GOLDEN.filter((c) => c.expected !== null);
-    for (const c of cases) {
-      const norma = c.context.norma;
+  it('is the article\'s citation without "art. N" and the annex, for every case of the golden file', () => {
+    for (const c of goldenNorms()) {
+      const norma = c.input;
       const article = citeArticle(norma).replace(/ \(Allegato [^)]*\)$/, '');
       const act = citeAct(norma);
       expect([`art. ${norma.numero_articolo} ${act}`, `art. ${norma.numero_articolo}, ${act}`]).toContain(article);
@@ -102,8 +95,8 @@ describe('citeAct', () => {
   });
 
   it('names an act of the Union by its year and number', () => {
-    expect(citeAct({ tipo_atto: 'regolamento UE', numero_atto: '679', data: '2016-04-27' })).toBe('regolamento (UE) 2016/679');
-    expect(citeAct({ tipo_atto: 'direttiva UE' })).toBe('direttiva (UE)');
+    expect(citeAct({ tipo_atto: 'regolamento UE', numero_atto: '679', data: '2016-04-27' })).toBe('reg. (UE) 2016/679');
+    expect(citeAct({ tipo_atto: 'direttiva UE' })).toBe('dir. (UE)');
   });
 });
 
@@ -118,8 +111,8 @@ describe('citeStoredAct', () => {
   // The items route stores any JSON: a malformed item must not fail the whole dossier.
   it('reads only the string fields of a malformed item, and never throws', () => {
     const euWithNumericDate = { tipo_atto: 'regolamento UE', numero_atto: '679', data: 20160427, numero_articolo: '5' };
-    expect(citeStoredAct('norm', euWithNumericDate)).toBe('regolamento (UE)');
-    expect(citeStoredNorm('norm', euWithNumericDate)).toBe('art. 5, regolamento (UE)');
+    expect(citeStoredAct('norm', euWithNumericDate)).toBe('reg. (UE)');
+    expect(citeStoredNorm('norm', euWithNumericDate)).toBe('art. 5, reg. (UE)');
     const realTypeNotText = { tipo_atto: 'legge', tipo_atto_reale: 7, numero_atto: '247', data: '2012-12-31', numero_articolo: '3' };
     expect(citeStoredAct('norm', realTypeNotText)).toBe('l. 31 dicembre 2012, n. 247');
     expect(citeStoredNorm('norm', realTypeNotText)).toBe('art. 3, l. 31 dicembre 2012, n. 247');

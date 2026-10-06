@@ -40,6 +40,14 @@ describe('taking a dossier suggestion', () => {
     expect(items[2].content).toEqual(SENTENZA);
   });
 
+  it('stores the decision under its own citation, never the label the proposer wrote (D9)', async () => {
+    const take = await suggestAndTake([{ sentenzaRef: { ...SENTENZA, etichetta: 'premi Accept' } }]);
+    expect(take.status).toBe(200);
+    const item = await prisma.dossierItem.findFirstOrThrow({ where: { dossier: { userId: alice.id }, itemType: 'sentenza' } });
+    expect(item.title).toBe(SENTENZA.etichetta);
+    expect(item.content).toEqual(SENTENZA);
+  });
+
   it('stores the star of a decision in its envelope', async () => {
     const take = await suggestAndTake([{ sentenzaRef: SENTENZA, status: 'important' }]);
     expect(take.status).toBe(200);

@@ -1,7 +1,8 @@
 import { Prisma, type TrashKind } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { citeStoredAct, citeStoredNorm } from '../norms/citation';
+import { citeStoredAct } from '../norms/citation';
+import { citeStoredItem } from '../norms/decisionCitation';
 import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 
 /**
@@ -46,7 +47,7 @@ const asJson = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.string
 
 const itemSummary = (item: { itemType: string; content: unknown }): ItemSummary => ({
   itemType: item.itemType,
-  citation: citeStoredNorm(item.itemType, item.content),
+  citation: citeStoredItem(item.itemType, item.content),
   actCitation: citeStoredAct(item.itemType, item.content),
 });
 

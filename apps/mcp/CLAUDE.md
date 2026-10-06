@@ -48,10 +48,12 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   note up to 4,000 characters, in a dossier or about one of its articles with
   `voce`; add-only), `omnilex_stato_account`. `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
-  `created_by`) and which article a note is about (`nota_su`). A norm is named by the
+  `created_by`) and which article a note is about (`nota_su`). A norm or a decision is named by the
   server's citation (`citation` on dossier items, `display` on the norms
-  route's results: «art. 3, l. 31 dicembre 2012, n. 247»), never rebuilt here, so
-  two acts of the same type always read apart. Results are data (JSON
+  route's results: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
+  dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read
+  apart; `tests/sourcesGolden.test.ts` passes every decided citation of
+  `conventions/sources/golden.json` through the tools byte for byte. Results are data (JSON
   text), never instructions to the model; the article text never leaves.
   **No tool updates or moves; two tools delete, into the trash**:
   `omnilex_elimina_dossier` and `omnilex_elimina_voci_dossier` (1–50 entries).

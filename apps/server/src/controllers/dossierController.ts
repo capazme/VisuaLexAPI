@@ -5,7 +5,8 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
-import { citeStoredAct, citeStoredNorm } from '../norms/citation';
+import { citeStoredAct } from '../norms/citation';
+import { citeStoredItem } from '../norms/decisionCitation';
 import { parseDecisionItemContent } from '../schemas/decisionItem';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
@@ -27,8 +28,9 @@ function serializeItem(i: ItemRow) {
     id: i.id,
     item_type: i.itemType,
     title: i.title,
-    // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247"); null for anything else.
-    citation: citeStoredNorm(i.itemType, i.content),
+    // How a lawyer cites the norm ("art. 3, l. 31 dicembre 2012, n. 247") or the decision
+    // ("Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310"); null for anything else.
+    citation: citeStoredItem(i.itemType, i.content),
     // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
     act_citation: citeStoredAct(i.itemType, i.content),
     content: i.content,

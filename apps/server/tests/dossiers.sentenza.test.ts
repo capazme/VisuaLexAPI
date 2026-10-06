@@ -22,8 +22,8 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     const res = await add({ itemType: 'sentenza', title: 'ignorato', content: SENTENZA });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ item_type: 'sentenza', title: SENTENZA.etichetta, content: SENTENZA });
-    // The server cites norms only: a decision's citation is the web app's (source convention, Q9).
-    expect(res.body).toMatchObject({ citation: null, act_citation: null });
+    // The server cites a decision as the web app does (source convention §4), for the MCP tools.
+    expect(res.body).toMatchObject({ citation: SENTENZA.etichetta, act_citation: null });
   });
 
   it.each([
@@ -33,6 +33,7 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     ['a year in the future', { ...SENTENZA, anno: new Date().getFullYear() + 1 }],
     ['an unknown key', { ...SENTENZA, testo: 'il testo intero' }],
     ['a label too long', { ...SENTENZA, etichetta: 'x'.repeat(201) }],
+    ['a date with no such month', { ...SENTENZA, data_deposito: '2024-13-05' }],
     ['a Corte costituzionale decision with a section',
       { corte: 'corte_costituzionale', numero: 1, anno: 2014, sezione: '3', etichetta: 'Corte cost. n. 1/2014' }],
     ['a Corte costituzionale decision before 1956',
@@ -46,25 +47,27 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(0);
   });
 
-  it('stores a label with markup as text', async () => {
+  it('stores its own citation as the label, whatever the client sent (D9: «A ogni scrittura»)', async () => {
     const res = await add({ itemType: 'sentenza', title: 'x', content: { ...SENTENZA, etichetta: '<b>Cass.</b>' } });
     expect(res.status).toBe(201);
-    expect(res.body.content.etichetta).toBe('<b>Cass.</b>');
+    expect(res.body).toMatchObject({ title: SENTENZA.etichetta, content: { etichetta: SENTENZA.etichetta } });
   });
 
   it('carries the star in its envelope, checks an update like a creation, and keeps the title on the label', async () => {
     const created = await add({ itemType: 'sentenza', title: 'x', content: SENTENZA });
     const url = `/api/dossiers/${dossierId}/items/${created.body.id}`;
-    const relabelled = { ...SENTENZA, etichetta: 'Cass. pen., sez. VII, n. 10787/2024', _dossierMeta: { important: true } };
+    // A section corrected: the label follows the identity, not the copy the client sent.
+    const relabelled = { ...SENTENZA, sezione: '6', etichetta: 'Cass. pen., sez. VII, n. 10787/2024', _dossierMeta: { important: true } };
+    const expected = { ...relabelled, etichetta: 'Cass. pen., sez. VI, sent. dep. 12 marzo 2024, n. 10787' };
     const starred = await request(app).put(url).set(authHeader(owner)).send({ title: 'altro', content: relabelled });
     expect(starred.status).toBe(200);
-    expect(starred.body).toMatchObject({ title: relabelled.etichetta, content: relabelled });
+    expect(starred.body).toMatchObject({ title: expected.etichetta, content: expected, citation: expected.etichetta });
     const titleOnly = await request(app).put(url).set(authHeader(owner)).send({ title: 'altro' });
-    expect(titleOnly.body.title).toBe(relabelled.etichetta);
+    expect(titleOnly.body.title).toBe(expected.etichetta);
     const broken = await request(app).put(url).set(authHeader(owner)).send({ content: { ...SENTENZA, numero: -1 } });
     expect(broken.status).toBe(400);
     const row = await prisma.dossierItem.findUniqueOrThrow({ where: { id: created.body.id } });
-    expect(row).toMatchObject({ title: relabelled.etichetta, content: relabelled });
+    expect(row).toMatchObject({ title: expected.etichetta, content: expected });
   });
 
   it('moves to another dossier, and goes into a snapshot, unchanged', async () => {

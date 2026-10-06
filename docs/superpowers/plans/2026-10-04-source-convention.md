@@ -60,13 +60,15 @@ The orchestrator split PR 1 in three (5 October 2026): **1a** the labels of norm
 
 **Files:** `apps/server/src/norms/citation.ts` (+ `shortNorm`), a new `apps/server/src/norms/decisionCitation.ts` once PR C of Sentenze needs it, `apps/server/src/utils/normaWatcher.ts:105`, `apps/server/tests/norms/sourcesGolden.test.ts`, `apps/mcp/tests/sourcesGolden.test.ts`; `apps/server/CLAUDE.md`, `apps/mcp/CLAUDE.md`.
 
-- [ ] **Golden test** for `citeArticle` on every norm case; the existing test against `citationGolden.ts` moves to the JSON file (the TS golden keeps only the version clause).
-- [ ] Fix what it shows red: `art. 101, tfue` → per Q6; `art. 6, l. 1983, n. 184` → per Q7; EU forms per Q6.
-- [ ] **Notification message**: the citation of the snapshot, not the raw `normaKey`.
-- [ ] **Decision citation on the server** (owner, 4 October 2026, in the Sentenze session: «Rinviare (Raccomandata)»): until this PR, the MCP read of a decision item shows its stored copy and the trash shows no label for a decision. This PR ports the decision citation to `apps/server` (`norms/decisionCitation.ts`, the forms of spec §4 and of `decisionLinks.formatDecisionCitation`, pinned to the golden decision cases), and both the MCP reads and the trash summaries use it.
-- [ ] **D9 on the server**: the stored decision label (`etichetta`, `title`) is recomputed on every write of the item («A ogni scrittura (Raccomandata)»); opening a dossier writes nothing.
-- [ ] **MCP**: a stub server answering the golden citations; the tools pass `citation` and `display` through byte for byte.
-- [ ] **Suites:** `npm --prefix apps/server run build`, `npm --prefix apps/server test` (after the orchestrator's go), `npm --prefix apps/mcp run build && npm --prefix apps/mcp test`.
+- [x] **Golden test** (`tests/norms/sourcesGolden.test.ts`): `citeArticle`, `shortNorm`, `citeAct` on every norm case, `citeDecision` and `shortDecision` on every decision case (the hearing-date case pending everywhere: Italgiure gives none), the codes table against the API's `map.py`. The test against the web's `citationGolden.ts` is gone; `tests/norms/citation.test.ts` reads the JSON for its act/article check. The tables are `norms/actTypes.ts`, a copy of the web's.
+- [x] Fixed what it showed red: «art. 101 TFUE», «art. 5, reg. (UE) 2016/679», «dir. (UE)» (D6); «art. 6, l. n. 184 del 1983» (D7); the D4 abbreviations; an aliased code stored without its decree.
+- [x] **Notification message**: the citation of the snapshot (`changeMessage`, both writers), the key only when the snapshot names no article.
+- [x] **Decision citation on the server**: `norms/decisionCitation.ts` (`citeDecision`, `shortDecision`, `citeStoredItem`); every dossier answer and the trash list carry a decision's `citation`; the web's trash summary names it; the MCP dialog names a decision «Sentenza: <citation>». A stored decision is cited only from the values the item schema admits (the citation reaches the confirmation dialog).
+- [x] **D9 on the server**: `withDecisionLabel` recomputes `etichetta` (and the `title`) on every write — add, update, a Forum take — whatever the client sent; reading and a trash restore write nothing new.
+- [x] **MCP**: `tests/sourcesGolden.test.ts` — a stub API answering every decided citation; `omnilex_leggi_dossier` and `omnilex_aggiungi_norme_dossier` pass `citation` and `display` through byte for byte.
+- [x] **Suites:** `npm --prefix apps/server run build`, `npm --prefix apps/server test` (in the orchestrator's window: 77 files, 1061 tests), `npm --prefix apps/mcp run build && npm --prefix apps/mcp test`, the web's dossier tests (the trash summary and `parseSentenzaContent`, whose date of deposit now needs a real month and day, as the server's schema does).
+- [ ] **Follow-up (pre-existing, found in review)**: a Forum proposal's `articleRef` is stored unvalidated (`utils/suggestionEntries.ts`), so a proposer's free text can reach a norm's citation, which the MCP confirmation dialog shows; validate it with a norm schema (lengths, characters).
+- [ ] **Not in PR 2**: dropping the Massimario's stored `label` from the rassegne wire (the web ignores it since 1c; MERL-T writes it in the convention since PR 4).
 
 ## PR 3 — Python API: identity edges (3a: `fix/api-source-identity`; 3b: year-only)
 

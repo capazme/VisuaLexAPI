@@ -142,7 +142,7 @@ function citationSection(raw: string | null | undefined): string | null {
 
 /** The identity line: "Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata il …". */
 export function formatDecisionHeading(identity: DecisionIdentity, attrs: DecisionAttributes): string {
-  const tipo = (attrs.tipo && TIPO_TITLE[attrs.tipo]) || (identity.corte === 'cassazione' ? 'Decisione' : 'Pronuncia');
+  const tipo = (attrs.tipo && Object.hasOwn(TIPO_TITLE, attrs.tipo) ? TIPO_TITLE[attrs.tipo] : null) || (identity.corte === 'cassazione' ? 'Decisione' : 'Pronuncia');
   const number = `${tipo} n. ${identity.numero}/${identity.anno}`;
   const deposited = attrs.data_deposito ? `depositata ${withPreposition('il', formatDateItalianLong(attrs.data_deposito))}` : null;
   if (identity.corte === 'corte_costituzionale') {
@@ -163,7 +163,7 @@ export function formatDecisionHeading(identity: DecisionIdentity, attrs: Decisio
  * ("Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787").
  */
 export function formatDecisionCitation(identity: DecisionIdentity, attrs: DecisionAttributes): string {
-  const tipo = attrs.tipo ? (TIPO_ABBR[attrs.tipo] ?? null) : null;
+  const tipo = attrs.tipo && Object.hasOwn(TIPO_ABBR, attrs.tipo) ? TIPO_ABBR[attrs.tipo] : null;
   const date = attrs.data_deposito ? formatDateForCitation(attrs.data_deposito) : null;
   const numero = date ? `n. ${identity.numero}` : `n. ${identity.numero}/${identity.anno}`;
   if (identity.corte === 'corte_costituzionale') {

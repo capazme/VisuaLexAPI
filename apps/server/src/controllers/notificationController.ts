@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { compareNormaSnapshots } from '../utils/normaWatcher';
+import { changeMessage, compareNormaSnapshots } from '../utils/normaWatcher';
 
 // 2 MB cap on article_text: generous for any real article, but bounds the
 // payload a malicious or buggy client could push into the snapshot JSON column.
@@ -130,7 +130,7 @@ export const checkNorma = async (req: Request, res: Response) => {
         userId,
         watchId: existing.id,
         normaKey,
-        message: `La norma salvata «${normaKey}» è cambiata`,
+        message: changeMessage(normaKey, normaData.norma_data),
         snapshot: snapshotJson,
       },
     }),

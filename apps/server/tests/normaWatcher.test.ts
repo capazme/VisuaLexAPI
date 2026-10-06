@@ -129,6 +129,8 @@ describe('runNormaWatcher', () => {
 
     const notifications = await prisma.normaChangeNotification.findMany({ where: { watchId: watch.id } });
     expect(notifications).toHaveLength(1);
+    // A snapshot that names no article is named by its key, as before.
+    expect(notifications[0].message).toBe(`La norma salvata «${watch.normaKey}» è cambiata`);
   });
 
   it('strips a trailing slash on the base URL instead of producing a double slash', async () => {

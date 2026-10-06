@@ -30,25 +30,33 @@ function articleOf(citation: string, act: string): string | null {
   return annex ? `${number} ${annex}` : number;
 }
 
-/** «l. 31 dicembre 2012, n. 247: artt. 3, 25 · c.c.: art. 2043 · 1 nota»: articles by act, then the rest counted. */
+/**
+ * «l. 31 dicembre 2012, n. 247: artt. 3, 25 · c.c.: art. 2043 · Cass. civ., sez. un., sent. 6 dicembre 2024,
+ * n. 31310 · 1 nota»: articles by act, then the decisions by the server's citation, then the rest counted.
+ */
 export function trashItemsSummary(items: TrashItemSummary[]): string {
   const byAct = new Map<string, string[]>();
   let notes = 0;
-  let decisions = 0;
+  const decisions: string[] = [];
+  let unnamedDecisions = 0;
   let unnamed = 0;
   for (const item of items) {
     if (item.itemType === 'note') { notes += 1; continue; }
-    // A decision carries no label until the convention's server PR (the owner's «Rinviare»).
-    if (item.itemType === 'sentenza') { decisions += 1; continue; }
+    // A decision by the citation the server writes from its identity (source convention §4).
+    if (item.itemType === 'sentenza') {
+      if (item.citation) decisions.push(item.citation); else unnamedDecisions += 1;
+      continue;
+    }
     const article = item.citation && item.actCitation ? articleOf(item.citation, item.actCitation) : null;
     if (!article || !item.actCitation) { unnamed += 1; continue; }
     const list = byAct.get(item.actCitation);
     if (list) list.push(article); else byAct.set(item.actCitation, [article]);
   }
   const parts = Array.from(byAct.entries()).map(([act, articles]) => `${act}: ${articles.length === 1 ? 'art.' : 'artt.'} ${articles.join(', ')}`);
+  parts.push(...decisions);
   if (unnamed) parts.push(plural(unnamed, 'voce', 'voci'));
   if (notes) parts.push(plural(notes, 'nota', 'note'));
-  if (decisions) parts.push(plural(decisions, 'sentenza', 'sentenze'));
+  if (unnamedDecisions) parts.push(plural(unnamedDecisions, 'sentenza', 'sentenze'));
   return parts.join(' · ');
 }
 
