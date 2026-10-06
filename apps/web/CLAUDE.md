@@ -296,14 +296,15 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   which dossier to restore into — or emptied behind a danger confirmation; a
   restore reloads that dossier from the server (`refreshDossier`). The web never
   moves anything to the trash: its own deletions stay immediate, with an undo.
-  A decision in the trash has no label until the convention's server PR.
+  A decision in the trash is named by the server's citation.
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's page
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
   «Giurisprudenza» (`DossierDecisionsSection`: each citation links to the decision's page, and
-  each row can be removed). The stored `etichetta` is a copy (source convention, Q9):
+  each row can be removed). The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
-  sends it (`itemContentFor`, `serverItemFor`) and every screen shows it, never the copy.
+  sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
+  (`withDecisionLabel`), and every screen shows the recomputed one, never the copy.
   `parseSentenzaContent` (dossierUtils) mirrors `apps/server/src/schemas/decisionItem.ts`:
   change both together. Every switch over item types ends in `assertNever`, so a new type cannot
   fall silently into "note".

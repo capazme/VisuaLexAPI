@@ -1,9 +1,19 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { citeStoredNorm } from '../norms/citation';
 
 let running = false;
 
 export type NormaSnapshot = { norma_data: unknown; article_text: string };
+
+/**
+ * The notification's sentence: the norm by its citation («La norma salvata «art. 2043 c.c.» è
+ * cambiata»), the stored key only when the snapshot names no article. Both writers of the
+ * notifications (this watcher and the reader's check) use it.
+ */
+export function changeMessage(normaKey: string, normaData: unknown): string {
+  return `La norma salvata «${citeStoredNorm('norm', normaData) ?? normaKey}» è cambiata`;
+}
 
 /**
  * The two writers of normaWatch rows (this background watcher and
@@ -102,7 +112,7 @@ async function checkWatch(watch: { id: string; userId: string; normaKey: string;
   await prisma.$transaction([
     prisma.normaWatch.update({ where: { id: watch.id }, data: { normaData: snapshot, lastSeenAt: new Date() } }),
     prisma.normaChangeNotification.create({
-      data: { userId: watch.userId, watchId: watch.id, normaKey: watch.normaKey, message: `La norma salvata «${watch.normaKey}» è cambiata`, snapshot },
+      data: { userId: watch.userId, watchId: watch.id, normaKey: watch.normaKey, message: changeMessage(watch.normaKey, article.norma_data), snapshot },
     }),
   ]);
 }

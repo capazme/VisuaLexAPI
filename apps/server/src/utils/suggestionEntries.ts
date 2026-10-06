@@ -6,7 +6,7 @@
  * dossier item schema (design 2026-10-01 §6).
  */
 import type { Prisma } from '@prisma/client';
-import { decisionItemContentSchema } from '../schemas/decisionItem';
+import { decisionItemContentSchema, withDecisionLabel } from '../schemas/decisionItem';
 
 export interface EntryItem {
   itemType: 'norm' | 'note' | 'sentenza';
@@ -22,7 +22,9 @@ export function dossierItemFromEntry(entry: unknown, position: number): EntryIte
   if (e.sentenzaRef !== undefined) {
     const parsed = decisionItemContentSchema.safeParse(e.sentenzaRef);
     if (!parsed.success) return null;
-    return { itemType: 'sentenza', title: parsed.data.etichetta, content: { ...parsed.data, ...star }, position };
+    // The label is recomputed here as on every write (D9): a proposal's copy is the proposer's.
+    const decision = withDecisionLabel(parsed.data);
+    return { itemType: 'sentenza', title: decision.etichetta, content: { ...decision, ...star }, position };
   }
   if (typeof e.articleRef === 'object' && e.articleRef !== null && !Array.isArray(e.articleRef)) {
     const norma = e.articleRef as Record<string, unknown>;

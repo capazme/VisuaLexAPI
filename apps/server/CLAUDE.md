@@ -113,8 +113,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `schemas/decisionItem.ts` (unknown keys refused) when an item is added and
   when a decision's content is updated; it must stay aligned with the web's
   `parseSentenzaContent`, so change both together. The item's `title` follows
-  `etichetta` (a copy the web recomputes on every write; the server bounds and
-  stores it). A Forum suggestion's `take` stores what each dossier entry carries
+  `etichetta`, a copy of the decision's citation that every write recomputes on the
+  server from the identity and the attributes (`withDecisionLabel`, source convention D9),
+  whatever the client sent; reading writes nothing. A Forum suggestion's `take` stores what each dossier entry carries
   (`utils/suggestionEntries.ts`) and refuses a malformed proposal whole: a 400,
   nothing applied.
 - **Deleting through a connected application, and the trash** (second-round
@@ -145,17 +146,24 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   ones in one transaction, after the dossier's last item. Each resolved
   reference's `display` is its citation (below), never Python's own label
   («Art. 3 — legge» named no act).
-- **`norms/citation.ts`** — `citeArticle`, how a lawyer cites an article in the
-  owner's style: «art. 3, l. 31 dicembre 2012, n. 247», «art. 1284 c.c.», «art. 81
-  Cost.». Dossier items carry it as `citation` (null for anything but a norm) in
-  `GET /dossiers`, `GET /dossiers/:id` and the answer of `POST /dossiers/:id/items`, and the MCP tools pass it on. `citeAct`
-  is the act alone («l. 31 dicembre 2012, n. 247», «c.c.»), without the article
-  or the annex, carried as `act_citation` for a reader that names each act once
-  above its articles; `citeArticle` is built on it, so the two cannot drift. It is a
-  second implementation of the web app's `utils/citation.ts`, pinned to the web's
-  golden file: `tests/norms/citation.test.ts` imports
-  `apps/web/src/utils/__fixtures__/citationGolden.ts` and fails when the two
-  disagree. Change the wording in both.
+- **`norms/citation.ts`** and **`norms/decisionCitation.ts`** — how the server names a
+  source, in the source convention (spec
+  `docs/superpowers/specs/2026-10-04-source-convention-design.md`, decided by the owner):
+  `citeArticle` («art. 3, l. 31 dicembre 2012, n. 247», «art. 1284 c.c.», «art. 5, reg. (UE)
+  2016/679», «art. 6, l. n. 184 del 1983»), `shortNorm` («art. 3 l. 247/2012»), `citeAct` (the
+  act alone, without the article or the annex, carried as `act_citation` for a reader that
+  names each act once above its articles; `citeArticle` is built on the same code, so the two
+  cannot drift), `citeDecision` («Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310») and
+  `shortDecision`. Dossier items carry `citeStoredItem` as `citation` — a norm's or a
+  decision's, null for anything else — in every dossier answer and in the trash's list, and the
+  MCP tools pass it on. The tables (`norms/actTypes.ts`) are a copy of the web app's
+  `utils/sources/actTypes.ts`; the web app, the API and MERL-T write the same words with their
+  own code. `tests/norms/sourcesGolden.test.ts` pins this copy to
+  `conventions/sources/golden.json` and the codes table to the API's `map.py`: change the
+  wording in the golden file and every copy together. A stored decision is cited only from the
+  values the item schema admits, because the citation reaches the MCP confirmation dialog.
+  The saved-norm notifications name the norm by its citation (`changeMessage`), the stored key
+  only when the snapshot names no article.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore

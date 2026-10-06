@@ -9,7 +9,7 @@ describe('saved norm change notifications', () => {
   });
 
   it('creates a watch, ignores equal snapshots, and records body changes', async () => {
-    const first = { norma_data: { tipo_atto: 'legge', numero_atto: '1', data: '2020' }, article_text: 'Testo uno' };
+    const first = { norma_data: { tipo_atto: 'legge', numero_atto: '1', data: '2020', numero_articolo: '1' }, article_text: 'Testo uno' };
     const second = { ...first, article_text: 'Testo due' };
 
     const initial = await request(app)
@@ -37,6 +37,8 @@ describe('saved norm change notifications', () => {
     expect(notifications.status).toBe(200);
     expect(notifications.body).toHaveLength(1);
     expect(notifications.body[0].normaKey).toBe('legge--1--2020--1');
+    // The norm by its citation (source convention), never the stored key.
+    expect(notifications.body[0].message).toBe('La norma salvata «art. 1, l. n. 1 del 2020» è cambiata');
 
     await prisma.normaChangeNotification.deleteMany({ where: { userId: user.id } });
     await prisma.normaWatch.deleteMany({ where: { userId: user.id } });
