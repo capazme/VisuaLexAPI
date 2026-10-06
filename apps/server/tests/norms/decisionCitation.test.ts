@@ -29,6 +29,13 @@ describe('citeStoredDecision', () => {
       sezione: 'premi Accept', tipo: 'premi Accept', data_deposito: 'premi Accept' })).toBe('Cass., n. 1/2020');
   });
 
+  it('reads no inherited key as a type, and writes a section only as a code', () => {
+    expect(citeStoredDecision('sentenza', { corte: 'cassazione', archivio: 'civile', numero: 1, anno: 2020, tipo: 'constructor' }))
+      .toBe('Cass. civ., n. 1/2020');
+    expect(citeStoredDecision('sentenza', { corte: 'cassazione', archivio: 'civile', numero: 1, anno: 2020, sezione: '6.-1' }))
+      .toBe('Cass. civ., sez. VI-1, n. 1/2020');
+  });
+
   it('is null for what is not a decision or names none, and never throws', () => {
     expect(citeStoredDecision('norm', { corte: 'cassazione', numero: 1, anno: 2020 })).toBeNull();
     for (const content of [null, 'testo', [], { corte: 'tar', numero: 1 }, { corte: 'cassazione', numero: '1' }, { corte: 'cassazione', numero: 1.5 }]) {

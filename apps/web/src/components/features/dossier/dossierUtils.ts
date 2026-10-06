@@ -210,7 +210,7 @@ export function parseSentenzaContent(data: unknown, now: Date = new Date()): Dos
   if (corte === 'corte_costituzionale' && (archivio !== undefined || sezione !== undefined)) return null;
   if (sezione !== undefined && !(typeof sezione === 'string' && SEZIONI.has(sezione))) return null;
   if (tipo !== undefined && !(typeof tipo === 'string' && TIPI.has(tipo))) return null;
-  if (data_deposito !== undefined && !(typeof data_deposito === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data_deposito))) return null;
+  if (data_deposito !== undefined && !(typeof data_deposito === 'string' && /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(data_deposito))) return null;
   return {
     corte,
     numero,
@@ -246,7 +246,7 @@ export function sentenzaFromDecision(identity: DecisionIdentity, attrs: Decision
     ...(identity.archivio ? { archivio: identity.archivio } : {}),
     ...(attrs.sezione && SEZIONI.has(attrs.sezione) && identity.corte === 'cassazione' ? { sezione: attrs.sezione } : {}),
     ...(attrs.tipo && TIPI.has(attrs.tipo) ? { tipo: attrs.tipo } : {}),
-    ...(attrs.data_deposito && /^\d{4}-\d{2}-\d{2}$/.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
+    ...(attrs.data_deposito && /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
   };
   return { ...kept, etichetta: decisionCitationOf(kept) };
 }

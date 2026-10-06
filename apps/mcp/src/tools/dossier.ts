@@ -133,7 +133,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Leggi un dossier',
       description:
-        'Le voci di un dossier (id, tipo, titolo, riferimento della norma), senza il testo degli articoli. Il dossier si indica per id o per nome esatto.',
+        'Le voci di un dossier (id, tipo, titolo, riferimento della norma o della sentenza), senza il testo degli articoli. Il dossier si indica per id o per nome esatto.',
       inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

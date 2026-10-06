@@ -33,6 +33,7 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     ['a year in the future', { ...SENTENZA, anno: new Date().getFullYear() + 1 }],
     ['an unknown key', { ...SENTENZA, testo: 'il testo intero' }],
     ['a label too long', { ...SENTENZA, etichetta: 'x'.repeat(201) }],
+    ['a date with no such month', { ...SENTENZA, data_deposito: '2024-13-05' }],
     ['a Corte costituzionale decision with a section',
       { corte: 'corte_costituzionale', numero: 1, anno: 2014, sezione: '3', etichetta: 'Corte cost. n. 1/2014' }],
     ['a Corte costituzionale decision before 1956',

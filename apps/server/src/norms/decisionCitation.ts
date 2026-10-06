@@ -44,7 +44,7 @@ function court(decision: CitableDecision): string {
  * names it «dep.» ("Cass. pen., sez. VII, ord. dep. 14 marzo 2024, n. 10787").
  */
 export function citeDecision(decision: CitableDecision): string {
-  const tipo = decision.tipo ? (TIPO_ABBR[decision.tipo] ?? null) : null;
+  const tipo = decision.tipo && Object.hasOwn(TIPO_ABBR, decision.tipo) ? TIPO_ABBR[decision.tipo] : null;
   const date = decision.data_deposito ? citationDate(decision.data_deposito) : null;
   const numero = date || !decision.anno ? `n. ${decision.numero}` : `n. ${decision.numero}/${decision.anno}`;
   if (decision.corte === 'corte_costituzionale') {
@@ -77,14 +77,15 @@ export function citeStoredDecision(itemType: string, content: unknown): string |
   const numero = raw.numero;
   if ((corte !== 'cassazione' && corte !== 'corte_costituzionale') || typeof numero !== 'number' || !Number.isInteger(numero)) return null;
   const anno = typeof raw.anno === 'number' && Number.isInteger(raw.anno) ? raw.anno : null;
-  // Only values the item schema admits are written: the citation reaches the MCP client's
-  // confirmation dialog, where no text a client stored may speak.
+  // Only closed values are written — a court, an archive, a section code, a known type, a real
+  // date, integers: the citation reaches the MCP client's confirmation dialog, where no text a
+  // client stored may speak.
   const archivio = str('archivio');
-  const sezione = str('sezione');
+  const sezione = (str('sezione') ?? '').replace(/[\s.]+/g, '').toUpperCase();
   return citeDecision({
     corte, numero, anno,
     archivio: archivio === 'civile' || archivio === 'penale' ? archivio : null,
-    sezione: sezione && /^(?:[1-7]|[ULFT])(?:-[0-9A-Z]{1,3})?$/i.test(sezione.replace(/[\s.]+/g, '')) ? sezione : null,
+    sezione: /^(?:[1-7]|[ULFT])(?:-[0-9A-Z]{1,3})?$/.test(sezione) ? sezione : null,
     tipo: str('tipo'),
     data_deposito: str('data_deposito'),
   });

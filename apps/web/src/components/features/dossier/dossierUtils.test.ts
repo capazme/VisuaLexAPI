@@ -357,6 +357,7 @@ describe('decision items', () => {
       { ...SENTENZA, numero: 1_000_000 },              // above the maximum
       { ...SENTENZA, tipo: 'x' },                      // not a known type
       { ...SENTENZA, data_deposito: '12/03/2024' },    // not an ISO date
+      { ...SENTENZA, data_deposito: '2024-13-05' },    // no such month: the server refuses it too
       { ...SENTENZA, etichetta: 'x'.repeat(201) },     // label too long
       { ...COST, archivio: 'civile' },                 // the Corte costituzionale has no archive
     ]) {
