@@ -487,6 +487,7 @@ cat >"$d/bin/iptables" <<'STUB'
 #!/bin/sh
 echo "iptables $*" >>"$STUB_LOG"
 f="$STUB_RULES"
+[ "$1" = -w ] && shift
 case "$1" in
   -S) echo "-N DOCKER-USER"; cat "$f"; echo "-A DOCKER-USER -j RETURN" ;;
   -I) shift 3; line="$*"

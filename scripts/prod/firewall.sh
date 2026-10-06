@@ -56,8 +56,8 @@ need_root() {
     || { err "the $chain chain does not exist: is Docker running, with its iptables integration (not the nftables backend)?"; exit 1; }
 }
 
-ipt() { # the command, or its text with --dry-run
-  if [ -n "$dry" ]; then printf 'iptables %s\n' "$*"; else iptables "$@"; fi
+ipt() { # the command, or its text with --dry-run; -w waits for the xtables lock (legacy)
+  if [ -n "$dry" ]; then printf 'iptables %s\n' "$*"; else iptables -w "$@"; fi
 }
 
 is_private() {
@@ -138,11 +138,22 @@ case "$action" in
       say "the scrapers are not running here: nothing checked from inside"
       exit 0
     fi
-    if docker exec "$scraper" python -c "import socket; socket.setdefaulttimeout(5); socket.getaddrinfo('www.normattiva.it', 443)" >/dev/null 2>&1; then
-      say "a scraper resolves names: yes"
-    else
-      warn "a scraper cannot resolve names (or not within 5 s): the sources will fail. Remove the rules (sudo sh scripts/prod/firewall.sh remove) and report it"
-    fi
+    # The time is measured: a lookup that only succeeds after a resolver timed out is a
+    # resolver being dropped.
+    dns="$(docker exec "$scraper" python -c "
+import socket, time
+t = time.monotonic()
+try:
+    socket.getaddrinfo('www.normattiva.it', 443)
+except OSError:
+    print('failed')
+else:
+    print('slow' if time.monotonic() - t > 2 else 'ok')" 2>/dev/null || echo failed)"
+    case "$dns" in
+      ok) say "a scraper resolves names: yes" ;;
+      slow) warn "a scraper resolves names, but slowly (over 2 s): a resolver is probably dropped. Report it" ;;
+      *) warn "a scraper cannot resolve names: the sources will fail. Remove the rules (sudo sh scripts/prod/firewall.sh uninstall) and report it" ;;
+    esac
     # The home router (the host's default gateway): a drop is a timeout; a refusal or an
     # answer means the scraper reached it.
     gateway="$(ip route show default 2>/dev/null | sed -n 's/^default via \([0-9.]*\).*/\1/p' | head -1)"
@@ -187,7 +198,10 @@ ExecStart=/bin/sh $copy/firewall.sh apply
 WantedBy=multi-user.target docker.service
 UNIT
     systemctl daemon-reload
-    systemctl enable --now "$(basename "$unit")"
+    systemctl enable "$(basename "$unit")"
+    # restart, not start: an installed unit is already active, and a start would not apply a
+    # new subnet or a new copy of the script.
+    systemctl restart "$(basename "$unit")"
     say "installed: $(basename "$unit") applies the rules whenever Docker starts, from $copy"
     ;;
   uninstall)
