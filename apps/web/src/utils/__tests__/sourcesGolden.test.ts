@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path';
 import { formatNormCitation } from '../citation';
 import { citeNorm } from '../sources';
 import { isEuropeanAct } from '../versionDisplay';
-import { decisionKey, formatDecisionCitation, linkableDecisionPath, type LooseDecisionRef } from '../decisionLinks';
+import { decisionKey, formatDecisionCitation, formatDecisionShort, linkableDecisionPath, type LooseDecisionRef } from '../decisionLinks';
+import { formatRetrievedUrn } from '../../features/merlt/qa/format';
 import type { DecisionAttributes, DecisionIdentity } from '../../types/decisions';
 
 // The convention for legal sources (docs/superpowers/specs/2026-10-04-source-convention-design.md)
@@ -152,6 +153,29 @@ describe('the golden file of legal sources', () => {
         it(`${c.id} (pending adoption)`, () => expect(formatDecisionCitation(identity, attributes)).not.toBe(c.labels.citation.value));
       } else {
         it(`${c.id}: the citation`, () => expect(formatDecisionCitation(identity, attributes)).toBe(c.labels.citation.value));
+      }
+    }
+  });
+
+  describe('decided short labels of decisions are what decisionLinks.ts writes', () => {
+    // The section, where the file gives it with the attributes, is the decision's own.
+    const refOf = (c: DecisionCase): LooseDecisionRef => ({
+      ...c.input.reference,
+      sezione: c.input.reference.sezione ?? (c.input.attributes.sezione as string | undefined) ?? null,
+    });
+    const shorts = golden.decisions.filter((c) => c.labels.short?.status === 'decided');
+    it('covers the cases the owner decided', () => expect(shorts.length).toBeGreaterThan(5));
+    for (const c of shorts) {
+      it(`${c.id}: the short label`, () => expect(formatDecisionShort(refOf(c))).toBe(c.labels.short.value));
+    }
+    for (const c of golden.decisions.filter((d) => d.labels.short_with_rv?.status === 'decided')) {
+      it(`${c.id}: the short label with the massime`, () =>
+        expect(formatDecisionShort(refOf(c), c.input.rv)).toBe(c.labels.short_with_rv.value));
+    }
+    // A legacy key (Brocardi's) names no section: the Q&A chip writes the short label of what it says.
+    for (const c of shorts.filter((d) => d.input.legacy_keys?.length && !refOf(d).sezione)) {
+      for (const legacy of c.input.legacy_keys ?? []) {
+        it(`${c.id}: ${legacy} in the Q&A chip`, () => expect(formatRetrievedUrn(legacy)).toBe(c.labels.short.value));
       }
     }
   });

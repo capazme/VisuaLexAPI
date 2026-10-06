@@ -369,7 +369,10 @@ Duplicating any of these is a defect, not a shortcut.
   work as before. `/version` and `/health` are the two that stay open.
 - `utils/decisionLinks.ts` — the addresses of court decisions (`decisionPath`,
   `parseDecisionPath`, `decisionKey`) and their names (`formatDecisionHeading`,
-  `formatDecisionCitation`, pinned to `conventions/sources/golden.json`). The paths
+  `formatDecisionCitation`, and `formatDecisionShort` — «Cass. civ., sez. un., n.
+  31310/2024 · Rv. …», for chips and lists — both pinned to
+  `conventions/sources/golden.json`); `brocardiDecisionRef` reads the court a Brocardi
+  massima is headed with. Never write a decision's label inline. The paths
   `/sentenze/<corte>/<numero>/<anno>` are a contract with LibreLex and the MERL-T graph: never
   rename them (spec `docs/superpowers/specs/2026-10-01-sentenze-design.md`). Its first block is
   shared with the Massimario panel (`linkableDecisionPath`); `httpsUrl` keeps a source link to

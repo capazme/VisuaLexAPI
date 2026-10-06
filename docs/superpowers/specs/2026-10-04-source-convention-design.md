@@ -310,7 +310,10 @@ as `Cass. civ., sez. un., n. 10787/2024`.
 
 `sez. I` … `sez. VII` (Roman, as the courts print them), `sez. un.`, `sez. lav.`,
 `sez. fer.`; the tributaria is printed as the source gives it (`sez. V`), since
-Italgiure does not tell sez. V from the tributaria. Lower case, like «art.».
+Italgiure does not tell sez. V from the tributaria. Lower case, like «art.». A sub-section keeps its own
+writing (`sez. VI-1`), and a source that does name the tributaria (`T`, the
+Massimario) gets `sez. trib.`: the web's `formatDecisionShort` and MERL-T's
+`decision_short` write the same.
 
 ### 4.4 Incomplete references
 
