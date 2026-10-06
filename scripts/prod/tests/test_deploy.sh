@@ -209,6 +209,13 @@ set_line "$d/infra/.env" MCP_CLIENT_SECRET "abcdefghijklmnopqrstuvwxyz0123456789
 set_line "$d/apps/server/.env" OAUTH_DELEGATION_SECRET "$(value_of "$d/apps/server/.env" JWT_SECRET)"
 outcome "$d" scripts/prod/preflight.sh env
 expect_status nonzero "a delegation secret equal to JWT_SECRET is refused"; expect_out "OAUTH_DELEGATION_SECRET" "by name"
+set_line "$d/apps/server/.env" OAUTH_DELEGATION_SECRET "zyxwvutsrqponmlkjihgfedcba9876543210ZYXW"
+set_line "$d/apps/server/.env" OAUTH_API_AUDIENCE "http://localhost:3001/api"
+outcome "$d" scripts/prod/preflight.sh env
+expect_status nonzero "an API audience pinned in apps/server/.env that differs from PUBLIC_ORIGIN/api is refused"; expect_out "OAUTH_API_AUDIENCE" "by name"
+set_line "$d/apps/server/.env" OAUTH_API_AUDIENCE "https://vlx.example/api"
+outcome "$d" scripts/prod/preflight.sh env
+expect_status 0 "the matching audience passes"
 
 # OpenRouter: a warning, never a refusal.
 d="$(mkrepo openrouter)"
