@@ -482,6 +482,10 @@ EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261012T033000Z BACKUP_EXIT=3"; ou
 expect_status nonzero "a failed backup fails the run"
 [ "$(ours)" = "${before}visualex-20261012 " ] && ok "and deletes nothing (its half-written folder stays, for now)" || bad "and deletes nothing (now: $(ours))"
 EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261013T033000Z"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+[ -d "$B/visualex-20261012T033000Z" ] && ok "a half-written folder touched in the last six hours may still be in progress: it stays" || bad "a recent half-written folder stays"
+rm -rf "$B/visualex-20261013T033000Z"; complete visualex-20261004T033000Z; complete visualex-20261005T033000Z
+touch -t 202610010000 "$B/visualex-20261012T033000Z"
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261013T033000Z"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
 expect_status 0 "the next night's backup runs"
 [ "$(ours)" = "visualex-20261006 visualex-20261007 visualex-20261008 visualex-20261009 visualex-20261010 visualex-20261011 visualex-20261013 " ] \
   && ok "the half-written folder never counted as one of the seven, and goes once a newer backup is complete" || bad "half-written folders do not count (kept: $(ours))"

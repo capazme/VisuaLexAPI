@@ -4,7 +4,7 @@
 # ~/visualex-backups are kept, whoever took them (a deploy takes one too).
 # A backup is complete when its folder holds manifest.json, written last; only complete
 # ones count. A folder left half-written by a failure is removed once a newer complete
-# backup exists (it can no longer be in progress), never before. A failed backup deletes
+# backup exists and it has not changed for six hours (so it is not still being written). A failed backup deletes
 # nothing. Only folders named <stack>-YYYYMMDDTHHMMSSZ, as the backup tool names them, are
 # ever removed.
 set -eu
@@ -33,7 +33,9 @@ ls -1 "$dir" 2>/dev/null \
         [ "$complete" -le "$keep" ] && continue
         rm -rf -- "${dir:?}/$name"
         say "removed the old backup $name"
-      elif [ "$complete" -gt 0 ]; then
+      elif [ "$complete" -gt 0 ] && [ -n "$(find "$dir/$name" -maxdepth 0 -mmin +360 2>/dev/null)" ]; then
+        # Older than a complete backup and untouched for six hours: not one still being
+        # written (a deploy's, say, started just before this run).
         rm -rf -- "${dir:?}/$name"
         say "removed $name, a backup left half-written"
       fi
