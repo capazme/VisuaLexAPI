@@ -197,6 +197,8 @@ export interface ImportOutcome {
 export interface EnvironmentImportOutcome {
     imported: number;
     lost: number;
+    /** Why the client left items out, each once («Tipo di atto non riconosciuto («…»)»), for the toast. */
+    reasons: string[];
 }
 
 /** Imports each dossier of an environment: checked first, and every loss counted, never in silence. */
@@ -206,6 +208,7 @@ async function importDossiersChecked(
 ): Promise<EnvironmentImportOutcome> {
     let imported = 0;
     let lost = 0;
+    const reasons = new Set<string>();
     for (const raw of dossiers) {
         const check = validateImportedDossier(raw);
         // A dossier that vanishes is a loss even when it holds no items: counting 0 would let the
@@ -213,8 +216,10 @@ async function importDossiersChecked(
         // old ones were deleted). So each such dossier counts at least one.
         if (!check) {
             lost += Math.max(1, Array.isArray(raw?.items) ? raw.items.length : 0);
+            reasons.add('dossier non leggibile');
             continue;
         }
+        for (const d of check.discarded) reasons.add(d.reason);
         let dossierLost = check.discarded.length;
         const outcome = await importDossier(check.dossier);
         if (outcome) {
@@ -226,7 +231,7 @@ async function importDossiersChecked(
         }
         lost += dossierLost;
     }
-    return { imported, lost };
+    return { imported, lost, reasons: [...reasons] };
 }
 
 interface AppState {
@@ -2722,7 +2727,7 @@ const appStore = createStore<AppState>()(
 
             applyEnvironment: async (id, mode) => {
                 const env = get().environments.find(e => e.id === id);
-                if (!env) return { imported: 0, lost: 0 };
+                if (!env) return { imported: 0, lost: 0, reasons: [] };
 
                 // ── Dossiers: must go through the server (same reason as
                 // importDossier — addItem later checks server ownership and

@@ -1,15 +1,14 @@
 /**
- * A norm as a Forum proposal carries it (`articleRef`, the web's `NormaVisitata`), rebuilt from
- * known fields in closed forms. A proposal is someone else's data: its norm becomes a dossier
- * item whose citation (`norms/citation.ts`) the owner reads on the web, in the MCP reads and in
- * the MCP deletion dialog. A type the convention's tables do not know is written there in full,
- * so the type must be one they know, and every field a citation reads one of its fixed forms (an
- * article's suffix is a printed ordinal, an annex a number, a Roman numeral or a letter): no word
- * a proposer chose reaches a citation. The source addresses are kept only when they are
- * Normattiva's or EUR-Lex's; unknown keys are dropped.
+ * A norm that comes from someone else — a dossier in a shared environment, a JSON file, a share
+ * link — rebuilt from known fields in closed forms before it is imported: the web app's copy of
+ * the server's `apps/server/src/schemas/normEntry.ts` (which rebuilds a Forum proposal's norms).
+ * The imported item is cited to its new owner — here, in the MCP reads and in the MCP deletion
+ * dialog — so its act type must be one the convention's tables know (a type outside them is
+ * written in full, i.e. free text), every field a citation reads one of its fixed forms, and
+ * unknown keys are dropped. Both copies are pinned to `conventions/sources/norm-entries.json`.
  */
-import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS } from '../norms/actTypes';
-import { ARTICLE_SUFFIX_ALTERNATION } from '../utils/articleSuffixes';
+import { ARTICLE_SUFFIX_ALTERNATION } from '../articleSuffixes';
+import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
 
 export interface NormEntry {
   tipo_atto: string;

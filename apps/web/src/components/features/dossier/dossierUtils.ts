@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { DossierApi, DossierItemApi } from '../../../services/dossierService';
 import type { DecisionArchive, DecisionAttributes, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
 import { decisionKey, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
+import { rebuildNormEntry } from '../../../utils/sources';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
@@ -302,9 +303,12 @@ export interface ImportCheck {
 }
 
 /**
- * A dossier from a share link or a JSON file, its decision items checked (design 2026-10-01 §6).
- * An item that cannot be imported is listed with the reason, never dropped in silence. Norm and
- * note items are not checked in depth yet (spec, "Later"); the server checks every decision again.
+ * A dossier from someone else — a shared environment, a share link, a JSON file — its items
+ * rebuilt before they are imported: a decision through `parseSentenzaContent` with its label
+ * recomputed (design 2026-10-01 §6; the server checks it again), a norm through
+ * `rebuildNormEntry` (a known act type, closed forms: no text its author wrote reaches a
+ * citation). An item that cannot be imported is listed with the reason and counted in the toast,
+ * never dropped in silence. A note is imported as it is: its text is never in a citation.
  */
 export function validateImportedDossier(raw: unknown): ImportCheck | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -327,7 +331,20 @@ export function validateImportedDossier(raw: unknown): ImportCheck | null {
           ...(item.status === 'important' ? { status: 'important' as const } : {}),
         });
       } else discarded.push({ index, reason: 'sentenza con dati non validi' });
-    } else if (item?.type === 'norma' || item?.type === 'note') {
+    } else if (item?.type === 'norma') {
+      // A norm from someone else's dossier is cited to its new owner (here, and in the MCP
+      // deletion dialog): rebuilt from closed values, or left out and counted (utils/sources).
+      const norm = rebuildNormEntry(item.data);
+      if (norm.ok) {
+        items.push({
+          id: typeof item.id === 'string' && item.id ? item.id : uuidv4(),
+          type: 'norma',
+          data: { data: '', ...norm.entry },
+          addedAt: typeof item.addedAt === 'string' && item.addedAt ? item.addedAt : new Date().toISOString(),
+          ...(item.status === 'important' ? { status: 'important' as const } : {}),
+        });
+      } else discarded.push({ index, reason: norm.reason });
+    } else if (item?.type === 'note') {
       items.push(entry as DossierItem);
     } else {
       discarded.push({ index, reason: 'tipo di voce sconosciuto' });
@@ -356,6 +373,13 @@ export function importToastType(imported: number, lost: number): 'success' | 'in
 /** «1 voce importata, 1 scartata»: the counts of a partial import. */
 export function importCounts(imported: number, lost: number): string {
   return `${imported} ${imported === 1 ? 'voce importata' : 'voci importate'}, ${lost} ${lost === 1 ? 'scartata' : 'scartate'}`;
+}
+
+/** Why items were left out, after the counts: the first reason, and how many others («… e altri 2 motivi»). */
+export function importReasonsText(reasons: string[]): string {
+  if (reasons.length === 0) return '';
+  const others = reasons.length - 1;
+  return ` — ${reasons[0]}${others > 0 ? ` e ${others === 1 ? 'un altro motivo' : `altri ${others} motivi`}` : ''}`;
 }
 
 /** The toast after an import: whole, or how many items were left out (not importable, or refused by the server). */

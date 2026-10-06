@@ -14,7 +14,7 @@ import {
 import { exampleEnvironments } from '../../../data/exampleEnvironments';
 import { useTour } from '../../../hooks/useTour';
 import { Toast } from '../../ui/Toast';
-import { importCounts, importToastType } from '../dossier/dossierUtils';
+import { importCounts, importReasonsText, importToastType } from '../dossier/dossierUtils';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EnvironmentCard } from './EnvironmentCard';
@@ -155,10 +155,10 @@ export function EnvironmentPage() {
     const snapshot = importingEnv;
     setImportingEnv(null);
     try {
-      const { imported, lost } = await importEnvironmentPartial(snapshot, selection, mode);
+      const { imported, lost, reasons } = await importEnvironmentPartial(snapshot, selection, mode);
       const modeText = mode === 'merge' ? 'unito' : 'importato';
       showToast(
-        lost === 0 ? `Ambiente "${snapshot.name}" ${modeText} con successo` : `Ambiente "${snapshot.name}" ${modeText} in parte: ${importCounts(imported, lost)}`,
+        lost === 0 ? `Ambiente "${snapshot.name}" ${modeText} con successo` : `Ambiente "${snapshot.name}" ${modeText} in parte: ${importCounts(imported, lost)}${importReasonsText(reasons)}`,
         importToastType(imported, lost),
       );
     } catch (err) {
@@ -183,10 +183,10 @@ export function EnvironmentPage() {
 
   const runApply = async (env: Environment, mode: 'replace' | 'merge') => {
     try {
-      const { imported, lost } = await applyEnvironment(env.id, mode);
+      const { imported, lost, reasons } = await applyEnvironment(env.id, mode);
       const modeText = mode === 'merge' ? 'unito' : 'applicato';
       showToast(
-        lost === 0 ? `Ambiente "${env.name}" ${modeText} con successo` : `Ambiente "${env.name}" ${modeText} in parte: ${importCounts(imported, lost)}`,
+        lost === 0 ? `Ambiente "${env.name}" ${modeText} con successo` : `Ambiente "${env.name}" ${modeText} in parte: ${importCounts(imported, lost)}${importReasonsText(reasons)}`,
         importToastType(imported, lost),
       );
     } catch (err) {

@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { dossierItemFromEntry, rebuildDossierPayload, type EntryItem } from '../utils/suggestionEntries';
+import { rebuildEnvironmentDossiers } from '../utils/environmentDossiers';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -325,6 +326,7 @@ export const getSharedEnvironmentDetail = async (req: Request, res: Response) =>
  */
 export const publishEnvironment = async (req: Request, res: Response) => {
   const data = publishEnvironmentSchema.parse(req.body);
+  data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'pubblicato');
 
   // Check daily limit
   const today = new Date();
@@ -821,6 +823,7 @@ export const republishEnvironment = async (req: Request, res: Response) => {
 export const updateEnvironmentWithVersion = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = updateWithVersionSchema.parse(req.body);
+  if (data.content) data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'aggiornato');
 
   // Check ownership
   const existing = await prisma.sharedEnvironment.findFirst({
@@ -1372,11 +1375,16 @@ export const restoreVersion = async (req: Request, res: Response) => {
     // Create snapshot of current state before restoring
     await createVersionSnapshot(tx, id, env.content, 'Prima del ripristino');
 
-    // Restore the content
+    // Restore the content: an old version's norms are rebuilt like a publication's (a version
+    // stored before the check would otherwise put them back as they were).
+    const restored = version.content as { dossiers?: unknown } | null;
+    const content = restored && Array.isArray(restored.dossiers)
+      ? { ...restored, dossiers: rebuildEnvironmentDossiers(restored.dossiers, 'ripristinato') }
+      : restored;
     const updated = await tx.sharedEnvironment.update({
       where: { id },
       data: {
-        content: version.content as object,
+        content: content as object,
         currentVersion: env.currentVersion + 1,
       },
       include: {
