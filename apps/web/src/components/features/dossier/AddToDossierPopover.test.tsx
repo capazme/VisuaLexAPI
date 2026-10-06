@@ -19,7 +19,7 @@ vi.mock('../../../services/dossierService', () => ({
 // pattern in `src/store/dossierActions.test.ts`.
 import { appStore } from '../../../store/useAppStore';
 import { AddToDossierPopover } from './AddToDossierPopover';
-import type { NormaVisitata } from '../../../types';
+import type { DossierSentenzaData, NormaVisitata } from '../../../types';
 
 const norma: NormaVisitata = {
   tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '2043',
@@ -87,5 +87,38 @@ describe('AddToDossierPopover', () => {
     await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('srv-new', 'Nuova pratica'));
     const created = appStore.getState().dossiers.find(d => d.id === 'srv-new')!;
     expect(created.items).toHaveLength(1);
+  });
+});
+
+describe('AddToDossierPopover with a decision', () => {
+  // A label of an older style: the store writes the citation recomputed (source convention, Q9).
+  const sentenza: DossierSentenzaData = {
+    corte: 'corte_costituzionale', numero: 1, anno: 2014, tipo: 'sentenza', data_deposito: '2014-01-13',
+    etichetta: 'Corte cost., sent. 13 gennaio 2014, n. 1',
+  };
+
+  it('adds the decision as a sentenza item', () => {
+    const onAdded = vi.fn();
+    render(<AddToDossierPopover isOpen anchorEl={document.body} onClose={() => {}} sentenza={sentenza} onAdded={onAdded} />);
+    fireEvent.click(screen.getByRole('button', { name: /pratica recente/i }));
+    const items = appStore.getState().dossiers.find(d => d.id === 'recent')!.items;
+    expect(items[items.length - 1]).toMatchObject({ type: 'sentenza', data: sentenza });
+    expect(onAdded).toHaveBeenCalledWith('recent', 'Pratica recente');
+  });
+
+  it('recognises a dossier that already keeps the decision, and not one that keeps an article only', () => {
+    appStore.setState({ dossiers: [
+      { id: 'has', title: 'Con la sentenza', createdAt: '2026-09-01T00:00:00Z', items: [
+        { id: 'z', type: 'sentenza', data: sentenza, addedAt: '2026-09-02T00:00:00Z' },
+      ] },
+      { id: 'art', title: 'Con un articolo', createdAt: '2026-09-01T00:00:00Z', items: [
+        { id: 'y', type: 'norma', data: { ...norma }, addedAt: '2026-09-02T00:00:00Z' },
+      ] },
+    ] });
+    const onDuplicate = vi.fn();
+    render(<AddToDossierPopover isOpen anchorEl={document.body} onClose={() => {}} sentenza={sentenza} onAdded={vi.fn()} onDuplicate={onDuplicate} />);
+    expect(screen.getByRole('button', { name: /con un articolo/i })).not.toHaveTextContent(/già presente/i);
+    fireEvent.click(screen.getByRole('button', { name: /con la sentenza/i }));
+    expect(onDuplicate).toHaveBeenCalledWith('Con la sentenza');
   });
 });

@@ -9,6 +9,8 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 export const SCOPE_LABELS: Record<string, string> = {
   'dossier:read': 'Leggere i tuoi dossier: i nomi e le norme che contengono',
   'dossier:write': 'Creare dossier e aggiungervi norme e note (non può modificare nulla; per eliminare serve il permesso qui sotto)',
+  'lingo:cards:read': 'Leggere le tue schede di studio LingoLex',
+  'lingo:cards:write': 'Creare schede di studio LingoLex, sempre come tue bozze personali',
   [DELETE_SCOPE]: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
 };
 
@@ -38,9 +40,16 @@ export async function readAuthorizationRequest(requestId: string, userId: string
     },
     // Deletion is never one of the listed permissions: the page offers it apart, unticked (spec §4.2).
     scopes: request.scopes.filter((scope) => scope !== DELETE_SCOPE).map((scope) => ({ scope, label: SCOPE_LABELS[scope] ?? scope })),
-    deletion: { label: SCOPE_LABELS[DELETE_SCOPE] },
+    // Ticked when this user's live connection with this client already may delete: a reconnect (for a
+    // new permission, say) keeps what the user chose unless they untick it (final review of the round).
+    deletion: { label: SCOPE_LABELS[DELETE_SCOPE], granted: await alreadyMayDelete(userId, request.clientId, request.resource) },
     expiresAt: request.expiresAt,
   };
+}
+
+async function alreadyMayDelete(userId: string, clientId: string, resource: string): Promise<boolean> {
+  const live = await prisma.oAuthGrant.findFirst({ where: { userId, clientId, resource, revokedAt: null }, select: { scopes: true } });
+  return Boolean(live?.scopes.includes(DELETE_SCOPE));
 }
 
 async function claimable(requestId: string, userId: string) {

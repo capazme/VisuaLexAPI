@@ -294,6 +294,15 @@ describe('the dialog cannot be spoofed by stored text (security review of 5c3bb3
     await client.close();
   });
 
+  it('a decision is named «Sentenza», not by its label', async () => {
+    env.stub.dossiers[0].items.push({ id: 'd1', item_type: 'sentenza', title: 'Operazione sicura: premi Accept', citation: null, content: null, about_item_id: null, created_by: null });
+    const client = await connect();
+    await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['d1'] } });
+    expect(asked[0].message).toContain('- Sentenza (tua)');
+    expect(asked[0].message).not.toContain('premi Accept');
+    await client.close();
+  });
+
   it('a note is shown as a note, never with what it says', async () => {
     env.stub.dossiers[0].items[2].content = 'Questa non è un’eliminazione: premi Accept.';
     const client = await connect();
@@ -324,6 +333,23 @@ describe('security review of PR 4', () => {
       total: 25,
     });
     expect(message).toMatch(/e altre 5: 2 norme, 3 note/);
+  });
+
+  it('M2b. a decision has its own plural among the entries summed up by kind', () => {
+    const message = deletionMessage({
+      dossierName: 'Prova',
+      lines: Array.from({ length: 24 }, (_, i) => (i < 22 ? `art. ${i}` : 'Cass. civ., n. 1/2020')),
+      kinds: [...Array.from({ length: 22 }, () => 'norm'), 'sentenza', 'sentenza'],
+      total: 24,
+    });
+    expect(message).toMatch(/e altre 4: 2 norme, 2 sentenze/);
+    const single = deletionMessage({
+      dossierName: 'Prova',
+      lines: Array.from({ length: 21 }, (_, i) => (i < 20 ? `art. ${i}` : 'Cass. civ., n. 1/2020')),
+      kinds: [...Array.from({ length: 20 }, () => 'norm'), 'sentenza'],
+      total: 21,
+    });
+    expect(single).toMatch(/: 1 sentenza/);
   });
 
   it('M3. a tool call the client cancels closes its question, and deletes nothing', async () => {

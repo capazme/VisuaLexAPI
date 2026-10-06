@@ -1,18 +1,17 @@
 import { FolderInput } from 'lucide-react';
 import type { Dossier } from '../../../types';
+import { computeItemCounts } from './dossierUtils';
 
 interface Props {
   dossier: Dossier;
+  /** What the check of a share link or a file left out, with the reason (`validateImportedDossier`). */
+  discarded?: Array<{ index: number; reason: string }>;
   onClose: () => void;
   onConfirm: () => void;
 }
 
-export function ImportDossierModal({ dossier, onClose, onConfirm }: Props) {
-  const stats = {
-    total: dossier.items.length,
-    norme: dossier.items.filter((i) => i.type === 'norma').length,
-    note: dossier.items.filter((i) => i.type === 'note').length,
-  };
+export function ImportDossierModal({ dossier, discarded, onClose, onConfirm }: Props) {
+  const counts = computeItemCounts(dossier.items);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -34,16 +33,21 @@ export function ImportDossierModal({ dossier, onClose, onConfirm }: Props) {
           )}
           <div className="flex flex-wrap gap-2 text-sm">
             <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-              {stats.total} elementi
+              {dossier.items.length} elementi
             </span>
-            {stats.norme > 0 && (
+            {counts.norme > 0 && (
               <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
-                {stats.norme} articoli
+                {counts.norme} articoli
               </span>
             )}
-            {stats.note > 0 && (
+            {counts.sentenze > 0 && (
+              <span className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">
+                {counts.sentenze} {counts.sentenze === 1 ? 'sentenza' : 'sentenze'}
+              </span>
+            )}
+            {counts.note > 0 && (
               <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded">
-                {stats.note} note
+                {counts.note} note
               </span>
             )}
           </div>
@@ -57,6 +61,13 @@ export function ImportDossierModal({ dossier, onClose, onConfirm }: Props) {
             </div>
           )}
         </div>
+
+        {discarded && discarded.length > 0 && (
+          <div role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+            {discarded.length} {discarded.length === 1 ? 'voce non importabile' : 'voci non importabili'}:{' '}
+            {[...new Set(discarded.map((d) => d.reason))].join('; ')}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button

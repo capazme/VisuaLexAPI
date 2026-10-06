@@ -55,7 +55,7 @@ describe('GET /oauth/authorize', () => {
     await request(app).get('/oauth/authorize').query(authorizeQuery(clientId, { scope: 'dossier:read offline_access' }));
     await request(app).get('/oauth/authorize').query(authorizeQuery(clientId, { scope: undefined }));
     const stored = await prisma.oAuthAuthorizationRequest.findMany({ orderBy: { createdAt: 'asc' } });
-    expect(stored.map((r) => r.scopes)).toEqual([['dossier:read'], ['dossier:read', 'dossier:write']]);
+    expect(stored.map((r) => r.scopes)).toEqual([['dossier:read'], ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write']]);
   });
 
   // `state` comes back when the SDK's handler got as far as reading it: not when
