@@ -101,6 +101,21 @@ for spelling in /fetch_article%5Ftext //fetch_article_text /x/../fetch_article_t
 done
 expect "and none of them reached the scrapers" "$before" "$(scraper_calls)"
 
+# 7a. the authorization server: reached without a login, outside the gate; other well-known names are 404
+before="$(scraper_calls)"
+expect "/oauth/authorize reaches the server without a login" "401" "$(code "$B/oauth/authorize?client_id=x")"
+expect "and the server saw that path" "/oauth/authorize?client_id=x" "$(seen 13001 'd["last"]["path"]')"
+curl -s -o /dev/null -m 10 "$B/.well-known/oauth-authorization-server"
+expect "the authorization server metadata reaches the server" "/.well-known/oauth-authorization-server" "$(seen 13001 'd["last"]["path"]')"
+before_server="$(verify_calls)"
+for spelling in /oauth/introspect /oauth/introspect/ /OAUTH/Introspect //oauth/introspect /oauth/./introspect /oauth/introspect/x; do
+  expect "introspection is a 404 from the network ($spelling)" 404 "$(code --path-as-is -X POST -d 'token=x' "$B$spelling")"
+done
+expect "and the server never saw any of them" "$before_server" "$(verify_calls)"
+expect "another well-known name is a 404" 404 "$(code "$B/.well-known/openid-configuration")"
+expect "not the app's page with a 200" 404 "$(code "$B/.well-known/anything")"
+expect "and the scrapers never heard of any of it" "$before" "$(scraper_calls)"
+
 # 7b. the client's address: kept from a trusted hop, overwritten from anyone else
 curl -s -o /dev/null -m 10 -H 'X-Forwarded-For: 100.64.1.2' "$B/api/probe"
 xff="$(seen 13001 'd["last"]["xff"]')"

@@ -69,7 +69,7 @@ the public exposure (phase 2 of the deployment design).
 - **Image:** the server's pattern — Node 24 slim, `npm ci` in a build stage, the runtime with production dependencies only, user `node`, exec-form `CMD`.
 - **Hardening** as every application module (H2/H3): `init`, `cap_drop: ALL`, `no-new-privileges`, `read_only` with a `tmpfs` on `/tmp`, log rotation, `restart: unless-stopped`.
 - **Health check:** `GET /.well-known/oauth-protected-resource` on `127.0.0.1`. It is unauthenticated and needs no new route.
-- **Started only when `MCP_PUBLIC_URL` is set** in `infra/.env`: a Compose profile `mcp` that `deploy.sh` turns on. Without the variable the stack is exactly today's.
+- **Started only when `MCP_PUBLIC_URL` is set** in `infra/.env`: a Compose profile `mcp` that `deploy.sh` turns on. Without the variable no MCP container runs; the ingress still routes `/oauth/*` to the server, which issues nothing usable without the MCP (the exchange needs its credential). Accepted after the security review.
 - **`./start.sh --prod --stop` stops it** whatever the setting.
 
 ### 4.2 Networks and what is published
@@ -79,9 +79,12 @@ the public exposure (phase 2 of the deployment design).
 | `edge` | `ingress` | as today; its subnet becomes fixed (`EDGE_SUBNET`, default `172.29.241.0/24`) because Caddy trusts it, as it trusts `app`'s (section 5) |
 | `mcp` (new) | `mcp`, `server` | the MCP reaches the server and nothing else: not the scrapers, not MERL-T (whose `/admin` and `/ner` routes have no gate of their own, R2), not the stores |
 
-Published: `${MCP_BIND:-127.0.0.1}:${MCP_PORT:-8091}:3002`, on the loopback by
-default, like the ingress. The overlay reaches it through a second `tailscale
-serve` mapping (`--https=8443`). No other port is published.
+Published: `127.0.0.1:${MCP_PORT:-8091}:3002`, **on the loopback only**,
+with no setting to move it. Its door is the host's proxy: the overlay reaches
+it through a second `tailscale serve` mapping (`--https=8443`). A LAN bind
+would let a device of the home network forge its address past the
+per-address ceiling (section 5), so it is not offered. No other port is
+published.
 
 ### 4.3 The addresses, from one place
 
@@ -185,9 +188,13 @@ are today.
   - `handle /oauth/*`
   - `handle /.well-known/oauth-authorization-server`
 - Every other `/.well-known/*` answers 404: no more HTML for a client's probe.
-- `/connect` is the single-page app. It already gets `frame-ancestors 'none'`
-  and `X-Frame-Options: DENY`, so the consent page cannot be framed
-  (clickjacking).
+- `/oauth/introspect` answers 404 at the ingress: only the MCP calls it, from
+  inside the stack, so it has no reason to be reachable from the network
+  (added after Task 5's review).
+- `/connect` is the single-page app. It cannot be framed (clickjacking):
+  `X-Frame-Options: DENY` is enforced. `frame-ancestors 'none'` is in the
+  CSP too, but that header is still report-only until a separate change makes
+  it enforcing.
 - `paths.test.mjs` asserts the two OAuth routes, and that they are not behind
   `forward_auth`.
 - `checks/gate.sh` asserts:
@@ -235,7 +242,8 @@ are today.
   - the open `/version` and `/health`.
 - **On the MCP port:** the protected resource metadata, and a 401 for anything
   else.
-- **Introspection** answers only to the MCP's own credential.
+- **Introspection** is not routed by the ingress, and the server answers it
+  only to the MCP's own credential.
 
 **Token audience and issuer behind the proxies:**
 - They are configuration strings, never derived from the request's `Host` or
@@ -253,13 +261,21 @@ are today.
 - The review checks this against the code, not this document.
 
 **Remaining risks, stated:**
+- **IPv6 on the overlay.** Overlay IPv6 addresses share one /48. The MCP counts
+  each address on its own (`ipv6Subnet: false`). The server's limiters, merged
+  in PR 1, still group IPv6 by /56, so over IPv6 every overlay peer would share
+  one count. Clients prefer the overlay's IPv4 address (RFC 6724), so this is a
+  follow-up, not a blocker.
+- **The loopback is the host's alone.** That holds on Docker Engine 28 or newer,
+  or with the userland proxy on. With an older engine and `userland-proxy:
+  false`, a LAN device could reach ports published on 127.0.0.1. The owner
+  checks the engine once (`docker version`).
 - The overlay's identity headers (`Tailscale-User-*`) reach the server, and
   nothing reads them. Nothing may start trusting them without a design: anyone
   who reaches the ingress some other way could set them.
-- **`MCP_BIND` set to a LAN address.** The MCP trusts every private range
-  (`'loopback, uniquelocal'`). A device on the home network could then forge
-  `X-Forwarded-For` and spread its requests over invented addresses. The
-  ceiling is a backstop, not a gate, and the default bind is the loopback.
+- **A process on the host itself** reaches the MCP's loopback port, and can
+  forge `X-Forwarded-For` past the per-address ceiling. The host is trusted,
+  as it is for the ingress. A LAN bind is not offered for this reason (4.2).
 - **H1 does not cover the `mcp` network.** A compromised MCP process could open
   connections to the home network. It renders no third-party content, unlike
   the scrapers, so this is lower risk. The H1 script (D3) can take the subnet

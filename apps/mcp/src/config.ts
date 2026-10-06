@@ -14,6 +14,13 @@ export interface McpConfig {
   resource: string;
   /** The authorization server's issuer, as its metadata says it. */
   issuer: string;
+  /**
+   * Where introspection and the token exchange are sent: the authorization
+   * server's address on the network. Defaults to the issuer; in a container it
+   * is the server's container address, since the public origin is not reachable
+   * from inside.
+   */
+  authUrl: string;
   /** The API's base URL (…/api) and the audience of the tokens exchanged for it. */
   apiBase: string;
   apiAudience: string;
@@ -34,6 +41,7 @@ const positiveInt = (value: string | undefined, fallback: number): number => {
 export function readConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
   const port = parseInt(env.MCP_PORT || '3002', 10);
   const issuer = (env.MCP_AUTH_ISSUER || 'http://localhost:3001').replace(/\/+$/, '');
+  const authUrl = (env.MCP_AUTH_URL || issuer).replace(/\/+$/, '');
   const apiBase = (env.MCP_API_BASE || `${issuer}/api`).replace(/\/+$/, '');
   const clientSecret = env.MCP_CLIENT_SECRET || '';
   if (!clientSecret) {
@@ -44,6 +52,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
     port,
     resource: env.MCP_RESOURCE || `http://localhost:${port}/mcp`,
     issuer,
+    authUrl,
     apiBase,
     apiAudience: env.MCP_API_AUDIENCE || apiBase,
     clientId: 'mcp-omnilex',

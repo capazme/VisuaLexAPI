@@ -150,7 +150,9 @@ export async function startStubs() {
     host: '127.0.0.1',
     port: 0,
     resource: RESOURCE,
-    issuer: `http://127.0.0.1:${asPort}`,
+    // The public identity, never called: introspection and the exchange go to authUrl.
+    issuer: 'https://visualex.example',
+    authUrl: `http://127.0.0.1:${asPort}`,
     apiBase: `http://127.0.0.1:${asPort}/api`,
     apiAudience: `http://127.0.0.1:${asPort}/api`,
     clientId: 'mcp-omnilex',
@@ -160,7 +162,8 @@ export async function startStubs() {
   };
   const store = new SessionStore();
   const mcpServer: Server = await new Promise((resolve) => {
-    const s = createApp(config, { store }).listen(0, '127.0.0.1', () => resolve(s));
+    // The suites send hundreds of requests from one address: well above the per-address ceiling.
+    const s = createApp(config, { store, requestsPerMinute: 100_000 }).listen(0, '127.0.0.1', () => resolve(s));
   });
   const mcpUrl = `http://127.0.0.1:${(mcpServer.address() as AddressInfo).port}/mcp`;
   return {

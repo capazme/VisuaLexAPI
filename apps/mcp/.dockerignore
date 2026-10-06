@@ -1,0 +1,10 @@
+# Never in an image: secrets, dependencies built for another machine, local state.
+.env
+.env.*
+node_modules
+dist
+coverage
+*.log
+.DS_Store
+tests
+scripts

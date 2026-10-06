@@ -100,3 +100,35 @@ test('the open paths never carry the login token to the scrapers, and take no bo
   assert.match(handle[1], /^\s*header_up -Authorization$/m);
   assert.match(handle[1], /^\s*max_size 1KB$/m);
 });
+
+// The body of the first `handle <path> {` block, braces matched.
+function handleBlock(path) {
+  const start = caddyfile.indexOf(`handle ${path} {`);
+  assert.ok(start >= 0, `the Caddyfile has no "handle ${path} { … }" block`);
+  let depth = 0;
+  for (let i = caddyfile.indexOf('{', start); i < caddyfile.length; i += 1) {
+    if (caddyfile[i] === '{') depth += 1;
+    if (caddyfile[i] === '}') depth -= 1;
+    if (depth === 0) return caddyfile.slice(start, i + 1);
+  }
+  assert.fail(`the "handle ${path}" block is not closed`);
+}
+
+test('the authorization server is routed to the server, outside the scraping gate', () => {
+  for (const path of ['/oauth/*', '/.well-known/oauth-authorization-server']) {
+    const block = handleBlock(path);
+    assert.match(block, /reverse_proxy \{\$SERVER_UPSTREAM:server:3001\}/, `${path} goes to the server`);
+    assert.doesNotMatch(block, /forward_auth/, `${path} is not behind the login check: a client has no login yet`);
+    assert.match(block, /max_size 64KB/, `${path} takes a small body only`);
+  }
+});
+
+test('any other well-known name is a 404, not the app', () => {
+  assert.match(handleBlock('/.well-known/*'), /respond 404/);
+});
+
+test('introspection is not reachable through the ingress: only the MCP calls it, from inside', () => {
+  const block = handleBlock('/oauth/*');
+  assert.match(block, /@introspect path \/oauth\/introspect \/oauth\/introspect\/\*/, 'the exact path and anything under it');
+  assert.match(block, /respond @introspect 404/);
+});

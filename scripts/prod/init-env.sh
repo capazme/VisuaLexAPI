@@ -28,3 +28,16 @@ if [ ! -f "$server" ]; then
   chmod 600 "$server"
   say "created apps/server/.env: the JWT secret and the first admin's password (ADMIN_PASSWORD in that file) are generated"
 fi
+
+# Keys added since a host first ran this: completed in files that already exist, never
+# overwritten. The MCP's credential is shared by the server and the mcp module, so it lives
+# in infra/.env (like MERLT_INTERNAL_SECRET); the delegation key is the server's alone.
+add_missing() { # add_missing <file> <KEY> [quote]
+  if [ -z "$(env_get "$1" "$2")" ]; then
+    env_set "$1" "$2" "$(random_secret 48)" "${3:-}"
+    chmod 600 "$1"
+    say "added $2 to ${1#"$root"/} (generated, not shown here)"
+  fi
+}
+add_missing "$infra" MCP_CLIENT_SECRET
+add_missing "$server" OAUTH_DELEGATION_SECRET '"'

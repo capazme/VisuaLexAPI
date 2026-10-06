@@ -59,6 +59,34 @@
 		reverse_proxy {$SERVER_UPSTREAM:server:3001}
 	}
 
+	# The OAuth authorization server for MCP clients (apps/server): its metadata, and the
+	# endpoints where a client registers, asks for consent and gets its tokens. Not behind
+	# the login check: a client starts here before anyone has signed in. The consent page
+	# itself (/connect) is the app's, and frame-ancestors 'none' keeps it out of frames.
+	handle /oauth/* {
+		# Introspection answers only to the MCP server's credential, and the MCP calls the
+		# server from inside the stack: it has no reason to be reachable from the network.
+		# Every spelling the server would route there (a trailing slash, another case) is
+		# matched here too: Caddy's path matcher is case-insensitive on the cleaned path.
+		@introspect path /oauth/introspect /oauth/introspect/*
+		respond @introspect 404
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	handle /.well-known/oauth-authorization-server {
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	# Any other well-known name is not ours: a 404, never the app's page (a client probing
+	# /.well-known/openid-configuration would read HTML where it expects JSON).
+	handle /.well-known/* {
+		respond 404
+	}
+
 	# The scrapers. The list below is the one Vite proxies to port 5000 in development,
 	# prefix for prefix; infra/ingress/paths.test.mjs keeps the two in step.
 	#
