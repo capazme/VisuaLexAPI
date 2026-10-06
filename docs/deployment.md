@@ -121,7 +121,48 @@ logins stay blocked for 15 minutes after the check.
 - **Off the machine.** The backups hold personal data and stay on this disk for now. A
   copy elsewhere (encrypted) is a later step of the deployment design (section 8).
 
-## 6. When a module is unhealthy
+## 6. Keeping the containers off the private networks (H1)
+
+The scrapers render third-party pages. If one were compromised, it could otherwise open
+connections to the other devices of the home network and of the tailnet. `firewall.sh`
+stops that: new connections from the stack's `app` subnet to private ranges outside it
+(`10/8`, `172.16/12`, `192.168/16`, `169.254/16`, Tailscale's `100.64/10`) are dropped,
+in Docker's `DOCKER-USER` chain only. The internet stays reachable. So do replies on the
+published ports and the private DNS resolvers Docker forwards to.
+
+**Every rule matches only traffic whose source is the stack's own `app` subnet**
+(`-s $APP_SUBNET`). Other programs' containers on the same machine, on their own Docker
+networks, are never matched: neither their outgoing traffic nor their replies. The one
+effect on them is the intended one: VisuaLex's containers cannot open connections to them.
+
+**This is the last step, and on a shared machine it needs the machine owner's agreement.**
+
+```sh
+sudo sh scripts/prod/firewall.sh apply --dry-run   # what it would add
+sudo sh scripts/prod/firewall.sh install           # apply now, and whenever Docker starts
+sudo sh scripts/prod/firewall.sh status            # its rules, and a live check from a scraper
+sudo sh scripts/prod/firewall.sh uninstall         # everything it added, gone
+```
+
+- **`install`** copies the script to `/usr/local/lib/visualex-h1-<stack>`, owned by root.
+  It writes the stack's name and subnet into the unit, so the boot never runs a file the
+  deploying user can edit.
+- **After a change of `APP_SUBNET`**, run `install` again.
+- **`status` must say both:**
+  - "a scraper resolves names: yes";
+  - "the home network from a scraper (…): blocked".
+
+  If names stop resolving, `uninstall` and report it.
+
+**What it does not cover:**
+- A container reaching the host itself: its addresses, SSH, other programs listening on
+  it. That is the host's own firewall (H4).
+- IPv6, which the stack's networks do not use.
+- Docker's experimental nftables backend: it has no `DOCKER-USER` chain, and the script
+  refuses to run there.
+- At boot the containers start a few seconds before the rules are back.
+
+## 7. When a module is unhealthy
 
 - **What runs, and its state:** `docker compose -f infra/compose.yml -f infra/compose.app.yml
   -f infra/compose.scrapers.yml -f infra/compose.prod.yml ps`. The deploy prints the exact
