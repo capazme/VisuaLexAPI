@@ -3,7 +3,7 @@ import { Prisma, EnvironmentCategory, ReportReason } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
-import { dossierItemFromEntry, type EntryItem } from '../utils/suggestionEntries';
+import { dossierItemFromEntry, rebuildDossierPayload, type EntryItem } from '../utils/suggestionEntries';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -54,6 +54,20 @@ const createSuggestionSchema = z.object({
 const addSuggestionItemsSchema = z.object({
   items: z.array(suggestionItemSchema).min(1).max(MAX_ITEMS_PER_SUGGESTION),
 });
+
+/**
+ * The items of a proposal as they are stored: a dossier's entries rebuilt from closed values
+ * (`rebuildDossierPayload`), so a proposer's free text never reaches a citation its owner reads;
+ * a refused entry refuses the proposal with the entry, the field and why.
+ */
+function storableSuggestionItems(items: z.infer<typeof suggestionItemSchema>[]) {
+  return items.map((i) => {
+    if (i.itemType !== 'dossier') return { itemType: i.itemType, payload: i.payload as Prisma.InputJsonValue };
+    const rebuilt = rebuildDossierPayload(i.payload);
+    if (!rebuilt.ok) throw new AppError(400, `${rebuilt.reason}: la proposta non può essere salvata`);
+    return { itemType: i.itemType, payload: rebuilt.payload };
+  });
+}
 
 const declineItemSchema = z.object({
   reviewNote: z.string().max(500).optional(),
@@ -948,16 +962,15 @@ export const createSuggestion = async (req: Request, res: Response) => {
     throw new AppError(400, 'Suggestion payload exceeds maximum size (512KB)');
   }
 
+  const items = storableSuggestionItems(data.items);
+
   const suggestion = await prisma.environmentSuggestion.create({
     data: {
       sharedEnvironmentId: id,
       suggesterId: req.user!.id,
       message: data.message,
       items: {
-        create: data.items.map(i => ({
-          itemType: i.itemType,
-          payload: i.payload as object,
-        })),
+        create: items,
       },
     },
     include: {
@@ -1114,11 +1127,12 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
             });
           case 'dossier': {
             const entries: unknown[] = Array.isArray(payload.entries) ? payload.entries : [];
-            const items = entries.map((e, idx) => dossierItemFromEntry(e, idx));
-            const unreadable = items.filter((i) => i === null).length;
-            if (unreadable > 0) {
+            const items: EntryItem[] = [];
+            for (const [idx, e] of entries.entries()) {
+              const made = dossierItemFromEntry(e, idx);
               // Nothing partial: the transaction rolls back and the item stays pending.
-              throw new AppError(400, `La proposta contiene ${unreadable} voci non valide: non è stata applicata`);
+              if (!made.ok) throw new AppError(400, `Voce ${idx + 1}: ${made.reason}: la proposta non è stata applicata`);
+              items.push(made.item);
             }
             return tx.dossier.create({
               data: {
@@ -1126,7 +1140,7 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
                 name: payload.title,
                 description: payload.description,
                 ...attribution,
-                items: { create: items as EntryItem[] },
+                items: { create: items },
               },
               include: { items: true },
             });
@@ -1281,11 +1295,7 @@ export const addSuggestionItems = async (req: Request, res: Response) => {
   }
 
   await prisma.suggestionItem.createMany({
-    data: data.items.map(i => ({
-      suggestionId,
-      itemType: i.itemType,
-      payload: i.payload as object,
-    })),
+    data: storableSuggestionItems(data.items).map((i) => ({ suggestionId, ...i })),
   });
 
   const refreshed = await prisma.environmentSuggestion.findUnique({

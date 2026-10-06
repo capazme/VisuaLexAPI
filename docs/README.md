@@ -12,6 +12,7 @@ Indice della documentazione del progetto **VisuaLexAPI**: applicazione per avvoc
 
 - **[git-workflow.md](./git-workflow.md)**: il modello dei rami — `develop` per lavorare, `main` per le release, pull request, code owner, hotfix.
 - **[setup.md](./setup.md)**: da un clone vuoto a uno stack funzionante con le suite verdi.
+- **[deployment.md](./deployment.md)**: lo stack di produzione sulla macchina dedicata (`./start.sh --prod`): primo deploy, Tailscale e MCP, aggiornamenti, backup.
 
 1. ✅ **[merlt/blueprint.md](./merlt/blueprint.md)**: l'architettura MERL-T verificata sul codice (topologia, come pensa, come impara, dati, infra). **Leggi prima questo.**
 2. ✅ **[merlt/integration.md](./merlt/integration.md)**: runbook da un clone vuoto a uno stack funzionante, con le variabili d'ambiente.

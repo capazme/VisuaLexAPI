@@ -115,9 +115,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `parseSentenzaContent`, so change both together. The item's `title` follows
   `etichetta`, a copy of the decision's citation that every write recomputes on the
   server from the identity and the attributes (`withDecisionLabel`, source convention D9),
-  whatever the client sent; reading writes nothing. A Forum suggestion's `take` stores what each dossier entry carries
-  (`utils/suggestionEntries.ts`) and refuses a malformed proposal whole: a 400,
-  nothing applied.
+  whatever the client sent; reading writes nothing. A Forum proposal of a dossier is someone else's data, and its entries end up
+  cited to the owner (the web, the MCP reads and deletion dialog): every entry is rebuilt
+  from closed values when the proposal is stored and again when it is taken
+  (`utils/suggestionEntries.ts`) — a norm through `schemas/normEntry.ts` (an act type the
+  convention's tables know; an article's suffix one of the printed ordinals, an annex a number,
+  a Roman numeral or a letter, fixed forms for number, date and version; the
+  sources' addresses kept only when they are Normattiva's or EUR-Lex's; unknown keys dropped),
+  a decision through the item schema with its label recomputed. One refused entry refuses the
+  proposal whole, with an Italian 400 naming the entry, the field and why; nothing applied.
 - **Deleting through a connected application, and the trash** (second-round
   spec §4.2–4.3). Scope `content:delete`: the consent page offers it apart and
   unticked, `PATCH /api/oauth/grants/:id {canDelete}` switches it, and
