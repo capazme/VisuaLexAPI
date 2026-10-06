@@ -188,6 +188,9 @@ are today.
   - `handle /oauth/*`
   - `handle /.well-known/oauth-authorization-server`
 - Every other `/.well-known/*` answers 404: no more HTML for a client's probe.
+- `/oauth/introspect` answers 404 at the ingress: only the MCP calls it, from
+  inside the stack, so it has no reason to be reachable from the network
+  (added after Task 5's review).
 - `/connect` is the single-page app. It already gets `frame-ancestors 'none'`
   and `X-Frame-Options: DENY`, so the consent page cannot be framed
   (clickjacking).
@@ -238,7 +241,8 @@ are today.
   - the open `/version` and `/health`.
 - **On the MCP port:** the protected resource metadata, and a 401 for anything
   else.
-- **Introspection** answers only to the MCP's own credential.
+- **Introspection** is not routed by the ingress, and the server answers it
+  only to the MCP's own credential.
 
 **Token audience and issuer behind the proxies:**
 - They are configuration strings, never derived from the request's `Host` or

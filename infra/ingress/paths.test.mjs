@@ -126,3 +126,7 @@ test('the authorization server is routed to the server, outside the scraping gat
 test('any other well-known name is a 404, not the app', () => {
   assert.match(handleBlock('/.well-known/*'), /respond 404/);
 });
+
+test('introspection is not reachable through the ingress: only the MCP calls it, from inside', () => {
+  assert.match(handleBlock('/oauth/introspect'), /respond 404/);
+});
