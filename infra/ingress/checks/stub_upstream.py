@@ -6,8 +6,8 @@
     stub_upstream.py hang     PORT   a server that hangs: reads the request, never answers
 
 server:   answers 204 to "Bearer good-token", 429 with Retry-After: 7 to "Bearer slow-down",
-          401 to everything else, and remembers the X-Forwarded-Uri and X-Forwarded-Method
-          the ingress sent with the question.
+          401 to everything else, and remembers the X-Forwarded-Uri, X-Forwarded-Method and
+          X-Forwarded-For the ingress sent.
 scrapers: answers 200 "scrapers <METHOD> <path>", remembers the Authorization header and the
           body it received, and streams three NDJSON lines a second apart on /stream_article_text.
 hang:     sleeps for a minute in the handler, so a caller with a timeout gives up first.
@@ -53,6 +53,7 @@ class Handler(BaseHTTPRequestHandler):
                 "uri": self.headers.get("X-Forwarded-Uri"),
                 "method": self.headers.get("X-Forwarded-Method"),
                 "path": self.path,
+                "xff": self.headers.get("X-Forwarded-For"),
             }
             token = self.headers.get("Authorization", "")
             if token == "Bearer good-token":

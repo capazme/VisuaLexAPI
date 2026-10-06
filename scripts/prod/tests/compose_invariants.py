@@ -80,6 +80,13 @@ def prod(cfg, lan_bind):
 
     subnet = ((cfg["networks"]["app"].get("ipam") or {}).get("config") or [{}])[0].get("subnet")
     check(subnet == "172.29.240.0/24", "the app network has the fixed subnet the host firewall rule is keyed on")
+    edge = ((cfg["networks"]["edge"].get("ipam") or {}).get("config") or [{}])[0].get("subnet")
+    check(edge == "172.29.241.0/24", "the edge network has a fixed subnet: the ingress trusts it")
+    ingress_env = environment(services, "ingress")
+    check(
+        ingress_env.get("EDGE_SUBNET") == edge and ingress_env.get("APP_SUBNET") == subnet,
+        "and the ingress is told the same two subnets it keeps forwarded addresses from",
+    )
 
     check(
         all(services[s].get("restart") == "unless-stopped" for s in set(services) - {"migrate"}),

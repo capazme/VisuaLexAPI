@@ -31,11 +31,12 @@ import { createOAuthRouter } from './routes/oauth';
 import oauthAccountRoutes from './routes/oauthAccount';
 import { oauthConfig } from './oauth/config';
 import { delegatedAuth } from './middleware/delegated';
+import { TRUST_PROXY } from './lib/trustProxy';
 
 const app = express();
 
-// Trust first proxy (load balancer) for accurate req.ip
-app.set('trust proxy', 1);
+// The client's address past the ingress and the host's own hops (lib/trustProxy.ts).
+app.set('trust proxy', TRUST_PROXY);
 
 // Security headers
 app.use(helmet({

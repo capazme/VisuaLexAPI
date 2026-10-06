@@ -152,8 +152,17 @@ are today.
   a minute, counted with `express-rate-limit`. Without it, one caller sending
   invalid tokens makes the server introspect each one and spends the
   introspection ceiling (1,200 a minute), which is shared by every user.
-- **If the overlay proxy sends no `X-Forwarded-For`**, nothing is worse than
-  today. It is measured after the deploy (section 9).
+- **What this depends on.** The overlay proxy must write the client's address
+  into `X-Forwarded-For` itself, replacing or appending to whatever the client
+  sent. Tailscale's `serve` is a Go reverse proxy that sets the header from the
+  connection's source address. If a proxy passed the client's header through
+  untouched, a client could choose its own address: worse than today, when
+  everyone shares the gateway's. So the owner checks it on the host before the
+  change is relied on (section 10, step 6): six wrong logins with one invented
+  address, then one with another. The seventh must still be refused, because
+  the limit counts the real overlay address. If it is not refused, the
+  Caddyfile's `trusted_proxies` line is removed and the server is back to
+  today's behaviour.
 
 ## 6. `apps/mcp` changes
 
@@ -308,8 +317,10 @@ are today.
    3. add `tailscale serve --bg --https=8443 http://127.0.0.1:8091`;
    4. from a second device of the overlay: `claude mcp add …`, sign in, list
       the dossiers;
-   5. in the server's logs, check that a login attempt from that device shows
-      its overlay address, not the gateway.
+   5. from that device, check the client address cannot be forged: six logins
+      with a wrong password and `X-Forwarded-For: 203.0.113.9`, then one more
+      with `X-Forwarded-For: 203.0.113.10`. The seventh must be a 429: the
+      limit counts the real overlay address, not what the client wrote.
 
 ## 11. Pull requests
 
