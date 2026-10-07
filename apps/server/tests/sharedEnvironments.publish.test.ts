@@ -175,8 +175,9 @@ describe('publish shared environment — content round-trip', () => {
     const downloaded = await request(app).post(`/api/shared-environments/${published.body.id}/download`).set(authHeader(bob));
     expect(downloaded.body.content.dossiers[0].items[0].data.etichetta).toBe(COST_LABEL);
 
+    // past every number a restore can take (restoring 98 above wrote 99)
     const bad = await prisma.sharedEnvironmentVersion.create({ data: {
-      sharedEnvironmentId: published.body.id, version: 99,
+      sharedEnvironmentId: published.body.id, version: 500,
       content: contentWith([{ id: 's1', type: 'sentenza', addedAt: 'x', data: { ...COST, anno: 1800 } }]),
     } });
     const refused = await restore(bad.id);
