@@ -166,6 +166,11 @@ describe('how a decision is named', () => {
       .toBe('Corte costituzionale · Sentenza n. 1/2014 · decisa il 4 dicembre 2013 · depositata il 13 gennaio 2014 · ECLI:IT:COST:2014:1');
   });
 
+  it('the heading agrees «depositato» with a decreto', () => {
+    expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'decreto', data_deposito: '2024-04-22' }))
+      .toBe('Corte di cassazione · Sez. III civile · Decreto n. 10787/2024 · depositato il 22 aprile 2024');
+  });
+
   it('the heading writes "il" as "l\'" before 8 and 11, and keeps the plain date for the 1st', () => {
     expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-01' }))
       .toBe('Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata il 1 aprile 2024');

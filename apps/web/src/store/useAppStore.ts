@@ -11,6 +11,7 @@ import {
     findLiveBackIndex,
     type ReadingBackEntry,
 } from '../utils/readingBackStack';
+import { topicKey } from '../utils/decisionSearchNorma';
 import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '../types/decisions';
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
@@ -791,6 +792,7 @@ const appStore = createStore<AppState>()(
                 const query = asked.tema === undefined ? asked : { ...asked, tema: asked.tema.trim() };
                 set((state) => {
                     const wanted = stableQueryKey(query);
+                    const nothingOnScreen = !state.workspaceTabs.some(t => !t.isHidden && !t.isMinimized);
                     const existing = state.workspaceTabs.find(t =>
                         t.view?.kind === 'decision-search' && stableQueryKey(t.view.query) === wanted);
                     const tab = existing ?? newViewTab(state, label, { kind: 'decision-search', query });
@@ -798,6 +800,8 @@ const appStore = createStore<AppState>()(
                     tab.isMinimized = false;
                     if (existing) tab.zIndex = ++state.highestZIndex;
                     if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
+                    // with nothing else on screen a new search takes the free area, like a decision
+                    else if (!existing && nothingOnScreen) fillFreeArea(state, tab.id);
                     tabId = tab.id;
                 });
                 return tabId;
@@ -919,6 +923,16 @@ const appStore = createStore<AppState>()(
                     const newArticles = articles.filter(
                         a => !existingArticleKeys.has(getArticleKey(a))
                     );
+
+                    // an article stored while Brocardi was down learns what a later copy of it got
+                    for (const incoming of articles) {
+                        if (!incoming.brocardi_info) continue;
+                        const stored = existingNorma.articles.find(a => getArticleKey(a) === getArticleKey(incoming));
+                        if (stored && !stored.brocardi_info) {
+                            stored.brocardi_info = incoming.brocardi_info;
+                            delete stored.brocardi_error;
+                        }
+                    }
 
                     if (newArticles.length > 0) {
                         existingNorma.articles = [...existingNorma.articles, ...newArticles];
@@ -3150,7 +3164,14 @@ function isValidView(view: unknown): boolean {
             Number.isInteger(r.numero) && (r.numero as number) > 0 &&
             Number.isInteger(r.anno) && (r.anno as number) > 0;
     }
-    if (v.kind === 'decision-search') return !!v.query && typeof v.query === 'object';
+    if (v.kind === 'decision-search') {
+        const q = v.query as { tema?: unknown; norma?: unknown } | null | undefined;
+        if (!q || typeof q !== 'object') return false;
+        if (q.tema !== undefined && typeof q.tema !== 'string') return false;
+        const n = q.norma as Record<string, unknown> | null | undefined;
+        if (n !== undefined && (!n || typeof n !== 'object' || typeof n.tipo_atto !== 'string' || typeof n.numero_articolo !== 'string')) return false;
+        return q.tema !== undefined || n !== undefined;
+    }
     return false;
 }
 
@@ -3172,7 +3193,7 @@ function stableQueryKey(query: DecisionSearchQuery): string {
     const { normaLabel: _label, ...rest } = query;
     void _label;
     // the same topic typed with other spacing or case is one search
-    if (rest.tema !== undefined) rest.tema = rest.tema.trim().replace(/\s+/g, ' ').toLowerCase();
+    if (rest.tema !== undefined) rest.tema = topicKey(rest.tema);
     return JSON.stringify(sorted({ ...rest, norma: rest.norma ? sorted(rest.norma) : undefined }));
 }
 

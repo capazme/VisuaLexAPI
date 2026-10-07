@@ -7,6 +7,7 @@ import type { UserResponse } from '../types/api';
 import { appStore } from '../store/useAppStore';
 import { getErrorMessage } from '../utils/errors';
 import { clearDecisionCache } from '../utils/decisionFetchCache';
+import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
 
 interface AuthState {
   user: UserResponse | null;
@@ -130,6 +131,7 @@ export function useAuth() {
     // Clear user data from store
     appStore.getState().clearUserData();
     clearDecisionCache();
+    clearDecisionSearchCache();
     setState({
       user: null,
       loading: false,

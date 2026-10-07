@@ -9,6 +9,7 @@ import { searchDecisions } from '../../../services/decisionSearchService';
 import { appStore } from '../../../store/useAppStore';
 import { renderTabView } from '../workspace/renderTabView';
 import { DecisionSearchTabView } from './DecisionSearchTabView';
+import { clearDecisionSearchCache } from '../../../utils/decisionSearchCache';
 
 const NORMA = { tipo_atto: 'codice civile', numero_articolo: '2043' };
 const EMPTY: SearchDecisionsAnswer = { esito: 'risultati', totale: 0, pagina: 1, modo: 'testo', archivio: 'civile', archivio_dal: '2021-01-04', decisioni: [] };
@@ -56,3 +57,5 @@ describe('DecisionSearchTabView', () => {
     await screen.findByText(/Nessuna decisione/);
   });
 });
+
+beforeEach(() => clearDecisionSearchCache());

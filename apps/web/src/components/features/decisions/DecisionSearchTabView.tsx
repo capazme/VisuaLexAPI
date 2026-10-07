@@ -13,14 +13,14 @@ export function DecisionSearchTabView({ tabId, query }: { tabId: string; query: 
   const [topicOnly, setTopicOnly] = useState(false);
   const canWiden = Boolean(query.tema && query.norma);
   const shown: DecisionSearchQuery = topicOnly
-    ? { tema: query.tema, archivio: query.archivio }
+    ? { tema: query.tema }
     : query;
   const heading = query.tema ? `Tema: ${query.tema}` : query.normaLabel ?? 'Sentenze';
 
   return (
-    <div className="space-y-3 p-4">
+    <div className="space-y-3">
       <header className="space-y-1">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{heading}</h2>
+        <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{heading}</h4>
         {query.tema && !topicOnly && query.normaLabel && (
           <p className="text-sm text-slate-600 dark:text-slate-300">e {query.normaLabel}</p>
         )}

@@ -10,3 +10,8 @@ export function searchNorma(norma: NormaVisitata): DecisionSearchNorma {
     ...(norma.data ? { data: norma.data } : {}),
   };
 }
+
+/** A topic as the dedupe sees it: trimmed, inner spaces collapsed, case ignored. */
+export function topicKey(tema: string): string {
+  return tema.trim().replace(/\s+/g, ' ').toLowerCase();
+}

@@ -1,7 +1,8 @@
 // apps/web/src/components/features/decisions/DecisionResultList.tsx
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { RotateCw } from 'lucide-react';
-import { DECISION_PAGE_SIZE, searchDecisions } from '../../../services/decisionSearchService';
+import { DECISION_PAGE_SIZE } from '../../../services/decisionSearchService';
+import { searchDecisionsCached } from '../../../utils/decisionSearchCache';
 import { decisionPath, formatDecisionDeposit, formatDecisionShort } from '../../../utils/decisionLinks';
 import { codePointRangesToUtf16 } from '../../../utils/decisionText';
 import { formatDateItalianLong, withPreposition } from '../../../utils/dateUtils';
@@ -23,8 +24,6 @@ interface DecisionResultListProps {
   besideTabId?: string;
   /** Where the reader stands in the article: the way back from an opened decision. */
   backEntry?: ReadingBackEntry;
-  /** The reader picked another archive: the tab keeps it in its query. */
-  onArchiveChange?: (archivio: DecisionArchive | undefined) => void;
 }
 
 const INDEX_REFUSED = 'L’indice della Cassazione non esprime questo atto';
@@ -123,11 +122,12 @@ type ArchiveChoice = DecisionArchive | 'entrambi';
  * The decisions that cite an article or match a topic (design 2026-10-05 §5): page one on mount,
  * «Altri risultati» appends the next up to the tenth, and the reader can change the archive and,
  * for an article, ask the Cassazione's index or the text. It says what the answer says: the
- * count of the public archive (last five years), never of "all" decisions.
+ * count of the public archive (last five years), never of "all" decisions. The archive is the
+ * list's own state: it starts from what the route chooses and is not kept in the tab's query.
  */
-export function DecisionResultList({ query, besideTabId, backEntry, onArchiveChange }: DecisionResultListProps) {
+export function DecisionResultList({ query, besideTabId, backEntry }: DecisionResultListProps) {
   const refusedNoteId = useId();
-  const [archivio, setArchivio] = useState<DecisionArchive | undefined>(query.archivio);
+  const [archivio, setArchivio] = useState<DecisionArchive | undefined>(undefined);
   const [modo, setModo] = useState<'indice' | 'testo'>('indice');
   const [hits, setHits] = useState<DecisionSearchHit[]>([]);
   const [last, setLast] = useState<Page | null>(null);
@@ -135,14 +135,14 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
   const [loading, setLoading] = useState(true);
   // what the route said about this query, each tied to the query it was learned for:
   // the archive it applies on its own (null: it searches both) and whether it refused the index
-  const [learned, setLearned] = useState<{ key: string; defaultArchive?: DecisionArchive | null; indexRefused?: boolean } | null>(null);
+  const [learned, setLearned] = useState<Record<string, { defaultArchive?: DecisionArchive | null; indexRefused?: boolean }>>({});
   // only the latest request writes: a slower earlier one is dropped
   const token = useRef(0);
   const dropPending = useCallback(() => { token.current++; }, []);
 
   const hasNorma = Boolean(query.norma);
   const queryKey = JSON.stringify({ norma: query.norma, tema: query.tema });
-  const known = learned?.key === queryKey ? learned : null;
+  const known = learned[queryKey] ?? null;
   // a refusal is kept for the query, so later pages and reloads ask for the text straight away; a ref, not
   // state, because `load` reads it when it runs and must not be re-created (nor re-run) when it is learned
   const refusedRef = useRef(false);
@@ -154,7 +154,7 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
     setProblem(null);
     const asked = { norma: query.norma, tema: query.tema, archivio };
     const sentModo = hasNorma ? (refusedRef.current ? 'testo' : modo) : undefined;
-    searchDecisions(asked, pagina, sentModo)
+    searchDecisionsCached(asked, pagina, sentModo)
       .catch((error): SearchDecisionsAnswer => {
         console.error('search_decisions: no answer', error);
         return { esito: 'fonte_non_raggiungibile', fonte: 'rete' };
@@ -172,14 +172,14 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
           });
           const refused = sentModo === 'indice' && answer.modo === 'testo';
           if (!asked.archivio || refused) {
-            setLearned((previous) => {
-              const base = previous?.key === queryKey ? previous : { key: queryKey };
-              return {
-                ...base,
+            setLearned((previous) => ({
+              ...previous,
+              [queryKey]: {
+                ...previous[queryKey],
                 ...(asked.archivio ? {} : { defaultArchive: answer.archivio }),
                 ...(refused ? { indexRefused: true } : {}),
-              };
-            });
+              },
+            }));
           }
         } else {
           setProblem(answer);
@@ -209,7 +209,6 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
     if (choice === archiveShown) return; // the same query again
     const next = choice === 'entrambi' ? undefined : choice;
     setArchivio(next);
-    onArchiveChange?.(next);
   };
 
 
@@ -291,7 +290,7 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
       )}
       {capped && !loading && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Mostrate le prime {MAX_PAGE * DECISION_PAGE_SIZE}: restringi la ricerca con un tema.
+          Mostrate le prime {MAX_PAGE * DECISION_PAGE_SIZE}: restringi la ricerca con {query.tema ? 'altre parole' : 'un tema'}.
         </p>
       )}
     </section>

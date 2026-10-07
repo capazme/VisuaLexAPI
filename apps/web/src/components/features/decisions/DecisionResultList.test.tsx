@@ -7,6 +7,7 @@ import type { DecisionSearchHit, SearchDecisionsAnswer } from '../../../types/de
 vi.mock('../../../services/decisionSearchService');
 import { searchDecisions } from '../../../services/decisionSearchService';
 import { DecisionResultList } from './DecisionResultList';
+import { clearDecisionSearchCache } from '../../../utils/decisionSearchCache';
 
 const NORMA = { tipo_atto: 'codice civile', numero_articolo: '2043' };
 const HIT: DecisionSearchHit = {
@@ -131,12 +132,35 @@ describe('DecisionResultList', () => {
     expect(screen.getByText('Mostrate le prime 200: restringi la ricerca con un tema.')).toBeInTheDocument();
   });
 
-  it('changes the archive, starts again from page one and tells the owner', async () => {
-    const onArchiveChange = vi.fn();
+  it('says «con altre parole» in the cap line of a topic', async () => {
+    const pageOf = (pagina: number): Page => ({ ...PAGE, totale: 400, pagina, decisioni: [{ ...HIT, identita: { ...HIT.identita, numero: 2000 + pagina } }] });
+    for (let p = 1; p <= 10; p++) mockSearch(pageOf(p));
+    render(<Wrapper><DecisionResultList query={{ tema: 'colpa' }} /></Wrapper>);
+    for (let p = 2; p <= 10; p++) {
+      await userEvent.click(await screen.findByRole('button', { name: 'Altri risultati' }));
+      await screen.findByRole('link', { name: new RegExp(`n\\. ${2000 + p}/2026`) });
+    }
+    expect(screen.getByText('Mostrate le prime 200: restringi la ricerca con altre parole.')).toBeInTheDocument();
+  });
+
+  it('keeps what it learned about an article while the query is a topic, and back', async () => {
+    const NUMBERED = { tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07', numero_articolo: '2' };
+    const withArticle = { norma: NUMBERED, tema: 'colpa' };
+    mockSearch({ ...PAGE_TEXT, archivio: null }); // the article: the route searches both
+    const { rerender } = render(<Wrapper><DecisionResultList query={withArticle} /></Wrapper>);
+    expect(await screen.findByRole('button', { name: 'Entrambi' })).toBeInTheDocument();
+    mockSearch({ ...PAGE, archivio: 'civile' });
+    rerender(<Wrapper><DecisionResultList query={{ tema: 'colpa' }} /></Wrapper>);
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
+    mockSearch({ ...PAGE_TEXT, archivio: null }); // the index was refused: this time it asks the text
+    rerender(<Wrapper><DecisionResultList query={withArticle} /></Wrapper>);
+    expect(await screen.findByRole('button', { name: 'Entrambi' })).toBeInTheDocument();
+  });
+
+  it('changes the archive and starts again from page one', async () => {
     mockSearch(PAGE); mockSearch({ ...PAGE, archivio: 'penale' });
-    render(<Wrapper><DecisionResultList query={QUERY} onArchiveChange={onArchiveChange} /></Wrapper>);
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
     await userEvent.click(await screen.findByRole('button', { name: 'Penale' }));
-    expect(onArchiveChange).toHaveBeenCalledWith('penale');
     await waitFor(() => expect(searchMock).toHaveBeenLastCalledWith({ norma: NORMA, tema: undefined, archivio: 'penale' }, 1, 'indice'));
     expect(await screen.findByRole('button', { name: 'Penale' })).toHaveAttribute('aria-pressed', 'true');
   });
@@ -223,3 +247,5 @@ describe('DecisionResultList', () => {
     expect(await screen.findByText('Decreto depositato l\'8 settembre 2026')).toBeInTheDocument();
   });
 });
+
+beforeEach(() => clearDecisionSearchCache());

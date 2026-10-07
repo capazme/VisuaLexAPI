@@ -19,6 +19,7 @@ vi.mock('../../../plugins/PluginSlot', () => ({
 import { searchDecisions } from '../../../services/decisionSearchService';
 import { CaseLawSection } from './CaseLawSection';
 import { massimeStateOf } from './massimeState';
+import { clearDecisionSearchCache } from '../../../utils/decisionSearchCache';
 
 const NORMA: NormaVisitata = {
   tipo_atto: 'codice civile', numero_articolo: '2043', data: '1942-03-16', numero_atto: '262', allegato: '2',
@@ -170,3 +171,5 @@ describe('massimeStateOf', () => {
     expect(massimeStateOf(doctrineVisible, info, error)).toBe(expected);
   });
 });
+
+beforeEach(() => clearDecisionSearchCache());
