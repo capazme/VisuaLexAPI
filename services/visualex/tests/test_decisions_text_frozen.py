@@ -153,6 +153,10 @@ def synthetic_cases() -> dict:
         "synthetic_field_without_dispositivo": to_decision(_record(ocr=[_OCR]), "civile").testo,
         "synthetic_field_multivalued": to_decision(
             _record(ocr=["  RILEVATO CHE primo.  ", "  CONSIDERATO CHE secondo.  "]), "civile").testo,
+        # a character outside the BMP: Python counts one code point, a JS string two units
+        "synthetic_field_astral": to_decision(
+            _record(ocr=["RILEVATO CHE la massima \U0001D49C vale per la sezione \U0001D49D. P.Q.M. Rigetta."]),
+            "civile").testo,
         "synthetic_field_withheld": to_decision(
             _record(ocr=["CORTE SUPREMA DI CASSAZIONE ITALGIUREWEB La sentenza richiesta e' in fase di "
                          "oscuramento"]), "civile").testo,

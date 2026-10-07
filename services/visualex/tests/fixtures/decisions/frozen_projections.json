@@ -63,6 +63,10 @@
     "length": 221,
     "sha256": "aeb8b3c2e36a4c2bae00e1a3c34a4febba3b6ecfff50d932eddfb04e6830ce4b"
   },
+  "synthetic_field_astral": {
+    "length": 64,
+    "sha256": "ff5a0086b721b67410569f0d566c71644701b54c54d01a49b31d9ead178122e9"
+  },
   "synthetic_field_full": {
     "length": 342,
     "sha256": "868066ddd4882f4b92961e78e1d7c748914b85bace69209a641b0685c8ef1c80"
