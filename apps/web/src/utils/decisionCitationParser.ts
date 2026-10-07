@@ -23,7 +23,7 @@ const SECTION =
 // ("del 21 aprile", "del 15/12/1999") is a day, not a year; the date's own year is read below.
 // The bare "10787/2024" must not be a piece of a date either.
 const NUMBER_YEAR =
-  /\bn(?:\.|um(?:ero)?\.?)?\s*(\d{1,6})\s*(?:\/(\d{4}|\d{2})|del\s+(\d{4}|\d{2}))(?![\s/.-]*\d|\s+[a-zà-ù])\b|(?<![\d/.-])\b(\d{1,6})\s*\/\s*(\d{4}|\d{2})(?![/.-]?\d)\b/i;
+  /\bn(?:\.|um(?:ero)?\.?)?\s*(\d{1,6})\s*(?:\/(\d{4}|\d{2})(?![/.-]\d)|del\s+(?:(\d{4})|(\d{2})(?![\s/.-]*\d|\s+[a-zà-ù])))\b|(?<![\d/.-])\b(\d{1,6})\s*\/\s*(\d{4}|\d{2})(?![/.-]?\d)\b/i;
 const NUMBER_ONLY = /\bn(?:\.|um(?:ero)?\.?)?\s*(\d{1,6})\b/i;
 // The Cassazione numbers a decision when it is deposited: "dep." with a full date or a bare year.
 const DEPOSIT_YEAR =
@@ -55,8 +55,8 @@ export function parseDecisionCitation(
   const rest = text.slice(court[0].length);
 
   const pair = NUMBER_YEAR.exec(rest);
-  const numero = pair ? Number(pair[1] ?? pair[4]) : Number(NUMBER_ONLY.exec(rest)?.[1]);
-  const pairYear = pair ? pair[2] ?? pair[3] ?? pair[5] : undefined;
+  const numero = pair ? Number(pair[1] ?? pair[5]) : Number(NUMBER_ONLY.exec(rest)?.[1]);
+  const pairYear = pair ? pair[2] ?? pair[3] ?? pair[4] ?? pair[6] : undefined;
   const dep = corte === 'cassazione' ? DEPOSIT_YEAR.exec(rest) : null;
   const date = DATE_YEAR.exec(rest);
   const rawYear = dep ? dep[1] ?? dep[2] ?? dep[3] : pairYear ?? date?.[1] ?? date?.[2];
