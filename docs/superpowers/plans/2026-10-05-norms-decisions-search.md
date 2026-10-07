@@ -731,6 +731,7 @@ class IndexCoordinates:
     sp: str | None = None  # act type of a numbered act: "DLG", "DPR" …
     num: str | None = None # its number, four digits
     dat: str | None = None # its year
+    # Amended 7 Oct: only `gen` and `art` exist; the index serves codes and the Constitution.
 
 
 def index_clause(norma: dict) -> tuple[str, str | None, IndexCoordinates]:
@@ -772,6 +773,7 @@ git commit -m "feat(api): phrase an article for the Cassazione's index and for t
   - `async def ItalgiureReader.search(self, q: str, pagina: int, rows: int = 20, *, coords: IndexCoordinates | None = None, hl_query: str | None = None) -> SearchPage` — with `coords`, the page asks for the `rnc-*` fields and keeps only the records `cites(doc, coords)` accepts; `hl_query` is sent as `hl.q` (the text phrasing, so an index row can carry a passage); each `SearchHit` has `trovata: "indice" | "testo"`
   - `def fragment_ranges(snippet: str) -> dict`
   - The homepage GET runs once per reader instance and again only after a non-Solr answer.
+  - *Amended 7 Oct:* no homepage request in the normal path (the first select sets the session cookie); one lock-guarded reopen of the session on an anti-bot answer. `coords` is `IndexCoordinates(gen, art)` only.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1003,6 +1005,7 @@ git commit -m "feat(api): search Italgiure by index or text, sorted by deposit, 
 - Test: `services/visualex/tests/test_search_decisions.py`
 
 **Interfaces:**
+- *Amended 7 Oct:* `IndexCoordinates(gen, art)` only, no homepage once per reader (see Task 6).
 - Consumes: Task 5 (`article_clause`, `index_clause`, `topic_clause`, `build_query`, `UnsupportedAct`, `IndexCoordinates`), Task 6 (`ItalgiureReader.search`, `SearchPage`, `SearchHit.trovata`).
 - Produces: `POST /search_decisions`, body `{norma?, tema?, archivio?, pagina?, modo?}` (`modo`: `"indice"`, the default with an article, or `"testo"`; a topic is always searched in the text), answers:
   - `{"esito": "risultati", "totale": int, "pagina": int, "modo": "indice"|"testo", "archivio": "civile"|"penale"|null, "archivio_dal": "YYYY-MM-DD"|null, "decisioni": [{"identita": {...}, "attributi": {...}, "trovata": "indice"|"testo", "frammento": {"testo": str, "evidenziati": [[int,int]]} | null}]}` 200. With `modo: "indice"` and an act the index cannot express, the route searches the text instead and answers `modo: "testo"` — the client shows what was actually done.
@@ -1439,7 +1442,7 @@ git commit -m "feat(api): POST /fetch_decision_pdf — the court's own PDF of a 
 ### Task 9: A decision's text is frozen
 
 > **Amended 5 October (the Sentenze session's review; privacy).** The repository is public: fixtures hold only courts, magistrates, institutions and provisions, never a party's or a lawyer's name. Real PDFs and records live only in the git-ignored `services/visualex/tests/fixtures/decisions/private/` (see its README section); tests that need them go in a `*_local.py` module skipped when that folder is absent (as `test_decisions_pdf_text_local.py` does). CI tests use synthetic PDFs from `services/visualex/tests/decisions_pdf_synth.py` (`make_pdf`, `Text`) and synthetic Solr records. Wherever this task says `FIX / "pdf" / "<fixture>…"`, read: a synthetic record and PDF in CI, the private ones in the local module.
-> Also amended: the projection is each block `strip()`ped at its edges, then concatenated, then every `\n` removed (spec §8.2): `"".join((testo.get(k) or "").strip() for k in ("epigrafe", "motivazione", "dispositivo")).replace("\n", "")`. The golden file stores, per case, `{"sha256": <hex of the projection's UTF-8>, "length": <len>}` — never the text — in `frozen_projections.json`; the synthetic cases run in CI, the private ones in `test_decisions_text_frozen_local.py`. The freeze takes effect with PR 4 (spec §8.5): this task writes the test and the contract now so that every later change is caught.
+> Also amended: the projection is each block `strip()`ped at its edges, then concatenated, then every `\n` removed (spec §8.2): `"".join((testo.get(k) or "").strip(" \t\n\r\f\v") for k in ("epigrafe", "motivazione", "dispositivo")).replace("\n", "")` (the strip is of ASCII whitespace only, spec §8.2: Python's bare `strip()` and JavaScript's `trim()` also strip the no-break space and other Unicode spaces, and they do not agree). The golden file stores, per case, `{"sha256": <hex of the projection's UTF-8>, "length": <len>}` — never the text — in `frozen_projections.json`; the synthetic cases run in CI, the private ones in `test_decisions_text_frozen_local.py`. The freeze takes effect with PR 4 (spec §8.5): this task writes the test and the contract now so that every later change is caught.
 
 **Files:**
 - Create: `services/visualex/tests/test_decisions_text_frozen.py`
@@ -2498,8 +2501,9 @@ describe('renderDecisionHtml', () => {
 const BLOCKS: Array<[keyof DecisionText, string]> = [['epigrafe', 'Epigrafe'], ['motivazione', 'Motivazione'], ['dispositivo', 'Dispositivo']];
 
 export function decisionProjection(testo: DecisionText): string {
-  // each block trimmed at its edges (spec §8.2), as the API's freeze test computes it
-  return BLOCKS.map(([k]) => (testo[k] ?? '').trim()).join('').replace(/\n/g, '');
+  // each block stripped of ASCII whitespace at its edges (spec §8.2), as the API's freeze test
+  // computes it: never `.trim()`, which also strips the no-break space and other Unicode spaces
+  return BLOCKS.map(([k]) => (testo[k] ?? '').replace(/^[ \t\n\r\f\v]+|[ \t\n\r\f\v]+$/g, '')).join('').replace(/\n/g, '');
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -3131,9 +3135,9 @@ without_a_space` against, and to assert `"RILEVATO CHE"` / `"CONSIDERATO CHE"` /
 each start their own paragraph in.
 
 *Furniture left over, by design, not a defect*: letter-spaced OCR noise around the judges'
-signatures in 5 of 36 (`snpen_05881/05882/05883/05884_2022`, `snpen_35166_2026` — e.g. "Vittori
-ìenza Gi iotallevi" for a name, "Massimo Perro Messini D'Agostini" merged) and stamp debris in
-1 of 36 (`snpen_35172_2026`: "p Q w Monica Boni eLz 2? - scrj g …"), confined to the closing
+signatures in 5 of 36 (`snpen_05881/05882/05883/05884_2022`, `snpen_35166_2026` — e.g. a
+judge's name broken into pieces, two names merged: «[nomi dei magistrati]») and stamp debris in
+1 of 36 (`snpen_35172_2026`: "p Q w [firma del cancelliere] eLz 2? - scrj g …"), confined to the closing
 signature block in every case, never the motivazione or dispositivo text itself — exactly the
 "OCR debris from stamps" and "digital signature printed letter by letter" faults the design
 already named for the text field; Task 3/4 should not try to remove these, they cost nothing to
@@ -3330,3 +3334,11 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 
 **Amendment, 2026-10-05 (evening) — the Sentenze session's review of §8, and privacy.** Accepted in full (spec §8.2, §8.4, §8.5, §11.6): the projection strips each block's edges; a decision read from the text field is cached 24 h with a «provvisorio» notice; the freeze takes effect with PR 4 and `italgiure:v3:` is the last change of characters; `line_paragraphs`/`paragraphs` may still change; Corte costituzionale corrections are a cause in §8.4. Privacy: real decisions stay in the git-ignored `private/` folder, CI tests run on synthetic PDFs and records, freeze goldens are SHA-256 and length. With the owner's «46 sì» the branch was rebuilt from c98e1f40 so that no commit holds a real PDF or record (Tasks 2–3 now in 5d6d11dd and e42ad740). Tasks 4, 9 and 18 carry the amendment at their head.
 
+**Amendments, 2026-10-07 — the rulings of 6–7 October, as the code has them.**
+- The index serves the codes and the Constitution only (c.c. `CC`, c.p.c. `PC`, c.p. `CP`, c.p.p. `PV`, Cost. `LC`). Numbered acts, the preleggi and the disp. att. go to the text search. Among the suffixes only «-bis» (`02`) is established.
+- `cites` keeps a record whose `rnc-gen` and `rnc-art` lists are not aligned (`rnc-art` is shorter when a citation names no article, so positions cannot be trusted); on aligned records the false matches measured 2.0 %. The answer has no `totale_approssimato`.
+- No homepage request in the normal path: a cold select answers and sets the session cookie itself (measured 7 Oct; the homepage timed out 20-25 s about one time in two). One lock-guarded reopen of the session, on an answer that is not JSON (the anti-bot page).
+- `archivio_dal` is the earliest of the two archive starts for a search of both archives; an answer without it is not cached.
+- An original PDF whose header cannot be read is served on the record and filename checks; a damaged one never. A cached original PDF is served only while the decision's text entry is cached.
+- The strip of the projection is of ASCII whitespace (space, `\t`, `\n`, `\r`, `\f`, `\v`), in the API's freeze test and in the web's `decisionProjection` (spec §8.2).
+- Known limits, accepted for now: the PDF body is read whole before the size check (allowlisted host, pinned TLS, 8 s budget); an anti-bot page on the download path answers 404 `non_disponibile`; `_plausible` tokenises on whitespace (Task 2 measured `[a-z0-9]+`; genuine pairs score 16–17 either way); a parse that times out keeps its worker thread.

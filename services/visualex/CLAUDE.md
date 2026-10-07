@@ -194,9 +194,21 @@ POST unless noted, JSON bodies.
   Cassazione's have no source link. Lookups cached per archive: found 30 days, absent 1
   hour, a decision found without its text 24 hours (with the notice
   `testo_non_disponibile`; `attributi.testo_assente` says why only when the source did:
-  `oscuramento` or `valutazione_oscuramento`), errors never. Expired entries are swept at
+  `oscuramento` or `valutazione_oscuramento`), a text read from the archive's field
+  instead of the PDF 24 hours too (notice `testo_da_archivio`), errors never. Expired entries are swept at
   start and every six hours (`sweep_decision_caches`). Design:
   docs/superpowers/specs/2026-10-01-sentenze-design.md
+- `/search_decisions` — the Cassazione decisions that mention an article or a topic:
+  `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?}` → `esito`
+  risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, and per decision its identity,
+  attributes, `trovata` and `frammento`; cached a day), non_supportata, richiesta_non_valida
+  400, fonte_non_raggiungibile 503. Italgiure only, the last five years; the index serves
+  codes and the Constitution, any other act goes to the text search. Design:
+  docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md
+- `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
+  PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
+  fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.
+  Served only behind the login
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
 - `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
@@ -480,8 +492,9 @@ Breaking one of these breaks the product. Read before editing.
     The Cassazione's text is read from the court's original PDF (`decisions/pdf_text.py`, then
     `italgiure.py`): one more request per decision found, with a budget of its own (one try, 8 s,
     parse 6 s, the whole step 15 s of the resolver's 25) so a slow PDF falls back instead of
-    failing the lookup. The PDF is accepted only when its filename and its first-page header name
-    the record's number and year, its text is at least 70% of the field's length and shares 10 of
+    failing the lookup. The PDF is refused when its filename or its first-page header names
+    another decision (a filename without tags or a PDF without a header is accepted; a damaged
+    PDF is never accepted); it must also be at least 70% of the field's length and share 10 of
     the field's first 20 words with its first 250 (`_plausible`). Otherwise the field's text
     stands, `testo_origine` is `"archivio"`, a warning logs the reason, and the resolver adds the
     notice `testo_da_archivio` and keeps the decision 24 hours in `decisions_pending`, so the PDF

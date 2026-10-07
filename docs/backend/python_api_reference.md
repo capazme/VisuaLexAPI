@@ -265,8 +265,9 @@ one time in two on 2026-10-07, while a cold select answers in about 1.2 s and se
 cookie itself; after an answer that is not JSON the reader fetches the homepage once and asks
 again once), and one `GET` for the
 court's PDF per decision found (the text is read from it; without it the archive's text field
-stands, with the notice `testo_da_archivio`), at most 10 requests in all: a reference without the archive queries both archives (2), a miss adds the query for
-each archive's start, once a day (2), and, for the penal archive, the next year's lookup (1).
+stands, with the notice `testo_da_archivio`), at most 10 requests in all: a reference without
+the archive queries both archives (2), a miss adds the query for each archive's start, once a
+day (2), and, for the penal archive, the next year's lookup (1).
 A later miss the same day sends at most 3, a hit in a named archive 2 (the suggestion of the
 penal next year reads the record only, no PDF); retries of a failed
 request come on top. A Corte costituzionale call makes at most one
@@ -320,17 +321,24 @@ limit is 1 MB, and the ingress's own page answers).
   `presidente`, `materia`; and `testo_assente`, why there is no text, present only when the
   source said why (the source withholds the text while it removes personal data): `oscuramento`
   (it answers that the text is in the process of being obscured) or `valutazione_oscuramento`
-  (it answers that the obscuring is being evaluated).
+  (it answers that the obscuring is being evaluated); and `testo_origine` (Cassazione),
+  where the text was read from: `"pdf"` (the court's original PDF) or `"archivio"` (the
+  archive's text field, the fallback; see the notice `testo_da_archivio`).
 - `testo`: the whole text, never cut, in blocks: `epigrafe` (Corte costituzionale),
   `motivazione`, `dispositivo` (a block left empty is absent). It is `{}` when the decision
-  comes without its text (notice `testo_non_disponibile`). The Cassazione's blocks are the
-  source's. When the Corte costituzionale's open data leave their `testo` field empty (3,592 of
+  comes without its text (notice `testo_non_disponibile`). The Cassazione's text is read from
+  the court's original PDF: the running headers and footers, the first page's header and the
+  «copia non ufficiale» mark are removed, and the paragraphs come from the page layout (a
+  heading, an indented line, a gap between lines). Only when that PDF cannot be used (no file,
+  a request that fails, a file refused as damaged or as another decision's, a text that is not
+  the field's) is the text the archive's field, read as described below, with the notice
+  `testo_da_archivio` and `testo_origine` `"archivio"`. When the Corte costituzionale's open data leave their `testo` field empty (3,592 of
   4,056 ordinanze, 2001–2026), the reasoning is inside the epigrafe, and the reader splits it at
   the first line whose first word is "Ritenuto" or "Considerato", in any case, searched after
   "ha pronunciato la seguente" when the epigrafe has it (3,577 of those 3,592): what comes
   before is `epigrafe`, the rest `motivazione`, and only the whitespace at the boundary is
   dropped. Without such a line nothing is split, and the reasoning stays in `epigrafe`.
-  Italgiure gives a Cassazione block as one line (45 of 45 texts measured on 2026-10-04, up to
+  The archive's field gives a Cassazione block as one line (45 of 45 texts measured on 2026-10-04, up to
   82,322 characters), so the reader restores its paragraphs by inserting a blank line (`\n\n`)
   before each heading («FATTI DI CAUSA», «RAGIONI DELLA DECISIONE», «RITENUTO IN FATTO» … in
   capitals; «Rilevato che:», «Considerato che,» … in mixed case), before «P.Q.M.» and before
@@ -516,6 +524,10 @@ may be a different decision.
   300 characters that mentions «oscuramento» is never the court's). Without it, the source said
   nothing about why: a rare stub such as «Oscuramento disposto Numero registro generale …» is
   withheld the same way, with no cause.
+- `testo_da_archivio`: the text was read from the archive's field and not from the court's
+  original PDF (`attributi.testo_origine` is `"archivio"`): the PDF could not be used, and its
+  layout, which gives the paragraphs, is not there, so the paragraphs are the restored ones
+  described above. The decision is kept 24 hours and the PDF is tried again soon.
 
 `citata` is the section as the caller wrote it, and it is present only when that is a short
 plain form: at most 20 characters, all of them letters, digits, `_`, spaces, `.`, `-` or `/`.
@@ -529,6 +541,7 @@ homonym deposited later in the other archive is never hidden:
 | found | 30 days |
 | not found | 1 hour |
 | found without its text | 24 hours |
+| read from the archive's field (fallback) | 24 hours |
 | error | never |
 
 Expired entries are deleted at start and every six hours, not only when their key is read
@@ -613,7 +626,8 @@ A page is cached for 24 hours per query and page. Design:
 Each item of `decisioni` is `{identita, attributi, trovata, frammento}`: the identity and
 particulars as in `/fetch_decision`, `trovata` (`indice` or `testo`: how the decision was
 found) and `frammento`, `{testo, evidenziati}` or `null`, a plain-text excerpt with the
-ranges `[start, end]` to emphasise; the client never receives the source's markup. **Offsets
+ranges `[start, end]` to emphasise; only `<em>` becomes ranges; any other markup reaches the client as literal characters and
+must be rendered as text. **Offsets
 count Python code points**: JavaScript counts UTF-16 units, so the client converts them for
 characters outside the BMP. With `modo: "indice"`, `totale` is the index's count; the false
 matches of that index (parallel `rnc-*` fields) were measured at 2.0 %, and the reader drops

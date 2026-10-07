@@ -415,19 +415,18 @@ searched in the text. Answers, all JSON with `esito` like `/fetch_decision`:
 #### 5.2 How an article is searched
 
 **By the index of cited norms (`modo: "indice"`, N15).** The article becomes the
-index's coordinates: the code family and the article for the codes and the
-Constitution (`rnc-gen:"CC" AND rnc-art:"2043 00"`), and for a numbered act the
-family, the act type, the number and the year with the article. The table of
-codes (`CC`, `PC`, `LS` …, act types `COD`, `DLG`, `DPR` …) and how a suffix
-(«-bis») is written in `rnc-art` are measured before they are frozen (plan
-Task 2). Because the index's fields are parallel lists, the query can match a
-decision that cites art. 2043 of one act and something else of the code; the
-server therefore asks for the `rnc-*` fields with each page and keeps only the
-decisions where one citation carries every coordinate (the lists are aligned
-position by position; how the number and year lists align with the others is
-measured in Task 2). The count is the archive's `numFound`; when Task 2
-measures more than 5 % of false matches for a family, that family's count is
-shown as «circa N». The passage shown with an index row comes from Solr's
+index's coordinates: the code family and the article (`rnc-gen:"CC" AND
+rnc-art:"2043 00"`). The index serves the codes and the Constitution only (c.c.
+`CC`, c.p.c. `PC`, c.p. `CP`, c.p.p. `PV`, Cost. `LC`); numbered acts, the
+preleggi and the disp. att. go to the text search, and of the suffixes only
+«-bis» (`02`) is written the way the index does (plan Task 2). Because the
+index's fields are parallel lists, the query can match a decision that cites
+art. 2043 of one act and something else of the code; the server therefore asks
+for the `rnc-*` fields with each page and keeps only the decisions where one
+citation carries every coordinate. A record whose lists are not aligned
+(`rnc-art` is shorter when a citation names no article) is kept, since its
+positions cannot be trusted; on aligned records the false matches measured
+2.0 %. The count is the archive's `numFound`, shown as is. The passage shown with an index row comes from Solr's
 highlighting with the text phrasing below as its query (`hl.q`), when the text
 mentions the article in a form it knows; otherwise the row has no passage.
 
@@ -447,8 +446,8 @@ about a third of the records (§11), so this way finds less; the switch says
   «l. 241 del 1990»), as a Solr proximity phrase of 6 positions (plan Task 1,
   measured: 8 and 12 already let a wrong article in).
 - **EU acts**: not in this round (`non_supportata`).
-- Ordinal suffixes come from `article_suffixes.py`, written both joined and
-  spaced («2051-bis», «2051 bis»).
+- The suffix of an article (any ordinal, «-bis», «-ter» …) is written with a space in
+  the phrase («2051 bis»); the article is read as «2051-bis» or «2051 bis».
 
 The archive: the civil codes search the civil archive, the penal codes the
 penal one, the others both; `archivio` in the body overrides. Order: date of
@@ -459,9 +458,11 @@ deposit, newest first (`sort=pd desc`).
 - The decision reader's own `ThrottledHttpClient` (`decisions_http_client`):
   its own semaphore and minimum interval, the egress allowlist, honest
   User-Agent, verified TLS.
-- One Solr request per page, plus the homepage request that opens the session.
-  The homepage is fetched once per client session, not once per query (today's
-  `_select` fetches it every time; plan task).
+- One Solr request per page. No homepage request in the normal path: the select
+  itself sets the session cookie (a cold select answers in about 1.2 s, while the
+  homepage timed out 20-25 s about one time in two, measured 7 October). When an
+  answer is not JSON (the anti-bot page), one lock-guarded reopen of the session
+  and one more try.
 - Answers cached 24 hours per (query, page) in the existing cache manager.
 - The route counts against the per-IP rate limit; a page beyond the tenth is
   refused (`richiesta_non_valida`): 200 decisions is a reading list, not an
@@ -551,7 +552,7 @@ before the choice) takes no notes.
 
 A decision's text, for anchoring, is **its blocks in reading order — epigrafe,
 motivazione, dispositivo — each with the whitespace at its two edges removed
-(`strip()`), then concatenated, then every `\n` removed**. Offsets count
+(`strip()` of ASCII whitespace only: space, `\t`, `\n`, `\r`, `\f`, `\v`), then concatenated, then every `\n` removed**. Offsets count
 characters in that string, as an article's count characters in `article_text`
 minus `\n` (rule 23). Two properties follow:
 
@@ -565,7 +566,7 @@ minus `\n` (rule 23). Two properties follow:
   `text[:cut].rstrip()`), so without the edge `strip()` the spaces at a split
   would be counted on one side and not the other (the Sentenze session's
   review, 5 October). The web's `decisionProjection` and the API's freeze test
-  compute the same string.
+  compute the same string (never `.trim()`, which also strips the no-break space).
 
 #### 8.3 The renderer
 
@@ -783,7 +784,7 @@ File name: the short form made safe (`Cass_civ_sez_III_n_10787_2024.pdf`).
 
 For the Cassazione only, when the record names a PDF: `POST /fetch_decision_pdf`
 with the identity, behind the login (proxy and ingress lists, `legalFetch`).
-It serves the bytes §11 cached, or fetches them once (one request, rate-limited
+It serves the bytes §11 cached, or fetches them once (two requests, the record and then the PDF, rate-limited
 like the lookup) and caches them. Answers `application/pdf` with
 `Content-Disposition: attachment`, or JSON `{ esito }`: `non_disponibile` 404
 (no PDF named, or a withheld text), `fonte_non_raggiungibile` 503,
