@@ -49,11 +49,10 @@ court, archive, number and year:
 - Corte di cassazione, civil (`snciv`), no. 5628 of 2022 — Sez. U, Ordinanza, 14 pages (the
   dispositivo is headed «PQM.»).
 
-To fetch them again (plan `2026-10-05-norms-decisions-search`, Task 2, Step 1): GET the archive's
-homepage `https://www.italgiure.giustizia.it/sncass/` first, then a Solr query on `sn.solr` for
+To fetch them again (plan `2026-10-05-norms-decisions-search`, Task 2, Step 1): a Solr query on `sn.solr` for
 `kind:"snciv" AND numdec:<numero> AND anno:<anno>` with `fl=*`; the PDF is at
 `https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll?verbo=attach&db=snciv&id=<filename with ".pdf" replaced by ".clean.pdf">`,
-in the same session. At least 2.5 s between requests. Read each file for a natural person's name
+in the same session. The homepage `https://www.italgiure.giustizia.it/sncass/` is not needed first (measured 2026-10-07: a cold select sets the session cookie, the PDF follows in the same session, and the homepage times out about one time in two). At least 2.5 s between requests. Read each file for a natural person's name
 before relying on it; never copy any of it into a committed file.
 
 `italgiure_index_2043_cc.json`: `kind:"snciv" AND rnc-gen:"CC" AND rnc-art:"2043 00"`,

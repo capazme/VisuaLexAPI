@@ -9,6 +9,7 @@ from visualex_api.services.decisions import italgiure
 from visualex_api.services.decisions.italgiure import ItalgiureReader, SourceAnswerError, fragment_ranges
 from visualex_api.services.decisions.search import IndexCoordinates
 from visualex_api.services.http_client import HttpResult
+from visualex_api.tools.exceptions import NetworkError
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "decisions"
 EMPTY = (FIX / "italgiure_search_empty.json").read_text()
@@ -107,6 +108,46 @@ async def test_concurrent_failures_share_one_homepage_get(monkeypatch):
             both_posted.set()
         if sent["POST"] <= 2:
             await both_posted.wait()  # both first attempts are in flight before either fails
+            return HttpResult(text="<html>Verifica</html>", status=200, headers={})
+        return HttpResult(text=EMPTY, status=200, headers={})
+
+    monkeypatch.setattr(italgiure.decisions_http_client, "request", fake_request)
+    reader = ItalgiureReader()
+    pages = await asyncio.gather(reader.search('(ocr:"x")', pagina=1),
+                                 reader.search('(ocr:"y")', pagina=1))
+    assert [p.totale for p in pages] == [0, 0]
+    assert calls.count("GET") == 1 and calls.count("POST") == 4
+
+
+async def test_a_homepage_that_fails_does_not_stop_the_retry(monkeypatch):
+    calls, posts = [], iter(["<html>Verifica</html>", EMPTY])
+
+    async def fake_request(method, url, **kwargs):
+        calls.append(method)
+        if method == "GET":
+            raise NetworkError("timeout")
+        return HttpResult(text=next(posts), status=200, headers={})
+
+    monkeypatch.setattr(italgiure.decisions_http_client, "request", fake_request)
+    page = await ItalgiureReader().search('(ocr:"x")', pagina=1)
+    assert page.totale == 0 and calls == ["POST", "GET", "POST"]
+
+
+async def test_concurrent_failures_share_one_failed_homepage_get(monkeypatch):
+    calls = []
+    sent = {"POST": 0}
+    both_posted = asyncio.Event()
+
+    async def fake_request(method, url, **kwargs):
+        calls.append(method)
+        if method == "GET":
+            await asyncio.sleep(0)
+            raise NetworkError("timeout")
+        sent["POST"] += 1
+        if sent["POST"] == 2:
+            both_posted.set()
+        if sent["POST"] <= 2:
+            await both_posted.wait()
             return HttpResult(text="<html>Verifica</html>", status=200, headers={})
         return HttpResult(text=EMPTY, status=200, headers={})
 

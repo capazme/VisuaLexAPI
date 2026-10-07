@@ -311,9 +311,16 @@ class ItalgiureReader:
         async with self._reopen_lock:
             if self._generation != generation:
                 return  # another request reopened the session after this one was sent
-            await decisions_http_client.request("GET", f"{BASE}/", source="italgiure", ssl=ctx,
-                                                headers=http_headers())
-            self._generation += 1
+            try:
+                await decisions_http_client.request("GET", f"{BASE}/", source="italgiure", ssl=ctx,
+                                                    headers=http_headers())
+            except (NetworkError, DocumentNotFoundError, OSError, asyncio.TimeoutError,
+                    aiohttp.ClientError) as exc:
+                # the homepage often times out (2026-10-07) and the select sets the cookie
+                # itself: the retry goes ahead, and the attempt counts for the requests queued
+                log.warning("Italgiure homepage not fetched", error=type(exc).__name__)
+            finally:
+                self._generation += 1
 
     async def _post(self, params: dict[str, str], ctx) -> dict | None:
         """Solr's answer, None when the body is not JSON; SourceAnswerError for JSON of another shape."""
