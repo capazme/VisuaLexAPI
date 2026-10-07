@@ -17,17 +17,23 @@ export interface CitationLinksOptions {
 /**
  * The click and hover behaviour of the `.citation-hover` spans `wrapCitationsInHtml` leaves in a
  * reading surface: hover shows the preview, a click records the way back and opens the cited norm.
- * The listeners sit on `containerRef`'s element, attached once; the options are read when an event
- * fires, so a new `onOpen` or `origin` never re-attaches them.
+ * The listeners sit on `containerRef`'s element and follow it: they are attached when the element
+ * appears and again if it changes (a text that becomes visible later). The options are read when an
+ * event fires, so a new `onOpen` or `origin` never re-attaches them.
  */
 export function useCitationLinks(containerRef: RefObject<HTMLElement | null>, options: CitationLinksOptions): void {
   const pushReadingBack = useAppStore((s) => s.pushReadingBack);
   const latest = useRef(options);
+  const attached = useRef<{ element: HTMLElement; detach: () => void } | null>(null);
   // after each render, never during it
   useEffect(() => { latest.current = options; });
 
+  // After every render: cheap, and the only way to notice an element that appeared since.
   useEffect(() => {
     const container = containerRef.current;
+    if (attached.current?.element === container) return;
+    attached.current?.detach();
+    attached.current = null;
     if (!container) return;
 
     const handleClick = (event: Event) => {
@@ -68,10 +74,18 @@ export function useCitationLinks(containerRef: RefObject<HTMLElement | null>, op
     container.addEventListener('click', handleClick);
     container.addEventListener('mouseenter', handleMouseEnter, true);
     container.addEventListener('mouseleave', handleMouseLeave, true);
-    return () => {
-      container.removeEventListener('click', handleClick);
-      container.removeEventListener('mouseenter', handleMouseEnter, true);
-      container.removeEventListener('mouseleave', handleMouseLeave, true);
+    attached.current = {
+      element: container,
+      detach: () => {
+        container.removeEventListener('click', handleClick);
+        container.removeEventListener('mouseenter', handleMouseEnter, true);
+        container.removeEventListener('mouseleave', handleMouseLeave, true);
+      },
     };
-  }, [containerRef, pushReadingBack]);
+  });
+
+  useEffect(() => () => {
+    attached.current?.detach();
+    attached.current = null;
+  }, []);
 }

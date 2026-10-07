@@ -73,7 +73,7 @@ export const SHAPE_TEXTS: Record<string, DecisionText> = {
   epigrafe_only: { epigrafe: 'Ordinanza\nsul ricorso n. 1.' },
   // a character outside the BMP is two UTF-16 units and one code point
   astral: { motivazione: 'La massima \u{1D49C} vale per la sezione \u{1D49D}.\nFine.' },
-  // a carriage return inside a line (the field reader does not normalise it)
+  // a carriage return inside a line: a renderer-level case only, the readers normalise it (italgiure:v4)
   carriage_return: { motivazione: 'riga uno\rriga due\r\nterza riga', dispositivo: 'Rigetta.' },
   // markup-looking characters must reach a text node escaped, never parsed
   markup: { motivazione: 'Se a < b && b > c, "x" & \'y\'.' },

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { appStore } from '../../store/useAppStore';
@@ -73,5 +73,28 @@ describe('useCitationLinks', () => {
     fireEvent.click(citation());
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('attaches to a container that appears after the hook, and follows it when it changes', () => {
+    const onOpen = vi.fn();
+    function Late() {
+      const ref = useRef<HTMLDivElement>(null);
+      const hoveringRef = useRef(false);
+      const [shown, setShown] = useState(0);
+      useCitationLinks(ref, { onOpen, showPreview: vi.fn(), hidePreview: vi.fn(), isHoveringPopupRef: hoveringRef });
+      return (
+        <>
+          <button onClick={() => setShown((n) => n + 1)}>next</button>
+          {shown > 0 && <div key={shown} ref={ref} data-testid="late" dangerouslySetInnerHTML={{ __html: HTML }} />}
+        </>
+      );
+    }
+    render(<Late />);
+    fireEvent.click(screen.getByText('next'));
+    fireEvent.click(screen.getByTestId('late').querySelector('.citation-hover')!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText('next')); // a new element replaces the first
+    fireEvent.click(screen.getByTestId('late').querySelector('.citation-hover')!);
+    expect(onOpen).toHaveBeenCalledTimes(2);
   });
 });

@@ -113,8 +113,10 @@ export function renderDecisionHtml({ testo, highlights, annotations, signs = fal
       const html = paragraphs
         .map(({ ranges }) => {
           const lines = ranges
-            // A carriage return inside a line is kept by the projection but the HTML parser would
-            // turn it into a line feed: as a character reference it reaches the DOM unchanged.
+            // The readers turn every carriage return into a line feed (italgiure:v4), so none
+            // reaches the page. Should one come, it is written as a character reference so this
+            // HTML is faithful to the projection; SafeHTML's sanitiser re-serialises it, and the
+            // page's parser would read it as a line feed: the guarantee is the readers', not ours.
             // (A NUL is dropped by the parser and stays a limit, as in an article.)
             .map(({ from, to }) => `<span class="vlx-dec-line">${renderSpan(plain, from, to, marks, false).replace(/\r/g, '&#13;')}</span>`)
             .join('');

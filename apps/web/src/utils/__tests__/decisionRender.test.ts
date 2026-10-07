@@ -254,7 +254,7 @@ describe('labels and characters', () => {
     expect(labels(renderDecisionHtml({ testo: { epigrafe: 'a', motivazione: 'b' }, highlights: [], annotations: [] }))).toEqual(['Epigrafe', 'Motivazione']);
   });
 
-  it('keeps an interior carriage return in the DOM', () => {
+  it('writes an interior carriage return as a reference (the readers never emit one: italgiure:v4)', () => {
     const testo = DECISION_TEXTS.carriage_return;
     const html = renderDecisionHtml({ testo, highlights: [], annotations: [] });
     expect(html).toContain('&#13;');
