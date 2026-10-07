@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Command } from 'cmdk';
 import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles, SlidersHorizontal, Gavel } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
@@ -54,7 +54,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     openAliasManager: s.openAliasManager,
     openDecisionTab: s.openDecisionTab,
   })));
-  const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+  // The box is focused as the palette opens; the first-open tour (driver.js, started 300 ms later)
+  // can take that focus, so when the tour ends the box gets it back. Only if the box is still there:
+  // the ref is empty once the palette has closed or moved on to another step.
+  const boxRef = useRef<HTMLInputElement>(null);
+  const { tryStartTour } = useTour({
+    theme: settings.theme as 'light' | 'dark',
+    onComplete: (tour) => {
+      if (tour === 'commandPalette') setTimeout(() => boxRef.current?.focus(), 0);
+    },
+  });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
   const [article, setArticle] = useState('1');
@@ -511,6 +520,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
               {step === 'select_act' && (
                 <div className="flex-1">
                   <Command.Input
+                    ref={boxRef}
                     autoFocus
                     value={inputValue}
                     onValueChange={setInputValue}

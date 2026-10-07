@@ -76,3 +76,13 @@ describe('SearchPanel on a phone', () => {
     expect(appStore.getState().workspaceTabs.map((t) => t.id)).toContain(penal);
   });
 });
+
+describe('SearchPanel on a phone — the layout\'s menu button', () => {
+  it('leaves room for the fixed menu button (top-left, 56px wide) at the left of the tab header', () => {
+    appStore.getState().addWorkspaceTab('Codice civile');
+    render(<MemoryRouter><SearchPanel /></MemoryRouter>);
+    const header = screen.getByRole('button', { name: PREVIOUS }).closest('div.border-b');
+    // 4.5rem = 72px: the button's 16px offset and 40px of width, and a gap
+    expect(header).toHaveClass('pl-[4.5rem]');
+  });
+});

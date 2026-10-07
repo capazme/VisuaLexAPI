@@ -56,7 +56,7 @@ describe('DecisionAddress', () => {
   it('says why an address does not read, in the app\'s error toast', async () => {
     renderAt('/sentenze/tar-lazio/1/2024');
     await screen.findByTestId('search-page');
-    expect(appStore.getState().lastSyncError?.message).toBe("L'indirizzo non indica una sentenza leggibile: Organo non riconosciuto.");
+    expect(appStore.getState().lastSyncError?.message).toBe("L'indirizzo non indica una sentenza leggibile: organo non riconosciuto.");
   });
 
   it('says nothing for /sentenze alone or for a good address', async () => {

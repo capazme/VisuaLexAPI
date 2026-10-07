@@ -18,7 +18,7 @@ export function DecisionAddress() {
     if (parsed?.ok) requestOpenDecision(parsed.reference);
     else {
       // the app's transient error toast (SyncErrorToast, mounted for the whole layout)
-      if (parsed) pushError(`L'indirizzo non indica una sentenza leggibile: ${Object.values(parsed.errors).join('; ')}.`);
+      if (parsed) pushError(`L'indirizzo non indica una sentenza leggibile: ${Object.values(parsed.errors).map((r) => r.charAt(0).toLowerCase() + r.slice(1)).join('; ')}.`);
       openCommandPalette();
     }
     // the address is read once, as the route mounts

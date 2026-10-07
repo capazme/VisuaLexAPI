@@ -730,8 +730,10 @@ export function SearchPanel() {
       {/* Mobile: Swipeable tabs navigation */}
       {hasTabs && (
         <div className="md:hidden w-full h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-          {/* Tab header with navigation - Glass aesthetic */}
-          <div className="flex-shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-4">
+          {/* Tab header with navigation - Glass aesthetic. The layout's fixed menu button (top-left,
+              16px in, 56px wide) sits over the header's left edge: the inset keeps the previous-tab
+              chevron clear of it. */}
+          <div className="flex-shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 pl-[4.5rem] pr-4 py-4">
             <div className="flex items-center justify-between">
               {/* Prev button */}
               <button

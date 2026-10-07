@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+const tour = vi.hoisted(() => ({ onComplete: undefined as undefined | ((t: string) => void) }));
 vi.mock('../../../hooks/useTour', () => ({
-  useTour: () => ({ tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true }),
+  useTour: (options?: { onComplete?: (t: string) => void }) => {
+    tour.onComplete = options?.onComplete;
+    return { tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true };
+  },
 }));
 
 import { CommandPalette } from './CommandPalette';
@@ -355,5 +359,24 @@ describe('CommandPalette — focus on opening', () => {
   it('puts the cursor in the box, so typing goes somewhere', () => {
     renderPalette();
     expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveFocus();
+  });
+
+  it('gives the box its focus back when the first-open tour ends', async () => {
+    renderPalette();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    // the tour took the focus (driver.js moves it into its popover)
+    box.blur();
+    expect(box).not.toHaveFocus();
+    act(() => { tour.onComplete?.('commandPalette'); });
+    await waitFor(() => expect(box).toHaveFocus());
+  });
+
+  it('leaves the focus alone when another tour ends', async () => {
+    renderPalette();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    box.blur();
+    act(() => { tour.onComplete?.('welcome'); });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(box).not.toHaveFocus();
   });
 });
