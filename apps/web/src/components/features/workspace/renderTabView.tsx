@@ -1,5 +1,6 @@
 import type { WorkspaceTab } from '../../../store/useAppStore';
 import { DecisionTabView } from '../decisions/DecisionTabView';
+import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
 
 function assertNever(x: never): never {
   throw new Error(`unhandled tab view ${JSON.stringify(x)}`);
@@ -14,7 +15,7 @@ export function renderTabView(tab: WorkspaceTab, view: NonNullable<WorkspaceTab[
     case 'decision':
       return <DecisionTabView key={tab.id} tabId={tab.id} reference={view.reference} />;
     case 'decision-search':
-      return null; // drawn by the search tab (Task 17)
+      return <DecisionSearchTabView key={tab.id} tabId={tab.id} query={view.query} />;
     default:
       return assertNever(view);
   }

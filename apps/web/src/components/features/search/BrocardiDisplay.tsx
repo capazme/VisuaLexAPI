@@ -7,6 +7,8 @@ import { DOCTRINE_ATTRIBUTION, DOCTRINE_SOURCE_NAME, LATIN_MAXIMS_LABEL } from '
 import { FootnoteTooltip } from './FootnoteTooltip';
 import { MarkableBrocardiSection } from './MarkableBrocardiSection';
 import { useAppStore } from '../../../store/useAppStore';
+import type { DecisionSearchNorma } from '../../../types/decisions';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 
 // Error Boundary for BrocardiSection — surfaces the failure instead of hiding
 // the section silently so users know something went wrong and can retry.
@@ -431,8 +433,16 @@ function CrossReferencesSection({
   );
 }
 
-function GlossarioSection({ entries }: { entries: GlossaryEntry[] }) {
+/** The article a glossary term is read beside: its decisions open next to the article's tab. */
+export interface GlossaryCaseLaw {
+  norma: DecisionSearchNorma;
+  normaLabel: string;
+  tabId?: string;
+}
+
+function GlossarioSection({ entries, caseLaw }: { entries: GlossaryEntry[]; caseLaw?: GlossaryCaseLaw }) {
   const [isOpen, setIsOpen] = useState(false);
+  const openDecisionSearchTab = useAppStore((s) => s.openDecisionSearchTab);
 
   const toggle = () => setIsOpen((v) => !v);
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -464,7 +474,7 @@ function GlossarioSection({ entries }: { entries: GlossaryEntry[] }) {
       {isOpen && (
         <ul className="flex flex-wrap gap-2 px-4 pb-3">
           {entries.map((entry) => (
-            <li key={entry.url}>
+            <li key={entry.url} className="flex flex-wrap items-center gap-1">
               <a
                 href={entry.url}
                 target="_blank"
@@ -473,6 +483,18 @@ function GlossarioSection({ entries }: { entries: GlossaryEntry[] }) {
               >
                 {entry.termine}
               </a>
+              <button
+                type="button"
+                aria-label={`Sentenze su questo tema: ${entry.termine}`}
+                onClick={() => openDecisionSearchTab(
+                  { tema: entry.termine, ...(caseLaw ? { norma: caseLaw.norma, normaLabel: caseLaw.normaLabel } : {}) },
+                  `Tema: ${entry.termine}`,
+                  caseLaw?.tabId ? { besideTabId: caseLaw.tabId } : undefined,
+                )}
+                className={`rounded-full px-2 py-1 text-xs text-primary-700 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE} inline-flex items-center`}
+              >
+                Sentenze su questo tema
+              </button>
             </li>
           ))}
         </ul>
@@ -540,6 +562,8 @@ function RelatedArticlesSection({
 interface BrocardiDisplayProps {
   info: BrocardiInfoType | null;
   currentNorma?: { tipo_atto: string; data?: string; numero_atto?: string };
+  /** The article and its tab: a glossary term's decisions are searched with it and open beside it. */
+  caseLaw?: GlossaryCaseLaw;
   onArticleClick?: (articleNumber: string, tipoAtto: string) => void;
   /**
    * Parent article identity. When both are provided, the Ratio and
@@ -582,7 +606,7 @@ function BrocardiEmptyState({ link }: { link?: string | null }) {
   );
 }
 
-export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote }: BrocardiDisplayProps) {
+export function BrocardiDisplay({ info, currentNorma, caseLaw, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote }: BrocardiDisplayProps) {
   const canMark = Boolean(itemKey && uniqueArticleId && onRequestAddNote);
   // Default collapsed on mobile (<768px), expanded on desktop
   const [isMainOpen, setIsMainOpen] = useState(() =>
@@ -686,7 +710,7 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
 
           {/* Glossario (dizionario giuridico Brocardi) */}
           {info.Glossario && info.Glossario.length > 0 && (
-            <GlossarioSection entries={info.Glossario} />
+            <GlossarioSection entries={info.Glossario} caseLaw={caseLaw} />
           )}
 
           {/* Articoli correlati (precedente/successivo) */}

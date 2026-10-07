@@ -1,12 +1,12 @@
 import { useId, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { MassimaStructured, NormaVisitata } from '../../../types';
-import type { DecisionSearchNorma } from '../../../types/decisions';
 import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { DOCTRINE_ATTRIBUTION, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLabel';
 import { httpsUrl } from '../../../utils/decisionLinks';
 import { citeNorm } from '../../../utils/sources';
+import { searchNorma } from '../../../utils/decisionSearchNorma';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { getSlotComponents } from '../../../plugins/registry';
@@ -53,16 +53,6 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
   } catch {
     // storage may be unavailable: the section just does not remember
   }
-}
-
-/** The four fields `/search_decisions` reads; the others of an article are ignored there. */
-function searchNorma(norma: NormaVisitata): DecisionSearchNorma {
-  return {
-    tipo_atto: norma.tipo_atto,
-    numero_articolo: norma.numero_articolo,
-    ...(norma.numero_atto ? { numero_atto: norma.numero_atto } : {}),
-    ...(norma.data ? { data: norma.data } : {}),
-  };
 }
 
 /**

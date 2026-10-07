@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import type { BrocardiInfo } from '../../../types';
+import { appStore } from '../../../store/useAppStore';
 
 const empty: BrocardiInfo = {
   position: null, link: null, Brocardi: null, Ratio: null,
@@ -59,6 +60,29 @@ describe('BrocardiDisplay — Glossario', () => {
     const link = screen.getByRole('link', { name: 'colpa' });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+});
+
+describe('BrocardiDisplay — Glossario, decisions on a term', () => {
+  const original = appStore.getState().openDecisionSearchTab;
+  afterEach(() => appStore.setState({ openDecisionSearchTab: original }));
+
+  it('keeps the Brocardi link and opens a search tab beside the article', () => {
+    const open = vi.fn(() => 'tab');
+    appStore.setState({ openDecisionSearchTab: open } as never);
+    const norma = { tipo_atto: 'codice civile', numero_articolo: '2043' };
+    render(<BrocardiDisplay
+      caseLaw={{ norma, normaLabel: 'art. 2043 c.c.', tabId: 'article-tab' }}
+      info={{ ...empty, Glossario: [{ termine: 'danno ingiusto', url: 'https://brocardi.it/dizionario/1.html', dizionario_id: '1' }] }}
+    />);
+    expandGlossario();
+    expect(screen.getByRole('link', { name: 'danno ingiusto' })).toHaveAttribute('href', 'https://brocardi.it/dizionario/1.html');
+    fireEvent.click(screen.getByRole('button', { name: /Sentenze su questo tema/ }));
+    expect(open).toHaveBeenCalledWith(
+      { tema: 'danno ingiusto', norma, normaLabel: 'art. 2043 c.c.' },
+      'Tema: danno ingiusto',
+      { besideTabId: 'article-tab' },
+    );
   });
 });
 

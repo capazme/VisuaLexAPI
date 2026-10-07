@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { CaseLawSection } from './CaseLawSection';
+import { searchNorma } from '../../../utils/decisionSearchNorma';
 import { massimeStateOf } from './massimeState';
 import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
@@ -1209,6 +1210,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
                     <BrocardiDisplay
                         info={brocardi_info}
+                        caseLaw={{ norma: searchNorma(norma_data), normaLabel: citeNorm(norma_data), tabId: originTabId ?? tabId }}
                         itemKey={itemKey}
                         uniqueArticleId={uniqueArticleId}
                         onRequestAddNote={handleBrocardiAddNote}
