@@ -690,18 +690,22 @@ admin moderation (`ArticleThread` and its tables, `articleDiscussionController`,
 `ArticleDiscussionPanel`) — open on a decision too, with the same rules and the
 same panel.
 
-**Target.** A discussion is anchored by `(normaKey, articleId)` like a note. On
-a decision: `normaKey` = the decision key, `articleId` = `""`, `articleLabel` =
-`formatDecisionShort`, `version` absent, `articleUrn` absent, `textHash` = the
+**Target** (the owner, question 5: «no facciamo la migrazione, tanto non abbiamo
+ancora veri dati storici se non di test. Può aiutare nell'ambito della pulizia e
+struttura del dato giuridico»). A thread says what it is about in columns of its
+own, next to the article's: `target_kind` (`article` | `decision`, default
+`article`, every existing row backfilled `article`) and `decision_key`. A CHECK
+binds them: an `article` thread has no `decision_key`; a `decision` thread has a
+`decision_key`, `normaKey` equal to it, `articleId` `""`, no `version` and no
+`articleUrn`. So one index and one list route still serve both
+(`(normaKey, articleId)`), and a query can ask the decisions alone without reading
+key shapes. On a decision `articleLabel` = `formatDecisionShort`, `textHash` = the
 SHA-256 of the decision's projection (§8.2), and a passage's
-`start`/`prefix`/`suffix` measured on that projection. Only a found identity
-takes a discussion (as §8.1). **No schema change** (recommended, question 5): the
-two key spaces cannot meet (a norm key never contains `:`), and the server
-accepts `articleId` `""` only when `normaKey` is a decision key that it reads back
-(`identityFromKey`'s server twin: same shapes, the same bounds), so a malformed
-key is refused, not stored. The alternative is a `target_kind` column and a
-`decision_key` column with a CHECK, which costs a migration (to be announced in
-the register first) and buys nothing the key's shape does not already give.
+`start`/`prefix`/`suffix` are measured on that projection. Only a found identity
+takes a discussion (as §8.1). The server reads the key back before storing it
+(`identityFromKey`'s server twin: the same shapes and bounds), so a malformed key
+is refused. The migration is hand-written (`apps/server/CLAUDE.md`, «Prisma
+migrations») and announced in the register before its code.
 
 **Where.** The decision tab's toolbar has the discussion button where the
 article's is; «Discuti» in `SelectionPopup` starts a passage discussion; the
@@ -710,20 +714,21 @@ with the decision's anchor and projection). `ArticleDiscussionPanel` takes the
 anchor and the label it shows from its caller, so it serves both without a
 branch.
 
-**Words a court withdrew.** A passage discussion quotes the decision publicly.
+**Words a court withdrew** (question 6: «a, reversibile (nel senso che l'admin
+può rimetterlo in chiaro)»). A passage discussion quotes the decision publicly.
 When the decision's current text no longer holds the quoted words (§8.4: the
 court obscured or corrected it), the article's rule would keep showing the
-original quotation beside a «detached» notice. On a decision the panel shows
-it only to its author and the admins; everyone else reads «Il passo citato non è
-più nel testo della decisione» (question 6). This is §8.6's caution applied to
-the one place where a user's quotation is public. The limit, said plainly: the
-server does not read decisions, so it cannot tell on its own that a passage is
-gone, and the API still returns the stored quotation to a signed-in caller. To
-withhold it there too, the first reader whose text no longer holds the passage
-would mark the thread (a `passage_withdrawn_at` column: a migration), and the
-server would stop returning the quotation from then on. Recommended: the panel
-rule now (no migration; the app is behind the login), the column only if the
-owner wants the API covered as well.
+original quotation beside a «detached» notice. On a decision the panel shows it
+only to its author and the admins; everyone else reads «Il passo citato non è
+più nel testo della decisione». An admin can put a quotation back in the clear,
+and hide it again: a per-thread override stored with the thread
+(`passage_released_at`, `passage_released_by`, in the same migration; set and
+cleared through the moderation route), so the panel shows the quotation to every
+reader while it is set. This is §8.6's caution applied to the one place where a
+user's quotation is public. The limit, said plainly: the server does not read
+decisions and cannot tell on its own that a passage is gone, so the API still
+returns the stored quotation to a signed-in caller; the rule is the panel's (the
+app is behind the login).
 
 **Unchanged.** Reports, votes, moderation (`PATCH /admin/article-discussions/:id`),
 the user's data export (`authController` already exports every thread) and
@@ -916,13 +921,18 @@ were the orchestrator's numbers for the four questions below).
 | 3 | Excerpts with personal data of a decision later withdrawn | Nothing more: the user's own data, visible and deletable in §8.4's box |
 | 4 | Notes and highlights on decisions in environments and the Forum | Yes, with the caution of §8.6: an anchor whose words are no longer in the decision's current text does not travel |
 
-## Questions for the owner — open (7 October)
+## Questions for the owner — answered (7 October)
 
-| # | Question | Recommended |
+Answered by the owner on 7 October 2026, verbatim: 5 «no facciamo la migrazione,
+tanto non abbiamo ancora veri dati storici se non di test. Può aiutare
+nell'ambito della pulizia e struttura del dato giuridico»; 6 «a, reversibile (nel
+senso che l'admin può rimetterlo in chiaro)»; 7 «sì».
+
+| # | Question | Answer |
 |---|---|---|
-| 5 | Discussions on decisions: stored as today's article discussions, keyed by the decision (no schema change), or with new columns (a migration) | No schema change (§8.7) |
-| 6 | A passage discussion whose words are no longer in the decision's text: (a) hidden by the panel from everyone but its author and the admins, (b) also withheld by the API (a column, a migration), (c) shown as on articles | (a) now, (b) only if the API must be covered too (§8.7) |
-| 7 | The round-B signs on a decision: one per paragraph, as on an article's comma | Yes (§8.3) |
+| 5 | Discussions on decisions: keyed as today's article discussions (no schema change), or with columns of their own (a migration) | Columns of their own: `target_kind`, `decision_key`, with a CHECK (§8.7) |
+| 6 | A passage discussion whose words are no longer in the decision's text | The panel hides it from everyone but its author and the admins; an admin can put it back in the clear, a stored per-thread override (§8.7) |
+| 7 | The round-B signs on a decision, one per paragraph | Yes (§8.3) |
 
 ## Coordination
 

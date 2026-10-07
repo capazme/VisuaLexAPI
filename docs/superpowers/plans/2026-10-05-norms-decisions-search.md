@@ -2908,21 +2908,24 @@ git commit -m "feat(web): download a decision as a PDF of ours, or the court's o
 
 ## PR 4b — `feat/decision-discussions` (apps/server, apps/web)
 
-Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it needs the decision's reading surface, its projection and `SelectionPopup` on it. The storage choice (spec question 5) and the quotation rule (question 6) are the owner's; the tasks below follow the recommended answers and change only in Task 26 if he chooses the migration. Server tests need the test database: ask the orchestrator first.
+Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it needs the decision's reading surface, its projection and `SelectionPopup` on it. The owner's answers of 7 October (spec, «Questions for the owner — answered (7 October)»): discussions on decisions have columns of their own (a migration), a withdrawn quotation is hidden by the panel and an admin can put it back in the clear, signs per paragraph. The migration is announced in the register (`_registro`, an «avvio» entry naming it) before Task 26's code; the server tests need the test database: ask the orchestrator first.
 
 ### Task 26: The server takes a discussion on a decision
 
 **Files:**
+- Create: `apps/server/prisma/migrations/<timestamp>_article_threads_decision_target/migration.sql` (hand-written: `target_kind` text NOT NULL DEFAULT 'article', `decision_key` text NULL, `passage_released_at` timestamptz NULL, `passage_released_by` text NULL referencing `users(id)` ON DELETE SET NULL; CHECK `target_kind IN ('article','decision')`; CHECK `(target_kind = 'article' AND decision_key IS NULL) OR (target_kind = 'decision' AND decision_key IS NOT NULL AND norma_key = decision_key AND article_id = '' AND version IS NULL AND article_urn IS NULL)`; CHECK that the release columns are both set or both null; existing rows stay `article` by the default)
+- Modify: `apps/server/prisma/schema.prisma` (`ArticleThread`: the four fields; the relation for `passage_released_by`; no `prisma format`)
 - Create: `apps/server/src/norms/decisionKey.ts` (`readDecisionKey(key): { corte, archivio?, numero, anno } | null`, the server twin of the web's `identityFromKey`: same shapes, same bounds — `[1-9]\d{0,5}`, a year from the court's first to the current one)
-- Modify: `apps/server/src/controllers/articleDiscussionController.ts` (the anchor schema: `articleId` may be `""` only when `normaKey` reads as a decision key; a decision key with a non-empty `articleId`, or a malformed one, is a 400 in Italian; `version` and `articleUrn` refused on a decision)
-- Modify: `apps/server/CLAUDE.md` («Article discussions»: also decisions, keyed as notes are)
+- Modify: `apps/server/src/controllers/articleDiscussionController.ts` (create: a body with `target: { kind: 'decision', key }` stores `target_kind`/`decision_key`/`normaKey = key`/`articleId = ''`; a malformed key, a version or an URN on a decision is a 400 in Italian; lists unchanged; the thread's answer carries `target` and `passageReleased`; moderation: `PATCH /admin/article-discussions/:id` also takes `{ passageReleased: boolean }`, setting or clearing the two columns with the admin's id)
+- Modify: `apps/server/CLAUDE.md` («Article discussions»: decisions, the columns, the release)
 - Test: `apps/server/tests/articleDiscussions.decision.test.ts`
 
-- [ ] **Step 1: Failing tests.** Create, list, list passages, comment, vote, report and moderate a thread on `cassazione:civile:10787:2024` with `articleId: ""`; a norm key with `articleId: ""` → 400; `cassazione:civile:007:2024`, a future year, `corte_costituzionale:civile:1:2020` → 400; a decision thread never appears in an article's list and the reverse; the user's export (`GET /auth/export`) includes it; account deletion removes it (cascade).
+- [ ] **Step 0: Announce the migration in the register** (an «avvio» entry: the table, the four columns, the branch) and tell the orchestrator.
+- [ ] **Step 1: Failing tests.** Create, list, list passages, comment, vote, report and moderate a thread on `cassazione:civile:10787:2024`; the stored row has `target_kind = 'decision'` and `decision_key`; a norm thread is `article` with no key; `cassazione:civile:007:2024`, a future year, `corte_costituzionale:civile:1:2020`, a decision with a version → 400; the CHECKs refuse a direct insert that breaks them (one `prisma.$executeRaw` per CHECK); a decision thread never appears in an article's list and the reverse; an admin sets and clears `passageReleased` and a non-admin cannot; the user's export includes the thread with its target; account deletion removes it and an admin's deletion leaves `passage_released_by` null.
 - [ ] **Step 2: Run to see them fail** (test DB, after the orchestrator's go).
-- [ ] **Step 3: Implement.** A `superRefine` on the anchor schema; no Prisma change. If the owner chose question 5's migration instead: a hand-written migration adding `target_kind` (`article` | `decision`) with a CHECK and backfilling `article`, announced in the register before it is applied (`apps/server/CLAUDE.md`, «Prisma migrations»), and the same tests.
-- [ ] **Step 4: Run the touched tests, then the whole server suite once.**
-- [ ] **Step 5: Commit** — «feat(server): a discussion may be anchored on a court decision, keyed as its notes are».
+- [ ] **Step 3: Implement**, then `npx prisma migrate deploy` on the test database through the suite's setup (never `migrate dev`), `npx prisma generate`.
+- [ ] **Step 4: Run the touched tests, then the whole server suite once.** The dev stack's database gets the migration after the merge, by the orchestrator.
+- [ ] **Step 5: Commit** — «feat(server): a discussion may be anchored on a court decision, in columns of its own».
 
 ### Task 27: One discussion panel for an article and a decision
 
@@ -2951,12 +2954,12 @@ Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it nee
 
 **Files:**
 - Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (a decision thread whose passage is `detached` shows «Il passo citato non è più nel testo della decisione» instead of the quotation, except to its author and to admins)
-- Only if the owner chose question 6 (b): a hand-written migration adding `article_threads.passage_withdrawn_at` (announced in the register first), `POST /article-discussions/:threadId/passage-withdrawn` called by the first reader whose decision text no longer holds the passage (idempotent, decision threads only), and `passageQuote` withheld from every reader but the author and admins once it is set. With (a) the rule is the panel's only, and a comment says so.
-- Test: the panel cases (author, admin, other reader) and, if server-side, the controller's.
+- Modify: `ArticleDiscussionPanel.tsx` (admin only: on a decision thread whose passage is withdrawn, «Mostra a tutti» / «Nascondi di nuovo» through the moderation route's `passageReleased`, Task 26; while released, every reader sees the quotation). The rule is the panel's: the API still returns the stored quotation (spec §8.7, the limit), and a comment says so.
+- Test: the panel cases (author, admin, other reader; released and not; the admin's two buttons).
 
 - [ ] Steps as above; commit — «feat(web): a decision's withdrawn words are not quoted to other readers».
 
-**PR 4b:** title «feat: discussions on court decisions»; body names the storage choice and the quotation rule with the owner's answers. Browser pass: open a discussion on a decision and on a passage, reply, vote, report as a second test account, moderate as admin; the sign counts; a detached passage seen by its author and by another account. Merge: `merge: feat/decision-discussions — discussions on decisions, the article's panel and rules`.
+**PR 4b:** title «feat: discussions on court decisions»; body names the migration (announced in the register), the quotation rule and the owner's answers of 7 October. Browser pass: open a discussion on a decision and on a passage, reply, vote, report as a second test account, moderate as admin; the sign counts; a detached passage seen by its author and by another account. Merge: `merge: feat/decision-discussions — discussions on decisions, the article's panel and rules`.
 
 ## PR 5 — `feat/decision-history` (apps/server, apps/web)
 
@@ -3408,6 +3411,6 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 
 **Amendments, 2026-10-07 (late evening) — the owner's requests of 7 October** («alle sentenze possiamo aggiungere gli stessi tool di note, eviodenziazioni e commenti? Assicuriamoci anche che gli ambienti possano mantenere sentenze»).
 - Notes and highlights on decisions are the article's own tools, signs included (spec §8.3; Task 20 amended at its head).
-- Discussions on decisions are new scope: spec §8.7 and PR 4b (Tasks 26–29), after PR 4. Open questions 5–7 in the spec.
+- Discussions on decisions are new scope: spec §8.7 and PR 4b (Tasks 26–29), after PR 4. The owner answered questions 5–7 the same day: columns of their own (a migration, announced in the register before its code), a withdrawn quotation hidden by the panel and released by an admin, signs per paragraph.
 - Environments keep decisions: the web already rebuilt them on import; the server now rebuilds a published environment's decision entries from closed values on publish, update and restore, refuses an entry of an unknown type and a note that is not a text of at most 4,000 characters (`fix/environment-decision-entries`, a pull request of its own after PR 2). The dev database held no entry those refusals would reject (read-only count, 7 October). Annotations on decisions inside environments stay Task 21's.
 
