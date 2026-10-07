@@ -90,7 +90,7 @@ _PAGE_NUMBER = re.compile(r"^(?:-\s*\d{1,3}\s*-|\d{1,3}|Pag\.?\s*\d{1,3}(?:\s*(?
 _CID = re.compile(r"\(cid:\d+\)")
 # running headers and footers whose shape is known even on a page where they appear once
 # (measured on 2026-10-05: «Ric. 2021 n. 09083 sez. SU - ud. 14-12-2021», «r.g. n. 27512/2022»,
-# «Cons. est. Paolo Fraulini»). The "Ric." branch was loosened in fix round 1: OCR noise can
+# «Cons. est. [name]»). The "Ric." branch was loosened in fix round 1: OCR noise can
 # turn it into «Ric, 2021 n. 039U Su. SU - ud. 08-02-2022» (comma, garbled "sez."), which the
 # original branch's required literal "sez." never matched — the shape up to the case number is
 # distinctive enough on its own.

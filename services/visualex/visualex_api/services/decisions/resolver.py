@@ -86,6 +86,11 @@ def _text_notices(decision: Decision) -> list[dict[str, str]]:
     return [{"tipo": "testo_da_archivio"}] if decision.testo_origine == "archivio" else []
 
 
+def _cass_key(archivio: str, numero: int, anno: int) -> str:
+    """The cache key of a Cassazione decision's text (see the version note in `_cass`)."""
+    return f"italgiure:v3:{archivio}:{numero}:{anno}"
+
+
 def _citata(raw: str | None) -> str | None:
     """The section as cited, when it can be echoed in a notice: short, and only the characters
     a section is written with. The page builds the request from a shareable address, so
@@ -145,7 +150,7 @@ class Resolver:
         # (the sweep deletes them once expired). Raise the version whenever the reader changes the
         # shape of what it returns — the shape only (blocks, `\n`): a change of characters is refused
         # by test_decisions_text_frozen.py (design 2026-10-05 §8.5); the last change of characters
-        # (italgiure:v3).
+        # was italgiure:v3's.
         pdf: list[bytes] = []
 
         async def read() -> Decision | None:
@@ -157,7 +162,7 @@ class Resolver:
                 pdf.append(data)
             return decision
 
-        decision = await self._lookup(f"italgiure:v3:{archivio}:{numero}:{anno}", "cassazione",
+        decision = await self._lookup(_cass_key(archivio, numero, anno), "cassazione",
                                       ITALGIURE_TIMEOUT, read, store=with_pdf)
         if decision is not None and pdf:
             # outside the source's limit and errors: a cache that cannot be written is not an
@@ -188,7 +193,7 @@ class Resolver:
             data = b""
             try:
                 text_kept = await self.found.get(
-                    f"italgiure:v3:{identity.archivio}:{identity.numero}:{identity.anno}") is not None
+                    _cass_key(identity.archivio, identity.numero, identity.anno)) is not None
             except Exception:  # noqa: BLE001 - unknown: the source is asked
                 text_kept = False
             if text_kept:
@@ -239,8 +244,7 @@ class Resolver:
             # to 30 days, and a new key never serves them (the sweep deletes them once expired).
             # Raise the version whenever the reader changes the shape of what it returns — the
             # shape only (blocks, `\n`): a change of characters is refused by
-            # test_decisions_text_frozen.py (design 2026-10-05 §8.5); the last change of characters
-            # (italgiure:v3).
+            # test_decisions_text_frozen.py (design 2026-10-05 §8.5).
             decision = await self._lookup(
                 f"corte_cost:v2:{ref.numero}:{ref.anno}", "corte_costituzionale",
                 CORTE_COST_TIMEOUT, lambda: self.corte_cost.lookup(ref.numero, ref.anno))
