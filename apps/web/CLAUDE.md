@@ -134,6 +134,15 @@ per line or comma boundary, which made every cross-comma highlight unmatched.
 The renderer also accepts, at the same offset, a stored text that differs only
 in whitespace, so those older highlights show again.
 
+**«Giurisprudenza» under the article** (`CaseLawSection`, between the text and
+`BrocardiDisplay`): an accordion closed by default (state per tab in
+`sessionStorage`) holding Brocardi's massime (`MassimeSection`, only where the
+doctrine is shown — gotcha 32), the Massimario's panel (the plugin slot
+`article_case_law`, which takes `articleUrn`, `isHistorical`, `besideTabId`,
+`backEntry`) and the Cassazione's decisions that mention the article, searched
+only when the reader presses the button (`DecisionResultList`). On a past text the
+section stays; the massime do not. A decision opens beside the article with the way back.
+
 **Normattiva's update notes** are interactive and out of the way:
 `useArticleTextInteractions` delegates click and Enter/Space on the body — a
 `(119)` chip opens `UpdateNotePopover`, the "Note di aggiornamento (N)" toggle

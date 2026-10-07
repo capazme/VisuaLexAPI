@@ -4,11 +4,9 @@ import type { BrocardiInfo as BrocardiInfoType, RelazioneContent, Footnote, Cros
 import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';
 import { DOCTRINE_ATTRIBUTION, DOCTRINE_SOURCE_NAME, LATIN_MAXIMS_LABEL } from '../../../utils/doctrineLabel';
-import { MassimeSection } from './MassimeSection';
 import { FootnoteTooltip } from './FootnoteTooltip';
 import { MarkableBrocardiSection } from './MarkableBrocardiSection';
 import { useAppStore } from '../../../store/useAppStore';
-import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 
 // Error Boundary for BrocardiSection — surfaces the failure instead of hiding
 // the section silently so users know something went wrong and can retry.
@@ -556,10 +554,6 @@ interface BrocardiDisplayProps {
    * `rect` is the viewport-space bounding box of the selection, used by the
    * consumer to anchor an inline composer on the span itself. */
   onRequestAddNote?: (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
-  /** The workspace tab the article is in: a decision cited in the massime opens beside it. */
-  besideTabId?: string;
-  /** Where the reader stands in the article, so the jump to a decision can be walked back. */
-  backEntry?: ReadingBackEntry;
 }
 
 function BrocardiEmptyState({ link }: { link?: string | null }) {
@@ -571,7 +565,7 @@ function BrocardiEmptyState({ link }: { link?: string | null }) {
           Nessun approfondimento disponibile
         </div>
         <div className="text-xs text-slate-400 dark:text-slate-500 max-w-md">
-          Nessuna dottrina o massima disponibile per questo articolo.
+          Nessuna dottrina disponibile per questo articolo.
         </div>
         {link && (
           <a
@@ -588,7 +582,7 @@ function BrocardiEmptyState({ link }: { link?: string | null }) {
   );
 }
 
-export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote, besideTabId, backEntry }: BrocardiDisplayProps) {
+export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote }: BrocardiDisplayProps) {
   const canMark = Boolean(itemKey && uniqueArticleId && onRequestAddNote);
   // Default collapsed on mobile (<768px), expanded on desktop
   const [isMainOpen, setIsMainOpen] = useState(() =>
@@ -600,7 +594,6 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
   }
 
   const hasContent = info.Brocardi || info.Ratio || info.Spiegazione ||
-    (info.Massime && info.Massime.length > 0) ||
     (info.Relazioni && info.Relazioni.length > 0) ||
     (info.CrossReferences && info.CrossReferences.length > 0) ||
     (info.Footnotes && info.Footnotes.length > 0) ||
@@ -665,11 +658,6 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
               content={info.Spiegazione || null}
               icon={<FileText size={16} className="text-primary-500" />}
             />
-          )}
-
-          {/* Massime with search and filter */}
-          {info.Massime && info.Massime.length > 0 && (
-            <MassimeSection massime={info.Massime} besideTabId={besideTabId} backEntry={backEntry} />
           )}
 
           {/* Note a piè di pagina */}

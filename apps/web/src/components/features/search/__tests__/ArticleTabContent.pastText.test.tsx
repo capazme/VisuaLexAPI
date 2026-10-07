@@ -189,6 +189,14 @@ describe('ArticleTabContent — a past text is a reading', () => {
     expect(screen.queryByTestId('brocardi')).not.toBeInTheDocument();
   });
 
+  it('keeps «Giurisprudenza» on a past text, with the Massimario slot told it is one', async () => {
+    show(article(MIDDLE, PAST));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(slotCalls.find((c) => c.slot === 'article_case_law')?.props).toMatchObject({ isHistorical: true });
+    expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
+    expect(screen.queryByText('Massime (Brocardi)')).not.toBeInTheDocument();
+  });
+
   it('does not ask the discussions of the passages of a text it will not mark', () => {
     show(article(MIDDLE, PAST));
     expect(listPassages).not.toHaveBeenCalled();

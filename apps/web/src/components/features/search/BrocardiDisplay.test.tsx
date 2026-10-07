@@ -119,7 +119,7 @@ describe('BrocardiDisplay — attribution', () => {
 
   it('offers the check on the source from the empty state when it has a link', () => {
     render(<BrocardiDisplay info={{ ...empty, link: withContent.link }} />);
-    expect(screen.getByText('Nessuna dottrina o massima disponibile per questo articolo.')).toBeInTheDocument();
+    expect(screen.getByText('Nessuna dottrina disponibile per questo articolo.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Verifica su Brocardi\.it/ })).toHaveAttribute('href', withContent.link);
   });
 

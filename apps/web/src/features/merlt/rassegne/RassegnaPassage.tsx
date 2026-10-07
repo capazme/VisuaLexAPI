@@ -1,6 +1,7 @@
 // apps/web/src/features/merlt/rassegne/RassegnaPassage.tsx
 import { useState, type ReactNode } from 'react';
 import { DecisionChip } from './DecisionChip';
+import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import type { RassegnaEvidenziazione, RassegnePasso } from './types';
 
 const COMMA_PARTS: Record<string, string> = { com: 'comma', num: 'n.', let: 'lett.' };
@@ -43,7 +44,7 @@ function provenance(p: RassegnePasso): string {
   ].filter(Boolean).join(' › ');
 }
 
-export function RassegnaPassage({ passo }: { passo: RassegnePasso }) {
+export function RassegnaPassage({ passo, besideTabId, backEntry }: { passo: RassegnePasso; besideTabId?: string; backEntry?: ReadingBackEntry }) {
   const [full, setFull] = useState(false);
   const long = passo.testo.length > 400;
   return (
@@ -61,7 +62,7 @@ export function RassegnaPassage({ passo }: { passo: RassegnePasso }) {
       )}
       {passo.pronunce.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {passo.pronunce.map((p, i) => <DecisionChip key={`${p.key ?? p.label}-${i}`} pronuncia={p} />)}
+          {passo.pronunce.map((p, i) => <DecisionChip key={`${p.key ?? p.label}-${i}`} pronuncia={p} besideTabId={besideTabId} backEntry={backEntry} />)}
         </div>
       )}
       <p className="text-[11px] text-slate-400">
