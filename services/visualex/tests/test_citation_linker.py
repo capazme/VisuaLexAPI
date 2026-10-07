@@ -567,3 +567,27 @@ class TestRunsOfSpaces:
         c = extract_citations(text, context_act_type="codice civile")
         assert time.perf_counter() - started < 3.0
         assert len(c) == 1_200
+
+
+class TestAbbreviationInsideALongerOne:
+    """An act's abbreviation is never read as the head of a longer one."""
+
+    def _read(self, text):
+        return [(text[c.start:c.end], c.act_type, c.article) for c in extract_citations(text)]
+
+    def test_cpa_is_not_the_codice_penale(self):
+        # «c.p.a.» is the codice del processo amministrativo, which the act tables know
+        got = self._read("ai sensi dell'art. 110 c.p.a. il ricorso")
+        assert got and all(act != "codice penale" for _, act, _ in got)
+        assert got[0][1] == "codice del processo amministrativo"
+
+    def test_cp_cpc_cpp_keep_their_own_code(self):
+        assert self._read("art. 110 c.p.") == [("art. 110 c.p.", "codice penale", "110")]
+        assert self._read("art. 360 c.p.c.")[0][1] == "codice di procedura civile"
+        assert self._read("art. 360 c.p.p.")[0][1] == "codice di procedura penale"
+
+    def test_cci_is_not_the_codice_civile(self):
+        assert all(act != "codice civile" for _, act, _ in self._read("art. 5 c.c.i. prevede"))
+
+    def test_final_cp_before_the_next_sentence_still_links(self):
+        assert self._read("previsto dall'art. 110 c.p. Il ricorso è infondato")[0][1] == "codice penale"

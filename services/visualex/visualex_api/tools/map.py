@@ -679,6 +679,8 @@ NORMATTIVA_SEARCH = {
         "legge": "legge",
         "c.c.": "codice civile",
         "c.p.": "codice penale",
+        "c.p.a": "codice del processo amministrativo",
+        "c.p.a.": "codice del processo amministrativo",
         "c.p.c": "codice di procedura civile",
         "c.p.p.": "codice di procedura penale",
         "cad": "codice dell'amministrazione digitale",

@@ -368,3 +368,36 @@ describe('extractCitations — article suffixes past decies', () => {
     },
   );
 });
+
+// An act's abbreviation is never read inside a longer one: "art. 110 c.p.a." (codice del
+// processo amministrativo) used to link to the codice penale's art. 110, and "c.p.c." to the
+// codice penale too, because the shorter alternative came first.
+describe('extractCitations — an abbreviation is not the head of a longer one', () => {
+  const norma = { tipo_atto: 'codice civile' } as never;
+  const read = (text: string) => extractCitations(text, norma).map((c) => [c.text, c.parsed.act_type, c.parsed.article]);
+
+  it('"c.p.a." is the codice del processo amministrativo, never the codice penale', () => {
+    expect(read("ai sensi dell'art. 110 c.p.a. il ricorso")).toEqual([["dell'art. 110 c.p.a.", 'codice del processo amministrativo', '110']]);
+    expect(read('art. 110 c.p.a')).toEqual([['art. 110 c.p.a', 'codice del processo amministrativo', '110']]);
+  });
+
+  it('"c.p." and "c.p.c." and "c.p.p." still link to their own code', () => {
+    expect(read('art. 110 c.p.')).toEqual([['art. 110 c.p.', 'codice penale', '110']]);
+    expect(read('art. 360 c.p.c.')).toEqual([['art. 360 c.p.c.', 'codice di procedura civile', '360']]);
+    expect(read('art. 360 c.p.p.')).toEqual([['art. 360 c.p.p.', 'codice di procedura penale', '360']]);
+    expect(read('artt. 1 e 2 c.p.c.')[0][1]).toBe('codice di procedura civile');
+  });
+
+  it('"c.c.i." (codice della crisi) is not "c.c." and gets no link at all', () => {
+    expect(read('art. 5 c.c.i. prevede')).toEqual([]);
+    expect(read('art. 5 c.c. prevede')).toEqual([['art. 5 c.c.', 'codice civile', '5']]);
+  });
+
+  it('a word that begins like an abbreviation is not one', () => {
+    expect(read("l'art. 5 costituzionale")).toEqual([]);
+  });
+
+  it('a final "c.p." before the next sentence still links', () => {
+    expect(read('previsto dall\'art. 110 c.p. Il ricorso è infondato')).toEqual([["dall'art. 110 c.p.", 'codice penale', '110']]);
+  });
+});
