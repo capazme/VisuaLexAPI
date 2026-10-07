@@ -592,6 +592,16 @@ class TestAbbreviationInsideALongerOne:
     def test_final_cp_before_the_next_sentence_still_links(self):
         assert self._read("previsto dall'art. 110 c.p. Il ricorso è infondato")[0][1] == "codice penale"
 
+    def test_closing_quote_after_the_abbreviation_still_links(self):
+        for text, act in (
+            ("‘art. 2043 c.c.’", "codice civile"),
+            ("'art. 2043 c.c.'", "codice civile"),
+            ("l’art. 3 Cost.’", "costituzione"),
+            ("art. 640 c.p.'", "codice penale"),
+        ):
+            got = self._read(text)
+            assert got and got[0][1] == act, text
+
     def test_cp_followed_by_a_word_starting_with_c_or_p_stays_penale(self):
         assert self._read("art. 640 c.p. c'è truffa")[0][1] == "codice penale"
         assert self._read("art. 640 c.p. c) la frode")[0][1] == "codice penale"

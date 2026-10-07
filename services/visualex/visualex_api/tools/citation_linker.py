@@ -34,10 +34,11 @@ _ACT_ABBREVS = sorted(
 # dell'ordinamento militare and "costituzionalmente" the "cost" of the
 # Costituzione, and the false act poisoned the context of every bare
 # "art. N" that followed.
+# An apostrophe blocks only before a letter ("c.p.c'è"); a closing quote ("art. 2 c.c.’") does not.
 # … and a name is not the prefix of a longer one: "codice penale militare di
 # pace" is not the codice penale.
 _ACT_ABBREV_PATTERN = (
-    "(?:" + "|".join(re.escape(a) for a in _ACT_ABBREVS) + r")(?![A-Za-z'\u2019])(?!\s+milita(?:re|ri)\b)"
+    "(?:" + "|".join(re.escape(a) for a in _ACT_ABBREVS) + r")(?![A-Za-z])(?!['\u2019][A-Za-z])(?!\s+milita(?:re|ri)\b)"
 )
 
 # Acts that cannot be opened without a number. One that comes out of a

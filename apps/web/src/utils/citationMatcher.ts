@@ -106,7 +106,8 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
 // il codice penale), e il lookahead `(?!\.?[a-zà-ÿ'’])` impedisce a un'abbreviazione
 // di essere letta dentro una più lunga o dentro una parola: "c.p.a." non è
 // "c.p.", "c.c.i." non è "c.c.", "costituzionale" non è "cost", "c.p. c'è" non
-// è "c.p.c". Un punto finale seguito da spazio resta valido ("art. 110 c.p.
+// è "c.p.c". Un apostrofo blocca solo se segue una lettera: «art. 2043 c.c.’» (virgolette
+// che si chiudono) resta un link. Un punto finale seguito da spazio resta valido ("art. 110 c.p.
 // Il ricorso"). Le forme di tre lettere si scrivono attaccate ("c.p.c.", "cpc")
 // o del tutto spaziate con tutti i punti ("c. p. c."): una lettera dopo uno
 // spazio senza la sua serie di punti è la parola seguente ("c.p. c) la frode",
@@ -117,7 +118,7 @@ const ACT_SUFFIX_PATTERN =
   '(?:c\\.?p\\.?c|c\\.\\s+p\\.\\s+c(?=\\.)|c\\.?p\\.?p|c\\.\\s+p\\.\\s+p(?=\\.)|c\\.?p\\.?a|' +
   'c\\.?\\s*c|c\\.?\\s*p|' +
   'cost|c\\.?\\s*d\\.?\\s*s|c\\.?\\s*n|prel|cod\\.?\\s*civ|cod\\.?\\s*pen)' +
-  "(?!\\.?[a-zà-ÿ'’])\\.?)";
+  "(?!\\.?[a-zà-ÿ])(?!\\.?['’][a-zà-ÿ])\\.?)";
 
 // Suffissi articolo (bis, ter, ... terdecies, sexiesdecies): la tabella sta in
 // articleSuffixes.ts, ed è la sola copia. Il \b è obbligatorio: senza, il
