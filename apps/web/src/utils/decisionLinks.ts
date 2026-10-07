@@ -192,6 +192,23 @@ export function formatDecisionShort(ref: LooseDecisionRef, rv?: readonly string[
   return rv && rv.length > 0 ? `${label} · Rv. ${rv.join(', ')}` : label;
 }
 
+const KEY = /^(?:cassazione:(civile|penale):(\d{1,6}):(\d{4})|corte_costituzionale:(\d{1,6}):(\d{4}))$/;
+
+/** A decision's key (`decisionKey`) read back, or null for anything else — a norm's key has no colon. */
+export function identityFromKey(key: string, now: Date = new Date()): DecisionIdentity | null {
+  const m = KEY.exec(key);
+  if (!m) return null;
+  const corte: DecisionCourt = m[1] ? 'cassazione' : 'corte_costituzionale';
+  const numero = Number(m[2] ?? m[4]);
+  const anno = Number(m[3] ?? m[5]);
+  if (numero < 1 || numero > MAX_NUMERO || anno < FIRST_YEAR[corte] || anno > now.getFullYear()) return null;
+  return corte === 'cassazione' ? { corte, archivio: m[1] as DecisionArchive, numero, anno } : { corte, numero, anno };
+}
+
+export function isDecisionKey(key: string): boolean {
+  return identityFromKey(key) !== null;
+}
+
 /**
  * The decision a Brocardi massima is headed with ("Cass. civ.", "Cass. pen.", "Cass. lav.",
  * "Cass. sez. un.", "Cass.", "Corte cost.", then "n. 31191/2025"), or null for another court
