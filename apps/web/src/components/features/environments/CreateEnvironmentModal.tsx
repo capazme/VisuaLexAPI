@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { Annotation, Dossier, Highlight, CustomAlias, QuickNorm } from '../../../types';
 import type { EnvironmentCategory } from '../../../types';
@@ -13,6 +13,9 @@ import {
 import { EnvironmentContentViewer } from './EnvironmentContentViewer';
 import { useLeftOutNotice } from './useLeftOutNotice';
 import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
+
+const NOTHING: Annotation[] = [];
+const NOTHING_H: Highlight[] = [];
 
 interface CreateEnvironmentOptions {
   description?: string;
@@ -50,6 +53,9 @@ export function CreateEnvironmentModal({
   const [version, setVersion] = useState('');
   const [category, setCategory] = useState<EnvironmentCategory>('other');
   const [includeContent, setIncludeContent] = useState(true);
+  // The submit waits for the decisions' current texts: one click is one environment.
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = useRef(false);
 
   // Create environment representation of current state
   const currentAsEnv = {
@@ -80,7 +86,7 @@ export function CreateEnvironmentModal({
     () => currentState.highlights.filter(h => selection.highlightIds.includes(h.id)),
     [currentState.highlights, selection.highlightIds],
   );
-  const leftOutNotice = useLeftOutNotice(includeContent ? chosenAnnotations : [], includeContent ? chosenHighlights : []);
+  const leftOutNotice = useLeftOutNotice(includeContent ? chosenAnnotations : NOTHING, includeContent ? chosenHighlights : NOTHING_H);
 
   if (!isOpen) return null;
 
@@ -93,28 +99,35 @@ export function CreateEnvironmentModal({
     currentState.highlights.length > 0;
 
   const handleSubmit = async () => {
-    if (!name.trim()) return;
-    // Words a court withdrew do not leave the account (spec §8.6): the selection handed on is narrowed.
-    const travelling = await travellingSelection(chosenAnnotations, chosenHighlights);
-    const narrowed: EnvironmentSelection = {
-      ...selection,
-      annotationIds: selection.annotationIds.filter(i => travelling.annotationIds.has(i)),
-      highlightIds: selection.highlightIds.filter(i => travelling.highlightIds.has(i)),
-    };
-    const selectionToUse = includeContent && selectedCount > 0 ? narrowed : null;
-    onCreate(name.trim(), selectionToUse, {
-      description: description.trim() || undefined,
-      author: author.trim() || undefined,
-      version: version.trim() || undefined,
-      category
-    });
-    setName('');
-    setDescription('');
-    setAuthor('');
-    setVersion('');
-    setCategory('other');
-    setIncludeContent(true);
-    setSelection(createFullSelection(currentAsEnv));
+    if (!name.trim() || submitting.current) return;
+    submitting.current = true;
+    setIsSubmitting(true);
+    try {
+      // Words a court withdrew do not leave the account (spec §8.6): the selection handed on is narrowed.
+      const travelling = await travellingSelection(chosenAnnotations, chosenHighlights);
+      const narrowed: EnvironmentSelection = {
+        ...selection,
+        annotationIds: selection.annotationIds.filter(i => travelling.annotationIds.has(i)),
+        highlightIds: selection.highlightIds.filter(i => travelling.highlightIds.has(i)),
+      };
+      const selectionToUse = includeContent && selectedCount > 0 ? narrowed : null;
+      onCreate(name.trim(), selectionToUse, {
+        description: description.trim() || undefined,
+        author: author.trim() || undefined,
+        version: version.trim() || undefined,
+        category
+      });
+      setName('');
+      setDescription('');
+      setAuthor('');
+      setVersion('');
+      setCategory('other');
+      setIncludeContent(true);
+      setSelection(createFullSelection(currentAsEnv));
+    } finally {
+      submitting.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const toggleSelectAll = () => {
@@ -268,7 +281,7 @@ export function CreateEnvironmentModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!name.trim()}
+            disabled={!name.trim() || isSubmitting}
             className="flex-1 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-lg transition-colors disabled:cursor-not-allowed min-h-[44px]"
           >
             Crea {includeContent && selectedCount > 0 && `(${selectedCount} elementi)`}

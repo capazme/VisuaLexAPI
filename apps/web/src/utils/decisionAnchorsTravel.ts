@@ -8,7 +8,7 @@
 import type { Annotation, Highlight } from '../types';
 import { resolveAnchors } from './articleAnnotations';
 import { fetchDecisionCached } from './decisionFetchCache';
-import { identityFromKey, isDecisionKey } from './decisionLinks';
+import { identityFromKey } from './decisionLinks';
 import { decisionProjection } from './decisionRender';
 
 export interface LeftOut {
@@ -16,7 +16,32 @@ export interface LeftOut {
   highlights: number;
 }
 
-const isAnchoredNote = (a: Annotation) => typeof a.startOffset === 'number' && Boolean(a.anchorText);
+/**
+ * A decision's key space: a norm's key never contains a colon, so anything opening with a court's
+ * name is a decision's. One `identityFromKey` cannot read (leading zeros, a future year, another
+ * shape) is still a decision's: its anchors are left out, never taken for an article's.
+ */
+const inDecisionKeySpace = (key: string) => key.startsWith('cassazione:') || key.startsWith('corte_costituzionale:');
+
+/** A note quoting words of the decision. With no quote it is free and carries none of the court's words;
+ *  one with a quote but no usable offset cannot land (`resolveAnchors`), so it is left out like any that does not. */
+const isAnchoredNote = (a: Annotation) => Boolean(a.anchorText);
+
+/** Runs `task` over `items`, at most `limit` at a time: a cold decision lookup is many source requests. */
+async function mapLimited<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await task(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+const MAX_CONCURRENT_LOOKUPS = 4;
 
 async function currentText(key: string): Promise<string | null> {
   const identity = identityFromKey(key);
@@ -36,9 +61,9 @@ export async function travellingAnchors(input: { annotations: Annotation[]; high
   leftOut: LeftOut;
 }> {
   const keys = new Set(
-    [...input.annotations.filter(isAnchoredNote), ...input.highlights].map((a) => a.normaKey).filter(isDecisionKey),
+    [...input.annotations.filter(isAnchoredNote), ...input.highlights].map((a) => a.normaKey).filter(inDecisionKeySpace),
   );
-  const texts = new Map(await Promise.all([...keys].map(async (k) => [k, await currentText(k)] as const)));
+  const texts = new Map(await mapLimited([...keys], MAX_CONCURRENT_LOOKUPS, async (k) => [k, await currentText(k)] as const));
   const landedHighlights = new Set<string>();
   const landedNotes = new Set<string>();
   for (const key of keys) {
@@ -54,9 +79,9 @@ export async function travellingAnchors(input: { annotations: Annotation[]; high
       else if (x.kind === 'note') landedNotes.add(x.note.id);
     }
   }
-  const highlights = input.highlights.filter((h) => !isDecisionKey(h.normaKey) || landedHighlights.has(h.id));
+  const highlights = input.highlights.filter((h) => !inDecisionKeySpace(h.normaKey) || landedHighlights.has(h.id));
   const annotations = input.annotations.filter(
-    (a) => !isDecisionKey(a.normaKey) || !isAnchoredNote(a) || landedNotes.has(a.id),
+    (a) => !inDecisionKeySpace(a.normaKey) || !isAnchoredNote(a) || landedNotes.has(a.id),
   );
   return {
     annotations,

@@ -32,4 +32,25 @@ describe('CreateEnvironmentModal: words a court withdrew do not enter the new en
     expect(selection.annotationIds).toEqual(['n-art']);
     expect(selection.highlightIds).toEqual(['h-art']);
   });
+
+  it('creates one environment however many times the button is pressed while it waits', async () => {
+    let release: (v: never) => void = () => {};
+    vi.mocked(fetchDecisionCached).mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    const onCreate = vi.fn();
+    render(
+      <CreateEnvironmentModal
+        isOpen
+        onClose={vi.fn()}
+        onCreate={onCreate}
+        currentState={{ dossiers: [], quickNorms: [], customAliases: [], annotations: [decisionNote], highlights: [] }}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/DPO Compliance/), { target: { value: 'Prova' } });
+    const button = screen.getByRole('button', { name: /^Crea/ });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    release(obscuredAnswer as never);
+    await vi.waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+  });
 });

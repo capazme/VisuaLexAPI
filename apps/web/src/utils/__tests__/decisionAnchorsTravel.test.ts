@@ -54,6 +54,43 @@ describe('travellingAnchors', () => {
     expect(out.annotations).toHaveLength(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it.each([
+    ['a malformed key', 'cassazione:civile:007:2024'],
+    ['a future year', 'cassazione:civile:10787:2999'],
+    ['another shape', 'corte_costituzionale:civile:71:2020'],
+  ])('leaves out the anchors on %s: it is a decision\'s key space, never an article\'s', async (_name, key) => {
+    fetchMock.mockResolvedValue(found('Il ricorso è fondato.'));
+    const out = await travellingAnchors({ annotations: [note(key, 3, 'ricorso')], highlights: [hl(key, 3, 'ricorso')] });
+    expect(out.annotations).toEqual([]);
+    expect(out.highlights).toEqual([]);
+    expect(out.leftOut).toEqual({ annotations: 1, highlights: 1 });
+  });
+  it('leaves out a note that quotes the court but has no offset to land by', async () => {
+    fetchMock.mockResolvedValue(found('Il ricorso è fondato.'));
+    const quoting = { id: 'q', normaKey: KEY, articleId: '', text: 'nota', anchorText: 'ricorso' } as never;
+    const out = await travellingAnchors({ annotations: [quoting], highlights: [] });
+    expect(out.leftOut.annotations).toBe(1);
+  });
+  it('lets a note with an empty anchor travel as free', async () => {
+    const free = { id: 'f', normaKey: KEY, articleId: '', text: 'nota', anchorText: '', startOffset: 3 } as never;
+    const out = await travellingAnchors({ annotations: [free], highlights: [] });
+    expect(out.annotations).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('asks the source for at most four decisions at a time', async () => {
+    let running = 0;
+    let peak = 0;
+    fetchMock.mockImplementation(async () => {
+      running++; peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 5));
+      running--;
+      return found('Il ricorso è fondato.');
+    });
+    const many = Array.from({ length: 10 }, (_, i) => hl(`cassazione:civile:${100 + i}:2024`, 3, 'ricorso'));
+    await travellingAnchors({ annotations: [], highlights: many });
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(peak).toBeLessThanOrEqual(4);
+  });
   it('says how many were left out and why', () => {
     expect(leftOutMessage({ annotations: 0, highlights: 0 })).toBeNull();
     expect(leftOutMessage({ annotations: 1, highlights: 2 }))
