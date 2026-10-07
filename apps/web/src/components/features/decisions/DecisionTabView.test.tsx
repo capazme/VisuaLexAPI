@@ -7,7 +7,7 @@ vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unkn
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 
 import { appStore, useAppStore } from '../../../store/useAppStore';
-import { forgetDecision } from '../../../utils/decisionFetchCache';
+import { fetchDecisionCached, forgetDecision } from '../../../utils/decisionFetchCache';
 import { DecisionTabView } from './DecisionTabView';
 import { renderTabView } from '../workspace/renderTabView';
 
@@ -234,5 +234,10 @@ describe('DecisionTabView — the store learns the identity of a tab opened by a
     expect(statuses.every((n) => n === 0)).toBe(true);
     expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
     expect(fetchDecision).toHaveBeenCalledTimes(1);
+    // the answer seeded for the bare identity carries nothing about what was cited
+    const seeded = await fetchDecisionCached(PENALE);
+    expect(fetchDecision).toHaveBeenCalledTimes(1);
+    expect(seeded).toMatchObject({ esito: 'trovata', avvisi: [] });
+    expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
   });
 });

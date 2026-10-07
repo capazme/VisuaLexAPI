@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
-import type { DecisionReference, FetchDecisionAnswer } from '../../../types/decisions';
+import type { DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
 import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
 import { decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
 import { DecisionView } from './DecisionView';
+
+/** Notices about what was cited (its section, the archive deduced from it), not about the decision:
+ *  the tab that cited keeps them, the answer seeded for the bare identity does not carry them. */
+const ABOUT_THE_CITATION: ReadonlySet<string> = new Set(['sezione_diversa', 'sezione_non_riconosciuta', 'archivio_dedotto']);
+function withoutCitationNotices(answer: FoundDecision): FoundDecision {
+  return { ...answer, avvisi: answer.avvisi.filter((n) => !ABOUT_THE_CITATION.has(n.tipo)) };
+}
 
 /**
  * A decision in its workspace tab: fetched through the session cache, drawn by `DecisionView`.
@@ -26,7 +33,14 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
   const current = chosen && chosen.from === decisionPath(reference) ? chosen.reference : reference;
   const key = `${decisionPath(current)}#${attempt}`;
 
+  // The store replaces a looser reference (no archive, a cited section) with the identity once the
+  // decision is found. The answer on screen is then already the one for the new reference: it stays,
+  // notices included, instead of falling back to the skeleton while the same text is asked for again.
+  const held = result?.answer.esito === 'trovata' && decisionPath(identityOf(result.answer.identita)) === decisionPath(current)
+    ? result.answer : null;
   useEffect(() => {
+    // the answer on screen already is this reference's: nothing to ask
+    if (held) return;
     let cancelled = false;
     fetchDecisionCached(current).then(
       (answer) => { if (!cancelled) setResult({ key, answer }); },
@@ -36,18 +50,13 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
       },
     );
     return () => { cancelled = true; };
-  }, [current, key]);
+  }, [current, key, held]);
 
-  // The store replaces a looser reference (no archive, a cited section) with the identity once the
-  // decision is found. The answer on screen is then already the one for the new reference: it stays,
-  // notices included, instead of falling back to the skeleton while the same text is asked for again.
-  const held = result?.answer.esito === 'trovata' && decisionPath(identityOf(result.answer.identita)) === decisionPath(current)
-    ? result.answer : null;
   const answer = result?.key === key ? result.answer : held;
 
   useEffect(() => {
     if (answer?.esito === 'trovata') {
-      rememberDecision(identityOf(answer.identita), answer);
+      rememberDecision(identityOf(answer.identita), withoutCitationNotices(answer));
       setIdentity(tabId, answer.identita, formatDecisionShort({ ...answer.identita, sezione: answer.attributi.sezione }));
     }
   }, [answer, setIdentity, tabId]);
