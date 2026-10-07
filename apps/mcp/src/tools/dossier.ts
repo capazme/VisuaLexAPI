@@ -8,36 +8,37 @@ import { ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
 import { TRASH_DAYS, canAsk, confirmWithUser, deletionMessage, type Confirmation } from '../confirm.js';
 
-const DELETE_SCOPE = 'content:delete';
+export const DELETE_SCOPE = 'content:delete';
 export const MAX_DELETIONS = 50;
 
-const NO_PERMISSION =
+export const NO_PERMISSION =
   'Questa applicazione non è autorizzata a eliminare. Puoi abilitarlo in VisuaLex: Impostazioni → Applicazioni collegate → «Può eliminare dossier, voci e schede».';
-const CANNOT_ASK =
+export const CANNOT_ASK =
   'Questo client non può chiederti conferma, quindi da qui non si elimina nulla. Puoi eliminare dalla pagina del dossier in VisuaLex.';
 const NOTHING_DELETED = 'Nulla è stato eliminato: l’eliminazione non è stata confermata.';
 /** What the user reads when the question did not end in a confirmation. */
-const NOT_CONFIRMED: Record<Exclude<Confirmation, 'confirmed' | 'unsupported'>, string> = {
+export const NOT_CONFIRMED: Record<Exclude<Confirmation, 'confirmed' | 'unsupported'>, string> = {
   declined: NOTHING_DELETED,
   timeout: 'Nessuna risposta alla richiesta di conferma in tempo. Nulla è stato eliminato.',
   failed: 'La richiesta di conferma non è arrivata all’utente. Nulla è stato eliminato.',
 };
 
 /** Until when what goes to the trash today can be restored, in Italian. */
-const restorableUntil = (): string =>
+export const restorableUntil = (): string =>
   new Date(Date.now() + TRASH_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /**
- * How an entry reads in the dialog: a norm by the citation the server builds from its
- * structured fields; anything else by its kind. Titles and note texts may have been
- * written by a model, and must never speak in the dialog.
+ * How an entry reads in the dialog: a norm or a decision by the citation the server builds
+ * from its structured fields; anything else by its kind. Titles, labels and note texts may
+ * have been written by a model, and must never speak in the dialog.
  */
-const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione' };
+const KIND_WORDS: Record<string, string> = { norm: 'Norma', note: 'Nota', section: 'Sezione', sentenza: 'Sentenza' };
 /** Who wrote it, from the server's mark; never the application's own (self-chosen) name. */
 const author = (item: ApiDossierItem): string =>
   item.created_by ? (item.item_type === 'note' ? ' (scritta da un’applicazione collegata)' : ' (di un’applicazione collegata)') : ' (tua)';
 const entryLine = (item: ApiDossierItem, all: ApiDossierItem[]): string => {
   if (item.item_type === 'norm') return item.citation ?? KIND_WORDS.norm;
+  if (item.item_type === 'sentenza' && item.citation) return `${KIND_WORDS.sentenza}: ${item.citation}${author(item)}`;
   if (item.item_type === 'note') {
     const article = item.about_item_id ? all.find((other) => other.id === item.about_item_id && other.item_type === 'norm') : undefined;
     return `${article?.citation ? `Nota su ${article.citation}` : 'Nota'}${author(item)}`;
@@ -69,7 +70,8 @@ interface ApiDossierItem {
   id: string;
   item_type: string;
   title: string;
-  /** The server's citation of a norm, in the app's style ("art. 3, l. 31 dicembre 2012, n. 247"); null otherwise. */
+  /** The server's citation of a norm or a decision, in the source convention ("art. 3, l. 31 dicembre 2012, n. 247",
+   *  "Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310"); null otherwise. */
   citation?: string | null;
   content: unknown;
   /** The connected application that added the entry, or null for the user's own. */
@@ -131,7 +133,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Leggi un dossier',
       description:
-        'Le voci di un dossier (id, tipo, titolo, riferimento della norma), senza il testo degli articoli. Il dossier si indica per id o per nome esatto.',
+        'Le voci di un dossier (id, tipo, titolo, riferimento della norma o della sentenza), senza il testo degli articoli. Il dossier si indica per id o per nome esatto.',
       inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

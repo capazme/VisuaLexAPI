@@ -18,6 +18,7 @@ from typing import Any, Iterable, Mapping, Optional, Union
 import structlog
 
 from merlt.utils.map import NORMATTIVA_URN_CODICI
+from merlt.utils.sources import short_from_urn
 from merlt.utils.urn_labels import article_number_from_urn
 
 log = structlog.get_logger()
@@ -403,64 +404,6 @@ def _is_norm_reference(value: str) -> bool:
     return lowered.startswith("urn:") or "urn:nir:" in lowered
 
 
-# Abbreviations used in `estremi` ("Art. 1982 c.c."), keyed on the lowercased
-# act name as VisuaLex spells it in NORMATTIVA_URN_CODICI (visualex_api/tools/
-# map.py; copied, MERL-T must not import visualex_api). An explicit table
-# replaced a first-letter initialism that turned "codice del consumo" into
-# "c.c." (the Codice civile) and "codice in materia di protezione dei dati
-# personali" into "c.i.m.p.d.p.".
-CODE_ABBREVIATIONS: dict[str, str] = {
-    "codice civile": "c.c.",
-    "codice penale": "c.p.",
-    "codice di procedura civile": "c.p.c.",
-    "codice di procedura penale": "c.p.p.",
-    "codice del consumo": "cod. cons.",
-    "codice della strada": "C.d.S.",
-    "codice in materia di protezione dei dati personali": "cod. privacy",
-    "codice della privacy": "cod. privacy",
-    "codice del processo amministrativo": "c.p.a.",
-    "codice della navigazione": "cod. nav.",
-    "codice dei contratti pubblici": "cod. contr. pubbl.",
-    "codice dell'amministrazione digitale": "CAD",
-    "codice della proprieta' industriale": "c.p.i.",
-    "codice della proprietà industriale": "c.p.i.",
-    "codice delle assicurazioni private": "cod. ass.",
-    "codice del turismo": "cod. tur.",
-    "codice dell'ambiente": "cod. amb.",
-    "codice dei beni culturali e del paesaggio": "cod. beni cult.",
-    "codice antimafia": "cod. antimafia",
-    "codice della crisi d'impresa e dell'insolvenza": "CCII",
-    "codice del terzo settore": "CTS",
-    "codice delle comunicazioni elettroniche": "cod. com. el.",
-    "codice del processo tributario": "c.p.t.",
-    "codice di giustizia contabile": "c.g.c.",
-    "codice della nautica da diporto": "cod. naut.",
-    "codice dell'ordinamento militare": "c.o.m.",
-    "codice delle pari opportunita'": "cod. pari opp.",
-    "codice delle pari opportunità": "cod. pari opp.",
-    "costituzione": "Cost.",
-}
-
-
-def act_abbreviation(act_type: str) -> str:
-    """`"codice civile"` → `"c.c."`. Case- and space-insensitive. An act the
-    table does not know keeps its own name, never an invented initialism."""
-    key = " ".join(act_type.strip().lower().split())
-    if not key:
-        return act_type.strip()
-    hit = CODE_ABBREVIATIONS.get(key)
-    if hit is None:
-        # debug: it runs several times per article for any act outside the table
-        log.debug("graph_schema.abbrev_fallback", act_type=act_type)
-        return act_type.strip()
-    return hit
-
-
-def format_estremi(numero_articolo: str, act_type: str) -> str:
-    abbreviation = act_abbreviation(act_type)
-    return f"Art. {numero_articolo} {abbreviation}" if abbreviation else f"Art. {numero_articolo}"
-
-
 _ACT_BY_URN: dict[str, str] = {urn.lower(): name for name, urn in NORMATTIVA_URN_CODICI.items()}
 
 
@@ -474,16 +417,14 @@ def act_name_from_urn(urn: Optional[str]) -> Optional[str]:
 
 
 def estremi_from_urn(urn: Optional[str]) -> tuple[Optional[str], Optional[str]]:
-    """`(numero_articolo, estremi)` from a URN, `(None, None)` without an article:
-    `Art. N <abbreviation>` for a code the abbreviation table knows (`Art. 2043 c.c.`);
-    `Art. N <the act's name>` for an act the URN table lists without an abbreviation
-    (`Art. 5 preleggi`); `Art. N` for an act the URN table does not list (a numbered
-    law)."""
+    """`(numero_articolo, estremi)` from a URN, `(None, None)` without an article. The
+    estremi are the norm's short label of the source convention (`art. 2043 c.c.`,
+    `art. 2 l. 241/1990`, `utils/sources.py`), read from the key alone; `art. N` when the
+    key names no act the convention can read."""
     numero = article_number_from_urn(urn)
     if numero is None:
         return None, None
-    act = act_name_from_urn(urn)
-    return numero, (format_estremi(numero, act) if act else f"Art. {numero}")
+    return numero, (short_from_urn(urn) or f"art. {numero}")
 
 
 def stub_properties(urn: str, provenance: Provenance = Provenance.INGESTION) -> dict[str, Any]:

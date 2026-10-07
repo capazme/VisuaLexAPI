@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Union
 
-from merlt.api.models.citation_models import CitationFormat
+from merlt.citation.format_kinds import CitationFormat
 from merlt.citation.formats.italian_legal import ItalianLegalFormat
 from merlt.citation.formats.bibtex import BibTeXFormat
 from merlt.citation.formats.plain_text import PlainTextFormat

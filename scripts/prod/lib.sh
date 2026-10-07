@@ -25,12 +25,14 @@ env_get() {
 env_set() {
   _f="$1"; _k="$2"; _v="$3"; _q="${4:-}"
   _tmp="$_f.tmp.$$"
-  V="$_v" awk -v k="$_k" -v q="$_q" '
-    BEGIN { v = ENVIRON["V"]; done = 0 }
-    $0 ~ "^" k "=" && !done { print k "=" q v q; done = 1; next }
-    { print }
-    END { if (!done) print k "=" q v q }
-  ' "$_f" >"$_tmp" && cat "$_tmp" >"$_f" && rm -f "$_tmp"
+  # The temporary copy holds every secret of the file: the owner's alone from the start.
+  ( umask 077
+    V="$_v" awk -v k="$_k" -v q="$_q" '
+      BEGIN { v = ENVIRON["V"]; done = 0 }
+      $0 ~ "^" k "=" && !done { print k "=" q v q; done = 1; next }
+      { print }
+      END { if (!done) print k "=" q v q }
+    ' "$_f" >"$_tmp" ) && cat "$_tmp" >"$_f" && rm -f "$_tmp"
 }
 
 # N characters from the system's random source, letters and digits only.

@@ -24,17 +24,19 @@ import notificationRoutes from './routes/notifications';
 import articleDiscussionRoutes from './routes/articleDiscussions';
 import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
+import lingoCardsRoutes from './routes/lingoCards';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
 import oauthAccountRoutes from './routes/oauthAccount';
 import { oauthConfig } from './oauth/config';
 import { delegatedAuth } from './middleware/delegated';
+import { TRUST_PROXY } from './lib/trustProxy';
 
 const app = express();
 
-// Trust first proxy (load balancer) for accurate req.ip
-app.set('trust proxy', 1);
+// The client's address past the ingress and the host's own hops (lib/trustProxy.ts).
+app.set('trust proxy', TRUST_PROXY);
 
 // Security headers
 app.use(helmet({
@@ -123,6 +125,7 @@ app.use('/api/merlt', merltKillSwitch, merltRoutes);
 // Same reason for LingoLex: a prefixed router authenticates once, here, instead
 // of passing through every catch-all router below first.
 app.use('/api/lingo/simulazioni', lingoSimulazioniRoutes);
+app.use('/api/lingo/cards', lingoCardsRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 app.use('/api', authRoutes);

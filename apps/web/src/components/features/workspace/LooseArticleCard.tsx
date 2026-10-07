@@ -10,6 +10,7 @@ import { Toast } from '../../ui/Toast';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
+import { actHeading } from '../../../utils/sources';
 
 interface LooseArticleCardProps {
   tabId: string;
@@ -107,9 +108,7 @@ export function LooseArticleCard({
               Art. {article.norma_data.numero_articolo}
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              da {sourceNorma.tipo_atto}
-              {sourceNorma.numero_atto && ` n. ${sourceNorma.numero_atto}`}
-              {sourceNorma.data && ` del ${sourceNorma.data}`}
+              da {actHeading(sourceNorma)}
             </p>
           </div>
         </div>

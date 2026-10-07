@@ -15,7 +15,7 @@ import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import { formatNormaMeta } from '../../../utils/normaMeta';
+import { formatNormaMeta, formatNormaTitle } from '../../../utils/normaMeta';
 import { READ_ONLY_REASON, describeVersion } from '../../../utils/versionDisplay';
 import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';
 
@@ -249,7 +249,7 @@ export function NormaBlockComponent({
             role="button"
             tabIndex={0}
             aria-expanded={!normaBlock.isCollapsed}
-            aria-label={`${normaBlock.norma.tipo_atto}${normaBlock.norma.numero_atto ? ` n. ${normaBlock.norma.numero_atto}` : ''} — ${normaBlock.isCollapsed ? 'espandi' : 'comprimi'}`}
+            aria-label={`${formatNormaTitle(normaBlock.norma)} — ${normaBlock.isCollapsed ? 'espandi' : 'comprimi'}`}
             onClick={() => toggleNormaCollapse(tabId, normaBlock.id)}
             onKeyDown={(e) => {
               if (e.target !== e.currentTarget) return;
@@ -271,15 +271,10 @@ export function NormaBlockComponent({
 
             <div className="min-w-0">
               <h4 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
-                {normaBlock.norma.tipo_atto}
-                {/* Show number only if NOT an alias (no tipo_atto_reale) */}
-                {!normaBlock.norma.tipo_atto_reale && normaBlock.norma.numero_atto && ` n. ${normaBlock.norma.numero_atto}`}
+                {formatNormaTitle(normaBlock.norma)}
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {formatNormaMeta(normaBlock.norma, {
-                  variant: 'block',
-                  articleCount: normaBlock.articles.length,
-                })}
+                {formatNormaMeta(normaBlock.norma, normaBlock.articles.length)}
               </p>
             </div>
           </div>
@@ -596,7 +591,7 @@ export function NormaBlockComponent({
         articles={normaBlock.articles}
         onNavigate={(articleId) => focusArticle(articleId)}
         onCrossReferenceNavigate={onCrossReference}
-        normaLabel={`${normaBlock.norma.tipo_atto}${normaBlock.norma.numero_atto ? ` n. ${normaBlock.norma.numero_atto}` : ''}`}
+        normaLabel={formatNormaTitle(normaBlock.norma)}
         allArticleIds={allArticleIds}
         onLoadArticle={handleLoadArticleWithNavigation}
       />

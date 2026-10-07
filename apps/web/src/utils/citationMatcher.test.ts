@@ -325,7 +325,7 @@ describe('extractCitations — article suffixes past decies', () => {
 
   it.each([
     'undecies', 'duodecies', 'terdecies', 'quaterdecies',
-    'quinquiesdecies', 'sexiesdecies', 'septiesdecies',
+    'quinquiesdecies', 'sexiesdecies', 'septiesdecies', 'nonies',
   ])('keeps "art. 25-%s del d.lgs. 231/2001" whole', (suffix) => {
     const [m, ...rest] = extractCitations(`ai sensi dell'art. 25-${suffix} del d.lgs. 231/2001`, inCodice);
     expect(rest).toHaveLength(0);

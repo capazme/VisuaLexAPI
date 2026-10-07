@@ -206,9 +206,9 @@ built now.
 |---|---|---|
 | **citation** | how a lawyer cites the article | copy and export of any text (with the version clause, §3.5), dossier `citation`, MCP `riferimento`, norms route `display`, notifications |
 | **short** | the article in little room | tabs of a single article, dossier rows, comparison headers, chips (Q&A, links), quick-norm suggestions, the graph's `estremi`, PDF headings |
-| **act citation** | the act alone, as cited | workspace block subtitle, «Fonte:» lines |
+| **act citation** | the act alone, as cited | «Fonte:» lines; under a code's heading, the decree it is («r.d. 16 marzo 1942, n. 262» under «Codice civile») |
 | **act short** | the act in little room | workspace tabs, dossier groups |
-| **act heading** | the act as a title: the name for the acts cited by their own name (the codes cited by name, the Constitution, the preleggi, the disp. att.), the act citation for every other act (decided: the dossier spec `2026-10-04-dossier-per-atto-design.md` §2, interview Q6) | the dossier's act block, the graph's act node `titolo`, the index window title |
+| **act heading** | the act as a title: the name for the acts cited by their own name (the codes cited by name, the Constitution, the preleggi, the disp. att.), the act citation for every other act (decided: the dossier spec `2026-10-04-dossier-per-atto-design.md` §2, interview Q6) | the dossier's act block, the search card and the workspace block titles, the graph's act node `titolo`, the index window title |
 
 ### 3.2 The forms
 
@@ -231,6 +231,10 @@ and with no comma; an aliased code cited by the act it is). The short forms, the
 EU forms and the new abbreviations were the questions of §9; the owner took
 every recommendation (4 October), so the golden file marks them `decided`. The
 act headings follow the dossier spec the owner approved (§3.1); the strings of the named acts are the dossier's own table.
+A card's or a block's line under the heading says only what the heading does not:
+the decree a code is, an aliased code's name («Codice del consumo» under «d.lgs.
+6 settembre 2005, n. 206»), «Estremi non disponibili» for an act with neither date
+nor number, else nothing (web PR 1a: the old «Edizione del …» repeated the heading's date).
 
 ### 3.3 The tables
 
@@ -306,7 +310,10 @@ as `Cass. civ., sez. un., n. 10787/2024`.
 
 `sez. I` … `sez. VII` (Roman, as the courts print them), `sez. un.`, `sez. lav.`,
 `sez. fer.`; the tributaria is printed as the source gives it (`sez. V`), since
-Italgiure does not tell sez. V from the tributaria. Lower case, like «art.».
+Italgiure does not tell sez. V from the tributaria. Lower case, like «art.». A sub-section keeps its own
+writing (`sez. VI-1`), and a source that does name the tributaria (`T`, the
+Massimario) gets `sez. trib.`: the web's `formatDecisionShort` and MERL-T's
+`decision_short` write the same.
 
 ### 4.4 Incomplete references
 
@@ -322,7 +329,8 @@ Italgiure does not tell sez. V from the tributaria. Lower case, like «art.».
 ### 5.1 Norm nodes
 
 - **Key:** the identity of §1 (unchanged for every well-formed node).
-- `estremi` = the short label (§3.2); `titolo` of an act node = the act heading;
+- `estremi` = the short label (§3.2) for an article, the act citation for an act
+  node that has one; `titolo` of an act node = the act heading;
   `titolo` of an article node is not the extremes (today «Art. 1 costituzione»):
   it is the rubric, or absent.
 - `autorita_emanante` is derived from the type through one table: `legge`,
@@ -443,7 +451,7 @@ rule 23; web gotcha 23).
 | `DossierItem.title` (the act type) | left as it is; every reader shows the derived citation |
 | `QuickNorm.label` | the user's text, untouched; new quick norms are suggested with the short label |
 | `NormaChangeNotification.message` (the raw key) | new messages carry the citation; old ones are already re-labelled from their snapshot (`normaChangeLabel`) |
-| decision dossier item `etichetta` and `title` (Sentenze PR C, not built) | the approved Sentenze design §6 stores the citation as `etichetta` (required) and as `title`. That freezes today's wording into user data: if Q1 or Q2 later changes, every saved decision keeps the old label. **Decided (Q9, 4 October 2026):** keep both fields, since sharing and export need a label without a lookup, but treat them as a cache: readers show `formatDecisionCitation` of the stored identity and attributes, and the stored copy is rewritten on read when it differs. Sentenze §6 is amended accordingly by the Sentenze session |
+| decision dossier item `etichetta` and `title` (Sentenze PR C, not built) | the approved Sentenze design §6 stores the citation as `etichetta` (required) and as `title`. That freezes today's wording into user data: if Q1 or Q2 later changes, every saved decision keeps the old label. **Decided (Q9, 4 October 2026):** keep both fields, since sharing and export need a label without a lookup, but treat them as a cache: readers show `formatDecisionCitation` of the stored identity and attributes. The owner then fixed how the copy is refreshed (4 October, in the Sentenze session): «A ogni scrittura (Raccomandata)» — the stored label is recomputed on every write of the item, and opening a dossier writes nothing; that is the agreed reading of «rewritten on read». Sentenze §6 is amended accordingly by the Sentenze session |
 | graph `estremi`, `titolo`, `autorita_emanante` | recomputed by the backfill (§5.3) |
 
 ## 9. Questions for the owner — answered

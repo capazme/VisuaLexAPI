@@ -35,7 +35,7 @@ Every expected value `E` is `{ "value": …, "status": … }`:
 
 | status | meaning | asserted |
 |---|---|---|
-| `decided` | the owner's words exist (quoted in `note` or in the spec) | today: the web suite for norm citations, except the cases still listed in its `PENDING_ADOPTION`; every adopting suite |
+| `decided` | the owner's words exist (quoted in `note` or in the spec) | every adopting suite: the web app, the server and the MCP server, the API, MERL-T |
 | `current` | what the code does today, and the convention keeps it | by the suites that hold that code (today: the API for norm identities and decision keys, the web for decision paths) |
 | `proposed` | a low-impact call stated in the spec; the owner can overturn it | once the area adopts the convention |
 | `open:Qn` | waits for question n of the spec (§9); the value is the recommendation | once the owner answers and the status flips (none today: the owner answered Q1–Q9 on 4 October 2026) |
@@ -60,3 +60,12 @@ holding `conventions/`, and fails when it is not there.
 A new case or a changed value is a change of the convention: it goes with the
 code that makes the suites green again, in the same pull request. Flipping an
 `open` status to `decided` quotes the owner's answer in the `note`.
+
+## `norm-entries.json`
+
+A norm that comes from someone else — a Forum proposal, a published environment, a file or a
+share link — is rebuilt from closed values before it can be cited to its new owner (a known act
+type, fixed forms for every cited field, unknown keys dropped). The file holds the inputs and,
+for each, the norm kept or the Italian reason it is refused; the server's
+`apps/server/src/schemas/normEntry.ts` and the web's `apps/web/src/utils/sources/normEntry.ts`
+both assert it.

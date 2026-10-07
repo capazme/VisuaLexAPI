@@ -141,26 +141,6 @@ export function formatDateItalianLong(isoDate: string): string {
   return isoDate;
 }
 
-const ACT_TYPE_ABBREVIATIONS: Record<string, string> = {
-  'regio decreto': 'R.D.',
-  'decreto legislativo': 'D.Lgs.',
-  'decreto legge': 'D.L.',
-  'decreto del presidente della repubblica': 'D.P.R.',
-  'legge': 'L.',
-};
-
-/**
- * Abbreviates Italian act types for compact display.
- *
- * @param actType - Full act type name (e.g., "regio decreto")
- * @returns Abbreviated form (e.g., "R.D.") or original if no abbreviation found
- */
-export function abbreviateActType(actType: string): string {
-  if (!actType) return '';
-  const lower = actType.toLowerCase();
-  return ACT_TYPE_ABBREVIATIONS[lower] || actType;
-}
-
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function isRealDay(year: number, month: number, day: number): boolean {

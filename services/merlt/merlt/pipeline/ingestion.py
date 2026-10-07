@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from merlt.pipeline.parsing import CommaParser, ArticleStructure
 from merlt.pipeline.chunking import StructuralChunker, Chunk
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
+from merlt.utils.sources import act_heading, authority, decision_short, norm_from_urn, short_from_urn
 from merlt.models import BridgeMapping
 
 from merlt.clients import NormTree, get_article_position
@@ -492,8 +493,11 @@ class IngestionPipelineV2:
             {
                 "urn": codice_urn,
                 "url": codice_urn,  # Codice URL = URN
-                "titolo": meta.tipo_atto.title(),
-                "autorita": "Regio Decreto" if "regio" in codice_urn.lower() else "Parlamento",
+                # The act heading and the authority of the source convention
+                # (utils/sources.py): "Codice civile" / "Re", not "Codice Civile" /
+                # "Regio Decreto" (an act type is no authority).
+                "titolo": act_heading(norm_from_urn(codice_urn) or meta.norm()),
+                "autorita": authority(norm_from_urn(codice_urn) or meta.norm()),
                 "data": meta.data,
                 "timestamp": self._timestamp,
             }
@@ -711,9 +715,14 @@ class IngestionPipelineV2:
         # Il dataclass NON ha .get() → trattalo come fonte vuota; i campi `meta.*`
         # dataclass coprono comunque autorità/data/titolo nei fallback sotto.
         norma_meta = article.metadata if isinstance(article.metadata, dict) else {}
-        autorita = norma_meta.get("autorita") or ("Regio Decreto" if "regio" in result.article_urn.lower() else "Parlamento")
+        # Labels read from the key first, as a stub's and the backfill's are: the disp. att. travel
+        # here as ordinary acts ("regio decreto", annex 1) and would otherwise be named differently.
+        key_norm = norm_from_urn(result.article_urn)
+        autorita = norma_meta.get("autorita") or authority(key_norm or meta.norm())
         data_pubb = norma_meta.get("data") or meta.data
-        titolo_atto = norma_meta.get("titolo") or meta.to_estremi()
+        # An article's `titolo` is never its extremes (source convention §5.1): the act's
+        # own title when the metadata carry one, else nothing (null clears an old value).
+        titolo_atto = norma_meta.get("titolo") or None
 
         await self.falkordb.query(
             """
@@ -765,7 +774,7 @@ class IngestionPipelineV2:
             {
                 "urn": result.article_urn,
                 "url": result.article_url,
-                "estremi": meta.to_estremi(),
+                "estremi": short_from_urn(result.article_urn) or meta.to_estremi(),
                 "numero_articolo": article_structure.numero_articolo,
                 "rubrica": article_structure.rubrica or "",
                 "testo": article.article_text,
@@ -909,7 +918,7 @@ class IngestionPipelineV2:
     ) -> None:
         """Create Dottrina and AttoGiudiziario nodes from Brocardi."""
         brocardi = article.brocardi_info
-        estremi = article.metadata.to_estremi()
+        estremi = short_from_urn(article_urn) or article.metadata.to_estremi()
 
         # Ratio → Dottrina (tipo: ratio)
         if brocardi.get("Ratio"):
@@ -1215,6 +1224,9 @@ class IngestionPipelineV2:
             anno = parts[1] if len(parts) > 1 else ""
 
         atto_id = f"massima_{corte.lower().replace(' ', '_')}_{numero.replace('/', '_')}"
+        # The legacy key stays until graph phase 2 re-keys these nodes (convention §5.3);
+        # the label is the decision's short label already.
+        estremi = _brocardi_decision_short(corte, numero_sentenza, anno) or f"{corte} {numero}"
 
         await self.falkordb.query(
             """
@@ -1233,7 +1245,7 @@ class IngestionPipelineV2:
             """,
             {
                 "id": atto_id,
-                "estremi": f"{corte} {numero}",
+                "estremi": estremi,
                 "organo": corte,
                 "numero": numero_sentenza,
                 "anno": anno,
@@ -1257,6 +1269,22 @@ class IngestionPipelineV2:
             {"a_id": atto_id, "art_urn": article_urn}
         )
         result.relations_created.append(f"INTERPRETA:{atto_id}->{article_urn}")
+
+
+def _brocardi_decision_short(corte: str, numero: str, anno: str) -> Optional[str]:
+    """The short label of a Brocardi massima's decision ("Cass. civ., n. 31191/2025"), or
+    None when the court is not one the convention names (a TAR, a merit court)."""
+    archivio = {"cassazione civile": "civile", "cassazione penale": "penale", "cassazione lavoro": "civile"}
+    key = corte.strip().lower()
+    if not str(numero).isdigit():
+        return None
+    year = int(anno) if str(anno).isdigit() else None
+    if key == "corte costituzionale":
+        return decision_short("corte_costituzionale", int(numero), year)
+    if key in archivio or key in ("cassazione", "cassazione sezioni unite"):
+        sezione = "L" if key == "cassazione lavoro" else "U" if key == "cassazione sezioni unite" else None
+        return decision_short("cassazione", int(numero), year, archivio.get(key), sezione)
+    return None
 
 
 # Convenience function

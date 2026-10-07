@@ -13,12 +13,14 @@ SEED_ID = "5c56c793-69f3-4fbf-87e6-c4bf54c28c26"
 
 
 def test_estremi_are_rewritten_only_for_codes_the_table_knows():
+    # The estremi are now the source convention's short label (the 2 Oct migration
+    # wrote "Art. 1321 c.c."; scripts/backfill_source_labels.py brings them all to it).
     rows = [
         {"id": 1, "urn": CODE + "~art1321", "estremi": "Art. 1321 codice civile"},
         {"id": 2, "urn": CODE + "~art1322", "estremi": "Art. 1322 c.c."},
         {"id": 3, "urn": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1992-02-17;154~art11", "estremi": "Art. 11 L. 154/1992"},
     ]
-    assert mig.plan_estremi(rows) == [{"id": 1, "estremi": "Art. 1321 c.c."}]
+    assert mig.plan_estremi(rows) == [{"id": 1, "estremi": "art. 1321 c.c."}, {"id": 2, "estremi": "art. 1322 c.c."}]
 
 
 def _collection() -> QdrantClient:

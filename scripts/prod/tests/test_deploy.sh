@@ -8,8 +8,12 @@ set -eu
 here="$(cd "$(dirname "$0")/.." && pwd)"
 root="$(cd "$here/../.." && pwd)"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+holder=""
+trap 'if [ -n "$holder" ]; then kill "$holder" 2>/dev/null; fi; rm -rf "$work"' EXIT
 fail=0
+# A port nothing listens on, so the port check passes wherever the tests run.
+FREE_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+FREE_PORT2="$(python3 -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", 0)); p=s.getsockname()[1]; print(p if p != int(sys.argv[1]) else p + 1)' "$FREE_PORT")"
 
 ok()   { echo "ok   $1"; }
 bad()  { echo "FAIL $1"; fail=1; }
@@ -19,8 +23,10 @@ show() { sed 's/^/     /' "$1" | head -8; }
 mkrepo() { # mkrepo <name>: prints its path
   d="$work/$1"
   mkdir -p "$d/scripts/prod" "$d/infra" "$d/apps/server" "$d/vendor/mcp-legal-it" "$d/bin"
-  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$here"/update.sh "$d/scripts/prod/"
+  cp "$here"/lib.sh "$here"/preflight.sh "$here"/init-env.sh "$here"/deploy.sh "$here"/update.sh \
+     "$here"/firewall.sh "$here"/backup-daily.sh "$here"/backup-timer.sh "$d/scripts/prod/"
   cp "$root/infra/.env.example" "$d/infra/.env.example"
+  sed "s/^INGRESS_PORT=.*/INGRESS_PORT=$FREE_PORT/" "$d/infra/.env.example" >"$d/infra/.env.example.t" && mv "$d/infra/.env.example.t" "$d/infra/.env.example"
   cp "$root/apps/server/.env.example" "$d/apps/server/.env.example"
   for f in compose.yml compose.app.yml compose.scrapers.yml compose.prod.yml; do : >"$d/infra/$f"; done
   : >"$d/vendor/mcp-legal-it/Dockerfile"
@@ -87,6 +93,7 @@ expect_log_re() { # expect_log_re <repo> <regex> <description>
 }
 line_of() { grep -n -- "$2" "$1/docker.log" | head -1 | cut -d: -f1; } # line_of <repo> <text>: the first line that has it
 mode_of() { ls -ld "$1" | cut -c1-10; }
+value_of() { sed -n "s/^$2=//p" "$1" | tail -1 | sed 's/^"\(.*\)"$/\1/'; } # value_of <file> <KEY>
 
 # --- the host checks -----------------------------------------------------------------
 d="$(mkrepo dirty)"
@@ -138,7 +145,8 @@ expect_out "apps/server/.env" "and where the server's is"
   && ok "and are readable by their owner only" || bad "and are readable by their owner only ($(mode_of "$d/infra/.env"))"
 leak=0
 for pair in "infra/.env POSTGRES_PASSWORD" "infra/.env PLATFORM_DB_PASSWORD" "infra/.env MERLT_DB_PASSWORD" \
-            "infra/.env MERLT_INTERNAL_SECRET" "infra/.env MERLT_API_KEY" "apps/server/.env JWT_SECRET" "apps/server/.env ADMIN_PASSWORD"; do
+            "infra/.env MERLT_INTERNAL_SECRET" "infra/.env MERLT_API_KEY" "apps/server/.env JWT_SECRET" "apps/server/.env ADMIN_PASSWORD" \
+            "infra/.env MCP_CLIENT_SECRET" "apps/server/.env OAUTH_DELEGATION_SECRET"; do
   set -- $pair
   value="$(sed -n "s/^$2=//p" "$d/$1" | tail -1 | sed 's/^"\(.*\)"$/\1/')"
   if [ "${#value}" -lt 24 ]; then bad "$2 is generated and long enough (got ${#value} characters)"; leak=1; continue; fi
@@ -153,6 +161,108 @@ outcome "$d" scripts/prod/init-env.sh
 sum2="$(cksum "$d/infra/.env" "$d/apps/server/.env" | tr '\n' ' ')"
 [ "$sum1" = "$sum2" ] && ok "a second run never overwrites what exists" || bad "a second run never overwrites what exists"
 
+# An existing host: env files from before the MCP get the two new secrets, and nothing else changes.
+d="$(mkrepo oldhost)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+for f in infra/.env apps/server/.env; do
+  grep -v -E '^(MCP_CLIENT_SECRET|OAUTH_DELEGATION_SECRET)=' "$d/$f" >"$d/t" && cat "$d/t" >"$d/$f"
+done
+rm -f "$d/t"
+before_jwt="$(value_of "$d/apps/server/.env" JWT_SECRET)"; before_pg="$(value_of "$d/infra/.env" POSTGRES_PASSWORD)"
+chmod 644 "$d/infra/.env" "$d/apps/server/.env"
+outcome "$d" scripts/prod/init-env.sh
+expect_status 0 "an existing host's env files are completed"
+m="$(value_of "$d/infra/.env" MCP_CLIENT_SECRET)"
+[ "${#m}" -ge 32 ] && ok "MCP_CLIENT_SECRET is added to infra/.env" || bad "MCP_CLIENT_SECRET is added to infra/.env (${#m} characters)"
+o="$(value_of "$d/apps/server/.env" OAUTH_DELEGATION_SECRET)"
+[ "${#o}" -ge 32 ] && ok "OAUTH_DELEGATION_SECRET is added to apps/server/.env" || bad "OAUTH_DELEGATION_SECRET is added to apps/server/.env (${#o} characters)"
+[ "$(value_of "$d/apps/server/.env" JWT_SECRET)" = "$before_jwt" ] && [ "$(value_of "$d/infra/.env" POSTGRES_PASSWORD)" = "$before_pg" ] \
+  && ok "and what was there is untouched" || bad "and what was there is untouched"
+expect_out "MCP_CLIENT_SECRET" "it says which key it added"
+if grep -qF -- "$m" "$work/out" || grep -qF -- "$o" "$work/out"; then bad "and never prints the value"; else ok "and never prints the value"; fi
+[ "$(mode_of "$d/infra/.env")" = "-rw-------" ] && [ "$(mode_of "$d/apps/server/.env")" = "-rw-------" ] \
+  && ok "the files it completes are left readable by their owner only" || bad "the files it completes are left readable by their owner only ($(mode_of "$d/infra/.env"))"
+
+# The MCP's addresses and secrets: checked only when MCP_PUBLIC_URL is set.
+d="$(mkrepo mcpenv)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+set_line() { # set_line <file> <KEY> [value]: the KEY's lines removed, then the value appended if given
+  grep -v "^$2=" "$1" >"$1.t" || true; cat "$1.t" >"$1"; rm -f "$1.t"
+  [ "$#" -lt 3 ] || echo "$2=$3" >>"$1"
+}
+mcp_case() { # mcp_case <PUBLIC_ORIGIN> <MCP_PUBLIC_URL or ""> <0|nonzero> <description> [text expected]
+  set_line "$d/infra/.env" PUBLIC_ORIGIN "$1"
+  if [ -n "$2" ]; then set_line "$d/infra/.env" MCP_PUBLIC_URL "$2"; else set_line "$d/infra/.env" MCP_PUBLIC_URL; fi
+  outcome "$d" scripts/prod/preflight.sh env
+  expect_status "$3" "$4"
+  if [ -n "${5:-}" ]; then expect_out "$5" "naming $5"; fi
+}
+mcp_case "http://localhost:8080" "" 0 "without MCP_PUBLIC_URL nothing about the MCP is checked"
+mcp_case "https://vlx.example" "https://vlx.example:8443/mcp" 0 "an https origin and an endpoint on the same host pass"
+mcp_case "http://localhost:18080" "http://localhost:18091/mcp" 0 "http on localhost passes (throwaway trials)"
+mcp_case "https://vlx.example/" "https://vlx.example:8443/mcp" nonzero "a trailing slash on PUBLIC_ORIGIN is refused (it is the issuer)" PUBLIC_ORIGIN
+mcp_case "https://vlx.example,http://localhost:8080" "https://vlx.example:8443/mcp" nonzero "a list in PUBLIC_ORIGIN is refused" "must be one origin"
+mcp_case "https://vlx.example" "http://localhost:8091@evil.example/mcp" nonzero "a user@ part is refused (it would fool the host check)" "no user@ part"
+mcp_case "https://[2001:db8::1]" "https://[2001:db8::2]:8443/mcp" nonzero "an IPv6 literal is refused (it would fool the host check)" "no user@ part"
+mcp_case "http://192.0.2.10:8080" "http://192.0.2.10:8091/mcp" nonzero "plain http beyond the loopback is refused" PUBLIC_ORIGIN
+mcp_case "https://vlx.example" "https://other.example:8443/mcp" nonzero "an endpoint on another host is refused" MCP_PUBLIC_URL
+mcp_case "https://vlx.example" "https://vlx.example:8443/" nonzero "an endpoint not ending in /mcp is refused" MCP_PUBLIC_URL
+mcp_case "https://vlx.example" "https://vlx.example:8443/mcp" 0 "back to a good pair"
+set_line "$d/infra/.env" MCP_CLIENT_SECRET short
+outcome "$d" scripts/prod/preflight.sh env
+expect_status nonzero "a short MCP_CLIENT_SECRET is refused"; expect_out "MCP_CLIENT_SECRET" "by name"
+set_line "$d/infra/.env" MCP_CLIENT_SECRET "abcdefghijklmnopqrstuvwxyz0123456789ABCD"
+set_line "$d/apps/server/.env" OAUTH_DELEGATION_SECRET "$(value_of "$d/apps/server/.env" JWT_SECRET)"
+outcome "$d" scripts/prod/preflight.sh env
+expect_status nonzero "a delegation secret equal to JWT_SECRET is refused"; expect_out "OAUTH_DELEGATION_SECRET" "by name"
+set_line "$d/apps/server/.env" OAUTH_DELEGATION_SECRET "zyxwvutsrqponmlkjihgfedcba9876543210ZYXW"
+set_line "$d/apps/server/.env" OAUTH_API_AUDIENCE "http://localhost:3001/api"
+outcome "$d" scripts/prod/preflight.sh env
+expect_status nonzero "an API audience pinned in apps/server/.env that differs from PUBLIC_ORIGIN/api is refused"; expect_out "OAUTH_API_AUDIENCE" "by name"
+set_line "$d/apps/server/.env" OAUTH_API_AUDIENCE "https://vlx.example/api"
+outcome "$d" scripts/prod/preflight.sh env
+expect_status 0 "the matching audience passes"
+
+# OpenRouter: a warning, never a refusal.
+d="$(mkrepo openrouter)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+outcome "$d" scripts/prod/preflight.sh env
+expect_status 0 "an empty OPENROUTER_API_KEY does not stop a deploy"
+expect_out "OPENROUTER_API_KEY" "but it is named in a warning"
+
+# The ports: checked before the build.
+d="$(mkrepo ports)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+outcome "$d" scripts/prod/preflight.sh ports
+expect_status 0 "a free ingress port passes"
+python3 -c 'import socket,sys,time; s=socket.socket(); s.bind(("127.0.0.1",int(sys.argv[1]))); s.listen(); time.sleep(30)' "$FREE_PORT" & holder=$!
+i=0; while python3 -c 'import socket,sys; socket.create_connection(("127.0.0.1",int(sys.argv[1])),1)' "$FREE_PORT" 2>/dev/null; [ $? != 0 ] && [ "$i" -lt 50 ]; do i=$((i + 1)); sleep 0.1; done
+outcome "$d" scripts/prod/preflight.sh ports
+expect_status nonzero "a port another program holds is refused"
+expect_out "INGRESS_PORT" "naming the key to change"
+: >"$d/docker.log"
+outcome "$d" scripts/prod/deploy.sh --no-backup
+expect_no_log "$d" "--build" "and the deploy stops before it builds anything"
+expect_out "INGRESS_PORT" "and says it was the port"
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null || true; holder=""
+printf 'MCP_PUBLIC_URL=https://vlx.example:8443/mcp\nMCP_PORT=%s\n' "$FREE_PORT" >>"$d/infra/.env"
+outcome "$d" scripts/prod/preflight.sh ports
+expect_status nonzero "the MCP on the ingress's own port is refused"; expect_out "same port" "saying so"
+
+# The mcp profile follows MCP_PUBLIC_URL; a stop stops every module whatever the settings.
+d="$(mkrepo mcpdeploy)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+printf 'PUBLIC_ORIGIN=https://vlx.example\nMCP_PUBLIC_URL=https://vlx.example:8443/mcp\nMCP_PORT=%s\n' "$FREE_PORT2" >>"$d/infra/.env"
+outcome "$d" scripts/prod/deploy.sh
+expect_status 0 "a deploy with the MCP on runs to the end"
+expect_log "$d" "--profile merlt --profile mcp up -d --build --wait" "it starts the mcp profile too"
+expect_out "https://vlx.example:8443/mcp" "and prints the address to give Claude Code"
+d="$(mkrepo stopall)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+echo "MERLT_ENABLED=false" >>"$d/infra/.env"
+outcome "$d" scripts/prod/deploy.sh --stop
+expect_log "$d" "--profile merlt --profile mcp stop" "a stop names every profile, so nothing a previous deploy started keeps running"
+
 # --- the deploy ---------------------------------------------------------------------------
 d="$(mkrepo first)"
 outcome "$d" scripts/prod/deploy.sh
@@ -160,6 +270,7 @@ expect_status 0 "a first deploy on main runs to the end"
 expect_log "$d" "docker compose -f infra/compose.yml -f infra/compose.app.yml -f infra/compose.scrapers.yml -f infra/compose.prod.yml --profile merlt up -d --build --wait" \
   "it builds and starts the four files in order, MERL-T included, and waits"
 expect_no_log "$d" "BACKUP" "and takes no backup: there is nothing to back up yet"
+expect_no_log "$d" "--profile mcp" "and, with no MCP_PUBLIC_URL, not the MCP"
 expect_log "$d" "exec -T server node dist/utils/seed.js" "and seeds the admin (the seed is idempotent)"
 expect_out "$(git -C "$d" rev-parse --short HEAD)" "and reports the commit it deployed"
 # `.Health` has no column header in Compose's table format (the header reads "<no value>").
@@ -340,6 +451,141 @@ expect_status 0 "--stop stops"
 expect_log "$d" "compose -f infra/compose.yml" "through the same Compose files"
 expect_log "$d" " stop" "with stop"
 if grep -E ' (up|down|build|rm)( |$)' "$d/docker.log" >/dev/null; then bad "and nothing else (no up, down, build or rm)"; show "$d/docker.log"; else ok "and nothing else (no up, down, build or rm)"; fi
+
+# --- the host firewall, H1 (firewall.sh) ------------------------------------------------------
+d="$(mkrepo h1)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+printf 'nameserver 8.8.8.8\n' >"$d/resolv-public"
+printf 'nameserver 192.168.1.1\nnameserver 8.8.8.8\n' >"$d/resolv-router"
+EXTRA_ENV="FIREWALL_RESOLV_CONF=$d/resolv-public"; outcome "$d" scripts/prod/firewall.sh apply --dry-run; EXTRA_ENV=""
+expect_status 0 "the H1 rules can be printed without root"
+grep '^iptables' "$work/out" >"$work/rules"
+[ "$(wc -l <"$work/rules" | tr -d ' ')" = 7 ] && ok "seven rules with a public resolver" || bad "seven rules with a public resolver (got $(wc -l <"$work/rules"))"
+[ "$(grep -c -- ' -s 172.29.240.0/24 ' "$work/rules")" = 7 ] && ok "every rule matches only traffic FROM the stack's app subnet: other containers on the machine are never matched" \
+  || bad "every rule matches only traffic from the app subnet"
+[ "$(grep -c -- '-I DOCKER-USER ' "$work/rules")" = 7 ] && [ "$(grep -c -- '--comment visualex-h1-visualex$' "$work/rules")" = 7 ] \
+  && ok "all in DOCKER-USER, all tagged with this stack's comment (no character iptables would quote)" || bad "all in DOCKER-USER, all tagged"
+sed -n 1p "$work/rules" | grep -q -- '-I DOCKER-USER 1 -s 172.29.240.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN' \
+  && ok "replies to connections from outside come first" || bad "replies first: $(sed -n 1p "$work/rules")"
+sed -n 2p "$work/rules" | grep -q -- '-s 172.29.240.0/24 -d 172.29.240.0/24 -j RETURN' && ok "then the subnet's own traffic" || bad "then the subnet's own traffic"
+for range in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10; do
+  grep -q -- "-s 172.29.240.0/24 -d $range -j DROP" "$work/rules" && ok "new connections to $range are dropped" || bad "new connections to $range are dropped"
+done
+EXTRA_ENV="FIREWALL_RESOLV_CONF=$d/resolv-router"; outcome "$d" scripts/prod/firewall.sh apply --dry-run; EXTRA_ENV=""
+grep '^iptables' "$work/out" >"$work/rules"
+grep -q -- '-d 192.168.1.1/32 -p udp --dport 53 -j RETURN' "$work/rules" && grep -q -- '-d 192.168.1.1/32 -p tcp --dport 53 -j RETURN' "$work/rules" \
+  && ok "a private resolver Docker forwards to keeps answering the containers' lookups" || bad "a private resolver keeps answering"
+grep -q -- '-d 8.8.8.8' "$work/rules" && bad "a public resolver needs no exception" || ok "a public resolver needs no exception"
+last_return="$(grep -n -- '-j RETURN' "$work/rules" | tail -1 | cut -d: -f1)"; first_drop="$(grep -n -- '-j DROP' "$work/rules" | head -1 | cut -d: -f1)"
+[ "$last_return" -lt "$first_drop" ] && ok "every exception before the first drop" || bad "every exception before the first drop"
+for wide in 0.0.0.0/0 8.8.8.0/24 10.0.0.0/8; do
+  EXTRA_ENV="APP_SUBNET=$wide"; outcome "$d" scripts/prod/firewall.sh apply --dry-run; EXTRA_ENV=""
+  expect_status nonzero "APP_SUBNET $wide is refused (not a private block between /16 and /28)"
+done
+
+# A stub iptables that keeps its rules and prints them as iptables -S does (the target last),
+# beside another program's rule (its comment quoted) and a stack whose name extends this one's.
+cat >"$d/bin/iptables" <<'STUB'
+#!/bin/sh
+echo "iptables $*" >>"$STUB_LOG"
+f="$STUB_RULES"
+[ "$1" = -w ] && shift
+case "$1" in
+  -S) echo "-N DOCKER-USER"; cat "$f"; echo "-A DOCKER-USER -j RETURN" ;;
+  -I) shift 3; line="$*"
+      target="$(printf '%s' "$line" | sed -n 's/.*\(-j [A-Z]*\).*/\1/p')"
+      rest="$(printf '%s' "$line" | sed 's/ -j [A-Z]*//')"
+      { echo "-A DOCKER-USER $rest $target"; cat "$f"; } >"$f.t" && mv "$f.t" "$f" ;;
+  -D) shift; want="-A $*"
+      grep -vxF -- "$want" "$f" >"$f.t" || true
+      [ "$(wc -l <"$f.t")" -lt "$(wc -l <"$f")" ] || { mv "$f.t" "$f"; echo "iptables: Bad rule" >&2; exit 1; }
+      mv "$f.t" "$f" ;;
+esac
+exit 0
+STUB
+printf '#!/bin/sh\necho 0\n' >"$d/bin/id"; chmod +x "$d/bin/iptables" "$d/bin/id"
+cat >"$d/iptables-rules" <<'RULES'
+-A DOCKER-USER -s 10.9.0.0/16 -m comment --comment "someone else: keep" -j DROP
+-A DOCKER-USER -s 172.29.240.0/24 -d 100.64.0.0/10 -m comment --comment visualex-h1-visualex-dev -j DROP
+RULES
+mine() { grep -c -- '--comment visualex-h1-visualex -j ' "$d/iptables-rules" || true; }
+EXTRA_ENV="STUB_RULES=$d/iptables-rules FIREWALL_RESOLV_CONF=$d/resolv-router"; outcome "$d" scripts/prod/firewall.sh apply; EXTRA_ENV=""
+expect_status 0 "apply runs"
+[ "$(mine)" = 9 ] && ok "it adds its nine rules" || bad "it adds its nine rules (found $(mine))"
+EXTRA_ENV="STUB_RULES=$d/iptables-rules FIREWALL_RESOLV_CONF=$d/resolv-router"; outcome "$d" scripts/prod/firewall.sh apply; EXTRA_ENV=""
+[ "$(mine)" = 9 ] && ok "a second apply replaces them, never doubles them" || bad "a second apply replaces them (found $(mine))"
+EXTRA_ENV="STUB_RULES=$d/iptables-rules"; outcome "$d" scripts/prod/firewall.sh status; EXTRA_ENV=""
+expect_out "--comment visualex-h1-visualex -j DROP" "status lists them"
+EXTRA_ENV="STUB_RULES=$d/iptables-rules"; outcome "$d" scripts/prod/firewall.sh remove; EXTRA_ENV=""
+expect_status 0 "remove runs"
+[ "$(mine)" = 0 ] && ok "remove deletes every one of them" || bad "remove deletes every one of them (left $(mine))"
+grep -q 'someone else: keep' "$d/iptables-rules" && grep -q 'visualex-h1-visualex-dev' "$d/iptables-rules" \
+  && ok "and neither another program's rule nor the rule of a stack whose name extends this one's" || bad "another program's and a prefix stack's rules survive"
+printf '#!/bin/sh\necho 1000\n' >"$d/bin/id"
+outcome "$d" scripts/prod/firewall.sh apply
+expect_status nonzero "apply without root is refused"; expect_out "sudo" "and says so"
+# --- the daily backup (backup-daily.sh) and its timer (backup-timer.sh) -------------------------
+d="$(mkrepo daily)"
+run "$d" scripts/prod/init-env.sh >/dev/null 2>&1
+B="$d/home/visualex-backups"
+mkdir -p "$B"
+complete() { mkdir "$B/$1" && echo '{}' >"$B/$1/manifest.json"; } # a finished backup: its manifest is written last
+for n in 1 2 3 4 5 6 7 8 9; do complete "visualex-2026100${n}T033000Z"; done
+mkdir "$B/other-20260101T000000Z" "$B/visualex-notes"
+# the backup tool, as a stub: takes the backup BACKUP_NAME, or leaves it half-written and fails
+cat >"$d/scripts/backup.sh" <<'STUB'
+#!/bin/sh
+mkdir "$HOME/visualex-backups/$BACKUP_NAME"
+[ "${BACKUP_EXIT:-0}" = 0 ] || exit "$BACKUP_EXIT"
+echo '{}' >"$HOME/visualex-backups/$BACKUP_NAME/manifest.json"
+STUB
+ours() { ls -1 "$B" | grep '^visualex-2' | sort | sed 's/T033000Z//' | tr '\n' ' '; }
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261010T033000Z"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status 0 "the daily backup runs"
+[ "$(ours)" = "visualex-20261004 visualex-20261005 visualex-20261006 visualex-20261007 visualex-20261008 visualex-20261009 visualex-20261010 " ] \
+  && ok "it keeps the newest seven of this stack, the one it just took included" || bad "it keeps the newest seven of this stack (kept: $(ours))"
+[ -d "$B/other-20260101T000000Z" ] && [ -d "$B/visualex-notes" ] \
+  && ok "and never touches another stack's folders or anything not named as the tool names it" || bad "and never touches another stack's folders or other names"
+expect_out "removed the old backup visualex-20261001T033000Z" "it says what it removed"
+# Eight complete now: a rotation after a failure would remove one. It must not.
+complete visualex-20261011T033000Z
+before="$(ours)"
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261012T033000Z BACKUP_EXIT=3"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status nonzero "a failed backup fails the run"
+[ "$(ours)" = "${before}visualex-20261012 " ] && ok "and deletes nothing (its half-written folder stays, for now)" || bad "and deletes nothing (now: $(ours))"
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261013T033000Z"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+[ -d "$B/visualex-20261012T033000Z" ] && ok "a half-written folder touched in the last six hours may still be in progress: it stays" || bad "a recent half-written folder stays"
+rm -rf "$B/visualex-20261013T033000Z"; complete visualex-20261004T033000Z; complete visualex-20261005T033000Z
+touch -t 202610010000 "$B/visualex-20261012T033000Z"
+EXTRA_ENV="HOME=$d/home BACKUP_NAME=visualex-20261013T033000Z"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status 0 "the next night's backup runs"
+[ "$(ours)" = "visualex-20261006 visualex-20261007 visualex-20261008 visualex-20261009 visualex-20261010 visualex-20261011 visualex-20261013 " ] \
+  && ok "the half-written folder never counted as one of the seven, and goes once a newer backup is complete" || bad "half-written folders do not count (kept: $(ours))"
+expect_out "a backup left half-written" "it says so"
+EXTRA_ENV="HOME=$d/home BACKUP_KEEP=0"; outcome "$d" scripts/prod/backup-daily.sh; EXTRA_ENV=""
+expect_status nonzero "a BACKUP_KEEP of 0 is refused, before anything is taken or removed"
+
+# The timer, against stub systemctl and loginctl that record their calls.
+for tool in systemctl loginctl; do
+  printf '#!/bin/sh\necho "%s $*" >>"$STUB_LOG"\n[ "$1" = show-user ] && echo no\nexit 0\n' "$tool" >"$d/bin/$tool"
+  chmod +x "$d/bin/$tool"
+done
+: >"$d/docker.log"
+EXTRA_ENV="HOME=$d/home XDG_CONFIG_HOME=$d/home/.config"; outcome "$d" scripts/prod/backup-timer.sh install; EXTRA_ENV=""
+expect_status 0 "the timer installs"
+u="$d/home/.config/systemd/user"
+[ -f "$u/visualex-backup.service" ] && [ -f "$u/visualex-backup.timer" ] && ok "as a service and a timer named after the stack" || bad "as a service and a timer named after the stack"
+grep -q "^ExecStart=/bin/sh $d/scripts/prod/backup-daily.sh\$" "$u/visualex-backup.service" && ok "the service runs the daily backup of this checkout" || bad "the service runs the daily backup of this checkout"
+grep -q '^OnCalendar=\*-\*-\* 03:30:00$' "$u/visualex-backup.timer" && grep -q '^Persistent=true$' "$u/visualex-backup.timer" \
+  && ok "every day at 03:30, and a run missed while the machine was off happens at the next start" || bad "daily at 03:30, persistent"
+expect_log "$d" "systemctl --user enable --now visualex-backup.timer" "it starts the timer as the user, not as root"
+expect_out "enable-linger" "and says how to keep it running while nobody is logged in"
+: >"$d/docker.log"
+EXTRA_ENV="HOME=$d/home XDG_CONFIG_HOME=$d/home/.config"; outcome "$d" scripts/prod/backup-timer.sh remove; EXTRA_ENV=""
+expect_status 0 "the timer is removed"
+[ ! -e "$u/visualex-backup.service" ] && [ ! -e "$u/visualex-backup.timer" ] && ok "its unit files are gone" || bad "its unit files are gone"
+expect_log "$d" "systemctl --user disable --now visualex-backup.timer" "and it is stopped first"
+[ -d "$d/home/visualex-backups/visualex-20261010T033000Z" ] && ok "the backups already taken stay" || bad "the backups already taken stay"
 
 # --- the pull: --branch main|develop (update.sh) --------------------------------------------
 # A repo as mkrepo makes it, with an origin (a bare clone) on which develop is one commit ahead
@@ -561,7 +807,6 @@ runbash() {
       PATH="$d/bin:$PATH" STUB_LOG="$d/docker.log" PLAYWRIGHT_BROWSERS_PATH="$d/pw" $EXTRA_ENV bash "$@" )
 }
 outcomeb() { if runbash "$@" >"$work/out" 2>&1; then status=0; else status=$?; fi; }
-value_of() { sed -n "s/^$2=//p" "$1" | tail -1 | sed 's/^"\(.*\)"$/\1/'; } # value_of <file> <KEY>
 
 # --prod hands over before anything of the development flow runs: were the dev env files made
 # first, init-env.sh would find them and keep their development passwords, and the deploy would refuse.

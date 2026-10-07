@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js';
+import { rateLimit } from 'express-rate-limit';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { authenticate, authInfoFor, callerOf, type Caller } from './auth.js';
@@ -10,9 +11,19 @@ import type { McpConfig } from './config.js';
 import { ToolError } from './errors.js';
 import { SessionStore } from './sessions.js';
 import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier.js';
+import { CARD_TOOL_SCOPES, registerCardTools } from './tools/cards.js';
 
-const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const ALL_SCOPES = ['dossier:read', 'dossier:write'];
+/** Hostnames always accepted besides the endpoint's: the health check calls the loopback. */
+const LOOPBACK_NAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+/**
+ * Requests per address per minute on the endpoint: a backstop, so one caller
+ * sending invalid tokens cannot spend the introspection ceiling every user
+ * shares (spec 2026-10-05-mcp-production-design.md, section 5).
+ */
+export const REQUESTS_PER_MINUTE = 300;
+// What a client asks for at sign-in; deletion (content:delete) is never asked: the user switches it on in VisuaLex.
+const ALL_SCOPES = ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write'];
 
 /** The protected resource metadata URL for the endpoint (RFC 9728 §3.1). */
 export function resourceMetadataUrl(config: McpConfig): string {
@@ -49,7 +60,7 @@ function scopesNeeded(message: unknown): string[] {
   if (!message || typeof message !== 'object') return [];
   const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
   if (method !== 'tools/call' || typeof params?.name !== 'string') return [];
-  return TOOL_SCOPES[params.name] ?? [];
+  return TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? [];
 }
 
 type AuthedRequest = Request & { auth?: AuthInfo };
@@ -66,13 +77,19 @@ const sessionNotFound = (res: Response) =>
  * scope a tool needs: 403 `insufficient_scope`. It never reads the database
  * and never forwards the client's token to the API.
  */
-export function createApp(config: McpConfig, options: { store?: SessionStore } = {}) {
+export function createApp(config: McpConfig, options: { store?: SessionStore; requestsPerMinute?: number } = {}) {
   const store = options.store ?? new SessionStore();
   const app = express();
   app.disable('x-powered-by');
 
-  // DNS rebinding: on a loopback bind, only loopback Host headers.
-  if (LOOPBACK.has(config.host)) app.use(hostHeaderValidation(['localhost', '127.0.0.1', '[::1]']));
+  // Behind the overlay proxy and Docker's gateway: the client's address is the
+  // first one, from the right, outside the loopback and the private ranges.
+  // Named presets only (GHSA-jqcg-44mw-7w3h).
+  app.set('trust proxy', 'loopback, uniquelocal');
+
+  // DNS rebinding: only the endpoint's own hostname, and the loopback names
+  // (a rebinding page sends its own hostname, never these). On every bind.
+  app.use(hostHeaderValidation([...new Set([new URL(config.resource).hostname, ...LOOPBACK_NAMES])]));
 
   // A browser page may not drive the server unless its origin is listed;
   // native clients (Claude Code, LibreLex) send no Origin header.
@@ -98,6 +115,19 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
   });
 
   const endpoint = new URL(config.resource).pathname;
+  app.use(
+    endpoint,
+    rateLimit({
+      windowMs: 60_000,
+      limit: options.requestsPerMinute ?? REQUESTS_PER_MINUTE,
+      // One address, one count: overlay IPv6 addresses share a /48, so grouping by
+      // subnet (the library's default /56) would put every IPv6 peer in one bucket.
+      ipv6Subnet: false,
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      message: { jsonrpc: '2.0', error: { code: -32000, message: 'Too many requests: retry in a minute' }, id: null },
+    }),
+  );
 
   /** The caller of this request, or the 401/503 answer already sent. */
   async function callerOrRefuse(req: Request, res: Response): Promise<Caller | undefined> {
@@ -131,6 +161,8 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
     if (missing.length > 0) {
       // The scopes the token has plus the ones it lacks: a client that signs in
       // again with exactly this list keeps what it had (MCP 2025-11-25, step-up).
+      // Deletion is not a token scope here: the consent page shows its box ticked
+      // when the connection already may delete, so the user keeps it by leaving it.
       const scope = [...new Set([...caller.scopes, ...needed])].join(' ');
       res.setHeader('WWW-Authenticate', challenge(config, { error: 'insufficient_scope', scope }));
       res.status(403).json({ error: 'insufficient_scope' });
@@ -160,6 +192,7 @@ export function createApp(config: McpConfig, options: { store?: SessionStore } =
       try {
         server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
         registerDossierTools(server, config, runner);
+        registerCardTools(server, config, runner);
         const opened = server;
         // No JSON responses: a tool that asks the user to confirm sends that
         // request back on the call's own SSE stream.

@@ -52,9 +52,9 @@ describe('AskMerltEntry', () => {
         `/grafo?urn=${encodeURIComponent(BASE.articleUrn)}`,
         {
           state: {
-            prefillQuery: "Spiegami l'art. 2043 codice civile",
+            prefillQuery: "Spiegami l'art. 2043 c.c.",
             articleUrn: BASE.articleUrn,
-            articleHeading: 'Art. 2043 codice civile',
+            articleHeading: 'art. 2043 c.c.',
           },
         },
       );
@@ -65,9 +65,9 @@ describe('AskMerltEntry', () => {
       fireEvent.click(screen.getByRole('button', { name: /chiedi su questo articolo/i }));
       expect(navigateMock).toHaveBeenCalledWith('/grafo', {
         state: {
-          prefillQuery: "Spiegami l'art. 2043 codice civile",
+          prefillQuery: "Spiegami l'art. 2043 c.c.",
           articleUrn: '',
-          articleHeading: 'Art. 2043 codice civile',
+          articleHeading: 'art. 2043 c.c.',
         },
       });
     });
@@ -86,8 +86,8 @@ describe('AskMerltEntry', () => {
       );
       fireEvent.click(screen.getByRole('button', { name: /chiedi su questo articolo/i }));
       const payload = navigateMock.mock.calls[0][1].state;
-      expect(payload.articleHeading).toBe('Art. 7 (All. A) legge n. 241');
-      expect(payload.prefillQuery).toBe("Spiegami l'art. 7 (All. A) legge n. 241");
+      expect(payload.articleHeading).toBe('art. 7 l. n. 241 (All. A)');
+      expect(payload.prefillQuery).toBe("Spiegami l'art. 7 l. n. 241 (All. A)");
     });
   });
 

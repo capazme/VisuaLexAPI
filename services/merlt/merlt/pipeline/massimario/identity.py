@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+from merlt.utils.sources import decision_short
+
 CASSAZIONE = "cassazione"
 CORTE_COSTITUZIONALE = "corte_costituzionale"
 ARCHIVI = ("civile", "penale")
@@ -60,16 +62,10 @@ class CitedDecision:
 
     @property
     def estremi(self) -> str:
-        if self.corte == CORTE_COSTITUZIONALE:
-            return f"Corte cost., n. {self.numero}/{self.anno}"
-        court = {"civile": "Cass. civ.", "penale": "Cass. pen."}.get(self.archivio or "", "Cass.")
-        return f"{court}, n. {self.numero}/{self.anno}" if self.anno else f"{court}, n. {self.numero}"
+        """The decision's short label (source convention, D2): "Cass. civ., sez. un., n. 31310/2024"."""
+        return decision_short(self.corte, self.numero, self.anno, self.archivio, self.sezione)
 
     @property
     def label(self) -> str:
-        """As the chip shows it: the section as written, number/year, the massime."""
-        if self.corte == CORTE_COSTITUZIONALE or not self.sezione:
-            head = self.estremi
-        else:
-            head = f"Sez. {self.sezione}, n. {self.numero}" + (f"/{self.anno}" if self.anno else "")
-        return f"{head} · Rv. {', '.join(self.rv)}" if self.rv else head
+        """As the chip shows it: the short label and the massime ("… · Rv. 673165-01")."""
+        return decision_short(self.corte, self.numero, self.anno, self.archivio, self.sezione, self.rv or None)

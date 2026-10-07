@@ -23,7 +23,7 @@ const ACCESS_TOKEN = 'urn:ietf:params:oauth:token-type:access_token';
 async function exchange(config: McpConfig, caller: Caller, scope: string): Promise<string> {
   let response: Response;
   try {
-    response = await fetch(`${config.issuer}/oauth/token`, {
+    response = await fetch(`${config.authUrl}/oauth/token`, {
       method: 'POST',
       headers: { authorization: basicAuthorization(config), 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -94,6 +94,10 @@ export async function callApi<T>(
       const what = typeof body.quota === 'string' ? QUOTA_WORDS[body.quota] ?? 'operazioni' : 'operazioni';
       throw new ToolError(`Hai raggiunto il limite giornaliero di ${what} tramite applicazioni collegate: si rinnova ${renewal}.`);
     }
+    case 503:
+      // The server says why in Italian (sources down, nothing written): pass it on, else a plain retry.
+      if (typeof body.detail === 'string') throw new ToolError(body.detail);
+      throw new ToolError('VisuaLex non è disponibile in questo momento: riprova tra poco.');
     case 409:
       // The data changed under the call (a dossier edited while the user confirmed): the server says what.
       {

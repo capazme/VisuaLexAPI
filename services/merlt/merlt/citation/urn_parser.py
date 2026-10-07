@@ -475,6 +475,7 @@ def format_italian_date(date_str: str) -> str:
 __all__ = [
     "ParsedURN",
     "parse_urn",
+    "cite_urn",
     "get_codice_abbreviation",
     "get_act_type_abbreviation",
     "format_italian_date",
@@ -483,3 +484,17 @@ __all__ = [
     "CODICE_FULL_NAMES",
     "ITALIAN_MONTHS",
 ]
+
+
+def cite_urn(urn: str) -> Optional[str]:
+    """The citation of the norm a URN names, in the owner's style (source convention,
+    ``merlt/utils/sources.py``): "art. 2043 c.c.", "art. 2, l. 7 agosto 1990, n. 241",
+    "reg. (UE) 2016/679" for an act; None when the URN names no norm the convention reads,
+    and the caller falls back to ``parse_urn``. The parser below this used to drop the
+    article of every code keyed with its annex ("R.D. 16 marzo 1942, n. 262")."""
+    from merlt.utils.sources import cite_act, cite_article, norm_from_urn
+
+    norm = norm_from_urn(urn)
+    if norm is None:
+        return None
+    return cite_article(norm) if norm.get("numero_articolo") else cite_act(norm)

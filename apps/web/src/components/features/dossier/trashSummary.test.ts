@@ -12,6 +12,13 @@ describe('trashItemsSummary', () => {
       { itemType: 'sentenza', citation: null, actCitation: null },
     ])).toBe(`${L247}: artt. 3, 25 · c.c.: art. 2043 · 1 nota · 1 sentenza`);
   });
+  it('names a decision by the server\'s citation, after the acts', () => {
+    expect(trashItemsSummary([
+      { itemType: 'sentenza', citation: 'Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310', actCitation: null },
+      norm('2043', 'c.c.', ' '),
+      { itemType: 'note', citation: null, actCitation: null },
+    ])).toBe('c.c.: art. 2043 · Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310 · 1 nota');
+  });
   it('keeps an annex with its article', () => {
     expect(trashItemsSummary([{ itemType: 'norm', citation: 'art. 1, d.lgs. 31 marzo 2023, n. 36 (Allegato I.1)', actCitation: 'd.lgs. 31 marzo 2023, n. 36' }]))
       .toBe('d.lgs. 31 marzo 2023, n. 36: art. 1 (Allegato I.1)');

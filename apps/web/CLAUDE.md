@@ -260,7 +260,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
   the notes first (`DossierNotesSection`), then one `DossierActBlock` per act in
-  the order the acts entered the dossier. An act's identity is a code's name
+  the order the acts entered the dossier, then «Giurisprudenza»
+  (`DossierDecisionsSection`, the decisions in stored order). An act's identity is a code's name
   (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
@@ -295,7 +296,18 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   which dossier to restore into — or emptied behind a danger confirmation; a
   restore reloads that dossier from the server (`refreshDossier`). The web never
   moves anything to the trash: its own deletions stay immediate, with an undo.
-  A decision in the trash has no label until the convention's server PR.
+  A decision in the trash is named by the server's citation.
+- **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
+  schema accepts and a label, never the text. They are added from the decision's page
+  («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
+  «Giurisprudenza» (`DossierDecisionsSection`: each citation links to the decision's page, and
+  each row can be removed). The stored `etichetta` is a copy (source convention, D9):
+  `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
+  sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
+  (`withDecisionLabel`), and every screen shows the recomputed one, never the copy.
+  `parseSentenzaContent` (dossierUtils) mirrors `apps/server/src/schemas/decisionItem.ts`:
+  change both together. Every switch over item types ends in `assertNever`, so a new type cannot
+  fall silently into "note".
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
@@ -314,8 +326,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   and defers the PUT while an item is still in `pendingDossierItemIds` (its
   `addItem` POST hasn't returned a server id yet), replaying it once settled.
   Legacy status values still hydrate and simply render as unstarred.
-- **Collection**: `AddToDossierPopover.tsx` is the only add-from-reading entry
-  point (from `ReadingToolbar` and `LooseArticleCard`). It lists recent dossiers,
+- **Collection**: `AddToDossierPopover.tsx` is the add-from-reading entry
+  point for articles (from `ReadingToolbar` and `LooseArticleCard`) and for
+  decisions (`DecisionPage`, with `sentenza`). It lists recent dossiers,
   guards duplicates, and its inline "Nuovo dossier" waits for the server id
   before adding — `createDossier()` returns `Promise<string | null>`.
   `DossierModal` is create-only.
@@ -355,6 +368,29 @@ Duplicating any of these is a defect, not a shortcut.
   `api.ts`'s single in-flight refresh) because the production ingress refuses those calls
   without one, and it returns fetch's own `Response`, so the NDJSON stream and the PDF
   work as before. `/version` and `/health` are the two that stay open.
+- `utils/decisionLinks.ts` — the addresses of court decisions (`decisionPath`,
+  `parseDecisionPath`, `decisionKey`) and their names (`formatDecisionHeading`,
+  `formatDecisionCitation`, and `formatDecisionShort` — «Cass. civ., sez. un., n.
+  31310/2024 · Rv. …», for chips and lists — both pinned to
+  `conventions/sources/golden.json`); `brocardiDecisionRef` reads the court a Brocardi
+  massima is headed with. Never write a decision's label inline. The paths
+  `/sentenze/<corte>/<numero>/<anno>` are a contract with LibreLex and the MERL-T graph: never
+  rename them (spec `docs/superpowers/specs/2026-10-01-sentenze-design.md`). Its first block is
+  shared with the Massimario panel (`linkableDecisionPath`); `httpsUrl` keeps a source link to
+  https only.
+- `services/decisionService.ts` — `fetchDecision(reference)`: `POST /fetch_decision` through
+  `legalFetch`. Only the route's six `esito` values are read as its answer: a quota refusal, or
+  any other body (the rate limit's, the login gate's, a framework page), is "fonte non
+  raggiungibile", and `errore_interno` a generic error; neither is ever "non trovata".
+- `utils/decisionText.ts` + `features/decisions/DecisionTextView.tsx` — a decision's text, one
+  span per line: the text nodes spell the received text minus `\n` (the same contract as
+  gotcha 23), labels and the space between lines come from CSS, and a copy is composed by
+  `decisionClipboardText` so it reads as the page does. An epigrafe without a motivazione is
+  labelled «Testo» (the owner's decision); a decision found without its text draws no block
+  (`hasDecisionText`).
+- `utils/returnTo.ts` — where the login sends the reader back: router state or the
+  sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
+  URL parameter; a logout forgets it.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
   `findLiveBackIndex` for citation-jump undo.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
@@ -375,8 +411,8 @@ Duplicating any of these is a defect, not a shortcut.
   `_expand_year`: "90" → 1990, "23" → 2023), `formatDateDashed` ("29-12-2007",
   the way Normattiva writes a day), `formatDateForCitation` ("1° ottobre 2026"),
   `withPreposition` (a preposition and the date it governs, elided before 8 and
-  11: "dall'11 giugno", "all'8 settembre"; the version banners, the citations and
-  the cards' "Edizione del …" go through it, and so does any new sentence that
+  11: "dall'11 giugno", "all'8 settembre"; the version banners and the citations
+  (`consultato il …`) go through it, and so does any new sentence that
   puts a spelled-out date after "il", "del", "dal", "al" or "nel"),
   `addDaysToIsoDate`, and `todayInRome` (the day the server compares a
   `version_date` with; the browser's own day can differ).
@@ -392,7 +428,10 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/citation.ts` — `formatNormCitation` (null when there is nothing honest
   to cite: the text in force with no day, an act of the Union, an article that did
   not exist, a version that does not contain the day, a repealed article with no
-  repeal day stated) and `withCitation`; the wording is the golden file's.
+  repeal day stated; its head is `citeNorm`), `unversionedCitation` (what a copy
+  starts with when no version is cited: the text in force's, never on a past text)
+  and `withCitation(text, citation, inForce)`, which puts the citation first — the
+  version's, else `inForce` (`unversionedCitation`); the wording is the golden file's.
 - `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
   then number, "679/2016" the reverse, "2006/2004" number first), shared by
   the palette parser and the in-text matcher and mirrored by
@@ -410,9 +449,28 @@ Duplicating any of these is a defect, not a shortcut.
   vocabulary. An article the prose gives to an act no pattern can read
   ("art. 17 della legge 23 agosto 1988, n. 400") gets no link on the
   client rather than one to the act being read.
-- `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
-  (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
-  copyable citation string.
+- `utils/sources/` — how a norm is written, for each use (the source convention,
+  `docs/superpowers/specs/2026-10-04-source-convention-design.md`; pinned to
+  `conventions/sources/golden.json` by `sources/__tests__/golden.test.ts`):
+  `citeNorm` («art. 2, l. 7 agosto 1990, n. 241», «art. 2043 c.c.»), `shortNorm`
+  («art. 2 l. 241/1990»: tabs of an article, comparison, chips, quick norms),
+  `citeAct`, `shortAct` (workspace tabs), `actHeading` (a code's name, else the act
+  citation: card and block titles), `actSubtitle`, `inForceCitation` (what a copy
+  of the text in force starts with, D8), `labelFromParams` (the parsers'
+  previews), `normFromUrn` (a Normattiva URN or an ELI read back into a norm; the
+  preleggi are never the codice civile). `actTypes.ts` holds the tables; its
+  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and the golden test
+  fails when the two differ. Never write a norm's label inline: a new surface
+  picks one of these.
+- `utils/sources/normEntry.ts` — `rebuildNormEntry`: a norm from someone else (a shared
+  environment, a file, a share link) rebuilt from closed values — a known act type, fixed forms,
+  unknown keys dropped — or refused with an Italian reason. `validateImportedDossier` runs it on
+  every imported norm and counts what it leaves out. A copy of the server's, both pinned to
+  `conventions/sources/norm-entries.json`.
+- `utils/normaMeta.ts` — `formatNormaTitle(norma)` (the act heading) and
+  `formatNormaMeta(norma, articleCount?)`, the line under it: only
+  what the title does not say (a code's decree, an aliased code's name, «Estremi
+  non disponibili»), often empty.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
 - `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
   reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
@@ -665,9 +723,14 @@ meant to stay split; add new features as new files, not inside the shells:
     (`increment: 1`), never a read-modify-write PUT. Client pattern: bump locally
     for instant feedback, then fire-and-forget `service.use(id)`; the next
     `fetchUserData` is the source of truth.
-20. **SuggestionItem payloads are server-trusted** — the `take` handler trusts the
-    stored shape, so any rename must happen before storage. That is why the alias
-    Rename path is deferred; Replace and Skip cover the flows.
+20. **SuggestionItem payloads are server-trusted, except a dossier's entries** —
+    the `take` handler trusts the stored shape, so any rename must happen before
+    storage. That is why the alias Rename path is deferred; Replace and Skip cover
+    the flows. A dossier proposal is the exception: the server rebuilds each entry from
+    closed values when it is stored and when it is taken
+    (`apps/server/src/utils/suggestionEntries.ts`: a norm of a known act type, a decision
+    through the item schema) and, if any is not accepted, refuses the whole proposal with an
+    Italian 400 naming the entry and the field, and applies nothing.
 21. **`sourceSuggestionId` + `originalAuthorId` are the attribution contract** —
     never mutate or filter them out. If a row has an author, the UI shows the
     `AttributionChip`; a deleted author renders "@utente-rimosso" by design.

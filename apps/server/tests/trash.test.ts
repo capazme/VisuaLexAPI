@@ -309,5 +309,17 @@ describe('the trash', () => {
     expect(refused.body.quota).toBe('trash');
   });
 
-  it.skip('a sentenza entry round-trips unchanged (waits for Sentenze PR C to add the item type)', () => {});
+  it('a sentenza entry round-trips unchanged, listed by its type and its citation', async () => {
+    const sentenza = { corte: 'corte_costituzionale', numero: 1, anno: 2014, tipo: 'sentenza',
+      data_deposito: '2014-01-13', etichetta: 'Corte cost., sent. 13 gennaio 2014, n. 1', _dossierMeta: { important: true } };
+    const decisionId = await addItem(dossierId, { itemType: 'sentenza', title: 'x', content: sentenza });
+    const before = await prisma.dossierItem.findUniqueOrThrow({ where: { id: decisionId } });
+    const { bearer } = await connected(alice);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [decisionId] })).status).toBe(200);
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    expect(entry.items).toEqual([{ itemType: 'sentenza', citation: sentenza.etichetta, actCitation: null }]);
+    expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+    const after = await prisma.dossierItem.findUniqueOrThrow({ where: { id: decisionId } });
+    expect(after).toMatchObject({ itemType: 'sentenza', title: sentenza.etichetta, content: sentenza, createdAt: before.createdAt });
+  });
 });

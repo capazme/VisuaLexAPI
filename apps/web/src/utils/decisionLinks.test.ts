@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  brocardiDecisionRef,
   decisionKey,
   decisionPath,
   describeNotice,
   formatDecisionCitation,
   formatDecisionHeading,
+  formatDecisionShort,
   httpsUrl,
   linkableDecisionPath,
   notFoundMessage,
@@ -294,5 +296,49 @@ describe('httpsUrl', () => {
       .toBe('https://www.cortecostituzionale.it/scheda-pronuncia/2014/1');
     expect(httpsUrl('HTTPS://www.cortecostituzionale.it/scheda-pronuncia/2014/1'))
       .toBe('https://www.cortecostituzionale.it/scheda-pronuncia/2014/1');
+  });
+});
+
+// The golden file pins the decided short labels (utils/__tests__/sourcesGolden.test.ts); these are the
+// section codes the Massimario writes and the file does not list, as MERL-T's `decision_short` writes them.
+describe('formatDecisionShort', () => {
+  it('writes every section code as the courts print it', () => {
+    const at = (sezione: string) => formatDecisionShort({ corte: 'cassazione', archivio: 'civile', numero: 5, anno: 2020, sezione });
+    expect(at('T')).toBe('Cass. civ., sez. trib., n. 5/2020');
+    expect(at('6-1')).toBe('Cass. civ., sez. VI-1, n. 5/2020');
+    expect(at(' u. ')).toBe('Cass. civ., sez. un., n. 5/2020');
+    expect(at('F')).toBe('Cass. civ., sez. fer., n. 5/2020');
+  });
+
+  it('joins several massime', () => {
+    expect(formatDecisionShort({ corte: 'cassazione', archivio: 'penale', numero: 9, anno: 2021 }, ['1-01', '1-02']))
+      .toBe('Cass. pen., n. 9/2021 · Rv. 1-01, 1-02');
+    expect(formatDecisionShort({ corte: 'corte_costituzionale', numero: 71, anno: 2020 }, [])).toBe('Corte cost., n. 71/2020');
+  });
+});
+
+describe('brocardiDecisionRef', () => {
+  it('reads the courts Brocardi heads a massima with', () => {
+    expect(brocardiDecisionRef('Cass. civ.', '31191', '2025')).toEqual({ corte: 'cassazione', archivio: 'civile', numero: 31191, anno: 2025 });
+    expect(brocardiDecisionRef('Cass. pen', '12', '2023')).toEqual({ corte: 'cassazione', archivio: 'penale', numero: 12, anno: 2023 });
+    expect(brocardiDecisionRef('Cass. lav.', '7', '2019')).toEqual({ corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: 7, anno: 2019 });
+    expect(brocardiDecisionRef('Cass. sez. un.', '8', '2018')).toEqual({ corte: 'cassazione', sezione: 'U', numero: 8, anno: 2018 });
+    expect(brocardiDecisionRef('Corte cost.', '71', '2020')).toEqual({ corte: 'corte_costituzionale', numero: 71, anno: 2020 });
+    expect(brocardiDecisionRef('Corte Costituzionale', '71', '2020')?.corte).toBe('corte_costituzionale');
+  });
+
+  it('names no archive for a bare «Cass.», and is linked as a reference', () => {
+    const ref = brocardiDecisionRef('Cass', '2633', '1982');
+    expect(ref).toEqual({ corte: 'cassazione', numero: 2633, anno: 1982 });
+    expect(formatDecisionShort(ref!)).toBe('Cass., n. 2633/1982');
+    expect(linkableDecisionPath(ref!, new Date('2026-10-06'))).toBe('/sentenze/cassazione/2633/1982');
+  });
+
+  it('is null for another court or no number', () => {
+    for (const autorita of ['Cons. Stato', 'TAR Lazio', 'Trib.', 'CGUE', null]) {
+      expect(brocardiDecisionRef(autorita, '10', '2020')).toBeNull();
+    }
+    expect(brocardiDecisionRef('Cass. civ.', null, '2020')).toBeNull();
+    expect(brocardiDecisionRef('Cass. civ.', 'x', '2020')).toBeNull();
   });
 });

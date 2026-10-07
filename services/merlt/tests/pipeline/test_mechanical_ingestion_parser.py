@@ -67,7 +67,7 @@ def test_parses_frontmatter_into_article_level_properties():
     assert art1["properties"]["node_id"] == f"{_BASE_URN}~art1"
     assert art1["properties"]["rubrica"] == "(Libertà di opinione)."
     assert art1["properties"]["tipo_documento"] == "articolo"
-    assert art1["properties"]["estremi"] == "Art. 1 Legge 20 maggio 1970, n. 300"
+    assert art1["properties"]["estremi"] == "art. 1 l. 300/1970"  # the short label, read from the key
     assert art1["properties"]["vigenza"] == "vigente"
     assert art1["properties"]["titolo"] == "TITOLO I - Della libertà di opinione"
     assert "diritto, nei luoghi" in art1["properties"]["testo_vigente"]
@@ -92,7 +92,26 @@ def test_article_number_suffix_concatenated_in_urn_but_hyphenated_in_property():
     nodes = result["nodes"]
     art1bis = next(n for n in nodes if n["properties"]["numero_articolo"] == "1-bis")
     assert art1bis["properties"]["URN"] == f"{_BASE_URN}~art1bis"
-    assert art1bis["properties"]["estremi"] == "Art. 1-bis Legge 20 maggio 1970, n. 300"
+    assert art1bis["properties"]["estremi"] == "art. 1-bis l. 300/1970"
+
+
+def test_the_ninth_spelled_nonies_is_its_own_article():
+    """Normattiva prints the ninth «nonies» (art. 21-nonies l. 241/1990): a table that knew only
+    «novies» read "### Art. 21-nonies" as art. 21, with «nonies» left in its rubrica."""
+    md = """---
+tipo_documento: legge
+estremi: "Legge 7 agosto 1990, n. 241"
+urn: "urn:nir:stato:legge:1990-08-07;241"
+vigente: true
+---
+
+### Art. 21-nonies. — (Annullamento d'ufficio).
+
+Il provvedimento amministrativo illegittimo può essere annullato d'ufficio.
+"""
+    nodes = parse_italia_corpus_markdown(md)["nodes"]
+    article = next(n for n in nodes if n["properties"].get("numero_articolo") == "21-nonies")
+    assert article["properties"]["URN"].endswith("~art21nonies")
 
 
 def test_section_heading_switches_titolo_for_subsequent_articles():

@@ -84,6 +84,11 @@ describe('compareArticles', () => {
       .sort(compareArticles).map(articleLabel);
     expect(sorted).toEqual(['art. 2', 'art. 2-bis', 'art. 2 ter', 'art. 10', 'art. 25-ter', 'art. 25-terdecies', 'All. A, art. 1']);
   });
+
+  it('ranks the ninth by its value in either spelling (art. 21-nonies l. 241/1990)', () => {
+    const sorted = [nv('21-decies'), nv('21-nonies'), nv('21-octies')].sort(compareArticles).map((i) => articleLabel(i));
+    expect(sorted).toEqual(['art. 21-octies', 'art. 21-nonies', 'art. 21-decies']);
+  });
   it('reads a suffix written without a hyphen, and sub-numbers as numbers', () => {
     const sorted = [nv('2bis'), nv('2-bis.10'), nv('2'), nv('2-bis.2'), nv('2ter'), nv('270-bis.1')]
       .sort(compareArticles).map((x) => x.numero_articolo);
@@ -152,6 +157,29 @@ describe('actsSummary', () => {
   });
 });
 
+describe('decisions in the layout', () => {
+  const decision = (id: string, numero: number): DossierItem => ({
+    id, type: 'sentenza', addedAt: '2026-10-04',
+    data: { corte: 'corte_costituzionale', numero, anno: 2014, etichetta: `Corte cost. n. ${numero}/2014` },
+  });
+
+  it('puts each decision under «Giurisprudenza», in stored order, never among the notes or the acts', () => {
+    const { notes, acts, decisions } = layoutDossier([decision('s2', 2), art({ numero_articolo: '3' }, L247), note('a'), decision('s1', 1)]);
+    expect(decisions.map((i) => i.id)).toEqual(['s2', 's1']);
+    expect(notes.map((i) => i.id)).toEqual(['n-a']);
+    expect(acts).toHaveLength(1);
+  });
+
+  it('saves the decisions after the acts when the acts are dragged', () => {
+    const a = art({ numero_articolo: '3' }, L247);
+    const b = art({ numero_atto: '49', data: '2023-04-21', numero_articolo: '1' }, L49);
+    const s = decision('s', 1);
+    const c = note('y');
+    const layout = layoutDossier([s, a, c, b]);
+    expect(dossierItemOrder([s, a, c, b], layout, [layout.acts[1].key, layout.acts[0].key])).toEqual([c.id, b.id, a.id, s.id]);
+  });
+});
+
 describe('notes about an article', () => {
   it("sit with their article; one whose article is gone is a plain note", () => {
     const a = art({ numero_articolo: '3' }, L247);
@@ -163,5 +191,31 @@ describe('notes about an article', () => {
     expect(layout.notes.map((i) => i.id)).toEqual(['n-o', 'n-libera']);
     // A drag keeps every item, the attached note included.
     expect(dossierItemOrder([a, about, orphan, plain], layout, [layout.acts[0].key]).sort()).toEqual([a.id, 'n-a', 'n-libera', 'n-o'].sort());
+  });
+});
+
+describe('every kind of item at once', () => {
+  it('puts each item in exactly one place, and a drag names every item once', () => {
+    const a = art({ numero_articolo: '3' }, L247);
+    const about: DossierItem = { id: 'n-a', type: 'note', data: 'Sul dovere', addedAt: '', aboutItemId: a.id };
+    const plain = note('libera');
+    const s: DossierItem = {
+      id: 's', type: 'sentenza', addedAt: '',
+      data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'Corte cost. n. 1/2014' },
+    };
+    const items = [s, a, about, plain];
+    const layout = layoutDossier(items);
+    const placed = [
+      ...layout.notes.map((i) => i.id),
+      ...[...layout.attached.values()].flat().map((i) => i.id),
+      ...layout.acts.flatMap((act) => act.articles.map((i) => i.id)),
+      ...layout.decisions.map((i) => i.id),
+    ];
+    expect(placed.sort()).toEqual(items.map((i) => i.id).sort());
+    expect(layout.attached.get(a.id)?.map((i) => i.id)).toEqual(['n-a']);
+    expect(layout.decisions.map((i) => i.id)).toEqual(['s']);
+    const order = dossierItemOrder(items, layout, [layout.acts[0].key]);
+    expect(order).toHaveLength(items.length);
+    expect(new Set(order)).toEqual(new Set(items.map((i) => i.id)));
   });
 });

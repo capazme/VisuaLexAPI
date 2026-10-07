@@ -10,6 +10,7 @@
 # The upstreams come from the environment, so a module can move to another machine:
 #   SERVER_UPSTREAM     default server:3001
 #   SCRAPERS_UPSTREAM   default scrapers:5000
+#   APP_SUBNET, EDGE_SUBNET   the subnets a forwarded client address is kept from
 #
 # Only the paths below reach the Python API. Its own /history, /dossiers… and
 # circuit-breaker pages stay unrouted: it keeps a global, unauthenticated history
@@ -19,6 +20,15 @@
 {
 	admin off
 	auto_https off
+	servers {
+		# The client's address (X-Forwarded-For) is kept only when the connection comes from
+		# the stack's own subnets: the host's gateway addresses, where a proxy on the host
+		# (the overlay's) arrives through the loopback, and the stack's containers. From
+		# anyone else Caddy writes the address it sees. Docker may route a published port
+		# through either network of the ingress, so both are listed.
+		# Spec: docs/superpowers/specs/2026-10-05-mcp-production-design.md, section 5.
+		trusted_proxies static {$APP_SUBNET:172.29.240.0/24} {$EDGE_SUBNET:172.29.241.0/24}
+	}
 }
 
 :8080 {
@@ -47,6 +57,34 @@
 			max_size 10MB
 		}
 		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+
+	# The OAuth authorization server for MCP clients (apps/server): its metadata, and the
+	# endpoints where a client registers, asks for consent and gets its tokens. Not behind
+	# the login check: a client starts here before anyone has signed in. The consent page
+	# itself (/connect) is the app's, and frame-ancestors 'none' keeps it out of frames.
+	handle /oauth/* {
+		# Introspection answers only to the MCP server's credential, and the MCP calls the
+		# server from inside the stack: it has no reason to be reachable from the network.
+		# Every spelling the server would route there (a trailing slash, another case) is
+		# matched here too: Caddy's path matcher is case-insensitive on the cleaned path.
+		@introspect path /oauth/introspect /oauth/introspect/*
+		respond @introspect 404
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	handle /.well-known/oauth-authorization-server {
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	# Any other well-known name is not ours: a 404, never the app's page (a client probing
+	# /.well-known/openid-configuration would read HTML where it expects JSON).
+	handle /.well-known/* {
+		respond 404
 	}
 
 	# The scrapers. The list below is the one Vite proxies to port 5000 in development,

@@ -6,6 +6,8 @@ import { SafeHTML } from '../../../../utils/sanitize';
 import { cn } from '../../../../lib/utils';
 import { extractArticleRefs } from '../../../../utils/citationParser';
 import { getSelectionAnchor } from '../../../../utils/selectionOffset';
+import { unversionedCitation, withCitation } from '../../../../utils/citation';
+import { todayInRome } from '../../../../utils/dateUtils';
 import type { ArticleData, NormaVisitata, Highlight, Annotation, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
@@ -195,9 +197,9 @@ export function StudyModeContent({
   };
 
   // Handle copy from selection popup
+  // Study Mode opens only on the text in force: a copy starts with its citation (D8).
   const handleCopy = async (text: string) => {
-    const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}`;
-    await navigator.clipboard.writeText(text + citation);
+    await navigator.clipboard.writeText(withCitation(text, null, unversionedCitation(norma_data, todayInRome())));
   };
 
   return (

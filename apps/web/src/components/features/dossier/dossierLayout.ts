@@ -1,16 +1,18 @@
 import type { DossierItem, NormaVisitata } from '../../../types';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { requestIsHistorical, versionKey } from '../../../utils/versionDisplay';
-import { computeNormaGroups, type NormaGroup } from './dossierUtils';
+import { assertNever, computeNormaGroups, type NormaGroup } from './dossierUtils';
 
 /**
  * The dossier page as sections: notes first, then one block per act (its articles
- * beneath it), in the order the acts entered the dossier. Pure: the components
- * only render what this returns. Spec `2026-10-04-dossier-per-atto-design.md` §2.
+ * beneath it), in the order the acts entered the dossier, then the decisions in
+ * their stored order. Pure: the components only render what this returns. Spec
+ * `2026-10-04-dossier-per-atto-design.md` §2 and §7.
  */
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
+export type SentenzaItem = Extract<DossierItem, { type: 'sentenza' }>;
 
 export interface ActBlock {
   key: string;
@@ -26,10 +28,12 @@ export interface ActBlock {
 
 export interface DossierLayout {
   /** Free notes, and notes whose article is no longer in the dossier. */
-  notes: DossierItem[];
+  notes: NoteItem[];
   /** Article item id → the notes about it (MCP second round, `about_item_id`). */
   attached: Map<string, NoteItem[]>;
   acts: ActBlock[];
+  /** «Giurisprudenza»: every `sentenza` item, in stored order, never among the notes. */
+  decisions: SentenzaItem[];
 }
 
 // Acts cited by their own name, and their heading. Keys are `tipo_atto` in lower
@@ -73,7 +77,7 @@ export function actKeyOf(norma: { tipo_atto: string; numero_atto?: string; data?
 // Ordinal suffixes by value (2 = bis … 20 = vicies), with the variant spellings
 // of `utils/articleSuffixes.ts`.
 const ORDINALS: Record<string, number> = {
-  bis: 2, ter: 3, quater: 4, quinquies: 5, sexies: 6, septies: 7, octies: 8, novies: 9, decies: 10,
+  bis: 2, ter: 3, quater: 4, quinquies: 5, sexies: 6, septies: 7, octies: 8, novies: 9, nonies: 9, decies: 10,
   undecies: 11, duodecies: 12, terdecies: 13, quaterdecies: 14, quinquiesdecies: 15, quindecies: 15,
   sexiesdecies: 16, sexdecies: 16, septiesdecies: 17, octiesdecies: 18, duodevicies: 18,
   noviesdecies: 19, undevicies: 19, vicies: 20, vices: 20,
@@ -135,20 +139,34 @@ function fallbackHeading(norma: NormaVisitata): string {
 }
 
 export function layoutDossier(items: DossierItem[]): DossierLayout {
-  const notes: DossierItem[] = [];
+  const notes: NoteItem[] = [];
   const attached = new Map<string, NoteItem[]>();
+  const decisions: SentenzaItem[] = [];
   const byKey = new Map<string, NormaItem[]>();
   const articleIds = new Set(items.filter((i) => i.type === 'norma').map((i) => i.id));
   for (const item of items) {
-    if (item.type === 'norma') {
-      const key = actKeyOf(item.data);
-      const list = byKey.get(key);
-      if (list) list.push(item); else byKey.set(key, [item]);
-    } else if (item.aboutItemId && articleIds.has(item.aboutItemId)) {
-      const list = attached.get(item.aboutItemId);
-      if (list) list.push(item); else attached.set(item.aboutItemId, [item]);
-    } else {
-      notes.push(item);
+    switch (item.type) {
+      case 'norma': {
+        const key = actKeyOf(item.data);
+        const list = byKey.get(key);
+        if (list) list.push(item); else byKey.set(key, [item]);
+        break;
+      }
+      case 'sentenza':
+        decisions.push(item);
+        break;
+      case 'note': {
+        // A note about an article still in the dossier sits with it; otherwise it is a free note.
+        if (item.aboutItemId && articleIds.has(item.aboutItemId)) {
+          const list = attached.get(item.aboutItemId);
+          if (list) list.push(item); else attached.set(item.aboutItemId, [item]);
+        } else {
+          notes.push(item);
+        }
+        break;
+      }
+      default:
+        assertNever(item);
     }
   }
   const acts = Array.from(byKey.entries()).map(([key, articles]): ActBlock => {
@@ -164,20 +182,21 @@ export function layoutDossier(items: DossierItem[]): DossierLayout {
       groups: computeNormaGroups(sorted),
     };
   });
-  return { notes, attached, acts };
+  return { notes, attached, acts, decisions };
 }
 
 /**
  * The full item order a drag of the acts saves: notes as they are, then each
- * act's articles in display order, in the new order of the acts, then every
- * other item in its stored order — the order sent to the server must name every
- * item of the dossier.
+ * act's articles in display order, in the new order of the acts, then the
+ * decisions as they are, then every other item in its stored order — the order
+ * sent to the server must name every item of the dossier.
  */
 export function dossierItemOrder(items: DossierItem[], layout: DossierLayout, actKeys: string[]): string[] {
   const blocks = new Map(layout.acts.map((a) => [a.key, a]));
   const ordered = [
     ...layout.notes.map((i) => i.id),
     ...actKeys.flatMap((key) => blocks.get(key)?.articles.map((i) => i.id) ?? []),
+    ...layout.decisions.map((i) => i.id),
   ];
   const placed = new Set(ordered);
   return [...ordered, ...items.filter((i) => !placed.has(i.id)).map((i) => i.id)];

@@ -44,7 +44,11 @@ export function ConnectPage() {
     let cancelled = false;
     connectionsService
       .getRequest(requestId)
-      .then((request) => !cancelled && setState({ status: 'ready', request }))
+      .then((request) => {
+        if (cancelled) return;
+        setAllowDelete(Boolean(request.deletion?.granted));
+        setState({ status: 'ready', request });
+      })
       .catch((error: unknown) => {
         if (cancelled) return;
         setState({ status: 'error', message: getErrorMessage(error) ?? 'Impossibile leggere la richiesta di collegamento.' });

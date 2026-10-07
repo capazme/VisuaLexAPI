@@ -36,6 +36,16 @@ describe('the permission to delete', () => {
     expect(shown.body.deletion.label).toMatch(/^Eliminare dossier, voci e schede/);
   });
 
+  it('tells the consent page when the connection already may delete, so a reconnect does not drop it unseen (final review)', async () => {
+    const first = await connect(alice, true);
+    const flow = await startAuthorization({ scope: 'dossier:read lingo:cards:read' });
+    await prisma.oAuthAuthorizationRequest.update({ where: { id: flow.requestId }, data: { clientId: first.clientId } });
+    const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
+    expect(shown.body.deletion.granted).toBe(true);
+    const fresh = await startAuthorization({ scope: 'dossier:read' });
+    expect((await request(app).get(`/api/oauth/requests/${fresh.requestId}`).set(authHeader(alice))).body.deletion.granted).toBe(false);
+  });
+
   it('approving without allowDelete grants no deletion, even if the client asked for it', async () => {
     const { grant, access } = await connect(alice);
     expect(grant.scopes).not.toContain(DELETE);
@@ -106,7 +116,7 @@ describe('the permission to delete', () => {
   it('a request for deletion alone asks for read and write too, since deleting needs them (M6)', async () => {
     const flow = await startAuthorization({ scope: 'content:delete' });
     const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
-    expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write']);
+    expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write']);
   });
 
   it("PATCH on another user's grant or a revoked one is a 404, and the body is strict", async () => {

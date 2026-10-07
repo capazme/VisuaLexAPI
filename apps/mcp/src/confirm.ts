@@ -24,6 +24,7 @@ const KIND_PLURALS: Record<string, [string, string]> = {
   norm: ['norma', 'norme'],
   note: ['nota', 'note'],
   section: ['sezione', 'sezioni'],
+  sentenza: ['sentenza', 'sentenze'],
 };
 
 /** «: 2 norme, 3 note» for the entries the dialog does not list one by one (they follow the model's order). */
@@ -69,12 +70,21 @@ export function deletionMessage(what: {
 }
 
 /**
- * Asks the user, through the client, to confirm (a form elicitation, spec §4.1).
- * The question travels on the tool call's own stream (`relatedRequestId`).
- * Only an explicit Accept with the box ticked confirms; Decline, Cancel, a
- * timeout, an unticked box or any error are all 'declined'. A client that did
- * not declare elicitation is 'unsupported' — never a fallback.
+ * The dialog for study cards (spec §6): a card's question and answer are text
+ * a model may have written, so a card is named only by what nobody writes —
+ * its subject, its state and the day it was made.
  */
+export function cardDeletionMessage(lines: string[]): string {
+  const total = lines.length;
+  const shown = lines.slice(0, MAX_LINES).map((line) => `- ${clean(line)}`);
+  if (lines.length > MAX_LINES) shown.push(`e altre ${lines.length - MAX_LINES}`);
+  return [
+    `ELIMINAZIONE — Spostare nel cestino ${total} ${total === 1 ? 'scheda LingoLex' : 'schede LingoLex'}?`,
+    ...shown,
+    `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di VisuaLex.`,
+  ].join('\n');
+}
+
 /**
  * Whether the client can show a form to the user. The SDK turns a bare
  * `elicitation: {}` (the 2025-06-18 way of saying "forms") into `{ form: {} }`
@@ -85,6 +95,13 @@ export function canAsk(server: McpServer): boolean {
   return elicitation?.form !== undefined;
 }
 
+/**
+ * Asks the user, through the client, to confirm (a form elicitation, spec §4.1).
+ * The question travels on the tool call's own stream (`relatedRequestId`).
+ * Only an explicit Accept with the box ticked confirms; Decline, Cancel, a
+ * Decline, Cancel and an unticked box are 'declined'; a timeout is 'timeout'; any other failure 'failed'. A client that did
+ * not declare elicitation is 'unsupported' — never a fallback.
+ */
 export async function confirmWithUser(
   server: McpServer,
   message: string,

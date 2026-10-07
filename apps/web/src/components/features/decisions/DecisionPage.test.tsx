@@ -5,6 +5,18 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 const fetchDecision = vi.fn();
 vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
 
+// The popover is the dossier's, tested there: here, what the page hands it.
+vi.mock('../dossier/AddToDossierPopover', () => ({
+  AddToDossierPopover: ({ isOpen, sentenza, onAdded }: {
+    isOpen: boolean; sentenza?: { etichetta: string }; onAdded: (id: string, title: string) => void;
+  }) => (isOpen ? (
+    <div data-testid="popover">
+      {sentenza?.etichetta}
+      <button onClick={() => onAdded('d1', 'Pratica')}>Scegli Pratica</button>
+    </div>
+  ) : null),
+}));
+
 import { DecisionPage } from './DecisionPage';
 
 // `data-state` is what the address carries in the history entry: nothing, for this page. A span,
@@ -92,6 +104,16 @@ describe('DecisionPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Copia citazione' }));
     expect(writeText).toHaveBeenCalledWith('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787');
     expect(await screen.findByText('Citazione copiata')).toBeInTheDocument();
+  });
+
+  it('adds the decision to a dossier from its page, labelled as lawyers cite it', async () => {
+    fetchDecision.mockResolvedValue(found);
+    renderAt('/sentenze/cassazione-penale/10787/2024');
+    expect(screen.queryByTestId('popover')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Aggiungi al dossier' }));
+    expect(screen.getByTestId('popover')).toHaveTextContent('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787');
+    fireEvent.click(screen.getByRole('button', { name: 'Scegli Pratica' }));
+    expect(await screen.findByText('Aggiunta a «Pratica»')).toBeInTheDocument();
   });
 
   it.each([

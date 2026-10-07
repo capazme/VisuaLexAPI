@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { formatNormCitation } from '../citation';
-import { decisionKey, formatDecisionCitation, linkableDecisionPath, type LooseDecisionRef } from '../decisionLinks';
+import { citeNorm } from '../sources';
+import { isEuropeanAct } from '../versionDisplay';
+import { decisionKey, formatDecisionCitation, formatDecisionShort, linkableDecisionPath, type LooseDecisionRef } from '../decisionLinks';
+import { formatRetrievedUrn } from '../../features/merlt/qa/format';
 import type { DecisionAttributes, DecisionIdentity } from '../../types/decisions';
 
 // The convention for legal sources (docs/superpowers/specs/2026-10-04-source-convention-design.md)
 // lives in one neutral file every suite reads. Until each area adopts it, this test keeps the
 // file honest: its shape, the citations the owner decided, the decision paths, keys and citations
-// the app builds.
+// the app builds. The labels of norms are checked in full by utils/sources/__tests__/golden.test.ts.
 
 function findGolden(from: string): string {
   for (let dir = from; ; dir = dirname(dir)) {
@@ -77,24 +80,19 @@ describe('the golden file of legal sources', () => {
   });
 
   describe('decided citations of norms are what citation.ts writes', () => {
-    // Decided by the owner on 4 October 2026 and not written by citation.ts yet: the web
-    // adoption PR (plan, PR 1) empties this list. A case listed here that starts passing
-    // fails too, so the list cannot go stale.
-    const PENDING_ADOPTION = new Set([
-      'l-184-1983-6-year-only', 'dpcm-2020-03-08-1', 'dm-55-2014-4', 'cpi-regolamento-1',
-      'lcost-1-2012-1', 'gdpr-5', 'nis2-21', 'tfue-101',
-    ]);
+    // A past text of an act of the Union is never cited by version (the server ignores the
+    // day): its citation is the convention's own (utils/sources), which a copy starts with.
     const decided = golden.norms.filter((c) => c.labels.citation?.status === 'decided');
     it('covers the cases the owner decided', () => expect(decided.length).toBeGreaterThan(10));
-    it('lists only decided cases as pending', () => {
-      for (const id of PENDING_ADOPTION) expect(decided.map((c) => c.id), id).toContain(id);
-    });
     for (const c of decided) {
-      if (PENDING_ADOPTION.has(c.id)) {
-        it(`${c.id} (pending adoption)`, () => expect(citationHead(c.input)).not.toBe(c.labels.citation.value));
-      } else {
-        it(c.id, () => expect(citationHead(c.input)).toBe(c.labels.citation.value));
-      }
+      it(c.id, () => {
+        if (isEuropeanAct(c.input.tipo_atto)) {
+          expect(citationHead(c.input)).toBeNull();
+          expect(citeNorm(c.input)).toBe(c.labels.citation.value);
+        } else {
+          expect(citationHead(c.input)).toBe(c.labels.citation.value);
+        }
+      });
     }
   });
 
@@ -155,6 +153,29 @@ describe('the golden file of legal sources', () => {
         it(`${c.id} (pending adoption)`, () => expect(formatDecisionCitation(identity, attributes)).not.toBe(c.labels.citation.value));
       } else {
         it(`${c.id}: the citation`, () => expect(formatDecisionCitation(identity, attributes)).toBe(c.labels.citation.value));
+      }
+    }
+  });
+
+  describe('decided short labels of decisions are what decisionLinks.ts writes', () => {
+    // The section, where the file gives it with the attributes, is the decision's own.
+    const refOf = (c: DecisionCase): LooseDecisionRef => ({
+      ...c.input.reference,
+      sezione: c.input.reference.sezione ?? (c.input.attributes.sezione as string | undefined) ?? null,
+    });
+    const shorts = golden.decisions.filter((c) => c.labels.short?.status === 'decided');
+    it('covers the cases the owner decided', () => expect(shorts.length).toBeGreaterThan(5));
+    for (const c of shorts) {
+      it(`${c.id}: the short label`, () => expect(formatDecisionShort(refOf(c))).toBe(c.labels.short.value));
+    }
+    for (const c of golden.decisions.filter((d) => d.labels.short_with_rv?.status === 'decided')) {
+      it(`${c.id}: the short label with the massime`, () =>
+        expect(formatDecisionShort(refOf(c), c.input.rv)).toBe(c.labels.short_with_rv.value));
+    }
+    // A legacy key (Brocardi's) names no section: the Q&A chip writes the short label of what it says.
+    for (const c of shorts.filter((d) => d.input.legacy_keys?.length && !refOf(d).sezione)) {
+      for (const legacy of c.input.legacy_keys ?? []) {
+        it(`${c.id}: ${legacy} in the Q&A chip`, () => expect(formatRetrievedUrn(legacy)).toBe(c.labels.short.value));
       }
     }
   });

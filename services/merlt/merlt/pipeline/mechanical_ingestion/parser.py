@@ -24,26 +24,15 @@ import structlog
 import yaml
 
 from merlt.clients import get_visualex_client
-# The abbreviation table lives in the graph's schema; these names stay for the
-# parser's callers and tests.
-from merlt.storage.graph.schema import CODE_ABBREVIATIONS as _CODE_ABBREVIATIONS  # noqa: F401
 from merlt.storage.graph.schema import Fonte, Provenance, text_fingerprint
-from merlt.storage.graph.schema import act_abbreviation as _code_abbreviation
+from merlt.utils.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+from merlt.utils.sources import authority, short_from_urn
 
 log = structlog.get_logger()
 
-_SUFFIX_WORDS = (
-    "bis",
-    "ter",
-    "quater",
-    "quinquies",
-    "sexies",
-    "septies",
-    "octies",
-    "novies",
-    "decies",
-)
-_SUFFIX_ALT = "|".join(_SUFFIX_WORDS)
+# The one ordinal table, longest first (a copy of the API's): this private list used to
+# stop at "decies", so "### Art. 25-terdecies" was read as no article at all.
+_SUFFIX_ALT = ARTICLE_SUFFIX_ALTERNATION
 
 # Separator between "Art. N" and the rubrica: em dash (U+2014), en dash
 # (U+2013), or a plain hyphen. The rubrica itself may or may not be
@@ -292,8 +281,9 @@ class VisualexTreeAdapter:
         base_urn = f"{act_base_url}:{allegato}" if allegato else act_base_url
 
         tipo_atto_reale = getattr(nv.norma, "tipo_atto_reale", None)
-        autorita_emanante = tipo_atto_reale.title() if tipo_atto_reale else None
-        abbrev = _code_abbreviation(act_type)
+        # The act's authority from its type (source convention §5.1): "Re" for a regio
+        # decreto, never the type itself ("Regio Decreto").
+        autorita_emanante = authority({"tipo_atto": act_type, "tipo_atto_reale": tipo_atto_reale})
 
         # 2. Full article list. `fetch_tree` is called on the BASE url (no
         # annex) — that's the page that carries the complete navigable tree
@@ -373,7 +363,8 @@ class VisualexTreeAdapter:
                 urn = _article_urn(base_urn, numero)
                 text = result.text
                 rubrica = _extract_rubrica(text)
-                estremi = f"Art. {numero} {abbrev}"
+                # The short label, read from the key (source convention): "art. 2043 c.c.".
+                estremi = short_from_urn(urn) or f"art. {numero}"
                 props: dict[str, Any] = {
                     "URN": urn,
                     "node_id": urn,
@@ -383,7 +374,6 @@ class VisualexTreeAdapter:
                     "numero_articolo": numero,
                     "rubrica": rubrica,
                     "testo_vigente": text,
-                    "titolo": estremi,
                     "fonte": Fonte.NORMATTIVA.value,
                     "vigenza": "vigente",
                     "stato": "vigente",
@@ -511,8 +501,9 @@ def parse_italia_corpus_markdown(md_text: str) -> dict[str, list]:
         and skipped rather than folded into an open article's `testo_vigente`.
         `### Art. N. — (rubrica).` (level-3 heading) starts a Norma node; the
         text until the next heading is `testo_vigente`. The node's
-        `estremi`/`tipo_documento` are ARTICLE-level ("Art. N <atto>" /
-        "articolo") to match the graph schema — see
+        `estremi`/`tipo_documento` are ARTICLE-level (the short label of the
+        source convention, "art. 1 l. 300/1970", read from the key / "articolo")
+        to match the graph schema — see
         `data/seeds/libro-iv-cc-graph.json` — not the act-level frontmatter
         values verbatim.
         Markdown links `[...](...urn...#art_N)` inside an article's body
@@ -543,7 +534,6 @@ def parse_italia_corpus_markdown(md_text: str) -> dict[str, list]:
             "in frontmatter) — refusing to emit degenerate `~artN` article URNs."
         )
 
-    act_estremi = meta.get("estremi")
     vigenza = "vigente" if meta.get("vigente", True) else "non vigente"
 
     nodes: list[dict[str, Any]] = []
@@ -601,9 +591,7 @@ def parse_italia_corpus_markdown(md_text: str) -> dict[str, list]:
                 "numero_articolo": numero,
                 "rubrica": f"({rubrica_raw})." if rubrica_raw else "",
                 "tipo_documento": "articolo",
-                "estremi": (
-                    f"Art. {numero} {act_estremi}".strip() if act_estremi else f"Art. {numero}"
-                ),
+                "estremi": short_from_urn(current_urn) or f"art. {numero}",
                 "vigenza": vigenza,
                 "fonte": "italia_corpus",
             }

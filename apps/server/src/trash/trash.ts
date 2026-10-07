@@ -1,7 +1,9 @@
 import { Prisma, type TrashKind } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { citeStoredAct, citeStoredNorm } from '../norms/citation';
+import { citeStoredAct } from '../norms/citation';
+import { citeStoredItem } from '../norms/decisionCitation';
+import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
@@ -45,7 +47,7 @@ const asJson = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.string
 
 const itemSummary = (item: { itemType: string; content: unknown }): ItemSummary => ({
   itemType: item.itemType,
-  citation: citeStoredNorm(item.itemType, item.content),
+  citation: citeStoredItem(item.itemType, item.content),
   actCitation: citeStoredAct(item.itemType, item.content),
 });
 
@@ -169,6 +171,51 @@ export async function trashDossierItems(
     if (deleted.count !== moved.length) throw new AppError(409, 'Il dossier è cambiato nel frattempo: riprova.');
     await tx.dossier.update({ where: { id: dossierId }, data: { updatedAt: now } });
     return { trashId: entry.id, moved, notFound: wanted.filter((id) => !moved.includes(id)) };
+  });
+}
+
+/**
+ * Moves the user's own cards to the trash, only in a personal state (draft,
+ * archived: owner's answer «28 sì»); a card the community has taken up is
+ * reported as not deletable and stays (D-045). Nothing movable: nothing written.
+ */
+export async function trashLingoCards(
+  userId: string,
+  cardIds: string[],
+  by: DeletedBy,
+): Promise<{ trashId?: string; moved: string[]; notFound: string[]; notDeletable: string[] }> {
+  await maybeSweep();
+  return prisma.$transaction(async (tx) => {
+    const wanted = [...new Set(cardIds)];
+    const cards = await tx.lingoCard.findMany({ where: { id: { in: wanted }, autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } });
+    const movable = cards.filter((card) => PERSONAL_STATES.includes(card.stato));
+    const moved = movable.map((card) => card.id);
+    const notFound = wanted.filter((id) => !cards.some((card) => card.id === id));
+    const notDeletable = cards.filter((card) => !PERSONAL_STATES.includes(card.stato)).map((card) => card.id);
+    if (movable.length === 0) return { moved, notFound, notDeletable };
+    const now = new Date();
+    const entry = await tx.trashEntry.create({
+      data: {
+        userId,
+        kind: 'LINGO_CARDS',
+        dossierId: null,
+        label: 'Schede LingoLex',
+        summary: asJson({
+          itemCount: movable.length,
+          cards: movable.map((card) => ({ istituto: card.istituto, domanda: card.domanda.length > 120 ? `${card.domanda.slice(0, 119)}…` : card.domanda })),
+        }),
+        payload: asJson({ cards: movable }),
+        clientId: by.clientId,
+        clientName: by.clientName,
+        grantId: by.grantId,
+        deletedAt: now,
+        expiresAt: expiry(now),
+      },
+    });
+    // Anchors cascade with their card; the state filter again, against a change since the read.
+    const deleted = await tx.lingoCard.deleteMany({ where: { id: { in: moved }, autoreId: userId, stato: { in: PERSONAL_STATES } } });
+    if (deleted.count !== moved.length) throw new AppError(409, 'Le schede sono cambiate nel frattempo: riprova.');
+    return { trashId: entry.id, moved, notFound, notDeletable };
   });
 }
 
@@ -310,7 +357,31 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
         return { dossierId: target.id };
       }
 
-      throw new AppError(409, 'Questo elemento del cestino non si può ancora ripristinare.');
+      if (entry.kind === 'LINGO_CARDS') {
+        const { cards } = entry.payload as unknown as {
+          cards: (Record<string, unknown> & { id: string; createdAt: string; ancore: (Record<string, unknown> & { id: string; ultimaVerifica: string })[] })[];
+        };
+        for (const card of cards) {
+          const { ancore, createdAt, updatedAt: _updatedAt, autoreId: _autoreId, ...fields } = card;
+          await tx.lingoCard.create({
+            data: {
+              ...(fields as unknown as Omit<Prisma.LingoCardUncheckedCreateInput, 'autoreId' | 'createdAt' | 'ancore'>),
+              autoreId: userId,
+              createdAt: new Date(createdAt),
+              ancore: {
+                create: ancore.map(({ cardId: _cardId, ultimaVerifica, ...anchor }) => ({
+                  ...(anchor as unknown as Omit<Prisma.LingoCardAncoraCreateWithoutCardInput, 'ultimaVerifica'>),
+                  ultimaVerifica: new Date(ultimaVerifica),
+                })),
+              },
+            },
+          });
+        }
+        await tx.trashEntry.delete({ where: { id: entry.id } });
+        return { dossierId: null };
+      }
+
+      throw new AppError(409, 'Questo elemento del cestino non si può ripristinare.');
     });
   } catch (error) {
     // An id taken again since the deletion (restored twice in a race, or re-created).

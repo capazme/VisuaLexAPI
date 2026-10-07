@@ -66,6 +66,7 @@ compose_files() {
   esac
   FILES="$FILES -f infra/compose.prod.yml"
   if [ "$(env_get infra/.env MERLT_ENABLED)" != false ]; then FILES="$FILES --profile merlt"; fi
+  if [ -n "$(env_get infra/.env MCP_PUBLIC_URL)" ]; then FILES="$FILES --profile mcp"; fi
 }
 # FILES is unquoted on purpose: paths relative to the checkout, no spaces.
 dc() { docker compose $FILES "$@"; }
@@ -76,6 +77,9 @@ if [ "$stop" = 1 ]; then
     exit 0
   fi
   compose_files
+  # Every profile, whatever the settings say now: a module a previous deploy started must stop too.
+  case "$FILES" in *"--profile merlt"*) ;; *) FILES="$FILES --profile merlt" ;; esac
+  case "$FILES" in *"--profile mcp"*) ;; *) FILES="$FILES --profile mcp" ;; esac
   dc stop
   say "stopped; the containers and the volumes stay. ./start.sh --prod starts them again."
   exit 0
@@ -89,6 +93,7 @@ say "$deploying"
 # 2. First run: the env files, with generated secrets; then they must be fit for production.
 sh scripts/prod/init-env.sh
 sh scripts/prod/preflight.sh env || exit 1
+sh scripts/prod/preflight.sh ports || exit 1
 compose_files
 if [ -n "$REMOTE_SCRAPERS" ]; then
   say "the scrapers run elsewhere ($REMOTE_SCRAPERS): compose.scrapers.yml is left out"
@@ -160,6 +165,12 @@ say ""
 say "  address   http://$bind:$port"
 if [ "$bind" = 127.0.0.1 ]; then
   say "            (this machine only: to reach it from another device set INGRESS_BIND and PUBLIC_ORIGIN in infra/.env, then run this again)"
+fi
+mcp_url="$(env_get infra/.env MCP_PUBLIC_URL)"
+if [ -n "$mcp_url" ]; then
+  mcp_port="$(env_get infra/.env MCP_PORT)"
+  say "  mcp       $mcp_url  (on this machine: http://127.0.0.1:${mcp_port:-8091}; publish it at that address with the host's HTTPS proxy)"
+  say "            claude mcp add --transport http visualex $mcp_url"
 fi
 if [ -n "$REMOTE_SCRAPERS" ]; then say "  scrapers  expected at $REMOTE_SCRAPERS (compose.scrapers.yml is not started here)"; fi
 say "  logs      docker compose $FILES logs -f"

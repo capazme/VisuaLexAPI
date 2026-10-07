@@ -43,8 +43,17 @@ def all_on_loopback(services):
     return all(ip == LOOPBACK for ips in published_hosts(services).values() for ip in ips)
 
 
+def postgres_has_start_margin(services):
+    # Compose renders durations as Go strings ("1m0s"); the first deploy needs a margin.
+    check(
+        (services["postgres"].get("healthcheck") or {}).get("start_period") == "1m0s",
+        "postgres has a 60-second start margin, so a first start on an empty volume is not unhealthy",
+    )
+
+
 def dev(cfg):
     services = cfg["services"]
+    postgres_has_start_margin(services)
     check(set(services) == STORES, "the base file alone is the four stores")
     check(set(cfg.get("networks", {})) == {"default"}, "and no network beyond the default one")
     check(all_on_loopback(services), "every published port is on the loopback")
@@ -58,6 +67,7 @@ def dev_merlt(cfg):
 
 def prod(cfg, lan_bind):
     services = cfg["services"]
+    postgres_has_start_margin(services)
     check(set(services) == STORES | MERLT | MODULES, "the production set is the stores, MERL-T and the four modules")
 
     hosts = published_hosts(services)
@@ -69,7 +79,8 @@ def prod(cfg, lan_bind):
         check(not beyond, "by default nothing is published beyond the loopback, the ingress included")
 
     check(networks(services, "ingress") == {"edge", "app"}, "ingress: edge and app")
-    check(networks(services, "server") == {"app", "data"}, "server: app and data")
+    check(networks(services, "server") == {"app", "data", "mcp"}, "server: app, data, and the MCP's network")
+    check("mcp" not in services, "without the mcp profile there is no MCP container")
     check(networks(services, "scrapers") == {"app"}, "scrapers: app and nothing else, so no store is reachable from them")
     check(networks(services, "migrate") == {"data"}, "migrate: data only")
     check(all(networks(services, s) == {"data"} for s in STORES), "every store: data only")
@@ -80,6 +91,13 @@ def prod(cfg, lan_bind):
 
     subnet = ((cfg["networks"]["app"].get("ipam") or {}).get("config") or [{}])[0].get("subnet")
     check(subnet == "172.29.240.0/24", "the app network has the fixed subnet the host firewall rule is keyed on")
+    edge = ((cfg["networks"]["edge"].get("ipam") or {}).get("config") or [{}])[0].get("subnet")
+    check(edge == "172.29.241.0/24", "the edge network has a fixed subnet: the ingress trusts it")
+    ingress_env = environment(services, "ingress")
+    check(
+        ingress_env.get("EDGE_SUBNET") == edge and ingress_env.get("APP_SUBNET") == subnet,
+        "and the ingress is told the same two subnets it keeps forwarded addresses from",
+    )
 
     check(
         all(services[s].get("restart") == "unless-stopped" for s in set(services) - {"migrate"}),
@@ -119,6 +137,8 @@ def prod(cfg, lan_bind):
         "the database has its three passwords set",
     )
     check(server["NODE_ENV"] == "production", "the server runs in production mode")
+    check(server["OAUTH_ISSUER"] == "http://localhost:8080", "the OAuth issuer is the public origin")
+    check(server["OAUTH_CONSENT_URL"] == "http://localhost:8080/connect", "and the consent page is on it")
     check(server["MERLT_API_URL"] == "http://merlt-api:8000", "the server reaches MERL-T by container name")
     check(server["LEGAL_API_URL"] == "http://scrapers:5000", "and the scrapers by container name")
     secrets = {
@@ -203,6 +223,51 @@ def scrapers_alone(cfg):
     check(not services["scrapers"].get("ports"), "publishing nothing until the machine that runs it decides to")
 
 
+def prod_mcp(cfg):
+    services = cfg["services"]
+    check("mcp" in services, "with the mcp profile the MCP module runs")
+    check(networks(services, "mcp") == {"mcp"}, "mcp: its own network, shared with the server only")
+    members = {name for name in services if "mcp" in networks(services, name)}
+    check(members == {"mcp", "server"}, "and nothing else is on it: no scraper, no MERL-T, no store")
+    ports = services["mcp"].get("ports") or []
+    check(
+        [(p.get("host_ip"), str(p.get("published")), p.get("target")) for p in ports] == [(LOOPBACK, "8091", 3002)],
+        "it is published on the loopback, port 8091, and nowhere else",
+    )
+    m = services["mcp"]
+    check(
+        m.get("cap_drop") == ["ALL"] and "no-new-privileges:true" in (m.get("security_opt") or []),
+        "it drops every capability and cannot gain privileges",
+    )
+    check(m.get("read_only") is True and "/tmp" in (m.get("tmpfs") or []), "its root filesystem is read-only, with a tmpfs")
+    check(m.get("restart") == "unless-stopped" and m.get("init") is True, "it restarts unless stopped, with an init")
+    check(bool((m.get("logging") or {}).get("options", {}).get("max-size")), "its log is rotated")
+    env = environment(services, "mcp")
+    server = environment(services, "server")
+    check(
+        env["MCP_RESOURCE"] == "https://vlx.example:8443/mcp" == server["OAUTH_MCP_RESOURCE"],
+        "the MCP and the server agree on the resource, from MCP_PUBLIC_URL",
+    )
+    check(env["MCP_AUTH_ISSUER"] == "https://vlx.example" == server["OAUTH_ISSUER"], "and on the issuer, from PUBLIC_ORIGIN")
+    check(
+        env["MCP_AUTH_URL"] == "http://server:3001" and env["MCP_API_BASE"] == "http://server:3001/api",
+        "it calls the server by container name",
+    )
+    check(env["MCP_API_AUDIENCE"] == "https://vlx.example/api", "and asks for the API audience the server issues")
+    check(
+        env["MCP_CLIENT_SECRET"] == server["OAUTH_MCP_CLIENT_SECRET"] != "",
+        "the credential is the same on both sides, from one place",
+    )
+    check(
+        env["MCP_HOST"] == "0.0.0.0" and env.get("MCP_ALLOWED_ORIGINS", "") == "",
+        "it listens in its container and admits no browser origin",
+    )
+    check(
+        (m.get("depends_on") or {}).get("server", {}).get("condition") == "service_healthy",
+        "it starts once the server is healthy",
+    )
+
+
 SCENARIOS = {
     "dev": dev,
     "dev-merlt": dev_merlt,
@@ -212,6 +277,7 @@ SCENARIOS = {
     "prod-merlt-off": prod_merlt_off,
     "no-scrapers": no_scrapers,
     "scrapers-alone": scrapers_alone,
+    "prod-mcp": prod_mcp,
 }
 
 if __name__ == "__main__":

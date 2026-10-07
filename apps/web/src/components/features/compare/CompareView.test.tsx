@@ -26,7 +26,7 @@ const normaBlock = (id: string, data: NormaVisitata) => ({
 // The selector is drawn once per side: the labels of one side are enough.
 // heading -> its header -> the panel
 const leftPanel = () => screen.getByText('Seleziona primo articolo').parentElement!.parentElement!;
-const pickerLabels = () => within(leftPanel()).getAllByText(/^Art\. 128\d - /).map((el) => el.textContent);
+const pickerLabels = () => within(leftPanel()).getAllByText(/^art\. 128\d c\.c\./).map((el) => el.textContent);
 
 beforeEach(() => {
   closeCompare();
@@ -50,9 +50,9 @@ describe('CompareView — the articles it lists from the open tabs', () => {
     });
     render(<CompareView />);
     expect(pickerLabels()).toEqual([
-      'Art. 1284 - codice civile n. 262',
-      'Art. 1284 - codice civile n. 262 — testo al 29/12/2007',
-      'Art. 1284 - codice civile n. 262 — testo originale',
+      'art. 1284 c.c.',
+      'art. 1284 c.c. — testo al 29/12/2007',
+      'art. 1284 c.c. — testo originale',
     ]);
   });
 
@@ -68,9 +68,9 @@ describe('CompareView — the articles it lists from the open tabs', () => {
     });
     render(<CompareView />);
     expect(pickerLabels()).toEqual([
-      'Art. 1284 - codice civile n. 262 — testo al 29/12/2007',
-      'Art. 1284 - codice civile n. 262 — testo al 29/12/2007',
-      'Art. 1285 - codice civile n. 262',
+      'art. 1284 c.c. — testo al 29/12/2007',
+      'art. 1284 c.c. — testo al 29/12/2007',
+      'art. 1285 c.c.',
     ]);
   });
 });

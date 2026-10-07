@@ -3,6 +3,8 @@ import { Prisma, EnvironmentCategory, ReportReason } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
+import { dossierItemFromEntry, rebuildDossierPayload, type EntryItem } from '../utils/suggestionEntries';
+import { rebuildEnvironmentDossiers } from '../utils/environmentDossiers';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -53,6 +55,20 @@ const createSuggestionSchema = z.object({
 const addSuggestionItemsSchema = z.object({
   items: z.array(suggestionItemSchema).min(1).max(MAX_ITEMS_PER_SUGGESTION),
 });
+
+/**
+ * The items of a proposal as they are stored: a dossier's entries rebuilt from closed values
+ * (`rebuildDossierPayload`), so a proposer's free text never reaches a citation its owner reads;
+ * a refused entry refuses the proposal with the entry, the field and why.
+ */
+function storableSuggestionItems(items: z.infer<typeof suggestionItemSchema>[]) {
+  return items.map((i) => {
+    if (i.itemType !== 'dossier') return { itemType: i.itemType, payload: i.payload as Prisma.InputJsonValue };
+    const rebuilt = rebuildDossierPayload(i.payload);
+    if (!rebuilt.ok) throw new AppError(400, `${rebuilt.reason}: la proposta non può essere salvata`);
+    return { itemType: i.itemType, payload: rebuilt.payload };
+  });
+}
 
 const declineItemSchema = z.object({
   reviewNote: z.string().max(500).optional(),
@@ -310,6 +326,7 @@ export const getSharedEnvironmentDetail = async (req: Request, res: Response) =>
  */
 export const publishEnvironment = async (req: Request, res: Response) => {
   const data = publishEnvironmentSchema.parse(req.body);
+  data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'pubblicato');
 
   // Check daily limit
   const today = new Date();
@@ -806,6 +823,7 @@ export const republishEnvironment = async (req: Request, res: Response) => {
 export const updateEnvironmentWithVersion = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = updateWithVersionSchema.parse(req.body);
+  if (data.content) data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'aggiornato');
 
   // Check ownership
   const existing = await prisma.sharedEnvironment.findFirst({
@@ -947,16 +965,15 @@ export const createSuggestion = async (req: Request, res: Response) => {
     throw new AppError(400, 'Suggestion payload exceeds maximum size (512KB)');
   }
 
+  const items = storableSuggestionItems(data.items);
+
   const suggestion = await prisma.environmentSuggestion.create({
     data: {
       sharedEnvironmentId: id,
       suggesterId: req.user!.id,
       message: data.message,
       items: {
-        create: data.items.map(i => ({
-          itemType: i.itemType,
-          payload: i.payload as object,
-        })),
+        create: items,
       },
     },
     include: {
@@ -1112,21 +1129,21 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
               },
             });
           case 'dossier': {
-            const entries = Array.isArray(payload.entries) ? payload.entries : [];
+            const entries: unknown[] = Array.isArray(payload.entries) ? payload.entries : [];
+            const items: EntryItem[] = [];
+            for (const [idx, e] of entries.entries()) {
+              const made = dossierItemFromEntry(e, idx);
+              // Nothing partial: the transaction rolls back and the item stays pending.
+              if (!made.ok) throw new AppError(400, `Voce ${idx + 1}: ${made.reason}: la proposta non è stata applicata`);
+              items.push(made.item);
+            }
             return tx.dossier.create({
               data: {
                 userId: req.user!.id,
                 name: payload.title,
                 description: payload.description,
                 ...attribution,
-                items: {
-                  create: entries.map((e: any, idx: number) => ({
-                    itemType: e.articleRef ? 'norm' : 'note',
-                    title: e.articleRef?.label ?? e.note?.slice(0, 60) ?? `Item ${idx + 1}`,
-                    content: e,
-                    position: idx,
-                  })),
-                },
+                items: { create: items },
               },
               include: { items: true },
             });
@@ -1281,11 +1298,7 @@ export const addSuggestionItems = async (req: Request, res: Response) => {
   }
 
   await prisma.suggestionItem.createMany({
-    data: data.items.map(i => ({
-      suggestionId,
-      itemType: i.itemType,
-      payload: i.payload as object,
-    })),
+    data: storableSuggestionItems(data.items).map((i) => ({ suggestionId, ...i })),
   });
 
   const refreshed = await prisma.environmentSuggestion.findUnique({
@@ -1362,11 +1375,16 @@ export const restoreVersion = async (req: Request, res: Response) => {
     // Create snapshot of current state before restoring
     await createVersionSnapshot(tx, id, env.content, 'Prima del ripristino');
 
-    // Restore the content
+    // Restore the content: an old version's norms are rebuilt like a publication's (a version
+    // stored before the check would otherwise put them back as they were).
+    const restored = version.content as { dossiers?: unknown } | null;
+    const content = restored && Array.isArray(restored.dossiers)
+      ? { ...restored, dossiers: rebuildEnvironmentDossiers(restored.dossiers, 'ripristinato') }
+      : restored;
     const updated = await tx.sharedEnvironment.update({
       where: { id },
       data: {
-        content: version.content as object,
+        content: content as object,
         currentVersion: env.currentVersion + 1,
       },
       include: {

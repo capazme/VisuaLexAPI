@@ -39,10 +39,20 @@ export interface Stub {
     }[];
   }[];
   introspectionDown?: boolean;
+  /** The user's study cards, as GET /api/lingo/cards answers them. */
+  cards: {
+    id: string;
+    materia: string;
+    stato: string;
+    istituto: string;
+    domanda: string;
+    createdAt: string;
+    ancore?: { normaKey: string; articleId: string; urn: string; isPrimary: boolean }[];
+  }[];
 }
 
 export async function startStubs() {
-  const stub: Stub = { tokens: {}, apiCalls: [], exchanges: [], dossiers: [] };
+  const stub: Stub = { tokens: {}, apiCalls: [], exchanges: [], dossiers: [], cards: [] };
   const as = express();
   as.use(express.urlencoded({ extended: false }));
   as.use(express.json());
@@ -78,6 +88,27 @@ export async function startStubs() {
     const norms = path.match(/^\/dossiers\/([^/]+)\/norms$/);
     if (req.method === 'POST' && norms) {
       return void res.json({ results: (req.body.references as string[]).map((reference) => ({ reference, outcome: 'added' })) });
+    }
+    if (req.method === 'POST' && path === '/lingo/cards') {
+      const results = (req.body.cards as { ancore: { riferimento: string }[] }[]).map((card, i) =>
+        card.ancore.some((a) => a.riferimento.includes('99999'))
+          ? { outcome: 'refused', detail: 'Un’ancora non è verificabile: la scheda non è stata creata.', anchors: [{ reference: 'art. 99999 c.c.', outcome: 'does_not_exist', detail: 'non esiste' }] }
+          : { outcome: 'created', id: `c-new-${i}` },
+      );
+      return void res.json({ results });
+    }
+    if (req.method === 'POST' && path === '/lingo/cards/trash') {
+      const ids = req.body.cardIds as string[];
+      const own = stub.cards.filter((c) => ids.includes(c.id));
+      const moved = own.filter((c) => c.stato === 'BOZZA_PERSONALE' || c.stato === 'ARCHIVIATA').map((c) => c.id);
+      stub.cards = stub.cards.filter((c) => !moved.includes(c.id));
+      return void res.json({ trashId: moved.length ? 'tc' : undefined, moved, notFound: ids.filter((id) => !own.some((c) => c.id === id)), notDeletable: own.filter((c) => !moved.includes(c.id)).map((c) => c.id) });
+    }
+    if (req.method === 'GET' && path === '/lingo/cards') return void res.json({ cards: stub.cards, nextOffset: null });
+    const card = path.match(/^\/lingo\/cards\/([^/]+)$/);
+    if (req.method === 'GET' && card) {
+      const found = stub.cards.find((c) => c.id === card[1]);
+      return void (found ? res.json(found) : res.status(404).json({ detail: 'Scheda non trovata.' }));
     }
     const trashItems = path.match(/^\/dossiers\/([^/]+)\/trash-items$/);
     if (req.method === 'POST' && trashItems) {
@@ -119,7 +150,9 @@ export async function startStubs() {
     host: '127.0.0.1',
     port: 0,
     resource: RESOURCE,
-    issuer: `http://127.0.0.1:${asPort}`,
+    // The public identity, never called: introspection and the exchange go to authUrl.
+    issuer: 'https://visualex.example',
+    authUrl: `http://127.0.0.1:${asPort}`,
     apiBase: `http://127.0.0.1:${asPort}/api`,
     apiAudience: `http://127.0.0.1:${asPort}/api`,
     clientId: 'mcp-omnilex',
@@ -129,7 +162,8 @@ export async function startStubs() {
   };
   const store = new SessionStore();
   const mcpServer: Server = await new Promise((resolve) => {
-    const s = createApp(config, { store }).listen(0, '127.0.0.1', () => resolve(s));
+    // The suites send hundreds of requests from one address: well above the per-address ceiling.
+    const s = createApp(config, { store, requestsPerMinute: 100_000 }).listen(0, '127.0.0.1', () => resolve(s));
   });
   const mcpUrl = `http://127.0.0.1:${(mcpServer.address() as AddressInfo).port}/mcp`;
   return {

@@ -22,7 +22,6 @@ Example:
 """
 
 from datetime import datetime
-from enum import Enum
 from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
@@ -33,12 +32,9 @@ from pydantic import BaseModel, Field
 # =============================================================================
 
 
-class CitationFormat(str, Enum):
-    """Supported citation export formats."""
-    ITALIAN_LEGAL = "italian_legal"
-    BIBTEX = "bibtex"
-    PLAIN_TEXT = "plain_text"
-    JSON = "json"
+# One enum for the API and the formatter (kept in merlt.citation: importing it from here ran
+# merlt.api from inside merlt.citation, a circular import).
+from merlt.citation.format_kinds import CitationFormat  # noqa: E402,F401
 
 
 # =============================================================================

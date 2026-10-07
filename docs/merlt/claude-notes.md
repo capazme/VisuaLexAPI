@@ -870,13 +870,15 @@ though that doc's header still says DRAFT.
   - `POST …/promote`, which answers 409 while conflicts are unresolved.
   - `POST …/reject`.
 - Each batch carries a conflict report: `urn_conflicts`, `node_updates` and
-  `node_new`.
+  `node_new`. Only a different `tipo_documento` is a conflict: `estremi` is a
+  label derived from the key (source convention), never one.
 - Status writes are conditional. A reject that races a promote gets 409
   `batch_status_changed_concurrently`, and the worker writes only while the
   batch is still `promoting`.
-- The parser (`pipeline/mechanical_ingestion/parser.py`) derives code
-  abbreviations from an explicit table, `_CODE_ABBREVIATIONS`, never from
-  initials. An unknown act keeps its name.
+- The parser (`pipeline/mechanical_ingestion/parser.py`) writes each article's
+  `estremi` as the source convention's short label, read from its key
+  (`merlt/utils/sources.short_from_urn`: «art. 2043 c.c.», «art. 1 l. 300/1970»),
+  never from initials; an article's `titolo` is never its extremes.
 - FE: `ops/ingestion/IngestionAdminPanel`, under the `/admin` tab
   "Ingestione".
 

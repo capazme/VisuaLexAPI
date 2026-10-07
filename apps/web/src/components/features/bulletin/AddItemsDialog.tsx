@@ -5,6 +5,7 @@ import { sharedEnvironmentService } from '../../../services/sharedEnvironmentSer
 import { useAppStore } from '../../../store/useAppStore';
 import type { Environment, SuggestionItemType } from '../../../types';
 import type { EnvironmentSelection } from '../../../utils/environmentUtils';
+import { dossierSuggestionPayload } from '../dossier/dossierUtils';
 
 interface AddItemsDialogProps {
   suggestionId: string;
@@ -54,13 +55,7 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
       }
       for (const id of selection.dossierIds) {
         const d = dossiers.find(x => x.id === id);
-        if (d) items.push({ itemType: 'dossier', payload: {
-          title: d.title, description: d.description, tags: d.tags ?? [],
-          entries: d.items.map(it => ({
-            articleRef: it.type === 'norma' ? it.data : undefined,
-            note: it.type === 'note' ? it.data : undefined, status: it.status,
-          })),
-        }});
+        if (d) items.push({ itemType: 'dossier', payload: dossierSuggestionPayload(d) });
       }
       for (const id of selection.quickNormIds) {
         const qn = quickNorms.find(x => x.id === id);

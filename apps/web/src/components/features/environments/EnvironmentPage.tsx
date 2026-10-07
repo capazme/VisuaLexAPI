@@ -14,6 +14,7 @@ import {
 import { exampleEnvironments } from '../../../data/exampleEnvironments';
 import { useTour } from '../../../hooks/useTour';
 import { Toast } from '../../ui/Toast';
+import { importCounts, importReasonsText, importToastType } from '../dossier/dossierUtils';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EnvironmentCard } from './EnvironmentCard';
@@ -53,13 +54,13 @@ export function EnvironmentPage() {
   const [editingEnv, setEditingEnv] = useState<Environment | null>(null);
   const [detailEnv, setDetailEnv] = useState<Environment | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
   const [isLoadingExamples, setIsLoadingExamples] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { tryStartTour } = useTour();
 
-  const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = (text: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
     setToastMessage({ text, type });
   };
 
@@ -154,9 +155,12 @@ export function EnvironmentPage() {
     const snapshot = importingEnv;
     setImportingEnv(null);
     try {
-      await importEnvironmentPartial(snapshot, selection, mode);
+      const { imported, lost, reasons } = await importEnvironmentPartial(snapshot, selection, mode);
       const modeText = mode === 'merge' ? 'unito' : 'importato';
-      showToast(`Ambiente "${snapshot.name}" ${modeText} con successo`, 'success');
+      showToast(
+        lost === 0 ? `Ambiente "${snapshot.name}" ${modeText} con successo` : `Ambiente "${snapshot.name}" ${modeText} in parte: ${importCounts(imported, lost)}${importReasonsText(reasons)}`,
+        importToastType(imported, lost),
+      );
     } catch (err) {
       console.error('importEnvironmentPartial failed:', err);
       showToast(`Errore durante l'import di "${snapshot.name}"`, 'error');
@@ -179,9 +183,12 @@ export function EnvironmentPage() {
 
   const runApply = async (env: Environment, mode: 'replace' | 'merge') => {
     try {
-      await applyEnvironment(env.id, mode);
+      const { imported, lost, reasons } = await applyEnvironment(env.id, mode);
       const modeText = mode === 'merge' ? 'unito' : 'applicato';
-      showToast(`Ambiente "${env.name}" ${modeText} con successo`, 'success');
+      showToast(
+        lost === 0 ? `Ambiente "${env.name}" ${modeText} con successo` : `Ambiente "${env.name}" ${modeText} in parte: ${importCounts(imported, lost)}${importReasonsText(reasons)}`,
+        importToastType(imported, lost),
+      );
     } catch (err) {
       console.error('applyEnvironment failed:', err);
       showToast(`Errore durante l'applicazione di "${env.name}"`, 'error');

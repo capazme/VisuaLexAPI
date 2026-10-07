@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCitation } from './normaMeta';
-import { formatNormCitation, withCitation } from './citation';
+import { formatNormCitation, unversionedCitation, withCitation } from './citation';
 import { CITATION_GOLDEN } from './__fixtures__/citationGolden';
 
 describe('formatNormCitation — the golden file', () => {
@@ -58,12 +57,30 @@ describe('withCitation', () => {
   const citation = { short: 'S', long: 'art. 1284 c.c., nel testo in vigore al 29 dicembre 2007 (Normattiva)' };
 
   it('puts the citation of a past text first, so the quotation cannot travel without its version', () => {
-    expect(withCitation('Il testo.', citation, '\n\n---\nTratto da: x')).toBe(`${citation.long}\n\nIl testo.`);
+    expect(withCitation('Il testo.', citation, 'x')).toBe(`${citation.long}\n\nIl testo.`);
   });
 
-  it('keeps the trailer the text in force always had, byte for byte', () => {
-    const norma = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043', allegato: '2' };
-    expect(withCitation('Il testo.', null, `\n\n---\nTratto da: ${formatCitation(norma)}`))
-      .toBe('Il testo.\n\n---\nTratto da: codice civile n. 262 del 1942-03-16, Art. 2043 (Allegato 2)');
+  it('starts the text in force with its citation too (D8)', () => {
+    const inForce = 'art. 2043 c.c. (Normattiva, testo vigente, consultato il 5 ottobre 2026)';
+    expect(withCitation('Il testo.', null, inForce)).toBe(`${inForce}\n\nIl testo.`);
+  });
+});
+
+describe('unversionedCitation', () => {
+  const norma = { tipo_atto: 'codice civile', numero_articolo: '1284' };
+
+  it('cites the text in force with its source and the day (D8)', () => {
+    expect(unversionedCitation({ ...norma, versione: 'vigente', data_versione: '' }, '2026-10-05'))
+      .toBe('art. 1284 c.c. (Normattiva, testo vigente, consultato il 5 ottobre 2026)');
+  });
+
+  it('never calls a past text «testo vigente»', () => {
+    expect(unversionedCitation({ ...norma, versione: 'vigente', data_versione: '2005-06-01' }, '2026-10-05')).toBe('art. 1284 c.c.');
+    expect(unversionedCitation({ ...norma, versione: 'originale', data_versione: '' }, '2026-10-05')).toBe('art. 1284 c.c.');
+  });
+
+  it('cites an act of the Union as its text in force: the server ignores the day', () => {
+    expect(unversionedCitation({ tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', numero_articolo: '5', versione: 'vigente', data_versione: '2007-10-12' }, '2026-10-05'))
+      .toBe('art. 5, reg. (UE) 2016/679 (EUR-Lex, testo vigente, consultato il 5 ottobre 2026)');
   });
 });

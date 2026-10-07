@@ -35,6 +35,7 @@ from dataclasses import dataclass
 
 from merlt.citation.formats.base import BaseFormat
 from merlt.citation.urn_parser import (
+    cite_urn,
     ParsedURN,
     parse_urn,
     format_italian_date,
@@ -93,8 +94,7 @@ class ItalianLegalFormat(BaseFormat):
 
         # Parse and format the URN
         if urn:
-            parsed = parse_urn(urn)
-            text = self._format_parsed_urn(parsed)
+            text = cite_urn(urn) or self._format_parsed_urn(parse_urn(urn))
         else:
             # Fallback: use title or raw text
             text = source.get("title", source.get("text", str(source)))

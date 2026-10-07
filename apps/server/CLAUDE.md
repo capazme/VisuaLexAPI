@@ -87,7 +87,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and the counter it spent. Then it sets `req.user` and `req.delegation`, and `authenticate` lets
   the request through; nothing else sets `req.delegation`. **Adding a route to
   the table is a security decision**: every entry is reachable by any MCP
-  client the user connected, and none may update, move or delete.
+  client the user connected. None updates or moves, and none deletes for
+  good: the three trash routes (below) move rows to a trash only the user's
+  session restores or empties.
   `GET /api/oauth/quota` reports what is left (`{ points, counters }`).
 - **Provenance and notes** (MCP second round; spec
   `docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` §5). Dossiers
@@ -106,6 +108,38 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   session only, the route is not in the delegated table): the web app's undo
   restores an article with a new id and points its notes at it.
   `assertArticleOfDossier` is the one check behind both routes.
+- **Decisions in a dossier**: an item may be `sentenza`: a court decision's
+  identity and a label, never its text. Its content is checked by
+  `schemas/decisionItem.ts` (unknown keys refused) when an item is added and
+  when a decision's content is updated; it must stay aligned with the web's
+  `parseSentenzaContent`, so change both together. The item's `title` follows
+  `etichetta`, a copy of the decision's citation that every write recomputes on the
+  server from the identity and the attributes (`withDecisionLabel`, source convention D9),
+  whatever the client sent; reading writes nothing. A Forum proposal of a dossier is someone else's data, and its entries end up
+  cited to the owner (the web, the MCP reads and deletion dialog): every entry is rebuilt
+  from closed values when the proposal is stored and again when it is taken
+  (`utils/suggestionEntries.ts`) — a norm through `schemas/normEntry.ts` (an act type the
+  convention's tables know; an article's suffix one of the printed ordinals, an annex a number,
+  a Roman numeral or a letter, fixed forms for number, date and version; the
+  sources' addresses kept only when they are Normattiva's or EUR-Lex's; unknown keys dropped),
+  a decision through the item schema with its label recomputed. One refused entry refuses the
+  proposal whole, with an Italian 400 naming the entry, the field and why; nothing applied.
+- **Deleting through a connected application, and the trash** (second-round
+  spec §4.2–4.3). Scope `content:delete`: the consent page offers it apart and
+  unticked, `PATCH /api/oauth/grants/:id {canDelete}` switches it, and
+  introspection, the exchange and `delegatedAuth` read it **live from the
+  grant** (`effectiveScopes`), so switching it off stops a token exchanged
+  before; a deletion route also needs the read scope of what it deletes
+  (`readScope` in the delegated table). `trash/trash.ts` copies the rows into
+  `trash_entries` and deletes them in one transaction, the dossier row locked
+  (`FOR UPDATE`): `POST /dossiers/:id/trash {itemIds}` (the entries the user
+  saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
+  `/lingo/cards/trash` — exchanged tokens only, never the web app, whose own
+  deletions stay immediate. `GET /api/trash`, `POST /api/trash/:id/restore
+  {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
+  Restore brings every column back with the original ids; entries 30 days,
+  then swept (awaited, at most every ten minutes). No route reachable by an
+  exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
   norm as the reader stores it), then existence once per act: the
@@ -118,17 +152,24 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   ones in one transaction, after the dossier's last item. Each resolved
   reference's `display` is its citation (below), never Python's own label
   («Art. 3 — legge» named no act).
-- **`norms/citation.ts`** — `citeArticle`, how a lawyer cites an article in the
-  owner's style: «art. 3, l. 31 dicembre 2012, n. 247», «art. 1284 c.c.», «art. 81
-  Cost.». Dossier items carry it as `citation` (null for anything but a norm) in
-  `GET /dossiers`, `GET /dossiers/:id` and the answer of `POST /dossiers/:id/items`, and the MCP tools pass it on. `citeAct`
-  is the act alone («l. 31 dicembre 2012, n. 247», «c.c.»), without the article
-  or the annex, carried as `act_citation` for a reader that names each act once
-  above its articles; `citeArticle` is built on it, so the two cannot drift. It is a
-  second implementation of the web app's `utils/citation.ts`, pinned to the web's
-  golden file: `tests/norms/citation.test.ts` imports
-  `apps/web/src/utils/__fixtures__/citationGolden.ts` and fails when the two
-  disagree. Change the wording in both.
+- **`norms/citation.ts`** and **`norms/decisionCitation.ts`** — how the server names a
+  source, in the source convention (spec
+  `docs/superpowers/specs/2026-10-04-source-convention-design.md`, decided by the owner):
+  `citeArticle` («art. 3, l. 31 dicembre 2012, n. 247», «art. 1284 c.c.», «art. 5, reg. (UE)
+  2016/679», «art. 6, l. n. 184 del 1983»), `shortNorm` («art. 3 l. 247/2012»), `citeAct` (the
+  act alone, without the article or the annex, carried as `act_citation` for a reader that
+  names each act once above its articles; `citeArticle` is built on the same code, so the two
+  cannot drift), `citeDecision` («Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310») and
+  `shortDecision`. Dossier items carry `citeStoredItem` as `citation` — a norm's or a
+  decision's, null for anything else — in every dossier answer and in the trash's list, and the
+  MCP tools pass it on. The tables (`norms/actTypes.ts`) are a copy of the web app's
+  `utils/sources/actTypes.ts`; the web app, the API and MERL-T write the same words with their
+  own code. `tests/norms/sourcesGolden.test.ts` pins this copy to
+  `conventions/sources/golden.json` and the codes table to the API's `map.py`: change the
+  wording in the golden file and every copy together. A stored decision is cited only from the
+  values the item schema admits, because the citation reaches the MCP confirmation dialog.
+  The saved-norm notifications name the norm by its citation (`changeMessage`), the stored key
+  only when the snapshot names no article.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore
@@ -136,6 +177,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
+- **Published environments** carry dossiers; their norms are rebuilt from closed values when
+  an environment is published or its content updated (`utils/environmentDossiers.ts`, through
+  `schemas/normEntry.ts`), and one that cannot be rebuilt refuses the publication with an
+  Italian 400 naming the dossier, the entry and why: whoever applies the environment has those
+  norms cited to them, in the MCP deletion dialog too. The web rebuilds them again on import.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
@@ -227,7 +273,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   No learning steps in minutes. Every exported function refuses what is not a
   finite number in range with a `RangeError`, including a custom set of weights
   that overflows: a NaN must never reach a stored row.
-- **LingoLex cards** (data layer only; no route writes them yet): `LingoCard` and
+- **LingoLex card routes** (`routes/lingoCards.ts`, `/api/lingo/cards`; second-round
+  spec §6): `POST` (1–10 cards, at most 20 distinct anchor references a call,
+  anchors given in words and resolved by `lingo/anchors.ts` — the official
+  `urn:nir:…` as identity, `normaKey`/`articleId` derived in one place, the AKN
+  fingerprint from the part matched to the annex by article numbers, refused
+  when ambiguous; a card with an unverifiable anchor is refused, the others
+  created; always the author's draft), `GET /` and `GET /:id` (own cards only),
+  `POST /trash` (personal states only, `PERSONAL_STATES`). Scopes
+  `lingo:cards:read` / `lingo:cards:write`; two points per reference, one of
+  the day's hundred per card.
+- **LingoLex cards** (data layer): `LingoCard` and
   `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
   is the strict contract: one to ten anchors, a lower-case SHA-256 fingerprint,
   at most one primary, and the caller cannot set state, score, author or id.

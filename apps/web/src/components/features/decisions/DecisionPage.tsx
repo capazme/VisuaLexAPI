@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Copy, ExternalLink, Gavel, RotateCw } from 'lucide-react';
+import { AlertCircle, Copy, ExternalLink, FolderPlus, Gavel, RotateCw } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { SkeletonText } from '../../ui/Skeleton';
 import { Toast, type ToastProps } from '../../ui/Toast';
@@ -17,6 +17,8 @@ import {
   parseDecisionPath,
 } from '../../../utils/decisionLinks';
 import { hasDecisionText } from '../../../utils/decisionText';
+import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
+import { sentenzaFromDecision } from '../dossier/dossierUtils';
 import { DecisionLookupForm } from './DecisionLookupForm';
 import { DecisionTextView } from './DecisionTextView';
 
@@ -44,10 +46,13 @@ function Alert({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FoundView({ answer, onCopy }: { answer: FoundDecision; onCopy: () => void }) {
+type ShowToast = (message: string, type: ToastProps['type']) => void;
+
+function FoundView({ answer, onCopy, onToast }: { answer: FoundDecision; onCopy: () => void; onToast: ShowToast }) {
   // The source's own page, only ever over https: the address comes from our server, built on fixed
   // bases, so this is defence in depth.
   const sourceUrl = httpsUrl(answer.fonte.url);
+  const [dossierAnchor, setDossierAnchor] = useState<HTMLElement | null>(null);
   return (
     <article className="space-y-5">
       <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
@@ -59,6 +64,15 @@ function FoundView({ answer, onCopy }: { answer: FoundDecision; onCopy: () => vo
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" icon={<Copy size={16} />} className={TOUCH_TARGET_RESPONSIVE} onClick={onCopy}>
           Copia citazione
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<FolderPlus size={16} />}
+          className={TOUCH_TARGET_RESPONSIVE}
+          onClick={(e) => setDossierAnchor(e.currentTarget)}
+        >
+          Aggiungi al dossier
         </Button>
         {sourceUrl && (
           <a
@@ -78,6 +92,16 @@ function FoundView({ answer, onCopy }: { answer: FoundDecision; onCopy: () => vo
       <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         Fonte: {answer.fonte.nome}
       </footer>
+      {/* The item keeps the identity and the citation computed from what it keeps (source
+          convention, Q9), never the text. */}
+      <AddToDossierPopover
+        isOpen={dossierAnchor !== null}
+        anchorEl={dossierAnchor}
+        onClose={() => setDossierAnchor(null)}
+        sentenza={sentenzaFromDecision(answer.identita, answer.attributi)}
+        onAdded={(_dossierId, title) => onToast(`Aggiunta a «${title}»`, 'success')}
+        onDuplicate={(title) => onToast(`Già presente in «${title}»`, 'info')}
+      />
     </article>
   );
 }
@@ -185,7 +209,13 @@ export function DecisionPage() {
       </div>
     );
   } else if (answer.esito === 'trovata') {
-    body = <FoundView answer={answer} onCopy={() => { void copy(answer); }} />;
+    body = (
+      <FoundView
+        answer={answer}
+        onCopy={() => { void copy(answer); }}
+        onToast={(message, type) => setToast({ message, type })}
+      />
+    );
   } else if (answer.esito === 'ambigua') {
     body = (
       <section className="space-y-3">

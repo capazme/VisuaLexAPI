@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from merlt.pipeline.mechanical_ingestion.conflict_report import build_conflict_report
-from merlt.pipeline.mechanical_ingestion.parser import _CODE_ABBREVIATIONS, _code_abbreviation
+from merlt.utils.sources import short_norm
 from merlt.storage.retriever.retriever import GraphAwareRetriever
 from merlt.utils.urn_labels import article_number_from_urn, derive_article_fields_from_urn
 
@@ -38,7 +38,8 @@ from merlt.utils.urn_labels import article_number_from_urn, derive_article_field
 def test_compound_suffixes_are_read_whole(segment, expected):
     urn = f"https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262~art{segment}"
     assert article_number_from_urn(urn) == expected
-    assert derive_article_fields_from_urn(urn) == (expected, f"Art. {expected}")
+    # The key has no annex, so it names the decree, not the codice civile.
+    assert derive_article_fields_from_urn(urn) == (expected, f"art. {expected} r.d. 262/1942")
 
 
 def test_comma_and_version_markers_still_ignored():
@@ -53,38 +54,29 @@ def test_unknown_alphabetic_tail_is_not_a_suffix_and_digits_do_not_backtrack():
 
 
 # ---------------------------------------------------------------------------
-# mechanical parser: explicit code abbreviations
+# labels: a code enacted by a decree is cited by its decree, never an initialism
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
     "act_type, expected",
     [
-        ("codice civile", "c.c."),
-        ("Codice Civile", "c.c."),
-        ("codice penale", "c.p."),
-        ("codice di procedura civile", "c.p.c."),
-        ("codice di procedura penale", "c.p.p."),
-        ("codice del consumo", "cod. cons."),
-        ("Codice Del Consumo", "cod. cons."),
-        ("codice in materia di protezione dei dati personali", "cod. privacy"),
+        ("codice civile", "art. 1 c.c."),
+        ("Codice Civile", "art. 1 c.c."),
+        ("codice penale", "art. 1 c.p."),
+        ("codice di procedura civile", "art. 1 c.p.c."),
+        ("codice di procedura penale", "art. 1 c.p.p."),
+        # D3 (owner, 4 Oct 2026): by the decree, not "cod. cons." / "cod. privacy"
+        ("codice del consumo", "art. 1 d.lgs. 206/2005"),
+        ("Codice Del Consumo", "art. 1 d.lgs. 206/2005"),
+        ("codice in materia di protezione dei dati personali", "art. 1 d.lgs. 196/2003"),
     ],
 )
-def test_code_abbreviation_table(act_type, expected):
-    assert _code_abbreviation(act_type) == expected
+def test_short_label_of_the_codes(act_type, expected):
+    assert short_norm({"tipo_atto": act_type, "numero_articolo": "1"}) == expected
 
 
 def test_unknown_act_keeps_its_name_instead_of_an_initialism():
-    assert _code_abbreviation("legge sulla privacy") == "legge sulla privacy"
-
-
-def test_no_two_codes_share_an_abbreviation():
-    by_abbrev: dict[str, set[str]] = {}
-    for name, abbrev in _CODE_ABBREVIATIONS.items():
-        by_abbrev.setdefault(abbrev, set()).add(name.replace("'", "à").replace("proprietà", "proprieta"))
-    # The only duplicates allowed are spelling variants of the same act.
-    for abbrev, names in by_abbrev.items():
-        stems = {n.split()[0:4].__str__() for n in names}
-        assert len(stems) <= 2, (abbrev, names)
+    assert short_norm({"tipo_atto": "legge sulla privacy", "numero_articolo": "3"}) == "art. 3 legge sulla privacy"
 
 
 # ---------------------------------------------------------------------------
@@ -105,23 +97,24 @@ def _node(urn: str, estremi: str) -> dict:
     }
 
 
-def test_stub_estremi_from_a2_or_backfill_is_an_update_not_a_conflict():
-    urn = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262~art2043"
-    nodes = [_node(urn, "Art. 2043 c.c.")]
-    falkordb = _fake_falkordb([[{"urn": urn, "estremi": "Art. 2043", "tipo_documento": None}], []])
+def test_a_different_wording_of_the_estremi_is_an_update_not_a_conflict():
+    # `estremi` is a label derived from the key (source convention): the graph's
+    # "Art. 2043" or "Art. 2043 c.c." and the batch's "art. 2043 c.c." are one article.
+    urn = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043"
+    for live in ("Art. 2043", "Art. 2043 c.c.", "Art. 1 R.D. 25 giugno 1938, n. 1852"):
+        nodes = [_node(urn, "art. 2043 c.c.")]
+        falkordb = _fake_falkordb([[{"urn": urn, "estremi": live, "tipo_documento": "articolo"}], []])
 
-    report = asyncio.run(build_conflict_report(falkordb, nodes, edges=[]))
+        report = asyncio.run(build_conflict_report(falkordb, nodes, edges=[]))
 
-    assert report["urn_conflicts"] == []
-    assert report["node_updates"] == [urn]
+        assert report["urn_conflicts"] == [], live
+        assert report["node_updates"] == [urn]
 
 
-def test_a_real_divergence_is_still_a_conflict():
-    urn = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262~art1"
-    nodes = [_node(urn, "Art. 1 c.c.")]
-    falkordb = _fake_falkordb(
-        [[{"urn": urn, "estremi": "Art. 1 R.D. 25 giugno 1938, n. 1852", "tipo_documento": "articolo"}], []]
-    )
+def test_a_different_type_of_document_is_still_a_conflict():
+    urn = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1"
+    nodes = [_node(urn, "art. 1 c.c.")]
+    falkordb = _fake_falkordb([[{"urn": urn, "estremi": "art. 1 c.c.", "tipo_documento": "capo"}], []])
 
     report = asyncio.run(build_conflict_report(falkordb, nodes, edges=[]))
 

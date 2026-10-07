@@ -42,7 +42,7 @@ describe('QaSourceChip', () => {
   });
 
   it('formatRetrievedUrn handles massime and live nodes', () => {
-    expect(formatRetrievedUrn('massima_cassazione_civile_4022_2018')).toMatch(/Cass\. civ\. 4022\/2018/);
+    expect(formatRetrievedUrn('massima_cassazione_civile_4022_2018')).toMatch(/Cass\. civ\., n\. 4022\/2018/);
     expect(formatRetrievedUrn('live:abc')).toBe('Fonte provvisoria');
   });
 

@@ -5,9 +5,12 @@
 # (the stores, MERL-T, the server, the ingress), never the scrapers, whose file carries
 # its own settings: leaving compose.scrapers.yml out must still render.
 #
-#   edge  the ingress, the only door
+#   edge  the ingress, the app's door
 #   app   the request path: ingress, server, scrapers, MERL-T
 #   data  the stores, reachable only by the server and MERL-T
+#   mcp   the MCP server (a second door, on the loopback) and the server, nothing else
+#
+# edge and app have fixed subnets: the host firewall and the ingress key on them.
 #
 # Hardening (spec section 8, H2): the application modules and MERL-T run with every
 # capability dropped and no way to gain privileges (measured: MERL-T is healthy that
@@ -36,7 +39,12 @@ x-hardening: &hardening
   security_opt: ["no-new-privileges:true"]
 
 networks:
-  edge: {}
+  edge:
+    ipam:
+      config:
+        # Fixed, because the ingress keeps a forwarded client address only from this
+        # subnet and the app one. Change it (infra/.env) if it collides with yours.
+        - subnet: "${EDGE_SUBNET:-172.29.241.0/24}"
   app:
     ipam:
       config:
@@ -44,6 +52,8 @@ networks:
         # home network is keyed on it. Change it (infra/.env) if it collides with yours.
         - subnet: "${APP_SUBNET:-172.29.240.0/24}"
   data: {}
+  # Not internal: Docker does not publish a port of a container on internal networks only.
+  mcp: {}
 
 services:
   postgres:
@@ -106,9 +116,13 @@ services:
     logging: *logging
   server:
     restart: unless-stopped
-    networks: [app, data]
+    networks: [app, data, mcp]
     logging: *logging
   ingress:
     restart: unless-stopped
     networks: [edge, app]
+    logging: *logging
+  mcp:
+    restart: unless-stopped
+    networks: [mcp]
     logging: *logging
