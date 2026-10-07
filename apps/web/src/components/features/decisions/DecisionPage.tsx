@@ -91,6 +91,7 @@ export function DecisionPage() {
           answer={answer}
           reference={parsed.reference}
           headingLevel={1}
+          addressShown
           onRetry={() => setAttempt((a) => a + 1)}
           onChooseCandidate={(identity) => navigate(decisionPath(identity))}
           onOpenPalette={openCommandPalette}

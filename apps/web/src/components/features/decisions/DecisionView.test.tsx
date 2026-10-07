@@ -73,10 +73,10 @@ describe('DecisionView', () => {
     expect(screen.getByText(/Fonte: Corte di cassazione/)).toBeInTheDocument();
   });
 
-  it('draws the decision as an h2 by default and as the h1 when asked', () => {
+  it('draws the decision as an h4 by default (under the tab\'s h3) and as the h1 when asked', () => {
     const tab = view(FOUND);
     expect(screen.queryAllByRole('heading', { level: 1 })).toHaveLength(0);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/Sentenza n\. 10787\/2024/);
+    expect(screen.getByRole('heading', { level: 4 })).toHaveTextContent(/Sentenza n\. 10787\/2024/);
     tab.unmount();
     view(FOUND, { headingLevel: 1 });
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Sentenza n\. 10787\/2024/);
@@ -251,10 +251,15 @@ describe('DecisionView', () => {
 
   it("a request the route refuses gives the route's reason and sends to the search bar", () => {
     const { onOpenPalette } = view({ esito: 'richiesta_non_valida', errori: { numero: 'Il numero va da 1 a 999999' } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Il numero va da 1 a 999999');
+    expect(screen.getByRole('alert')).toHaveTextContent("La citazione non indica una sentenza leggibile: Il numero va da 1 a 999999.");
     expect(screen.queryByRole('textbox')).toBeNull(); // no lookup form in the view
     fireEvent.click(screen.getByRole('button', { name: 'Cerca nella barra di ricerca' }));
     expect(onOpenPalette).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells a refused request as a refused address on the page of an address', () => {
+    view({ esito: 'richiesta_non_valida', errori: { numero: 'x' } }, { addressShown: true });
+    expect(screen.getByRole('alert')).toHaveTextContent("L'indirizzo non indica una sentenza leggibile: x.");
   });
 
   it('keeps 44px touch targets on mobile on its buttons and on the links to choose from', () => {

@@ -169,4 +169,69 @@ describe('decision tabs', () => {
     expect((persisted.workspaceTabs as Array<{ view?: unknown }>)[0].view).toEqual({ kind: 'decision', reference: REF });
     expect(persisted).not.toHaveProperty('pendingDecision');
   });
+
+  describe('a tab with a view takes no content', () => {
+    const NORMA = { tipo_atto: 'legge', numero_atto: '241', data: '1990', urn: 'urn:x' } as unknown as Parameters<ReturnType<typeof get>['addNormaToTab']>[1];
+    const ARTICLE = { norma_data: { numero_articolo: '1' }, article_text: 'x' } as unknown as Parameters<ReturnType<typeof get>['addNormaToTab']>[2][number];
+    let id: string;
+    let articleTab: string;
+    let warn: ReturnType<typeof vi.spyOn>;
+    const content = () => get().workspaceTabs.find((t) => t.id === id)!.content;
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      id = get().openDecisionTab(REF);
+      articleTab = get().addWorkspaceTab('Codice civile');
+    });
+    afterEach(() => warn.mockRestore());
+
+    it.each([
+      ['addNormaToTab', () => get().addNormaToTab(id, NORMA, [ARTICLE])],
+      ['addLooseArticleToTab', () => get().addLooseArticleToTab(id, ARTICLE, NORMA)],
+      ['addNormaIndexToTab', () => expect(get().addNormaIndexToTab(id, NORMA)).toBeNull()],
+      ['createCollection', () => get().createCollection(id)],
+    ])('%s refuses it, and says so', (name, act) => {
+      act();
+      expect(content()).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(name));
+    });
+
+    it('moveNormaBetweenTabs and moveLooseArticleBetweenTabs refuse it as a target and keep the item at its source', () => {
+      get().addNormaToTab(articleTab, NORMA, [ARTICLE]);
+      get().addLooseArticleToTab(articleTab, ARTICLE, NORMA);
+      const source = () => get().workspaceTabs.find((t) => t.id === articleTab)!.content;
+      const norma = source().find((c) => c.type === 'norma')!;
+      const loose = source().find((c) => c.type === 'loose-article')!;
+      get().moveNormaBetweenTabs(norma.id, articleTab, id);
+      get().moveLooseArticleBetweenTabs(loose.id, articleTab, id);
+      expect(content()).toEqual([]);
+      expect(source()).toHaveLength(2);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('moveNormaBetweenTabs'));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('moveLooseArticleBetweenTabs'));
+    });
+
+    it('an article tab still takes content', () => {
+      get().addNormaToTab(articleTab, NORMA, [ARTICLE]);
+      expect(get().workspaceTabs.find((t) => t.id === articleTab)!.content).toHaveLength(1);
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('one tab per decision after a candidate is chosen', () => {
+    const PENAL = { ...REF, archivio: 'penale' as const };
+    it('brings the tab that already holds the decision to the front and closes this one', () => {
+      const penal = get().openDecisionTab(PENAL);
+      const civil = get().openDecisionTab(REF);
+      get().setDecisionTabIdentity(civil, PENAL, 'Cass. pen., n. 10787/2024');
+      const tabs = get().workspaceTabs;
+      expect(tabs.map((t) => t.id)).toEqual([penal]);
+      expect(tabs[0].zIndex).toBe(get().highestZIndex);
+    });
+
+    it('just renames the tab when no other tab holds the decision', () => {
+      const bare = get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024 });
+      get().setDecisionTabIdentity(bare, PENAL, 'Cass. pen., n. 10787/2024');
+      expect(get().workspaceTabs).toHaveLength(1);
+      expect(get().workspaceTabs[0].view).toEqual({ kind: 'decision', reference: PENAL });
+    });
+  });
 });

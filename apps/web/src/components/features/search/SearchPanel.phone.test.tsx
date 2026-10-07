@@ -16,6 +16,7 @@ vi.mock('../decisions/DecisionTabView', () => ({
 import { appStore } from '../../../store/useAppStore';
 import { SearchPanel } from './SearchPanel';
 
+const PREVIOUS = 'Tab precedente';
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
 
 beforeEach(() => appStore.setState({ workspaceTabs: [], pendingDecision: null }));
@@ -33,15 +34,38 @@ describe('SearchPanel on a phone', () => {
     expect(screen.getByText('Cass. civ., n. 10787/2024')).toBeInTheDocument(); // the header names it
 
     // the reader goes back to the first tab (the previous-tab chevron is the first button)
-    fireEvent.click(screen.getAllByRole('button')[0]);
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.click(screen.getByRole('button', { name: PREVIOUS }));
+    fireEvent.click(screen.getByRole('button', { name: PREVIOUS }));
     await waitFor(() => expect(screen.queryByTestId('decision')).toBeNull());
     expect(screen.getByText('Codice civile')).toBeInTheDocument();
 
     // a later change to the store does not pull the reader back to the decision
     act(() => { appStore.getState().addWorkspaceTab('Codice di procedura'); });
-    await new Promise((r) => setTimeout(r, 400));
+    // nothing moves: the header still names the tab the reader chose (let the animation settle)
+    await waitFor(() => expect(screen.getByText('Codice civile')).toBeInTheDocument());
     expect(screen.queryByTestId('decision')).toBeNull();
-    expect(screen.getByText('Codice civile')).toBeInTheDocument();
+  });
+
+  it('shows the decision again when it is opened again while it is still the frontmost tab', async () => {
+    appStore.getState().addWorkspaceTab('Codice civile');
+    render(<MemoryRouter><SearchPanel /></MemoryRouter>);
+    act(() => { appStore.getState().openDecisionTab(REF); });
+    expect(await screen.findByTestId('decision')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: PREVIOUS }));
+    await waitFor(() => expect(screen.queryByTestId('decision')).toBeNull());
+
+    act(() => { appStore.getState().openDecisionTab(REF); }); // same tab, still in front, raised
+    expect(await screen.findByTestId('decision')).toBeInTheDocument();
+  });
+
+  it('shows the surviving tab when a chosen candidate was already open in another tab', async () => {
+    const penal = appStore.getState().openDecisionTab({ ...REF, archivio: 'penale' });
+    const civil = appStore.getState().openDecisionTab(REF);
+    render(<MemoryRouter><SearchPanel /></MemoryRouter>);
+    act(() => { appStore.getState().addWorkspaceTab('Codice civile'); });
+    act(() => { appStore.getState().setDecisionTabIdentity(civil, { ...REF, archivio: 'penale' }, 'Cass. pen., n. 10787/2024'); });
+    expect(await screen.findByTestId('decision')).toHaveTextContent('n. 10787');
+    expect(appStore.getState().workspaceTabs.map((t) => t.id)).not.toContain(civil);
+    expect(appStore.getState().workspaceTabs.map((t) => t.id)).toContain(penal);
   });
 });

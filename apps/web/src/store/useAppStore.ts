@@ -761,6 +761,17 @@ const appStore = createStore<AppState>()(
             setDecisionTabIdentity: (tabId, identity, label) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab || tab.view?.kind !== 'decision') return;
+                // One tab per decision: if another tab already holds this one (a candidate chosen
+                // in this tab), that one comes to the front and this one closes.
+                const other = state.workspaceTabs.find(t =>
+                    t.id !== tabId && t.view?.kind === 'decision' && sameDecision(t.view.reference, identity));
+                if (other) {
+                    other.isHidden = false;
+                    other.isMinimized = false;
+                    other.zIndex = ++state.highestZIndex;
+                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
+                    return;
+                }
                 tab.view = { kind: 'decision', reference: identityOf(identity) };
                 tab.label = label;
             }),
@@ -832,6 +843,7 @@ const appStore = createStore<AppState>()(
             addNormaToTab: (tabId, norma, articles) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'addNormaToTab')) return;
 
                 // Helper to get a unique key for an article within a norma block
                 const getArticleKey = (a: ArticleData) => {
@@ -897,6 +909,7 @@ const appStore = createStore<AppState>()(
             addLooseArticleToTab: (tabId, article, sourceNorma) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'addLooseArticleToTab')) return;
 
                 tab.content.push({
                     type: 'loose-article',
@@ -993,6 +1006,7 @@ const appStore = createStore<AppState>()(
             addNormaIndexToTab: (tabId, norma) => {
                 const tab = get().workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return null;
+                if (refuseViewTab(tab, 'addNormaIndexToTab')) return null;
 
                 const existing = tab.content.find(
                     (c): c is NormaBlock => c.type === 'norma' &&
@@ -1109,6 +1123,7 @@ const appStore = createStore<AppState>()(
                 const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
                 const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
                 if (!sourceTab || !targetTab) return;
+                if (refuseViewTab(targetTab, 'moveNormaBetweenTabs')) return;
 
                 const normaIndex = sourceTab.content.findIndex(c => c.type === 'norma' && c.id === normaId);
                 if (normaIndex === -1) return;
@@ -1155,6 +1170,7 @@ const appStore = createStore<AppState>()(
                 const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
                 const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
                 if (!sourceTab || !targetTab) return;
+                if (refuseViewTab(targetTab, 'moveLooseArticleBetweenTabs')) return;
 
                 const articleIndex = sourceTab.content.findIndex(c => c.type === 'loose-article' && c.id === articleId);
                 if (articleIndex === -1) return;
@@ -1262,6 +1278,7 @@ const appStore = createStore<AppState>()(
                 set((state) => {
                     const tab = state.workspaceTabs.find(t => t.id === tabId);
                     if (!tab) return;
+                if (refuseViewTab(tab, 'createCollection')) return;
 
                     const newCollection: ArticleCollection = {
                         type: 'collection',
@@ -1294,6 +1311,7 @@ const appStore = createStore<AppState>()(
             addArticleToCollection: (tabId, collectionId, article, sourceNorma) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'addArticleToCollection')) return;
 
                 const collection = tab.content.find(
                     c => c.type === 'collection' && c.id === collectionId
@@ -1348,6 +1366,7 @@ const appStore = createStore<AppState>()(
             moveLooseArticleToCollection: (tabId, looseArticleId, collectionId) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'moveLooseArticleToCollection')) return;
 
                 // Find and remove loose article
                 const looseIndex = tab.content.findIndex(
@@ -3109,6 +3128,14 @@ function stableQueryKey(query: DecisionSearchQuery): string {
     const { normaLabel: _label, ...rest } = query;
     void _label;
     return JSON.stringify(sorted({ ...rest, norma: rest.norma ? sorted(rest.norma) : undefined }));
+}
+
+/** A tab with a `view` draws its view and ignores `content`: anything pushed into it would be kept
+ *  and never shown. Every action that writes content into a tab refuses such a tab. */
+function refuseViewTab(tab: WorkspaceTab, action: string): boolean {
+    if (!tab.view) return false;
+    console.warn(`${action}: the tab "${tab.label}" shows a ${tab.view.kind} and takes no content`);
+    return true;
 }
 
 function newViewTab(state: AppState, label: string, view: TabView): WorkspaceTab {

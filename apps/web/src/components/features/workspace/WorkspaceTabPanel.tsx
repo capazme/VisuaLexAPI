@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus, FileText } from 'lucide-react';
@@ -16,11 +17,7 @@ import { useCompare } from '../../../hooks/useCompare';
 import { Z_INDEX_VALUES } from '../../../constants/zIndex';
 import { normaForDossier } from '../dossier/dossierUtils';
 import { dragLimits, workspaceOrigin } from '../../../utils/workspaceOrigin';
-import { DecisionTabView } from '../decisions/DecisionTabView';
-
-function assertNever(x: never): never {
-  throw new Error(`unhandled tab view ${JSON.stringify(x)}`);
-}
+import { renderTabView } from './renderTabView';
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -178,9 +175,24 @@ export function WorkspaceTabPanel({
   const tabWidth = tab.isMinimized ? 300 : tab.size.width;
   const minVisible = 50;
 
+  // The origin is read once the page is laid out (on a reload the area is not in the document
+  // during this component's first render), again when the window resizes, and again just before a
+  // drag starts, because the sidebar and the focus mode move the area without a resize.
+  const [origin, setOrigin] = useState(workspaceOrigin);
+  const refreshOrigin = useCallback(() => {
+    const next = workspaceOrigin();
+    setOrigin((prev) => (prev.left === next.left && prev.top === next.top ? prev : next));
+  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the DOM's layout, which does not exist during render
+  useLayoutEffect(refreshOrigin, [refreshOrigin]);
+  useEffect(() => {
+    window.addEventListener('resize', refreshOrigin);
+    return () => window.removeEventListener('resize', refreshOrigin);
+  }, [refreshOrigin]);
+
   const dragConstraints = useMemo(
-    () => dragLimits(workspaceOrigin(), windowSize, tabWidth, minVisible),
-    [windowSize, tabWidth],
+    () => dragLimits(origin, windowSize, tabWidth, minVisible),
+    [origin, windowSize, tabWidth],
   );
 
   useEffect(() => {
@@ -297,18 +309,6 @@ export function WorkspaceTabPanel({
     bringTabToFront(tab.id);
   };
 
-  // One branch per kind of view: a new kind fails to compile here until it is drawn.
-  const renderView = (view: NonNullable<WorkspaceTab['view']>): React.ReactNode => {
-    switch (view.kind) {
-      case 'decision':
-        return <DecisionTabView key={tab.id} tabId={tab.id} reference={view.reference} />;
-      case 'decision-search':
-        return null; // drawn by the search tab (Task 17)
-      default:
-        return assertNever(view);
-    }
-  };
-
   // When heavy overlays are open, hide the tab panels
   if (shouldHide) return null;
 
@@ -356,6 +356,8 @@ export function WorkspaceTabPanel({
           onPointerDown={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('button') || target.closest('input')) return;
+            // the limits must be right when the drag starts, not at the next render
+            flushSync(refreshOrigin);
             dragControls.start(e);
           }}
           className="cursor-grab active:cursor-grabbing flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-slate-800 select-none touch-none"
@@ -532,7 +534,7 @@ export function WorkspaceTabPanel({
         {!tab.isMinimized && (
           <div className="flex-1 overflow-auto p-4 space-y-4">
             {tab.view ? (
-              renderView(tab.view)
+              renderTabView(tab, tab.view)
             ) : tab.content.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400">
                 <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-3">

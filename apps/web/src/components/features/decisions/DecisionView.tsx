@@ -29,9 +29,12 @@ export interface DecisionViewProps {
   actions?: React.ReactNode;
   /** Replaces the plain text (the reading surface, later). */
   textSlot?: React.ReactNode;
-  /** The decision's heading: 1 on a page of its own, 2 (default) inside a workspace tab, where
-   *  the app's page has its h1. */
-  headingLevel?: 1 | 2;
+  /** The decision's heading: 1 on a page of its own; 4 (default) inside a workspace tab, where the
+   *  tab's label is an h3 and the norm cards' titles are h4 too. */
+  headingLevel?: 1 | 2 | 3 | 4;
+  /** The view is the page of an address (`/sentenze/…`): a refused request is then told as a
+   *  refused address, otherwise as a refused citation. */
+  addressShown?: boolean;
 }
 
 function Alert({ children }: { children: React.ReactNode }) {
@@ -73,13 +76,13 @@ function FoundView({ answer, onToast, actions, textSlot, headingLevel }: {
   onToast: ShowToast;
   actions?: React.ReactNode;
   textSlot?: React.ReactNode;
-  headingLevel: 1 | 2;
+  headingLevel: 1 | 2 | 3 | 4;
 }) {
   // The source's own page, only ever over https: the address comes from our server, built on fixed
   // bases, so this is defence in depth.
   const sourceUrl = httpsUrl(answer.fonte.url);
   const [dossierAnchor, setDossierAnchor] = useState<HTMLElement | null>(null);
-  const Heading = headingLevel === 1 ? 'h1' : 'h2';
+  const Heading = `h${headingLevel}` as const;
 
   const copy = async (text: string, done: string, what: string) => {
     try {
@@ -176,7 +179,7 @@ function unreachableMessage(fonte: string): string {
 
 /** The body of a decision, wherever it is drawn: the workspace tab, the phone's view or the page. */
 export function DecisionView({
-  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, headingLevel = 2,
+  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, headingLevel = 4, addressShown = false,
 }: DecisionViewProps) {
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
   const linkClass = `inline-flex items-center text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE}`;
@@ -259,7 +262,7 @@ export function DecisionView({
     // richiesta_non_valida: the route refused the request; its reasons, and the search to start over
     body = (
       <Alert>
-        <p>L'indirizzo non indica una sentenza leggibile: {Object.values(answer.errori).join('; ')}.</p>
+        <p>{addressShown ? "L'indirizzo" : 'La citazione'} non indica una sentenza leggibile: {Object.values(answer.errori).join('; ')}.</p>
         <div className="mt-2">
           <Button variant="secondary" size="sm" icon={<Search size={16} />} className={TOUCH_TARGET_RESPONSIVE} onClick={onOpenPalette}>
             Cerca nella barra di ricerca

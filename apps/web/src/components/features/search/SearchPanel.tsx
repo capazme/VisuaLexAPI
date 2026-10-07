@@ -8,7 +8,7 @@ import { AliasManager } from '../settings/AliasManager';
 const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
 import { NormaCard } from './NormaCard';
-import { DecisionTabView } from '../decisions/DecisionTabView';
+import { renderTabView } from '../workspace/renderTabView';
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
 import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight, Info } from 'lucide-react';
@@ -123,22 +123,22 @@ export function SearchPanel() {
     }
   }, [workspaceTabs.length, mobileActiveTabIndex]);
 
-  // Mobile shows one tab at a time: a decision that has just been opened (a new frontmost tab with
-  // a `view`) becomes the visible one. Only a frontmost tab not seen before switches, so the
-  // reader's own swipe to another tab is never undone by a later render.
-  const frontTabIdRef = useRef<string | null>(null);
+  // Mobile shows one tab at a time. Opening a decision (a new frontmost tab with a `view`, or an
+  // open one brought to the front again, which raises its zIndex) makes it the visible one. The
+  // reader's own swipes, chevrons and dots never touch a zIndex, so a later render never undoes them.
+  // (gotcha 11: this syncs the local phone index with the store, an external change, and there is
+  // nothing to derive it from during render. The lint rule does not flag it, so there is no disable.)
+  const frontTabRef = useRef<string | null>(null);
   const frontTabSeenRef = useRef(false);
   useEffect(() => {
     let front: (typeof workspaceTabs)[number] | undefined;
     for (const t of workspaceTabs) if (!front || t.zIndex > front.zIndex) front = t;
-    const previous = frontTabIdRef.current;
-    frontTabIdRef.current = front?.id ?? null;
+    const previous = frontTabRef.current;
+    frontTabRef.current = front ? `${front.id}:${front.zIndex}` : null;
     // the first run only records what is in front at mount
     if (!frontTabSeenRef.current) { frontTabSeenRef.current = true; return; }
-    if (front?.view && front.id !== previous) {
+    if (front?.view && frontTabRef.current !== previous) {
       const index = workspaceTabs.findIndex((t) => t.id === front.id);
-      // (gotcha 11) syncs the local phone index with the store's new frontmost tab, an external change
-      // with nothing to derive it from during render; the lint rule does not flag it, so no disable
       if (index >= 0) setMobileActiveTabIndex(index);
     }
   }, [workspaceTabs]);
@@ -230,6 +230,7 @@ export function SearchPanel() {
         let mergeTarget: typeof workspaceTabs[number] | undefined;
         if (tabLabel && !isHistorical) {
           mergeTarget = workspaceTabs.find(tab =>
+            !tab.view &&
             tab.labelIsCustom &&
             tab.label === tabLabel &&
             !tab.content.some(item =>
@@ -475,6 +476,7 @@ export function SearchPanel() {
           // one tab (see dossier `triggerMultiSearch` queue).
           const existingTab = isCustomForThisGroup
             ? workspaceTabs.find(tab =>
+                !tab.view &&
                 tab.labelIsCustom &&
                 tab.label === customTabLabel &&
                 !tab.content.some(item =>
@@ -726,6 +728,7 @@ export function SearchPanel() {
               <button
                 onClick={() => setMobileActiveTabIndex(Math.max(0, mobileActiveTabIndex - 1))}
                 disabled={mobileActiveTabIndex === 0}
+                aria-label="Tab precedente"
                 className={cn(
                   "p-2.5 rounded-xl transition-all shadow-sm active:scale-95",
                   mobileActiveTabIndex === 0
@@ -762,6 +765,7 @@ export function SearchPanel() {
               <button
                 onClick={() => setMobileActiveTabIndex(Math.min(workspaceTabs.length - 1, mobileActiveTabIndex + 1))}
                 disabled={mobileActiveTabIndex === workspaceTabs.length - 1}
+                aria-label="Tab successiva"
                 className={cn(
                   "p-2.5 rounded-xl transition-all shadow-sm active:scale-95",
                   mobileActiveTabIndex === workspaceTabs.length - 1
@@ -797,9 +801,7 @@ export function SearchPanel() {
                   }}
                   className="h-full overflow-y-auto p-4 space-y-4 custom-scrollbar"
                 >
-                  {activeMobileTab?.view?.kind === 'decision' && (
-                    <DecisionTabView key={activeMobileTab.id} tabId={activeMobileTab.id} reference={activeMobileTab.view.reference} />
-                  )}
+                  {activeMobileTab?.view && renderTabView(activeMobileTab, activeMobileTab.view)}
                   {workspaceTabs[mobileActiveTabIndex].content
                     .filter((item): item is typeof item & { type: 'norma' } => item.type === 'norma')
                     .map((normaBlock) => {
