@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import type { Annotation, Dossier, Highlight, CustomAlias, QuickNorm } from '../../../types';
 import type { EnvironmentCategory } from '../../../types';
@@ -11,6 +11,8 @@ import {
   type EnvironmentSelection,
 } from '../../../utils/environmentUtils';
 import { EnvironmentContentViewer } from './EnvironmentContentViewer';
+import { useLeftOutNotice } from './useLeftOutNotice';
+import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
 
 interface CreateEnvironmentOptions {
   description?: string;
@@ -70,6 +72,16 @@ export function CreateEnvironmentModal({
     }
   };
 
+  const chosenAnnotations = useMemo(
+    () => currentState.annotations.filter(a => selection.annotationIds.includes(a.id)),
+    [currentState.annotations, selection.annotationIds],
+  );
+  const chosenHighlights = useMemo(
+    () => currentState.highlights.filter(h => selection.highlightIds.includes(h.id)),
+    [currentState.highlights, selection.highlightIds],
+  );
+  const leftOutNotice = useLeftOutNotice(includeContent ? chosenAnnotations : [], includeContent ? chosenHighlights : []);
+
   if (!isOpen) return null;
 
   const selectedCount = countSelectedItems(selection);
@@ -80,9 +92,16 @@ export function CreateEnvironmentModal({
     currentState.annotations.length > 0 ||
     currentState.highlights.length > 0;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) return;
-    const selectionToUse = includeContent && selectedCount > 0 ? selection : null;
+    // Words a court withdrew do not leave the account (spec §8.6): the selection handed on is narrowed.
+    const travelling = await travellingSelection(chosenAnnotations, chosenHighlights);
+    const narrowed: EnvironmentSelection = {
+      ...selection,
+      annotationIds: selection.annotationIds.filter(i => travelling.annotationIds.has(i)),
+      highlightIds: selection.highlightIds.filter(i => travelling.highlightIds.has(i)),
+    };
+    const selectionToUse = includeContent && selectedCount > 0 ? narrowed : null;
     onCreate(name.trim(), selectionToUse, {
       description: description.trim() || undefined,
       author: author.trim() || undefined,
@@ -225,6 +244,10 @@ export function CreateEnvironmentModal({
                 )}
               </div>
             </>
+          )}
+
+          {leftOutNotice && (
+            <p role="status" className="text-sm text-amber-700 dark:text-amber-400">{leftOutNotice}</p>
           )}
 
           {!hasContent && (

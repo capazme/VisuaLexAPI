@@ -18,6 +18,14 @@ describe('SuggestionItemCard', () => {
     expect(screen.getAllByText(/dolo/).length).toBeGreaterThan(0);
   });
 
+  it('labels a decision\'s note by its citation, not by an empty article id', () => {
+    render(<SuggestionItemCard item={{
+      ...base, itemType: 'annotation',
+      payload: { normaKey: 'cassazione:civile:10787:2024', articleId: '', anchorText: 'ricorso', text: 'Da rivedere.' },
+    }} />);
+    expect(screen.getByText(/Cass\. civ\., n\. 10787\/2024/)).toBeInTheDocument();
+  });
+
   it('renders alias with trigger → expandTo', () => {
     render(<SuggestionItemCard item={{
       ...base, itemType: 'alias',

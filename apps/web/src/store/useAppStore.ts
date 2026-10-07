@@ -27,6 +27,7 @@ import { environmentService, type EnvironmentApi, type EnvironmentCreatePayload 
 import { quickNormService, type QuickNormApi } from '../services/quickNormService';
 import { customAliasService, type CustomAliasApi } from '../services/customAliasService';
 import { isAuthenticated } from '../services/authService';
+import { leftOutMessage, travellingAnchors } from '../utils/decisionAnchorsTravel';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../features/merlt/merltEventBus';
 import {
     annotationApiToStore,
@@ -43,6 +44,19 @@ import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor
 // annotations / highlights) inside a single opaque `content` JSON column.
 // These helpers keep the conversion in one place so every caller stays
 // consistent and avoids ad-hoc unpacking.
+
+/**
+ * Notes and highlights on decisions leave the account only while their words are still in the
+ * decision's text (design 2026-10-05 §8.6). Filters `slices` in place and, when it left some out,
+ * says so in the transient toast.
+ */
+async function keepTravelling(slices: { annotations: Annotation[]; highlights: Highlight[] }): Promise<void> {
+    const { annotations, highlights, leftOut } = await travellingAnchors(slices);
+    slices.annotations = annotations;
+    slices.highlights = highlights;
+    const message = leftOutMessage(leftOut);
+    if (message) appStore.getState().pushSyncError(message);
+}
 
 function environmentApiToStore(e: EnvironmentApi): Environment {
     const c = (e.content ?? {}) as Partial<Environment>;
@@ -2630,6 +2644,7 @@ const appStore = createStore<AppState>()(
                     highlights: options.fromCurrent ? JSON.parse(JSON.stringify(state.highlights)) : [],
                     tags: [],
                 };
+                await keepTravelling(draft);
                 try {
                     const server = await environmentService.create(environmentStoreToCreatePayload(draft));
                     const stored = environmentApiToStore(server);
@@ -2666,6 +2681,7 @@ const appStore = createStore<AppState>()(
                     highlights: JSON.parse(JSON.stringify(filtered.highlights || [])),
                     tags: [],
                 };
+                await keepTravelling(draft);
                 try {
                     const server = await environmentService.create(environmentStoreToCreatePayload(draft));
                     const stored = environmentApiToStore(server);
@@ -2690,6 +2706,12 @@ const appStore = createStore<AppState>()(
                     const env = state.environments.find(e => e.id === id);
                     if (env) Object.assign(env, updates, { updatedAt: optimistic.updatedAt });
                 });
+                // What is shipped is filtered; the local copy keeps the user's own notes.
+                const shipped = { annotations: optimistic.annotations, highlights: optimistic.highlights };
+                // (the snapshot ships whole when any slice changed, so both are checked then)
+                const contentPatched = updates.dossiers !== undefined || updates.quickNorms !== undefined
+                    || updates.customAliases !== undefined || updates.annotations !== undefined || updates.highlights !== undefined;
+                if (contentPatched) await keepTravelling(shipped);
                 try {
                     // Only send the fields that might have changed on the
                     // server — content included because updates can touch the
@@ -2712,8 +2734,8 @@ const appStore = createStore<AppState>()(
                                 dossiers: optimistic.dossiers,
                                 quickNorms: optimistic.quickNorms,
                                 customAliases: optimistic.customAliases,
-                                annotations: optimistic.annotations,
-                                highlights: optimistic.highlights,
+                                annotations: shipped.annotations,
+                                highlights: shipped.highlights,
                             },
                         }),
                     });

@@ -1,3 +1,4 @@
+import { annotationTargetLabel } from './annotationLabels';
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -322,7 +323,7 @@ export function EnvironmentContentViewer({
             <div className="flex items-center text-sm">
               <FileText size={14} className="mr-2 text-emerald-500" />
               <span className="flex-1 text-slate-700 dark:text-slate-300 truncate font-medium">
-                {normaKey.replace(/--/g, ' ').replace(/-/g, ' ')}
+                {annotationTargetLabel(normaKey)}
               </span>
               <span className="text-xs text-slate-500 ml-2">
                 {count} {count === 1 ? 'nota' : 'note'}
@@ -363,7 +364,7 @@ export function EnvironmentContentViewer({
             <div className="flex items-center text-sm">
               <FileText size={14} className="mr-2 text-yellow-500" />
               <span className="flex-1 text-slate-700 dark:text-slate-300 truncate font-medium">
-                {normaKey.replace(/--/g, ' ').replace(/-/g, ' ')}
+                {annotationTargetLabel(normaKey)}
               </span>
               <span className="text-xs text-slate-500 ml-2">
                 {count} {count === 1 ? 'evidenziazione' : 'evidenziazioni'}

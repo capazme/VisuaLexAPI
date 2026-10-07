@@ -1,3 +1,4 @@
+import { leftOutMessage, travellingAnchors } from './decisionAnchorsTravel';
 import type { Environment, EnvironmentExport, EnvironmentCategory, Dossier, QuickNorm, CustomAlias, Annotation, Highlight } from '../types';
 
 // ============================================
@@ -71,14 +72,28 @@ export function getCategoryBgAlpha(
 }
 
 /**
- * Export an environment to a downloadable JSON file
+ * The environment as it may leave the account: notes and highlights on a decision only while their
+ * words are still in its text (§8.6). `message` says how many were left out, or null.
  */
-export function exportEnvironmentToFile(env: Environment): void {
+export async function environmentForExport(env: Environment): Promise<{ env: Environment; message: string | null }> {
+  const { annotations, highlights, leftOut } = await travellingAnchors({
+    annotations: env.annotations || [],
+    highlights: env.highlights || [],
+  });
+  return { env: { ...env, annotations, highlights }, message: leftOutMessage(leftOut) };
+}
+
+/**
+ * Export an environment to a downloadable JSON file. Resolves to the «non incluse» line when
+ * anchors on decisions were left out, else null.
+ */
+export async function exportEnvironmentToFile(env: Environment): Promise<string | null> {
+  const { env: travelling, message } = await environmentForExport(env);
   const exportData: EnvironmentExport = {
     version: ENVIRONMENT_EXPORT_VERSION,
     type: 'environment',
     exportedAt: new Date().toISOString(),
-    data: env,
+    data: travelling,
   };
 
   const json = JSON.stringify(exportData, null, 2);
@@ -92,18 +107,20 @@ export function exportEnvironmentToFile(env: Environment): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  return message;
 }
 
 /**
- * Create a shareable link for an environment (base64 encoded)
- * Returns null if the environment is too large
+ * Create a shareable link for an environment (base64 encoded). `link` is null if the environment
+ * is too large; `message` is the «non incluse» line when anchors on decisions were left out.
  */
-export function createEnvironmentShareLink(env: Environment): string | null {
+export async function createEnvironmentShareLink(env: Environment): Promise<{ link: string | null; message: string | null }> {
+  const { env: travelling, message } = await environmentForExport(env);
   const exportData: EnvironmentExport = {
     version: ENVIRONMENT_EXPORT_VERSION,
     type: 'environment',
     exportedAt: new Date().toISOString(),
-    data: env,
+    data: travelling,
   };
 
   const json = JSON.stringify(exportData);
@@ -111,10 +128,10 @@ export function createEnvironmentShareLink(env: Environment): string | null {
 
   // URL length limit (roughly 2KB for base64)
   if (encoded.length > 2000) {
-    return null; // Too large for URL sharing
+    return { link: null, message }; // Too large for URL sharing
   }
 
-  return `${window.location.origin}/environments?import=${encodeURIComponent(encoded)}`;
+  return { link: `${window.location.origin}/environments?import=${encodeURIComponent(encoded)}`, message };
 }
 
 /**

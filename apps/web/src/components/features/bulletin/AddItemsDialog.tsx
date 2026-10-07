@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useLeftOutNotice } from '../environments/useLeftOutNotice';
+import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
 import { X, Send } from 'lucide-react';
 import { EnvironmentContentViewer } from '../environments/EnvironmentContentViewer';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
@@ -30,6 +32,10 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
     createdAt: new Date().toISOString(),
   }), [dossiers, quickNorms, customAliases, annotations, highlights]);
 
+  const chosenAnnotations = useMemo(() => annotations.filter(a => selection.annotationIds.includes(a.id)), [annotations, selection.annotationIds]);
+  const chosenHighlights = useMemo(() => highlights.filter(h => selection.highlightIds.includes(h.id)), [highlights, selection.highlightIds]);
+  const leftOutNotice = useLeftOutNotice(chosenAnnotations, chosenHighlights);
+
   const hasSelection =
     selection.dossierIds.length + selection.quickNormIds.length + selection.aliasIds.length +
     selection.annotationIds.length + selection.highlightIds.length > 0;
@@ -37,16 +43,18 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
   const submit = async () => {
     setBusy(true); setError(null);
     try {
+      // Words a court withdrew are not offered (spec §8.6).
+      const travelling = await travellingSelection(chosenAnnotations, chosenHighlights);
       const items: Array<{ itemType: SuggestionItemType; payload: unknown }> = [];
       // (same per-type builder as SuggestContentModal — extract to a util
       //  when the third caller appears, not earlier.)
-      for (const id of selection.annotationIds) {
+      for (const id of selection.annotationIds.filter(i => travelling.annotationIds.has(i))) {
         const a = annotations.find(x => x.id === id);
         if (a) items.push({ itemType: 'annotation', payload: {
           normaKey: a.normaKey, articleId: a.articleId, anchorText: a.anchorText, startOffset: a.startOffset, text: a.text,
         }});
       }
-      for (const id of selection.highlightIds) {
+      for (const id of selection.highlightIds.filter(i => travelling.highlightIds.has(i))) {
         const h = highlights.find(x => x.id === id);
         if (h) items.push({ itemType: 'highlight', payload: {
           normaKey: h.normaKey, articleId: h.articleId, anchorText: h.text, startOffset: h.startOffset ?? 0,
@@ -70,6 +78,7 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
           searchParams: a.searchParams, description: a.description,
         }});
       }
+      if (items.length === 0) { setError('Nessun elemento da inviare.'); return; }
       await sharedEnvironmentService.addSuggestionItems(suggestionId, { items });
       onAdded();
     } catch (err) {
@@ -99,6 +108,9 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
             onSelectionChange={setSelection}
             maxHeight="250px"
           />
+          {leftOutNotice && (
+            <p role="status" className="text-sm text-amber-700 dark:text-amber-400">{leftOutNotice}</p>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
         <div className="flex items-center justify-end gap-3 px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
