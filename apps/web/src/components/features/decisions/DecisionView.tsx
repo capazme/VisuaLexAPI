@@ -16,6 +16,7 @@ import {
 import { hasDecisionText } from '../../../utils/decisionText';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { sentenzaFromDecision } from '../dossier/dossierUtils';
+import { DecisionDownloads } from './DecisionDownloads';
 import { DecisionAnchorsWithoutText } from './DecisionAnchorsWithoutText';
 import { DecisionTextView } from './DecisionTextView';
 
@@ -140,6 +141,7 @@ function FoundView({ answer, onToast, actions, textSlot }: {
             <ExternalLink size={16} aria-hidden /> Apri sulla fonte
           </a>
         )}
+        <DecisionDownloads answer={answer} identity={answer.identita} />
         {actions}
       </div>
       {/* Found without its text: the notice above says so, no empty block is drawn, and the reader's

@@ -38,7 +38,7 @@ export function decisionProjection(testo: DecisionText): string {
     .replace(/\n/g, '');
 }
 
-interface DecisionLayout {
+export interface DecisionLayout {
   label: string;
   paragraphs: Array<{ start: number; end: number; ranges: Array<{ from: number; to: number }> }>;
 }
@@ -47,7 +47,7 @@ interface DecisionLayout {
  * The text laid out in projection offsets: per block its label, per paragraph its range and the
  * range of each of its lines (a line holds no `\n`, so a range of the projection is its text).
  */
-function layoutDecision(testo: DecisionText): DecisionLayout[] {
+export function layoutDecision(testo: DecisionText): DecisionLayout[] {
   let offset = 0;
   const texts = blockTexts(testo);
   const hasMotivazione = texts.some(([key, , text]) => key === 'motivazione' && text !== '');
