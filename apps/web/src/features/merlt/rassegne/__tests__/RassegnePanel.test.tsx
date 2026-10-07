@@ -1,5 +1,6 @@
 // apps/web/src/features/merlt/rassegne/__tests__/RassegnePanel.test.tsx
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RassegnePanel } from '../RassegnePanel';
@@ -40,7 +41,7 @@ function renderPanel() {
 }
 
 async function openPanel() {
-  const row = await screen.findByRole('button', { name: /Espandi le rassegne della Cassazione/ });
+  const row = await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ });
   fireEvent.click(row);
 }
 
@@ -60,7 +61,7 @@ describe('RassegnePanel', () => {
   it('is a closed row with the count and the years', async () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel();
-    const row = await screen.findByRole('button', { name: /Espandi le rassegne della Cassazione/ });
+    const row = await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('Nelle rassegne della Cassazione')).toBeInTheDocument();
     expect(screen.getByText('3 passi, 2016–2024')).toBeInTheDocument();
@@ -70,8 +71,9 @@ describe('RassegnePanel', () => {
   it('opens with the keyboard on the newest year', async () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel();
-    const row = await screen.findByRole('button', { name: /Espandi le rassegne della Cassazione/ });
-    fireEvent.keyDown(row, { key: 'Enter' });
+    const row = await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ });
+    row.focus();
+    await userEvent.keyboard('{Enter}');
     expect(await screen.findByText("Rassegna dell'anno 2024")).toBeInTheDocument();
     expect(screen.getByText(/Rassegna civile 2024 · vol\. 1 › CAPITOLO I › § 2 Il danno\./)).toBeInTheDocument();
     expect(screen.getByText('di Anna Rossi')).toBeInTheDocument();
@@ -191,7 +193,7 @@ describe('RassegnePanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Penale' }));
     rerender(<MemoryRouter><RassegnePanel articleUrn={OTHER} /></MemoryRouter>);
     await waitFor(() => expect(fetchRassegne).toHaveBeenLastCalledWith({ urn: OTHER }));
-    expect(await screen.findByRole('button', { name: /Espandi le rassegne della Cassazione/ }))
+    expect(await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ }))
       .toHaveAttribute('aria-expanded', 'false');
   });
 });

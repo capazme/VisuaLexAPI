@@ -120,6 +120,8 @@ export interface ArticleData {
     url?: string;
     norma_data: NormaVisitata;
     brocardi_info?: BrocardiInfo | null;
+    /** Set by the server when Brocardi was asked and did not answer (no `brocardi_info` then). */
+    brocardi_error?: string;
     error?: string;
     queue_position?: number;
     /** What the source's own page says about the text it served; absent when it cannot be read. */

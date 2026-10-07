@@ -17,8 +17,12 @@ interface CaseLawSectionProps {
   norma: NormaVisitata;
   /** Brocardi's massime; `null` when the source gave none. */
   massime: (string | MassimaStructured)[] | null;
-  /** False on a past text (gotcha 32): the massime subsection is not shown at all. */
-  massimeVisible?: boolean;
+  /**
+   * What Brocardi did: `answered` (its massime, or a line saying it has none), `failed` (a line
+   * saying it did not answer: a failure is never shown as an absence), `hidden` (a past text, gotcha 32,
+   * or Brocardi was not asked): no subsection.
+   */
+  massimeState?: 'answered' | 'failed' | 'hidden';
   /** The article's page on Brocardi, credited beside the massime. */
   brocardiLink?: string | null;
   articleUrn?: string;
@@ -70,7 +74,7 @@ function searchNorma(norma: NormaVisitata): DecisionSearchNorma {
  * can search both archives only from a request sent without one (Task 15), so each opening of
  * the section starts from the route's own choice.
  */
-export function CaseLawSection({ norma, massime, massimeVisible = true, brocardiLink, articleUrn, tabId, backEntry, isHistorical = false }: CaseLawSectionProps) {
+export function CaseLawSection({ norma, massime, massimeState = 'answered', brocardiLink, articleUrn, tabId, backEntry, isHistorical = false }: CaseLawSectionProps) {
   const panelId = useId();
   const [open, setOpen] = useState(() => readOpen(tabId));
   const [searched, setSearched] = useState(false);
@@ -112,7 +116,7 @@ export function CaseLawSection({ norma, massime, massimeVisible = true, brocardi
       <div id={panelId} hidden={!open} className="mt-3 space-y-6">
         {open && (
           <>
-            {massimeVisible && (
+            {massimeState !== 'hidden' && (
               <section aria-labelledby={`${panelId}-massime`} className="space-y-2">
                 <h4 id={`${panelId}-massime`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Massime (Brocardi)
@@ -124,7 +128,9 @@ export function CaseLawSection({ norma, massime, massimeVisible = true, brocardi
                     </a>
                   ) : DOCTRINE_ATTRIBUTION}
                 </p>
-                {hasMassime ? (
+                {massimeState === 'failed' ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non ha risposto: le massime non sono disponibili ora.`}</p>
+                ) : hasMassime ? (
                   <MassimeSection massime={massime} besideTabId={tabId} backEntry={backEntry} />
                 ) : (
                   <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non riporta massime per questo articolo.`}</p>

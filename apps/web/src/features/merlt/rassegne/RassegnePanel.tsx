@@ -1,5 +1,5 @@
 // apps/web/src/features/merlt/rassegne/RassegnePanel.tsx
-import { useState, type KeyboardEvent } from 'react';
+import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { RassegnaPassage } from './RassegnaPassage';
@@ -119,27 +119,21 @@ export function RassegnePanel({ articleUrn, besideTabId, backEntry }: RassegnePa
   if (data.total === 0) return null;
 
   const toggle = () => setOpen((v) => !v);
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      toggle();
-    }
-  };
   const both = data.archivi.includes('civile') && data.archivi.includes('penale');
 
   return (
     <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
-      <div role="button" tabIndex={0} aria-expanded={open}
-        aria-label={open ? 'Comprimi le rassegne della Cassazione' : 'Espandi le rassegne della Cassazione'}
-        onClick={toggle} onKeyDown={onKeyDown}
-        className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
-        <span className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</span>
-        <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span>{`${passi(data.total)}, ${years(data.anni)}`}</span>
-          <ChevronDown size={16} className={cn('transition-transform duration-200', open && 'rotate-180')} />
-        </span>
-      </div>
+      {/* Accordion pattern: the toggle inside the heading, named by its text, state in aria-expanded alone. */}
+      <h4>
+        <button type="button" aria-expanded={open} onClick={toggle}
+          className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
+          <span className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</span>
+          <span className="flex items-center gap-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+            <span>{`${passi(data.total)}, ${years(data.anni)}`}</span>
+            <ChevronDown size={16} className={cn('transition-transform duration-200', open && 'rotate-180')} />
+          </span>
+        </button>
+      </h4>
       {open && (
         <div className="mt-3">
           {both && (

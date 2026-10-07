@@ -92,7 +92,7 @@ describe('CaseLawSection', () => {
   });
 
   it('on a past text keeps the section, the Massimario and the search, and drops the massime', async () => {
-    show({ massime: null, massimeVisible: false, isHistorical: true });
+    show({ massime: null, massimeState: 'hidden', isHistorical: true });
     await userEvent.click(toggle());
     expect(screen.queryByText('Massime (Brocardi)')).toBeNull();
     expect(slotCalls.at(-1)?.props).toMatchObject({ isHistorical: true });
@@ -104,6 +104,21 @@ describe('CaseLawSection', () => {
     await userEvent.click(toggle());
     expect(screen.getByRole('heading', { name: 'Massime (Brocardi)' })).toBeInTheDocument();
     expect(screen.getByText('Brocardi.it non riporta massime per questo articolo.')).toBeInTheDocument();
+  });
+
+  it('says Brocardi did not answer, rather than that it has no massime', async () => {
+    show({ massime: null, massimeState: 'failed' });
+    await userEvent.click(toggle());
+    expect(screen.getByRole('heading', { name: 'Massime (Brocardi)' })).toBeInTheDocument();
+    expect(screen.getByText('Brocardi.it non ha risposto: le massime non sono disponibili ora.')).toBeInTheDocument();
+    expect(screen.queryByText(/non riporta massime/)).toBeNull();
+  });
+
+  it('shows no massime subsection when Brocardi was not asked', async () => {
+    show({ massime: null, massimeState: 'hidden' });
+    await userEvent.click(toggle());
+    expect(screen.queryByRole('heading', { name: 'Massime (Brocardi)' })).toBeNull();
+    expect(screen.queryByText(/Brocardi.it non/)).toBeNull();
   });
 
   it('links the source credit to the article on Brocardi, https only', async () => {

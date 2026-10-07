@@ -1195,7 +1195,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             <CaseLawSection
                 norma={norma_data}
                 massime={brocardi_info?.Massime ?? null}
-                massimeVisible={display.doctrineVisible}
+                // Brocardi answered (info present), or failed (error present); not asked: no subsection
+                massimeState={!display.doctrineVisible ? 'hidden' : brocardi_info !== undefined ? 'answered' : data.brocardi_error ? 'failed' : 'hidden'}
                 brocardiLink={brocardi_info?.link}
                 articleUrn={norma_data.urn}
                 tabId={originTabId ?? tabId}

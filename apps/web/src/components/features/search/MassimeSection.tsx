@@ -136,9 +136,9 @@ export function MassimeSection({ massime, besideTabId, backEntry }: MassimeSecti
       >
         <strong className="text-xs font-bold text-slate-500 flex items-center gap-2">
           <Scale size={14} className="text-blue-600" />
-          {filteredMassime.length} di {normalizedMassime.length}
+          {filteredMassime.length} di {normalizedMassime.length} {normalizedMassime.length === 1 ? 'massima' : 'massime'}
         </strong>
-        <span className={cn("transition-transform text-slate-400", isOpen ? "rotate-180" : "")}>
+        <span aria-hidden="true" className={cn("transition-transform text-slate-400", isOpen ? "rotate-180" : "")}>
           ▼
         </span>
       </button>
