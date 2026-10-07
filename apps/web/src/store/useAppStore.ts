@@ -785,8 +785,10 @@ const appStore = createStore<AppState>()(
                 return tabId;
             },
 
-            openDecisionSearchTab: (query, label, options) => {
+            openDecisionSearchTab: (asked, label, options) => {
                 let tabId = '';
+                // the tab keeps the topic as typed, trimmed
+                const query = asked.tema === undefined ? asked : { ...asked, tema: asked.tema.trim() };
                 set((state) => {
                     const wanted = stableQueryKey(query);
                     const existing = state.workspaceTabs.find(t =>
@@ -3169,6 +3171,8 @@ function stableQueryKey(query: DecisionSearchQuery): string {
     // the label is presentation, not query
     const { normaLabel: _label, ...rest } = query;
     void _label;
+    // the same topic typed with other spacing or case is one search
+    if (rest.tema !== undefined) rest.tema = rest.tema.trim().replace(/\s+/g, ' ').toLowerCase();
     return JSON.stringify(sorted({ ...rest, norma: rest.norma ? sorted(rest.norma) : undefined }));
 }
 

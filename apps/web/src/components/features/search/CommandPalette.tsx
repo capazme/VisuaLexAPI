@@ -345,7 +345,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   // A custom alias as the first word is the user's own shortcut, not a topic.
   const topic = useMemo(() => {
     const words = inputValue.trim();
-    if (words.length < 3 || decisionRef || parsedCitation || resolvingRemotely) return null;
+    if (words.length < 3 || !/[\p{L}\p{N}]/u.test(words) || decisionRef || parsedCitation || resolvingRemotely) return null;
     const first = foldAlias(words.split(/\s+/)[0]);
     return customAliases.some((a) => foldAlias(a.trigger) === first) ? null : words;
   }, [inputValue, decisionRef, parsedCitation, resolvingRemotely, customAliases]);

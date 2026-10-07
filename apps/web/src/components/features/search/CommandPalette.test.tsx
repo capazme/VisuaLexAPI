@@ -440,4 +440,24 @@ describe('CommandPalette — a topic for the Cassazione', () => {
     await settle();
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
   });
+
+  it('is not offered for a box with no letter or digit', async () => {
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), '...');
+    await settle();
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
+  });
+
+  it('waits for the server to say it is not an act, then offers the line', async () => {
+    let answer!: (v: unknown) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { answer = resolve; })));
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'perdita di chance');
+    await settle();
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
+    await act(async () => { answer({ ok: true, status: 200, json: async () => ({ recognized: false }) }); });
+    expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
+  });
 });

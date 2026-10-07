@@ -148,7 +148,7 @@ A topic opens a `decision-search` tab (`renderTabView` draws `DecisionSearchTabV
 list; a decision opened from it sits beside that tab, with no way back): from a Brocardi glossary
 term («Sentenze su questo tema», beside the article's tab, with its norm) or from the palette
 (a line «Cerca "…" nelle sentenze della Cassazione», shown only when the box is neither a decision,
-a norm, nor starts with a custom alias, and announced in the palette's status region).
+a norm, nor starts with a custom alias, nor while the server is still resolving it as an act, and announced in the palette's status region).
 
 **Normattiva's update notes** are interactive and out of the way:
 `useArticleTextInteractions` delegates click and Enter/Space on the body — a

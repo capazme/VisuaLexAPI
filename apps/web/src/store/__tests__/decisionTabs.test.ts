@@ -52,6 +52,14 @@ describe('decision tabs', () => {
     expect(get().openDecisionSearchTab({ norma, normaLabel: 'Art. 2043 codice civile' }, 'b')).toBe(a);
   });
 
+  it('reuses one tab for a topic typed with other case or spacing, and keeps it as typed', () => {
+    const a = get().openDecisionSearchTab({ tema: 'Perdita di chance' }, 'Tema: Perdita di chance');
+    expect(get().openDecisionSearchTab({ tema: ' perdita  di chance ' }, 'Tema: perdita di chance')).toBe(a);
+    const b = get().openDecisionSearchTab({ tema: '  Colpa ' }, 'x');
+    const view = get().workspaceTabs.find((t) => t.id === b)!.view;
+    expect(view).toEqual({ kind: 'decision-search', query: { tema: 'Colpa' } });
+  });
+
   describe('side by side', () => {
     const original = { w: window.innerWidth, h: window.innerHeight };
     const viewport = (w: number, h: number, o: { left: number; top: number }) => {
