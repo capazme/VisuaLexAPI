@@ -1,0 +1,48 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FetchDecisionAnswer } from '../../types/decisions';
+
+vi.mock('../../services/decisionService', () => ({ fetchDecision: vi.fn() }));
+import { fetchDecision } from '../../services/decisionService';
+import { fetchDecisionCached, forgetDecision } from '../decisionFetchCache';
+
+const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const mocked = vi.mocked(fetchDecision);
+const answer = (esito: string) => ({ esito }) as unknown as FetchDecisionAnswer;
+
+beforeEach(() => {
+  mocked.mockReset();
+  forgetDecision(REF);
+});
+
+describe('fetchDecisionCached', () => {
+  it('asks once however many callers', async () => {
+    mocked.mockResolvedValue(answer('trovata'));
+    const [a, b] = await Promise.all([fetchDecisionCached(REF), fetchDecisionCached(REF)]);
+    await fetchDecisionCached(REF);
+    expect(a).toBe(b);
+    expect(mocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not keep an unreachable source', async () => {
+    mocked.mockResolvedValue(answer('fonte_non_raggiungibile'));
+    await fetchDecisionCached(REF);
+    await fetchDecisionCached(REF);
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not keep a rejection', async () => {
+    mocked.mockRejectedValueOnce(new Error('network'));
+    await expect(fetchDecisionCached(REF)).rejects.toThrow('network');
+    mocked.mockResolvedValue(answer('trovata'));
+    await fetchDecisionCached(REF);
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks again after forgetDecision', async () => {
+    mocked.mockResolvedValue(answer('non_trovata'));
+    await fetchDecisionCached(REF);
+    forgetDecision(REF);
+    await fetchDecisionCached(REF);
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
+});

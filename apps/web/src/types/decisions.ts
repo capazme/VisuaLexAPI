@@ -1,3 +1,5 @@
+import type { NormaVisitata } from './index';
+
 /** Court decisions (design docs/superpowers/specs/2026-10-01-sentenze-design.md), as
  *  POST /fetch_decision answers them (docs/backend/python_api_reference.md). */
 export type DecisionCourt = 'cassazione' | 'corte_costituzionale';
@@ -14,6 +16,17 @@ export interface DecisionIdentity {
 /** What a citation says: it may lack the archive and carry a section as written. */
 export interface DecisionReference extends DecisionIdentity {
   sezione?: string;
+}
+
+/** The norm a decision search is anchored to (the same fields that identify an article). */
+export type DecisionSearchNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo' | 'allegato'>;
+
+/** What a decision-search tab asks for: decisions citing a norm, matching a text, or both. */
+export interface DecisionSearchQuery {
+  norma?: DecisionSearchNorma;
+  normaLabel?: string;
+  tema?: string;
+  archivio?: DecisionArchive;
 }
 
 /** The particulars the source has, and only those. */
