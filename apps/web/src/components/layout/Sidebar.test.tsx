@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'u1', username: 'tester' }, isAdmin: false, logout: vi.fn() }),
@@ -18,9 +18,14 @@ import { appStore } from '../../store/useAppStore';
  * never named the control for a screen reader or a keyboard user, and the
  * whole primary navigation announced as unnamed links and buttons.
  */
-function renderSidebar() {
+function Where() {
+  return <span data-testid="where">{useLocation().pathname}</span>;
+}
+
+function renderSidebar(initialPath = '/') {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Where />
       <Sidebar
         theme="light"
         toggleTheme={vi.fn()}
@@ -47,11 +52,13 @@ describe('Sidebar — accessible names', () => {
     expect(screen.getByRole('button', { name: /Sentenze/ })).toBeInTheDocument();
   });
 
-  it('opens the palette when «Sentenze» is pressed', () => {
+  it('opens the palette and goes to the search page when «Sentenze» is pressed', () => {
     appStore.setState({ commandPaletteOpen: false });
-    renderSidebar();
+    renderSidebar('/dossier');
+    expect(screen.getByTestId('where')).toHaveTextContent('/dossier');
     fireEvent.click(screen.getByRole('button', { name: /Sentenze/ }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
+    expect(screen.getByTestId('where').textContent).toBe('/');
     appStore.setState({ commandPaletteOpen: false });
   });
 

@@ -19,7 +19,7 @@ function renderAt(path: string) {
   );
 }
 
-beforeEach(() => appStore.setState({ pendingDecision: null, commandPaletteOpen: false }));
+beforeEach(() => appStore.setState({ pendingDecision: null, commandPaletteOpen: false, lastSyncError: null }));
 
 describe('DecisionAddress', () => {
   it('queues the decision and lands on the search page, once', async () => {
@@ -51,5 +51,21 @@ describe('DecisionAddress', () => {
     await screen.findByTestId('search-page');
     expect(appStore.getState().commandPaletteOpen).toBe(true);
     expect(appStore.getState().pendingDecision).toBeNull();
+  });
+
+  it('says why an address does not read, in the app\'s error toast', async () => {
+    renderAt('/sentenze/tar-lazio/1/2024');
+    await screen.findByTestId('search-page');
+    expect(appStore.getState().lastSyncError?.message).toBe("L'indirizzo non indica una sentenza leggibile: Organo non riconosciuto.");
+  });
+
+  it('says nothing for /sentenze alone or for a good address', async () => {
+    const alone = renderAt('/sentenze');
+    await screen.findByTestId('search-page');
+    expect(appStore.getState().lastSyncError).toBeNull();
+    alone.unmount();
+    renderAt('/sentenze/cassazione-civile/10787/2024');
+    await screen.findByTestId('search-page');
+    expect(appStore.getState().lastSyncError).toBeNull();
   });
 });

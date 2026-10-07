@@ -40,7 +40,9 @@ export function DecisionLink({ to, besideTabId, className, title, children }: De
       return;
     }
     const parsed = parseDecisionPath(pathParams(path), new URL(path, 'http://link.invalid').searchParams);
+    // the two parsers share their ranges; if they ever diverge the link still goes somewhere
     if (parsed.ok) openDecisionTab(parsed.reference, { besideTabId });
+    else navigate(path);
   };
   return <a href={path} onClick={onClick} className={className} title={title}>{children}</a>;
 }

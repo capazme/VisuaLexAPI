@@ -10,7 +10,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab, `/sentenze` alone or an
-  address that does not parse opens the palette; the addresses stay the contract with LibreLex
+  address that does not parse opens the palette, and says why in the error toast (`pushSyncError`); the addresses stay the contract with LibreLex
   and the graph), then the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
   `/grafo` (`/merlt/qa` and `/merlt/chiedi` redirect to `/grafo`), and a 404 for
   anything else. The MERL-T routes are always registered: `VITE_FEATURE_MERLT`

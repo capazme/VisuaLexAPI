@@ -73,13 +73,12 @@ describe('DecisionView', () => {
     expect(screen.getByText(/Fonte: Corte di cassazione/)).toBeInTheDocument();
   });
 
-  it('draws the decision as an h4 by default (under the tab\'s h3) and as the h1 when asked', () => {
-    const tab = view(FOUND);
+  it('draws the decision as an h4 (under the tab\'s h3), focusable by script', () => {
+    view(FOUND);
     expect(screen.queryAllByRole('heading', { level: 1 })).toHaveLength(0);
-    expect(screen.getByRole('heading', { level: 4 })).toHaveTextContent(/Sentenza n\. 10787\/2024/);
-    tab.unmount();
-    view(FOUND, { headingLevel: 1 });
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Sentenza n\. 10787\/2024/);
+    const heading = screen.getByRole('heading', { level: 4 });
+    expect(heading).toHaveTextContent(/Sentenza n\. 10787\/2024/);
+    expect(heading).toHaveAttribute('tabindex', '-1');
   });
 
   it('announces the loading in a status that is not inside a busy container', () => {
@@ -241,6 +240,9 @@ describe('DecisionView', () => {
     ['a limit of requests is reached', { esito: 'fonte_non_raggiungibile', fonte: 'quota' }, 'Hai raggiunto il limite di richieste: riprova tra un minuto.'],
     ['the request never reached the server', { esito: 'fonte_non_raggiungibile', fonte: 'rete' }, 'Il server non ha risposto: controlla la connessione e riprova.'],
     ['the service failed', { esito: 'fonte_non_raggiungibile', fonte: 'risposta 502' }, 'Il servizio non ha risposto correttamente: riprova tra poco.'],
+    ['the login gate answered', { esito: 'fonte_non_raggiungibile', fonte: 'risposta 401' }, 'Il servizio non ha risposto correttamente: riprova tra poco.'],
+    ['the route was not found', { esito: 'fonte_non_raggiungibile', fonte: 'risposta 404' }, 'Il servizio non ha risposto correttamente: riprova tra poco.'],
+    ['the Corte costituzionale does not answer', { esito: 'fonte_non_raggiungibile', fonte: 'corte_costituzionale' }, 'La fonte non risponde in questo momento.'],
     ['something unexpected happened', { esito: 'errore_interno' }, 'Errore imprevisto: non è stato possibile caricare la decisione.'],
   ])('offers Riprova when %s', (_what, answer, message) => {
     const { onRetry } = view(answer as FetchDecisionAnswer);
@@ -255,11 +257,6 @@ describe('DecisionView', () => {
     expect(screen.queryByRole('textbox')).toBeNull(); // no lookup form in the view
     fireEvent.click(screen.getByRole('button', { name: 'Cerca nella barra di ricerca' }));
     expect(onOpenPalette).toHaveBeenCalledTimes(1);
-  });
-
-  it('tells a refused request as a refused address on the page of an address', () => {
-    view({ esito: 'richiesta_non_valida', errori: { numero: 'x' } }, { addressShown: true });
-    expect(screen.getByRole('alert')).toHaveTextContent("L'indirizzo non indica una sentenza leggibile: x.");
   });
 
   it('keeps 44px touch targets on mobile on its buttons and on the links to choose from', () => {

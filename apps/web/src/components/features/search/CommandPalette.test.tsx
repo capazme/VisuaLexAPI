@@ -280,10 +280,10 @@ describe('CommandPalette — a decision named in the box', () => {
 
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 10787/2024');
 
-    // announced as a status, like a result the reader should hear
-    const line = await screen.findByRole('status');
-    expect(line).toHaveTextContent('Sentenza → Cass. civ., n. 10787/2024');
-    expect(line).toHaveTextContent('Invio apre');
+    // the visible line, and the one live region (mounted from the start) that announces it
+    expect(await screen.findByText('Sentenza → Cass. civ., n. 10787/2024')).toBeInTheDocument();
+    expect(screen.getByText('Invio apre')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Sentenza: Cass. civ., n. 10787/2024. Invio per aprire.');
 
     await user.keyboard('{Enter}');
     expect(openDecisionTab).toHaveBeenCalledWith({ corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 });
@@ -310,6 +310,20 @@ describe('CommandPalette — a decision named in the box', () => {
     expect(onSearch).not.toHaveBeenCalled();
   });
 
+  it('keeps one live region, empty until a decision is read and again when it goes', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    const region = screen.getByRole('status');
+    expect(region).toBeEmptyDOMElement();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    await user.type(box, 'Cass. civ. 10787/2024');
+    expect(screen.getByRole('status')).toBe(region);
+    expect(region).toHaveTextContent('Sentenza: Cass. civ., n. 10787/2024');
+    await user.clear(box);
+    expect(screen.getByRole('status')).toBe(region);
+    expect(region).toBeEmptyDOMElement();
+  });
+
   it('still previews a norm as before', async () => {
     const user = userEvent.setup();
     renderPalette();
@@ -334,5 +348,12 @@ describe('CommandPalette — a decision named in the box', () => {
     expect(screen.queryByText(/Sentenza →/)).toBeNull();
     await user.keyboard('{Enter}');
     expect(openDecisionTab).not.toHaveBeenCalled();
+  });
+});
+
+describe('CommandPalette — focus on opening', () => {
+  it('puts the cursor in the box, so typing goes somewhere', () => {
+    renderPalette();
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveFocus();
   });
 });

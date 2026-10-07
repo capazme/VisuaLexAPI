@@ -237,7 +237,7 @@ export function decisionCitationOf(data: Omit<DossierSentenzaData, 'etichetta'>)
   });
 }
 
-/** The item a decision page adds: its identity, the attributes the item schema accepts, and the
+/** The item a decision's tab adds: its identity, the attributes the item schema accepts, and the
  *  citation computed from those, so that a later write recomputes the same label. */
 export function sentenzaFromDecision(identity: DecisionIdentity, attrs: DecisionAttributes): DossierSentenzaData {
   const kept = {

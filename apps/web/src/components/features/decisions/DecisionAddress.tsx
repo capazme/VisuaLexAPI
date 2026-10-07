@@ -12,10 +12,15 @@ export function DecisionAddress() {
   const [search] = useSearchParams();
   const requestOpenDecision = useAppStore((s) => s.requestOpenDecision);
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
+  const pushError = useAppStore((s) => s.pushSyncError);
   const parsed = params.corte ? parseDecisionPath(params, search) : null;
   useEffect(() => {
     if (parsed?.ok) requestOpenDecision(parsed.reference);
-    else openCommandPalette();
+    else {
+      // the app's transient error toast (SyncErrorToast, mounted for the whole layout)
+      if (parsed) pushError(`L'indirizzo non indica una sentenza leggibile: ${Object.values(parsed.errors).join('; ')}.`);
+      openCommandPalette();
+    }
     // the address is read once, as the route mounts
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

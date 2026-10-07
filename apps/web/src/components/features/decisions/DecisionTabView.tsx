@@ -45,11 +45,14 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
   // The reader chose a candidate in another tab that turned out to be this one: the tab they were
   // in is gone, so keyboard focus comes here rather than falling to the page.
   useEffect(() => {
-    if (focusRequested && takeFocusRequest(tabId)) panelRef.current?.focus();
+    if (focusRequested && takeFocusRequest(tabId)) {
+      const panel = panelRef.current;
+      (panel?.querySelector<HTMLElement>('[data-decision-heading]') ?? panel)?.focus();
+    }
   }, [focusRequested, takeFocusRequest, tabId]);
 
   return (
-    <div ref={panelRef} tabIndex={-1} data-decision-tab={tabId} className="outline-none">
+    <div ref={panelRef} tabIndex={-1} data-decision-tab={tabId} className="focus:outline-none">
       <DecisionView
         answer={answer}
         reference={current}

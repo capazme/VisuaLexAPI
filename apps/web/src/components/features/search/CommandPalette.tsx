@@ -496,6 +496,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
               </div>
             </div>
 
+            {/* One live region for the whole life of the palette, its text changing: a region that
+                appears already holding its text is often not announced. The visible line is aria-hidden. */}
+            <p role="status" className="sr-only">
+              {decisionRef ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.` : ''}
+            </p>
+
             {/* Main Interactive Input Area */}
             <div className="flex items-center gap-4 px-6 pb-6">
               <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
@@ -505,6 +511,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
               {step === 'select_act' && (
                 <div className="flex-1">
                   <Command.Input
+                    autoFocus
                     value={inputValue}
                     onValueChange={setInputValue}
                     placeholder="Es. 'art 2043 cc' o 'Cass. civ. 10787/2024'"
@@ -523,7 +530,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                     {/* A decision named in the box: Enter opens its tab */}
                     {decisionRef && (
                       <motion.div
-                        role="status"
+                        aria-hidden
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="mt-2 flex items-center gap-2.5"

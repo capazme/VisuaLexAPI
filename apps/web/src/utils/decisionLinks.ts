@@ -10,8 +10,9 @@ import type {
 } from '../types/decisions';
 import { formatDateForCitation, formatDateItalianLong, withPreposition } from './dateUtils';
 
-/** True: App.tsx routes /sentenze/:corte/:numero/:anno, so data that names a decision (the Massimario's
- *  chips) can link to its page. The one switch for those links. */
+/** True: App.tsx routes /sentenze/:corte/:numero/:anno (the address opens the decision's tab in the
+ *  search space), so data that names a decision (the Massimario's chips) can link to it. The one
+ *  switch for those links. */
 export const DECISION_PAGE_AVAILABLE = true;
 
 /** A decision as other data names it (graph nodes, imports): loose, possibly incomplete. */
@@ -26,9 +27,9 @@ export interface LooseDecisionRef {
 const LINKABLE_FIRST_YEAR: Record<string, number> = { cassazione: 1900, corte_costituzionale: 1956 };
 
 /**
- * The page of a decision named by other data, or null when that data cannot make a link (another
+ * The address of a decision named by other data, or null when that data cannot make a link (another
  * court, no year, a number out of range). With the archive the path is the identity's and carries
- * no section; without it, the section as written goes along for the page to resolve.
+ * no section; without it, the section as written goes along for the decision's tab to resolve.
  */
 export function linkableDecisionPath(raw: LooseDecisionRef, now: Date = new Date()): string | null {
   const first = Object.hasOwn(LINKABLE_FIRST_YEAR, raw.corte) ? LINKABLE_FIRST_YEAR[raw.corte] : undefined;
@@ -212,7 +213,7 @@ export function isDecisionKey(key: string): boolean {
 /**
  * The decision a Brocardi massima is headed with ("Cass. civ.", "Cass. pen.", "Cass. lav.",
  * "Cass. sez. un.", "Cass.", "Corte cost.", then "n. 31191/2025"), or null for another court
- * or no number. A bare «Cass.» names no archive and «Cass. sez. un.» only its section: the page
+ * or no number. A bare «Cass.» names no archive and «Cass. sez. un.» only its section: the route
  * resolves them (Sentenze design §2), never a guess here. «Cass. lav.» is the civil labour section.
  */
 export function brocardiDecisionRef(

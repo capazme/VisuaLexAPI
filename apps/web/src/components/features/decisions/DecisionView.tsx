@@ -29,12 +29,6 @@ export interface DecisionViewProps {
   actions?: React.ReactNode;
   /** Replaces the plain text (the reading surface, later). */
   textSlot?: React.ReactNode;
-  /** The decision's heading: 1 on a page of its own; 4 (default) inside a workspace tab, where the
-   *  tab's label is an h3 and the norm cards' titles are h4 too. */
-  headingLevel?: 1 | 2 | 3 | 4;
-  /** The view is the page of an address (`/sentenze/…`): a refused request is then told as a
-   *  refused address, otherwise as a refused citation. */
-  addressShown?: boolean;
 }
 
 function Alert({ children }: { children: React.ReactNode }) {
@@ -71,18 +65,16 @@ function DecisionChoice({ identity, onChoose, className, children }: {
   );
 }
 
-function FoundView({ answer, onToast, actions, textSlot, headingLevel }: {
+function FoundView({ answer, onToast, actions, textSlot }: {
   answer: FoundDecision;
   onToast: ShowToast;
   actions?: React.ReactNode;
   textSlot?: React.ReactNode;
-  headingLevel: 1 | 2 | 3 | 4;
 }) {
   // The source's own page, only ever over https: the address comes from our server, built on fixed
   // bases, so this is defence in depth.
   const sourceUrl = httpsUrl(answer.fonte.url);
   const [dossierAnchor, setDossierAnchor] = useState<HTMLElement | null>(null);
-  const Heading = `h${headingLevel}` as const;
 
   const copy = async (text: string, done: string, what: string) => {
     try {
@@ -97,9 +89,15 @@ function FoundView({ answer, onToast, actions, textSlot, headingLevel }: {
 
   return (
     <article className="space-y-5">
-      <Heading className="text-xl font-semibold text-slate-900 dark:text-white">
+      {/* h4: the tab's label is an h3 and the norm cards' titles are h4 too. Focusable by script, so a
+          tab that takes over from a closed one can put the reader's focus on the decision. */}
+      <h4
+        tabIndex={-1}
+        data-decision-heading
+        className="text-xl font-semibold text-slate-900 dark:text-white rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      >
         {formatDecisionHeading(answer.identita, answer.attributi)}
-      </Heading>
+      </h4>
       {answer.avvisi.map((notice, i) => (
         <Alert key={i}>{describeNotice(notice, answer.attributi)}</Alert>
       ))}
@@ -177,9 +175,9 @@ function unreachableMessage(fonte: string): string {
   return 'La fonte non risponde in questo momento.';
 }
 
-/** The body of a decision, wherever it is drawn: the workspace tab, the phone's view or the page. */
+/** The body of a decision, wherever it is drawn: the workspace tab or the phone's view. */
 export function DecisionView({
-  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, headingLevel = 4, addressShown = false,
+  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot,
 }: DecisionViewProps) {
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
   const linkClass = `inline-flex items-center text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE}`;
@@ -208,7 +206,6 @@ export function DecisionView({
         onToast={(message, type) => setToast({ message, type })}
         actions={actions}
         textSlot={textSlot}
-        headingLevel={headingLevel}
       />
     );
   } else if (answer.esito === 'ambigua') {
@@ -262,7 +259,7 @@ export function DecisionView({
     // richiesta_non_valida: the route refused the request; its reasons, and the search to start over
     body = (
       <Alert>
-        <p>{addressShown ? "L'indirizzo" : 'La citazione'} non indica una sentenza leggibile: {Object.values(answer.errori).join('; ')}.</p>
+        <p>La citazione non indica una sentenza leggibile: {Object.values(answer.errori).join('; ')}.</p>
         <div className="mt-2">
           <Button variant="secondary" size="sm" icon={<Search size={16} />} className={TOUCH_TARGET_RESPONSIVE} onClick={onOpenPalette}>
             Cerca nella barra di ricerca
