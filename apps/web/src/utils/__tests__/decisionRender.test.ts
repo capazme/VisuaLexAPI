@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { decisionProjection, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
+import { decisionProjection, decisionStructure, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
 import { DECISION_TEXTS, READER_TEXTS } from '../__fixtures__/decisionTexts';
 import type { Annotation, Highlight } from '../../types';
 
@@ -28,18 +28,43 @@ function findGolden(from: string): string {
   }
 }
 
+/** An offset moved off the middle of a surrogate pair, so a mark never cuts a character in two. */
+const whole = (plain: string, i: number): number => (i > 0 && i < plain.length && /[\udc00-\udfff]/.test(plain[i]) ? i - 1 : i);
+
+/**
+ * Marks and a note on any text, short or long: the head, the tail, one over the first special
+ * character (no-break space, `<`, `&`, `\r`, an astral one), one across the first paragraph
+ * boundary (a block boundary where the text has two blocks), and a note in the middle.
+ */
+function marksOn(testo: Parameters<typeof decisionProjection>[0]) {
+  const plain = decisionProjection(testo);
+  const n = plain.length;
+  const span = (from: number, to: number, id: string) => {
+    const a = whole(plain, Math.max(0, from));
+    const b = whole(plain, Math.min(n, to));
+    return hl(a, plain.slice(a, b), id);
+  };
+  const highlights = [span(0, 10, 'head'), span(n - 10, n, 'tail')];
+  const special = /[\u00a0<&\r]|[\ud800-\udbff][\udc00-\udfff]/.exec(plain);
+  if (special) highlights.push(span(special.index - 2, special.index + special[0].length + 2, 'special'));
+  const blocks = decisionStructure(testo).blocks;
+  if (blocks.length > 1) highlights.push(span(blocks[0].end - 3, blocks[1].start + 3, 'cross'));
+  const mid = whole(plain, Math.floor(n / 2));
+  const end = whole(plain, Math.min(n, mid + 5));
+  const annotations = n > 0 ? [note(mid, plain.slice(mid, end), 'mid')] : [];
+  return { plain, highlights: n > 0 ? highlights : [], annotations };
+}
+
 describe('renderDecisionHtml', () => {
   for (const [name, testo] of Object.entries(DECISION_TEXTS)) {
     for (const signs of [false, true]) {
       it(`${name}: the text nodes spell the projection, marks on, signs ${signs ? 'on' : 'off'}`, () => {
-        const plain = decisionProjection(testo);
-        const marks = plain.length > 60 ? [hl(10, plain.slice(10, 40)), hl(plain.length - 30, plain.slice(-30))] : [];
-        const notes = plain.length > 60 ? [note(25, plain.slice(25, 33))] : [];
-        const html = renderDecisionHtml({ testo, highlights: marks, annotations: notes, signs });
+        const { plain, highlights, annotations } = marksOn(testo);
+        const html = renderDecisionHtml({ testo, highlights, annotations, signs });
         expect(textNodes(html)).toBe(plain);
         const root = document.createElement('div');
         root.innerHTML = html;
-        expect(root.innerHTML).toBe(html.replace(/\u00a0/g, '&nbsp;')); // kept as written (only nbsp is serialised as an entity): well-formed
+        expect(root.innerHTML).toBe(html.replace(/\u00a0/g, '&nbsp;').replace(/&#13;/g, '\r')); // kept as written (only nbsp is serialised as an entity): well-formed
       });
     }
   }
@@ -163,13 +188,71 @@ describe('the web projection is the API projection', () => {
       // the golden counts Python code points, a JS string counts UTF-16 units
       expect({ sha256: createHash('sha256').update(plain, 'utf8').digest('hex'), length: [...plain].length }).toEqual(golden[key]);
       for (const signs of [false, true]) {
-        const marks = [hl(0, plain.slice(0, 20)), hl(Math.max(0, plain.length - 20), plain.slice(-20))];
-        expect(textNodes(renderDecisionHtml({ testo, highlights: marks, annotations: [], signs }))).toBe(plain);
+        const { highlights, annotations } = marksOn(testo);
+        expect(textNodes(renderDecisionHtml({ testo, highlights, annotations, signs }))).toBe(plain);
       }
     });
   }
 
-  it('every reader-derived fixture has a golden entry', () => {
+  it('every reader-derived fixture has a golden entry, and every synthetic golden entry a fixture', () => {
     expect(Object.keys(READER_TEXTS).filter((k) => !(k in golden))).toEqual([]);
+    // the golden also holds real and open-data cases the web must not carry; the synthetic ones it must
+    expect(Object.keys(golden).filter((k) => k.startsWith('synthetic_') && !(k in READER_TEXTS))).toEqual([]);
+  });
+
+  it('the astral case tells code points from UTF-16 units', () => {
+    const plain = decisionProjection(READER_TEXTS.synthetic_field_astral);
+    expect(plain.length).toBe([...plain].length + 2);
+    expect(golden.synthetic_field_astral.length).toBe([...plain].length);
+  });
+});
+
+describe('decisionStructure', () => {
+  const testo = DECISION_TEXTS.wraps_and_paragraphs;
+
+  it('is the same list every time, whatever the anchors, and the renderer numbers its signs by it', () => {
+    expect(decisionStructure(testo)).toEqual(decisionStructure({ ...testo }));
+    const { blocks } = decisionStructure(testo);
+    const plain = decisionProjection(testo);
+    expect(blocks.length).toBe(4); // three paragraphs of the motivazione, one of the dispositivo
+    expect(blocks.map((b) => plain.slice(b.start, b.end))[1]).toBe('  Secondo paragrafo con rientro.');
+    const at = plain.indexOf('Terzo');
+    for (const marks of [[], [hl(at, 'Terzo')]]) {
+      const root = document.createElement('div');
+      root.innerHTML = renderDecisionHtml({ testo, highlights: marks, annotations: [], signs: true });
+      expect(root.querySelectorAll('.vlx-dec-para').length).toBe(blocks.length);
+      expect([...root.querySelectorAll<HTMLElement>('.vlx-sign')].map((s) => s.dataset.block)).toEqual(marks.length ? ['2'] : []);
+    }
+  });
+
+  it('has no paragraph for a block without text', () => {
+    expect(decisionStructure({}).blocks).toEqual([]);
+    expect(decisionStructure({ epigrafe: '  ', motivazione: 'x' }).blocks.length).toBe(1);
+  });
+});
+
+describe('labels and characters', () => {
+  const labels = (html: string) => [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('section')].map((s) => s.dataset.label);
+
+  it('an epigrafe is «Testo» when the stripped motivazione is empty', () => {
+    expect(labels(renderDecisionHtml({ testo: { epigrafe: 'a', motivazione: ' \n\t ' }, highlights: [], annotations: [] }))).toEqual(['Testo']);
+    expect(labels(renderDecisionHtml({ testo: { epigrafe: 'a', motivazione: 'b' }, highlights: [], annotations: [] }))).toEqual(['Epigrafe', 'Motivazione']);
+  });
+
+  it('keeps an interior carriage return in the DOM', () => {
+    const testo = DECISION_TEXTS.carriage_return;
+    const html = renderDecisionHtml({ testo, highlights: [], annotations: [] });
+    expect(html).toContain('&#13;');
+    expect(textNodes(html)).toContain('riga uno\rriga due');
+    expect(textNodes(html)).toBe(decisionProjection(testo));
+  });
+
+  it('marks that touch the special characters are really drawn', () => {
+    for (const name of ['nbsp', 'astral', 'markup', 'carriage_return', 'epigrafe_only']) {
+      const { highlights } = marksOn(DECISION_TEXTS[name]);
+      const root = document.createElement('div');
+      root.innerHTML = renderDecisionHtml({ testo: DECISION_TEXTS[name], highlights, annotations: [] });
+      expect(root.querySelectorAll('mark').length, name).toBeGreaterThanOrEqual(2);
+    }
   });
 });

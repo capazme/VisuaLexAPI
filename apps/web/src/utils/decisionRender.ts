@@ -38,6 +38,51 @@ export function decisionProjection(testo: DecisionText): string {
     .replace(/\n/g, '');
 }
 
+interface DecisionLayout {
+  label: string;
+  paragraphs: Array<{ start: number; end: number; ranges: Array<{ from: number; to: number }> }>;
+}
+
+/**
+ * The text laid out in projection offsets: per block its label, per paragraph its range and the
+ * range of each of its lines (a line holds no `\n`, so a range of the projection is its text).
+ */
+function layoutDecision(testo: DecisionText): DecisionLayout[] {
+  let offset = 0;
+  const texts = blockTexts(testo);
+  const hasMotivazione = texts.some(([key, , text]) => key === 'motivazione' && text !== '');
+  return texts.map(([key, name, text]) => {
+    const label = key === 'epigrafe' && !hasMotivazione ? 'Testo' : name;
+    const paragraphs = text
+      ? decisionParagraphs(text).map((lines) => {
+          const start = offset;
+          const ranges = lines.map((line) => {
+            const from = offset;
+            offset += line.length;
+            return { from, to: offset };
+          });
+          return { start, end: offset, ranges };
+        })
+      : [];
+    return { label, paragraphs };
+  });
+}
+
+/**
+ * A decision's paragraphs as the blocks of an article's structure, in projection offsets: the
+ * one list the renderer's `data-block` indices, `groupAnnotationsByBlock` and the popover's
+ * host (`describeBlock(decisionProjection(testo), block)` names a block) all read, so a sign and
+ * the list it opens never disagree. It depends on the text alone, never on the anchors.
+ */
+export function decisionStructure(testo: DecisionText): ArticleStructure {
+  return {
+    blocks: layoutDecision(testo).flatMap((b) => b.paragraphs.map(({ start, end }) => ({ start, end, kind: 'comma' as const }))),
+    decorations: [],
+    notes: {},
+    updates: null,
+  };
+}
+
 export interface RenderDecisionInput {
   testo: DecisionText;
   highlights: readonly Highlight[];
@@ -58,30 +103,8 @@ export function renderDecisionHtml({ testo, highlights, annotations, signs = fal
     }
   });
 
-  // Lay the text out first: each line is a range of the projection (no `\n` in it), so
-  // `renderSpan` over `plain` cuts and nests the marks per line, each segment self-contained.
-  let offset = 0;
-  const layout = blockTexts(testo).map(([key, name, text]) => {
-    const label = key === 'epigrafe' && !testo.motivazione ? 'Testo' : name;
-    const paragraphs = text
-      ? decisionParagraphs(text).map((lines) => {
-          const start = offset;
-          const ranges = lines.map((line) => {
-            const from = offset;
-            offset += line.length;
-            return { from, to: offset };
-          });
-          return { start, end: offset, ranges };
-        })
-      : [];
-    return { label, paragraphs };
-  });
-
-  // A paragraph is a block of the pseudo-structure the signs are counted over.
-  const all = layout.flatMap((b) => b.paragraphs);
-  const groups = signs
-    ? groupAnchorsByBlock(plain, { blocks: all.map((p) => ({ start: p.start, end: p.end, kind: 'comma' as const })) } as ArticleStructure, anchors)
-    : null;
+  const layout = layoutDecision(testo);
+  const groups = signs ? groupAnchorsByBlock(plain, decisionStructure(testo), anchors) : null;
 
   let index = 0;
   return layout
@@ -90,7 +113,10 @@ export function renderDecisionHtml({ testo, highlights, annotations, signs = fal
       const html = paragraphs
         .map(({ ranges }) => {
           const lines = ranges
-            .map(({ from, to }) => `<span class="vlx-dec-line">${renderSpan(plain, from, to, marks, false)}</span>`)
+            // A carriage return inside a line is kept by the projection but the HTML parser would
+            // turn it into a line feed: as a character reference it reaches the DOM unchanged.
+            // (A NUL is dropped by the parser and stays a limit, as in an article.)
+            .map(({ from, to }) => `<span class="vlx-dec-line">${renderSpan(plain, from, to, marks, false).replace(/\r/g, '&#13;')}</span>`)
             .join('');
           // After the lines, so a sign is never inside a mark.
           const sign = groups ? signHtml(index, groups[index]) : '';

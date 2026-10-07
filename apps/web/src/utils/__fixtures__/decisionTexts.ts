@@ -7,7 +7,7 @@ import type { DecisionText } from '../../types/decisions';
  *
  * READER_TEXTS is the output of the API's readers on the synthetic cases of
  * services/visualex/tests/test_decisions_text_frozen.py (the PDF built by decisions_pdf_synth.py,
- * the text-field fallbacks, three Corte costituzionale records written by hand), recorded by a
+ * the text-field fallbacks, three Corte costituzionale records written by hand; no real record), recorded by a
  * scratch run of the Python readers and copied character for character; each key is that
  * golden's key, and decisionRender.test.ts checks the web's projection against its SHA-256.
  * Frozen on purpose: a re-record changes what the tests prove.
@@ -30,9 +30,10 @@ export const READER_TEXTS: Record<string, DecisionText> = {
   "synthetic_field_multivalued": {
     motivazione: "RILEVATO CHE primo.  \n  \n\nCONSIDERATO CHE secondo.",
   },
-  "italgiure_snpen_10787_2024.json": {
-    motivazione: "seguente ORDINANZA sul ricorso proposto da:",
-    dispositivo: "P. Q. M.",
+  "synthetic_field_astral": {
+    motivazione: "RILEVATO CHE la massima \ud835\udc9c vale per la sezione \ud835\udc9d. \n\nP.Q.M. Rigetta.",
+  },
+  "synthetic_field_withheld": {
   },
   "synthetic_corte_cost_full": {
     epigrafe: "LA CORTE COSTITUZIONALE\nha pronunciato la seguente",
@@ -72,6 +73,8 @@ export const SHAPE_TEXTS: Record<string, DecisionText> = {
   epigrafe_only: { epigrafe: 'Ordinanza\nsul ricorso n. 1.' },
   // a character outside the BMP is two UTF-16 units and one code point
   astral: { motivazione: 'La massima \u{1D49C} vale per la sezione \u{1D49D}.\nFine.' },
+  // a carriage return inside a line (the field reader does not normalise it)
+  carriage_return: { motivazione: 'riga uno\rriga due\r\nterza riga', dispositivo: 'Rigetta.' },
   // markup-looking characters must reach a text node escaped, never parsed
   markup: { motivazione: 'Se a < b && b > c, "x" & \'y\'.' },
 };
