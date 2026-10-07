@@ -1,6 +1,6 @@
 # VisuaLex Studia — the screens for study cards
 
-**Status:** draft for the owner's review (7 October 2026). No code yet.
+**Status:** approved by the owner (7 October 2026), with decision 22 added at his request. No code yet.
 **Plan:** `docs/superpowers/plans/2026-10-07-studia-cards-screens.md`.
 **Builds on:** the foundation plan (`docs/superpowers/plans/2026-09-30-lingolex-foundation.md`: the card model, its states, the FSRS v4 engine, account deletion) and the MCP second round (`docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` §6: the card routes, anchors given in words, the trash).
 
@@ -8,7 +8,7 @@
 
 The cards exist in the database, Claude can create them through MCP, and they appear nowhere in the web app except the dossier trash. Nobody can read, write, study or validate a card in VisuaLex. Two goals of the owners' workspace make that the next thing to build: a seed of validated cards per subject, written by the founders and validated by them and a few recruited graduates (D-066, D-067); and studying those cards with spaced repetition.
 
-The interview of 7 October put 21 questions, each with a proposal, to the owner. His answer: «per il resto la spec di Visualex Studia va bene». He commented on no single question, so all 21 proposals stand as written. Four points are the other developer's to confirm, and are recorded here as provisional defaults: the validation threshold (decision 14), and three questions on the exam simulation (§11). Two texts are the owner's to word: the notice shown when proposing a card (decision 13) and the consent before the first simulation (§11, question 20).
+The interview of 7 October put 21 questions, each with a proposal, to the owner. His answer: «per il resto la spec di Visualex Studia va bene». He commented on no single question, so all 21 proposals stand as written. Four points are the other developer's to confirm, and are recorded here as provisional defaults: the validation threshold (decision 14), and three questions on the exam simulation (§11). Two texts the user must accept, the notice shown when proposing a card (decision 13) and the consent before the first simulation (§11, question 20), were approved as worded on 7 October, on one condition of the owner's: «fai in modo che questi testi si possano cambiare facilmente dalla schermata admin» (decision 22).
 
 The product name on screen is **VisuaLex Studia** (D-064). Identifiers in the code (`Lingo…`, `lingolex_…`, `/api/lingo/…`) stay as they are until a rename of their own; nothing the user reads says «LingoLex».
 
@@ -19,8 +19,8 @@ Three pull requests of code after this one, in this order, each usable on its ow
 | PR | What the user gets | Schema |
 | --- | --- | --- |
 | **A. My cards** | The «Studia» area with «Le mie schede»: list, filters, detail, create and edit by hand, delete to the trash. Under each article in the reader, the cards anchored to it and «+ Nuova scheda». Cards written by Claude are marked. | `LingoCard` gains its origin (two columns). |
-| **B. Propose and validate** | «Proponi alla comunità» on a draft, with the licence notice. A validator role given by the admin. The «Da validare» queue. Validated cards counted and shown. | `LingoValidazioneCard`, `LingoPreferenzeStudio` (the notice's acceptance), `User.lingoValidatore`. |
-| **C. Review** | The «Ripasso» view: today's cards one at a time, four grades with their intervals, a daily goal, community cards by subject. | `LingoStatoRipasso`, `LingoRevisioneSRS`; `LingoPreferenzeStudio` gains the daily goal and the subjects. |
+| **B. Propose and validate** | «Proponi alla comunità» on a draft, with the licence notice. A validator role given by the admin. The «Da validare» queue. Validated cards counted and shown. | `LingoValidazioneCard`; `LingoTestoVersione` and `LingoAccettazioneTesto` (texts to accept, versioned, and who accepted which); `LingoCard.propostaTestoId`; `User.lingoValidatore`. |
+| **C. Review** | The «Ripasso» view: today's cards one at a time, four grades with their intervals, a daily goal, community cards by subject. | `LingoStatoRipasso`, `LingoRevisioneSRS`, `LingoPreferenzeStudio` (the daily goal and the subjects). |
 
 Out of scope: the exam simulation (its open answers are recorded in §11 and in the foundation plan's «Later»); the norm watcher that moves a card to «da rivedere»; RLCF weighting, authority and the «controversa» flag; offline use and installing the app; changes to the MCP tools beyond their user-facing wording.
 
@@ -50,7 +50,7 @@ Approved by the owner on 7 October (interview questions in brackets), unless mar
 10. **«Le mie schede»** (Q10): the author's cards, **grouped by subject, then institute**. Each row: the title (institute · anchor), the state as a chip, and, from PR C, the next review date. Filters: subject, state, kind, «da ripassare oggi» (from PR C), act (any anchor on that act, e.g. every card on the c.c.), and a text search in the question and the institute. On a phone the list is one column and a card's detail opens full screen.
 11. **Cards written by Claude** (Q11). A card records the connected application that created it, in two new nullable columns `createdByClientId` / `createdByClientName` on `LingoCard`, the same pair `DossierItem` has. A card created in the web app leaves them null. The list shows the dossier's mark «scritta da Claude Code (applicazione collegata)» (`ClaudeMark`, `dossierUtils.ts`) and offers the filter **«Scritte da Claude, da rileggere»**: a generated card deserves a look before it is proposed. The filter is origin = a connected application and state = draft.
 12. **Community cards** (Q12) show the chip **«Validata»** and the count of approvals («validata da 3»), **without the author's name** (consistent with D-045: the author disappears at deletion anyway). The «controversa» flag waits for RLCF.
-13. **Proposing** (Q13). «Proponi alla comunità» on a draft. The first time, a one-off notice to accept (D-045, D-057). The proposed wording, **for the owner to approve as final**:
+13. **Proposing** (Q13). «Proponi alla comunità» on a draft. Before the first proposal, a notice to accept (D-045, D-057). Its wording, **approved by the owner on 7 October** and seeded as version 1 of the text `PROPOSTA_SCHEDA` (decision 22):
 
     > **Proponi la scheda alla comunità**
     >
@@ -62,7 +62,7 @@ Approved by the owner on 7 October (interview questions in brackets), unless mar
     >
     > ☐ Ho letto e accetto — [Annulla] [Proponi]
 
-    The acceptance is stored with its time and the notice's version (`proposta-cc-by-sa-4.0-v1`); a new version of the text asks again.
+    The acceptance records which version was accepted, and when. Once an administrator saves a new version, the notice is shown again **at the next proposal**: cards proposed before stay under the version accepted then, and each card records the version it was proposed under (`propostaTestoId`).
 14. **Validators and the rule** (Q14). **Provisional default, to confirm with the other developer.**
     - Validators are the users an administrator marks as such (`User.lingoValidatore`, a checkbox in the admin's user page): the founders and the graduates of D-066.
     - A vote is **approvata**, **migliorabile** or **errata**; a reason is required unless the vote is «approvata».
@@ -79,6 +79,12 @@ Taken here, for the owner's review of this spec:
 19. **Validations outlive their author, anonymous.** The specification cascades a validator's votes with their account; the owner's rule for cards (D-045, «si mantiene la validazione») keeps them: `LingoValidazioneCard.utenteId` becomes null at deletion (`SET NULL`), so a validated card keeps the votes that validated it. A vote's reason is the validator's writing and may name someone: the same reservation as the card's text, to check before the beta. Reviews, review state and preferences are personal and go with the account.
 20. **New state-machine arrow:** proposed → draft (decision 5). Every other arrow stays as the specification draws it.
 21. **Matching a card to the article being read** uses the anchor's URN. The reader's `norma_data.urn` is a Normattiva address; the server cuts it at `urn:` exactly as `lingo/anchors.ts` does when it stores an anchor, in one shared function, and drops a version suffix (`!vig=…`, `@…`), which a stored anchor never has. An EU act has no URN anchor, so its articles show no row.
+22. **Texts to accept live in the database, versioned, and the admin edits them** (the owner, 7 October: «per ora va bene, ma fai in modo che questi testi si possano cambiare facilmente dalla schermata admin», for both texts).
+    - Each text has a key (`PROPOSTA_SCHEDA` in PR B; `CONSENSO_SIMULAZIONE` with the simulation, §11) and a series of versions: title, body, checkbox label, button label, when, and which administrator wrote it. The current text is the highest version.
+    - Editing from the admin screen never overwrites: it **creates a new version**, and the old ones stay, readable in the admin screen. No route deletes a version, and the database refuses to (`Restrict` from acceptances and cards).
+    - An **acceptance** records the user, the version and the time. A user who has not accepted the current version is asked again: for the proposal notice at their next proposal, for the consent before their next simulation.
+    - The body is plain text. Paragraphs are separated by a blank line; no HTML or Markdown is interpreted, so an administrator's text cannot carry a script (§7).
+    - Version 1 of each text is written by the migration that creates its key, with the wording the owner approved. Changing the wording later needs no release.
 
 ## 4. Data model
 
@@ -118,20 +124,46 @@ model LingoValidazioneCard {
   @@map("lingo_validazioni_card")
 }
 
-model LingoPreferenzeStudio {
-  utenteId                  String    @id @map("utente_id")
-  // The proposal notice (decision 13): when it was accepted, and which text.
-  licenzaPropostaAccettata  DateTime? @map("licenza_proposta_accettata")
-  licenzaPropostaVersione   String?   @map("licenza_proposta_versione")
-  updatedAt                 DateTime  @updatedAt @map("updated_at")
+enum LingoTestoChiave {
+  PROPOSTA_SCHEDA
+}
 
-  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+// A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
+model LingoTestoVersione {
+  id        String           @id @default(uuid())
+  chiave    LingoTestoChiave
+  versione  Int
+  titolo    String
+  corpo     String           @db.Text
+  conferma  String           // the checkbox, e.g. «Ho letto e accetto»
+  azione    String           // the button, e.g. «Proponi»
+  createdAt DateTime         @default(now()) @map("created_at")
+  // The administrator who wrote it; null for version 1 (written by the migration) or once that account is gone.
+  autoreId  String?          @map("autore_id")
 
-  @@map("lingo_preferenze_studio")
+  autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  accettazioni LingoAccettazioneTesto[]
+  carte        LingoCard[]
+
+  @@unique([chiave, versione])
+  @@map("lingo_testi_versioni")
+}
+
+model LingoAccettazioneTesto {
+  id         String   @id @default(uuid())
+  utenteId   String   @map("utente_id")
+  testoId    String   @map("testo_id")
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+
+  utente User               @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  testo  LingoTestoVersione @relation(fields: [testoId], references: [id], onDelete: Restrict)
+
+  @@unique([utenteId, testoId])
+  @@map("lingo_accettazioni_testi")
 }
 ```
 
-and on `User`: `lingoValidatore Boolean @default(false) @map("lingo_validatore")`, plus the back-relations. `pesoAuthority` from the specification is left out until RLCF: a column nobody writes would read as a weight of 0. With `utenteId` nullable, Postgres treats nulls as distinct, so anonymous votes never collide on the unique index.
+on `LingoCard`: `propostaTestoId String? @map("proposta_testo_id")`, the version of the notice the card was proposed under (`Restrict`; null for a draft, cleared on withdrawal); and on `User`: `lingoValidatore Boolean @default(false) @map("lingo_validatore")`, plus the back-relations. The migration inserts version 1 of `PROPOSTA_SCHEDA` with the wording of decision 13. `pesoAuthority` from the specification is left out until RLCF: a column nobody writes would read as a weight of 0. With `utenteId` nullable, Postgres treats nulls as distinct, so anonymous votes never collide on the unique index.
 
 **PR C**:
 
@@ -174,7 +206,20 @@ model LingoRevisioneSRS {
 }
 ```
 
-and on `lingo_preferenze_studio`: `nuoveAlGiorno Int @default(20)` (1–200) and `materieComunita LingoMateria[]` (empty at first).
+and the user's study preferences:
+
+```prisma
+model LingoPreferenzeStudio {
+  utenteId        String         @id @map("utente_id")
+  nuoveAlGiorno   Int            @default(20) @map("nuove_al_giorno")   // 1–200
+  materieComunita LingoMateria[] @default([]) @map("materie_comunita")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@map("lingo_preferenze_studio")
+}
+```
 
 A community card's review rows belong to the reviewer and cascade with the card: if a validated card is ever deleted, the reviews of it go with it.
 
@@ -194,8 +239,11 @@ Every route below sits behind `authenticate` and is the user's own session's. No
 
 **PR B**:
 
-- `POST /api/lingo/cards/:id/proponi { accettoLicenza?: true }` — draft → proposed, the author's only. If the user's accepted version is not the current one, the body must carry `accettoLicenza: true`, and the acceptance is stored in the same transaction; otherwise 409 with `{ richiedeLicenza: true, versione }`, which the web app turns into the notice.
-- `POST /api/lingo/cards/:id/ritira` — proposed → draft, the author's only; deletes the card's votes in the same transaction.
+- `GET /api/lingo/testi/:chiave` — the current version of a text (`id`, `versione`, `titolo`, `corpo`, `conferma`, `azione`) and whether the caller has accepted it.
+- `POST /api/lingo/cards/:id/proponi { accettoTestoId?: string }` — draft → proposed, the author's only. If the caller has accepted the current version of `PROPOSTA_SCHEDA`, no body is needed. Otherwise `accettoTestoId` must be that current version's id: the acceptance is stored in the same transaction. Anything else (no id, or an older version's because an administrator saved a new one meanwhile) answers 409 with `{ richiedeTesto: <the current version> }`, which the web app shows. The card records the version in `propostaTestoId`.
+- `GET /api/admin/studia/testi` — administrators only: for each key, every version, newest first, with its author's username.
+- `POST /api/admin/studia/testi/:chiave { titolo, corpo, conferma, azione }` — administrators only: saves a new version, numbered one above the highest (two administrators saving at once: the unique index refuses the second, which answers 409 «Un'altra versione è stata salvata nel frattempo: ricarica»). Lengths: title 200, body 8,000, checkbox and button 120.
+- `POST /api/lingo/cards/:id/ritira` — proposed → draft, the author's only; deletes the card's votes and clears `propostaTestoId` in the same transaction.
 - `GET /api/lingo/cards/:id` — for the author, adds the reasons of the «migliorabile» and «errata» votes, without who gave them, and the approval count.
 - `GET /api/lingo/validazione/coda?materia=&limit=` — validators only (403 otherwise): proposed cards not written by the caller and not yet voted on by the caller, oldest first, with their anchors; at most 20 a page.
 - `POST /api/lingo/validazione/:cardId { giudizio, motivazione? }` — validators only; 404 if the card is not proposed, 403 on one's own card, 409 on a second vote. In one transaction (the card row locked, `FOR UPDATE`): the vote is stored, then `validationRule.ts` decides the card's state (decision 14). The response says the card's new state.
@@ -209,7 +257,7 @@ Every route below sits behind `authenticate` and is the user's own session's. No
 - `GET` / `PUT /api/lingo/srs/preferenze` — the daily goal (1–200) and the community subjects.
 - `GET /api/lingo/cards` gains `dovuteOggi=true` and each card its `prossimoRipasso` for the caller.
 
-**Account deletion and export.** `lingo/deleteUserAccount.ts` stays the one path. With the foreign keys above, deleting the user removes their preferences, review state and reviews (cascade) and anonymises their votes (`SET NULL`); the function itself still removes drafts and archived cards first. `GET /api/auth/export` adds `data.lingoValidazioni` (the user's votes with the card id, the verdict and the reason), `data.lingoRipassi` (the review log) and `data.lingoPreferenze`. The payload stays at `schemaVersion` 1: keys are added, none changed.
+**Account deletion and export.** `lingo/deleteUserAccount.ts` stays the one path. With the foreign keys above, deleting the user removes their acceptances, preferences, review state and reviews (cascade) and anonymises their votes and the text versions they wrote (`SET NULL`); the function itself still removes drafts and archived cards first. `GET /api/auth/export` adds `data.lingoValidazioni` (the user's votes with the card id, the verdict and the reason) and `data.lingoAccettazioni` (key, version and time of each text accepted) in PR B, and `data.lingoRipassi` (the review log) and `data.lingoPreferenze` in PR C. The payload stays at `schemaVersion` 1: keys are added, none changed.
 
 ## 6. Web
 
@@ -229,6 +277,10 @@ Every route below sits behind `authenticate` and is the user's own session's. No
 
 **Copy.** Sentence case, Italian, verbs that say what happens and the same word through a flow: «Proponi» → toast «Scheda proposta alla comunità»; «Ritira» → «Proposta ritirata: la scheda è di nuovo una bozza»; «Elimina» → «Scheda nel cestino». Errors say what failed and what to do («L'articolo 99999 c.c. non esiste: correggi l'ancora»), never apologise.
 
+**Admin** (PR B). The admin page gains a section «Testi di VisuaLex Studia»: for each text, the current version in a form (title, body, checkbox label, button label) with a preview as the user will see it, and «Salva come nuova versione», confirmed through `ConfirmDialog` («Si crea la versione n+1. Chi ha accettato una versione precedente la vedrà di nuovo alla prossima proposta. Le versioni precedenti restano consultabili.»). Below, the earlier versions, newest first, each with its number, date and author, opening read-only. The user list gains the checkbox «Validatore di VisuaLex Studia».
+
+**Texts to accept** are shown by one component, `AcceptTextDialog`, from the server's version: title, the body split into paragraphs on blank lines as plain text, the checkbox with the version's label, «Annulla» and the version's button. Nothing about their wording is in the web app's code.
+
 **Trash.** `TrashEntryRow` says «Scheda di studio» / «Schede di studio (n)»; `trashWhen` says «Rimosso da te» when the entry has no client.
 
 ## 7. Security
@@ -236,13 +288,14 @@ Every route below sits behind `authenticate` and is the user's own session's. No
 - **Authorisation on every id** (OWASP A01). Card routes filter by `autoreId = session user` for anything but reading validated community cards; the validation routes check `lingoValidatore` from the database on each call (never from the token), refuse one's own card and a second vote. Tests for each refusal.
 - **No new delegated surface.** The new routes are absent from the delegated table, so an exchanged token answers 403 there; a test pins it for each new path.
 - **Mass assignment** (A04/A08). Strict schemas; state, author, counts, origin and validator flag never come from a body except `lingoValidatore` on the admin's route.
-- **Stored text** (A03). Question, answer, explanation and reasons are plain text, rendered as React text nodes; no Markdown, no HTML. A test renders a card whose question is `<img src=x onerror=alert(1)>` and finds the literal text.
+- **Who writes the texts to accept.** Only administrators (`AdminRoute` on the web, the admin check on the server), each version stamped with its author; a user can neither create nor alter a version, only accept the current one by its id.
+- **Stored text** (A03). Question, answer, explanation, reasons and the texts to accept are plain text, rendered as React text nodes; no Markdown, no HTML. A test renders a card whose question is `<img src=x onerror=alert(1)>` and finds the literal text.
 - **Cost.** The anchor checks on create and edit keep today's caps (10 anchors a card, 20 distinct references a call). Votes and reviews are cheap database writes; the existing per-user rate limiter covers them.
 - **Personal data.** Votes' reasons and cards' texts may name people (decision 19 and D-045's reservation); the notice tells the author not to write personal data. The export carries everything of the user's.
 
 ## 8. Testing
 
-- **Server** (one suite run at a time; it resets the shared test database): each route's happy path and every refusal above; the validation rule as a pure table (2 approvals, 1 errata, migliorabile, withdrawal resets); the review day boundary in Europe/Rome (a review at 23:59 and one at 00:01 are different days; a daylight-saving night); «only the first grade of the day»; the daily goal across two «devices» (two sessions); account deletion keeps votes anonymous and removes reviews; the export's new keys; the delegated table's refusals; the migration drift check.
+- **Server** (one suite run at a time; it resets the shared test database): each route's happy path and every refusal above; the validation rule as a pure table (2 approvals, 1 errata, migliorabile, withdrawal resets); the review day boundary in Europe/Rome (a review at 23:59 and one at 00:01 are different days; a daylight-saving night); «only the first grade of the day»; the daily goal across two «devices» (two sessions); account deletion keeps votes anonymous and removes reviews and acceptances; a new version of the notice asks again at the next proposal and leaves earlier proposals untouched; two versions saved at once; a non-admin refused on the admin text routes; the export's new keys; the delegated table's refusals; the migration drift check.
 - **Web** (Vitest, Testing Library, services mocked with `vi.mock`): the form (inferred subject, disabled on a past text, server anchor errors on the right chip); the list's grouping and filters; the reader row's count and Peek; the notice flow (409 → notice → accept → proposed); the review session's keyboard flow and the requeue of «Di nuovo»; the text-node XSS case; the trash wording.
 - **Browser pass** on `http://localhost:5173` for each PR, on desktop and at phone width, light and dark.
 
@@ -265,7 +318,7 @@ Not built in this round; recorded so the simulation's own spec starts from them.
 - **Duration (Q17).** Chosen per simulation, with the legal duration as default. *To confirm with the other developer:* the legal duration on the text in force, and whether the opinion and the act are sat on the same day.
 - **Editor (Q18).** Free text with optional headings the correction recognises; pasting more than 1,000 characters at once stays blocked. *To confirm with the other developer:* whether the real exam is written by hand or on a computer.
 - **Lost connection (Q19).** Time runs and the text is restored; an administrator may grant an extension for a documented failure.
-- **Who reads an essay, and its fate (Q20).** The candidate, the assigned correctors, and administrators with every access logged. Essays are detached from the account and kept with their correction (D-058). Explicit consent before the first simulation; proposed wording, **for the owner to approve as final**:
+- **Who reads an essay, and its fate (Q20).** The candidate, the assigned correctors, and administrators with every access logged. Essays are detached from the account and kept with their correction (D-058). Explicit consent before the first simulation, with the wording below, **approved by the owner on 7 October**. It lives in the store of decision 22 under the key `CONSENSO_SIMULAZIONE`, which the simulation's own PR adds (one `ALTER TYPE … ADD VALUE` and version 1 seeded by its migration), editable from the admin screen like the proposal notice. When an administrator saves a new version, the user is asked again **before their next simulation**:
 
   > **Prima della tua prima simulazione**
   >

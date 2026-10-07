@@ -386,7 +386,7 @@ const MyCardsView = lazy(() => import('./components/features/studia/MyCardsView'
 
 ## PR B — Propose and validate (`feat/studia-validation`)
 
-### Task B1: Votes, preferences, the validator flag
+### Task B1: Votes, versioned texts to accept, the validator flag
 
 **Files:**
 - Modify: `apps/server/prisma/schema.prisma`, `apps/server/tests/setup.ts` (truncate the new tables), `apps/server/src/controllers/authController.ts` (export), `apps/server/src/controllers/adminController.ts` (the flag)
@@ -395,19 +395,23 @@ const MyCardsView = lazy(() => import('./components/features/studia/MyCardsView'
 
 **Interfaces:**
 - Produces:
-  - the models `LingoValidazioneCard` (`lingo_validazioni_card`) and `LingoPreferenzeStudio` (`lingo_preferenze_studio`), the enum `LingoGiudizio`, and `User.lingoValidatore`, exactly as spec §4 «PR B» writes them;
-  - the export keys `data.lingoValidazioni: Array<{ cardId; giudizio; motivazione; createdAt }>` and `data.lingoPreferenze: { licenzaPropostaAccettata; licenzaPropostaVersione } | null`;
+  - the models `LingoValidazioneCard` (`lingo_validazioni_card`), `LingoTestoVersione` (`lingo_testi_versioni`) and `LingoAccettazioneTesto` (`lingo_accettazioni_testi`), the enums `LingoGiudizio` and `LingoTestoChiave`, `LingoCard.propostaTestoId` and `User.lingoValidatore`, exactly as spec §4 «PR B» writes them;
+  - version 1 of `PROPOSTA_SCHEDA`, inserted by the migration with the wording of spec decision 13 (title «Proponi la scheda alla comunità», the three paragraphs as the body separated by blank lines, checkbox «Ho letto e accetto», button «Proponi»), `autore_id` null;
+  - the export keys `data.lingoValidazioni: Array<{ cardId; giudizio; motivazione; createdAt }>` and `data.lingoAccettazioni: Array<{ chiave; versione; acceptedAt }>`;
   - `PUT /admin/users/:id` accepts `lingoValidatore: boolean`.
 
 - [ ] **Step 1: Write the failing tests.**
-  - Deleting Carol, who voted on Alice's proposed card, keeps the vote with `utenteId: null` and the card untouched. Her preferences row is gone. Use both deletion paths: the user's own and the admin's.
+  - Deleting Carol, who voted on Alice's proposed card and accepted the notice, keeps the vote with `utenteId: null` and the card untouched; her acceptance is gone. Use both deletion paths: the user's own and the admin's.
+  - Deleting an administrator who wrote version 2 keeps the version with `autoreId: null`.
+  - After the migration, `PROPOSTA_SCHEDA` has exactly one version, number 1, whose body contains «CC BY-SA 4.0».
+  - Deleting a text version that an acceptance points to fails at the database (`Restrict`).
   - Two anonymous votes on the same card don't collide on the unique index.
-  - The export of a validator carries their votes and their preferences.
+  - The export of a validator carries their votes and their acceptances.
   - The admin sets and clears `lingoValidatore`; a non-admin's PUT is 403.
 - [ ] **Step 2: Run them, see them fail.**
-- [ ] **Step 3: Schema, migration, generate.** Generate with `migrate diff`. Read the SQL: one enum, two tables, one column on `users`, and the foreign keys with `ON DELETE SET NULL` (votes) and `CASCADE` (preferences). Then the export and the admin field.
+- [ ] **Step 3: Schema, migration, generate.** Generate with `migrate diff`. Read the SQL: two enums, three tables, one column on `lingo_cards` and one on `users`, and the foreign keys: `SET NULL` from votes and versions to `users`, `CASCADE` from acceptances to `users`, `RESTRICT` from acceptances and cards to versions. Append by hand the `INSERT` of version 1 (a fixed uuid, `versione` 1, the texts as SQL literals with `'` doubled). Then the export and the admin field.
 - [ ] **Step 4: Run them, see them pass; build; drift check.**
-- [ ] **Step 5: Commit:** `feat(server): validators, their votes on study cards and the proposal notice's acceptance; votes outlive their author`.
+- [ ] **Step 5: Commit:** `feat(server): validators and their votes on study cards; texts to accept, versioned, and who accepted which; votes outlive their author`.
 
 ### Task B2: The validation rule and the new arrow
 
@@ -446,18 +450,21 @@ export function stateAfterVotes(votes: readonly LingoGiudizio[]): LingoCardStato
 - [ ] **Step 2: Fail. Step 3: Implement. Step 4: Pass.**
 - [ ] **Step 5: Commit:** `feat(server): when a proposed card is validated or archived, in one module; a proposal can be withdrawn`.
 
-### Task B3: Propose, withdraw, the queue, the vote
+### Task B3: Propose, withdraw, the queue, the vote, the texts' versions
 
 **Files:**
-- Create: `apps/server/src/routes/lingoValidazione.ts` (mounted at `/api/lingo/validazione`), `apps/server/src/lingo/proposalNotice.ts`
+- Create: `apps/server/src/routes/lingoValidazione.ts` (mounted at `/api/lingo/validazione`), `apps/server/src/lingo/texts.ts`, `apps/server/src/routes/lingoTesti.ts` (mounted at `/api/lingo/testi`), `apps/server/src/routes/adminStudiaTesti.ts` (next to the other admin routes, behind the admin check)
 - Modify: `apps/server/src/routes/lingoCards.ts`, `apps/server/src/routes/lingoArticolo.ts`, `apps/server/src/lingo/serializeCard.ts`, `apps/server/src/app.ts`
-- Test: `apps/server/tests/lingoValidation.routes.test.ts`, `apps/server/tests/unauthenticated.test.ts`
+- Test: `apps/server/tests/lingoValidation.routes.test.ts`, `apps/server/tests/lingoTexts.routes.test.ts`, `apps/server/tests/unauthenticated.test.ts`
 
 **Interfaces:**
 - Consumes: `stateAfterVotes`, `canTransition`.
 - Produces:
-  - `PROPOSAL_NOTICE_VERSION = 'proposta-cc-by-sa-4.0-v1'`;
-  - `POST /api/lingo/cards/:id/proponi`, body `{ accettoLicenza?: true }`. It answers `200 serialize(card)`, or `409 { richiedeLicenza: true, versione }`;
+  - in `lingo/texts.ts`: `currentText(tx, chiave): Promise<LingoTestoVersione>` (the highest version) and `hasAccepted(tx, userId, testoId): Promise<boolean>`;
+  - `GET /api/lingo/testi/:chiave`, which answers `200 { id, chiave, versione, titolo, corpo, conferma, azione, accettata: boolean }`, or 404 for an unknown key;
+  - `GET /api/admin/studia/testi`, which answers `200 { testi: Array<{ chiave, versioni: Array<{ id, versione, titolo, corpo, conferma, azione, createdAt, autore: string | null }> }> }`, newest version first;
+  - `POST /api/admin/studia/testi/:chiave`, body `{ titolo (1–200), corpo (1–8,000), conferma (1–120), azione (1–120) }`, strict. It answers `201` with the new version, or 409 when another version was saved at the same moment;
+  - `POST /api/lingo/cards/:id/proponi`, body `{ accettoTestoId?: string }`. It answers `200 serialize(card)`, or `409 { richiedeTesto: <current version, as GET /api/lingo/testi> }`;
   - `POST /api/lingo/cards/:id/ritira`, which answers `200 serialize(card)`;
   - `GET /api/lingo/validazione/coda?materia=&limit=` (1–20, default 10), which answers `200 { cards: Array<serialize(card)> }`;
   - `POST /api/lingo/validazione/:cardId`, body `{ giudizio: 'APPROVATA' | 'MIGLIORABILE' | 'ERRATA', motivazione?: string }` (reason 1–2,000 characters, required unless `APPROVATA`). It answers `200 { stato }`;
@@ -466,12 +473,15 @@ export function stateAfterVotes(votes: readonly LingoGiudizio[]): LingoCardStato
 
 - [ ] **Step 1: Write the failing tests.**
   - **Proposing:**
-    - without an accepted notice, 409 with the version, and the card is still a draft;
-    - with `accettoLicenza: true`, 200, the card is proposed, and the preference row holds the time and the version;
+    - without an accepted notice, 409 with the current version (number 1), and the card is still a draft;
+    - with `accettoTestoId` = that version's id, 200, the card is proposed with `propostaTestoId` set, and one acceptance row holds the user, the version and the time;
     - a second proposal by the same user needs no body;
+    - an administrator saves version 2: Alice's next proposal answers 409 with version 2, while her card proposed under version 1 keeps `propostaTestoId` = version 1 and its state;
+    - `accettoTestoId` = version 1's id after version 2 exists: 409 with version 2, and no acceptance is written;
+    - `accettoTestoId` = an unknown id: 409, nothing written;
     - Bob proposing Alice's draft gets 404;
     - proposing a proposed card gets 409.
-  - **Withdrawing:** Alice withdraws a proposed card that has one «migliorabile»: it is a draft again and its votes are gone. Withdrawing a validated card gets 409.
+  - **Withdrawing:** Alice withdraws a proposed card that has one «migliorabile»: it is a draft again, its votes are gone and `propostaTestoId` is null. Withdrawing a validated card gets 409.
   - **The queue:**
     - a non-validator gets 403;
     - Carol (validator) sees Alice's proposed cards, oldest first, and not her own, nor those she voted on, nor drafts;
@@ -487,7 +497,13 @@ export function stateAfterVotes(votes: readonly LingoGiudizio[]): LingoCardStato
   - **Review Focus 4:** Carol's flag is cleared between two calls, so her next vote gets 403.
   - **What the author sees:** Alice's `GET /:id` shows `approvazioni` and the «migliorabile» reason, without Carol's id.
   - **The article's cards:** Bob's `/api/lingo/articolo` on the URN of Alice's validated card returns it with `comunita: true, approvazioni: 2`, and never her drafts.
-  - **Tokens:** an exchanged token gets 403 on `proponi`, `ritira`, `coda` and the vote.
+  - **The texts' versions:**
+    - `GET /api/lingo/testi/PROPOSTA_SCHEDA` gives version 1 with `accettata: false`, then `true` after a proposal;
+    - an administrator's POST creates version 2 with the administrator as author; version 1 is still listed and unchanged;
+    - two POSTs sent together with `Promise.all`: one 201, one 409, and version 2 exists once;
+    - a non-admin gets 403 on both admin routes; an unknown key gets 404; an unknown body key, 400;
+    - a body holding `<script>` is stored and returned as the same literal string.
+  - **Tokens:** an exchanged token gets 403 on `proponi`, `ritira`, `coda`, the vote, `/api/lingo/testi` and the admin routes.
   - **Unauthenticated:** add the rows.
 - [ ] **Step 2: Run them, see them fail.**
 - [ ] **Step 3: Implement.** The vote's transaction:
@@ -510,29 +526,34 @@ await prisma.$transaction(async (tx) => {
 });
 ```
 
-  `ritira` locks the same row, checks the author and `PROPOSTA_COMMUNITY`, deletes the votes and sets the draft state, in one transaction. `proponi` upserts the preference row when the body accepts the notice.
+  `ritira` locks the same row, checks the author and `PROPOSTA_COMMUNITY`, deletes the votes and sets the draft state, in one transaction. `proponi`, in one transaction: lock the card row, check author and draft, read `currentText(tx, 'PROPOSTA_SCHEDA')`; if `hasAccepted` is false, require `accettoTestoId === current.id` and create the acceptance, or answer 409 with the current version; then set the state and `propostaTestoId`. The admin's POST reads the highest `versione` and inserts `versione + 1`; a unique violation on `(chiave, versione)` (Prisma `P2002`) answers 409.
 - [ ] **Step 4: Run the whole server suite alone, and the build.**
-- [ ] **Step 5: Commit:** `feat(server): proposing a card to the community, withdrawing it, and the validators' queue and vote`.
+- [ ] **Step 5: Commit:** `feat(server): proposing a card under the current notice, withdrawing it, the validators' queue and vote, and the admin's versions of the texts`.
 
-### Task B4: Proposing and withdrawing in the web app; the admin's checkbox
+### Task B4: Proposing and withdrawing in the web app; the admin's texts and checkbox
 
 **Files:**
-- Create: `apps/web/src/components/features/studia/ProposalNotice.tsx`
-- Modify: `CardDetail.tsx`, `studiaService.ts` (`propose`, `withdraw`), `types/studia.ts` (`approvazioni`, `rilievi`, `comunita`), `ArticleCardsPeek.tsx`, the admin users page (`pages/AdminPage.tsx` or the component it renders for users)
-- Test: `ProposalNotice.test.tsx`, `CardDetail.test.tsx`, the admin page test
+- Create: `apps/web/src/components/features/studia/AcceptTextDialog.tsx`, `apps/web/src/components/features/admin/StudiaTextsAdmin.tsx` (or next to the admin page's other sections, following its layout)
+- Modify: `CardDetail.tsx`, `studiaService.ts` (`propose`, `withdraw`, `text`), `services/adminService.ts` (or the admin page's service: `studiaTexts`, `saveStudiaText`), `types/studia.ts` (`approvazioni`, `rilievi`, `comunita`, `TestoDaAccettare`), `ArticleCardsPeek.tsx`, `pages/AdminPage.tsx` (the texts section, the validator checkbox)
+- Test: `AcceptTextDialog.test.tsx`, `StudiaTextsAdmin.test.tsx`, `CardDetail.test.tsx`, the admin page test
 
 **Interfaces:**
-- Produces: `studiaService.propose(id, accettoLicenza?: boolean)`, which returns `Scheda | { richiedeLicenza: true; versione: string }`, and `studiaService.withdraw(id)`, which returns `Scheda`.
+- Produces:
+  - `type TestoDaAccettare = { id: string; chiave: 'PROPOSTA_SCHEDA'; versione: number; titolo: string; corpo: string; conferma: string; azione: string }`;
+  - `studiaService.propose(id, accettoTestoId?: string)`, which returns `Scheda | { richiedeTesto: TestoDaAccettare }`, and `studiaService.withdraw(id)`, which returns `Scheda`;
+  - `<AcceptTextDialog text={TestoDaAccettare} onAccept={(id: string) => void} onCancel />`, the one place a text to accept is drawn (the simulation will reuse it).
 
 - [ ] **Step 1: Write the failing tests.**
-  - «Proponi alla comunità» on a draft, with the service answering `richiedeLicenza`, opens the notice with the wording of spec decision 13, verbatim.
-  - «Proponi» is disabled until the box is ticked. Proposing calls `propose(id, true)` and shows «Scheda proposta alla comunità».
+  - «Proponi alla comunità» on a draft, with the service answering `richiedeTesto`, opens `AcceptTextDialog` with that version's title, body, checkbox and button labels; nothing of the wording comes from the web app's code (the test passes a made-up text and finds it).
+  - The body «Uno.\n\nDue.» renders as two paragraphs; `<b>x</b>` in the body renders as literal text.
+  - The button is disabled until the box is ticked. Accepting calls `propose(id, text.id)` and shows «Scheda proposta alla comunità»; if the answer is `richiedeTesto` again (a new version meanwhile), the dialog shows the new version.
+  - In the admin page, «Testi di VisuaLex Studia» shows the current version of each text in a form with a preview; «Salva come nuova versione» asks through `ConfirmDialog` with the wording of spec §6 and posts; the earlier versions are listed newest first with number, date and author, and open read-only; a 409 shows «Un'altra versione è stata salvata nel frattempo: ricarica».
   - «Ritira» on a proposed card, through `ConfirmDialog` («La scheda torna una tua bozza; i voti ricevuti si perdono.»), shows «Proposta ritirata: la scheda è di nuovo una bozza».
   - The detail of a proposed card lists the reasons under «Rilievi dei validatori», without names.
   - The Peek shows «Validata da 2» on a community card.
   - The admin's user row has a «Validatore di VisuaLex Studia» checkbox that sends `lingoValidatore`.
 - [ ] **Step 2: Fail. Step 3: Implement. Step 4: Pass, build, lint.**
-- [ ] **Step 5: Commit:** `feat(web): propose a card with the licence notice, withdraw it, read the validators' remarks; the admin names validators`.
+- [ ] **Step 5: Commit:** `feat(web): propose a card under the current notice, withdraw it, read the validators' remarks; the admin edits the texts' versions and names validators`.
 
 ### Task B5: «Da validare»
 
@@ -554,8 +575,8 @@ await prisma.$transaction(async (tx) => {
 
 ### Task B6: Docs, browser pass, review, PR B
 
-- [ ] Update `apps/server/CLAUDE.md` (validation, the rule module, the deletion and export keys, the `User` flag) and `apps/web/CLAUDE.md` (the queue).
-- [ ] Browser pass. As admin, make a second test user a validator. As the first user, propose a card and accept the notice. As the validator, vote «migliorabile»; as the author, read the remark and withdraw. Propose again, approve twice with two validators, and see «Validata da 2» under the article for a third user. Repeat at phone width and in dark mode.
+- [ ] Update `apps/server/CLAUDE.md` (validation, the rule module, the texts to accept and their versions, the deletion and export keys, the `User` flag) and `apps/web/CLAUDE.md` (the queue, `AcceptTextDialog`, the admin texts).
+- [ ] Browser pass. As admin, make a second test user a validator. As the first user, propose a card and accept the notice. As admin, save version 2 of the notice: the first user's next proposal shows it again, and the first card still says version 1 in the database. As the validator, vote «migliorabile»; as the author, read the remark and withdraw. Propose again, approve twice with two validators, and see «Validata da 2» under the article for a third user. Repeat at phone width and in dark mode.
 - [ ] Fresh `code-reviewer`; fix everything.
 - [ ] PR (it touches the Prisma schema, the `User` model and the admin route), CI green, merge `merge: feat/studia-validation — study cards proposed to the community and validated by named validators`, then `prisma migrate deploy` on the development database.
 
@@ -563,7 +584,7 @@ await prisma.$transaction(async (tx) => {
 
 ## PR C — Review (`feat/studia-review`)
 
-### Task C1: Review state, review log, the daily goal
+### Task C1: Review state, review log, the study preferences
 
 **Files:**
 - Modify: `apps/server/prisma/schema.prisma`, `apps/server/tests/setup.ts`, `apps/server/src/controllers/authController.ts` (export)
@@ -573,11 +594,11 @@ await prisma.$transaction(async (tx) => {
 **Interfaces:**
 - Produces:
   - the models `LingoStatoRipasso` and `LingoRevisioneSRS`, exactly as spec §4 «PR C» writes them;
-  - on `LingoPreferenzeStudio`, `nuoveAlGiorno Int @default(20) @map("nuove_al_giorno")` and `materieComunita LingoMateria[] @default([]) @map("materie_comunita")`;
-  - the export key `data.lingoRipassi`, the log rows with `cardId`, `dataRevisione`, `rating`, `scheduledDays` and `durataMs`.
+  - the model `LingoPreferenzeStudio` (`lingo_preferenze_studio`: `nuoveAlGiorno`, default 20; `materieComunita`, empty at first), as spec §4 «PR C» writes it;
+  - the export keys `data.lingoRipassi` (the log rows with `cardId`, `dataRevisione`, `rating`, `scheduledDays` and `durataMs`) and `data.lingoPreferenze: { nuoveAlGiorno; materieComunita } | null`.
 
 - [ ] **Step 1: Write the failing tests.**
-  - Deleting a user removes their review state and log, and nobody else's.
+  - Deleting a user removes their review state, log and preferences, and nobody else's.
   - Deleting a card removes everyone's reviews of it.
   - The export carries the log.
 - [ ] **Step 2: Fail. Step 3: Schema, `migrate diff`, generate. Step 4: Pass; build; drift check.**
@@ -732,7 +753,7 @@ export function startOfRomeDay(day: string, plusDays?: number): Date;
 
 ## Later, each with its own plan
 
-- **The exam simulation**, starting from spec §11.
+- **The exam simulation**, starting from spec §11. Its consent adds the key `CONSENSO_SIMULAZIONE` to the texts' store of PR B (one `ALTER TYPE … ADD VALUE`, version 1 seeded with the approved wording), drawn by `AcceptTextDialog`, and asked again before the next simulation whenever an administrator saves a new version.
 - **The norm watcher for card anchors** (a validated card goes «da rivedere»), together with what a changed norm does to a *draft* (foundation decision 12).
 - **RLCF** weighting, authority and the «controversa» flag replace `validationRule.ts`.
 - **Fitting the FSRS weights** to the stored log.
