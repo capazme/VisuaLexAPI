@@ -502,3 +502,8 @@ Breaking one of these breaks the product. Read before editing.
     key (`italgiure:v3:…`, `corte_cost:v2:…`), or the entries cached before are served for up
     to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.
+    The characters of a decision's text are frozen like an article's (root rule 23): the readers
+    may add or move `\n` and move a boundary between blocks, never change another character, and a
+    cache version bump is for shape only. `tests/test_decisions_text_frozen.py` (synthetic PDFs
+    and records in CI; real ones in the `_local` twin) pins the projection (blocks stripped,
+    concatenated, `\n` removed) as a SHA-256 and a length in `fixtures/decisions/frozen_projections.json`.

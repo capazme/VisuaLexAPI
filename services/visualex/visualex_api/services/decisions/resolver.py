@@ -143,7 +143,8 @@ class Resolver:
         # again. v2 since the reader recognises every notice Italgiure gives in place of a text
         # and restores paragraphs (2026-10-04); a new key never serves the entries cached before
         # (the sweep deletes them once expired). Raise the version whenever the reader changes the
-        # shape of what it returns.
+        # shape of what it returns — the shape only (blocks, `\n`): a change of characters is refused
+        # by test_decisions_text_frozen.py (design 2026-10-05 §8.5); italgiure:v3 was the last one.
         pdf: list[bytes] = []
 
         async def read() -> Decision | None:
@@ -235,7 +236,9 @@ class Resolver:
             # v2 since the reader splits an epigrafe that holds the reasoning (2026-10-04): the
             # entries cached before, under "corte_cost:<numero>:<anno>", keep it unsplit for up
             # to 30 days, and a new key never serves them (the sweep deletes them once expired).
-            # Raise the version whenever the reader changes the shape of what it returns.
+            # Raise the version whenever the reader changes the shape of what it returns — the
+            # shape only (blocks, `\n`): a change of characters is refused by
+            # test_decisions_text_frozen.py (design 2026-10-05 §8.5); italgiure:v3 was the last one.
             decision = await self._lookup(
                 f"corte_cost:v2:{ref.numero}:{ref.anno}", "corte_costituzionale",
                 CORTE_COST_TIMEOUT, lambda: self.corte_cost.lookup(ref.numero, ref.anno))
