@@ -280,8 +280,8 @@ decisions yet (gotcha 23). «Cerca nella barra di ricerca», on a decision that 
 palette with its citation typed in (`openCommandPaletteWith`, taken once). The desktop panel and
 the phone view both mount a `DecisionTabView` for the same tab, one of them hidden: only the copy
 on screen takes the focus request, and both follow the identity the store learns, keeping the answer already shown (notices included) and seeding it
-in the cache (`rememberDecision`) so that no second request goes out. A later citation that adds a section or
-an archive to a tab still without one replaces its reference, so the tab asks again with it. The free-area
+in the cache (`rememberDecision`) so that no second request goes out. A later citation that adds a section to
+a tab still without an archive replaces its reference, so the tab asks again with it. The free-area
 placement applies from the `md` breakpoint up only: a phone's geometry is never saved with the tab.
 
 ### Dossier

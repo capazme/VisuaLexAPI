@@ -229,7 +229,8 @@ describe('DecisionTabView — the store learns the identity of a tab opened by a
     const statuses: number[] = [];
     const watch = new MutationObserver(() => statuses.push(screen.queryAllByRole('status').length));
     watch.observe(document.body, { childList: true, subtree: true });
-    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    // flush the effects and promise callbacks the identity change sets off, without a real timer
+    for (let i = 0; i < 5; i += 1) await act(async () => {});
     watch.disconnect();
     expect(statuses.every((n) => n === 0)).toBe(true);
     expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();

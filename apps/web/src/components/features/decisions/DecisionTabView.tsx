@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
-import type { DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
+import type { DecisionNotice, DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
 import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
 import { decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
 import { DecisionView } from './DecisionView';
 
 /** Notices about what was cited (its section, the archive deduced from it), not about the decision:
  *  the tab that cited keeps them, the answer seeded for the bare identity does not carry them. */
-const ABOUT_THE_CITATION: ReadonlySet<string> = new Set(['sezione_diversa', 'sezione_non_riconosciuta', 'archivio_dedotto']);
+const ABOUT_THE_CITATION = {
+  sezione_diversa: true,
+  sezione_non_riconosciuta: true,
+  archivio_dedotto: true,
+  testo_non_disponibile: false,
+  testo_da_archivio: false,
+} satisfies Record<DecisionNotice['tipo'], boolean>;
 function withoutCitationNotices(answer: FoundDecision): FoundDecision {
-  return { ...answer, avvisi: answer.avvisi.filter((n) => !ABOUT_THE_CITATION.has(n.tipo)) };
+  return { ...answer, avvisi: answer.avvisi.filter((n) => !ABOUT_THE_CITATION[n.tipo]) };
 }
 
 /**

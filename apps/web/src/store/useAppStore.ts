@@ -767,10 +767,11 @@ const appStore = createStore<AppState>()(
                     tab.isMinimized = false;
                     if (existing) {
                         tab.zIndex = ++state.highestZIndex;
-                        // an unresolved tab (no archive yet) learns what a later citation adds: its
-                        // section or archive may be what settles the homonyms, so it asks again
+                        // an unresolved tab (no archive yet) learns the section a later citation adds:
+                        // it may be what settles the homonyms, so it asks again (a citation with an
+                        // archive never reaches here: it matches only a tab of its archive)
                         const known = existing.view?.kind === 'decision' ? existing.view.reference : null;
-                        if (known && !known.archivio && (reference.archivio || reference.sezione) &&
+                        if (known && !known.archivio && reference.sezione &&
                             decisionPath(known) !== decisionPath(reference)) {
                             existing.view = { kind: 'decision', reference };
                             existing.label = formatDecisionShort(reference);
