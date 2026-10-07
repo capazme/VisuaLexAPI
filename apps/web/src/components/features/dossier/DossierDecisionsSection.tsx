@@ -12,7 +12,7 @@ interface Props {
 
 /**
  * «Giurisprudenza», after the acts: one row per decision, in stored order, its citation linking
- * to the decision's page. The minimal list the owner chose for Sentenze PR C (4 October 2026);
+ * to the decision's address (which opens its tab). The minimal list the owner chose for Sentenze PR C (4 October 2026);
  * the dossier-by-act round's PR 3 gives each row the star and the reader in place. The citation
  * is recomputed from the stored identity, never the stored copy (source convention, Q9).
  */

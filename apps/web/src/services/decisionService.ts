@@ -24,7 +24,7 @@ function isAnswer(body: unknown): body is FetchDecisionAnswer {
 /**
  * The route's answer to a reference, whatever the status: one of the six answers as it comes, or
  * a `fonte_non_raggiungibile` for a response that is not the route's. It rejects when no response
- * arrives at all, on a network failure or an abort: the page maps that rejection to `rete`.
+ * arrives at all, on a network failure or an abort: the decision's tab maps that rejection to `rete`.
  */
 export async function fetchDecision(reference: DecisionReference): Promise<FetchDecisionAnswer> {
   const response = await legalFetch('/fetch_decision', {

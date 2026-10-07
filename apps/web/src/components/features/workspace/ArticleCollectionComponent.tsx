@@ -259,6 +259,7 @@ export function ArticleCollectionComponent({
                 data={activeArticle.article}
                 onCrossReferenceNavigate={onCrossReference}
                 onOpenStudyMode={() => openStudyMode(activeArticle.article)}
+                tabId={tabId}
               />
             ) : (
               <div className="flex items-center justify-center h-40 text-slate-400">

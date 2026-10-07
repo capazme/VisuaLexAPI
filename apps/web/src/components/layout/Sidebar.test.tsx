@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'u1', username: 'tester' }, isAdmin: false, logout: vi.fn() }),
@@ -10,6 +10,7 @@ vi.mock('../../hooks/useForumNotifications', () => ({
 }));
 
 import { Sidebar } from './Sidebar';
+import { appStore } from '../../store/useAppStore';
 
 /**
  * Every control in the sidebar is an icon. `label` reached the eye only: the
@@ -17,9 +18,14 @@ import { Sidebar } from './Sidebar';
  * never named the control for a screen reader or a keyboard user, and the
  * whole primary navigation announced as unnamed links and buttons.
  */
-function renderSidebar() {
+function Where() {
+  return <span data-testid="where">{useLocation().pathname}</span>;
+}
+
+function renderSidebar(initialPath = '/') {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Where />
       <Sidebar
         theme="light"
         toggleTheme={vi.fn()}
@@ -35,9 +41,25 @@ function renderSidebar() {
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
     renderSidebar();
-    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Sentenze/, /Cronologia/]) {
+    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Cronologia/]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
+  });
+
+  it('offers «Sentenze» as a button that opens the palette, not as a page link', () => {
+    renderSidebar();
+    expect(screen.queryByRole('link', { name: /Sentenze/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Sentenze/ })).toBeInTheDocument();
+  });
+
+  it('opens the palette and goes to the search page when «Sentenze» is pressed', () => {
+    appStore.setState({ commandPaletteOpen: false });
+    renderSidebar('/dossier');
+    expect(screen.getByTestId('where')).toHaveTextContent('/dossier');
+    fireEvent.click(screen.getByRole('button', { name: /Sentenze/ }));
+    expect(appStore.getState().commandPaletteOpen).toBe(true);
+    expect(screen.getByTestId('where').textContent).toBe('/');
+    appStore.setState({ commandPaletteOpen: false });
   });
 
   it('folds the notification count into the link name', () => {

@@ -77,9 +77,15 @@ interface ArticleTabContentProps {
      * it undefined and simply do not push — there is no tab to return to.
      */
     readingOrigin?: { tabId: string; blockId: string };
+    /**
+     * The workspace tab a loose article or a collection sits in, which has no norma block to come
+     * back to: a decision cited in its massime opens beside that tab, with no way-back entry.
+     * `readingOrigin` wins when both are given.
+     */
+    tabId?: string;
 }
 
-export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin }: ArticleTabContentProps) {
+export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
     // Flattened to scalars so the citation listener effect below depends on
     // stable values: an inline `readingOrigin` object would change identity on
@@ -1183,6 +1189,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                         itemKey={itemKey}
                         uniqueArticleId={uniqueArticleId}
                         onRequestAddNote={handleBrocardiAddNote}
+                        besideTabId={originTabId ?? tabId}
+                        backEntry={originTabId && originBlockId ? {
+                            tabId: originTabId,
+                            blockId: originBlockId,
+                            articleId: uniqueArticleIdFromNorma(norma_data),
+                            label: shortNorm(norma_data),
+                        } : undefined}
                         currentNorma={{
                             tipo_atto: norma_data.tipo_atto,
                             data: norma_data.data,

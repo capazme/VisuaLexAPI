@@ -98,7 +98,7 @@ describe('the golden file of legal sources', () => {
 
   describe('current decision paths are what decisionLinks.ts builds', () => {
     const now = new Date('2026-10-04T12:00:00Z');
-    // An identity's path, or a reference's (no archive: the page resolves it).
+    // An identity's path, or a reference's (no archive: the route resolves it).
     for (const c of golden.decisions) {
       const path = c.identity.path ?? c.identity.reference_path;
       if (path?.status !== 'current') continue;

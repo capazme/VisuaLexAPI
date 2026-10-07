@@ -79,7 +79,7 @@ describe('RassegnePanel', () => {
     expect(mark.tagName).toBe('MARK');
   });
 
-  it('links a decision with an identity to its page, labelled in the source convention, not by the stored copy', async () => {
+  it('links a decision with an identity to its address, labelled in the source convention, not by the stored copy', async () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel();
     await openPanel();

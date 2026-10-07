@@ -1,0 +1,244 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { DecisionReference, FetchDecisionAnswer } from '../../../types/decisions';
+
+const fetchDecision = vi.fn();
+vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
+vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
+
+import { appStore, useAppStore } from '../../../store/useAppStore';
+import { fetchDecisionCached, forgetDecision } from '../../../utils/decisionFetchCache';
+import { DecisionTabView } from './DecisionTabView';
+import { renderTabView } from '../workspace/renderTabView';
+
+const CIVILE = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const PENALE = { ...CIVILE, archivio: 'penale' as const };
+const AMBIGUA_REF = { corte: 'cassazione' as const, numero: 10787, anno: 2024 };
+
+const foundOf = (identita: DecisionReference, sezione: string): FetchDecisionAnswer => ({
+  esito: 'trovata',
+  identita,
+  attributi: { sezione, tipo: 'sentenza', data_deposito: '2024-03-12' },
+  testo: { motivazione: 'RITENUTO IN FATTO' },
+  fonte: { nome: 'Corte di cassazione' },
+  avvisi: [],
+});
+const AMBIGUOUS: FetchDecisionAnswer = {
+  esito: 'ambigua',
+  candidati: [
+    { identita: CIVILE, attributi: { sezione: '3' } },
+    { identita: PENALE, attributi: { sezione: '7' } },
+  ],
+};
+
+function openTab(reference: DecisionReference) {
+  const id = appStore.getState().openDecisionTab(reference);
+  const tab = () => appStore.getState().workspaceTabs.find((t) => t.id === id)!;
+  return { id, tab };
+}
+
+beforeEach(() => {
+  fetchDecision.mockReset();
+  for (const ref of [CIVILE, PENALE, AMBIGUA_REF, { ...AMBIGUA_REF, sezione: 'VII' }]) forgetDecision(ref);
+  appStore.setState({ workspaceTabs: [], commandPaletteOpen: false });
+});
+
+// jsdom has no layout: an element counts as rendered unless it sits under a [data-copy="hidden"] one
+const originalClientRects = HTMLElement.prototype.getClientRects;
+beforeEach(() => {
+  HTMLElement.prototype.getClientRects = function (this: HTMLElement) {
+    return (this.closest('[data-copy="hidden"]') ? [] : [{}]) as unknown as DOMRectList;
+  };
+});
+afterEach(() => { HTMLElement.prototype.getClientRects = originalClientRects; });
+
+describe('DecisionTabView', () => {
+  it('sends the cited section to the route, names the tab with it, and stores the bare identity once found', async () => {
+    fetchDecision.mockResolvedValue(foundOf(PENALE, '7'));
+    // the production path: the store holds the reference, renderTabView draws the tab from it
+    const { id, tab } = openTab({ ...AMBIGUA_REF, sezione: 'VII' });
+    expect(tab().view).toEqual({ kind: 'decision', reference: { ...AMBIGUA_REF, sezione: 'VII' } });
+    render(<>{renderTabView(tab(), tab().view!)}</>);
+    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledWith({ ...AMBIGUA_REF, sezione: 'VII' });
+    await waitFor(() => expect(tab().label).toBe('Cass. pen., sez. VII, n. 10787/2024'));
+    expect(tab().view).toEqual({ kind: 'decision', reference: PENALE });
+    expect(id).toBe(tab().id);
+  });
+
+  it('opens a candidate in the same tab', async () => {
+    fetchDecision.mockImplementation(async (ref: DecisionReference) => (ref.archivio ? foundOf(ref, '7') : AMBIGUOUS));
+    const { id, tab } = openTab(AMBIGUA_REF);
+    render(<DecisionTabView tabId={id} reference={AMBIGUA_REF} />);
+    fireEvent.click(await screen.findByRole('link', { name: /Sez\. VII penale/ }));
+    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    await waitFor(() => expect(tab().view).toEqual({ kind: 'decision', reference: PENALE }));
+    expect(appStore.getState().workspaceTabs).toHaveLength(1);
+    expect(fetchDecision).toHaveBeenLastCalledWith(PENALE);
+  });
+
+  it('shows nothing of the list once a candidate is chosen, and the tab takes the candidate\'s label only when it answers', async () => {
+    let answerCivile: (answer: FetchDecisionAnswer) => void = () => {};
+    fetchDecision.mockImplementation((ref: DecisionReference) => {
+      if (!ref.archivio) return Promise.resolve(AMBIGUOUS);
+      return new Promise((resolve) => { answerCivile = resolve; });
+    });
+    const { id, tab } = openTab(AMBIGUA_REF);
+    render(<DecisionTabView tabId={id} reference={AMBIGUA_REF} />);
+    const labelBefore = tab().label;
+    fireEvent.click(await screen.findByRole('link', { name: /Sez\. III civile/ }));
+    expect(await screen.findByRole('status')).toBeInTheDocument();
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    expect(tab().label).toBe(labelBefore);
+    await act(async () => { answerCivile(foundOf(CIVILE, '3')); });
+    expect(await screen.findByText(/Sez\. III civile/)).toBeInTheDocument();
+    await waitFor(() => expect(tab().label).toBe('Cass. civ., sez. III, n. 10787/2024'));
+  });
+
+  it('an answer that arrives after the tab was closed reaches nothing', async () => {
+    let answer: (a: FetchDecisionAnswer) => void = () => {};
+    fetchDecision.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+    const { id, tab } = openTab(CIVILE);
+    const labelBefore = tab().label;
+    const { unmount } = render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    unmount();
+    await act(async () => { answer(foundOf(CIVILE, '3')); });
+    expect(tab().label).toBe(labelBefore);
+  });
+
+  it('«Riprova» after a source that does not answer forgets the answer and fetches again', async () => {
+    fetchDecision
+      .mockResolvedValueOnce({ esito: 'fonte_non_raggiungibile', fonte: 'cassazione' })
+      .mockResolvedValueOnce(foundOf(CIVILE, '3'));
+    const { id } = openTab(CIVILE);
+    render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    expect(await screen.findByText('La fonte non risponde in questo momento.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByText(/Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it('a request that never reached the server says so and logs why', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchDecision.mockRejectedValueOnce(new Error('Failed to fetch'));
+    const { id } = openTab(CIVILE);
+    render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    expect(await screen.findByText('Il server non ha risposto: controlla la connessione e riprova.')).toBeInTheDocument();
+    expect(error).toHaveBeenCalledWith('fetch_decision failed', expect.objectContaining({ error: expect.any(Error) }));
+    error.mockRestore();
+  });
+
+  it('opens the search palette from a refused request', async () => {
+    fetchDecision.mockResolvedValue({ esito: 'richiesta_non_valida', errori: { numero: 'Il numero va da 1 a 999999' } });
+    const { id } = openTab(CIVILE);
+    render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerca nella barra di ricerca' }));
+    expect(appStore.getState().commandPaletteOpen).toBe(true);
+    // with the citation typed in, ready to be corrected
+    expect(appStore.getState().commandPaletteQuery).toBe('Cass. civ., n. 10787/2024');
+  });
+});
+
+describe('DecisionTabView — focus after a merge of two tabs', () => {
+  it('takes keyboard focus when the tab the reader was in closed because this one already held the decision', async () => {
+    fetchDecision.mockResolvedValue(foundOf(PENALE, '7'));
+    const penal = openTab(PENALE);
+    render(<DecisionTabView tabId={penal.id} reference={PENALE} />);
+    await screen.findByText(/Sez\. VII penale/);
+    // a second tab (the civil one) is where the reader chose a candidate: it is the penal decision
+    const other = openTab(CIVILE);
+    const panel = screen.getByRole('heading', { level: 4 });
+    expect(panel).not.toHaveFocus();
+
+    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 10787/2024'); });
+
+    await waitFor(() => expect(panel).toHaveFocus());
+    expect(appStore.getState().decisionFocusRequest).toBeNull();
+    // session-only: what the store saves never carries it
+    appStore.setState({ decisionFocusRequest: 'some-tab' });
+    const saved = appStore.persist.getOptions().partialize!(appStore.getState());
+    expect(Object.keys(saved)).not.toContain('decisionFocusRequest');
+    appStore.setState({ decisionFocusRequest: null });
+    expect(appStore.getState().workspaceTabs.map((t) => t.id)).toEqual([penal.id]);
+  });
+});
+
+describe('DecisionTabView — the desktop panel and the phone view, both mounted', () => {
+  function renderTwoCopies(ref: DecisionReference, id: string) {
+    return render(
+      <>
+        <div data-copy="hidden"><DecisionTabView tabId={id} reference={ref} /></div>
+        <div data-copy="shown"><DecisionTabView tabId={id} reference={ref} /></div>
+      </>,
+    );
+  }
+
+  it('gives the focus request to the copy that is on screen, hidden one first in the tree', async () => {
+    fetchDecision.mockResolvedValue(foundOf(PENALE, '7'));
+    const penal = openTab(PENALE);
+    renderTwoCopies(PENALE, penal.id);
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(2));
+    const [, shownHeading] = screen.getAllByRole('heading', { level: 4 });
+    const other = openTab(CIVILE);
+    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 10787/2024'); });
+    await waitFor(() => expect(shownHeading).toHaveFocus());
+    expect(appStore.getState().decisionFocusRequest).toBeNull();
+  });
+
+  it('follows the identity the store learns in both copies, not only in the one the reader used', async () => {
+    fetchDecision.mockImplementation(async (ref: DecisionReference) => (ref.archivio ? foundOf(ref, '7') : AMBIGUOUS));
+    const { id } = openTab(AMBIGUA_REF);
+    const view = (ref: DecisionReference) => (
+      <>
+        <div data-copy="hidden"><DecisionTabView tabId={id} reference={ref} /></div>
+        <div data-copy="shown"><DecisionTabView tabId={id} reference={ref} /></div>
+      </>
+    );
+    const { rerender, container } = render(view(AMBIGUA_REF));
+    const shown = () => container.querySelector('[data-copy="shown"]') as HTMLElement;
+    const hidden = () => container.querySelector('[data-copy="hidden"]') as HTMLElement;
+    fireEvent.click(await within(shown()).findByRole('link', { name: /Sez\. VII penale/ }));
+    expect(await within(shown()).findByRole('heading', { level: 4 })).toHaveTextContent(/penale/);
+    // the store now holds the identity; the tab's reference changes for both copies
+    rerender(view(PENALE));
+    expect(await within(hidden()).findByRole('heading', { level: 4 })).toHaveTextContent(/penale/);
+    expect(within(hidden()).queryAllByRole('link')).toHaveLength(0);
+  });
+});
+
+describe('DecisionTabView — the store learns the identity of a tab opened by a looser reference', () => {
+  // a small shell: subscribes to the tab in the store and draws it the way the workspace does
+  function Shell({ id }: { id: string }) {
+    const tab = appStore.getState().workspaceTabs.find((t) => t.id === id);
+    const view = useAppStore((st) => st.workspaceTabs.find((t) => t.id === id)?.view);
+    return tab && view ? <>{renderTabView({ ...tab, view }, view)}</> : null;
+  }
+
+  it('keeps the answer and its notices on screen, with one request and no skeleton after the decision shows', async () => {
+    const withNotice: FetchDecisionAnswer = {
+      ...foundOf(PENALE, '7'),
+      avvisi: [{ tipo: 'archivio_dedotto', archivio: 'penale', sezione: '7' }],
+    } as FetchDecisionAnswer;
+    fetchDecision.mockResolvedValue(withNotice);
+    const { id, tab } = openTab({ ...AMBIGUA_REF, sezione: 'VII' });
+    render(<Shell id={id} />);
+    expect(await screen.findByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
+    // the identity lands in the store: the tab's reference is now the bare one
+    await waitFor(() => expect(tab().view).toEqual({ kind: 'decision', reference: PENALE }));
+    // from here on, no skeleton may appear
+    const statuses: number[] = [];
+    const watch = new MutationObserver(() => statuses.push(screen.queryAllByRole('status').length));
+    watch.observe(document.body, { childList: true, subtree: true });
+    // flush the effects and promise callbacks the identity change sets off, without a real timer
+    for (let i = 0; i < 5; i += 1) await act(async () => {});
+    watch.disconnect();
+    expect(statuses.every((n) => n === 0)).toBe(true);
+    expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(1);
+    // the answer seeded for the bare identity carries nothing about what was cited
+    const seeded = await fetchDecisionCached(PENALE);
+    expect(fetchDecision).toHaveBeenCalledTimes(1);
+    expect(seeded).toMatchObject({ esito: 'trovata', avvisi: [] });
+    expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
+  });
+});

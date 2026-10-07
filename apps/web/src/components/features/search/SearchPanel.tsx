@@ -8,6 +8,7 @@ import { AliasManager } from '../settings/AliasManager';
 const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
 import { NormaCard } from './NormaCard';
+import { renderTabView } from '../workspace/renderTabView';
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
 import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight, Info } from 'lucide-react';
@@ -28,6 +29,7 @@ import { deriveVersionInfo, requestIsHistorical, versionTabSuffix } from '../../
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
 import { shortAct } from '../../../utils/sources';
+import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 
 // Estimate the number of articles a search will return based on the `article`
 // field. Used both for the streaming progress bar and the loading skeleton.
@@ -64,6 +66,7 @@ export function SearchPanel() {
     searchQueue, drainNextSearch,
     quickNorms, selectQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
+    pendingDecision, drainPendingDecision,
     quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
   } = useAppStore(useShallow(s => ({
     addWorkspaceTab: s.addWorkspaceTab,
@@ -83,6 +86,8 @@ export function SearchPanel() {
     commandPaletteOpen: s.commandPaletteOpen,
     openCommandPalette: s.openCommandPalette,
     closeCommandPalette: s.closeCommandPalette,
+    pendingDecision: s.pendingDecision,
+    drainPendingDecision: s.drainPendingDecision,
     quickNormsManagerOpen: s.quickNormsManagerOpen,
     openQuickNormsManager: s.openQuickNormsManager,
     closeQuickNormsManager: s.closeQuickNormsManager,
@@ -120,6 +125,32 @@ export function SearchPanel() {
       setMobileActiveTabIndex(workspaceTabs.length - 1);
     }
   }, [workspaceTabs.length, mobileActiveTabIndex]);
+
+  // Mobile shows one tab at a time. Opening a decision (a new frontmost tab with a `view`, or an
+  // open one brought to the front again, which raises its zIndex) makes it the visible one. The
+  // reader's own swipes, chevrons and dots never touch a zIndex, so a later render never undoes them.
+  // (gotcha 11: this syncs the local phone index with the store, an external change, and there is
+  // nothing to derive it from during render. The lint rule does not flag it, so there is no disable.)
+  const frontTabRef = useRef<string | null>(null);
+  const frontTabSeenRef = useRef(false);
+  useEffect(() => {
+    let front: (typeof workspaceTabs)[number] | undefined;
+    for (const t of workspaceTabs) if (!front || t.zIndex > front.zIndex) front = t;
+    const previous = frontTabRef.current;
+    frontTabRef.current = front ? `${front.id}:${front.zIndex}` : null;
+    // the first run only records what is in front at mount
+    if (!frontTabSeenRef.current) { frontTabSeenRef.current = true; return; }
+    if (front?.view && frontTabRef.current !== previous) {
+      const index = workspaceTabs.findIndex((t) => t.id === front.id);
+      if (index >= 0) setMobileActiveTabIndex(index);
+    }
+  }, [workspaceTabs]);
+
+  // A decision asked for from outside the search space (the `/sentenze/…` address) is opened here, on
+  // every change of the request: the address may queue it after this panel has mounted.
+  useEffect(() => {
+    if (pendingDecision) drainPendingDecision();
+  }, [pendingDecision, drainPendingDecision]);
 
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({
@@ -208,6 +239,7 @@ export function SearchPanel() {
         let mergeTarget: typeof workspaceTabs[number] | undefined;
         if (tabLabel && !isHistorical) {
           mergeTarget = workspaceTabs.find(tab =>
+            !tab.view &&
             tab.labelIsCustom &&
             tab.label === tabLabel &&
             !tab.content.some(item =>
@@ -453,6 +485,7 @@ export function SearchPanel() {
           // one tab (see dossier `triggerMultiSearch` queue).
           const existingTab = isCustomForThisGroup
             ? workspaceTabs.find(tab =>
+                !tab.view &&
                 tab.labelIsCustom &&
                 tab.label === customTabLabel &&
                 !tab.content.some(item =>
@@ -625,9 +658,9 @@ export function SearchPanel() {
       // excluded from processResult's merge heuristics, so every later search
       // for this act — a citation jump included — would spawn a duplicate tab.
       // That is the accumulation this round exists to reduce.
-      const targetTabId = workspaceTabs.length > 0
-        ? workspaceTabs[workspaceTabs.length - 1].id
-        : addWorkspaceTab(params.act_type);
+      // (a decision tab draws no content list, so the index would land where nothing shows it)
+      const lastNormTab = [...workspaceTabs].reverse().find((t) => !t.view);
+      const targetTabId = lastNormTab ? lastNormTab.id : addWorkspaceTab(params.act_type);
 
       addNormaIndexToTab(targetTabId, norma);
     } catch (e) {
@@ -660,6 +693,7 @@ export function SearchPanel() {
   };
 
   const hasTabs = workspaceTabs.length > 0;
+  const activeMobileTab = workspaceTabs[mobileActiveTabIndex];
 
   return (
     <>
@@ -681,7 +715,7 @@ export function SearchPanel() {
 
       {/* Workspace Manager - renders all tabs */}
       {/* Desktop: Workspace floating panels - hidden on mobile */}
-      <div id="tour-results-area" className="hidden md:block">
+      <div id={WORKSPACE_AREA_ID} className="hidden md:block">
         <WorkspaceManager
           onViewPdf={handleViewPdf}
           onCrossReference={handleCrossReferenceNavigate}
@@ -696,13 +730,16 @@ export function SearchPanel() {
       {/* Mobile: Swipeable tabs navigation */}
       {hasTabs && (
         <div className="md:hidden w-full h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-          {/* Tab header with navigation - Glass aesthetic */}
-          <div className="flex-shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-4">
+          {/* Tab header with navigation - Glass aesthetic. The layout's fixed menu button (top-left,
+              16px in, 56px wide) sits over the header's left edge: the inset keeps the previous-tab
+              chevron clear of it. */}
+          <div data-testid="phone-tab-header" className="flex-shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 pl-[4.5rem] pr-4 py-4">
             <div className="flex items-center justify-between">
               {/* Prev button */}
               <button
                 onClick={() => setMobileActiveTabIndex(Math.max(0, mobileActiveTabIndex - 1))}
                 disabled={mobileActiveTabIndex === 0}
+                aria-label="Tab precedente"
                 className={cn(
                   "p-2.5 rounded-xl transition-all shadow-sm active:scale-95",
                   mobileActiveTabIndex === 0
@@ -739,6 +776,7 @@ export function SearchPanel() {
               <button
                 onClick={() => setMobileActiveTabIndex(Math.min(workspaceTabs.length - 1, mobileActiveTabIndex + 1))}
                 disabled={mobileActiveTabIndex === workspaceTabs.length - 1}
+                aria-label="Tab successiva"
                 className={cn(
                   "p-2.5 rounded-xl transition-all shadow-sm active:scale-95",
                   mobileActiveTabIndex === workspaceTabs.length - 1
@@ -774,6 +812,7 @@ export function SearchPanel() {
                   }}
                   className="h-full overflow-y-auto p-4 space-y-4 custom-scrollbar"
                 >
+                  {activeMobileTab?.view && renderTabView(activeMobileTab, activeMobileTab.view)}
                   {workspaceTabs[mobileActiveTabIndex].content
                     .filter((item): item is typeof item & { type: 'norma' } => item.type === 'norma')
                     .map((normaBlock) => {

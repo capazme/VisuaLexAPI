@@ -11,8 +11,11 @@ import {
     findLiveBackIndex,
     type ReadingBackEntry,
 } from '../utils/readingBackStack';
+import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '../types/decisions';
+import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
+import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -150,6 +153,13 @@ interface ArticleCollection {
 
 type TabContent = NormaBlock | LooseArticle | ArticleCollection;
 
+/** A tab that shows one thing rather than a list of norms (design 2026-10-05 §2.1): a decision,
+ *  or a list of decisions. A field of the tab, not a TabContent: 27 places switch over
+ *  TabContent, several with an `else` that would draw an unknown item as a loose article. */
+export type TabView =
+    | { kind: 'decision'; reference: DecisionReference }
+    | { kind: 'decision-search'; query: DecisionSearchQuery };
+
 // Renamed from FloatingPanel to WorkspaceTab
 interface WorkspaceTab {
     id: string;
@@ -167,6 +177,8 @@ interface WorkspaceTab {
      * into them, they spawn a new tab instead.
      */
     labelIsCustom: boolean;
+    /** Set on a decision or decision-search tab, which draws its view and ignores `content`. */
+    view?: TabView;
 }
 
 interface SearchPanelState {
@@ -287,6 +299,9 @@ interface AppState {
     // UI State
     sidebarVisible: boolean;
     commandPaletteOpen: boolean;
+    /** A citation to put in the palette's box as it opens («Cerca nella barra di ricerca» on a decision
+     *  that was not found); taken once by the palette. Session-only, absent from `partialize`. */
+    commandPaletteQuery: string | null;
     quickNormsManagerOpen: boolean;
     aliasManagerOpen: boolean;
     searchPanelState: SearchPanelState;
@@ -308,6 +323,18 @@ interface AppState {
      * deliberately absent from `partialize`.
      */
     readingBackStack: ReadingBackEntry[];
+
+    /**
+     * A decision some other page asked the workspace to open; drained once by
+     * `drainPendingDecision`. Session-only, absent from `partialize`.
+     */
+    pendingDecision: DecisionReference | null;
+    /**
+     * The decision tab that should take keyboard focus: set when a tab closes because the decision
+     * it resolved to was already open in another (that one survives). Taken once by the tab's view.
+     * Session-only, absent from `partialize`.
+     */
+    decisionFocusRequest: string | null;
 
     // Search State
     searchTrigger: SearchParams | null;
@@ -333,6 +360,8 @@ interface AppState {
     toggleSidebar: () => void;
     setSidebarVisible: (visible: boolean) => void;
     openCommandPalette: () => void;
+    openCommandPaletteWith: (query: string) => void;
+    takeCommandPaletteQuery: () => string | null;
     closeCommandPalette: () => void;
     openQuickNormsManager: () => void;
     closeQuickNormsManager: () => void;
@@ -342,6 +371,13 @@ interface AppState {
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
     // Workspace Tab Actions
+    openDecisionTab: (reference: DecisionReference, options?: { besideTabId?: string }) => string;
+    openDecisionSearchTab: (query: DecisionSearchQuery, label: string, options?: { besideTabId?: string }) => string;
+    setDecisionTabIdentity: (tabId: string, identity: DecisionIdentity, label: string) => void;
+    placeTabsSideBySide: (leftTabId: string, rightTabId: string) => void;
+    requestOpenDecision: (reference: DecisionReference) => void;
+    drainPendingDecision: () => string | null;
+    takeDecisionFocusRequest: (tabId: string) => boolean;
     addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
     addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
     focusArticleInTab: (tabId: string, articleId: string) => void;
@@ -546,6 +582,7 @@ const appStore = createStore<AppState>()(
             // UI State
             sidebarVisible: true,
             commandPaletteOpen: false,
+            commandPaletteQuery: null,
             quickNormsManagerOpen: false,
             aliasManagerOpen: false,
             searchPanelState: {
@@ -553,6 +590,8 @@ const appStore = createStore<AppState>()(
                 position: { x: window.innerWidth - 420, y: 20 },
             },
             workspaceTabs: [],
+            pendingDecision: null,
+            decisionFocusRequest: null,
             highestZIndex: 100,
             structureWindow: {
                 blockId: null,
@@ -658,6 +697,10 @@ const appStore = createStore<AppState>()(
                 // Each user should start with a clean workspace
                 state.workspaceTabs = [];
                 state.highestZIndex = 100;
+                // a decision asked for, a focus asked for, a citation waiting for the palette
+                state.pendingDecision = null;
+                state.decisionFocusRequest = null;
+                state.commandPaletteQuery = null;
             }),
 
             // UI Actions
@@ -672,6 +715,17 @@ const appStore = createStore<AppState>()(
             openCommandPalette: () => set((state) => {
                 state.commandPaletteOpen = true;
             }),
+
+            openCommandPaletteWith: (query) => set((state) => {
+                state.commandPaletteOpen = true;
+                state.commandPaletteQuery = query;
+            }),
+
+            takeCommandPaletteQuery: () => {
+                const query = get().commandPaletteQuery;
+                if (query !== null) set((state) => { state.commandPaletteQuery = null; });
+                return query;
+            },
 
             closeCommandPalette: () => set((state) => {
                 state.commandPaletteOpen = false;
@@ -700,6 +754,94 @@ const appStore = createStore<AppState>()(
             setSearchPanelPosition: (position) => set((state) => {
                 state.searchPanelState.position = position;
             }),
+
+            // Decision tabs (design 2026-10-05 §2.1-§2.2). Live here, not in workspaceTabActions.ts (gotcha 25).
+            openDecisionTab: (reference, options) => {
+                let tabId = '';
+                set((state) => {
+                    const existing = state.workspaceTabs.find(t =>
+                        t.view?.kind === 'decision' && sameDecision(t.view.reference, reference));
+                    const nothingOnScreen = !state.workspaceTabs.some(t => !t.isHidden && !t.isMinimized);
+                    const tab = existing ?? newViewTab(state, formatDecisionShort(reference), { kind: 'decision', reference });
+                    tab.isHidden = false;
+                    tab.isMinimized = false;
+                    if (existing) {
+                        tab.zIndex = ++state.highestZIndex;
+                        // an unresolved tab (no archive yet) learns the section a later citation adds:
+                        // it may be what settles the homonyms, so it asks again (a citation with an
+                        // archive never reaches here: it matches only a tab of its archive)
+                        const known = existing.view?.kind === 'decision' ? existing.view.reference : null;
+                        if (known && !known.archivio && reference.sezione &&
+                            decisionPath(known) !== decisionPath(reference)) {
+                            existing.view = { kind: 'decision', reference };
+                            existing.label = formatDecisionShort(reference);
+                        }
+                    }
+                    if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
+                    // with nothing else on screen a new decision takes the free area (design §2.2)
+                    else if (!existing && nothingOnScreen) fillFreeArea(state, tab.id);
+                    tabId = tab.id;
+                });
+                return tabId;
+            },
+
+            openDecisionSearchTab: (query, label, options) => {
+                let tabId = '';
+                set((state) => {
+                    const wanted = stableQueryKey(query);
+                    const existing = state.workspaceTabs.find(t =>
+                        t.view?.kind === 'decision-search' && stableQueryKey(t.view.query) === wanted);
+                    const tab = existing ?? newViewTab(state, label, { kind: 'decision-search', query });
+                    tab.isHidden = false;
+                    tab.isMinimized = false;
+                    if (existing) tab.zIndex = ++state.highestZIndex;
+                    if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
+                    tabId = tab.id;
+                });
+                return tabId;
+            },
+
+            setDecisionTabIdentity: (tabId, identity, label) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab || tab.view?.kind !== 'decision') return;
+                // One tab per decision: if another tab already holds this one (a candidate chosen
+                // in this tab), that one comes to the front and this one closes.
+                const other = state.workspaceTabs.find(t =>
+                    t.id !== tabId && t.view?.kind === 'decision' && sameDecision(t.view.reference, identity));
+                if (other) {
+                    other.isHidden = false;
+                    other.isMinimized = false;
+                    other.zIndex = ++state.highestZIndex;
+                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
+                    state.decisionFocusRequest = other.id;
+                    return;
+                }
+                tab.view = { kind: 'decision', reference: identityOf(identity) };
+                tab.label = label;
+            }),
+
+            placeTabsSideBySide: (leftTabId, rightTabId) => set((state) => {
+                placeSideBySide(state, leftTabId, rightTabId);
+            }),
+
+            requestOpenDecision: (reference) => set((state) => {
+                state.pendingDecision = reference;
+            }),
+
+            drainPendingDecision: () => {
+                // Atomic enough for StrictMode: the request is cleared before the tab opens,
+                // so the second call finds null (gotcha 14).
+                const pending = get().pendingDecision;
+                if (!pending) return null;
+                set((state) => { state.pendingDecision = null; });
+                return get().openDecisionTab(pending);
+            },
+
+            takeDecisionFocusRequest: (tabId) => {
+                if (get().decisionFocusRequest !== tabId) return false;
+                set((state) => { state.decisionFocusRequest = null; });
+                return true;
+            },
 
             // Workspace Tab Actions - Complete refactor
             addWorkspaceTab: (label, norma, articles, options) => {
@@ -751,6 +893,7 @@ const appStore = createStore<AppState>()(
             addNormaToTab: (tabId, norma, articles) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'addNormaToTab')) return;
 
                 // Helper to get a unique key for an article within a norma block
                 const getArticleKey = (a: ArticleData) => {
@@ -816,6 +959,7 @@ const appStore = createStore<AppState>()(
             addLooseArticleToTab: (tabId, article, sourceNorma) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'addLooseArticleToTab')) return;
 
                 tab.content.push({
                     type: 'loose-article',
@@ -912,6 +1056,7 @@ const appStore = createStore<AppState>()(
             addNormaIndexToTab: (tabId, norma) => {
                 const tab = get().workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return null;
+                if (refuseViewTab(tab, 'addNormaIndexToTab')) return null;
 
                 const existing = tab.content.find(
                     (c): c is NormaBlock => c.type === 'norma' &&
@@ -1028,6 +1173,7 @@ const appStore = createStore<AppState>()(
                 const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
                 const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
                 if (!sourceTab || !targetTab) return;
+                if (refuseViewTab(targetTab, 'moveNormaBetweenTabs')) return;
 
                 const normaIndex = sourceTab.content.findIndex(c => c.type === 'norma' && c.id === normaId);
                 if (normaIndex === -1) return;
@@ -1074,6 +1220,7 @@ const appStore = createStore<AppState>()(
                 const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
                 const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
                 if (!sourceTab || !targetTab) return;
+                if (refuseViewTab(targetTab, 'moveLooseArticleBetweenTabs')) return;
 
                 const articleIndex = sourceTab.content.findIndex(c => c.type === 'loose-article' && c.id === articleId);
                 if (articleIndex === -1) return;
@@ -1181,6 +1328,7 @@ const appStore = createStore<AppState>()(
                 set((state) => {
                     const tab = state.workspaceTabs.find(t => t.id === tabId);
                     if (!tab) return;
+                    if (refuseViewTab(tab, 'createCollection')) return;
 
                     const newCollection: ArticleCollection = {
                         type: 'collection',
@@ -1213,6 +1361,7 @@ const appStore = createStore<AppState>()(
             addArticleToCollection: (tabId, collectionId, article, sourceNorma) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'addArticleToCollection')) return;
 
                 const collection = tab.content.find(
                     c => c.type === 'collection' && c.id === collectionId
@@ -1267,6 +1416,7 @@ const appStore = createStore<AppState>()(
             moveLooseArticleToCollection: (tabId, looseArticleId, collectionId) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
+                if (refuseViewTab(tab, 'moveLooseArticleToCollection')) return;
 
                 // Find and remove loose article
                 const looseIndex = tab.content.findIndex(
@@ -2952,6 +3102,7 @@ const appStore = createStore<AppState>()(
                 return {
                     ...current,
                     ...p,
+                    ...(p.workspaceTabs !== undefined ? { workspaceTabs: sanitizeViews(p.workspaceTabs) ?? current.workspaceTabs } : {}),
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
@@ -2980,5 +3131,115 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 export { appStore };
 
 // Export types
+/** Does the tab's reference (`tab`) show the decision a citation (`wanted`) names? Same court,
+ *  number and year; a citation with an archive matches only a tab of that archive (civil and
+ *  penal numbers run in separate series), one without matches a tab of either. */
+function sameDecision(tab: DecisionReference, wanted: DecisionReference): boolean {
+    return tab.corte === wanted.corte && tab.numero === wanted.numero && tab.anno === wanted.anno &&
+        (wanted.archivio === undefined || tab.archivio === wanted.archivio);
+}
+
+function isValidView(view: unknown): boolean {
+    if (!view || typeof view !== 'object') return false;
+    const v = view as { kind?: unknown; reference?: Record<string, unknown>; query?: unknown };
+    if (v.kind === 'decision') {
+        const r = v.reference;
+        return !!r && typeof r.corte === 'string' && r.corte !== '' &&
+            Number.isInteger(r.numero) && (r.numero as number) > 0 &&
+            Number.isInteger(r.anno) && (r.anno as number) > 0;
+    }
+    if (v.kind === 'decision-search') return !!v.query && typeof v.query === 'object';
+    return false;
+}
+
+/** Drops a persisted tab's malformed `view`; a tab left without content goes with it. */
+function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
+    if (!Array.isArray(tabs)) return undefined;
+    return (tabs as WorkspaceTab[]).flatMap((tab) => {
+        if (!tab || tab.view === undefined || isValidView(tab.view)) return [tab];
+        const { view: _view, ...rest } = tab;
+        void _view;
+        return Array.isArray(rest.content) && rest.content.length > 0 ? [rest as WorkspaceTab] : [];
+    });
+}
+
+/** A query as a string that does not depend on key order. */
+function stableQueryKey(query: DecisionSearchQuery): string {
+    const sorted = (o: object) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)));
+    // the label is presentation, not query
+    const { normaLabel: _label, ...rest } = query;
+    void _label;
+    return JSON.stringify(sorted({ ...rest, norma: rest.norma ? sorted(rest.norma) : undefined }));
+}
+
+/** A tab with a `view` draws its view and ignores `content`: anything pushed into it would be kept
+ *  and never shown. Every action that writes content into a tab refuses such a tab. */
+function refuseViewTab(tab: WorkspaceTab, action: string): boolean {
+    if (!tab.view) return false;
+    console.warn(`${action}: the tab "${tab.label}" shows a ${tab.view.kind} and takes no content`);
+    return true;
+}
+
+function newViewTab(state: AppState, label: string, view: TabView): WorkspaceTab {
+    const cascade = (state.workspaceTabs.length % 5) * 40;
+    state.workspaceTabs.push({
+        id: uuidv4(), label, position: { x: 100 + cascade, y: 100 + cascade }, size: { width: 800, height: 650 },
+        zIndex: ++state.highestZIndex, isMinimized: false, isHidden: false, content: [],
+        // keeps a norm search from merging into a decision tab (R3 of streaming-ux)
+        labelIsCustom: true, view,
+    });
+    return state.workspaceTabs[state.workspaceTabs.length - 1];
+}
+
+// Layout.tsx: the static sidebar is 64px wide from the `lg` breakpoint (1024px) up; below it the
+// menu button (fixed top-4 left-4) and, from `md`, the focus toggle (fixed top-4 right-4) are each
+// about 40px square at 16px from the edge. The workspace dock is fixed bottom-6, about 44px high
+// collapsed (more when expanded), centred. All of these are viewport pixels.
+const LAYOUT_SIDEBAR_WIDTH = 64;
+const LAYOUT_LG_BREAKPOINT = 1024;
+const LAYOUT_MD_BREAKPOINT = 768; // the phone view takes over below it
+const SIDE_BY_SIDE_MARGIN = 16;
+const SIDE_BY_SIDE_TOP = 72; // below the two floating buttons
+const SIDE_BY_SIDE_BOTTOM = 88; // above the collapsed dock (24 + ~44) with a gap
+
+/** The left tab on the left half of the free area, the right one on the right half, both as tall
+ *  as the free area (design 2026-10-05 §2.2, reading 1). The free area is worked out in viewport
+ *  pixels (minus the static sidebar when shown, clear of the floating buttons and the dock), then
+ *  each target is turned into tab coordinates by subtracting the workspace origin, because a
+ *  tab's x/y are offsets from there (utils/workspaceOrigin.ts). */
+function freeArea(state: AppState) {
+    const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
+    const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
+    const origin = workspaceOrigin();
+    const sidebarShown = vw >= LAYOUT_LG_BREAKPOINT && state.sidebarVisible && !state.settings.focusMode;
+    const x0 = sidebarShown ? LAYOUT_SIDEBAR_WIDTH : 0;
+    const m = SIDE_BY_SIDE_MARGIN;
+    return {
+        origin, x0, m,
+        width: vw - x0 - m * 2,
+        height: Math.max(240, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_BOTTOM),
+        y: SIDE_BY_SIDE_TOP - origin.top,
+    };
+}
+
+function placeSideBySide(state: AppState, leftId: string, rightId: string) {
+    const left = state.workspaceTabs.find(t => t.id === leftId);
+    const right = state.workspaceTabs.find(t => t.id === rightId);
+    if (!left || !right || left.id === right.id) return;
+    const { origin, x0, m, width, height, y } = freeArea(state);
+    const half = Math.floor((width - m) / 2);
+    Object.assign(left, { position: { x: x0 + m - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
+    Object.assign(right, { position: { x: x0 + m * 2 + half - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
+}
+
+/** One tab on the whole free area (same clearances as `placeSideBySide`). */
+function fillFreeArea(state: AppState, tabId: string) {
+    const tab = state.workspaceTabs.find(t => t.id === tabId);
+    // only where the desktop workspace is laid out: a phone's geometry would be saved with the tab
+    if (!tab || (typeof window !== 'undefined' && window.innerWidth < LAYOUT_MD_BREAKPOINT)) return;
+    const { origin, x0, m, width, height, y } = freeArea(state);
+    Object.assign(tab, { position: { x: x0 + m - origin.left, y }, size: { width, height }, isHidden: false, isMinimized: false });
+}
+
 export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };
 

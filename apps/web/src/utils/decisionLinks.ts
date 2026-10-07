@@ -10,8 +10,9 @@ import type {
 } from '../types/decisions';
 import { formatDateForCitation, formatDateItalianLong, withPreposition } from './dateUtils';
 
-/** True: App.tsx routes /sentenze/:corte/:numero/:anno, so data that names a decision (the Massimario's
- *  chips) can link to its page. The one switch for those links. */
+/** True: App.tsx routes /sentenze/:corte/:numero/:anno (the address opens the decision's tab in the
+ *  search space), so data that names a decision (the Massimario's chips) can link to it. The one
+ *  switch for those links. */
 export const DECISION_PAGE_AVAILABLE = true;
 
 /** A decision as other data names it (graph nodes, imports): loose, possibly incomplete. */
@@ -26,9 +27,9 @@ export interface LooseDecisionRef {
 const LINKABLE_FIRST_YEAR: Record<string, number> = { cassazione: 1900, corte_costituzionale: 1956 };
 
 /**
- * The page of a decision named by other data, or null when that data cannot make a link (another
+ * The address of a decision named by other data, or null when that data cannot make a link (another
  * court, no year, a number out of range). With the archive the path is the identity's and carries
- * no section; without it, the section as written goes along for the page to resolve.
+ * no section; without it, the section as written goes along for the decision's tab to resolve.
  */
 export function linkableDecisionPath(raw: LooseDecisionRef, now: Date = new Date()): string | null {
   const first = Object.hasOwn(LINKABLE_FIRST_YEAR, raw.corte) ? LINKABLE_FIRST_YEAR[raw.corte] : undefined;
@@ -48,7 +49,7 @@ export function linkableDecisionPath(raw: LooseDecisionRef, now: Date = new Date
  * §4). The paths are a contract with LibreLex and the MERL-T graph: never rename them.
  */
 
-// --- The strict part: resolved identities and parsed references (the page, the dossier). ---
+// --- The strict part: resolved identities and parsed references (the decision tab, the dossier). ---
 
 export const DECISIONS_PATH = '/sentenze';
 export const MAX_NUMERO = 999_999;
@@ -117,7 +118,7 @@ const TIPO_ABBR: Record<string, string> = {
   sentenza: 'sent.', ordinanza: 'ord.', 'ordinanza interlocutoria': 'ord. interl.', decreto: 'decr.',
 };
 
-/** A section code as the source gives it (1-7, L, U, F) in the page's words. */
+/** A section code as the source gives it (1-7, L, U, F) in the view's words. */
 export function sectionName(code: string): string {
   if (code === 'U') return 'Sezioni Unite';
   if (code === 'L') return 'Sez. Lavoro';
@@ -192,10 +193,27 @@ export function formatDecisionShort(ref: LooseDecisionRef, rv?: readonly string[
   return rv && rv.length > 0 ? `${label} · Rv. ${rv.join(', ')}` : label;
 }
 
+const KEY = /^(?:cassazione:(civile|penale):([1-9]\d{0,5}):(\d{4})|corte_costituzionale:([1-9]\d{0,5}):(\d{4}))$/;
+
+/** A decision's key (`decisionKey`) read back, or null for anything else — a norm's key has no colon. */
+export function identityFromKey(key: string, now: Date = new Date()): DecisionIdentity | null {
+  const m = KEY.exec(key);
+  if (!m) return null;
+  const corte: DecisionCourt = m[1] ? 'cassazione' : 'corte_costituzionale';
+  const numero = Number(m[2] ?? m[4]);
+  const anno = Number(m[3] ?? m[5]);
+  if (anno < FIRST_YEAR[corte] || anno > now.getFullYear()) return null;
+  return corte === 'cassazione' ? { corte, archivio: m[1] as DecisionArchive, numero, anno } : { corte, numero, anno };
+}
+
+export function isDecisionKey(key: string): boolean {
+  return identityFromKey(key) !== null;
+}
+
 /**
  * The decision a Brocardi massima is headed with ("Cass. civ.", "Cass. pen.", "Cass. lav.",
  * "Cass. sez. un.", "Cass.", "Corte cost.", then "n. 31191/2025"), or null for another court
- * or no number. A bare «Cass.» names no archive and «Cass. sez. un.» only its section: the page
+ * or no number. A bare «Cass.» names no archive and «Cass. sez. un.» only its section: the route
  * resolves them (Sentenze design §2), never a guess here. «Cass. lav.» is the civil labour section.
  */
 export function brocardiDecisionRef(
@@ -233,10 +251,10 @@ function sectionWithArticle(code: string): { of: string; the: string; plural: bo
 const ARCHIVE_PLURAL: Record<DecisionArchive, string> = { civile: 'civili', penale: 'penali' };
 
 /**
- * A notice in the page's words. `citata`, sent only for a short plain form, is quoted as
- * written, and the page renders the string as text, never HTML. `attrs` says why a text is
+ * A notice in the view's words. `citata`, sent only for a short plain form, is quoted as
+ * written, and the view renders the string as text, never HTML. `attrs` says why a text is
  * missing (`testo_assente`), and only when the source said so; without it no reason is given.
- * A kind of notice this page does not know gets a plain sentence, never nothing.
+ * A kind of notice this view does not know gets a plain sentence, never nothing.
  */
 export function describeNotice(notice: DecisionNotice, attrs: DecisionAttributes = {}): string {
   switch (notice.tipo) {
@@ -278,7 +296,7 @@ export function describeNotice(notice: DecisionNotice, attrs: DecisionAttributes
 /**
  * Why a decision was not found, in words that never claim it does not exist: an archive holds
  * what it holds. The archive's start is read from the archive and can be missing. A reason this
- * page does not know gets a sentence that only says the decision was not found.
+ * view does not know gets a sentence that only says the decision was not found.
  */
 export function notFoundMessage(answer: NotFoundDecision, ref: DecisionReference): string {
   if (answer.motivo === 'fuori_archivio') {
@@ -311,7 +329,7 @@ export function notFoundMessage(answer: NotFoundDecision, ref: DecisionReference
 /**
  * An address that may go into an `href`: the one given, as it parses, when it is an absolute https
  * address; null for anything else (http, `javascript:`, `data:`, a protocol-relative `//host`, a
- * relative path, a string that is no address, nothing). The page links what was checked: the parsed
+ * relative path, a string that is no address, nothing). The view links what was checked: the parsed
  * form leaves a browser no second reading of `https:host`. Our server builds the source links from
  * fixed bases, so this is defence in depth, for the day that stops being so.
  */

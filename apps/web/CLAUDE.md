@@ -7,9 +7,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 ### Frontend (`apps/web/src`)
 
 - `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
-  `/history`, `/environments`, `/forum`, `/documents`, `/sentenze` (the form to
-  open a court decision) and `/sentenze/:corte/:numero/:anno` (a decision), then
-  the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
+  `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
+  `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
+  address queues the decision for the search space to open as a tab; `/sentenze` alone and an
+  address that does not parse both open the palette, and only the address that does not parse
+  says why, in the error toast (`pushSyncError`); the addresses stay the contract with LibreLex
+  and the graph), then the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
   `/grafo` (`/merlt/qa` and `/merlt/chiedi` redirect to `/grafo`), and a 404 for
   anything else. The MERL-T routes are always registered: `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
@@ -24,8 +27,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
   user drops in — parsed in the browser, never uploaded — each opening the
   reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
-  (`DecisionPage`, `DecisionLookupForm`, `DecisionTextView`: a court decision
-  by its address; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
+  (`DecisionView`, the body of a decision wherever it is drawn; `DecisionTabView`,
+  its workspace tab and the phone view; `DecisionAddress`, the `/sentenze/…` route element;
+  `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
+  `DecisionTextView`: a court decision's text; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
@@ -245,13 +250,39 @@ palette's "Apri l'indice e sfoglia" is the entry point. A block with zero
 articles is a legitimate state — guard anything that dereferences the active
 article (`StudyMode` is mounted conditionally for exactly this reason).
 
-**Going back.** `readingBackStack` records **citation jumps only**. Picking from
+**Going back.** `readingBackStack` records **citation jumps and the jump from an article to a decision**. Picking from
 the index does not lose your place, and a previous/next arrow is undone by the
 opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
 per-tab copy would sit inside the very tab an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
 combination for "back" already belongs to the browser.
+
+**Decisions in the workspace.** A court decision is a workspace tab of its own: `WorkspaceTab.view`
+(`{ kind: 'decision', reference }`, drawn by `workspace/renderTabView.tsx` on the desktop panel and the
+phone alike), never a `TabContent`; the norm actions refuse a view tab (`refuseViewTab`). There is
+one tab per decision (`openDecisionTab` brings an open one to the front; `setDecisionTabIdentity`
+closes the tab a candidate was chosen in when another already holds that decision, and asks the
+survivor to take keyboard focus), it opens beside the article when given `besideTabId`
+(`placeSideBySide`, in viewport pixels converted through `utils/workspaceOrigin.ts`), and it is
+persisted by its reference until the route has found it, then by identity (a cited section
+travels with the reference to the route, which uses it to tell homonyms apart): the text is fetched again through `utils/decisionFetchCache.ts`. On a
+phone one tab shows at a time, and a decision just opened becomes the visible one. The ways in:
+the palette (a citation such as «Cass. civ. 10787/2024» is read by `decisionCitationParser.ts`
+before the norm parser, unless the first word is one of the user's alias triggers; Enter opens
+the tab; with no other tab on screen a new decision takes the whole free area), `DecisionLink` (a
+plain click on the search page opens the tab beside the article and, given a `backEntry`, records
+the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as for a citation jump; any
+other click follows the real `href`, which `DecisionAddress` turns into the same tab), the
+sidebar's «Sentenze» (a button: it opens the palette, there is no page) and the address itself
+(queued in `pendingDecision`, drained by `SearchPanel`). Highlights and notes do not exist on
+decisions yet (gotcha 23). «Cerca nella barra di ricerca», on a decision that was not found, opens the
+palette with its citation typed in (`openCommandPaletteWith`, taken once). The desktop panel and
+the phone view both mount a `DecisionTabView` for the same tab, one of them hidden: only the copy
+on screen takes the focus request, and both follow the identity the store learns, keeping the answer already shown (notices included) and seeding it
+in the cache (`rememberDecision`) so that no second request goes out. A later citation that adds a section to
+a tab still without an archive replaces its reference, so the tab asks again with it. The free-area
+placement applies from the `md` breakpoint up only: a phone's geometry is never saved with the tab.
 
 ### Dossier
 
@@ -298,9 +329,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   moves anything to the trash: its own deletions stay immediate, with an undo.
   A decision in the trash is named by the server's citation.
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
-  schema accepts and a label, never the text. They are added from the decision's page
+  schema accepts and a label, never the text. They are added from the decision's tab
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
-  «Giurisprudenza» (`DossierDecisionsSection`: each citation links to the decision's page, and
+  «Giurisprudenza» (`DossierDecisionsSection`: each citation links to the decision's address, and
   each row can be removed). The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
@@ -328,7 +359,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   Legacy status values still hydrate and simply render as unstarred.
 - **Collection**: `AddToDossierPopover.tsx` is the add-from-reading entry
   point for articles (from `ReadingToolbar` and `LooseArticleCard`) and for
-  decisions (`DecisionPage`, with `sentenza`). It lists recent dossiers,
+  decisions (`DecisionView`'s actions, with `sentenza`). It lists recent dossiers,
   guards duplicates, and its inline "Nuovo dossier" waits for the server id
   before adding — `createDossier()` returns `Promise<string | null>`.
   `DossierModal` is create-only.
@@ -368,8 +399,13 @@ Duplicating any of these is a defect, not a shortcut.
   `api.ts`'s single in-flight refresh) because the production ingress refuses those calls
   without one, and it returns fetch's own `Response`, so the NDJSON stream and the PDF
   work as before. `/version` and `/health` are the two that stay open.
+- `utils/decisionCitationParser.ts` — `parseDecisionCitation(input, { aliasTriggers })`: a decision as
+  typed in the palette; it reads only an input that starts with a court and needs number and year.
+  `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session
+  (50 answers, least recently used out; a failure is not kept; `clearDecisionCache` at logout). `utils/workspaceOrigin.ts` — where a
+  tab's (0, 0) is on screen, and the drag limits.
 - `utils/decisionLinks.ts` — the addresses of court decisions (`decisionPath`,
-  `parseDecisionPath`, `decisionKey`) and their names (`formatDecisionHeading`,
+  `parseDecisionPath`, `decisionKey`, `identityFromKey` and `isDecisionKey`, which read a key back) and their names (`formatDecisionHeading`,
   `formatDecisionCitation`, and `formatDecisionShort` — «Cass. civ., sez. un., n.
   31310/2024 · Rv. …», for chips and lists — both pinned to
   `conventions/sources/golden.json`); `brocardiDecisionRef` reads the court a Brocardi

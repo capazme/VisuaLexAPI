@@ -224,6 +224,13 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     openCommandPalette();
   };
 
+  // Decisions are not a page: «Sentenze» opens the palette, which lives in the search space.
+  const handleDecisionsClick = () => {
+    navigate('/');
+    openCommandPalette();
+    closeMobile();
+  };
+
   return (
     <aside
       className={cn(
@@ -276,7 +283,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
-        <NavItem to="/sentenze" icon={Gavel} label="Sentenze" onClick={closeMobile} />
+        <ActionButton icon={Gavel} label="Sentenze" onClick={handleDecisionsClick} />
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} badgeCount={forumNotifications.normaChanges} />
         {isMerltEnabled() && (
           <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} />

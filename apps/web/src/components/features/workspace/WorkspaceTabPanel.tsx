@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus, FileText } from 'lucide-react';
@@ -15,6 +16,8 @@ import { useTour } from '../../../hooks/useTour';
 import { useCompare } from '../../../hooks/useCompare';
 import { Z_INDEX_VALUES } from '../../../constants/zIndex';
 import { normaForDossier } from '../dossier/dossierUtils';
+import { dragLimits, workspaceOrigin } from '../../../utils/workspaceOrigin';
+import { renderTabView } from './renderTabView';
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -127,8 +130,10 @@ export function WorkspaceTabPanel({
   };
 
   // Make this tab a drop zone
+  // (a decision tab draws no content list: an article dropped in would be invisible)
   const { setNodeRef, isOver } = useDroppable({
     id: tab.id,
+    disabled: tab.view !== undefined,
   });
 
   // Drag controls for handle-based dragging
@@ -163,16 +168,32 @@ export function WorkspaceTabPanel({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Very permissive drag constraints
+  // A tab's x/y are offsets from the workspace origin (utils/workspaceOrigin.ts), not from the
+  // viewport corner: the limits are expressed in viewport pixels and shifted by that origin, so the
+  // tab's rect stays inside the window. At least `minVisible` of its width and of its header stay
+  // on screen.
   const tabWidth = tab.isMinimized ? 300 : tab.size.width;
   const minVisible = 50;
 
-  const dragConstraints = useMemo(() => ({
-    left: -(tabWidth - minVisible),
-    top: 0,
-    right: windowSize.width - minVisible,
-    bottom: windowSize.height - minVisible
-  }), [windowSize.width, windowSize.height, tabWidth]);
+  // The origin is read once the page is laid out (on a reload the area is not in the document
+  // during this component's first render), again when the window resizes, and again just before a
+  // drag starts, because the sidebar and the focus mode move the area without a resize.
+  const [origin, setOrigin] = useState(workspaceOrigin);
+  const refreshOrigin = useCallback(() => {
+    const next = workspaceOrigin();
+    setOrigin((prev) => (prev.left === next.left && prev.top === next.top ? prev : next));
+  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the DOM's layout, which does not exist during render
+  useLayoutEffect(refreshOrigin, [refreshOrigin]);
+  useEffect(() => {
+    window.addEventListener('resize', refreshOrigin);
+    return () => window.removeEventListener('resize', refreshOrigin);
+  }, [refreshOrigin]);
+
+  const dragConstraints = useMemo(
+    () => dragLimits(origin, windowSize, tabWidth, minVisible),
+    [origin, windowSize, tabWidth],
+  );
 
   useEffect(() => {
     if (!isDragging) {
@@ -335,6 +356,8 @@ export function WorkspaceTabPanel({
           onPointerDown={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('button') || target.closest('input')) return;
+            // the limits must be right when the drag starts, not at the next render
+            flushSync(refreshOrigin);
             dragControls.start(e);
           }}
           className="cursor-grab active:cursor-grabbing flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-slate-800 select-none touch-none"
@@ -360,7 +383,7 @@ export function WorkspaceTabPanel({
 
             <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
 
-            {isEditingLabel ? (
+            {isEditingLabel && !tab.view ? (
               <input
                 type="text"
                 value={labelInput}
@@ -390,7 +413,7 @@ export function WorkspaceTabPanel({
             ) : (
               <div
                 className="flex items-center gap-2 flex-1 min-w-0 group"
-                onDoubleClick={() => {
+                onDoubleClick={tab.view ? undefined : () => {
                   setLabelInput(tab.label);
                   setIsEditingLabel(true);
                 }}
@@ -398,23 +421,27 @@ export function WorkspaceTabPanel({
                 <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">
                   {tab.label}
                 </h3>
-                <button
-                  onClick={() => {
-                    setLabelInput(tab.label);
-                    setIsEditingLabel(true);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-opacity"
-                  title="Modifica nome"
-                >
-                  <Edit2 size={12} className="text-slate-500" />
-                </button>
+                {/* a decision's label is its citation, set from the decision itself */}
+                {!tab.view && (
+                  <button
+                    onClick={() => {
+                      setLabelInput(tab.label);
+                      setIsEditingLabel(true);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-opacity"
+                    title="Modifica nome"
+                  >
+                    <Edit2 size={12} className="text-slate-500" />
+                  </button>
+                )}
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Add to Dossier button with dropdown */}
+            {/* Add to Dossier button with dropdown: a decision has its own, in its view */}
+            {!tab.view && (
             <div className="relative" ref={dossierMenuRef} onPointerDown={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setShowDossierMenu(!showDossierMenu)}
@@ -498,6 +525,7 @@ export function WorkspaceTabPanel({
                 </div>
               )}
             </div>
+            )}
 
           </div>
         </div>
@@ -505,7 +533,9 @@ export function WorkspaceTabPanel({
         {/* Content area */}
         {!tab.isMinimized && (
           <div className="flex-1 overflow-auto p-4 space-y-4">
-            {tab.content.length === 0 ? (
+            {tab.view ? (
+              renderTabView(tab, tab.view)
+            ) : tab.content.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400">
                 <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-3">
                   <FileText size={24} className="opacity-50" />

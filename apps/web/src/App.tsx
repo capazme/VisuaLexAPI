@@ -12,6 +12,7 @@ import { ConsentProvider } from './features/merlt/consent/ConsentContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ConnectPage } from './features/connections';
 import { AdminRoute } from './components/auth/AdminRoute';
+import { DecisionAddress } from './components/features/decisions/DecisionAddress';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
 import { lazy, Suspense } from 'react';
@@ -27,9 +28,6 @@ const ContribPage = lazy(() =>
 );
 const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
-);
-const DecisionPage = lazy(() =>
-  import('./components/features/decisions/DecisionPage').then(m => ({ default: m.DecisionPage })),
 );
 
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
@@ -121,22 +119,8 @@ function App() {
               </Suspense>
             }
           />
-          <Route
-            path="sentenze"
-            element={
-              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                <DecisionPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="sentenze/:corte/:numero/:anno"
-            element={
-              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                <DecisionPage />
-              </Suspense>
-            }
-          />
+          <Route path="sentenze" element={<DecisionAddress />} />
+          <Route path="sentenze/:corte/:numero/:anno" element={<DecisionAddress />} />
           {/* Global 404 catch-all (inside the layout: sidebar stays visible) */}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
