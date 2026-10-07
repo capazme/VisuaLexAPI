@@ -2612,6 +2612,8 @@ git commit -m "feat(web): a decision's text links the norms it cites, and they o
 
 ### Task 20: Notes and highlights on a decision, never lost
 
+> **Amended 2026-10-07 (the owner: «gli stessi tool di note, evidenziazioni e commenti»; spec §8.3).** The tools are the article's, not a version of them: `SelectionPopup` (same colours), `InlineNoteComposer`/`InlineNotePopover`, `NotesPeekPanel`, the highlight toggle and `HighlightsActionsPicker` in the same `ReadingToolbar` places, **and the round-B signs**: `renderDecisionHtml` takes `signs: true` and ends each annotated `p.vlx-dec-para` with the empty `span.vlx-sign`, `useArticleTextInteractions` opens `BlockAnnotationsPopover` on it (`describeBlock` names a paragraph by its opening words). Where a component needs something only an article has (`versionInfo`, Brocardi, the saved-norm watcher) the decision passes nothing and the feature is off; a component that would need a decision branch inside it is a finding, not a fix. Add to the tests: the sign appears on an annotated paragraph, its popover lists the paragraph's notes and highlights, the rendered text nodes still spell the projection with the signs on (Task 18's contract test, `signs: true`).
+
 **Files:**
 - Modify: `apps/web/src/components/features/decisions/DecisionReadingSurface.tsx`
 - Create: `apps/web/src/components/features/decisions/UnmatchedAnchors.tsx`
@@ -2903,6 +2905,58 @@ git commit -m "feat(web): download a decision as a PDF of ours, or the court's o
 **PR 4:** title «feat: read, annotate and follow the norms of a decision»; body names the contract (root rule 23 now covers decisions) and the dossier PR 3 follow-up (adopt `renderDecisionHtml`). Merge: `merge: feat/decision-annotations — notes, highlights and norm links on decisions, never lost`.
 
 ---
+
+## PR 4b — `feat/decision-discussions` (apps/server, apps/web)
+
+Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it needs the decision's reading surface, its projection and `SelectionPopup` on it. The storage choice (spec question 5) and the quotation rule (question 6) are the owner's; the tasks below follow the recommended answers and change only in Task 26 if he chooses the migration. Server tests need the test database: ask the orchestrator first.
+
+### Task 26: The server takes a discussion on a decision
+
+**Files:**
+- Create: `apps/server/src/norms/decisionKey.ts` (`readDecisionKey(key): { corte, archivio?, numero, anno } | null`, the server twin of the web's `identityFromKey`: same shapes, same bounds — `[1-9]\d{0,5}`, a year from the court's first to the current one)
+- Modify: `apps/server/src/controllers/articleDiscussionController.ts` (the anchor schema: `articleId` may be `""` only when `normaKey` reads as a decision key; a decision key with a non-empty `articleId`, or a malformed one, is a 400 in Italian; `version` and `articleUrn` refused on a decision)
+- Modify: `apps/server/CLAUDE.md` («Article discussions»: also decisions, keyed as notes are)
+- Test: `apps/server/tests/articleDiscussions.decision.test.ts`
+
+- [ ] **Step 1: Failing tests.** Create, list, list passages, comment, vote, report and moderate a thread on `cassazione:civile:10787:2024` with `articleId: ""`; a norm key with `articleId: ""` → 400; `cassazione:civile:007:2024`, a future year, `corte_costituzionale:civile:1:2020` → 400; a decision thread never appears in an article's list and the reverse; the user's export (`GET /auth/export`) includes it; account deletion removes it (cascade).
+- [ ] **Step 2: Run to see them fail** (test DB, after the orchestrator's go).
+- [ ] **Step 3: Implement.** A `superRefine` on the anchor schema; no Prisma change. If the owner chose question 5's migration instead: a hand-written migration adding `target_kind` (`article` | `decision`) with a CHECK and backfilling `article`, announced in the register before it is applied (`apps/server/CLAUDE.md`, «Prisma migrations»), and the same tests.
+- [ ] **Step 4: Run the touched tests, then the whole server suite once.**
+- [ ] **Step 5: Commit** — «feat(server): a discussion may be anchored on a court decision, keyed as its notes are».
+
+### Task 27: One discussion panel for an article and a decision
+
+**Files:**
+- Modify: `apps/web/src/services/articleDiscussionService.ts` (the anchor type: `{ normaKey, articleId, version? }` documented for both)
+- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (takes `anchor`, `label` and an optional `projectionHash` from its caller; nothing in it reads an article)
+- Modify: `apps/web/src/hooks/useArticlePassageThreads.ts` (takes the anchor and the plain text to locate against)
+- Test: their existing tests stay green; add a decision-anchored case to each
+
+- [ ] **Step 1: Failing tests** for the decision anchor (the panel lists, creates and replies; the hook locates a passage on a projection).
+- [ ] **Step 3: Implement** by lifting what the panel and the hook read from the article into props; `ArticleTabContent` passes what it passes today.
+- [ ] **Step 4: Web tests, build, lint. Step 5: Commit** — «refactor(web): the discussion panel and the passage hook take their anchor from the caller».
+
+### Task 28: Discussions on the decision's tab
+
+**Files:**
+- Modify: `apps/web/src/components/features/decisions/DecisionReadingSurface.tsx` (the toolbar's discussion button; «Discuti» in `SelectionPopup`; the signs count the paragraph's discussions, `data-threads`, as on an article)
+- Modify: `apps/web/src/utils/decisionRender.ts` (the thread focus class `.vlx-thread-focus`, as the article renderer nests it)
+- Test: `DecisionReadingSurface.test.tsx` (add); the contract test with threads on (text nodes still spell the projection)
+
+- [ ] **Step 1: Failing tests**: the button opens the panel anchored on the decision key; «Discuti» opens the composer with the passage (start/prefix/suffix on the projection, `textHash` = SHA-256 of the projection); a paragraph's sign shows its count; an open discussion lights its words.
+- [ ] **Step 3: Implement** with Task 27's props. Only a found identity shows the button (spec §8.1).
+- [ ] **Step 4–5:** web tests, build, lint; commit — «feat(web): discussions on a decision, with the article's panel and signs».
+
+### Task 29: A withdrawn passage is not quoted to others
+
+**Files:**
+- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (a decision thread whose passage is `detached` shows «Il passo citato non è più nel testo della decisione» instead of the quotation, except to its author and to admins)
+- Only if the owner chose question 6 (b): a hand-written migration adding `article_threads.passage_withdrawn_at` (announced in the register first), `POST /article-discussions/:threadId/passage-withdrawn` called by the first reader whose decision text no longer holds the passage (idempotent, decision threads only), and `passageQuote` withheld from every reader but the author and admins once it is set. With (a) the rule is the panel's only, and a comment says so.
+- Test: the panel cases (author, admin, other reader) and, if server-side, the controller's.
+
+- [ ] Steps as above; commit — «feat(web): a decision's withdrawn words are not quoted to other readers».
+
+**PR 4b:** title «feat: discussions on court decisions»; body names the storage choice and the quotation rule with the owner's answers. Browser pass: open a discussion on a decision and on a passage, reply, vote, report as a second test account, moderate as admin; the sign counts; a detached passage seen by its author and by another account. Merge: `merge: feat/decision-discussions — discussions on decisions, the article's panel and rules`.
 
 ## PR 5 — `feat/decision-history` (apps/server, apps/web)
 
@@ -3351,3 +3405,9 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - `/sentenze` alone opens the palette; an address that does not parse opens it and says why in a toast (raised above the palette). `DecisionLookupForm` and `DecisionPage` are gone: the palette reads decision citations. `?palette=sentenze` was not built (nothing reads it). «Cerca nella barra di ricerca» opens the palette with the citation typed in (`openCommandPaletteWith`, session-only).
 - Logout clears the pending decision, the focus request and the session cache of decisions.
 - Left for later (not this round): `ui/Toast`'s fixed `z-[60]` sits under every overlay band (pre-existing; the decision address notice is lifted on its own); the phone's tab arrows are 40 px, under the 44 px target (pre-existing).
+
+**Amendments, 2026-10-07 (late evening) — the owner's requests of 7 October** («alle sentenze possiamo aggiungere gli stessi tool di note, eviodenziazioni e commenti? Assicuriamoci anche che gli ambienti possano mantenere sentenze»).
+- Notes and highlights on decisions are the article's own tools, signs included (spec §8.3; Task 20 amended at its head).
+- Discussions on decisions are new scope: spec §8.7 and PR 4b (Tasks 26–29), after PR 4. Open questions 5–7 in the spec.
+- Environments keep decisions: the web already rebuilt them on import; the server now rebuilds a published environment's decision entries from closed values on publish, update and restore, refuses an entry of an unknown type and a note that is not a text of at most 4,000 characters (`fix/environment-decision-entries`, a pull request of its own after PR 2). The dev database held no entry those refusals would reject (read-only count, 7 October). Annotations on decisions inside environments stay Task 21's.
+

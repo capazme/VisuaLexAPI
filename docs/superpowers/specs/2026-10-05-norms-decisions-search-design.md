@@ -164,7 +164,7 @@ All on 2026-10-05 unless stated.
   need a search step first; Sentenze design, «Later»).
 - Searching norms by topic. Brocardi's glossary links a term to a definition,
   not to the articles that use it; see §6 for what it would cost.
-- Passage discussions on decisions (the Forum's article discussions). Notes and
+- (Removed on 7 October: discussions on decisions are §8.7.) Notes and
   highlights only.
 - The MERL-T graph's norm↔decision edges (5C, not chosen).
 - Ranking decisions by relevance. The list is ordered by date of deposit and says
@@ -579,12 +579,26 @@ text node is escaped. It reuses `resolveAnchors` (`utils/articleAnnotations.ts`)
 over the projection, so a decision's highlight matches exactly as an article's
 does (case-insensitive, whitespace-only differences tolerated, nothing else).
 
-The reading interactions are the article tab's: `SelectionPopup` with
-`getSelectionAnchor` over the text root («Evidenzia», «Nota», «Copia»), the
-inline note composer and popover, the Notes peek panel on the decision's
-toolbar, the highlight visibility toggle. Copy keeps
-`decisionClipboardText` (a copy reads as the text reads). No signs per block,
-no discussions (non-goals).
+**The same tools as on an article, not a version of them** (the owner, 7 October:
+«alle sentenze possiamo aggiungere gli stessi tool di note, evidenziazioni e
+commenti?»). A decision's text is read with the components the article tab uses,
+fed with the decision's anchor (`normaKey` = the decision key, `articleId` = `""`)
+and its text root; none is copied or forked:
+- `SelectionPopup` with `getSelectionAnchor` over the text root: «Evidenzia» with
+  the same colours, «Nota», «Copia», and «Discuti» once §8.7 lands;
+- `InlineNoteComposer` and `InlineNotePopover`; `NotesPeekPanel` on the decision's
+  toolbar; the highlight visibility toggle and `HighlightsActionsPicker` (export to
+  `.txt`), in the same `ReadingToolbar` places;
+- the round-B signs: `renderDecisionHtml` ends each annotated paragraph
+  (`p.vlx-dec-para`, the decision's block) with the same empty `span.vlx-sign`,
+  and `BlockAnnotationsPopover` opens on it with `NoteCard` and «Vai al passo»;
+- the same keyboard behaviour and the same toasts.
+Where a component asks for something only an article has (`versionInfo`,
+`describeVersion`, Brocardi, the saved-norm watcher), the decision passes
+«nothing» and the feature is off, rather than a decision-specific branch inside
+the component. Copy keeps `decisionClipboardText` (a copy reads as the text
+reads). What does not land is listed in §8.4's box, as `LooseHighlightsList` does
+for an article.
 
 #### 8.4 When the source's text changes
 
@@ -668,6 +682,52 @@ incluse: il loro testo non è più presente nella fonte»). The anchors stay in
 the user's own account, in §8.4's box. A test covers each case: a landing
 anchor travels; an anchor on an obscured decision, one whose words changed, and
 one on a decision that cannot be fetched do not; the count is shown.
+
+#### 8.7 Discussions on decisions (the owner, 7 October)
+
+The community discussions an article has — threads, replies, votes, reports,
+admin moderation (`ArticleThread` and its tables, `articleDiscussionController`,
+`ArticleDiscussionPanel`) — open on a decision too, with the same rules and the
+same panel.
+
+**Target.** A discussion is anchored by `(normaKey, articleId)` like a note. On
+a decision: `normaKey` = the decision key, `articleId` = `""`, `articleLabel` =
+`formatDecisionShort`, `version` absent, `articleUrn` absent, `textHash` = the
+SHA-256 of the decision's projection (§8.2), and a passage's
+`start`/`prefix`/`suffix` measured on that projection. Only a found identity
+takes a discussion (as §8.1). **No schema change** (recommended, question 5): the
+two key spaces cannot meet (a norm key never contains `:`), and the server
+accepts `articleId` `""` only when `normaKey` is a decision key that it reads back
+(`identityFromKey`'s server twin: same shapes, the same bounds), so a malformed
+key is refused, not stored. The alternative is a `target_kind` column and a
+`decision_key` column with a CHECK, which costs a migration (to be announced in
+the register first) and buys nothing the key's shape does not already give.
+
+**Where.** The decision tab's toolbar has the discussion button where the
+article's is; «Discuti» in `SelectionPopup` starts a passage discussion; the
+round-B signs count a paragraph's discussions (`useArticlePassageThreads`, fed
+with the decision's anchor and projection). `ArticleDiscussionPanel` takes the
+anchor and the label it shows from its caller, so it serves both without a
+branch.
+
+**Words a court withdrew.** A passage discussion quotes the decision publicly.
+When the decision's current text no longer holds the quoted words (§8.4: the
+court obscured or corrected it), the article's rule would keep showing the
+original quotation beside a «detached» notice. On a decision the panel shows
+it only to its author and the admins; everyone else reads «Il passo citato non è
+più nel testo della decisione» (question 6). This is §8.6's caution applied to
+the one place where a user's quotation is public. The limit, said plainly: the
+server does not read decisions, so it cannot tell on its own that a passage is
+gone, and the API still returns the stored quotation to a signed-in caller. To
+withhold it there too, the first reader whose text no longer holds the passage
+would mark the thread (a `passage_withdrawn_at` column: a migration), and the
+server would stop returning the quotation from then on. Recommended: the panel
+rule now (no migration; the app is behind the login), the column only if the
+owner wants the API covered as well.
+
+**Unchanged.** Reports, votes, moderation (`PATCH /admin/article-discussions/:id`),
+the user's data export (`authController` already exports every thread) and
+account deletion (cascade) work as they do for articles.
 
 ### 9. The Cronologia
 
@@ -856,6 +916,14 @@ were the orchestrator's numbers for the four questions below).
 | 3 | Excerpts with personal data of a decision later withdrawn | Nothing more: the user's own data, visible and deletable in §8.4's box |
 | 4 | Notes and highlights on decisions in environments and the Forum | Yes, with the caution of §8.6: an anchor whose words are no longer in the decision's current text does not travel |
 
+## Questions for the owner — open (7 October)
+
+| # | Question | Recommended |
+|---|---|---|
+| 5 | Discussions on decisions: stored as today's article discussions, keyed by the decision (no schema change), or with new columns (a migration) | No schema change (§8.7) |
+| 6 | A passage discussion whose words are no longer in the decision's text: (a) hidden by the panel from everyone but its author and the admins, (b) also withheld by the API (a column, a migration), (c) shown as on articles | (a) now, (b) only if the API must be covered too (§8.7) |
+| 7 | The round-B signs on a decision: one per paragraph, as on an article's comma | Yes (§8.3) |
+
 ## Coordination
 
 - **Sentenze (PR C and later)**: `DecisionPage` becomes `DecisionView` in a tab,
@@ -885,4 +953,3 @@ were the orchestrator's numbers for the four questions below).
   disk, without the source).
 - Norms by topic: a VisuaLex glossary from Brocardi's dictionary (§6), or MERL-T's concept layer.
 - Notes and highlights in the dossier's decision reader (dossier PR 3).
-- Passage discussions on decisions.
