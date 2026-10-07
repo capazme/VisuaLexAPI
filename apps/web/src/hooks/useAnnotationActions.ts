@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import type { Highlight } from '../types';
+import { highlightColorName } from '../utils/highlightColors';
 
 export type SelectionRect = { x: number; y: number; width: number; height: number };
 export type NoteAnchor = { anchorText: string; startOffset: number; scopedArticleId: string };
@@ -44,7 +45,7 @@ export function useAnnotationActions({
     }
     addHighlight(key, articleId, text, '', color, startOffset);
     onHighlightAdded?.(text, color, startOffset);
-    showToast(`Testo evidenziato in ${color}`, 'success');
+    showToast(`Testo evidenziato in ${highlightColorName(color)}`, 'success');
   };
 
   const openComposer = (anchor: NoteAnchor, rect: SelectionRect) => {
