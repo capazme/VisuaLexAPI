@@ -1,6 +1,8 @@
 /** A search page for the session, by query, archive, page and mode: one request per search however
  *  many tabs, lists or remounts ask (the desktop panel and the phone tree draw the same tab at
- *  once). Only a `risultati` answer is kept; anything else, or a failure, is asked again by «Riprova». */
+ *  once). Only a `risultati` answer is kept; anything else, or a failure, is asked again by «Riprova».
+ *  Tests: `src/test/setup.ts` clears it after each test; within one test, call `clearDecisionSearchCache()`
+ *  before rendering the same query a second time, or the first answer comes back. */
 import { searchDecisions } from '../services/decisionSearchService';
 import type { DecisionSearchQuery, SearchDecisionsAnswer } from '../types/decisions';
 import { topicKey } from './decisionSearchNorma';

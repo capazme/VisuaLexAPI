@@ -152,9 +152,18 @@ describe('DecisionResultList', () => {
     mockSearch({ ...PAGE, archivio: 'civile' });
     rerender(<Wrapper><DecisionResultList query={{ tema: 'colpa' }} /></Wrapper>);
     await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
-    mockSearch({ ...PAGE_TEXT, archivio: null }); // the index was refused: this time it asks the text
+    // the topic alone is searched in an archive of the reader's choosing
+    mockSearch({ ...PAGE, archivio: 'penale' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Penale' }));
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(3));
+    mockSearch({ ...PAGE_TEXT, archivio: 'penale' });
     rerender(<Wrapper><DecisionResultList query={withArticle} /></Wrapper>);
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(4));
+    // asked with the picked archive, so it learns nothing new: «Entrambi» and the refused index
+    // can only come from what the article taught it before
+    expect(searchMock).toHaveBeenLastCalledWith({ norma: NUMBERED, tema: 'colpa', archivio: 'penale' }, 1, 'testo');
     expect(await screen.findByRole('button', { name: 'Entrambi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Indice della Cassazione' })).toBeDisabled();
   });
 
   it('changes the archive and starts again from page one', async () => {

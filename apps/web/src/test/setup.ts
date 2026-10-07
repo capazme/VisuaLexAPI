@@ -9,8 +9,11 @@ import '@testing-library/jest-dom'
 configure({ asyncUtilTimeout: 5000 })
 
 // Cleanup after each test
-afterEach(() => {
+afterEach(async () => {
   cleanup()
+  // lazily, so the module (and legalFetch behind it) is not loaded before a test mocks them
+  const cache = await import('../utils/decisionSearchCache')
+  cache.clearDecisionSearchCache()
 })
 
 // Mock localStorage
