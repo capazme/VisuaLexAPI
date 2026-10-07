@@ -35,6 +35,7 @@ log = structlog.get_logger()
 ITALGIURE_TIMEOUT = 25.0
 CORTE_COST_TIMEOUT = 240.0  # covers the first download of a bundle
 FOUND_NS, ABSENT_NS, PENDING_NS = "decisions_found", "decisions_absent", "decisions_pending"
+SEARCH_NS = "decisions_search"  # one page of /search_decisions, kept a day
 PDF_NS = "decisions_pdf"  # the court's PDFs, base64, kept 30 days
 DECISION_CACHE_SWEEP_SECONDS = 6 * 3600
 _SOURCE_ERRORS = (NetworkError, DocumentNotFoundError, asyncio.TimeoutError, ValueError,
@@ -180,6 +181,10 @@ class Resolver:
             self._starts[key] = start
         return self._starts[key]
 
+    async def archive_start_of(self, archivio: str) -> tuple[int, str] | None:
+        """The archive's first deposit (year, date), as cached for the day; None if unknown."""
+        return await self._start(archivio)
+
     async def resolve(self, ref: Reference) -> Outcome:
         if ref.corte == "corte_costituzionale":
             # v2 since the reader splits an epigrafe that holds the reasoning (2026-10-04): the
@@ -259,7 +264,7 @@ async def sweep_decision_caches(manager=None) -> int:
     """
     manager = manager or get_cache_manager()
     removed = 0
-    for namespace in (FOUND_NS, ABSENT_NS, PENDING_NS, PDF_NS):
+    for namespace in (FOUND_NS, ABSENT_NS, PENDING_NS, PDF_NS, SEARCH_NS):
         sweep = getattr(manager.get_persistent(namespace), "sweep_expired", None)
         if sweep is not None:
             removed += await asyncio.to_thread(sweep)

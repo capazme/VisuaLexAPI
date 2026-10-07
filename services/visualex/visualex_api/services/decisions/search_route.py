@@ -1,0 +1,105 @@
+"""POST /search_decisions: the decisions whose text mentions an article or a topic (design
+2026-10-05 §5). Italgiure only, the last five years; a page is cached for a day."""
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any
+
+import structlog
+
+from ...tools.cache_manager import get_cache_manager
+from .resolver import _SOURCE_ERRORS, SEARCH_NS, get_resolver
+from .search import UnsupportedAct, article_clause, build_query, index_clause, topic_clause
+
+log = structlog.get_logger()
+MAX_PAGE = 10
+ROWS = 20  # fixed: the client pages by 20
+
+
+def get_searcher():
+    return get_resolver().italgiure
+
+
+def get_cache():
+    return get_cache_manager().get_persistent(SEARCH_NS)
+
+
+async def archive_start(archivio: str) -> str | None:
+    start = await get_resolver().archive_start_of(archivio)
+    return start[1] if start else None
+
+
+def _errors(body: Any) -> dict[str, str]:
+    if not isinstance(body, dict):
+        return {"norma": "Serve un articolo o un tema"}
+    errors: dict[str, str] = {}
+    norma, tema = body.get("norma"), body.get("tema")
+    if norma is None and tema is None:
+        errors["norma"] = "Serve un articolo o un tema"
+    if norma is not None and not isinstance(norma, dict):
+        errors["norma"] = "L'articolo non è leggibile"
+    if tema is not None and not isinstance(tema, str):
+        errors["tema"] = "Il tema non è leggibile"
+    pagina = body.get("pagina", 1)
+    if not isinstance(pagina, int) or isinstance(pagina, bool) or not 1 <= pagina <= MAX_PAGE:
+        errors["pagina"] = f"La pagina va da 1 a {MAX_PAGE}"
+    if body.get("archivio") not in (None, "civile", "penale"):
+        errors["archivio"] = "Archivio non riconosciuto"
+    if body.get("modo") not in (None, "indice", "testo"):
+        errors["modo"] = "Modo non riconosciuto"
+    return errors
+
+
+async def search_decisions(body: Any) -> tuple[dict, int]:
+    errors = _errors(body)
+    if errors:
+        return {"esito": "richiesta_non_valida", "errori": errors}, 400
+    article, archivio_default, coords, hl_query = None, None, None, None
+    modo = "testo"
+    if body.get("norma") is not None:
+        text_clause = None
+        try:
+            text_clause, archivio_default = article_clause(body["norma"])
+        except UnsupportedAct:
+            pass
+        if body.get("modo", "indice") == "indice":
+            try:
+                article, archivio_default, coords = index_clause(body["norma"])
+                modo, hl_query = "indice", text_clause
+            except UnsupportedAct:
+                pass  # the text way, said in the answer's `modo`
+        if article is None:
+            if text_clause is None:
+                return {"esito": "non_supportata"}, 200
+            article = text_clause
+    topic = None
+    if body.get("tema") is not None:
+        try:
+            topic = topic_clause(body["tema"])
+        except ValueError:
+            return {"esito": "richiesta_non_valida",
+                    "errori": {"tema": "Il tema non contiene parole"}}, 400
+    archivio = body.get("archivio") or archivio_default
+    pagina = body.get("pagina", 1)
+    q = build_query(article, topic, archivio)
+    key = hashlib.sha256(json.dumps([q, pagina, hl_query, coords and [coords.gen, coords.art]])
+                         .encode()).hexdigest()
+    cache = get_cache()
+    cached = await cache.get(key)
+    if cached is not None:
+        return cached, 200
+    try:
+        page = await get_searcher().search(q, pagina, ROWS, coords=coords, hl_query=hl_query)
+    except _SOURCE_ERRORS as exc:
+        log.warning("Decision search failed", error=str(exc), error_type=type(exc).__name__)
+        return {"esito": "fonte_non_raggiungibile", "fonte": "cassazione"}, 503
+    answer = {
+        "esito": "risultati", "totale": page.totale, "pagina": pagina, "modo": modo,
+        "archivio": archivio,
+        "archivio_dal": await archive_start(archivio) if archivio else None,
+        "decisioni": [{"identita": h.identita.to_dict(), "attributi": h.attributi,
+                       "trovata": h.trovata, "frammento": h.frammento} for h in page.decisioni],
+    }
+    await cache.set(key, answer)
+    return answer, 200

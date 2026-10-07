@@ -82,6 +82,8 @@ class CacheManager:
             "decisions_pdf": _create_cache("decisions_pdf", ttl=30 * 24 * 3600),
             "decisions_absent": _create_cache("decisions_absent", ttl=3600),
             "decisions_pending": _create_cache("decisions_pending", ttl=24 * 3600),
+            # One page of /search_decisions, per query: a day.
+            "decisions_search": _create_cache("decisions_search", ttl=24 * 3600),
             # A found act date never changes: keep it a year (act_dates.py).
             "act_dates": _create_cache("act_dates", ttl=365 * 24 * 3600),
         }

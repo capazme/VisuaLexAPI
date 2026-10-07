@@ -418,4 +418,4 @@ async def test_the_sweep_reaches_the_decision_caches_only():
     assert threading.get_ident() not in found.threads + absent.threads
     assert cache.stores["normattiva"].threads == []
     assert set(cache.stores) == {"decisions_found", "decisions_absent", "decisions_pending",
-                                 "decisions_pdf", "normattiva"}
+                                 "decisions_pdf", "decisions_search", "normattiva"}

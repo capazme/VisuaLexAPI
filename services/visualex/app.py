@@ -38,6 +38,7 @@ from types import SimpleNamespace
 from visualex_api.services.akn_fetch import fetch_act_index
 from visualex_api.services.akn_parser import presentable_title
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
+from visualex_api.services.decisions.search_route import search_decisions as search_decisions_route
 from visualex_api.services.decisions.resolver import (
     DECISION_CACHE_SWEEP_SECONDS,
     SourceUnavailable,
@@ -391,6 +392,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
         self.app.add_url_rule('/fetch_act_fingerprints', view_func=self.fetch_act_fingerprints, methods=['POST'])
         self.app.add_url_rule('/fetch_decision', view_func=self.fetch_decision, methods=['POST'])
+        self.app.add_url_rule('/search_decisions', view_func=self.search_decisions, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only. Not routed by the ingress
         # (infra/ingress/Caddyfile routes an allowlist of prefixes) nor proxied by Vite.
@@ -1065,6 +1067,21 @@ class NormaController:
             return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
         except Exception as exc:
             return self._error_response(exc, 'fetch_recitals')
+
+    async def search_decisions(self):
+        """Decisions whose text mentions an article or a topic (design 2026-10-05 §5). JSON with
+        `esito`: risultati and non_supportata 200, richiesta_non_valida 400,
+        fonte_non_raggiungibile 503, errore_interno 500 (a bug: a fixed body)."""
+        try:
+            body = await request.get_json(silent=True)
+        except (RecursionError, UnicodeDecodeError):
+            body = None
+        try:
+            answer, status = await search_decisions_route(body)
+        except Exception:
+            log.exception("Decision search failed unexpectedly")
+            return jsonify({'esito': 'errore_interno'}), 500
+        return jsonify(answer), status
 
     async def fetch_decision(self):
         """One court decision by its reference (design 2026-10-01 §3). Every answer this

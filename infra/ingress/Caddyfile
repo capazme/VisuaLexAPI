@@ -66,7 +66,7 @@
 		}
 	}
 	@legal {
-		path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_rubriche* /fetch_alias_catalog* /fetch_decision* /parse_query* /extract_citations* /export_pdf* /version* /health*
+		path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_rubriche* /fetch_alias_catalog* /fetch_decision* /search_decisions* /parse_query* /extract_citations* /export_pdf* /version* /health*
 		not path /version /health
 	}
 	handle @legal {
