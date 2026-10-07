@@ -489,7 +489,7 @@ Breaking one of these breaks the product. Read before editing.
     as the source's anonymisation. The resolver keeps a decision without its text 24 hours
     (`decisions_pending`), never 30 days, and adds the notice `testo_non_disponibile`; one read
     from the archive's field instead of the PDF is kept the same way. Never
-    pass a notice on as `motivazione`: the page would show it as the court's reasons and a
+    pass a notice on as `motivazione`: the decision's tab would show it as the court's reasons and a
     note could anchor to it (the first reader did, with the second notice and the stub, and
     the caches kept them 30 days). The decision caches hold whole texts, with whatever
     personal data the source left: `sweep_decision_caches` deletes their expired entries at

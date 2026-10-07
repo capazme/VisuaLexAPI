@@ -1,7 +1,8 @@
 /**
  * The "go back" stack for reading navigation.
  *
- * It records ONLY jumps taken from a citation in the article text. Picking an
+ * It records jumps taken from a citation in the article text and the jump from an article to a
+ * decision opened beside it. Picking an
  * article from the structure window does not lose your place — the article
  * appears inside the block you are already reading — and a previous/next arrow
  * is already undone by the opposite arrow. Recording those would fill the

@@ -125,6 +125,13 @@ describe('decision tabs', () => {
       expect(t.position.y + origin.top).toBeGreaterThanOrEqual(56);
     });
 
+    it('keeps the cascade on a phone, so phone geometry is never saved with the tab', () => {
+      viewport(390, 844, { left: 0, top: 0 });
+      appStore.setState({ workspaceTabs: [] });
+      const id = get().openDecisionTab(REF);
+      expect(get().workspaceTabs.find((x) => x.id === id)!.size).toEqual({ width: 800, height: 650 });
+    });
+
     it('a decision opened over a visible tab, without a tab to sit beside, keeps the cascade', () => {
       viewport(1280, 800, { left: 184, top: 32 });
       appStore.setState({ workspaceTabs: [] });
@@ -132,6 +139,20 @@ describe('decision tabs', () => {
       const id = get().openDecisionTab(REF);
       expect(get().workspaceTabs.find((x) => x.id === id)!.size).toEqual({ width: 800, height: 650 });
     });
+  });
+
+  it('gives an unresolved tab the section a later citation adds, and its label', () => {
+    const bare = { corte: 'cassazione' as const, numero: 10787, anno: 2024 };
+    const id = get().openDecisionTab({ ...bare, sezione: 'VII' });
+    const again = get().openDecisionTab({ ...bare, sezione: 'III' });
+    expect(again).toBe(id);
+    const tab = get().workspaceTabs.find((t) => t.id === id)!;
+    expect(tab.view).toEqual({ kind: 'decision', reference: { ...bare, sezione: 'III' } });
+    expect(tab.label).toBe('Cass., sez. III, n. 10787/2024');
+    // a tab that already has its archive keeps its reference
+    const resolved = get().openDecisionTab({ ...REF, numero: 5 });
+    get().openDecisionTab({ ...REF, numero: 5, sezione: 'III' });
+    expect(get().workspaceTabs.find((t) => t.id === resolved)!.view).toEqual({ kind: 'decision', reference: { ...REF, numero: 5 } });
   });
 
   it('persists a cited section with the reference until the decision is found', () => {

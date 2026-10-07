@@ -6,7 +6,7 @@ const fetchDecision = vi.fn();
 vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 
-import { appStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { forgetDecision } from '../../../utils/decisionFetchCache';
 import { DecisionTabView } from './DecisionTabView';
 import { renderTabView } from '../workspace/renderTabView';
@@ -39,7 +39,7 @@ function openTab(reference: DecisionReference) {
 
 beforeEach(() => {
   fetchDecision.mockReset();
-  for (const ref of [CIVILE, PENALE, AMBIGUA_REF]) forgetDecision(ref);
+  for (const ref of [CIVILE, PENALE, AMBIGUA_REF, { ...AMBIGUA_REF, sezione: 'VII' }]) forgetDecision(ref);
   appStore.setState({ workspaceTabs: [], commandPaletteOpen: false });
 });
 
@@ -203,5 +203,36 @@ describe('DecisionTabView — the desktop panel and the phone view, both mounted
     rerender(view(PENALE));
     expect(await within(hidden()).findByRole('heading', { level: 4 })).toHaveTextContent(/penale/);
     expect(within(hidden()).queryAllByRole('link')).toHaveLength(0);
+  });
+});
+
+describe('DecisionTabView — the store learns the identity of a tab opened by a looser reference', () => {
+  // a small shell: subscribes to the tab in the store and draws it the way the workspace does
+  function Shell({ id }: { id: string }) {
+    const tab = appStore.getState().workspaceTabs.find((t) => t.id === id);
+    const view = useAppStore((st) => st.workspaceTabs.find((t) => t.id === id)?.view);
+    return tab && view ? <>{renderTabView({ ...tab, view }, view)}</> : null;
+  }
+
+  it('keeps the answer and its notices on screen, with one request and no skeleton after the decision shows', async () => {
+    const withNotice: FetchDecisionAnswer = {
+      ...foundOf(PENALE, '7'),
+      avvisi: [{ tipo: 'archivio_dedotto', archivio: 'penale', sezione: '7' }],
+    } as FetchDecisionAnswer;
+    fetchDecision.mockResolvedValue(withNotice);
+    const { id, tab } = openTab({ ...AMBIGUA_REF, sezione: 'VII' });
+    render(<Shell id={id} />);
+    expect(await screen.findByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
+    // the identity lands in the store: the tab's reference is now the bare one
+    await waitFor(() => expect(tab().view).toEqual({ kind: 'decision', reference: PENALE }));
+    // from here on, no skeleton may appear
+    const statuses: number[] = [];
+    const watch = new MutationObserver(() => statuses.push(screen.queryAllByRole('status').length));
+    watch.observe(document.body, { childList: true, subtree: true });
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    watch.disconnect();
+    expect(statuses.every((n) => n === 0)).toBe(true);
+    expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledTimes(1);
   });
 });

@@ -12,7 +12,7 @@ import {
     type ReadingBackEntry,
 } from '../utils/readingBackStack';
 import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '../types/decisions';
-import { formatDecisionShort, identityOf } from '../utils/decisionLinks';
+import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
 import { workspaceOrigin } from '../utils/workspaceOrigin';
@@ -765,7 +765,17 @@ const appStore = createStore<AppState>()(
                     const tab = existing ?? newViewTab(state, formatDecisionShort(reference), { kind: 'decision', reference });
                     tab.isHidden = false;
                     tab.isMinimized = false;
-                    if (existing) tab.zIndex = ++state.highestZIndex;
+                    if (existing) {
+                        tab.zIndex = ++state.highestZIndex;
+                        // an unresolved tab (no archive yet) learns what a later citation adds: its
+                        // section or archive may be what settles the homonyms, so it asks again
+                        const known = existing.view?.kind === 'decision' ? existing.view.reference : null;
+                        if (known && !known.archivio && (reference.archivio || reference.sezione) &&
+                            decisionPath(known) !== decisionPath(reference)) {
+                            existing.view = { kind: 'decision', reference };
+                            existing.label = formatDecisionShort(reference);
+                        }
+                    }
                     if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
                     // with nothing else on screen a new decision takes the free area (design §2.2)
                     else if (!existing && nothingOnScreen) fillFreeArea(state, tab.id);
@@ -3186,6 +3196,7 @@ function newViewTab(state: AppState, label: string, view: TabView): WorkspaceTab
 // collapsed (more when expanded), centred. All of these are viewport pixels.
 const LAYOUT_SIDEBAR_WIDTH = 64;
 const LAYOUT_LG_BREAKPOINT = 1024;
+const LAYOUT_MD_BREAKPOINT = 768; // the phone view takes over below it
 const SIDE_BY_SIDE_MARGIN = 16;
 const SIDE_BY_SIDE_TOP = 72; // below the two floating buttons
 const SIDE_BY_SIDE_BOTTOM = 88; // above the collapsed dock (24 + ~44) with a gap
@@ -3223,7 +3234,8 @@ function placeSideBySide(state: AppState, leftId: string, rightId: string) {
 /** One tab on the whole free area (same clearances as `placeSideBySide`). */
 function fillFreeArea(state: AppState, tabId: string) {
     const tab = state.workspaceTabs.find(t => t.id === tabId);
-    if (!tab) return;
+    // only where the desktop workspace is laid out: a phone's geometry would be saved with the tab
+    if (!tab || (typeof window !== 'undefined' && window.innerWidth < LAYOUT_MD_BREAKPOINT)) return;
     const { origin, x0, m, width, height, y } = freeArea(state);
     Object.assign(tab, { position: { x: x0 + m - origin.left, y }, size: { width, height }, isHidden: false, isMinimized: false });
 }

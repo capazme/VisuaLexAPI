@@ -250,7 +250,7 @@ palette's "Apri l'indice e sfoglia" is the entry point. A block with zero
 articles is a legitimate state — guard anything that dereferences the active
 article (`StudyMode` is mounted conditionally for exactly this reason).
 
-**Going back.** `readingBackStack` records **citation jumps only**. Picking from
+**Going back.** `readingBackStack` records **citation jumps and the jump from an article to a decision**. Picking from
 the index does not lose your place, and a previous/next arrow is undone by the
 opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
@@ -279,7 +279,10 @@ sidebar's «Sentenze» (a button: it opens the palette, there is no page) and th
 decisions yet (gotcha 23). «Cerca nella barra di ricerca», on a decision that was not found, opens the
 palette with its citation typed in (`openCommandPaletteWith`, taken once). The desktop panel and
 the phone view both mount a `DecisionTabView` for the same tab, one of them hidden: only the copy
-on screen takes the focus request, and both follow the identity the store learns.
+on screen takes the focus request, and both follow the identity the store learns, keeping the answer already shown (notices included) and seeding it
+in the cache (`rememberDecision`) so that no second request goes out. A later citation that adds a section or
+an archive to a tab still without one replaces its reference, so the tab asks again with it. The free-area
+placement applies from the `md` breakpoint up only: a phone's geometry is never saved with the tab.
 
 ### Dossier
 

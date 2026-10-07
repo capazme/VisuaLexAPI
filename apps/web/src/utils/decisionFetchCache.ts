@@ -32,6 +32,16 @@ export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisi
   return pending;
 }
 
+/** An answer already in hand, kept under `ref`'s path unless something is kept there: a tab that
+ *  learns the identity of the decision it fetched by a looser reference seeds the identity, so the
+ *  tab's own re-render, its other copy and a later open find it without another request. */
+export function rememberDecision(ref: DecisionReference, answer: FetchDecisionAnswer): void {
+  const key = decisionPath(ref);
+  if (answers.has(key) || !KEPT.has(answer.esito)) return;
+  answers.set(key, Promise.resolve(answer));
+  while (answers.size > MAX_KEPT_ANSWERS) answers.delete(answers.keys().next().value as string);
+}
+
 /** Everything kept, at logout: the next reader of this browser starts with nothing of the last one's. */
 export function clearDecisionCache(): void {
   answers.clear();

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { DecisionReference, FetchDecisionAnswer } from '../../../types/decisions';
-import { forgetDecision, fetchDecisionCached } from '../../../utils/decisionFetchCache';
-import { decisionPath, formatDecisionShort } from '../../../utils/decisionLinks';
+import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
+import { decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
 import { DecisionView } from './DecisionView';
 
 /**
@@ -38,10 +38,16 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
     return () => { cancelled = true; };
   }, [current, key]);
 
-  const answer = result?.key === key ? result.answer : null;
+  // The store replaces a looser reference (no archive, a cited section) with the identity once the
+  // decision is found. The answer on screen is then already the one for the new reference: it stays,
+  // notices included, instead of falling back to the skeleton while the same text is asked for again.
+  const held = result?.answer.esito === 'trovata' && decisionPath(identityOf(result.answer.identita)) === decisionPath(current)
+    ? result.answer : null;
+  const answer = result?.key === key ? result.answer : held;
 
   useEffect(() => {
     if (answer?.esito === 'trovata') {
+      rememberDecision(identityOf(answer.identita), answer);
       setIdentity(tabId, answer.identita, formatDecisionShort({ ...answer.identita, sezione: answer.attributi.sezione }));
     }
   }, [answer, setIdentity, tabId]);
