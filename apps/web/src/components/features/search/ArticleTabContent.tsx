@@ -1183,6 +1183,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                         itemKey={itemKey}
                         uniqueArticleId={uniqueArticleId}
                         onRequestAddNote={handleBrocardiAddNote}
+                        besideTabId={originTabId}
                         currentNorma={{
                             tipo_atto: norma_data.tipo_atto,
                             data: norma_data.data,

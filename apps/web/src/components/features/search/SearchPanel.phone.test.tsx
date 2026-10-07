@@ -63,8 +63,15 @@ describe('SearchPanel on a phone', () => {
     const civil = appStore.getState().openDecisionTab(REF);
     render(<MemoryRouter><SearchPanel /></MemoryRouter>);
     act(() => { appStore.getState().addWorkspaceTab('Codice civile'); });
+    // the reader starts on the penal decision (first tab) and moves on to the civil one
+    expect(screen.getByText('Cass. pen., n. 10787/2024')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tab successiva' }));
+    await waitFor(() => expect(screen.getByText('Cass. civ., n. 10787/2024')).toBeInTheDocument());
     act(() => { appStore.getState().setDecisionTabIdentity(civil, { ...REF, archivio: 'penale' }, 'Cass. pen., n. 10787/2024'); });
     expect(await screen.findByTestId('decision')).toHaveTextContent('n. 10787');
+    // the header names the survivor, not the closed civil tab
+    expect(screen.getByText('Cass. pen., n. 10787/2024')).toBeInTheDocument();
+    expect(screen.queryByText('Cass. civ., n. 10787/2024')).toBeNull();
     expect(appStore.getState().workspaceTabs.map((t) => t.id)).not.toContain(civil);
     expect(appStore.getState().workspaceTabs.map((t) => t.id)).toContain(penal);
   });

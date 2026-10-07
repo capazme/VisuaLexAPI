@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../hooks/useAuth', () => ({
@@ -10,6 +10,7 @@ vi.mock('../../hooks/useForumNotifications', () => ({
 }));
 
 import { Sidebar } from './Sidebar';
+import { appStore } from '../../store/useAppStore';
 
 /**
  * Every control in the sidebar is an icon. `label` reached the eye only: the
@@ -35,9 +36,23 @@ function renderSidebar() {
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
     renderSidebar();
-    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Sentenze/, /Cronologia/]) {
+    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Cronologia/]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
+  });
+
+  it('offers «Sentenze» as a button that opens the palette, not as a page link', () => {
+    renderSidebar();
+    expect(screen.queryByRole('link', { name: /Sentenze/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Sentenze/ })).toBeInTheDocument();
+  });
+
+  it('opens the palette when «Sentenze» is pressed', () => {
+    appStore.setState({ commandPaletteOpen: false });
+    renderSidebar();
+    fireEvent.click(screen.getByRole('button', { name: /Sentenze/ }));
+    expect(appStore.getState().commandPaletteOpen).toBe(true);
+    appStore.setState({ commandPaletteOpen: false });
   });
 
   it('folds the notification count into the link name', () => {

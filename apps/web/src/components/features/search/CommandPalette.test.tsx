@@ -258,3 +258,81 @@ describe('CommandPalette — presets the server already understands', () => {
     expect(screen.queryByText('gdpr')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * A court decision typed in the box ("Cass. civ. 10787/2024") is read before the norm parser;
+ * Enter opens its tab. Anything that does not start with a court is left to the norm parser,
+ * and a custom alias trigger of the user's wins.
+ */
+describe('CommandPalette — a decision named in the box', () => {
+  const openDecisionTab = vi.fn(() => 'tab');
+  const original = appStore.getState().openDecisionTab;
+
+  beforeEach(() => openDecisionTab.mockClear());
+  afterEach(() => appStore.setState({ openDecisionTab: original, customAliases: [] }));
+
+  it('shows the decision line and Enter opens its tab and closes the palette', async () => {
+    appStore.setState({ openDecisionTab } as never);
+    const onClose = vi.fn();
+    const onSearch = vi.fn();
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={onClose} onSearch={onSearch} />);
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 10787/2024');
+
+    // announced as a status, like a result the reader should hear
+    const line = await screen.findByRole('status');
+    expect(line).toHaveTextContent('Sentenza → Cass. civ., n. 10787/2024');
+    expect(line).toHaveTextContent('Invio apre');
+
+    await user.keyboard('{Enter}');
+    expect(openDecisionTab).toHaveBeenCalledWith({ corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 });
+    expect(onClose).toHaveBeenCalled();
+    expect(onSearch).not.toHaveBeenCalled();
+    // the server fallback is not asked about a decision
+    expect(fetch).not.toHaveBeenCalledWith('/parse_query', expect.anything());
+  });
+
+  it('opens the decision even when a norm answer from the server is still around', async () => {
+    appStore.setState({ openDecisionTab } as never);
+    const user = userEvent.setup();
+    const onSearch = vi.fn();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
+
+    // a norm query is answered by the server first, then the box turns into a decision
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
+    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument(), { timeout: 3000 });
+    await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 10787/2024');
+    await user.keyboard('{Enter}');
+
+    expect(openDecisionTab).toHaveBeenCalledTimes(1);
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('still previews a norm as before', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    expect(screen.queryByText(/Sentenza →/)).toBeNull();
+  });
+
+  it('does not read a decision when the first word is a custom alias trigger', async () => {
+    appStore.setState({
+      openDecisionTab,
+      customAliases: [{
+        id: 'a1', trigger: 'cass', type: 'reference' as const,
+        expandTo: 'Art. 1490 c.c.', usageCount: 0, createdAt: '2026-08-27T00:00:00.000Z',
+      }],
+    } as never);
+    const user = userEvent.setup();
+    renderPalette();
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'cass 10787/2024');
+
+    expect(screen.queryByText(/Sentenza →/)).toBeNull();
+    await user.keyboard('{Enter}');
+    expect(openDecisionTab).not.toHaveBeenCalled();
+  });
+});

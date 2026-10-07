@@ -1,6 +1,6 @@
 // apps/web/src/features/merlt/rassegne/DecisionChip.tsx
-import { Link } from 'react-router-dom';
 import { DECISION_PAGE_AVAILABLE, formatDecisionShort, linkableDecisionPath } from '../../../utils/decisionLinks';
+import { DecisionLink } from '../../../components/features/decisions/DecisionLink';
 import type { RassegnaPronuncia } from './types';
 
 const CHIP = 'px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
@@ -13,7 +13,7 @@ export function DecisionChip({ pronuncia }: { pronuncia: RassegnaPronuncia }) {
   const path = DECISION_PAGE_AVAILABLE ? linkableDecisionPath(pronuncia) : null;
   const label = formatDecisionShort(pronuncia, pronuncia.rv);
   return path ? (
-    <Link to={path} className={`${CHIP} hover:underline`} title={label}>{label}</Link>
+    <DecisionLink to={pronuncia} className={`${CHIP} hover:underline`} title={label}>{label}</DecisionLink>
   ) : (
     <span className={CHIP} title={label}>{label}</span>
   );

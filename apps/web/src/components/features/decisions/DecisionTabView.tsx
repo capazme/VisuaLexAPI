@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { DecisionReference, FetchDecisionAnswer } from '../../../types/decisions';
 import { forgetDecision, fetchDecisionCached } from '../../../utils/decisionFetchCache';
@@ -14,6 +14,9 @@ import { DecisionView } from './DecisionView';
 export function DecisionTabView({ tabId, reference }: { tabId: string; reference: DecisionReference }) {
   const setIdentity = useAppStore((s) => s.setDecisionTabIdentity);
   const openPalette = useAppStore((s) => s.openCommandPalette);
+  const takeFocusRequest = useAppStore((s) => s.takeDecisionFocusRequest);
+  const focusRequested = useAppStore((s) => s.decisionFocusRequest === tabId);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; answer: FetchDecisionAnswer } | null>(null);
   const [current, setCurrent] = useState(reference);
@@ -39,13 +42,21 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
     }
   }, [answer, setIdentity, tabId]);
 
+  // The reader chose a candidate in another tab that turned out to be this one: the tab they were
+  // in is gone, so keyboard focus comes here rather than falling to the page.
+  useEffect(() => {
+    if (focusRequested && takeFocusRequest(tabId)) panelRef.current?.focus();
+  }, [focusRequested, takeFocusRequest, tabId]);
+
   return (
-    <DecisionView
-      answer={answer}
-      reference={current}
-      onRetry={() => { forgetDecision(current); setAttempt((a) => a + 1); }}
-      onChooseCandidate={(identity) => setCurrent(identity)}
-      onOpenPalette={openPalette}
-    />
+    <div ref={panelRef} tabIndex={-1} data-decision-tab={tabId} className="outline-none">
+      <DecisionView
+        answer={answer}
+        reference={current}
+        onRetry={() => { forgetDecision(current); setAttempt((a) => a + 1); }}
+        onChooseCandidate={(identity) => setCurrent(identity)}
+        onOpenPalette={openPalette}
+      />
+    </div>
   );
 }

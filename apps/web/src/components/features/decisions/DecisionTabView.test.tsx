@@ -123,3 +123,22 @@ describe('DecisionTabView', () => {
     expect(appStore.getState().commandPaletteOpen).toBe(true);
   });
 });
+
+describe('DecisionTabView — focus after a merge of two tabs', () => {
+  it('takes keyboard focus when the tab the reader was in closed because this one already held the decision', async () => {
+    fetchDecision.mockResolvedValue(foundOf(PENALE, '7'));
+    const penal = openTab(PENALE);
+    render(<DecisionTabView tabId={penal.id} reference={PENALE} />);
+    await screen.findByText(/Sez\. VII penale/);
+    // a second tab (the civil one) is where the reader chose a candidate: it is the penal decision
+    const other = openTab(CIVILE);
+    const panel = document.querySelector(`[data-decision-tab="${penal.id}"]`) as HTMLElement;
+    expect(panel).not.toHaveFocus();
+
+    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 10787/2024'); });
+
+    await waitFor(() => expect(panel).toHaveFocus());
+    expect(appStore.getState().decisionFocusRequest).toBeNull();
+    expect(appStore.getState().workspaceTabs.map((t) => t.id)).toEqual([penal.id]);
+  });
+});

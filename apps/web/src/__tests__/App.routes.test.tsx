@@ -42,7 +42,6 @@ vi.mock('../features/merlt/graph/page/GraphExplorerPage', () => ({
 }));
 vi.mock('../features/merlt/contrib/ContribPage', () => ({ ContribPage: () => <div /> }));
 vi.mock('../features/merlt/validate/ValidationPage', () => ({ ValidationPage: () => <div /> }));
-vi.mock('../components/features/decisions/DecisionPage', () => ({ DecisionPage: () => <div data-testid="decision-page" /> }));
 
 import App from '../App';
 
@@ -89,12 +88,14 @@ describe('App routing', () => {
     expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
   });
 
-  it('lazy-loads the decision page at /sentenze and at a decision address', async () => {
+  it('sends /sentenze and a decision address into the search space', async () => {
     const lookup = renderAt('/sentenze');
-    expect(await screen.findByTestId('decision-page')).toBeInTheDocument();
+    expect(await screen.findByTestId('search-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
     lookup.unmount();
 
     renderAt('/sentenze/cassazione-civile/10787/2024');
-    expect(await screen.findByTestId('decision-page')).toBeInTheDocument();
+    expect(await screen.findByTestId('search-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
   });
 });

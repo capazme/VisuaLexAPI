@@ -555,6 +555,8 @@ interface BrocardiDisplayProps {
    * `rect` is the viewport-space bounding box of the selection, used by the
    * consumer to anchor an inline composer on the span itself. */
   onRequestAddNote?: (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
+  /** The workspace tab the article is in: a decision cited in the massime opens beside it. */
+  besideTabId?: string;
 }
 
 function BrocardiEmptyState({ link }: { link?: string | null }) {
@@ -583,7 +585,7 @@ function BrocardiEmptyState({ link }: { link?: string | null }) {
   );
 }
 
-export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote }: BrocardiDisplayProps) {
+export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote, besideTabId }: BrocardiDisplayProps) {
   const canMark = Boolean(itemKey && uniqueArticleId && onRequestAddNote);
   // Default collapsed on mobile (<768px), expanded on desktop
   const [isMainOpen, setIsMainOpen] = useState(() =>
@@ -664,7 +666,7 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
 
           {/* Massime with search and filter */}
           {info.Massime && info.Massime.length > 0 && (
-            <MassimeSection massime={info.Massime} />
+            <MassimeSection massime={info.Massime} besideTabId={besideTabId} />
           )}
 
           {/* Note a piè di pagina */}

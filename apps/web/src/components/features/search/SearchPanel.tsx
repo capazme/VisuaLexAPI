@@ -66,6 +66,7 @@ export function SearchPanel() {
     searchQueue, drainNextSearch,
     quickNorms, selectQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
+    pendingDecision, drainPendingDecision,
     quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
   } = useAppStore(useShallow(s => ({
     addWorkspaceTab: s.addWorkspaceTab,
@@ -85,6 +86,8 @@ export function SearchPanel() {
     commandPaletteOpen: s.commandPaletteOpen,
     openCommandPalette: s.openCommandPalette,
     closeCommandPalette: s.closeCommandPalette,
+    pendingDecision: s.pendingDecision,
+    drainPendingDecision: s.drainPendingDecision,
     quickNormsManagerOpen: s.quickNormsManagerOpen,
     openQuickNormsManager: s.openQuickNormsManager,
     closeQuickNormsManager: s.closeQuickNormsManager,
@@ -142,6 +145,12 @@ export function SearchPanel() {
       if (index >= 0) setMobileActiveTabIndex(index);
     }
   }, [workspaceTabs]);
+
+  // A decision asked for from outside the search space (the `/sentenze/…` address) is opened here, on
+  // every change of the request: the address may queue it after this panel has mounted.
+  useEffect(() => {
+    if (pendingDecision) drainPendingDecision();
+  }, [pendingDecision, drainPendingDecision]);
 
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles, SlidersHorizontal, Gavel } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
@@ -14,6 +14,8 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { motion, AnimatePresence } from 'framer-motion';
 import { defaultSearchFilters } from '../../../utils/searchFilters';
 import { legalFetch } from '../../../services/legalFetch';
+import { parseDecisionCitation } from '../../../utils/decisionCitationParser';
+import { formatDecisionShort } from '../../../utils/decisionLinks';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -41,7 +43,7 @@ function requiresDetails(actValue: string): boolean {
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
-    customAliases, trackAliasUsage, openAliasManager
+    customAliases, trackAliasUsage, openAliasManager, openDecisionTab
   } = useAppStore(useShallow(s => ({
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
@@ -50,6 +52,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     customAliases: s.customAliases,
     trackAliasUsage: s.trackAliasUsage,
     openAliasManager: s.openAliasManager,
+    openDecisionTab: s.openDecisionTab,
   })));
   const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
   const [step, setStep] = useState<PaletteStep>('select_act');
@@ -115,10 +118,19 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
 
   // Smart citation parsing - include custom aliases for resolution
   // Es. "art 5 gdpr" risolve "gdpr" in Regolamento UE 679/2016
+  // A court decision ("Cass. civ. 10787/2024") is read first, but only an input that starts with a
+  // court: the norm parser keeps everything else, and an alias trigger of the user's wins over it.
+  const decisionRef = useMemo(
+    () => (inputValue.length >= 4
+      ? parseDecisionCitation(inputValue, { aliasTriggers: customAliases.map(a => a.trigger) })
+      : null),
+    [inputValue, customAliases],
+  );
+
   const localCitation = useMemo<ParsedCitation | null>(() => {
-    if (!inputValue || inputValue.length < 2) return null;
+    if (!inputValue || inputValue.length < 2 || decisionRef) return null;
     return parseLegalCitation(inputValue, customAliases);
-  }, [inputValue, customAliases]);
+  }, [inputValue, customAliases, decisionRef]);
 
   // Server-side fallback for act names the client does not carry.
   //
@@ -144,8 +156,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   // isSearchReady requires — so both left the palette on ENTER COMPLETA.
   const remoteQuery = useMemo(() => {
     const query = inputValue.trim();
-    return query.length >= 3 && !isSearchReady(localCitation) ? query : null;
-  }, [inputValue, localCitation]);
+    return query.length >= 3 && !decisionRef && !isSearchReady(localCitation) ? query : null;
+  }, [inputValue, localCitation, decisionRef]);
 
   useEffect(() => {
     if (!remoteQuery) return;
@@ -203,8 +215,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   // The client wins when its own parse is already searchable; otherwise the
   // server fills in. Nothing that resolves locally today changes.
   const parsedCitation = useMemo<ParsedCitation | null>(
-    () => (isSearchReady(localCitation) ? localCitation : serverCitation ?? localCitation),
-    [localCitation, serverCitation]
+    () => (decisionRef ? null : isSearchReady(localCitation) ? localCitation : serverCitation ?? localCitation),
+    [localCitation, serverCitation, decisionRef]
   );
 
   const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
@@ -303,6 +315,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
         : 'input_article'
     );
   }, [catalog.presets]);
+
+  const handleOpenDecision = useCallback(() => {
+    if (!decisionRef) return;
+    openDecisionTab(decisionRef);
+    onClose();
+  }, [decisionRef, openDecisionTab, onClose]);
 
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
@@ -489,16 +507,39 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                   <Command.Input
                     value={inputValue}
                     onValueChange={setInputValue}
-                    placeholder="Es. 'cc', 'art 2043 cc' o seleziona..."
+                    placeholder="Es. 'art 2043 cc' o 'Cass. civ. 10787/2024'"
                     className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 outline-none text-xl font-bold tracking-tight"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && parsedCitation) {
+                      if (e.key === 'Enter' && decisionRef) {
+                        e.preventDefault();
+                        handleOpenDecision();
+                      } else if (e.key === 'Enter' && parsedCitation) {
                         e.preventDefault();
                         handleCitationSearch();
                       }
                     }}
                   />
                   <AnimatePresence>
+                    {/* A decision named in the box: Enter opens its tab */}
+                    {decisionRef && (
+                      <motion.div
+                        role="status"
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-2 flex items-center gap-2.5"
+                      >
+                        <div className="w-5 h-5 rounded-md flex items-center justify-center bg-emerald-500 text-white">
+                          <Gavel size={10} strokeWidth={3} />
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                          Sentenza → {formatDecisionShort(decisionRef)}
+                        </span>
+                        <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Invio apre
+                        </span>
+                      </motion.div>
+                    )}
                     {/* Citation Match Indicator (shows alias badge if from alias) */}
                     {parsedCitation && citationPreview && (
                       <motion.div
@@ -603,7 +644,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
             {step === 'select_act' && (
               <Command.List id="command-palette-results" className="p-3">
                 <Command.Empty className="px-6 py-12 text-center text-slate-400">
-                  {citationReady ? (
+                  {decisionRef ? (
+                    <>
+                      <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+                        <Gavel size={24} className="text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <p className="font-bold text-slate-600 dark:text-slate-300">{formatDecisionShort(decisionRef)}</p>
+                      <p className="text-xs font-medium opacity-60 mt-1">Premi Enter per aprire la sentenza</p>
+                    </>
+                  ) : citationReady ? (
                     <>
                       {/* The act resolved, so Enter will search. Saying "nessun
                           risultato" here describes the local suggestion list,

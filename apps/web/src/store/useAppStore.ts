@@ -326,6 +326,12 @@ interface AppState {
      * `drainPendingDecision`. Session-only, absent from `partialize`.
      */
     pendingDecision: DecisionReference | null;
+    /**
+     * The decision tab that should take keyboard focus: set when a tab closes because the decision
+     * it resolved to was already open in another (that one survives). Taken once by the tab's view.
+     * Session-only, absent from `partialize`.
+     */
+    decisionFocusRequest: string | null;
 
     // Search State
     searchTrigger: SearchParams | null;
@@ -366,6 +372,7 @@ interface AppState {
     placeTabsSideBySide: (leftTabId: string, rightTabId: string) => void;
     requestOpenDecision: (reference: DecisionReference) => void;
     drainPendingDecision: () => string | null;
+    takeDecisionFocusRequest: (tabId: string) => boolean;
     addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
     addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
     focusArticleInTab: (tabId: string, articleId: string) => void;
@@ -578,6 +585,7 @@ const appStore = createStore<AppState>()(
             },
             workspaceTabs: [],
             pendingDecision: null,
+            decisionFocusRequest: null,
             highestZIndex: 100,
             structureWindow: {
                 blockId: null,
@@ -770,6 +778,7 @@ const appStore = createStore<AppState>()(
                     other.isMinimized = false;
                     other.zIndex = ++state.highestZIndex;
                     state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
+                    state.decisionFocusRequest = other.id;
                     return;
                 }
                 tab.view = { kind: 'decision', reference: identityOf(identity) };
@@ -791,6 +800,12 @@ const appStore = createStore<AppState>()(
                 if (!pending) return null;
                 set((state) => { state.pendingDecision = null; });
                 return get().openDecisionTab(pending);
+            },
+
+            takeDecisionFocusRequest: (tabId) => {
+                if (get().decisionFocusRequest !== tabId) return false;
+                set((state) => { state.decisionFocusRequest = null; });
+                return true;
             },
 
             // Workspace Tab Actions - Complete refactor
@@ -1278,7 +1293,7 @@ const appStore = createStore<AppState>()(
                 set((state) => {
                     const tab = state.workspaceTabs.find(t => t.id === tabId);
                     if (!tab) return;
-                if (refuseViewTab(tab, 'createCollection')) return;
+                    if (refuseViewTab(tab, 'createCollection')) return;
 
                     const newCollection: ArticleCollection = {
                         type: 'collection',
