@@ -102,6 +102,15 @@ class TestParseArticleInputAcceptsTheTreeShapes:
         ("2-bis", "2-bis"),
         ("2 bis", "2-bis"),
         ("25-quinquiesdecies", "25-quinquiesdecies"),
+        # the joined form, as Normattiva's URNs spell it ("~art615bis") and
+        # MERL-T's lazy ingestion sent it on 2026-10-07: only a suffix of the
+        # ordinal table is split off
+        ("615bis", "615-bis"),
+        ("615BIS", "615-bis"),
+        ("21nonies", "21-nonies"),
+        ("2409terdecies", "2409-terdecies"),
+        ("25sexiesdecies", "25-sexiesdecies"),
+        ("270bis.1", "270-bis.1"),
     ])
     async def test_single_article_is_accepted_and_canonicalised(self, raw, expected):
         tree = AsyncMock(return_value=LIVE_ODD_TREE)
@@ -121,6 +130,9 @@ class TestParseArticleInputAcceptsTheTreeShapes:
     @pytest.mark.parametrize("raw", [
         "abc", "1-", "1..2", "1-bis-", "1/", "/2", "1-bis.x", "1.", ".1",
         "1-bis.1.2", "314/2/3", "1--bis", "!!!",
+        # a joined word that is not an ordinal stays refused: EU lettered
+        # articles are not this grammar, and "bisogna" is not "bis"
+        "5a", "5bisogna",
     ])
     async def test_garbage_is_still_rejected(self, raw):
         with patch("visualex_api.tools.text_op.get_tree", new=AsyncMock(return_value=LIVE_ODD_TREE)):

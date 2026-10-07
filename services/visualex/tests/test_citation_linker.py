@@ -452,3 +452,105 @@ class TestSuffixesPastDecies:
     def test_codice_suffix_past_decies(self):
         citations = extract_citations("si veda l'art. 2409-octiesdecies c.c.")
         assert [c.article for c in citations] == ["2409-octiesdecies"]
+
+
+class TestOrdinalSpellings:
+    """«615 bis», «615bis» and «615-bis» are one article, and never art. 615.
+
+    The linker used to read only the hyphen: «art. 615 bis c.p.» came back as
+    art. 615 — an article that exists, so the edge MERL-T drew from it pointed at
+    the wrong norm and nothing looked broken. Court texts write all three forms;
+    the excerpts below are from Cass. pen. 23158/2025 and 10787/2024 as Italgiure
+    serves them (no space after «art.» included)."""
+
+    @pytest.mark.parametrize("text, article, cited", [
+        ("dal reato di cui all'art.615 ter commi 1 e 2 n.1 cod. pen. di cui al capo C)",
+         "615-ter", "art.615 ter commi 1 e 2 n.1 cod. pen."),
+        ("la mancata applicazione della condizione di non punibilità di cui all'art.131 bis cod. pen.",
+         "131-bis", "art.131 bis cod. pen."),
+        ("è configurabile l'aggravante di cui all'art. 615-ter, comma secondo, n. 3, cod. pen. nel caso",
+         "615-ter", None),
+        ("della circostanza di cui all'art. 393-bis cod. pen. che, secondo i principi",
+         "393-bis", "art. 393-bis cod. pen."),
+    ])
+    def test_real_decision_excerpts(self, text, article, cited):
+        citations = [c for c in extract_citations(text) if c.article]
+        assert [c.article for c in citations] == [article]
+        assert citations[0].act_type == "codice penale"
+        if cited:
+            assert text[citations[0].start:citations[0].end] == cited
+
+    def test_an_act_the_text_misspells_leaves_the_article_right(self):
+        # «cod. pen» without its dot (same decision) is no abbreviation the table
+        # knows: the act stays open for the context to fill, the article is right
+        text = "In relazione all'art.615 ter cod. pen di cui al capo A), secondo la difesa"
+        assert [(c.article, c.act_type) for c in extract_citations(text)] == [("615-ter", None)]
+        assert [(c.article, c.act_type) for c in extract_citations(
+            text, context_act_type="codice penale")] == [("615-ter", "codice penale")]
+
+    @pytest.mark.parametrize("written, article", [
+        ("615 bis", "615-bis"), ("615bis", "615-bis"), ("615-bis", "615-bis"),
+        ("615 - bis", "615-bis"), ("615 BIS", "615-bis"),
+        ("21 nonies", "21-nonies"), ("21nonies", "21-nonies"),
+        ("2409 terdecies", "2409-terdecies"), ("25sexiesdecies", "25-sexiesdecies"),
+    ])
+    def test_every_spelling_is_the_hyphenated_article(self, written, article):
+        citations = extract_citations(f"ai sensi dell'art. {written} c.p. e")
+        assert [c.article for c in citations] == [article]
+
+    def test_a_bare_article_reads_the_suffix_too(self):
+        citations = extract_citations("Si veda l'art. 615 bis.", context_act_type="codice penale")
+        assert [c.article for c in citations] == ["615-bis"]
+
+    def test_a_list_reads_every_suffix(self):
+        citations = extract_citations("Si vedano gli artt. 615 bis e 615ter c.p.")
+        assert citations[0].article == "615-bis"
+
+    def test_an_ordinary_word_after_the_number_is_not_a_suffix(self):
+        citations = extract_citations("ai sensi dell'art. 5 bisogna guardare il c.c.",
+                                      context_act_type="codice civile")
+        assert [c.article for c in citations] == ["5"]
+
+
+class TestTheParagraphClause:
+    """The paragraph written as a word belongs to the article, never breaks it."""
+
+    # art. 2044 c.c. as Normattiva serves it: the article it cites is the codice
+    # penale's, and the edge MERL-T drew from it pointed at art. 52 c.c.
+    ART_2044_CC = (
+        "Non è responsabile chi cagiona il danno per legittima difesa di sé o di altri. "
+        "((Nei casi di cui all'articolo 52, commi secondo, terzo e quarto, del codice "
+        "penale, la responsabilità di chi ha compiuto il fatto è esclusa. Nel caso di "
+        "cui all'articolo 55, secondo comma, del codice penale, al danneggiato è dovuta "
+        "una indennità"
+    )
+
+    def test_art_2044_cc_cites_the_codice_penale(self):
+        citations = extract_citations(self.ART_2044_CC, context_act_type="codice civile")
+        assert [(c.article, c.act_type) for c in citations] == [
+            ("52", "codice penale"), ("55", "codice penale")]
+        assert self.ART_2044_CC[citations[1].start:citations[1].end] == (
+            "articolo 55, secondo comma, del codice penale")
+
+    @pytest.mark.parametrize("clause", [
+        "comma 3-bis", "comma 3 bis", "commi primo e secondo", "secondo comma",
+        "primo e secondo comma", "comma 2, n. 3", "comma secondo n.3",
+    ])
+    def test_every_paragraph_spelling_keeps_the_act(self, clause):
+        citations = extract_citations(f"ai sensi dell'art. 2 {clause} c.p. e",
+                                      context_act_type="codice civile")
+        assert [(c.article, c.act_type) for c in citations] == [("2", "codice penale")]
+
+
+class TestRunsOfSpaces:
+    def test_long_runs_of_spaces_stay_fast(self):
+        # «\s*,?\s*» over a run of spaces tries every split of the run: 500 KB of
+        # «art. 5» followed by 400 spaces took 83 s before the whitespace became
+        # possessive (2026-10-07), well within what /extract_citations accepts
+        import time
+        text = ("art. 5" + " " * 200 + "- " + " " * 200 + "x ") * 1_200
+        assert len(text) > 400_000
+        started = time.perf_counter()
+        c = extract_citations(text, context_act_type="codice civile")
+        assert time.perf_counter() - started < 3.0
+        assert len(c) == 1_200

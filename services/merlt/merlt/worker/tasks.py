@@ -21,6 +21,7 @@ import structlog
 from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 from merlt.pipeline.visualex import NormaMetadata
 from merlt.storage.graph.schema import canonical_urn
+from merlt.utils.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from merlt.utils.text_op import normalize_act_type
 from merlt.worker.config import merlt_config_from_env
 
@@ -65,6 +66,13 @@ _ARTICLE_URN_RE = re.compile(
 )
 
 _ANNEX_TAIL_RE = re.compile(r":\d+$")
+# The URN joins an article's suffix to its number ("~art615bis"); VisuaLex reads
+# the article as the convention writes it, "615-bis", and refused "615bis" with a
+# 400 (2026-10-07: every lazy ingestion of a suffixed article failed). Only the
+# first suffix of the table takes the hyphen: the URN generator splits on it
+# once, so "270bis.1" -> "270-bis.1" and "135viciessemel" -> "135-viciessemel"
+# keep their key.
+_JOINED_SUFFIX_RE = re.compile(r"^(\d+)(?=(?:" + ARTICLE_SUFFIX_ALTERNATION + r"))")
 
 
 class UrnNotIngestible(ValueError):
@@ -127,6 +135,7 @@ def _urn_to_ingest_params(urn: str) -> IngestParams:
     key = _N2LS + body
 
     act_type, date, number, annex, articolo = match.group("type", "date", "number", "annex", "article")
+    articolo = _JOINED_SUFFIX_RE.sub(r"\1-", articolo)
     act = act_type + (f":{date}" if date else "") + (f";{number}" if number else "")
 
     codice = _code_name(act, annex)

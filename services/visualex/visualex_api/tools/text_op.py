@@ -1,6 +1,7 @@
 import re
 import datetime
 import asyncio
+from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import NORMATTIVA, NORMATTIVA_SEARCH, BROCARDI_SEARCH
 from .logging_config import log_handlers
 from .treextractor import get_tree
@@ -33,6 +34,12 @@ logging.basicConfig(level=logging.INFO,
 # and the compound spellings ("sex decies", "vicies semel") are not in it.
 _SINGLE_ARTICLE_RE = re.compile(r'^\d+(?:-[a-z]+)*(?:\.\d+)?$')
 _SLASH_ARTICLE_RE = re.compile(r'^\d+/\d+$')
+# A suffix of the ordinal table written against its number, as Normattiva's
+# URNs spell it ("~art615bis"): MERL-T's lazy ingestion sent "615bis" on
+# 2026-10-07 and got a 400. Only the table's words are split off, so "5a" or
+# "5bisogna" stay refused.
+_JOINED_SUFFIX_RE = re.compile(
+    r'(?<=\d)(?=(?:' + ARTICLE_SUFFIX_ALTERNATION + r')(?![a-z]))', re.IGNORECASE)
 
 
 def _canonicalise_article_token(part):
@@ -43,7 +50,10 @@ def _canonicalise_article_token(part):
     a bare digit after an ordinal is a dotted sub-number — probed live,
     ~art171octies1 makes Normattiva answer Art. 1, ~art171octies.1 the real
     article. Ranges are untouched: "3-5" has no letter before its digit.
+    "615bis" -> "615-bis" and "270bis.1" -> "270-bis.1": a suffix of the
+    ordinal table joined to its number is split off, as a space would be.
     """
+    part = _JOINED_SUFFIX_RE.sub('-', part)
     part = re.sub(r'(?<=[0-9a-z])\s+(?=[a-z])', '-', part, flags=re.IGNORECASE)
     part = re.sub(r'(?<=[a-z])[\s-]+(?=\d+$)', '.', part, flags=re.IGNORECASE)
     return part
