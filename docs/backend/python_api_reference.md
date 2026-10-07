@@ -558,8 +558,9 @@ Corte costituzionale keeps its link to the source). Behind the ingress the route
 like the other scraping routes. It serves the bytes a `/fetch_decision` lookup cached
 (`decisions_pdf`, 30 days), or reads the record (one Solr query) and fetches the PDF once (one
 request, in the session the query opens), within a 25 s limit, and caches it. Only a `%PDF-`
-file within 5 MB is cached or served; the record's filename and the PDF's header must name this
-number and year. Design: `docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md` §12.2.
+file within 5 MB is cached or served; the record's filename and the PDF's header, when it can be read, must
+not name another decision. The cached copy is served only while the decision's text is cached
+too (a withheld decision is not served from a stale copy). Design: `docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md` §12.2.
 
 **Request Body:** the decision's identity.
 

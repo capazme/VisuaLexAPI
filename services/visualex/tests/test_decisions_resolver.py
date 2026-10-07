@@ -65,6 +65,9 @@ class FakeStore(dict):
     async def set(self, key, value):
         self[key] = value
 
+    async def delete(self, key):
+        self.pop(key, None)
+
 
 class FakeCache:
     def __init__(self):
@@ -434,8 +437,13 @@ class PdfItalgiure:
         return self.data
 
 
+FOUND_KEY = "italgiure:v3:civile:5:2022"
+PDF_KEY = "cassazione:civile:5:2022"
+
+
 async def test_original_pdf_is_read_from_the_cache_without_a_request():
     cache = FakeCache()
+    cache.stores["decisions_found"] = FakeStore({FOUND_KEY: {"text": "kept"}})
     cache.stores["decisions_pdf"] = FakeStore(
         {"cassazione:civile:5:2022": base64.b64encode(b"%PDF-1.4 cached").decode()})
     italgiure = PdfItalgiure()
@@ -448,6 +456,8 @@ async def test_original_pdf_is_fetched_once_and_cached():
     resolver = _resolver(italgiure, cache=cache)
     identity = Identity("cassazione", 5, 2022, "civile")
     assert await resolver.original_pdf(identity) == b"%PDF-1.4 bytes"
+    # the copy is served again only once the decision's text is cached (a lookup does that)
+    await resolver.found.set(FOUND_KEY, {"text": "kept"})
     assert await resolver.original_pdf(identity) == b"%PDF-1.4 bytes"
     assert italgiure.calls == [("civile", 5, 2022)]
     assert base64.b64decode(cache.stores["decisions_pdf"]["cassazione:civile:5:2022"]) == b"%PDF-1.4 bytes"
@@ -462,6 +472,7 @@ async def test_original_pdf_that_is_none_or_not_a_pdf_caches_nothing(data):
 
 async def test_a_cached_entry_that_is_not_a_pdf_is_ignored():
     cache = FakeCache()
+    cache.stores["decisions_found"] = FakeStore({FOUND_KEY: {"text": "kept"}})
     cache.stores["decisions_pdf"] = FakeStore(
         {"cassazione:civile:5:2022": base64.b64encode(b"<html>").decode()})
     italgiure = PdfItalgiure()
@@ -473,3 +484,22 @@ async def test_original_pdf_source_errors_propagate():
     with pytest.raises(NetworkError):
         await _resolver(PdfItalgiure(error=NetworkError("down")), cache=FakeCache()).original_pdf(
             Identity("cassazione", 5, 2022, "civile"))
+
+
+async def test_a_cached_entry_that_is_not_base64_is_ignored_and_refetched():
+    cache = FakeCache()
+    cache.stores["decisions_found"] = FakeStore({FOUND_KEY: {"text": "kept"}})
+    cache.stores["decisions_pdf"] = FakeStore({PDF_KEY: "!!!"})
+    italgiure = PdfItalgiure()
+    out = await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out == b"%PDF-1.4 bytes" and italgiure.calls == [("civile", 5, 2022)]
+
+
+async def test_a_cached_pdf_without_the_text_entry_is_not_served_and_is_dropped():
+    # the court withheld the decision: the source now gives no PDF, and the old copy is gone
+    cache = FakeCache()
+    cache.stores["decisions_pdf"] = FakeStore({PDF_KEY: base64.b64encode(b"%PDF-1.4 old").decode()})
+    italgiure = PdfItalgiure(None)
+    out = await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out is None and italgiure.calls == [("civile", 5, 2022)]
+    assert PDF_KEY not in cache.stores["decisions_pdf"]

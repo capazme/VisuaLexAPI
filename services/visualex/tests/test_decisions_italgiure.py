@@ -542,3 +542,16 @@ async def test_an_unreachable_source_is_an_error_not_an_absent_pdf(monkeypatch):
     _serve_with_pdf(monkeypatch, _record(LINES), NetworkError("Exceeded retry budget"))
     with pytest.raises(NetworkError):
         await ItalgiureReader().original_pdf("civile", 12345, 2026)
+
+
+async def test_a_pdf_without_a_text_layer_is_still_given(monkeypatch):
+    # nothing to read the header from, nothing contradicting the record: the court's file stands
+    pdf = make_pdf([[]])
+    _serve_with_pdf(monkeypatch, _record(LINES), pdf)
+    assert await ItalgiureReader().original_pdf("civile", 12345, 2026) == pdf
+
+
+async def test_a_damaged_pdf_is_not_given(monkeypatch):
+    pdf = _pdf_of(LINES)
+    _serve_with_pdf(monkeypatch, _record(LINES), pdf[: len(pdf) // 3])
+    assert await ItalgiureReader().original_pdf("civile", 12345, 2026) is None

@@ -114,7 +114,15 @@ _PQM_PREFIX = ("P.Q.M.", "PQM.", "PER QUESTI MOTIVI")
 
 
 class PdfRefused(ValueError):
-    """Not a PDF this reader will read: the caller falls back to the text field."""
+    """Not a PDF this reader will read: the caller falls back to the text field.
+
+    `kind` says why, for callers that must tell a file with nothing to read from a damaged one:
+    "unreadable" (parsed, but no text layer, too many pages, or too slow) or "other" (not a PDF,
+    over the size limit, or a parse that failed: the file may be damaged)."""
+
+    def __init__(self, message: str, kind: str = "other"):
+        super().__init__(message)
+        self.kind = kind
 
 
 def _page_count(data: bytes) -> int:
@@ -165,10 +173,10 @@ def _lines(data: bytes) -> list[dict]:
     out: list[dict] = []
     try:
         if _page_count(data) > MAX_PAGES:
-            raise PdfRefused("over the page limit")
+            raise PdfRefused("over the page limit", "unreadable")
         for pno, page in enumerate(extract_pages(io.BytesIO(data), laparams=LAParams())):
             if pno >= MAX_PAGES:
-                raise PdfRefused("over the page limit")
+                raise PdfRefused("over the page limit", "unreadable")
             pieces: list[dict] = []
             for element in page:
                 if not isinstance(element, LTTextContainer):
@@ -354,11 +362,11 @@ def read_decision_pdf(data: bytes) -> tuple[dict[str, str], tuple[int, int] | No
     drop = _furniture(lines)
     body = [l for i, l in enumerate(lines) if i not in drop]
     if not body:
-        raise PdfRefused("no text layer")
+        raise PdfRefused("no text layer", "unreadable")
     debris = _margin_debris(body)
     body = [l for i, l in enumerate(body) if i not in debris]
     if not body:
-        raise PdfRefused("no text layer")
+        raise PdfRefused("no text layer", "unreadable")
     paragraphs = _paragraphs(body)
     pqm = max((i for i, p in enumerate(paragraphs)
                if _PQM.match(p) or p.startswith(_PQM_PREFIX)), default=None)
@@ -372,7 +380,7 @@ async def text_from_pdf_async(data: bytes, timeout: float = 20.0) -> dict[str, s
     try:
         return await asyncio.wait_for(asyncio.to_thread(text_from_pdf, data), timeout)
     except asyncio.TimeoutError as exc:
-        raise PdfRefused("parsing took too long") from exc
+        raise PdfRefused("parsing took too long", "unreadable") from exc
 
 
 async def read_decision_pdf_async(
@@ -380,4 +388,4 @@ async def read_decision_pdf_async(
     try:
         return await asyncio.wait_for(asyncio.to_thread(read_decision_pdf, data), timeout)
     except asyncio.TimeoutError as exc:
-        raise PdfRefused("parsing took too long") from exc
+        raise PdfRefused("parsing took too long", "unreadable") from exc

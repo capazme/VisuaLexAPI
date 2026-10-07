@@ -398,8 +398,12 @@ class ItalgiureReader:
         try:
             _, header = await read_decision_pdf_async(data, PDF_PARSE_TIMEOUT)
         except PdfRefused as exc:
-            # the header cannot be read (no text layer, too many pages): nothing contradicts the
-            # record and the filename, which were checked, so the court's file stands
+            if exc.kind != "unreadable":
+                # a damaged file (cut short, corrupt): never served as the court's
+                log.warning("Original PDF damaged", key=ident.key(), reason=str(exc))
+                return None
+            # a file with nothing to read the header from (no text layer, too many pages, too
+            # slow): nothing contradicts the record and the filename, which were checked
             log.warning("Original PDF header not read", key=ident.key(), reason=str(exc))
             header = None
         if header is not None and header != (numero, anno):

@@ -179,13 +179,27 @@ class Resolver:
         except Exception as exc:  # noqa: BLE001 - a broken cache costs a request, not the answer
             log.warning("Decision PDF cache not read", key=key, error_type=type(exc).__name__)
             cached = None
-        if isinstance(cached, str):
+        if cached is not None:
+            # served only while the decision's text is kept too: when the court withholds a
+            # decision (to anonymise it) the text entry goes with its month, and the PDF must
+            # not outlive it. Without the text entry the source is asked again.
+            data = b""
             try:
-                data = base64.b64decode(cached, validate=True)
-            except ValueError:
-                data = b""
-            if data.startswith(b"%PDF-") and len(data) <= MAX_BYTES:
-                return data
+                text_kept = await self.found.get(
+                    f"italgiure:v3:{identity.archivio}:{identity.numero}:{identity.anno}") is not None
+            except Exception:  # noqa: BLE001 - unknown: the source is asked
+                text_kept = False
+            if text_kept:
+                try:
+                    data = base64.b64decode(cached, validate=True) if isinstance(cached, str) else b""
+                except ValueError:
+                    data = b""
+                if data.startswith(b"%PDF-") and len(data) <= MAX_BYTES:
+                    return data
+            try:
+                await self.pdfs.delete(key)  # stale, or not a PDF
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Decision PDF entry not dropped", key=key, error_type=type(exc).__name__)
         data = await asyncio.wait_for(
             self.italgiure.original_pdf(identity.archivio, identity.numero, identity.anno),
             ITALGIURE_TIMEOUT)
