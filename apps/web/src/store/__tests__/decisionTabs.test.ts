@@ -52,6 +52,44 @@ describe('decision tabs', () => {
     expect(get().openDecisionSearchTab({ norma, normaLabel: 'Art. 2043 codice civile' }, 'b')).toBe(a);
   });
 
+  it('reuses one tab for a topic typed with other case or spacing, and keeps it as typed', () => {
+    const a = get().openDecisionSearchTab({ tema: 'Perdita di chance' }, 'Tema: Perdita di chance');
+    expect(get().openDecisionSearchTab({ tema: ' perdita  di chance ' }, 'Tema: perdita di chance')).toBe(a);
+    const b = get().openDecisionSearchTab({ tema: '  Colpa ' }, 'x');
+    const view = get().workspaceTabs.find((t) => t.id === b)!.view;
+    expect(view).toEqual({ kind: 'decision-search', query: { tema: 'Colpa' } });
+  });
+
+  it('drops a persisted search view whose query is malformed', () => {
+    const merge = (appStore as unknown as { persist: { getOptions: () => { merge: (p: unknown, c: unknown) => { workspaceTabs: Array<{ id: string }> } } } })
+      .persist.getOptions().merge;
+    const base = { position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1, isMinimized: false, isHidden: false, label: 'l', content: [] };
+    const search = (id: string, query: unknown) => ({ ...base, id, view: { kind: 'decision-search', query } });
+    const out = merge({
+      workspaceTabs: [
+        search('numeric', { tema: 42 }),
+        search('empty', {}),
+        search('halfnorma', { norma: { tipo_atto: 'codice civile' } }),
+        search('good', { tema: 'colpa' }),
+        search('goodnorma', { norma: { tipo_atto: 'codice civile', numero_articolo: '2043' } }),
+      ],
+    }, get());
+    expect(out.workspaceTabs.map((t) => t.id)).toEqual(['good', 'goodnorma']);
+  });
+
+  it('gives a stored article the Brocardi of a later copy, and forgets the error, text untouched', () => {
+    appStore.setState({ workspaceTabs: [] });
+    const NORMA = { tipo_atto: 'legge', numero_atto: '241', data: '1990' } as unknown as Parameters<ReturnType<typeof get>['addNormaToTab']>[1];
+    const art = (extra: object) => ({ norma_data: { numero_articolo: '1' }, article_text: 'testo', ...extra }) as unknown as Parameters<ReturnType<typeof get>['addNormaToTab']>[2][number];
+    const tabId = get().addWorkspaceTab('t');
+    get().addNormaToTab(tabId, NORMA, [art({ brocardi_error: 'down' })]);
+    get().addNormaToTab(tabId, NORMA, [art({ article_text: 'altro', brocardi_info: { Ratio: 'r' } })]);
+    const stored = (get().workspaceTabs[0].content[0] as unknown as { articles: Array<Record<string, unknown>> }).articles[0];
+    expect(stored.brocardi_info).toEqual({ Ratio: 'r' });
+    expect(stored).not.toHaveProperty('brocardi_error');
+    expect(stored.article_text).toBe('testo');
+  });
+
   describe('side by side', () => {
     const original = { w: window.innerWidth, h: window.innerHeight };
     const viewport = (w: number, h: number, o: { left: number; top: number }) => {
@@ -123,6 +161,15 @@ describe('decision tabs', () => {
       expect(t.position.x + origin.left + t.size.width).toBe(1280 - MARGIN);
       expect(t.position.y + origin.top + t.size.height).toBeLessThanOrEqual(DOCK_TOP(800));
       expect(t.position.y + origin.top).toBeGreaterThanOrEqual(56);
+    });
+
+    it('a search opened with nothing on screen takes the free area; over a visible tab it keeps the cascade', () => {
+      viewport(1280, 800, { left: 184, top: 32 });
+      appStore.setState({ workspaceTabs: [] });
+      const first = get().openDecisionSearchTab({ tema: 'colpa' }, 'Tema: colpa');
+      expect(get().workspaceTabs.find((x) => x.id === first)!.size).not.toEqual({ width: 800, height: 650 });
+      const second = get().openDecisionSearchTab({ tema: 'dolo' }, 'Tema: dolo');
+      expect(get().workspaceTabs.find((x) => x.id === second)!.size).toEqual({ width: 800, height: 650 });
     });
 
     it('keeps the cascade on a phone, so phone geometry is never saved with the tab', () => {

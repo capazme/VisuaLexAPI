@@ -390,3 +390,74 @@ describe('CommandPalette — a citation handed over as it opens', () => {
     expect(appStore.getState().commandPaletteQuery).toBeNull();
   });
 });
+
+describe('CommandPalette — a topic for the Cassazione', () => {
+  const open = vi.fn(() => 'tab');
+  const original = appStore.getState().openDecisionSearchTab;
+  beforeEach(() => {
+    open.mockClear();
+    appStore.setState({ openDecisionSearchTab: open } as never);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
+  });
+  afterEach(() => appStore.setState({ openDecisionSearchTab: original, customAliases: [] }));
+
+  it('offers the line, announces it, and Enter opens a search tab', async () => {
+    const user = fakeTimeUser();
+    const onClose = vi.fn();
+    render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'perdita di chance');
+    await settle();
+    expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Cerca "perdita di chance" nelle sentenze della Cassazione.');
+    await user.keyboard('{Enter}');
+    expect(open).toHaveBeenCalledWith({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('is not offered for a norm citation', async () => {
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    await settle();
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
+  });
+
+  it('is not offered for a decision, nor when the first word is a custom alias', async () => {
+    const user = fakeTimeUser();
+    appStore.setState({
+      customAliases: [{
+        id: 'a1', trigger: 'chance', type: 'reference' as const,
+        expandTo: 'Art. 1490 c.c.', usageCount: 0, createdAt: '2026-08-27T00:00:00.000Z',
+      }],
+    } as never);
+    renderPalette();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    await user.type(box, 'Cass. civ. 10787/2024');
+    await settle();
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
+    await user.clear(box);
+    await user.type(box, 'chance perduta');
+    await settle();
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
+  });
+
+  it('is not offered for a box with no letter or digit', async () => {
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), '...');
+    await settle();
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
+  });
+
+  it('waits for the server to say it is not an act, then offers the line', async () => {
+    let answer!: (v: unknown) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { answer = resolve; })));
+    const user = fakeTimeUser();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'perdita di chance');
+    await settle();
+    expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
+    await act(async () => { answer({ ok: true, status: 200, json: async () => ({ recognized: false }) }); });
+    expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
+  });
+});

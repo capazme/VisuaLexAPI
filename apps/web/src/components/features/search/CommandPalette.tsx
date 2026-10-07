@@ -43,7 +43,7 @@ function requiresDetails(actValue: string): boolean {
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
-    customAliases, trackAliasUsage, openAliasManager, openDecisionTab, takeCommandPaletteQuery, commandPaletteQuery
+    customAliases, trackAliasUsage, openAliasManager, openDecisionTab, openDecisionSearchTab, takeCommandPaletteQuery, commandPaletteQuery
   } = useAppStore(useShallow(s => ({
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
@@ -53,6 +53,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     trackAliasUsage: s.trackAliasUsage,
     openAliasManager: s.openAliasManager,
     openDecisionTab: s.openDecisionTab,
+    openDecisionSearchTab: s.openDecisionSearchTab,
     takeCommandPaletteQuery: s.takeCommandPaletteQuery,
     commandPaletteQuery: s.commandPaletteQuery,
   })));
@@ -340,6 +341,21 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     );
   }, [catalog.presets]);
 
+  // Words that are neither a decision nor a norm: a topic to look for in the Cassazione's decisions.
+  // A custom alias as the first word is the user's own shortcut, not a topic.
+  const topic = useMemo(() => {
+    const words = inputValue.trim();
+    if (words.length < 3 || !/[\p{L}\p{N}]/u.test(words) || decisionRef || parsedCitation || resolvingRemotely) return null;
+    const first = foldAlias(words.split(/\s+/)[0]);
+    return customAliases.some((a) => foldAlias(a.trigger) === first) ? null : words;
+  }, [inputValue, decisionRef, parsedCitation, resolvingRemotely, customAliases]);
+
+  const handleSearchTopic = useCallback(() => {
+    if (!topic) return;
+    openDecisionSearchTab({ tema: topic }, `Tema: ${topic}`);
+    onClose();
+  }, [topic, openDecisionSearchTab, onClose]);
+
   const handleOpenDecision = useCallback(() => {
     if (!decisionRef) return;
     openDecisionTab(decisionRef);
@@ -523,7 +539,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
             {/* One live region for the whole life of the palette, its text changing: a region that
                 appears already holding its text is often not announced. The visible line is aria-hidden. */}
             <p role="status" className="sr-only">
-              {decisionRef ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.` : ''}
+              {decisionRef
+                ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
+                : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
             </p>
 
             {/* Main Interactive Input Area */}
@@ -717,6 +735,28 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                     </>
                   )}
                 </Command.Empty>
+
+                {/* A topic, not a decision or a norm: its own line, after those */}
+                {topic && (
+                  <Command.Group className="mb-4">
+                    <Command.Item
+                      value={`cerca-sentenze ${topic}`}
+                      onSelect={handleSearchTopic}
+                      className={cn(
+                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                        "bg-white dark:bg-slate-900 border border-transparent",
+                        "aria-selected:bg-emerald-50 dark:aria-selected:bg-emerald-900/10 aria-selected:border-emerald-200/50 dark:aria-selected:border-emerald-800/30"
+                      )}
+                    >
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500">
+                        <Gavel size={18} />
+                      </div>
+                      <span className="flex-1 min-w-0 text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                        Cerca "{topic}" nelle sentenze della Cassazione
+                      </span>
+                    </Command.Item>
+                  </Command.Group>
+                )}
 
                 {/* QuickNorms Section */}
                 <Command.Group className="mb-4">

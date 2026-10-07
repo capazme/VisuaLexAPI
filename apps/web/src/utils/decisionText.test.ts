@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decisionClipboardText, decisionParagraphs, hasDecisionText } from './decisionText';
+import { codePointRangesToUtf16, decisionClipboardText, decisionParagraphs, hasDecisionText } from './decisionText';
 
 describe('decisionParagraphs', () => {
   it('groups lines at empty lines and drops only the newlines', () => {
@@ -113,5 +113,19 @@ describe('hasDecisionText', () => {
     expect(hasDecisionText({ dispositivo: 'dichiara' })).toBe(true);
     // an ordinanza whose epigrafe has no «Ritenuto» line comes without a motivazione
     expect(hasDecisionText({ epigrafe: 'ha pronunciato la seguente' })).toBe(true);
+  });
+});
+
+describe('codePointRangesToUtf16', () => {
+  it('moves a range past an astral character by one unit', () => {
+    const text = '𝔄 art. 2043 c.c.'; // «𝔄» is one code point and two UTF-16 units
+    const [[s, e]] = codePointRangesToUtf16(text, [[2, 16]]);
+    expect(text.slice(s, e)).toBe('art. 2043 c.c.');
+  });
+  it('leaves a text without astral characters as it is', () => {
+    expect(codePointRangesToUtf16('ex art. 2043', [[3, 12]])).toEqual([[3, 12]]);
+  });
+  it('drops empty, overlapping, out-of-range and non-integer ranges, sorting the rest', () => {
+    expect(codePointRangesToUtf16('abcdefghij', [[6, 8], [0, 2], [1, 3], [4, 4], [8, 99], [-1, 2], [1.5, 3]])).toEqual([[0, 2], [6, 8]]);
   });
 });

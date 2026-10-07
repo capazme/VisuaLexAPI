@@ -323,7 +323,8 @@ limit is 1 MB, and the ingress's own page answers).
   (it answers that the text is in the process of being obscured) or `valutazione_oscuramento`
   (it answers that the obscuring is being evaluated); and `testo_origine` (Cassazione),
   where the text was read from: `"pdf"` (the court's original PDF) or `"archivio"` (the
-  archive's text field, the fallback; see the notice `testo_da_archivio`).
+  archive's text field, the fallback: no filename, a PDF that cannot be fetched or parsed, or one
+  that fails the checks; see the notice `testo_da_archivio`).
 - `testo`: the whole text, never cut, in blocks: `epigrafe` (Corte costituzionale),
   `motivazione`, `dispositivo` (a block left empty is absent). It is `{}` when the decision
   comes without its text (notice `testo_non_disponibile`). The Cassazione's text is read from
@@ -618,7 +619,7 @@ A page is cached for 24 hours per query and page. Design:
 | `esito` | Status | Content |
 |---------|--------|---------|
 | `risultati` | 200 | `totale`, `pagina`, `modo`, `archivio`, `archivio_dal` (first deposit covered: the archive's, or the earlier of the two when both are searched; `null` if unknown, and such an answer is not cached), `decisioni` |
-| `non_supportata` | 200 | nothing else: an act the search cannot phrase |
+| `non_supportata` | 200 | nothing else: an act the search cannot phrase (an EU act, for one) |
 | `richiesta_non_valida` | 400 | `errori`: each bad field, with what was expected |
 | `fonte_non_raggiungibile` | 503 | `fonte`: `cassazione`. A source that does not answer is never an empty page |
 | `errore_interno` | 500 | nothing else: an unexpected failure, whose details stay in the log |
@@ -626,8 +627,9 @@ A page is cached for 24 hours per query and page. Design:
 Each item of `decisioni` is `{identita, attributi, trovata, frammento}`: the identity and
 particulars as in `/fetch_decision`, `trovata` (`indice` or `testo`: how the decision was
 found) and `frammento`, `{testo, evidenziati}` or `null`, a plain-text excerpt with the
-ranges `[start, end]` to emphasise; only `<em>` becomes ranges; any other markup reaches the client as literal characters and
-must be rendered as text. **Offsets
+ranges `[start, end]` to emphasise. The client receives plain text and ranges, never HTML from
+the source: `<em>` is the only markup read (it becomes ranges), any other reaches the client as
+literal characters and must be rendered as text. **Offsets
 count Python code points**: JavaScript counts UTF-16 units, so the client converts them for
 characters outside the BMP. With `modo: "indice"`, `totale` is the index's count; the false
 matches of that index (parallel `rnc-*` fields) were measured at 2.0 %, and the reader drops

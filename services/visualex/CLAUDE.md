@@ -64,9 +64,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     URN with the State's act of the same number), cached a year.
   - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
     `model.py` (identity and reference), `italgiure.py` (Cassazione, Italgiure's Solr),
-    `corte_cost.py` (Corte costituzionale open data, range bundles on disk), `resolver.py`
-    (one outcome, lookups cached per archive), `http.py` (the readers' own
-    `ThrottledHttpClient` and honest User-Agent).
+    `pdf_text.py` (the Cassazione's text from the court's PDF), `corte_cost.py` (Corte
+    costituzionale open data, range bundles on disk), `resolver.py` (one outcome, lookups
+    cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
+    User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
+    (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`.
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -205,8 +207,9 @@ POST unless noted, JSON bodies.
   `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?}` → `esito`
   risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, and per decision its identity,
   attributes, `trovata` and `frammento`; cached a day), non_supportata, richiesta_non_valida
-  400, fonte_non_raggiungibile 503. Italgiure only, the last five years; the index serves
-  codes and the Constitution, any other act goes to the text search. Design:
+  400, fonte_non_raggiungibile 503, errore_interno 500 (a bug: a fixed body). Italgiure only,
+  the last five years; the index serves codes and the Constitution, any other act goes to the
+  text search, and an act no way can phrase (an EU act among them) answers non_supportata. Design:
   docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md
 - `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
   PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
@@ -501,7 +504,8 @@ Breaking one of these breaks the product. Read before editing.
     failing the lookup. The PDF is refused when its filename or its first-page header names
     another decision (a filename without tags or a PDF without a header is accepted; a damaged
     PDF is never accepted); it must also be at least 70% of the field's length and share 10 of
-    the field's first 20 words with its first 250 (`_plausible`). Otherwise the field's text
+    the field's first 20 words with its first 250 (`_plausible`). Otherwise (no filename, a PDF
+    that cannot be fetched or parsed, or one that fails these checks) the field's text
     stands, `testo_origine` is `"archivio"`, a warning logs the reason, and the resolver adds the
     notice `testo_da_archivio` and keeps the decision 24 hours in `decisions_pending`, so the PDF
     is tried again soon; a text from the PDF is kept 30 days and its bytes under `decisions_pdf`

@@ -58,3 +58,20 @@ describe('MassimeSection — a decision opened from the article', () => {
     expect(appStore.getState().readingBackStack).toEqual([back]);
   });
 });
+
+describe('MassimeSection — its own toggle', () => {
+  it('is named by what it counts, in the singular too, and reports its state', () => {
+    const view = show([
+      { autorita: 'Cass. civ.', numero: '1', anno: '2020', massima: 'Uno.' },
+      { autorita: 'Cass. civ.', numero: '2', anno: '2021', massima: 'Due.' },
+      { autorita: 'Cass. civ.', numero: '3', anno: '2022', massima: 'Tre.' },
+    ]);
+    const toggle = screen.getByRole('button', { name: '3 di 3 massime' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    view.unmount();
+    show([{ autorita: 'Cass. civ.', numero: '1', anno: '2020', massima: 'Uno.' }]);
+    expect(screen.getByRole('button', { name: '1 di 1 massima' })).toBeInTheDocument();
+  });
+});

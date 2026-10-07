@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
+import { CaseLawSection } from './CaseLawSection';
+import { searchNorma } from '../../../utils/decisionSearchNorma';
+import { massimeStateOf } from './massimeState';
 import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
@@ -204,6 +207,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Brocardi's commentary carries no date.
     const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
     const readOnly = display.readOnly;
+    // Where a decision opened from the article's case law walks back to
+    const decisionBackEntry = useMemo(() => originTabId && originBlockId ? {
+        tabId: originTabId,
+        blockId: originBlockId,
+        articleId: uniqueArticleIdFromNorma(norma_data),
+        label: shortNorm(norma_data),
+    } : undefined, [originTabId, originBlockId, norma_data]);
     const requestedDate = norma_data.data_versione?.trim() || undefined;
     // "art. 1284 c.c., nel testo in vigore …" for a past text; null for the text in force.
     const citationNow = () => (display.canCite
@@ -1182,20 +1192,28 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 props={{ articleUrn: data.norma_data.urn }}
             />
 
+            {/* «Giurisprudenza»: the massime Brocardi gives (only where the doctrine is shown), the
+                Massimario's reviews and the Cassazione on request. It stays on a past text. */}
+            <CaseLawSection
+                norma={norma_data}
+                massime={brocardi_info?.Massime ?? null}
+                // Brocardi answered (info present), or failed (error present); not asked: no subsection
+                massimeState={massimeStateOf(display.doctrineVisible, brocardi_info, data.brocardi_error)}
+                brocardiLink={brocardi_info?.link}
+                articleUrn={norma_data.urn}
+                tabId={originTabId ?? tabId}
+                backEntry={decisionBackEntry}
+                isHistorical={readOnly}
+            />
+
             {brocardi_info !== undefined && display.doctrineVisible && (
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
                     <BrocardiDisplay
                         info={brocardi_info}
+                        caseLaw={{ norma: searchNorma(norma_data), normaLabel: citeNorm(norma_data), tabId: originTabId ?? tabId }}
                         itemKey={itemKey}
                         uniqueArticleId={uniqueArticleId}
                         onRequestAddNote={handleBrocardiAddNote}
-                        besideTabId={originTabId ?? tabId}
-                        backEntry={originTabId && originBlockId ? {
-                            tabId: originTabId,
-                            blockId: originBlockId,
-                            articleId: uniqueArticleIdFromNorma(norma_data),
-                            label: shortNorm(norma_data),
-                        } : undefined}
                         currentNorma={{
                             tipo_atto: norma_data.tipo_atto,
                             data: norma_data.data,

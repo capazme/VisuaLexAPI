@@ -273,14 +273,17 @@ class SearchHit:
 
 @dataclass(frozen=True)
 class SearchPage:
+    """One page of a search. `totale` is Solr's `numFound`: in index mode it counts records the
+    re-check of the citation (`cites`) may still drop from the page (about 2% measured), so it can
+    exceed the decisions the pages hold in all; a client ends the list by `totale`, not by rows."""
     totale: int
     decisioni: list[SearchHit]
 
 
 def fragment_ranges(snippet: str) -> dict:
-    """Solr's highlighted fragment as plain text and the ranges to emphasise: the client never
-    receives markup from the source (design 2026-10-05 §5.1). Only <em> marks a range; any other
-    markup stays as literal characters. Offsets count Python code points: the web client must
+    """Solr's highlighted fragment as plain text and the ranges to emphasise: the client receives
+    plain text and ranges (design 2026-10-05 §5.1). <em> is the only markup read, and it marks a
+    range; any other markup stays as literal characters. Offsets count Python code points: the web client must
     convert them for characters outside the BMP (JavaScript counts UTF-16 units). Empty ranges
     and a marker with no partner are dropped."""
     text, ranges, start, pos = [], [], None, 0

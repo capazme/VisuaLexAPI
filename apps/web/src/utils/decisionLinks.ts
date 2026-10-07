@@ -145,7 +145,7 @@ function citationSection(raw: string | null | undefined): string | null {
 export function formatDecisionHeading(identity: DecisionIdentity, attrs: DecisionAttributes): string {
   const tipo = (attrs.tipo && Object.hasOwn(TIPO_TITLE, attrs.tipo) ? TIPO_TITLE[attrs.tipo] : null) || (identity.corte === 'cassazione' ? 'Decisione' : 'Pronuncia');
   const number = `${tipo} n. ${identity.numero}/${identity.anno}`;
-  const deposited = attrs.data_deposito ? `depositata ${withPreposition('il', formatDateItalianLong(attrs.data_deposito))}` : null;
+  const deposited = attrs.data_deposito ? `${attrs.tipo === 'decreto' ? 'depositato' : 'depositata'} ${withPreposition('il', formatDateItalianLong(attrs.data_deposito))}` : null;
   if (identity.corte === 'corte_costituzionale') {
     const decided = attrs.data_decisione ? `decisa ${withPreposition('il', formatDateItalianLong(attrs.data_decisione))}` : null;
     return ['Corte costituzionale', number, decided, deposited, attrs.ecli ?? null].filter(Boolean).join(' · ');
@@ -156,6 +156,20 @@ export function formatDecisionHeading(identity: DecisionIdentity, attrs: Decisio
   else if (attrs.sezione === 'L') section = sectionName('L');
   else if (attrs.sezione) section = `${sectionName(attrs.sezione)} ${archive}`.trim();
   return ['Corte di cassazione', section, number, deposited].filter(Boolean).join(' · ');
+}
+
+/**
+ * "Ordinanza depositata il 1 settembre 2026", "Decreto depositato il …": the type of a decision
+ * and its day of deposit, the participle agreeing with the type. Only what is known is said:
+ * a type alone, a date alone ("Depositata il …") or null.
+ */
+export function formatDecisionDeposit(attrs: DecisionAttributes): string | null {
+  const title = attrs.tipo && Object.hasOwn(TIPO_TITLE, attrs.tipo) ? TIPO_TITLE[attrs.tipo] : null;
+  const masculine = attrs.tipo === 'decreto';
+  const deposited = attrs.data_deposito
+    ? `${title ? (masculine ? 'depositato' : 'depositata') : 'Depositata'} ${withPreposition('il', formatDateItalianLong(attrs.data_deposito))}`
+    : null;
+  return [title, deposited].filter(Boolean).join(' ') || null;
 }
 
 /**

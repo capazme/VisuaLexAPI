@@ -12,6 +12,8 @@
 export type PluginSlotName =
     | 'article_sidebar'
     | 'article_content_after'
+    // Hosted by the «Giurisprudenza» section under the article: the case-law panels of a plugin.
+    | 'article_case_law'
     // 'global' is mounted once in Layout — used for app-wide side-effect
     // components (e.g. forum-signal tracker) that listen to the merltEventBus
     // independent of any specific article or page.

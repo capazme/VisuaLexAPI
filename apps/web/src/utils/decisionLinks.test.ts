@@ -5,6 +5,7 @@ import {
   decisionPath,
   describeNotice,
   formatDecisionCitation,
+  formatDecisionDeposit,
   formatDecisionHeading,
   formatDecisionShort,
   httpsUrl,
@@ -163,6 +164,11 @@ describe('how a decision is named', () => {
     expect(formatDecisionHeading(cost, { tipo: 'sentenza', data_decisione: '2013-12-04',
       data_deposito: '2014-01-13', ecli: 'ECLI:IT:COST:2014:1' }))
       .toBe('Corte costituzionale · Sentenza n. 1/2014 · decisa il 4 dicembre 2013 · depositata il 13 gennaio 2014 · ECLI:IT:COST:2014:1');
+  });
+
+  it('the heading agrees «depositato» with a decreto', () => {
+    expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'decreto', data_deposito: '2024-04-22' }))
+      .toBe('Corte di cassazione · Sez. III civile · Decreto n. 10787/2024 · depositato il 22 aprile 2024');
   });
 
   it('the heading writes "il" as "l\'" before 8 and 11, and keeps the plain date for the 1st', () => {
@@ -327,6 +333,10 @@ describe('brocardiDecisionRef', () => {
     expect(brocardiDecisionRef('Corte Costituzionale', '71', '2020')?.corte).toBe('corte_costituzionale');
   });
 
+  it('reads «Cassazione» spelled out as a bare Cass., naming no archive', () => {
+    expect(brocardiDecisionRef('Cassazione', '2633', '1982')).toEqual({ corte: 'cassazione', numero: 2633, anno: 1982 });
+  });
+
   it('names no archive for a bare «Cass.», and is linked as a reference', () => {
     const ref = brocardiDecisionRef('Cass', '2633', '1982');
     expect(ref).toEqual({ corte: 'cassazione', numero: 2633, anno: 1982 });
@@ -340,5 +350,21 @@ describe('brocardiDecisionRef', () => {
     }
     expect(brocardiDecisionRef('Cass. civ.', null, '2020')).toBeNull();
     expect(brocardiDecisionRef('Cass. civ.', 'x', '2020')).toBeNull();
+  });
+});
+
+describe('formatDecisionDeposit', () => {
+  it.each([
+    ['sentenza', 'Sentenza depositata il 1 settembre 2026'],
+    ['ordinanza', 'Ordinanza depositata il 1 settembre 2026'],
+    ['ordinanza interlocutoria', 'Ordinanza interlocutoria depositata il 1 settembre 2026'],
+    ['decreto', 'Decreto depositato il 1 settembre 2026'],
+  ])('%s agrees in gender', (tipo, expected) => {
+    expect(formatDecisionDeposit({ tipo, data_deposito: '2026-09-01' })).toBe(expected);
+  });
+  it('says only what is known', () => {
+    expect(formatDecisionDeposit({ tipo: 'sentenza' })).toBe('Sentenza');
+    expect(formatDecisionDeposit({ data_deposito: '2026-09-08' })).toBe("Depositata l'8 settembre 2026");
+    expect(formatDecisionDeposit({})).toBeNull();
   });
 });

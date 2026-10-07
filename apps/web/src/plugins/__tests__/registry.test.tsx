@@ -34,22 +34,26 @@ afterEach(() => {
 });
 
 describe('getSlotComponents', () => {
-  it('returns the tracker and the reviews panel by default (flag unset)', () => {
+  it('returns the tracker after the article and the reviews panel in the case-law slot (flag unset)', () => {
     const components = getSlotComponents('article_content_after');
-    expect(components.map((c) => c.id)).toEqual(['merlt-article-tracker', 'merlt-article-rassegne']);
-    expect(components[1].requiredFlag).toBe('VITE_FEATURE_MERLT');
+    expect(components.map((c) => c.id)).toEqual(['merlt-article-tracker']);
     expect(components[0].pluginId).toBe('visualex-merlt');
     expect(components[0].requiredFlag).toBe('VITE_FEATURE_MERLT');
+    const caseLaw = getSlotComponents('article_case_law');
+    expect(caseLaw.map((c) => c.id)).toEqual(['merlt-article-rassegne']);
+    expect(caseLaw[0].requiredFlag).toBe('VITE_FEATURE_MERLT');
   });
 
-  it('includes the entry when VITE_FEATURE_MERLT=true', () => {
+  it('includes the entries when VITE_FEATURE_MERLT=true', () => {
     vi.stubEnv('VITE_FEATURE_MERLT', 'true');
-    expect(getSlotComponents('article_content_after')).toHaveLength(2);
+    expect(getSlotComponents('article_content_after')).toHaveLength(1);
+    expect(getSlotComponents('article_case_law')).toHaveLength(1);
   });
 
   it('excludes the entry when VITE_FEATURE_MERLT=false', () => {
     vi.stubEnv('VITE_FEATURE_MERLT', 'false');
     expect(getSlotComponents('article_content_after')).toHaveLength(0);
+    expect(getSlotComponents('article_case_law')).toHaveLength(0);
   });
 
   it('excludes the entry when VITE_FEATURE_MERLT=0', () => {
@@ -106,7 +110,7 @@ describe('PluginSlot', () => {
     // ArticleMerltSlot is mocked to render null — the slot still resolves,
     // we just check it didn't throw and that getSlotComponents agrees.
     const components = getSlotComponents('article_content_after');
-    expect(components).toHaveLength(2);
+    expect(components).toHaveLength(1);
     const { container } = render(
       <PluginSlot
         slot="article_content_after"
