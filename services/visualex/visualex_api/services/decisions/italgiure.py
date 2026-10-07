@@ -50,7 +50,7 @@ from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from ...tools.tls import italgiure_ssl_context
 from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
-from .pdf_text import PdfRefused, read_decision_pdf_async
+from .pdf_text import MAX_BYTES, PdfRefused, read_decision_pdf_async
 from .search import IndexCoordinates, cites
 
 log = structlog.get_logger()
@@ -349,6 +349,64 @@ class ItalgiureReader:
                 raise SourceAnswerError("Italgiure non ha risposto con i suoi dati")
         return data
 
+    async def record(self, archivio: str, numero: int, anno: int) -> dict | None:
+        """The archive's record of one decision (one Solr query), None if it has none."""
+        data = await self._select({
+            "q": f'kind:"{KINDS[archivio]}" AND numdec:{numero:05d} AND anno:{anno}',
+            "rows": "1", "fl": FIELDS})
+        docs = data.get("response", {}).get("docs", [])
+        return docs[0] if docs else None
+
+    async def fetch_pdf(self, url: str) -> bytes:
+        """The bytes of a PDF at `pdf_url`'s address, in the client session the record's query
+        opened (the archive refuses the attachment outside it). One try, within its own budget.
+        PdfRefused for an answer that is not a 200; network errors propagate."""
+        result = await decisions_http_client.request(
+            "GET", url, source="italgiure", ssl=italgiure_ssl_context(),
+            headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1",
+            max_retries=PDF_RETRIES, timeout=aiohttp.ClientTimeout(total=PDF_REQUEST_TIMEOUT))
+        if result.status != 200:
+            raise PdfRefused(f"PDF request answered {result.status}")
+        return result.text.encode("latin-1")
+
+    async def original_pdf(self, archivio: str, numero: int, anno: int) -> bytes | None:
+        """The court's own PDF of a decision, for the user to download; None when there is none
+        to give: no record, a text the source withholds, no usable filename, an answer that is
+        not a PDF (or is over MAX_BYTES), or a PDF whose header names another decision. The
+        record is read first because the archive serves the attachment only within the session
+        its query opens. Source errors propagate (an unreachable court is not "no PDF")."""
+        doc = await self.record(archivio, numero, anno)
+        if doc is None:
+            return None
+        try:
+            decision = to_decision(doc, archivio)
+        except ValueError as exc:
+            raise SourceAnswerError(
+                "Italgiure ha risposto con una decisione illeggibile") from exc
+        ident = decision.identita
+        if (ident.numero, ident.anno) != (numero, anno) or not decision.testo:
+            return None  # another decision, or withheld: there is no PDF to give
+        url = pdf_url(doc)
+        if url is None:
+            return None
+        try:
+            data = await self.fetch_pdf(url)
+        except (PdfRefused, DocumentNotFoundError):
+            return None
+        if not data.startswith(b"%PDF-") or len(data) > MAX_BYTES:
+            return None
+        try:
+            _, header = await read_decision_pdf_async(data, PDF_PARSE_TIMEOUT)
+        except PdfRefused as exc:
+            # the header cannot be read (no text layer, too many pages): nothing contradicts the
+            # record and the filename, which were checked, so the court's file stands
+            log.warning("Original PDF header not read", key=ident.key(), reason=str(exc))
+            header = None
+        if header is not None and header != (numero, anno):
+            log.warning("Original PDF names another decision", key=ident.key())
+            return None
+        return data
+
     async def lookup(self, archivio: str, numero: int, anno: int) -> Decision | None:
         found = await self.lookup_with_pdf(archivio, numero, anno)
         return found[0] if found else None
@@ -359,14 +417,11 @@ class ItalgiureReader:
         reads the record only (a suggestion shows an identity, not a text)."""
         # a cold lookup is one Solr query and the PDF: a search stays within the owner's 10
         # requests (2026-10-04)
-        data = await self._select({
-            "q": f'kind:"{KINDS[archivio]}" AND numdec:{numero:05d} AND anno:{anno}',
-            "rows": "1", "fl": FIELDS})
-        docs = data.get("response", {}).get("docs", [])
-        if not docs:
+        doc = await self.record(archivio, numero, anno)
+        if doc is None:
             return None
         try:
-            decision = to_decision(docs[0], archivio)
+            decision = to_decision(doc, archivio)
         except ValueError as exc:  # a record without a readable number or year
             raise SourceAnswerError(
                 "Italgiure ha risposto con una decisione illeggibile") from exc
@@ -376,7 +431,7 @@ class ItalgiureReader:
             return decision, None
         try:
             data_pdf, reason = await asyncio.wait_for(
-                self._read_pdf(docs[0], decision), PDF_STEP_TIMEOUT)
+                self._read_pdf(doc, decision), PDF_STEP_TIMEOUT)
         except asyncio.TimeoutError:
             data_pdf, reason = None, "PDF step timed out"
         if data_pdf is None:
@@ -392,13 +447,7 @@ class ItalgiureReader:
         if url is None:
             return None, "no usable filename"
         try:
-            result = await decisions_http_client.request(
-                "GET", url, source="italgiure", ssl=italgiure_ssl_context(),
-                headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1",
-                max_retries=PDF_RETRIES, timeout=aiohttp.ClientTimeout(total=PDF_REQUEST_TIMEOUT))
-            if result.status != 200:
-                return None, f"PDF request answered {result.status}"
-            data = result.text.encode("latin-1")
+            data = await self.fetch_pdf(url)
             text, header = await read_decision_pdf_async(data, PDF_PARSE_TIMEOUT)
         except PdfRefused as exc:
             return None, f"PDF refused: {exc}"

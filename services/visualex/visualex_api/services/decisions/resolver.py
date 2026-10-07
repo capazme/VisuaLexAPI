@@ -29,6 +29,7 @@ from ...tools.tls import IntermediateCertificateMismatch
 from .corte_cost import CorteCostReader
 from .italgiure import ItalgiureReader, SourceAnswerError
 from .model import Decision, Identity, Reference
+from .pdf_text import MAX_BYTES
 
 log = structlog.get_logger()
 
@@ -165,6 +166,36 @@ class Resolver:
                 log.warning("Decision PDF not cached", key=decision.identita.key(),
                             error_type=type(exc).__name__)
         return decision
+
+    async def original_pdf(self, identity: Identity) -> bytes | None:
+        """The court's PDF of a Cassazione decision: the bytes a lookup cached, else fetched once
+        (the record, then the PDF) and cached. None if there is none to give. Source errors
+        propagate. Only `%PDF-` bytes within MAX_BYTES are cached or returned."""
+        if identity.corte != "cassazione" or identity.archivio not in ("civile", "penale"):
+            return None
+        key = identity.key()
+        try:
+            cached = await self.pdfs.get(key)
+        except Exception as exc:  # noqa: BLE001 - a broken cache costs a request, not the answer
+            log.warning("Decision PDF cache not read", key=key, error_type=type(exc).__name__)
+            cached = None
+        if isinstance(cached, str):
+            try:
+                data = base64.b64decode(cached, validate=True)
+            except ValueError:
+                data = b""
+            if data.startswith(b"%PDF-") and len(data) <= MAX_BYTES:
+                return data
+        data = await asyncio.wait_for(
+            self.italgiure.original_pdf(identity.archivio, identity.numero, identity.anno),
+            ITALGIURE_TIMEOUT)
+        if not data or not data.startswith(b"%PDF-") or len(data) > MAX_BYTES:
+            return None
+        try:
+            await self.pdfs.set(key, base64.b64encode(data).decode())
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Decision PDF not cached", key=key, error_type=type(exc).__name__)
+        return data
 
     async def _start(self, archivio: str) -> tuple[int, str] | None:
         key = (archivio, self.today())

@@ -24,6 +24,7 @@ export default defineConfig({
       '/fetch_rubriche': 'http://localhost:5000',
       '/fetch_alias_catalog': 'http://localhost:5000',
       '/fetch_decision': 'http://localhost:5000',
+      '/fetch_decision_pdf': 'http://localhost:5000',
       '/search_decisions': 'http://localhost:5000',
       '/parse_query': 'http://localhost:5000',
       '/extract_citations': 'http://localhost:5000',

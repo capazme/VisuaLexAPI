@@ -419,3 +419,57 @@ async def test_the_sweep_reaches_the_decision_caches_only():
     assert cache.stores["normattiva"].threads == []
     assert set(cache.stores) == {"decisions_found", "decisions_absent", "decisions_pending",
                                  "decisions_pdf", "decisions_search", "normattiva"}
+
+
+# --- the court's original PDF (design 2026-10-05 §12.2) ---
+
+class PdfItalgiure:
+    def __init__(self, data=b"%PDF-1.4 bytes", error=None):
+        self.data, self.error, self.calls = data, error, []
+
+    async def original_pdf(self, archivio, numero, anno):
+        self.calls.append((archivio, numero, anno))
+        if self.error:
+            raise self.error
+        return self.data
+
+
+async def test_original_pdf_is_read_from_the_cache_without_a_request():
+    cache = FakeCache()
+    cache.stores["decisions_pdf"] = FakeStore(
+        {"cassazione:civile:5:2022": base64.b64encode(b"%PDF-1.4 cached").decode()})
+    italgiure = PdfItalgiure()
+    out = await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out == b"%PDF-1.4 cached" and italgiure.calls == []
+
+
+async def test_original_pdf_is_fetched_once_and_cached():
+    cache, italgiure = FakeCache(), PdfItalgiure()
+    resolver = _resolver(italgiure, cache=cache)
+    identity = Identity("cassazione", 5, 2022, "civile")
+    assert await resolver.original_pdf(identity) == b"%PDF-1.4 bytes"
+    assert await resolver.original_pdf(identity) == b"%PDF-1.4 bytes"
+    assert italgiure.calls == [("civile", 5, 2022)]
+    assert base64.b64decode(cache.stores["decisions_pdf"]["cassazione:civile:5:2022"]) == b"%PDF-1.4 bytes"
+
+
+@pytest.mark.parametrize("data", [None, b"<html>", b"%PDF-" + b"0" * (5 * 1024 * 1024)])
+async def test_original_pdf_that_is_none_or_not_a_pdf_caches_nothing(data):
+    cache = FakeCache()
+    out = await _resolver(PdfItalgiure(data), cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out is None and not cache.stores.get("decisions_pdf")
+
+
+async def test_a_cached_entry_that_is_not_a_pdf_is_ignored():
+    cache = FakeCache()
+    cache.stores["decisions_pdf"] = FakeStore(
+        {"cassazione:civile:5:2022": base64.b64encode(b"<html>").decode()})
+    italgiure = PdfItalgiure()
+    await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert italgiure.calls == [("civile", 5, 2022)]
+
+
+async def test_original_pdf_source_errors_propagate():
+    with pytest.raises(NetworkError):
+        await _resolver(PdfItalgiure(error=NetworkError("down")), cache=FakeCache()).original_pdf(
+            Identity("cassazione", 5, 2022, "civile"))

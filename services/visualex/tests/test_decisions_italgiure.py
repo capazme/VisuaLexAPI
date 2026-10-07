@@ -490,3 +490,55 @@ def test_a_filename_naming_another_decision_has_no_pdf():
     assert pdf_url({**ok, "anno": "2025"}) is None
     assert pdf_url({**ok, "filename": FILENAME.replace("n12345", "nx")}) is not None  # no digits: not a number tag
     assert pdf_url({**ok, "filename": "./20260101/snciv@s10@a2026@n12345@t\u00e8.pdf"}) is None  # ASCII only
+
+
+# --- the court's original PDF to download (design 2026-10-05 §12.2) ---
+
+async def test_the_original_pdf_is_the_record_then_the_pdf(monkeypatch):
+    pdf = _pdf_of(LINES)
+    calls = _serve_with_pdf(monkeypatch, _record(LINES), pdf)
+    assert await ItalgiureReader().original_pdf("civile", 12345, 2026) == pdf
+    assert [c[0] for c in calls] == ["POST", "GET"]  # the select opens the session, then the PDF
+
+
+@pytest.mark.parametrize("case", ["no_record", "withheld", "no_filename", "other_number_in_name",
+                                  "not_a_pdf", "status_204", "header_other_decision", "too_big",
+                                  "not_found"])
+async def test_there_is_no_original_pdf_to_give(monkeypatch, case):
+    record, pdf, status = _record(LINES), _pdf_of(LINES), 200
+    if case == "withheld":
+        record["ocr"] = "La sentenza richiesta è in fase di oscuramento"
+    elif case == "no_filename":
+        record.pop("filename")
+    elif case == "other_number_in_name":
+        record["filename"] = FILENAME.replace("n12345", "n99999")
+    elif case == "not_a_pdf":
+        pdf = b"<html>Verifica</html>"
+    elif case == "status_204":
+        status = 204
+    elif case == "header_other_decision":
+        pdf = _pdf_of(LINES, "Civile Ord. Sez. 1 Num. 12346 Anno 2026")
+    elif case == "too_big":
+        pdf = b"%PDF-1.4" + b"0" * italgiure.MAX_BYTES
+    elif case == "not_found":
+        pdf = DocumentNotFoundError("Document not found")
+    calls = _serve_with_pdf(monkeypatch, record, pdf, status)
+    if case == "no_record":
+        async def empty(method, url, **kwargs):
+            return HttpResult(text=json.dumps({"response": {"numFound": 0, "docs": []}}),
+                              status=200, headers={})
+        monkeypatch.setattr(italgiure.decisions_http_client, "request", empty)
+    assert await ItalgiureReader().original_pdf("civile", 12345, 2026) is None
+    if case in ("withheld", "no_filename", "other_number_in_name"):
+        assert not any("verbo=attach" in c[1] for c in calls)
+
+
+async def test_a_record_of_another_decision_gives_no_original_pdf(monkeypatch):
+    _serve_with_pdf(monkeypatch, _record(LINES, numdec="12346"), _pdf_of(LINES))
+    assert await ItalgiureReader().original_pdf("civile", 12345, 2026) is None
+
+
+async def test_an_unreachable_source_is_an_error_not_an_absent_pdf(monkeypatch):
+    _serve_with_pdf(monkeypatch, _record(LINES), NetworkError("Exceeded retry budget"))
+    with pytest.raises(NetworkError):
+        await ItalgiureReader().original_pdf("civile", 12345, 2026)

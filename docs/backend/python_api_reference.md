@@ -551,6 +551,37 @@ year is never read from a copy that could not be refreshed (`fonte_non_raggiungi
 
 ---
 
+### POST `/fetch_decision_pdf`
+
+The Corte di cassazione's own PDF of a decision, for the user to download. Cassazione only (the
+Corte costituzionale keeps its link to the source). Behind the ingress the route needs a login
+like the other scraping routes. It serves the bytes a `/fetch_decision` lookup cached
+(`decisions_pdf`, 30 days), or reads the record (one Solr query) and fetches the PDF once (one
+request, in the session the query opens), within a 25 s limit, and caches it. Only a `%PDF-`
+file within 5 MB is cached or served; the record's filename and the PDF's header must name this
+number and year. Design: `docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md` §12.2.
+
+**Request Body:** the decision's identity.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `corte` | string | Yes | `cassazione` |
+| `archivio` | string | Yes | `civile` or `penale` (the two series overlap: the archive is part of the identity) |
+| `numero` | integer | Yes | 1 to 999999 |
+| `anno` | integer | Yes | from 1900 to the current year |
+
+**Success:** `200`, `Content-Type: application/pdf`,
+`Content-Disposition: attachment; filename="Cass_<civ|pen>_n_<numero>_<anno>.pdf"`.
+
+| `esito` | Status | Content |
+|---------|--------|---------|
+| `non_disponibile` | 404 | nothing else: no such record, a text the source withholds («oscuramento»), no usable filename, an answer that is not the decision's PDF |
+| `richiesta_non_valida` | 400 | `errori`: each bad field |
+| `fonte_non_raggiungibile` | 503 | `fonte`: `cassazione` (also the 25 s limit) |
+| `errore_interno` | 500 | nothing else: an unexpected failure, whose details stay in the log |
+
+---
+
 ### POST `/search_decisions`
 
 The Cassazione decisions that cite an article (through the archive's index) or mention an
@@ -965,7 +996,7 @@ interface BrocardiInfo {
 
 ## Error Responses
 
-Every error a handler gives is JSON with this structure, except `/fetch_decision`'s and `/search_decisions`', which carry `esito` (see their sections):
+Every error a handler gives is JSON with this structure, except `/fetch_decision`'s, `/fetch_decision_pdf`'s and `/search_decisions`', which carry `esito` (see their sections):
 
 ```json
 {
