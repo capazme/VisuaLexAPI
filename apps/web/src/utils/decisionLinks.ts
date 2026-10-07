@@ -192,7 +192,7 @@ export function formatDecisionShort(ref: LooseDecisionRef, rv?: readonly string[
   return rv && rv.length > 0 ? `${label} · Rv. ${rv.join(', ')}` : label;
 }
 
-const KEY = /^(?:cassazione:(civile|penale):(\d{1,6}):(\d{4})|corte_costituzionale:(\d{1,6}):(\d{4}))$/;
+const KEY = /^(?:cassazione:(civile|penale):([1-9]\d{0,5}):(\d{4})|corte_costituzionale:([1-9]\d{0,5}):(\d{4}))$/;
 
 /** A decision's key (`decisionKey`) read back, or null for anything else — a norm's key has no colon. */
 export function identityFromKey(key: string, now: Date = new Date()): DecisionIdentity | null {
