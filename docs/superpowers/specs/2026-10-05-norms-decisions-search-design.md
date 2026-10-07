@@ -625,7 +625,7 @@ Nothing is deleted or moved automatically.
 From this round, root rule 23 covers decision texts too. **When:** the freeze
 takes effect with the pull request that first stores notes or highlights on
 decisions (plan PR 4); until then readers may still change, and the bump to
-`italgiure:v3:` (§11.7) is the last change of characters allowed. Notes on
+`italgiure:v4:` (§11.7; v4: carriage returns normalised, 7 October) is the last change of characters allowed. Notes on
 decisions never ship before the PDF reader they anchor to (PR 1 before PR 4).
 Frozen — the output of each reader, as projected (§8.2):
 
@@ -640,7 +640,7 @@ Frozen — the output of each reader, as projected (§8.2):
   `corte_cost.line_paragraphs` and `italgiure.paragraphs`, and the paragraph
   breaks of §11 (a `\n\n` where a space was would change a character: only a
   break between two characters already separated by a `\n` may move);
-- the caches (the resolver's `italgiure:v3:` and `corte_cost:v2:` entries): the
+- the caches (the resolver's `italgiure:v4:` and `corte_cost:v2:` entries): the
   resolver's rule «raise the version whenever the reader changes the shape of
   what it returns» stays for shape (blocks, `\n`); a change of characters is
   refused, so no bump of a cache key may serve as a way to change texts already
@@ -816,7 +816,7 @@ PDF (one more request, about 200 KB), and makes the text from the PDF:
 7. **Requests and caches.** One request more per decision found (the PDF), so a
    lookup stays within the owner's ten requests (2026-10-04). The PDF's bytes
    are kept 30 days (a cache namespace of their own) for §12.2; the text is
-   cached under a new key version (`italgiure:v3:`), so the texts cached from
+   cached under a new key version (`italgiure:v3:`, then `italgiure:v4:`), so the texts cached from
    the field are not served again.
 8. **Dependency.** `pdfminer.six` (MIT), pure Python, accepted by the owner.
 

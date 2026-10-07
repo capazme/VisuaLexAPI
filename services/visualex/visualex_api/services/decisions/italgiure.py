@@ -205,9 +205,10 @@ def _scalar(value: object) -> str:
 
 def _text(value: object) -> str:
     # never cut: a multi-valued text field is joined, not reduced to its first value
-    if isinstance(value, list):
-        return "\n".join(str(v) for v in value)
-    return "" if value is None else str(value)
+    text = "\n".join(str(v) for v in value) if isinstance(value, list) else ("" if value is None else str(value))
+    # carriage returns are line breaks, as the Corte costituzionale reader reads them: a CR
+    # inside a line would not survive the page's HTML and would shift every anchor after it
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _iso(raw: str) -> str | None:

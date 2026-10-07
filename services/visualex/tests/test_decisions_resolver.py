@@ -201,12 +201,12 @@ async def test_found_and_absent_are_cached_per_archive_errors_are_not():
     await resolver.resolve(ref(numero=2, anno=2024, archivio="civile"))
     await resolver.resolve(ref(numero=2, anno=2024, archivio="civile"))
     assert italgiure.calls == [("civile", 10787, 2024), ("civile", 2, 2024)]
-    assert "italgiure:v3:civile:10787:2024" in cache.stores["decisions_found"]
-    assert "italgiure:v3:civile:2:2024" in cache.stores["decisions_absent"]
+    assert "italgiure:v4:civile:10787:2024" in cache.stores["decisions_found"]
+    assert "italgiure:v4:civile:2:2024" in cache.stores["decisions_absent"]
     italgiure.down = True
     with pytest.raises(SourceUnavailable):
         await resolver.resolve(ref(numero=3, anno=2024, archivio="civile"))
-    assert "italgiure:v3:civile:3:2024" not in cache.stores["decisions_absent"]
+    assert "italgiure:v4:civile:3:2024" not in cache.stores["decisions_absent"]
 
 
 async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
@@ -216,8 +216,8 @@ async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
     resolver = _resolver(italgiure, cache=cache)
     out = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
     assert out.esito == "trovata" and out.avvisi == [{"tipo": "testo_non_disponibile"}]
-    assert "italgiure:v3:civile:10787:2024" in cache.stores["decisions_pending"]
-    assert "italgiure:v3:civile:10787:2024" not in cache.stores["decisions_found"]
+    assert "italgiure:v4:civile:10787:2024" in cache.stores["decisions_pending"]
+    assert "italgiure:v4:civile:10787:2024" not in cache.stores["decisions_found"]
     again = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
     assert again.avvisi == [{"tipo": "testo_non_disponibile"}]
     assert italgiure.calls == [("civile", 10787, 2024)]
@@ -302,7 +302,7 @@ async def test_a_cassazione_decision_cached_before_the_paragraphs_is_never_serve
         ref(numero=10787, anno=2024, archivio="civile"))
     assert out.decisione.testo == text.testo
     assert italgiure.calls == [("civile", 10787, 2024)]  # the reader was asked, not the old entry
-    assert "italgiure:v3:civile:10787:2024" in cache.stores["decisions_found"]
+    assert "italgiure:v4:civile:10787:2024" in cache.stores["decisions_found"]
 
 
 async def test_a_text_read_from_the_pdf_has_no_notice_and_keeps_the_pdf():
@@ -313,7 +313,7 @@ async def test_a_text_read_from_the_pdf_has_no_notice_and_keeps_the_pdf():
                           cache=cache).resolve(ref(numero=5, anno=2022, archivio="civile"))
     assert out.avvisi == [] and out.decisione.testo_origine == "pdf"
     assert out.to_dict()["attributi"]["testo_origine"] == "pdf"
-    assert "italgiure:v3:civile:5:2022" in cache.stores["decisions_found"]
+    assert "italgiure:v4:civile:5:2022" in cache.stores["decisions_found"]
     assert base64.b64decode(cache.stores["decisions_pdf"]["cassazione:civile:5:2022"]) == b"%PDF-1.4 bytes"
 
 
@@ -324,8 +324,8 @@ async def test_a_text_from_the_archive_says_so_and_is_kept_a_day_only():
     resolver = _resolver(italgiure, cache=cache)
     out = await resolver.resolve(ref(numero=5, anno=2022, archivio="civile"))
     assert out.avvisi == [{"tipo": "testo_da_archivio"}] and out.decisione.testo
-    assert "italgiure:v3:civile:5:2022" in cache.stores["decisions_pending"]
-    assert "italgiure:v3:civile:5:2022" not in cache.stores.get("decisions_found", {})
+    assert "italgiure:v4:civile:5:2022" in cache.stores["decisions_pending"]
+    assert "italgiure:v4:civile:5:2022" not in cache.stores.get("decisions_found", {})
     assert "decisions_pdf" not in cache.stores or not cache.stores["decisions_pdf"]
     again = await resolver.resolve(ref(numero=5, anno=2022, archivio="civile"))
     assert again.avvisi == [{"tipo": "testo_da_archivio"}]  # the notice survives the cache
@@ -353,8 +353,8 @@ async def test_a_suggestion_reads_the_record_only_and_keeps_nothing():
     out = await _resolver(italgiure, cache=cache).resolve(ref(numero=1399, anno=2024, archivio="penale"))
     assert out.suggerimento == d.identita
     assert italgiure.with_pdf_calls[-1] is False
-    assert "italgiure:v3:penale:1399:2025" not in cache.stores.get("decisions_found", {})
-    assert "italgiure:v3:penale:1399:2025" not in cache.stores.get("decisions_pending", {})
+    assert "italgiure:v4:penale:1399:2025" not in cache.stores.get("decisions_found", {})
+    assert "italgiure:v4:penale:1399:2025" not in cache.stores.get("decisions_pending", {})
 
 
 async def test_a_search_with_a_suggestion_hit_stays_within_ten_requests(monkeypatch):
@@ -437,7 +437,7 @@ class PdfItalgiure:
         return self.data
 
 
-FOUND_KEY = "italgiure:v3:civile:5:2022"
+FOUND_KEY = "italgiure:v4:civile:5:2022"
 PDF_KEY = "cassazione:civile:5:2022"
 
 

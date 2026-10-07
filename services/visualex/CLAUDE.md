@@ -522,8 +522,8 @@ Breaking one of these breaks the product. Read before editing.
     characters (the texts before about 2001): the page draws a paragraph only between blank
     lines, so without it a block is one paragraph. Both add line breaks and nothing else.
     Whatever changes the shape of what a reader returns must raise the version in its cache
-    key (`italgiure:v3:…`, `corte_cost:v2:…`), or the entries cached before are served for up
-    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05) cover the readers of Tasks 7a to 7c, none of which had shipped,
+    key (`italgiure:v4:…`, `corte_cost:v2:…`), or the entries cached before are served for up
+    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.
     The characters of a decision's text are to be frozen like an article's (root rule 23): the readers
     may add or move `\n` and move a boundary between blocks, never change another character, and a

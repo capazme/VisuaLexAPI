@@ -367,7 +367,8 @@ def read_decision_pdf(data: bytes) -> tuple[dict[str, str], tuple[int, int] | No
     body = [l for i, l in enumerate(body) if i not in debris]
     if not body:
         raise PdfRefused("no text layer", "unreadable")
-    paragraphs = _paragraphs(body)
+    # every path out of here passes through this normalisation (as in the field reader)
+    paragraphs = [p.replace("\r\n", "\n").replace("\r", "\n") for p in _paragraphs(body)]
     pqm = max((i for i, p in enumerate(paragraphs)
                if _PQM.match(p) or p.startswith(_PQM_PREFIX)), default=None)
     if pqm is None or pqm == 0:
