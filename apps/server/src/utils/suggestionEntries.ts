@@ -11,7 +11,7 @@
  * schema with its label recomputed (D9). A refusal names the entry, the field and why, in Italian.
  */
 import type { Prisma } from '@prisma/client';
-import { decisionItemContentSchema, withDecisionLabel } from '../schemas/decisionItem';
+import { rebuildDecisionEntry } from '../schemas/decisionItem';
 import { rebuildNormEntry } from '../schemas/normEntry';
 
 /** A note in a proposal: as long as a note the notes route takes. */
@@ -37,13 +37,10 @@ export function rebuildDossierEntry(raw: unknown): EntryCheck {
   const e = raw as { articleRef?: unknown; note?: unknown; sentenzaRef?: unknown; status?: unknown };
   const star = e.status === 'important' ? { status: 'important' as const } : {};
   if (e.sentenzaRef !== undefined && e.sentenzaRef !== null) {
-    const parsed = decisionItemContentSchema.safeParse(e.sentenzaRef);
-    if (!parsed.success) {
-      const field = parsed.error.issues[0]?.path.join('.') || 'voce';
-      return { ok: false, reason: `Sentenza non valida (${field}: ${parsed.error.issues[0]?.message ?? 'non accettato'})` };
-    }
     // The label is recomputed here as on every write (D9): a proposal's copy is the proposer's.
-    const { _dossierMeta: _ignored, ...decision } = withDecisionLabel(parsed.data);
+    const rebuilt = rebuildDecisionEntry(e.sentenzaRef);
+    if (!rebuilt.ok) return rebuilt;
+    const decision = rebuilt.entry;
     return { ok: true, entry: { sentenzaRef: decision as Prisma.InputJsonObject, ...star } };
   }
   if (e.articleRef !== undefined && e.articleRef !== null) {
