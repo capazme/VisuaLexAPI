@@ -187,6 +187,12 @@ describe('unmatchedAnchors', () => {
     expect(out.annotations).toEqual([lost]);
   });
 
+  it('never lists a free note: it has no anchor to lose', () => {
+    const free = { id: 'free', text: 'una nota', normaKey: 'k', articleId: '', createdAt: '' } as unknown as Annotation;
+    expect(unmatchedAnchors({ motivazione: 'Il ricorso è fondato.' }, [], [free])).toEqual({ highlights: [], annotations: [] });
+    expect(unmatchedAnchors({}, [], [free])).toEqual({ highlights: [], annotations: [] });
+  });
+
   it('a decision without its text lists every anchor', () => {
     const all = [hl(0, 'x')];
     const notes = [note(0, 'x')];

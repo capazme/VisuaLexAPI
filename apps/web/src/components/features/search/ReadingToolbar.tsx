@@ -1,10 +1,11 @@
 import type { Ref } from 'react';
 import type { ArticleData } from '../../../types';
-import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { VersionChip } from '../../../utils/versionDisplay';
 import { VersionStatusChip } from './VersionStatusChip';
+import { NotesHighlightsButtons } from './NotesHighlightsButtons';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
@@ -182,51 +183,17 @@ export function ReadingToolbar({
                 >
                     <Zap size={16} className={cn(isPinnedQuick && "fill-amber-500")} />
                 </button>
-                <button
-                    ref={notesButtonRef}
-                    onClick={onToggleNotes}
-                    aria-expanded={isNotesPeekOpen}
-                    aria-haspopup="dialog"
-                    className={cn("p-1.5 rounded-md transition-colors relative",
-                        isNotesPeekOpen
-                            ? "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
-                            : notesCount > 0
-                                ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-amber-500"
-                    )}
-                    title={tip(isNotesPeekOpen ? "Chiudi note" : "Apri note", lockedReason)}
-                    {...lock(lockedReason)}
-                >
-                    <StickyNote size={16} />
-                    {notesCount > 0 && (
-                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
-                            {notesCount}
-                        </span>
-                    )}
-                </button>
-                <button
-                    ref={highlightsButtonRef}
-                    onClick={onToggleHighlightsPeek}
-                    aria-expanded={isHighlightsPeekOpen}
-                    aria-haspopup="dialog"
-                    className={cn(
-                        "p-1.5 rounded-md transition-colors relative",
-                        isHighlightsPeekOpen
-                            ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
-                            : highlightsCount > 0
-                                ? "text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-purple-500"
-                    )}
-                    title={tip(isHighlightsPeekOpen ? "Chiudi evidenziazioni" : "Gestisci evidenziazioni", lockedReason)}
-                    {...lock(lockedReason)}
-                >
-                    <Highlighter size={16} />
-                    {highlightsCount > 0 && (
-                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-purple-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
-                            {highlightsCount}
-                        </span>
-                    )}
-                </button>
+                <NotesHighlightsButtons
+                    notesCount={notesCount}
+                    highlightsCount={highlightsCount}
+                    isNotesOpen={isNotesPeekOpen}
+                    isHighlightsOpen={isHighlightsPeekOpen}
+                    notesButtonRef={notesButtonRef}
+                    highlightsButtonRef={highlightsButtonRef}
+                    onToggleNotes={onToggleNotes}
+                    onToggleHighlights={onToggleHighlightsPeek}
+                    lockedReason={lockedReason}
+                />
                 <button
                     onClick={onToggleDiscussion}
                     aria-expanded={isDiscussionOpen}

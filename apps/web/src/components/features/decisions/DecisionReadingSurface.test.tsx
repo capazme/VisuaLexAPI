@@ -176,8 +176,18 @@ describe('DecisionReadingSurface — notes and highlights', () => {
   });
 
   it('keeps the contract with signs and marks on: the text nodes still spell the projection', () => {
-    seed([H], [N]);
+    const plain = decisionProjection(TESTO);
+    const word = 'ricorrente';
+    const at = plain.indexOf(word);
+    const later = plain.indexOf('termine');
+    seed(
+      [{ ...H, text: word, startOffset: at }],
+      [{ ...N, anchorText: 'termine', startOffset: later }],
+    );
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
+    expect(container.querySelector('mark')?.textContent).toBe(word);
+    expect(container.querySelector('.note-anchor')?.textContent).toBe('termine');
+    expect(container.querySelectorAll('.vlx-sign').length).toBeGreaterThan(0);
     expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(TESTO));
   });
 
@@ -203,6 +213,12 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     const box = await screen.findByRole('region', { name: 'Non ritrovate nel testo attuale (1)' });
     fireEvent.click(within(box).getByRole('button', { name: 'Rimuovi nota «da verificare»' }));
     expect(removeAnnotation).toHaveBeenCalledWith('n1');
+  });
+
+  it('says the notes list is empty in the decision\'s own words', async () => {
+    render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri note' }));
+    expect(await screen.findByText('Nessuna nota su questa decisione.')).toBeInTheDocument();
   });
 
   it('hides the highlights from the picker without losing them', async () => {

@@ -20,6 +20,7 @@ import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../.
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { decisionKey, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
 import { decisionProjection, decisionStructure, renderDecisionHtml, unmatchedAnchors } from '../../../utils/decisionRender';
+import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/annotationExport';
 import { selectionAsRead } from '../../../utils/decisionText';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 
@@ -104,14 +105,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const { openBlock, closeBlock } = useArticleTextInteractions(contentRef, key, { contentKey: html });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
-  // A free note (no anchor) is in the notes panel only; the box lists what was anchored and is gone.
-  const anchoredNotes = useMemo(
-    () => decisionNotes.filter((a) => typeof a.startOffset === 'number' && Boolean(a.anchorText)),
-    [decisionNotes],
-  );
+  // What no longer lands is listed under the text (a free note has no anchor: the panel holds it).
   const lost = useMemo(
-    () => unmatchedAnchors(testo, decisionHighlights, anchoredNotes),
-    [testo, decisionHighlights, anchoredNotes],
+    () => unmatchedAnchors(testo, decisionHighlights, decisionNotes),
+    [testo, decisionHighlights, decisionNotes],
   );
 
   const [isNotesOpen, setIsNotesOpen] = useState(false);
@@ -192,26 +189,15 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
     setComposerRect(null);
   };
 
-  const downloadTxt = (kind: 'Note' | 'Evidenziazioni', body: string) => {
-    const header = [`${kind} — ${formatDecisionCitation(identity, attributi)}`, `Esportato il ${new Date().toLocaleString('it-IT')}`, '─'.repeat(60), ''].join('\n');
-    const blob = new Blob([`${header}\n${body}\n`], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${kind === 'Note' ? 'note' : 'evidenziazioni'}-${key.replace(/[^a-z0-9]+/gi, '-')}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+  const exportSlug = slugify(key) || 'decisione';
   const exportNotes = () => {
     if (decisionNotes.length === 0) return setToast({ message: 'Nessuna nota da esportare', type: 'info' });
-    downloadTxt('Note', decisionNotes.map((n, i) => `${i + 1}. ${n.text}${n.anchorText ? `\n   Ancorata a: "${n.anchorText}"` : ''}`).join('\n\n'));
+    downloadTxt(notesTxt(formatDecisionCitation(identity, attributi), decisionNotes), `note-${exportSlug}`);
     setToast({ message: `Esportate ${decisionNotes.length} note`, type: 'success' });
   };
   const exportHighlights = () => {
     if (decisionHighlights.length === 0) return setToast({ message: 'Nessuna evidenziazione da esportare', type: 'info' });
-    downloadTxt('Evidenziazioni', decisionHighlights.map((h, i) => `${i + 1}. [${h.color}] ${h.text}`).join('\n\n'));
+    downloadTxt(highlightsTxt(formatDecisionCitation(identity, attributi), decisionHighlights), `evidenziazioni-${exportSlug}`);
     setToast({ message: `Esportate ${decisionHighlights.length} evidenziazioni`, type: 'success' });
   };
 
@@ -257,6 +243,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         onRemoveNote={removeAnnotation}
         onClearAnchor={() => setNoteAnchor(null)}
         onExportTxt={exportNotes}
+        emptyText="Nessuna nota su questa decisione."
       />
       <HighlightsActionsPicker
         isOpen={isHighlightsOpen}

@@ -44,6 +44,7 @@ import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWitho
 import type { Annotation, Highlight, ThreadPassage } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { citeNorm, shortNorm } from '../../../utils/sources';
+import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/annotationExport';
 import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
@@ -487,42 +488,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
     };
 
-    const downloadTxt = (content: string, filenameBase: string) => {
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${filenameBase}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
-
-    const slugify = (s: string) =>
-        s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-
     const articleSlug = () =>
         slugify(`${norma_data.tipo_atto}-art-${norma_data.numero_articolo}`) || 'articolo';
-
-    const articleHeader = (kind: 'Evidenziazioni' | 'Note') => [
-        `${kind} — ${citeNorm(norma_data)}`,
-        `Esportato il ${new Date().toLocaleString('it-IT')}`,
-        '─'.repeat(60),
-        '',
-    ].join('\n');
 
     const handleExportNotesTxt = () => {
         if (allPanelAnnotations.length === 0) {
             showToast('Nessuna nota da esportare', 'info');
             return;
         }
-        const body = allPanelAnnotations.map((n, i) => {
-            const lines = [`${i + 1}. ${n.text}`];
-            if (n.anchorText) lines.push(`   Ancorata a: "${n.anchorText}"`);
-            return lines.join('\n');
-        }).join('\n\n');
-        downloadTxt(articleHeader('Note') + body + '\n', `note-${articleSlug()}`);
+        downloadTxt(notesTxt(citeNorm(norma_data), allPanelAnnotations), `note-${articleSlug()}`);
         showToast(`Esportate ${allPanelAnnotations.length} note`, 'success');
     };
 
@@ -531,8 +505,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             showToast('Nessuna evidenziazione da esportare', 'info');
             return;
         }
-        const body = allPanelHighlights.map((h, i) => `${i + 1}. [${h.color}] ${h.text}`).join('\n\n');
-        downloadTxt(articleHeader('Evidenziazioni') + body + '\n', `evidenziazioni-${articleSlug()}`);
+        downloadTxt(highlightsTxt(citeNorm(norma_data), allPanelHighlights), `evidenziazioni-${articleSlug()}`);
         showToast(`Esportate ${allPanelHighlights.length} evidenziazioni`, 'success');
     };
 

@@ -34,6 +34,8 @@ export interface NotesPeekPanelProps {
     onClearAnchor: () => void;
     onOpenStudyMode?: () => void;
     onExportTxt: () => void;
+    /** What the list says when there are no notes (default: the article's sentence). */
+    emptyText?: string;
 }
 
 export function NotesPeekPanel(props: NotesPeekPanelProps) {
@@ -161,6 +163,7 @@ function PeekBody({
     onClearAnchor,
     onOpenStudyMode,
     onExportTxt,
+    emptyText = 'Nessuna nota su questo articolo.',
 }: BodyProps) {
     const { editingId, editingText, setEditingText, startEdit, commitEdit, cancelEdit } = useNoteEditing(annotations, onUpdateNote);
     const [composerText, setComposerText] = useState('');
@@ -252,7 +255,7 @@ function PeekBody({
                 {visibleNotes.length === 0 && (
                     <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-6">
                         {annotations.length === 0
-                            ? 'Nessuna nota su questo articolo.'
+                            ? emptyText
                             : 'Nessuna nota corrisponde al filtro selezionato.'}
                     </p>
                 )}

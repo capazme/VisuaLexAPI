@@ -132,7 +132,7 @@ export function renderDecisionHtml({ testo, highlights, annotations, signs = fal
 }
 
 /**
- * The anchors that do not land in the text, to be listed and never dropped (spec §8.4): their
+ * The anchors that do not land in the text (a note without an anchor is never one), to be listed and never dropped (spec §8.4): their
  * text was changed at the source, or the decision came without its text.
  */
 export function unmatchedAnchors(
@@ -140,8 +140,10 @@ export function unmatchedAnchors(
   highlights: readonly Highlight[],
   annotations: readonly Annotation[],
 ): { highlights: Highlight[]; annotations: Annotation[] } {
-  const landed = resolveAnchors(decisionProjection(testo), highlights, annotations);
+  // A free note has no anchor to lose: it lives in the notes panel, never in this list.
+  const anchored = annotations.filter((a) => typeof a.startOffset === 'number' && Boolean(a.anchorText));
+  const landed = resolveAnchors(decisionProjection(testo), highlights, anchored);
   const hl = new Set(landed.flatMap((a) => (a.kind === 'highlight' ? [a.highlight.id] : [])));
   const nt = new Set(landed.flatMap((a) => (a.kind === 'note' ? [a.note.id] : [])));
-  return { highlights: highlights.filter((h) => !hl.has(h.id)), annotations: annotations.filter((a) => !nt.has(a.id)) };
+  return { highlights: highlights.filter((h) => !hl.has(h.id)), annotations: anchored.filter((a) => !nt.has(a.id)) };
 }
