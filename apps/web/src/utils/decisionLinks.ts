@@ -159,7 +159,7 @@ export function formatDecisionHeading(identity: DecisionIdentity, attrs: Decisio
 }
 
 /**
- * "Ordinanza depositata il 1° settembre 2026", "Decreto depositato il …": the type of a decision
+ * "Ordinanza depositata il 1 settembre 2026", "Decreto depositato il …": the type of a decision
  * and its day of deposit, the participle agreeing with the type. Only what is known is said:
  * a type alone, a date alone ("Depositata il …") or null.
  */

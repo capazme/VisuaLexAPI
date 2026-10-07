@@ -1,5 +1,5 @@
 // apps/web/src/components/features/decisions/DecisionResultList.tsx
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { RotateCw } from 'lucide-react';
 import { DECISION_PAGE_SIZE, searchDecisions } from '../../../services/decisionSearchService';
 import { decisionPath, formatDecisionDeposit, formatDecisionShort } from '../../../utils/decisionLinks';
@@ -126,6 +126,7 @@ type ArchiveChoice = DecisionArchive | 'entrambi';
  * count of the public archive (last five years), never of "all" decisions.
  */
 export function DecisionResultList({ query, besideTabId, backEntry, onArchiveChange }: DecisionResultListProps) {
+  const refusedNoteId = useId();
   const [archivio, setArchivio] = useState<DecisionArchive | undefined>(query.archivio);
   const [modo, setModo] = useState<'indice' | 'testo'>('indice');
   const [hits, setHits] = useState<DecisionSearchHit[]>([]);
@@ -142,7 +143,8 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
   const hasNorma = Boolean(query.norma);
   const queryKey = JSON.stringify({ norma: query.norma, tema: query.tema });
   const known = learned?.key === queryKey ? learned : null;
-  // a refusal is kept for the query, so later pages and reloads ask for the text straight away
+  // a refusal is kept for the query, so later pages and reloads ask for the text straight away; a ref, not
+  // state, because `load` reads it when it runs and must not be re-created (nor re-run) when it is learned
   const refusedRef = useRef(false);
   refusedRef.current = Boolean(known?.indexRefused);
 
@@ -246,7 +248,7 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
                 text: 'Indice della Cassazione',
                 disabled: indexRefused,
                 title: indexRefused ? INDEX_REFUSED : undefined,
-                describedBy: indexRefused ? 'decision-index-refused' : undefined,
+                describedBy: indexRefused ? refusedNoteId : undefined,
               },
               { value: 'testo', text: 'Nel testo' },
             ]}
@@ -254,7 +256,7 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
         )}
       </div>
       {indexRefused && (
-        <p id="decision-index-refused" className="text-xs text-slate-500 dark:text-slate-400">{INDEX_REFUSED}</p>
+        <p id={refusedNoteId} className="text-xs text-slate-500 dark:text-slate-400">{INDEX_REFUSED}</p>
       )}
 
       {countLine && <p className="text-sm text-slate-700 dark:text-slate-200">{countLine}</p>}
