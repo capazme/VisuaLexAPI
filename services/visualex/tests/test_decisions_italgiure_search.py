@@ -1,4 +1,5 @@
 """Italgiure's search for the decision search route (design 2026-10-05 §5)."""
+import asyncio
 import json
 import pathlib
 
@@ -10,6 +11,7 @@ from visualex_api.services.decisions.search import IndexCoordinates
 from visualex_api.services.http_client import HttpResult
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "decisions"
+EMPTY = (FIX / "italgiure_search_empty.json").read_text()
 
 
 def _serve(monkeypatch, answers):
@@ -42,7 +44,7 @@ async def test_the_request_is_sorted_paged_and_highlighted(monkeypatch):
     data = calls[-1][2]["data"]
     assert data["sort"] == "pd desc" and data["start"] == "40" and data["rows"] == "20"
     assert data["hl"] == "true" and data["hl.fl"] == "ocr"
-    assert "ocr" not in data["fl"].split(",")  # never the whole text in a list
+    assert not {"ocr", "ocrdis"} & set(data["fl"].split(","))  # never the whole text in a list
 
 
 async def test_an_index_page_keeps_only_records_that_cite_the_article(monkeypatch):
@@ -63,23 +65,57 @@ async def test_a_record_matching_two_different_citations_is_dropped(monkeypatch)
     assert page.decisioni == [] and page.totale == 1
 
 
-async def test_the_homepage_is_fetched_once_per_reader(monkeypatch):
-    empty = (FIX / "italgiure_search_empty.json").read_text()
-    calls = _serve(monkeypatch, [empty, empty])
-    reader = ItalgiureReader()
-    await reader.search('(ocr:"x")', pagina=1)
-    await reader.search('(ocr:"y")', pagina=1)
-    assert [c[0] for c in calls] == ["GET", "POST", "POST"]
+async def test_a_cold_reader_sends_the_query_without_a_homepage_get(monkeypatch):
+    calls = _serve(monkeypatch, [EMPTY])
+    await ItalgiureReader().search('(ocr:"x")', pagina=1)
+    assert [c[0] for c in calls] == ["POST"]
 
 
-async def test_a_non_solr_answer_reopens_the_session(monkeypatch):
-    empty = (FIX / "italgiure_search_empty.json").read_text()
-    calls = _serve(monkeypatch, ["<html>Verifica</html>", empty])
-    reader = ItalgiureReader()
+async def test_a_non_solr_answer_reopens_the_session_and_asks_again(monkeypatch):
+    calls = _serve(monkeypatch, ["<html>Verifica</html>", EMPTY])
+    page = await ItalgiureReader().search('(ocr:"x")', pagina=1)
+    assert page.totale == 0
+    assert [c[0] for c in calls] == ["POST", "GET", "POST"]
+
+
+async def test_two_non_solr_answers_in_a_row_raise(monkeypatch):
+    calls = _serve(monkeypatch, ["<html>Verifica</html>", "<html>Verifica</html>"])
     with pytest.raises(SourceAnswerError):
-        await reader.search('(ocr:"x")', pagina=1)
-    await reader.search('(ocr:"x")', pagina=1)
-    assert [c[0] for c in calls] == ["GET", "POST", "GET", "POST"]
+        await ItalgiureReader().search('(ocr:"x")', pagina=1)
+    assert [c[0] for c in calls] == ["POST", "GET", "POST"]
+
+
+async def test_a_json_error_object_raises_at_once(monkeypatch):
+    calls = _serve(monkeypatch, [json.dumps({"error": {"code": 500}})])
+    with pytest.raises(SourceAnswerError):
+        await ItalgiureReader().search('(ocr:"x")', pagina=1)
+    assert [c[0] for c in calls] == ["POST"]
+
+
+async def test_concurrent_failures_share_one_homepage_get(monkeypatch):
+    calls = []
+    sent = {"POST": 0}
+    both_posted = asyncio.Event()
+
+    async def fake_request(method, url, **kwargs):
+        calls.append(method)
+        if method == "GET":
+            await asyncio.sleep(0)
+            return HttpResult(text="", status=200, headers={})
+        sent["POST"] += 1
+        if sent["POST"] == 2:
+            both_posted.set()
+        if sent["POST"] <= 2:
+            await both_posted.wait()  # both first attempts are in flight before either fails
+            return HttpResult(text="<html>Verifica</html>", status=200, headers={})
+        return HttpResult(text=EMPTY, status=200, headers={})
+
+    monkeypatch.setattr(italgiure.decisions_http_client, "request", fake_request)
+    reader = ItalgiureReader()
+    pages = await asyncio.gather(reader.search('(ocr:"x")', pagina=1),
+                                 reader.search('(ocr:"y")', pagina=1))
+    assert [p.totale for p in pages] == [0, 0]
+    assert calls.count("GET") == 1 and calls.count("POST") == 4
 
 
 def test_fragment_markers_become_ranges_and_the_text_stays_plain():
@@ -88,24 +124,15 @@ def test_fragment_markers_become_ranges_and_the_text_stays_plain():
     assert out["evidenziati"] == [[9, 12], [14, 18]]
 
 
+@pytest.mark.parametrize("snippet", [
+    "a <em>b", "a b</em> c", "a </em>b<em> c", "<em>a<em>b</em>c</em>", "a <em></em> b",
+    "<EM>a</EM> b", "<em>perché</em> <em>x</em><em></em>", "😀 <em>b</em> 😀<em>c</em>", ""])
+def test_ranges_are_always_inside_the_text_sorted_and_not_empty(snippet):
+    out = fragment_ranges(snippet)
+    ranges = out["evidenziati"]
+    assert all(0 <= s < e <= len(out["testo"]) for s, e in ranges)
+    assert all(a[1] <= b[0] for a, b in zip(ranges, ranges[1:]))
 
-async def test_a_pdf_refused_as_an_anti_bot_page_reopens_the_session(monkeypatch):
-    record = {"id": "snciv2026012345O", "numdec": "12345", "anno": "2026", "kind": "snciv",
-              "datdep": "20260101", "ocr": "testo " * 50,
-              "filename": "./20260101/snciv@s10@a2026@n12345@tO.pdf"}
-    calls = []
 
-    async def fake_request(method, url, **kwargs):
-        calls.append(method + (" pdf" if "verbo=attach" in url else ""))
-        if method == "POST":
-            return HttpResult(text=json.dumps({"response": {"numFound": 1, "docs": [record]}}),
-                              status=200, headers={})
-        if "verbo=attach" in url:
-            return HttpResult(text="<html>Verifica</html>", status=200, headers={})
-        return HttpResult(text="", status=200, headers={})
-
-    monkeypatch.setattr(italgiure.decisions_http_client, "request", fake_request)
-    reader = ItalgiureReader()
-    await reader.lookup("civile", 12345, 2026)
-    await reader.lookup("civile", 12345, 2026)
-    assert calls.count("GET") == 2
+def test_an_uppercase_marker_is_a_marker():
+    assert fragment_ranges("<EM>a</EM> b") == {"testo": "a b", "evidenziati": [[0, 1]]}

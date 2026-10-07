@@ -56,7 +56,7 @@ async def test_a_real_record_reads_from_its_pdf(monkeypatch, path):
         "civile", int(doc["numdec"]), int(doc["anno"]))
     assert decision.testo_origine == "pdf" and data == pdf
     assert decision.testo == text_from_pdf(pdf)
-    assert "motivazione" in decision.testo and len(calls) == 3
+    assert "motivazione" in decision.testo and len(calls) == 2
 
 
 @pytest.mark.parametrize("path", RECORDS, ids=lambda p: p.name)

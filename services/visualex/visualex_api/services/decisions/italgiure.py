@@ -29,6 +29,10 @@ the lookup of one decision:
   headings, "P.Q.M." and the numbered points, and changes nothing else: a note anchored to the
   text never moves.
 
+- no homepage first: a cold Solr select answers by itself and sets the session cookie, while
+  the homepage timed out for 20-25 s about one time in two (measured on 2026-10-07). The
+  homepage is fetched only after an answer that is not JSON, and the query is sent once more.
+
 The archive is a moving window (in 2026 it starts in 2021); its start is read from the
 archive, never written here.
 """
@@ -46,8 +50,8 @@ from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from ...tools.tls import italgiure_ssl_context
 from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
-from .search import IndexCoordinates, cites
 from .pdf_text import PdfRefused, read_decision_pdf_async
+from .search import IndexCoordinates, cites
 
 log = structlog.get_logger()
 
@@ -78,7 +82,7 @@ _WITHHELD_CAUSES = (("in fase di valutazione oscuramento", "valutazione_oscurame
 # The PDF step has a budget of its own, so a slow PDF falls back to the field instead of using up
 # the resolver's ITALGIURE_TIMEOUT (25 s) and turning a decision the record already gave into
 # "source unreachable": request (one try) + parse fit in PDF_STEP_TIMEOUT, which leaves at least
-# 10 s of the 25 for the homepage and the Solr query.
+# 10 s of the 25 for the Solr query.
 PDF_REQUEST_TIMEOUT, PDF_RETRIES, PDF_PARSE_TIMEOUT, PDF_STEP_TIMEOUT = 8.0, 0, 6.0, 15.0
 MIN_LENGTH_RATIO = 0.70
 FIELD_WORDS, PDF_WORDS, MIN_COMMON_WORDS = 20, 250, 10
@@ -256,7 +260,7 @@ def to_decision(doc: dict, archivio: str) -> Decision:
 SEARCH_FIELDS = "id,numdec,anno,datdep,szdec,tipoprov,kind"
 INDEX_FIELDS = ",rnc-gen,rnc-art,rnc-sp,rnc-num,rnc-dat"
 _KIND_ARCHIVE = {kind: archivio for archivio, kind in KINDS.items()}
-_EM_SPLIT = re.compile(r"(</?em>)")
+_EM_SPLIT = re.compile(r"(</?em>)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -276,13 +280,15 @@ class SearchPage:
 def fragment_ranges(snippet: str) -> dict:
     """Solr's highlighted fragment as plain text and the ranges to emphasise: the client never
     receives markup from the source (design 2026-10-05 §5.1). Only <em> marks a range; any other
-    markup stays as literal characters."""
+    markup stays as literal characters. Offsets count Python code points: the web client must
+    convert them for characters outside the BMP (JavaScript counts UTF-16 units). Empty ranges
+    and a marker with no partner are dropped."""
     text, ranges, start, pos = [], [], None, 0
     for piece in _EM_SPLIT.split(snippet):
-        if piece == "<em>":
+        if piece.lower() == "<em>":
             start = pos
-        elif piece == "</em>":
-            if start is not None:
+        elif piece.lower() == "</em>":
+            if start is not None and pos > start:
                 ranges.append([start, pos])
             start = None
         else:
@@ -293,34 +299,47 @@ def fragment_ranges(snippet: str) -> dict:
 
 class ItalgiureReader:
     def __init__(self) -> None:
-        # the archive's session (the cookie its homepage sets) is opened once per reader and
-        # reopened after an answer that shows it was lost; the PDF is served within it too
-        self._session_open = False
+        # No homepage GET in the normal path: measured on 2026-10-07 the homepage times out for
+        # 20-25 s about one time in two, a cold Solr select answers in about 1.2 s and sets the
+        # session cookie itself, and a PDF fetched in the same client session answers in 0.1 s.
+        # The homepage is fetched only after an answer that is not JSON (an anti-bot page), once
+        # for all the requests that met it: the generation counts the reopenings.
+        self._reopen_lock = asyncio.Lock()
+        self._generation = 0
 
-    async def _open_session(self, ctx) -> None:
-        # The endpoint refuses a cold session: the homepage sets the cookie the client keeps.
-        await decisions_http_client.request("GET", f"{BASE}/", source="italgiure", ssl=ctx,
-                                            headers=http_headers())
-        self._session_open = True
+    async def _reopen_session(self, generation: int, ctx) -> None:
+        async with self._reopen_lock:
+            if self._generation != generation:
+                return  # another request reopened the session after this one was sent
+            await decisions_http_client.request("GET", f"{BASE}/", source="italgiure", ssl=ctx,
+                                                headers=http_headers())
+            self._generation += 1
 
-    async def _select(self, params: dict[str, str]) -> dict:
-        ctx = italgiure_ssl_context()
-        if not self._session_open:
-            await self._open_session(ctx)
+    async def _post(self, params: dict[str, str], ctx) -> dict | None:
+        """Solr's answer, None when the body is not JSON; SourceAnswerError for JSON of another shape."""
         result = await decisions_http_client.request(
             "POST", SELECT, source="italgiure", ssl=ctx, data={**params, "wt": "json"},
             headers=http_headers({"Referer": f"{BASE}/", "X-Requested-With": "XMLHttpRequest"}))
         try:
             data = json.loads(result.text)
-        except json.JSONDecodeError as exc:
-            self._session_open = False  # an anti-bot page: the next call starts a new session
-            raise SourceAnswerError("Italgiure non ha risposto con i suoi dati") from exc
+        except json.JSONDecodeError:
+            return None
         response = data.get("response") if isinstance(data, dict) else None
         docs = response.get("docs") if isinstance(response, dict) else None
         if not isinstance(docs, list) or not all(isinstance(doc, dict) for doc in docs):
             # a 200 that is not Solr's answer (an error object, null, a list): never "absent"
-            self._session_open = False
             raise SourceAnswerError("Italgiure non ha risposto con i suoi dati")
+        return data
+
+    async def _select(self, params: dict[str, str]) -> dict:
+        ctx = italgiure_ssl_context()
+        generation = self._generation
+        data = await self._post(params, ctx)
+        if data is None:  # an anti-bot page: reopen the session once and ask again once
+            await self._reopen_session(generation, ctx)
+            data = await self._post(params, ctx)
+            if data is None:
+                raise SourceAnswerError("Italgiure non ha risposto con i suoi dati")
         return data
 
     async def lookup(self, archivio: str, numero: int, anno: int) -> Decision | None:
@@ -331,8 +350,8 @@ class ItalgiureReader:
                               with_pdf: bool = True) -> tuple[Decision, bytes | None] | None:
         """The decision and, when its text was read from it, the court's PDF. `with_pdf=False`
         reads the record only (a suggestion shows an identity, not a text)."""
-        # a cold lookup is the homepage, one Solr query and the PDF: a search stays within the
-        # owner's 10 requests (2026-10-04)
+        # a cold lookup is one Solr query and the PDF: a search stays within the owner's 10
+        # requests (2026-10-04)
         data = await self._select({
             "q": f'kind:"{KINDS[archivio]}" AND numdec:{numero:05d} AND anno:{anno}',
             "rows": "1", "fl": FIELDS})
@@ -371,12 +390,10 @@ class ItalgiureReader:
                 headers=http_headers({"Referer": f"{BASE}/"}), text_encoding="latin-1",
                 max_retries=PDF_RETRIES, timeout=aiohttp.ClientTimeout(total=PDF_REQUEST_TIMEOUT))
             if result.status != 200:
-                self._session_open = False  # the PDF is served only within the session
                 return None, f"PDF request answered {result.status}"
             data = result.text.encode("latin-1")
             text, header = await read_decision_pdf_async(data, PDF_PARSE_TIMEOUT)
         except PdfRefused as exc:
-            self._session_open = False  # an anti-bot page where the PDF should be
             return None, f"PDF refused: {exc}"
         except (NetworkError, DocumentNotFoundError, OSError) as exc:
             return None, f"PDF request failed: {type(exc).__name__}"

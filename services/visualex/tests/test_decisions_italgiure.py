@@ -61,13 +61,12 @@ async def test_a_civil_decision(monkeypatch):
     assert d.testo == {}
     assert d.testo_assente == "oscuramento"
     assert d.fonte["nome"].startswith("Corte di cassazione")
-    get, post = calls[0], calls[1]
-    assert get[0] == "GET" and post[0] == "POST"
+    assert [c[0] for c in calls] == ["POST"]
+    post = calls[0]
     assert post[2]["data"]["q"] == 'kind:"snciv" AND numdec:10787 AND anno:2024'
-    for call in (get, post):
-        ctx = call[2]["ssl"]
-        assert ctx is italgiure_ssl_context()
-        assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
+    ctx = post[2]["ssl"]
+    assert ctx is italgiure_ssl_context()
+    assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
     assert post[2]["headers"]["User-Agent"].startswith("VisuaLex/")
 
 
@@ -83,12 +82,12 @@ async def test_the_penal_decision_with_the_same_number(monkeypatch):
 
 async def test_a_number_below_10000_is_tried_padded_only(monkeypatch):
     # the index stores the number padded to five digits: the bare form never matched (measured
-    # on 2026-10-02), and every query costs a homepage GET and a Solr POST
+    # on 2026-10-02), and every query costs a Solr POST
     calls = _serve(monkeypatch, [json.dumps({"response": {"numFound": 0, "docs": []}})])
     assert await ItalgiureReader().lookup("civile", 123, 2024) is None
     assert [c[2]["data"]["q"] for c in calls if c[0] == "POST"] == [
         'kind:"snciv" AND numdec:00123 AND anno:2024']
-    assert [c[0] for c in calls] == ["GET", "POST"]
+    assert [c[0] for c in calls] == ["POST"]
 
 
 async def test_not_found_is_none(monkeypatch):
@@ -97,9 +96,10 @@ async def test_not_found_is_none(monkeypatch):
 
 
 async def test_an_anti_bot_page_is_a_source_error(monkeypatch):
-    _serve(monkeypatch, ["<html><body>Verifica di sicurezza</body></html>"])
+    calls = _serve(monkeypatch, ["<html><body>Verifica di sicurezza</body></html>"] * 2)
     with pytest.raises(SourceAnswerError):
         await ItalgiureReader().lookup("civile", 10787, 2024)
+    assert [c[0] for c in calls] == ["POST", "GET", "POST"]  # one reopening, one retry
 
 
 @pytest.mark.parametrize("body", ["{}", '{"error": {"msg": "x"}}', "null", "[]", '"x"',
@@ -361,7 +361,7 @@ async def test_the_text_comes_from_the_pdf_when_there_is_one(monkeypatch):
     assert decision.testo["motivazione"] == text_from_pdf(pdf)["motivazione"]
     assert calls[-1][1].endswith(".clean.pdf") and "verbo=attach" in calls[-1][1]
     assert "db=snciv" in calls[-1][1] and calls[-1][2]["ssl"] is italgiure_ssl_context()
-    assert [c[0] for c in calls] == ["GET", "POST", "GET"]  # homepage, Solr, PDF
+    assert [c[0] for c in calls] == ["POST", "GET"]  # Solr, PDF
 
 
 @pytest.mark.parametrize("pdf_answer", ["refused", "error", "missing_filename", "too_short",
