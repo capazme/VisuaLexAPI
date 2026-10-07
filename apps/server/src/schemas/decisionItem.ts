@@ -62,3 +62,25 @@ export function parseDecisionItemContent(content: unknown): DecisionItemContent 
 export function withDecisionLabel(content: DecisionItemContent): DecisionItemContent {
   return { ...content, etichetta: citeDecision(content) };
 }
+
+export type DecisionRebuild = { ok: true; entry: DecisionItemContent } | { ok: false; reason: string };
+
+/**
+ * A decision entry from someone else's data (a published environment, a Forum proposal), rebuilt
+ * from closed values: unknown keys refused, `etichetta` recomputed whatever arrives, the dossier
+ * star (`_dossierMeta`) left to the caller. An entry without `etichetta`, or with a null one (an
+ * older or hand-made environment), is labelled too: the exported schema keeps requiring it for the dossier item
+ * routes, so a placeholder stands in for the missing copy before it is parsed, only here.
+ */
+export function rebuildDecisionEntry(raw: unknown): DecisionRebuild {
+  const input = typeof raw === 'object' && raw !== null && !Array.isArray(raw) && (raw as { etichetta?: unknown }).etichetta == null
+    ? { ...raw, etichetta: '-' }
+    : raw;
+  const parsed = decisionItemContentSchema.safeParse(input);
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path.join('.') || 'voce';
+    return { ok: false, reason: `Sentenza non valida (${field}: ${parsed.error.issues[0]?.message ?? 'non accettato'})` };
+  }
+  const { _dossierMeta: _ignored, ...decision } = withDecisionLabel(parsed.data);
+  return { ok: true, entry: decision };
+}

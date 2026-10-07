@@ -63,6 +63,14 @@ describe('taking a dossier suggestion', () => {
     expect(item.content).toEqual(SENTENZA);
   });
 
+  it('labels a decision that came without a label, or with a null one (7 October: the label is the server\'s anyway)', async () => {
+    const { etichetta: _label, ...withoutLabel } = SENTENZA;
+    const take = await suggestAndTake([{ sentenzaRef: withoutLabel }, { sentenzaRef: { ...withoutLabel, etichetta: null } }]);
+    expect(take.status).toBe(200);
+    const items = await prisma.dossierItem.findMany({ where: { dossier: { userId: alice.id }, itemType: 'sentenza' } });
+    expect(items.map((i) => i.content)).toEqual([SENTENZA, SENTENZA]);
+  });
+
   it('stores the star of a decision in its envelope', async () => {
     const take = await suggestAndTake([{ sentenzaRef: SENTENZA, status: 'important' }]);
     expect(take.status).toBe(200);
