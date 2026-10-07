@@ -397,6 +397,17 @@ describe('extractCitations — an abbreviation is not the head of a longer one',
     expect(read("l'art. 5 costituzionale")).toEqual([]);
   });
 
+  it('"c.p." followed by a word that starts with c or p stays the codice penale', () => {
+    expect(read("art. 640 c.p. c'è truffa")[0]).toEqual(['art. 640 c.p.', 'codice penale', '640']);
+    expect(read('art. 640 c.p. c) la frode')[0]).toEqual(['art. 640 c.p.', 'codice penale', '640']);
+    expect(read('art. 2 c.p. p.')[0]).toEqual(['art. 2 c.p.', 'codice penale', '2']);
+  });
+
+  it('the fully spaced forms are still the code of civil and of penal procedure', () => {
+    expect(read('art. 5 c. p. c.')).toEqual([['art. 5 c. p. c.', 'codice di procedura civile', '5']]);
+    expect(read('art. 5 c. p. p.')).toEqual([['art. 5 c. p. p.', 'codice di procedura penale', '5']]);
+  });
+
   it('a final "c.p." before the next sentence still links', () => {
     expect(read('previsto dall\'art. 110 c.p. Il ricorso è infondato')).toEqual([["dall'art. 110 c.p.", 'codice penale', '110']]);
   });
