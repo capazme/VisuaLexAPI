@@ -181,8 +181,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   an environment is published, its content updated or an older version restored
   (`utils/environmentDossiers.ts`): norms through `schemas/normEntry.ts`, decisions through
   `rebuildDecisionEntry` in `schemas/decisionItem.ts` (unknown keys refused, the label
-  recomputed, a missing one supplied; a star inside the data moves to the item's `status`),
-  notes only as text of at most `MAX_NOTE_LENGTH`. An entry that cannot be rebuilt, or of an
+  recomputed, a missing one supplied), notes only as text of at most `MAX_NOTE_LENGTH`; around
+  its data an item keeps only its id and date when they are strings, its type and the star
+  (`status: 'important'`, also when it travelled inside the data as `_dossierMeta`). An entry that cannot be rebuilt, or of an
   unknown type, refuses the operation with an Italian 400 naming the dossier, the entry and why:
   whoever applies the environment has those entries cited to them, in the MCP deletion dialog
   too. The web rebuilds them again on import.

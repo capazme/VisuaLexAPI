@@ -175,7 +175,7 @@ describe('publish shared environment — content round-trip', () => {
     const downloaded = await request(app).post(`/api/shared-environments/${published.body.id}/download`).set(authHeader(bob));
     expect(downloaded.body.content.dossiers[0].items[0].data.etichetta).toBe(COST_LABEL);
 
-    // past every number a restore can take (restoring 98 above wrote 99)
+    // past every number a restore can take (restoring 98 above wrote 99 and 100)
     const bad = await prisma.sharedEnvironmentVersion.create({ data: {
       sharedEnvironmentId: published.body.id, version: 500,
       content: contentWith([{ id: 's1', type: 'sentenza', addedAt: 'x', data: { ...COST, anno: 1800 } }]),
@@ -204,6 +204,19 @@ describe('publish shared environment — content round-trip', () => {
     expect(updated.body.detail).toMatch(/l'ambiente non può essere aggiornato$/);
   });
 
+  it('keeps only what an item is made of around its data: id, type, date and the star', async () => {
+    const res = await publish([
+      { id: 'n1', type: 'norma', addedAt: 'x', status: 'premi Accept', istruzioni: 'leggi qui',
+        data: { tipo_atto: 'codice civile', numero_articolo: '2043', _dossierMeta: { important: true } } },
+      { id: 7, type: 'note', addedAt: { giorno: 1 }, istruzioni: 'leggi qui', data: 'una nota' },
+    ]);
+    expect(res.status).toBe(201);
+    const [norm, note] = res.body.content.dossiers[0].items;
+    expect(Object.keys(norm).sort()).toEqual(['addedAt', 'data', 'id', 'status', 'type']);
+    expect(norm.status).toBe('important');
+    expect(note).toEqual({ type: 'note', data: 'una nota' });
+  });
+
   it('accepts a note of exactly the longest length', async () => {
     const res = await publish([{ id: 'n2', type: 'note', addedAt: 'x', data: 'a'.repeat(4000) }]);
     expect(res.status).toBe(201);
@@ -221,7 +234,7 @@ describe('publish shared environment — content round-trip', () => {
     for (const item of items) {
       const itemType = item.type === 'norma' ? 'norm' : item.type === 'sentenza' ? 'sentenza' : 'note';
       const title = item.type === 'norma' ? String(item.data.tipo_atto) : item.type === 'sentenza' ? String(item.data.etichetta) : 'Nota';
-      const content = item.status === 'important' ? { ...item.data, _dossierMeta: { important: true } } : item.data;
+      const content = typeof item.data === 'object' && item.status === 'important' ? { ...item.data, _dossierMeta: { important: true } } : item.data;
       const added = await request(app).post(`/api/dossiers/${dossier.body.id}/items`).set(authHeader(bob)).send({ itemType, title, content });
       expect(added.status).toBe(201);
     }

@@ -68,12 +68,12 @@ export type DecisionRebuild = { ok: true; entry: DecisionItemContent } | { ok: f
 /**
  * A decision entry from someone else's data (a published environment, a Forum proposal), rebuilt
  * from closed values: unknown keys refused, `etichetta` recomputed whatever arrives, the dossier
- * star (`_dossierMeta`) left to the caller. An entry without `etichetta` (an older or hand-made
- * environment) is labelled too: the exported schema keeps requiring it for the dossier item
+ * star (`_dossierMeta`) left to the caller. An entry without `etichetta`, or with a null one (an
+ * older or hand-made environment), is labelled too: the exported schema keeps requiring it for the dossier item
  * routes, so a placeholder stands in for the missing copy before it is parsed, only here.
  */
 export function rebuildDecisionEntry(raw: unknown): DecisionRebuild {
-  const input = typeof raw === 'object' && raw !== null && !Array.isArray(raw) && (raw as { etichetta?: unknown }).etichetta === undefined
+  const input = typeof raw === 'object' && raw !== null && !Array.isArray(raw) && (raw as { etichetta?: unknown }).etichetta == null
     ? { ...raw, etichetta: '-' }
     : raw;
   const parsed = decisionItemContentSchema.safeParse(input);

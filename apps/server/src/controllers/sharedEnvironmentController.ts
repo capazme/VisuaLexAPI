@@ -1375,7 +1375,7 @@ export const restoreVersion = async (req: Request, res: Response) => {
     // Create snapshot of current state before restoring
     await createVersionSnapshot(tx, id, env.content, 'Prima del ripristino');
 
-    // Restore the content: an old version's norms are rebuilt like a publication's (a version
+    // Restore the content: an old version's entries (norms, decisions, notes) are rebuilt like a publication's (a version
     // stored before the check would otherwise put them back as they were).
     const restored = version.content as { dossiers?: unknown } | null;
     const content = restored && Array.isArray(restored.dossiers)

@@ -13,9 +13,8 @@
 import type { Prisma } from '@prisma/client';
 import { rebuildDecisionEntry } from '../schemas/decisionItem';
 import { rebuildNormEntry } from '../schemas/normEntry';
+import { MAX_NOTE_LENGTH as MAX_NOTE } from '../controllers/dossierController';
 
-/** A note in a proposal: as long as a note the notes route takes. */
-const MAX_NOTE = 4000;
 
 export interface EntryItem {
   itemType: 'norm' | 'note' | 'sentenza';
