@@ -29,6 +29,12 @@ export interface PdfWriter {
   footer(): void;
 }
 
+/**
+ * The font is one of jsPDF's standard fonts, which hold Windows-1252 only: Latin text with the
+ * Italian accents, «», — and ° is fine; a character outside it (Greek, mathematical signs, some
+ * Eastern European letters) is not drawn as itself. jsPDF writes an unrelated glyph or a
+ * placeholder there and does not warn. Embedding a TrueType font would lift the limit.
+ */
 export function createPdfWriter(doc: jsPDF, options: { footerLeft: string; font?: PdfFont }): PdfWriter {
   const font = options.font ?? 'helvetica';
   const writer: PdfWriter = {

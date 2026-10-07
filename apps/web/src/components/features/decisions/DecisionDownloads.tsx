@@ -8,10 +8,13 @@ import { fetchOriginalPdf } from '../../../services/decisionPdfService';
 import type { DecisionIdentity, FoundDecision } from '../../../types/decisions';
 import { todayInRome } from '../../../utils/dateUtils';
 import { decisionKey } from '../../../utils/decisionLinks';
+import { hasDecisionText } from '../../../utils/decisionText';
 import { decisionPdfModel, writeDecisionPdf } from './decisionPdf';
 
 // A decision's anchors are stored under its key with no article (as the reading surface does).
 const NO_ARTICLE = '';
+
+const REVOKE_AFTER_MS = 1000;
 
 /** Saves a blob through a temporary link, then lets the object URL go. */
 function saveBlob(blob: Blob, fileName: string): void {
@@ -22,7 +25,8 @@ function saveBlob(blob: Blob, fileName: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Not at once: a browser that has not started the download yet would find the URL gone.
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
 }
 
 /**
@@ -86,13 +90,18 @@ export function DecisionDownloads({ answer, identity }: { answer: FoundDecision;
 
   return (
     <>
-      <Button variant="secondary" size="sm" icon={<Download size={16} />} className={TOUCH_TARGET_RESPONSIVE} onClick={downloadOurs}>
-        Scarica PDF
-      </Button>
-      <label className={`inline-flex items-center gap-2 px-1 text-sm text-slate-700 dark:text-slate-300 ${TOUCH_TARGET_RESPONSIVE}`}>
-        <input type="checkbox" checked={withMarks} onChange={(e) => setWithMarks(e.target.checked)} />
-        Con le mie evidenziazioni e note
-      </label>
+      {/* A decision found without its text has nothing to print: its PDF would be a heading. */}
+      {hasDecisionText(answer.testo) && (
+        <>
+          <Button variant="secondary" size="sm" icon={<Download size={16} />} className={TOUCH_TARGET_RESPONSIVE} onClick={downloadOurs}>
+            Scarica PDF
+          </Button>
+          <label className={`inline-flex items-center gap-2 px-1 text-sm text-slate-700 dark:text-slate-300 ${TOUCH_TARGET_RESPONSIVE}`}>
+            <input type="checkbox" checked={withMarks} onChange={(e) => setWithMarks(e.target.checked)} />
+            Con le mie evidenziazioni e note
+          </label>
+        </>
+      )}
       {identity.corte === 'cassazione' && (
         <Button variant="secondary" size="sm" icon={<FileText size={16} />} className={TOUCH_TARGET_RESPONSIVE} disabled={busy} onClick={() => { void downloadOriginal(); }}>
           PDF originale della Corte

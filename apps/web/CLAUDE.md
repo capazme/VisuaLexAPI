@@ -207,9 +207,13 @@ No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRende
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
 `decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks
 that the rendered text nodes spell the projection (root rule 23). The .txt export of notes and
-highlights is shared with the article (`utils/annotationExport.ts`). What leaves the account
-(an environment, a file, the Forum) carries only the anchors whose words are still in the
-decision's text (`utils/decisionAnchorsTravel.ts`: `travellingAnchors`, `travellingSelection`).
+highlights is shared with the article (`utils/annotationExport.ts`). Only three things
+that leave the account carry just the anchors whose words are still in the decision's text: an
+environment's export file, its share link and the Forum (publishing, editing, suggestions), through
+`utils/decisionAnchorsTravel.ts` (`travellingAnchors`, `travellingSelection`). The personal files
+are not filtered: the .txt export and the PDF «Con le mie evidenziazioni e note» list the anchors
+that no longer land (the PDF under «Non ritrovate nel testo attuale»), pending the owner's answer
+on whether they should.
 **Downloads** (`DecisionDownloads`, among `DecisionView`'s actions for a found decision):
 «Scarica PDF» is a PDF of ours (`decisionPdf.ts`: `decisionPdfModel` is pure,
 `writeDecisionPdf` draws it with jsPDF through `utils/pdfWriter.ts`, the page layout the

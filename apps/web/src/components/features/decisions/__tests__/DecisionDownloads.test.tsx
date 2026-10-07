@@ -75,11 +75,26 @@ describe('DecisionDownloads', () => {
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
-    fireEvent.click(screen.getByRole('button', { name: /PDF originale della Corte/ }));
-    await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:x'));
-    expect(create).toHaveBeenCalledWith(blob);
-    expect(click).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: /PDF originale della Corte/ }));
+      await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+      expect(create).toHaveBeenCalledWith(blob);
+      expect(revoke).not.toHaveBeenCalled(); // not at once: the browser may not have begun
+      vi.advanceTimersByTime(1000);
+      expect(revoke).toHaveBeenCalledWith('blob:x');
+    } finally {
+      vi.useRealTimers();
+    }
     expect(fetchOriginalPdf).toHaveBeenCalledWith(FOUND.identita);
+  });
+
+  it('offers no PDF of ours for a decision found without its text, but still the court\'s', () => {
+    const bare = { ...FOUND, testo: {} } as FoundDecision;
+    render(<DecisionDownloads answer={bare} identity={bare.identita} />);
+    expect(screen.queryByRole('button', { name: /Scarica PDF/ })).toBeNull();
+    expect(screen.queryByLabelText('Con le mie evidenziazioni e note')).toBeNull();
+    expect(screen.getByRole('button', { name: /PDF originale della Corte/ })).toBeInTheDocument();
   });
 
   it('says so when the court\'s PDF is not available', async () => {
