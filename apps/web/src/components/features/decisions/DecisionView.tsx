@@ -16,6 +16,7 @@ import {
 import { hasDecisionText } from '../../../utils/decisionText';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { sentenzaFromDecision } from '../dossier/dossierUtils';
+import { DecisionAnchorsWithoutText } from './DecisionAnchorsWithoutText';
 import { DecisionTextView } from './DecisionTextView';
 
 export interface DecisionViewProps {
@@ -141,8 +142,11 @@ function FoundView({ answer, onToast, actions, textSlot }: {
         )}
         {actions}
       </div>
-      {/* Found without its text: the notice above says so, and no empty block is drawn. */}
-      {hasDecisionText(answer.testo) && (textSlot ?? <DecisionTextView testo={answer.testo} />)}
+      {/* Found without its text: the notice above says so, no empty block is drawn, and the reader's
+          notes and highlights on it are listed instead of dropped. */}
+      {hasDecisionText(answer.testo)
+        ? (textSlot ?? <DecisionTextView testo={answer.testo} />)
+        : <DecisionAnchorsWithoutText identity={answer.identita} />}
       {/* No licence line (the owner's decision, confirmed on 2026-10-04): fonte.licenza stays in
           the data. */}
       <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">

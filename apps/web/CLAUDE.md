@@ -194,6 +194,16 @@ article text changes, a discussion whose words moved re-attaches to the new loca
 a detached one stays listed in the panel with a notice and its original quotation,
 never hidden or deleted. Supported on the article tab for now.
 
+**A court decision takes the same tools** (`DecisionReadingSurface`, PR 4): notes and
+highlights are stored under `normaKey = decisionKey(identity)` with `articleId = ''` (wire key
+`<key>::art::`), through the store's ordinary actions; the surface mounts the article's own
+`SelectionPopup`, `InlineNoteComposer`/`InlineNotePopover`, `NotesPeekPanel`,
+`HighlightsActionsPicker`, the round-B signs and `BlockAnnotationsPopover` (a paragraph is the
+block; `decisionStructure` names them). `DecisionReadingToolbar` draws the two toolbar buttons
+(`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
+(`UnmatchedAnchors`; a decision found without text hosts it through `DecisionAnchorsWithoutText`).
+No MERL-T events, versions, Brocardi or saved-norm watcher.
+
 **A past text is a reading** (round "Testo alla data", spec
 `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`). The server
 states, next to `article_text`, the window the source's own page gives
