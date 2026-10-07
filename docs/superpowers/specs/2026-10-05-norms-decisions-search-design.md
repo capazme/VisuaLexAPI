@@ -571,9 +571,11 @@ minus `\n` (rule 23). Two properties follow:
 
 #### 8.3 The renderer
 
-`utils/decisionRender.ts` → `renderDecisionHtml({ testo, highlights, notes,
-citations })` replaces `DecisionTextView`'s React spans with the same structure
-as escaped HTML: one `section.vlx-dec-block` per block (its label in CSS, as
+`utils/decisionRender.ts` → `renderDecisionHtml({ testo, highlights, annotations,
+signs })` writes the decision's text as escaped HTML (the norms it cites are
+linked afterwards, by `wrapCitationsInHtml` over that HTML, which adds no
+character). `DecisionTextView`'s React spans stay as the fallback for a host that
+mounts `DecisionView` without the reading surface. The structure is the same: one `section.vlx-dec-block` per block (its label in CSS, as
 today), one `p.vlx-dec-para` per paragraph, one `span.vlx-dec-line` per line, cut
 at every mark and link edge with a stack, so the HTML is well-formed and every
 text node is escaped. It reuses `resolveAnchors` (`utils/articleAnnotations.ts`)
@@ -589,7 +591,9 @@ and its text root; none is copied or forked:
   the same colours, «Nota», «Copia», and «Discuti» once §8.7 lands;
 - `InlineNoteComposer` and `InlineNotePopover`; `NotesPeekPanel` on the decision's
   toolbar; the highlight visibility toggle and `HighlightsActionsPicker` (export to
-  `.txt`), in the same `ReadingToolbar` places;
+  `.txt`): the notes and highlights buttons are one component
+  (`NotesHighlightsButtons`) that the article's `ReadingToolbar` and the decision's
+  `DecisionReadingToolbar` both render;
 - the round-B signs: `renderDecisionHtml` ends each annotated paragraph
   (`p.vlx-dec-para`, the decision's block) with the same empty `span.vlx-sign`,
   and `BlockAnnotationsPopover` opens on it with `NoteCard` and «Vai al passo»;
@@ -677,7 +681,9 @@ offered to the Forum, each anchor keyed by a decision is checked with
 `resolveAnchors` against the decision's text fetched now (through the session
 cache); one that does not land — the text was obscured, anonymised or is
 missing — is left out, and so is every anchor of a decision that cannot be
-fetched at that moment (the source is down: nothing is sent on trust). The
+fetched at that moment (the source is down: nothing is sent on trust). «The decision's text fetched now» is the
+server's cached copy (up to 30 days, the owner's choice), so words a court has
+withdrawn can still travel until it expires. The
 dialog says how many were left out and why («2 evidenziazioni su sentenze non
 incluse: il loro testo non è più presente nella fonte»). The anchors stay in
 the user's own account, in §8.4's box. A test covers each case: a landing

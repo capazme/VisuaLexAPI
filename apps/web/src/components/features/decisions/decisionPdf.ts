@@ -7,7 +7,7 @@
  */
 import { jsPDF } from 'jspdf';
 import type { Annotation, Highlight } from '../../../types';
-import type { FoundDecision } from '../../../types/decisions';
+import type { DecisionAttributes, DecisionIdentity, FoundDecision } from '../../../types/decisions';
 import { resolveAnchors } from '../../../utils/articleAnnotations';
 import { formatDateItalianLong, withPreposition } from '../../../utils/dateUtils';
 import {
@@ -16,7 +16,7 @@ import {
   formatDecisionHeading,
   formatDecisionShort,
 } from '../../../utils/decisionLinks';
-import { decisionProjection, layoutDecision, unmatchedAnchors } from '../../../utils/decisionRender';
+import { decisionProjection, isAnchoredNote, layoutDecision, unmatchedAnchors } from '../../../utils/decisionRender';
 import { PDF_MARGIN, PDF_WIDTH, createPdfWriter } from '../../../utils/pdfWriter';
 
 export interface DecisionPdfParagraph {
@@ -78,13 +78,18 @@ function runningText(lines: string[], starts: number[]): { text: string; toText(
   };
 }
 
+/** The PDF's file name, from the identity alone (no model, no text). */
+export function decisionFileName(identity: DecisionIdentity, attributes: DecisionAttributes): string {
+  return `${formatDecisionShort({ ...identity, sezione: attributes.sezione }).replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')}.pdf`;
+}
+
 export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOptions): DecisionPdfModel {
   const { annotations, consultedOn, includeUnmatched = true } = options;
   const { identita, attributi, testo } = answer;
   const plain = decisionProjection(testo);
   const highlights = annotations?.highlights ?? [];
   const notes = annotations?.notes ?? [];
-  const resolved = annotations ? resolveAnchors(plain, highlights, notes.filter((n) => typeof n.startOffset === 'number' && Boolean(n.anchorText))) : [];
+  const resolved = annotations ? resolveAnchors(plain, highlights, notes.filter(isAnchoredNote)) : [];
 
   const blocks = layoutDecision(testo)
     .filter((b) => b.paragraphs.length > 0)
@@ -119,10 +124,10 @@ export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOpti
     subheading: formatDecisionHeading(identita, attributi),
     notices: answer.avvisi.map((n) => describeNotice(n, attributi)),
     blocks,
-    freeNotes: annotations ? notes.filter((n) => !(typeof n.startOffset === 'number' && n.anchorText)).map((n) => n.text) : [],
+    freeNotes: annotations ? notes.filter((n) => !isAnchoredNote(n)).map((n) => n.text) : [],
     unmatched,
     footer: `Fonte: ${answer.fonte.nome} · consultata ${withPreposition('il', formatDateItalianLong(consultedOn))}`,
-    fileName: `${formatDecisionShort({ ...identita, sezione: attributi.sezione }).replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')}.pdf`,
+    fileName: decisionFileName(identita, attributi),
   };
 }
 

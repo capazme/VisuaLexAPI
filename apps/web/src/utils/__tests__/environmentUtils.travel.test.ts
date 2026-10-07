@@ -4,7 +4,7 @@ vi.mock('../decisionFetchCache', () => ({ fetchDecisionCached: vi.fn() }));
 
 import { fetchDecisionCached } from '../decisionFetchCache';
 import { createEnvironmentShareLink, environmentForExport, exportEnvironmentToFile } from '../environmentUtils';
-import { articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../../components/features/environments/__tests__/travelFixtures';
+import { articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../../test/fixtures/travelFixtures';
 import type { Environment } from '../../types';
 
 const env = {
@@ -26,10 +26,21 @@ describe('environment export and share link: words a court withdrew stay home', 
 
   it('the file holds only what stands', async () => {
     let blob: Blob | undefined;
+    const saved = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
     URL.createObjectURL = vi.fn((b: Blob) => { blob = b; return 'blob:x'; });
     URL.revokeObjectURL = vi.fn();
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    const message = await exportEnvironmentToFile(env);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.useFakeTimers();
+    let message: string | null;
+    try {
+      message = await exportEnvironmentToFile(env);
+      vi.advanceTimersByTime(1000); // the delayed revoke runs against the stub, not the restored original
+    } finally {
+      vi.useRealTimers();
+      click.mockRestore();
+      URL.createObjectURL = saved.create;
+      URL.revokeObjectURL = saved.revoke;
+    }
     expect(message).toMatch(/non incluse/);
     const written = JSON.parse(await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.readAsText(blob!); }));
     expect(written.data.annotations.map((a: { id: string }) => a.id)).toEqual(['n-art']);

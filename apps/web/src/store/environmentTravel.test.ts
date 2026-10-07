@@ -15,7 +15,7 @@ vi.mock('../utils/decisionFetchCache', () => ({ fetchDecisionCached: vi.fn() }))
 import { appStore } from './useAppStore';
 import { environmentService } from '../services/environmentService';
 import { fetchDecisionCached } from '../utils/decisionFetchCache';
-import { articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../components/features/environments/__tests__/travelFixtures';
+import { articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../test/fixtures/travelFixtures';
 
 type Content = { annotations: Array<{ id: string }>; highlights: Array<{ id: string }> };
 const sent = (call: 'create' | 'update') => {

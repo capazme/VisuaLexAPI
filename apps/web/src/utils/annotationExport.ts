@@ -1,4 +1,5 @@
 import type { Annotation, Highlight } from '../types';
+import { saveBlob } from './saveBlob';
 
 /** The reader's notes or highlights as the plain text the «Esporta in .txt» actions write. */
 function header(kind: 'Evidenziazioni' | 'Note', title: string, now: Date): string {
@@ -24,13 +25,5 @@ export function slugify(s: string): string {
 }
 
 export function downloadTxt(content: string, filenameBase: string): void {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${filenameBase}.txt`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  saveBlob(new Blob([content], { type: 'text/plain;charset=utf-8' }), `${filenameBase}.txt`);
 }

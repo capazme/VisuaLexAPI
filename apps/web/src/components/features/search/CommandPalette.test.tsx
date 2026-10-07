@@ -260,7 +260,7 @@ describe('CommandPalette — presets the server already understands', () => {
 });
 
 /**
- * A court decision typed in the box ("Cass. civ. 10787/2024") is read before the norm parser;
+ * A court decision typed in the box ("Cass. civ. 99999/2024") is read before the norm parser;
  * Enter opens its tab. Anything that does not start with a court is left to the norm parser,
  * and a custom alias trigger of the user's wins.
  */
@@ -278,15 +278,15 @@ describe('CommandPalette — a decision named in the box', () => {
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={onClose} onSearch={onSearch} />);
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 10787/2024');
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
 
     // the visible line, and the one live region (mounted from the start) that announces it
-    expect(await screen.findByText('Sentenza → Cass. civ., n. 10787/2024')).toBeInTheDocument();
+    expect(await screen.findByText('Sentenza → Cass. civ., n. 99999/2024')).toBeInTheDocument();
     expect(screen.getByText('Invio apre')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Sentenza: Cass. civ., n. 10787/2024. Invio per aprire.');
+    expect(screen.getByRole('status')).toHaveTextContent('Sentenza: Cass. civ., n. 99999/2024. Invio per aprire.');
 
     await user.keyboard('{Enter}');
-    expect(openDecisionTab).toHaveBeenCalledWith({ corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 });
+    expect(openDecisionTab).toHaveBeenCalledWith({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 });
     expect(onClose).toHaveBeenCalled();
     expect(onSearch).not.toHaveBeenCalled();
     // the server fallback is not asked about a decision
@@ -304,7 +304,7 @@ describe('CommandPalette — a decision named in the box', () => {
     await settle();
     await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
     await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 10787/2024');
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
     await user.keyboard('{Enter}');
 
     expect(openDecisionTab).toHaveBeenCalledTimes(1);
@@ -317,9 +317,9 @@ describe('CommandPalette — a decision named in the box', () => {
     const region = screen.getByRole('status');
     expect(region).toBeEmptyDOMElement();
     const box = screen.getByPlaceholderText(/art 2043 cc/i);
-    await user.type(box, 'Cass. civ. 10787/2024');
+    await user.type(box, 'Cass. civ. 99999/2024');
     expect(screen.getByRole('status')).toBe(region);
-    expect(region).toHaveTextContent('Sentenza: Cass. civ., n. 10787/2024');
+    expect(region).toHaveTextContent('Sentenza: Cass. civ., n. 99999/2024');
     await user.clear(box);
     expect(screen.getByRole('status')).toBe(region);
     expect(region).toBeEmptyDOMElement();
@@ -344,7 +344,7 @@ describe('CommandPalette — a decision named in the box', () => {
     const user = userEvent.setup();
     renderPalette();
 
-    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'cass 10787/2024');
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'cass 99999/2024');
 
     expect(screen.queryByText(/Sentenza →/)).toBeNull();
     await user.keyboard('{Enter}');
@@ -383,10 +383,10 @@ describe('CommandPalette — focus on opening', () => {
 
 describe('CommandPalette — a citation handed over as it opens', () => {
   it('puts it in the box, reads it as a decision, and takes it once', async () => {
-    appStore.setState({ commandPaletteQuery: 'Cass. civ., n. 10787/2024' });
+    appStore.setState({ commandPaletteQuery: 'Cass. civ., n. 99999/2024' });
     renderPalette();
-    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('Cass. civ., n. 10787/2024');
-    expect(await screen.findByText('Sentenza → Cass. civ., n. 10787/2024')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('Cass. civ., n. 99999/2024');
+    expect(await screen.findByText('Sentenza → Cass. civ., n. 99999/2024')).toBeInTheDocument();
     expect(appStore.getState().commandPaletteQuery).toBeNull();
   });
 });
@@ -432,7 +432,7 @@ describe('CommandPalette — a topic for the Cassazione', () => {
     } as never);
     renderPalette();
     const box = screen.getByPlaceholderText(/art 2043 cc/i);
-    await user.type(box, 'Cass. civ. 10787/2024');
+    await user.type(box, 'Cass. civ. 99999/2024');
     await settle();
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
     await user.clear(box);

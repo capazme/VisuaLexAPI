@@ -486,7 +486,7 @@
 
 .vlx-art .vlx-ref:focus-visible,
 .vlx-art .vlx-updates-toggle:focus-visible,
-:is(.vlx-art, .vlx-decision) .vlx-sign:focus-visible {
+.vlx-art .vlx-sign:focus-visible {
   outline: none;
   @apply ring-2 ring-primary-500;
 }
@@ -583,18 +583,18 @@
   @apply font-serif;
 }
 
-:is(.vlx-art, .vlx-decision) {
+.vlx-art {
   --vlx-note-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z'/%3E%3Cpath d='M15 3v5a1 1 0 0 0 1 1h5'/%3E%3C/svg%3E");
   --vlx-thread-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719'/%3E%3C/svg%3E");
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-threads {
+.vlx-art .vlx-sign-threads {
   display: inline-flex;
   align-items: center;
   gap: 0.15rem;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-threads::before {
+.vlx-art .vlx-sign-threads::before {
   content: '';
   width: 0.8rem;
   height: 0.8rem;
@@ -603,14 +603,14 @@
   mask: var(--vlx-thread-icon) center / contain no-repeat;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-threads::after {
+.vlx-art .vlx-sign-threads::after {
   content: attr(data-count);
   font-variant-numeric: tabular-nums;
 }
 
 /* The words of the discussion open in the panel. A tint and an underline,
    not a new colour, so a highlight underneath stays readable. */
-:is(.vlx-art, .vlx-decision) .vlx-thread-focus {
+.vlx-art .vlx-thread-focus {
   border-radius: 2px;
   background-color: hsl(var(--primary) / 0.14);
   box-shadow: 0 2px 0 hsl(var(--primary) / 0.55);
@@ -618,11 +618,11 @@
   box-decoration-break: clone;
 }
 
-.dark :is(.vlx-art, .vlx-decision) .vlx-thread-focus {
+.dark .vlx-art .vlx-thread-focus {
   background-color: hsl(var(--primary) / 0.22);
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign {
+.vlx-art .vlx-sign {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -643,13 +643,13 @@
   @apply font-sans bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-notes {
+.vlx-art .vlx-sign-notes {
   display: inline-flex;
   align-items: center;
   gap: 0.15rem;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-notes::before {
+.vlx-art .vlx-sign-notes::before {
   content: '';
   width: 0.8rem;
   height: 0.8rem;
@@ -658,54 +658,54 @@
   mask: var(--vlx-note-icon) center / contain no-repeat;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-notes::after {
+.vlx-art .vlx-sign-notes::after {
   content: attr(data-count);
   font-variant-numeric: tabular-nums;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-dot {
+.vlx-art .vlx-sign-dot {
   width: 0.55rem;
   height: 0.55rem;
   border: 1px solid;
   border-radius: 9999px;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-dot[data-color="yellow"] {
+.vlx-art .vlx-sign-dot[data-color="yellow"] {
   background-color: hsl(var(--hl-yellow-bg));
   border-color: hsl(var(--hl-yellow-fg) / 0.5);
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-dot[data-color="green"] {
+.vlx-art .vlx-sign-dot[data-color="green"] {
   background-color: hsl(var(--hl-green-bg));
   border-color: hsl(var(--hl-green-fg) / 0.5);
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-dot[data-color="red"] {
+.vlx-art .vlx-sign-dot[data-color="red"] {
   background-color: hsl(var(--hl-red-bg));
   border-color: hsl(var(--hl-red-fg) / 0.5);
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-sign-dot[data-color="blue"] {
+.vlx-art .vlx-sign-dot[data-color="blue"] {
   background-color: hsl(var(--hl-blue-bg));
   border-color: hsl(var(--hl-blue-fg) / 0.5);
 }
 
 /* "Nascondi evidenziazioni" means the plain text: the dots go, and so does a
    sign that holds only highlights. */
-.highlights-hidden :is(.vlx-art, .vlx-decision) .vlx-sign-dot,
-.highlights-hidden :is(.vlx-art, .vlx-decision) .vlx-sign[data-notes="0"][data-threads="0"] {
+.highlights-hidden .vlx-art .vlx-sign-dot,
+.highlights-hidden .vlx-art .vlx-sign[data-notes="0"][data-threads="0"] {
   display: none;
 }
 
 /* "Vai al passo": the passage glows for 1.6 s (utils/revealAnnotation.ts).
    A box-shadow, not a background, so the highlight's own colour stays. */
-:is(.vlx-art, .vlx-decision) .highlight-mark,
-:is(.vlx-art, .vlx-decision) .note-anchor,
-:is(.vlx-art, .vlx-decision) .vlx-thread-focus {
+.vlx-art .highlight-mark,
+.vlx-art .note-anchor,
+.vlx-art .vlx-thread-focus {
   transition: box-shadow 0.4s ease;
 }
 
-:is(.vlx-art, .vlx-decision) .vlx-flash {
+.vlx-art .vlx-flash {
   border-radius: 2px;
   box-shadow: 0 0 0 3px hsl(43 96% 56% / 0.75);
   transition: none; /* on at once; the fade is on the way out */
@@ -716,11 +716,11 @@
 /* A larger, invisible hit area on touch screens, as for the "(119)" chips.
    Before the margin rule: there `position: absolute` must win. */
 @media (pointer: coarse) {
-  :is(.vlx-art, .vlx-decision) .vlx-sign {
+  .vlx-art .vlx-sign {
     position: relative;
   }
 
-  :is(.vlx-art, .vlx-decision) .vlx-sign::after {
+  .vlx-art .vlx-sign::after {
     content: '';
     position: absolute;
     inset: -12px -8px;
@@ -736,7 +736,7 @@
     position: relative;
   }
 
-  :is(.vlx-art, .vlx-decision) .vlx-sign {
+  .vlx-art .vlx-sign {
     position: absolute;
     top: 0.3rem;
     left: calc(100% + 0.75rem);
@@ -745,7 +745,7 @@
 }
 
 @media print {
-  :is(.vlx-art, .vlx-decision) .vlx-sign {
+  .vlx-art .vlx-sign {
     display: none;
   }
 }

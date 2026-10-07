@@ -1,4 +1,5 @@
 import { leftOutMessage, travellingAnchors } from './decisionAnchorsTravel';
+import { saveBlob } from './saveBlob';
 import type { Environment, EnvironmentExport, EnvironmentCategory, Dossier, QuickNorm, CustomAlias, Annotation, Highlight } from '../types';
 
 // ============================================
@@ -97,16 +98,7 @@ export async function exportEnvironmentToFile(env: Environment): Promise<string 
   };
 
   const json = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `ambiente-${sanitizeFilename(env.name)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  saveBlob(new Blob([json], { type: 'application/json' }), `ambiente-${sanitizeFilename(env.name)}.json`);
   return message;
 }
 

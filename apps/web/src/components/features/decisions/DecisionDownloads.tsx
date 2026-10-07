@@ -9,25 +9,11 @@ import type { DecisionIdentity, FoundDecision } from '../../../types/decisions';
 import { todayInRome } from '../../../utils/dateUtils';
 import { decisionKey } from '../../../utils/decisionLinks';
 import { hasDecisionText } from '../../../utils/decisionText';
-import { decisionPdfModel, writeDecisionPdf } from './decisionPdf';
+import { saveBlob } from '../../../utils/saveBlob';
+import { decisionFileName, decisionPdfModel, writeDecisionPdf } from './decisionPdf';
 
 // A decision's anchors are stored under its key with no article (as the reading surface does).
 const NO_ARTICLE = '';
-
-const REVOKE_AFTER_MS = 1000;
-
-/** Saves a blob through a temporary link, then lets the object URL go. */
-function saveBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  // Not at once: a browser that has not started the download yet would find the URL gone.
-  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
-}
 
 /**
  * The decision's two downloads, among its actions: a PDF of ours (optionally with the reader's
@@ -74,7 +60,7 @@ export function DecisionDownloads({ answer, identity }: { answer: FoundDecision;
     try {
       const result = await fetchOriginalPdf(identity);
       if (result instanceof Blob) {
-        saveBlob(result, `${decisionPdfModel(answer, { consultedOn: todayInRome() }).fileName}`);
+        saveBlob(result, decisionFileName(identity, answer.attributi));
       } else {
         setMessage(result.esito === 'non_disponibile'
           ? 'Il PDF originale non è disponibile per questa decisione.'

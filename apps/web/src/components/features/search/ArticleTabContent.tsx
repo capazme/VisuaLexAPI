@@ -17,6 +17,8 @@ import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { useCitationLinks } from '../../../hooks/useCitationLinks';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
+import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
+import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { ReadingToolbar } from './ReadingToolbar';
@@ -103,12 +105,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // state (bookmarks, dossiers…) no longer re-renders us.
     const {
         annotations,
-        addAnnotation,
         removeAnnotation,
         updateAnnotation,
         loadAnnotationsForArticle,
         highlights,
-        addHighlight,
         removeHighlight,
         loadHighlightsForArticle,
         triggerSearch,
@@ -118,12 +118,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         bookmarks,
     } = useAppStore(useShallow(s => ({
         annotations: s.annotations,
-        addAnnotation: s.addAnnotation,
         removeAnnotation: s.removeAnnotation,
         updateAnnotation: s.updateAnnotation,
         loadAnnotationsForArticle: s.loadAnnotationsForArticle,
         highlights: s.highlights,
-        addHighlight: s.addHighlight,
         removeHighlight: s.removeHighlight,
         loadHighlightsForArticle: s.loadHighlightsForArticle,
         triggerSearch: s.triggerSearch,
@@ -138,7 +136,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // actually mounts — same reasoning as notesButtonEl below (gotcha #13).
     const [dossierBtnEl, setDossierBtnEl] = useState<HTMLButtonElement | null>(null);
     const [isPeekOpen, setIsPeekOpen] = useState(false);
-    const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
     // State (not ref) so the popover re-reads the anchor when the button
     // actually mounts. Using ref.current in render triggers the
     // react-hooks/refs lint and can miss the post-mount update.
@@ -161,17 +158,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // not persisted across sessions.
     const [highlightsHidden, setHighlightsHidden] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
-    // When the user picks "Aggiungi nota" from the selection popup the
-    // selected span becomes the note's anchor. Kept in state so the panel
-    // can render a chip ("Ancorata a: …") until the user submits.
-    // scopedArticleId defaults to the article body; markable brocardi
-    // sections override it to target their own sub-section scope.
-    const [noteAnchor, setNoteAnchor] = useState<{ anchorText: string; startOffset: number; scopedArticleId: string } | null>(null);
-    // Captured selection rect (viewport coords) used to anchor the tooltip-style
-    // composer on the selected span itself, rather than the Notes toolbar button.
-    // When null, the composer isn't open; when set, `noteAnchor` carries the
-    // corresponding anchorText / offset / scope.
-    const [composerRect, setComposerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
     // Loop β #2 "missed" surface: a selection the user flagged as a legal
     // reference the citation detector did not link. Offset is in the same
     // marker projection as highlights; the rect was captured before the
@@ -299,6 +285,43 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         setToastMessage({ text, type });
     };
 
+    // The reader's marks, as every surface that renders them does them (hooks/useAnnotationActions).
+    // The MERL-T events are the article's own.
+    const {
+        noteAnchor, composerRect, clearAnchor, openComposer,
+        handlePopupHighlight, handlePopupAddNote, handleAddNote, closeComposer, commitComposer,
+    } = useAnnotationActions({
+        key: itemKey,
+        articleId: uniqueArticleId,
+        highlights: articleHighlights,
+        showToast,
+        enabled: !readOnly,
+        onHighlightAdded: (text, color, startOffset) => publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.highlightCreated,
+            article_urn: norma_data.urn,
+            metadata: { anchor_text: text, color, start_offset: startOffset, text_length: text.length },
+        }),
+        onNoteSelection: (text, startOffset) => publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.textSelected,
+            article_urn: norma_data.urn,
+            metadata: { source: 'selection_note', start_offset: startOffset, text_length: text.length },
+        }),
+        onNoteAdded: ({ targetArticleId, anchor, text }) => publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.annotationCreated,
+            article_urn: norma_data.urn,
+            metadata: {
+                source: 'annotation',
+                scoped_article_id: targetArticleId,
+                anchored: Boolean(anchor),
+                anchor_text: anchor?.anchorText ?? '',
+                start_offset: anchor?.startOffset ?? 0,
+                note_text: text,
+                text_length: text.length,
+            },
+        }),
+    });
+    const { inlineNote, closeInlineNote } = useInlineNoteAnchors(contentRef, itemAnnotations);
+
     // Fetch persisted highlights + annotations from the Node backend when the
     // article first mounts (or when the user switches to a different article
     // inside the same NormaCard). The store actions guard against racing
@@ -359,27 +382,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         if (!container) return;
         container.classList.toggle('highlights-hidden', highlightsHidden);
     }, [highlightsHidden]);
-
-    // Delegated click handler on the article body: tap on a wavy
-    // `.note-anchor` underline opens the compact InlineNotePopover for
-    // that single note. The full Peek panel stays for the toolbar button.
-    useEffect(() => {
-        const container = contentRef.current;
-        if (!container) return;
-        const handler = (e: MouseEvent) => {
-            const target = (e.target as HTMLElement | null)?.closest('.note-anchor') as HTMLElement | null;
-            if (!target) return;
-            const noteId = target.getAttribute('data-note-id');
-            if (!noteId) return;
-            const note = itemAnnotations.find(a => a.id === noteId);
-            if (!note) return;
-            e.preventDefault();
-            e.stopPropagation();
-            setInlineNote({ note, anchorEl: target });
-        };
-        container.addEventListener('click', handler);
-        return () => container.removeEventListener('click', handler);
-    }, [itemAnnotations]);
 
     const quickNormParams = useMemo(() => ({
         act_type: norma_data.tipo_atto,
@@ -462,32 +464,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    const handleAddNote = (text: string) => {
-        const trimmed = text.trim();
-        if (!trimmed) return;
-        const anchor = noteAnchor;
-        const targetArticleId = anchor?.scopedArticleId ?? uniqueArticleId;
-        const anchorPayload = anchor
-            ? { anchorText: anchor.anchorText, startOffset: anchor.startOffset }
-            : undefined;
-        addAnnotation(itemKey, targetArticleId, trimmed, anchorPayload);
-        publishMerltEvent({
-            interaction_type: MERLT_EVENT_TYPES.annotationCreated,
-            article_urn: norma_data.urn,
-            metadata: {
-                source: 'annotation',
-                scoped_article_id: targetArticleId,
-                anchored: Boolean(anchor),
-                anchor_text: anchor?.anchorText ?? '',
-                start_offset: anchor?.startOffset ?? 0,
-                note_text: trimmed,
-                text_length: trimmed.length,
-            },
-        });
-        setNoteAnchor(null);
-        showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
-    };
-
     const articleSlug = () =>
         slugify(`${norma_data.tipo_atto}-art-${norma_data.numero_articolo}`) || 'articolo';
 
@@ -529,64 +505,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    // Handler for SelectionPopup highlight action
-    const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
-        if (readOnly) return;
-        const alreadyHighlighted = articleHighlights.some(h =>
-            h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
-        );
-        if (alreadyHighlighted) {
-            showToast('Questa occorrenza è già evidenziata', 'info');
-            return;
-        }
-        addHighlight(itemKey, uniqueArticleId, text, '', color, startOffset);
-        publishMerltEvent({
-            interaction_type: MERLT_EVENT_TYPES.highlightCreated,
-            article_urn: norma_data.urn,
-            metadata: {
-                anchor_text: text,
-                color,
-                start_offset: startOffset,
-                text_length: text.length,
-            },
-        });
-        showToast(`Testo evidenziato in ${color}`, 'success');
-    };
-
-    // Handler for SelectionPopup note action in the article body.
-    // Shows a tooltip-style composer anchored on the selection itself; the
-    // full Peek panel stays reserved for the toolbar button (list + free compose).
-    const handlePopupAddNote = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
-        if (readOnly) return;
-        publishMerltEvent({
-            interaction_type: MERLT_EVENT_TYPES.textSelected,
-            article_urn: norma_data.urn,
-            metadata: {
-                source: 'selection_note',
-                start_offset: startOffset,
-                text_length: text.length,
-            },
-        });
-        setNoteAnchor({ anchorText: text, startOffset, scopedArticleId: uniqueArticleId });
-        setComposerRect(rect);
-    };
-
     // Brocardi sub-sections: same tooltip-composer flow as the article body.
     // The anchor offset is relative to the sub-section's textContent, so the
     // scopedArticleId carries the sub-section identifier.
     const handleBrocardiAddNote = (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
-        setNoteAnchor({ anchorText: text, startOffset, scopedArticleId });
-        setComposerRect(rect);
-    };
-
-    const closeInlineComposer = () => {
-        setNoteAnchor(null);
-        setComposerRect(null);
-    };
-
-    const commitInlineNote = (text: string) => {
-        handleAddNote(text);
-        setComposerRect(null);
+        openComposer({ anchorText: text, startOffset, scopedArticleId }, rect);
     };
 
     // Handler for SelectionPopup copy action. The popup stays on a text that may
@@ -923,7 +846,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onAddNote={handleAddNote}
                 onUpdateNote={updateAnnotation}
                 onRemoveNote={removeAnnotation}
-                onClearAnchor={() => setNoteAnchor(null)}
+                onClearAnchor={clearAnchor}
                 onOpenStudyMode={readOnly ? undefined : onOpenStudyMode}
                 onExportTxt={handleExportNotesTxt}
             />
@@ -942,7 +865,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 <InlineNotePopover
                     note={inlineNote.note}
                     anchorEl={inlineNote.anchorEl}
-                    onClose={() => setInlineNote(null)}
+                    onClose={closeInlineNote}
                     onUpdate={updateAnnotation}
                     onRemove={removeAnnotation}
                 />
@@ -952,8 +875,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 <InlineNoteComposer
                     anchorRect={composerRect}
                     anchorText={noteAnchor.anchorText}
-                    onSave={commitInlineNote}
-                    onClose={closeInlineComposer}
+                    onSave={commitComposer}
+                    onClose={closeComposer}
                 />
             )}
 

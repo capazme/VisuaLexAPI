@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
 import { DecisionLink } from './DecisionLink';
 
-const REF = { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 };
+const REF = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -29,12 +29,12 @@ beforeEach(() => {
 
 describe('DecisionLink', () => {
   it('opens the tab beside the article on the search page, without navigating', () => {
-    renderAt('/', <DecisionLink to={REF} besideTabId="t1">Cass. civ., n. 10787/2024</DecisionLink>);
+    renderAt('/', <DecisionLink to={REF} besideTabId="t1">Cass. civ., n. 99999/2024</DecisionLink>);
     const a = screen.getByRole('link');
-    expect(a).toHaveAttribute('href', '/sentenze/cassazione-civile/10787/2024');
+    expect(a).toHaveAttribute('href', '/sentenze/cassazione-civile/99999/2024');
     fireEvent.click(a);
     expect(openDecisionTab).toHaveBeenCalledWith(
-      { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 },
+      { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
       { besideTabId: 't1' },
     );
     expect(screen.getByTestId('where')).toHaveTextContent('/');
@@ -50,7 +50,7 @@ describe('DecisionLink', () => {
     renderAt('/dossier', <DecisionLink to={REF}>x</DecisionLink>);
     fireEvent.click(screen.getByRole('link'));
     expect(openDecisionTab).not.toHaveBeenCalled();
-    expect(screen.getByTestId('where')).toHaveTextContent('/sentenze/cassazione-civile/10787/2024');
+    expect(screen.getByTestId('where')).toHaveTextContent('/sentenze/cassazione-civile/99999/2024');
   });
 
   it.each([

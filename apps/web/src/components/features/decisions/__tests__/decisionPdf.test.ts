@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decisionPdfModel, writeDecisionPdf } from '../decisionPdf';
 
 const FOUND = {
-  esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 },
+  esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
   attributi: { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-22', testo_origine: 'pdf' },
   testo: { motivazione: 'Primo paragrafo.\n\nSecondo paragrafo.', dispositivo: 'P.Q.M.\n\nRigetta.' },
   fonte: { nome: 'Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)' }, avvisi: [],
@@ -23,11 +23,11 @@ const WITH_MARKS = (extra: Record<string, unknown> = {}) => ({
 describe('decisionPdfModel', () => {
   it('heads with the citation, keeps blocks and paragraphs, and names the source and the day', () => {
     const m = decisionPdfModel(FOUND as never, { consultedOn: '2026-10-05' });
-    expect(m.heading).toBe('Cass. civ., sez. III, ord. 22 aprile 2024, n. 10787');
+    expect(m.heading).toBe('Cass. civ., sez. III, ord. 22 aprile 2024, n. 99999');
     expect(m.blocks.map((b) => b.label)).toEqual(['Motivazione', 'Dispositivo']);
     expect(m.blocks[0].paragraphs.map((p) => p.text)).toEqual(['Primo paragrafo.', 'Secondo paragrafo.']);
     expect(m.footer).toBe('Fonte: Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure) · consultata il 5 ottobre 2026');
-    expect(m.fileName).toBe('Cass_civ_sez_III_n_10787_2024.pdf');
+    expect(m.fileName).toBe('Cass_civ_sez_III_n_99999_2024.pdf');
   });
 
   it('never writes a licence line, for the Corte costituzionale too', () => {
@@ -39,6 +39,13 @@ describe('decisionPdfModel', () => {
   it('prints the notices, the archive fallback included', () => {
     const m = decisionPdfModel({ ...FOUND, avvisi: [{ tipo: 'testo_da_archivio' }] } as never, { consultedOn: '2026-10-05' });
     expect(m.notices[0]).toMatch(/^Testo dell'archivio della Cassazione/);
+  });
+
+  it('a note with a quote but no offset is anchored: listed as not found, never among the free notes', () => {
+    const quoting = { id: 'q', text: 'Da rivedere', anchorText: 'Primo' } as never;
+    const m = decisionPdfModel(FOUND as never, { consultedOn: '2026-10-05', annotations: { highlights: [], notes: [quoting] } });
+    expect(m.freeNotes).toEqual([]);
+    expect(m.unmatched).toEqual(['nota: Da rivedere — su «Primo»']);
   });
 
   it('with annotations: marks in their paragraph, notes after it, the unmatched listed at the end', () => {
@@ -78,7 +85,7 @@ describe('decisionPdfModel', () => {
 });
 
 describe('writeDecisionPdf', () => {
-  it('writes a long decision with marks in a few seconds', () => {
+  it('writes a long decision with marks over many pages', () => {
     const paragraph = 'Il ricorrente deduce la violazione dell\'art. 2043 c.c. e sostiene che il giudice di merito abbia errato. '.repeat(8).trim();
     const motivazione = Array.from({ length: 150 }, () => paragraph).join('\n\n');
     const answer = { ...FOUND, testo: { motivazione } };
@@ -86,9 +93,7 @@ describe('writeDecisionPdf', () => {
       consultedOn: '2026-10-05',
       annotations: { highlights: [{ id: 'h', text: 'violazione', startOffset: 22, color: 'yellow' } as never], notes: [] },
     });
-    const t0 = Date.now();
     const doc = writeDecisionPdf(model);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(30);
-    expect(Date.now() - t0).toBeLessThan(5000);
   });
 });

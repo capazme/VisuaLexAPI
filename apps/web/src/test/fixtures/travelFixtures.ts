@@ -1,12 +1,12 @@
 // Shared by the tests of every place where notes and highlights leave the account (spec §8.6).
-import type { Annotation, Highlight } from '../../../../types';
+import type { Annotation, Highlight } from '../../types';
 
-export const DECISION_KEY = 'cassazione:civile:10787:2024';
+export const DECISION_KEY = 'cassazione:civile:99999:2024';
 
 /** The decision as the source answers now: found, but with its text withdrawn (obscured). */
 export const obscuredAnswer = {
   esito: 'trovata',
-  identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 },
+  identita: { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
   attributi: { testo_assente: 'oscuramento' },
   testo: {},
   fonte: { nome: 'f' },

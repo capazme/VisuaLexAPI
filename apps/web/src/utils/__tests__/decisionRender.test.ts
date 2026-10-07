@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { decisionProjection, decisionStructure, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
+import { decisionProjection, decisionStructure, isAnchoredNote, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
 import { DECISION_TEXTS, READER_TEXTS } from '../__fixtures__/decisionTexts';
 import type { Annotation, Highlight } from '../../types';
 
@@ -185,6 +185,12 @@ describe('unmatchedAnchors', () => {
     const out = unmatchedAnchors(testo, [gone, hl(3, 'ricorso', 'ok')], [lost, note(3, 'ricorso', 'okn')]);
     expect(out.highlights).toEqual([gone]);
     expect(out.annotations).toEqual([lost]);
+  });
+
+  it('lists a note with a quote but no offset: it is anchored, and cannot land', () => {
+    const quoting = { id: 'q', text: 'nota', normaKey: 'k', articleId: '', createdAt: '', anchorText: 'ricorso' } as unknown as Annotation;
+    expect(isAnchoredNote(quoting)).toBe(true);
+    expect(unmatchedAnchors({ motivazione: 'Il ricorso è fondato.' }, [], [quoting]).annotations).toEqual([quoting]);
   });
 
   it('never lists a free note: it has no anchor to lose', () => {

@@ -17,7 +17,7 @@ import { appStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { fetchDecisionCached } from '../../../utils/decisionFetchCache';
 import { SuggestContentModal } from './SuggestContentModal';
-import { NOTICE, articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../environments/__tests__/travelFixtures';
+import { NOTICE, articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../../../test/fixtures/travelFixtures';
 
 beforeEach(() => {
   vi.clearAllMocks();

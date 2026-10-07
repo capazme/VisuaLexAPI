@@ -6,7 +6,7 @@ vi.mock('../../../../utils/decisionFetchCache', () => ({ fetchDecisionCached: vi
 
 import { fetchDecisionCached } from '../../../../utils/decisionFetchCache';
 import { CreateEnvironmentModal } from '../CreateEnvironmentModal';
-import { NOTICE, articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from './travelFixtures';
+import { NOTICE, articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../../../../test/fixtures/travelFixtures';
 
 beforeEach(() => {
   vi.clearAllMocks();

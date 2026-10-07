@@ -22,7 +22,11 @@ function copyAsRead(event: ClipboardEvent<HTMLDivElement>) {
   event.preventDefault();
 }
 
-/** The decision as received: blocks as the reader divides them, one span per line. The space
+/** The fallback for a host that mounts `DecisionView` without the reading surface
+ *  (`DecisionReadingSurface`, which the workspace tab always passes as `textSlot`): the same
+ *  structure and copy behaviour, with no notes, highlights or links.
+ *
+ *  The decision as received: blocks as the reader divides them, one span per line. The space
  *  between two lines and each block's label come from CSS (index.css, "Court decisions"). An
  *  epigrafe without a motivazione holds the reasoning too, its start unmarked (the reader splits
  *  one only at a line beginning «Ritenuto» or «Considerato»: corte_cost.split_epigrafe), so it

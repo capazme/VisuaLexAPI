@@ -8,7 +8,7 @@ import { DECISION_TEXTS } from '../../../utils/__fixtures__/decisionTexts';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionView } from './DecisionView';
 
-const IDENTITY: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 };
+const IDENTITY: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
 const TESTO: DecisionText = {
   epigrafe: 'LA CORTE DI CASSAZIONE\nsezione terza civile',
   motivazione: 'Il ricorrente invoca l\'art. 2043 c.c. e,\n\nquanto al termine, l\'art. 5 della stessa disciplina.',
@@ -22,7 +22,7 @@ const textOf = (root: Element) => {
   return out;
 };
 
-const KEY = 'cassazione:civile:10787:2024';
+const KEY = 'cassazione:civile:99999:2024';
 const loadHighlights = vi.fn();
 const loadAnnotations = vi.fn();
 const addHighlight = vi.fn();
@@ -94,7 +94,7 @@ describe('DecisionReadingSurface', () => {
       version: 'vigente', show_brocardi_info: true, besideTabId: 'dec-tab',
     });
     expect(appStore.getState().readingBackStack).toEqual([
-      { tabId: 'dec-tab', blockId: 'dec-tab', articleId: '', label: 'Cass. civ., sez. III, n. 10787/2024' },
+      { tabId: 'dec-tab', blockId: 'dec-tab', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
     ]);
   });
 

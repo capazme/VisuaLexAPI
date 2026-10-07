@@ -25,13 +25,13 @@ vi.mock('../../../../services/decisionPdfService', () => ({ fetchOriginalPdf: (.
 import { DecisionDownloads } from '../DecisionDownloads';
 
 const FOUND: FoundDecision = {
-  esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 },
+  esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
   attributi: { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-22' },
   testo: { motivazione: 'Primo paragrafo.\n\nSecondo paragrafo.' },
   fonte: { nome: 'Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)' }, avvisi: [],
 };
 const CONSULTA: FoundDecision = { ...FOUND, identita: { corte: 'corte_costituzionale', numero: 71, anno: 2020 } };
-const KEY = 'cassazione:civile:10787:2024';
+const KEY = 'cassazione:civile:99999:2024';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,7 +45,7 @@ describe('DecisionDownloads', () => {
   it('«Scarica PDF» saves a file named by the model', () => {
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_10787_2024.pdf');
+    expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf');
   });
 
   it('with the option, the decision\'s own highlights are in the PDF (and only those)', () => {
@@ -72,6 +72,7 @@ describe('DecisionDownloads', () => {
     fetchOriginalPdf.mockResolvedValue(blob);
     const create = vi.fn(() => 'blob:x');
     const revoke = vi.fn();
+    const saved = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
@@ -85,6 +86,7 @@ describe('DecisionDownloads', () => {
       expect(revoke).toHaveBeenCalledWith('blob:x');
     } finally {
       vi.useRealTimers();
+      Object.assign(URL, { createObjectURL: saved.create, revokeObjectURL: saved.revoke });
     }
     expect(fetchOriginalPdf).toHaveBeenCalledWith(FOUND.identita);
   });

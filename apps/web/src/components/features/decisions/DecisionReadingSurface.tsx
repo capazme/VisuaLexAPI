@@ -13,9 +13,10 @@ import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
+import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
+import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
-import type { Annotation } from '../../../types';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { decisionKey, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
@@ -24,7 +25,6 @@ import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/an
 import { selectionAsRead } from '../../../utils/decisionText';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 
-type Rect = { x: number; y: number; width: number; height: number };
 // A decision's anchors are stored under its key with no article: the wire key is `<key>::art::`.
 const NO_ARTICLE = '';
 
@@ -48,17 +48,15 @@ export interface DecisionReadingSurfaceProps {
  */
 export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }: DecisionReadingSurfaceProps) {
   const {
-    triggerSearch, pushReadingBack, annotations, highlights, addAnnotation, removeAnnotation, updateAnnotation,
-    addHighlight, removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle,
+    triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
+    removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle,
   } = useAppStore(useShallow((s) => ({
     triggerSearch: s.triggerSearch,
     pushReadingBack: s.pushReadingBack,
     annotations: s.annotations,
     highlights: s.highlights,
-    addAnnotation: s.addAnnotation,
     removeAnnotation: s.removeAnnotation,
     updateAnnotation: s.updateAnnotation,
-    addHighlight: s.addHighlight,
     removeHighlight: s.removeHighlight,
     loadAnnotationsForArticle: s.loadAnnotationsForArticle,
     loadHighlightsForArticle: s.loadHighlightsForArticle,
@@ -116,30 +114,11 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
   const [highlightsHidden, setHighlightsHidden] = useState(false);
-  const [noteAnchor, setNoteAnchor] = useState<{ anchorText: string; startOffset: number; scopedArticleId: string } | null>(null);
-  const [composerRect, setComposerRect] = useState<Rect | null>(null);
-  const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
   }, [highlightsHidden]);
-
-  // A tap on a wavy `.note-anchor` opens that note's compact popover.
-  useEffect(() => {
-    const container = contentRef.current;
-    if (!container) return;
-    const handler = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement | null)?.closest<HTMLElement>('.note-anchor');
-      const note = target && decisionNotes.find((a) => a.id === target.getAttribute('data-note-id'));
-      if (!target || !note) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setInlineNote({ note, anchorEl: target });
-    };
-    container.addEventListener('click', handler);
-    return () => container.removeEventListener('click', handler);
-  }, [decisionNotes]);
 
   const origin = useMemo<ReadingBackEntry | undefined>(
     () => hostTabId ? { tabId: hostTabId, blockId: hostTabId, articleId: '', label } : undefined,
@@ -160,34 +139,11 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
 
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef });
 
-  const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
-    const already = decisionHighlights.some((h) => h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset);
-    if (already) {
-      setToast({ message: 'Questa occorrenza è già evidenziata', type: 'info' });
-      return;
-    }
-    addHighlight(key, NO_ARTICLE, text, '', color, startOffset);
-    setToast({ message: 'Testo evidenziato', type: 'success' });
-  };
-
-  // The rect was captured by the popup before the selection cleared: the composer sits on the words.
-  const handlePopupAddNote = (text: string, startOffset: number, rect: Rect) => {
-    setNoteAnchor({ anchorText: text, startOffset, scopedArticleId: NO_ARTICLE });
-    setComposerRect(rect);
-  };
-
-  const handleAddNote = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    addAnnotation(key, NO_ARTICLE, trimmed, noteAnchor ? { anchorText: noteAnchor.anchorText, startOffset: noteAnchor.startOffset } : undefined);
-    setToast({ message: noteAnchor ? 'Nota ancorata al testo' : 'Nota aggiunta', type: 'success' });
-    setNoteAnchor(null);
-  };
-
-  const closeComposer = () => {
-    setNoteAnchor(null);
-    setComposerRect(null);
-  };
+  const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
+  const {
+    noteAnchor, composerRect, clearAnchor, handlePopupHighlight, handlePopupAddNote, handleAddNote, closeComposer, commitComposer,
+  } = useAnnotationActions({ key, articleId: NO_ARTICLE, highlights: decisionHighlights, showToast });
+  const { inlineNote, closeInlineNote } = useInlineNoteAnchors(contentRef, decisionNotes);
 
   const exportSlug = slugify(key) || 'decisione';
   const exportNotes = () => {
@@ -241,7 +197,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         onAddNote={handleAddNote}
         onUpdateNote={updateAnnotation}
         onRemoveNote={removeAnnotation}
-        onClearAnchor={() => setNoteAnchor(null)}
+        onClearAnchor={clearAnchor}
         onExportTxt={exportNotes}
         emptyText="Nessuna nota su questa decisione."
       />
@@ -258,7 +214,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         <InlineNotePopover
           note={inlineNote.note}
           anchorEl={inlineNote.anchorEl}
-          onClose={() => setInlineNote(null)}
+          onClose={closeInlineNote}
           onUpdate={updateAnnotation}
           onRemove={removeAnnotation}
         />
@@ -267,7 +223,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         <InlineNoteComposer
           anchorRect={composerRect}
           anchorText={noteAnchor.anchorText}
-          onSave={(text) => { handleAddNote(text); setComposerRect(null); }}
+          onSave={commitComposer}
           onClose={closeComposer}
         />
       )}

@@ -5,7 +5,7 @@ vi.mock('../../services/decisionService', () => ({ fetchDecision: vi.fn() }));
 import { fetchDecision } from '../../services/decisionService';
 import { clearDecisionCache, fetchDecisionCached, forgetDecision, rememberDecision } from '../decisionFetchCache';
 
-const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 const mocked = vi.mocked(fetchDecision);
 const answer = (esito: string) => ({ esito }) as unknown as FetchDecisionAnswer;
 

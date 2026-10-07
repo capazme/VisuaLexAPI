@@ -13,7 +13,7 @@ import { fetchDecisionCached } from '../utils/decisionFetchCache';
 import { appStore } from '../store/useAppStore';
 import { useAuth } from './useAuth';
 
-const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 
 beforeEach(() => vi.mocked(fetchDecision).mockReset());
 

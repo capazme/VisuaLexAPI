@@ -5,7 +5,7 @@ vi.mock('../legalFetch', () => ({ legalFetch: (...args: unknown[]) => legalFetch
 
 import { fetchOriginalPdf } from '../decisionPdfService';
 
-const IDENTITY = { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 } as const;
+const IDENTITY = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 } as const;
 const reply = (status: number, type: string, extra: object) =>
   ({ status, ok: status < 400, headers: new Headers({ 'Content-Type': type }), ...extra }) as unknown as Response;
 

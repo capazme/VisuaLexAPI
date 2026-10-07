@@ -9,7 +9,7 @@ import type { Annotation, Highlight } from '../types';
 import { resolveAnchors } from './articleAnnotations';
 import { fetchDecisionCached } from './decisionFetchCache';
 import { identityFromKey } from './decisionLinks';
-import { decisionProjection } from './decisionRender';
+import { decisionProjection, isAnchoredNote } from './decisionRender';
 
 export interface LeftOut {
   annotations: number;
@@ -22,10 +22,6 @@ export interface LeftOut {
  * shape) is still a decision's: its anchors are left out, never taken for an article's.
  */
 const inDecisionKeySpace = (key: string) => key.startsWith('cassazione:') || key.startsWith('corte_costituzionale:');
-
-/** A note quoting words of the decision. With no quote it is free and carries none of the court's words;
- *  one with a quote but no usable offset cannot land (`resolveAnchors`), so it is left out like any that does not. */
-const isAnchoredNote = (a: Annotation) => Boolean(a.anchorText);
 
 /** Runs `task` over `items`, at most `limit` at a time: a cold decision lookup is many source requests. */
 async function mapLimited<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {

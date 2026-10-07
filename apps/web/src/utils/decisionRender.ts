@@ -132,6 +132,13 @@ export function renderDecisionHtml({ testo, highlights, annotations, signs = fal
 }
 
 /**
+ * A note that quotes words of the decision. One without a quote is free (it lives in the notes
+ * panel and carries none of the court's words); one with a quote but no usable offset is anchored
+ * and, since it cannot land, unmatched. The one definition: the box, the PDF and the exits read it.
+ */
+export const isAnchoredNote = (a: Annotation): boolean => Boolean(a.anchorText);
+
+/**
  * The anchors that do not land in the text (a note without an anchor is never one), to be listed and never dropped (spec §8.4): their
  * text was changed at the source, or the decision came without its text.
  */
@@ -141,7 +148,7 @@ export function unmatchedAnchors(
   annotations: readonly Annotation[],
 ): { highlights: Highlight[]; annotations: Annotation[] } {
   // A free note has no anchor to lose: it lives in the notes panel, never in this list.
-  const anchored = annotations.filter((a) => typeof a.startOffset === 'number' && Boolean(a.anchorText));
+  const anchored = annotations.filter(isAnchoredNote);
   const landed = resolveAnchors(decisionProjection(testo), highlights, anchored);
   const hl = new Set(landed.flatMap((a) => (a.kind === 'highlight' ? [a.highlight.id] : [])));
   const nt = new Set(landed.flatMap((a) => (a.kind === 'note' ? [a.note.id] : [])));

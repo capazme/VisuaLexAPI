@@ -5,8 +5,8 @@ import { fetchDecisionCached } from '../decisionFetchCache';
 vi.mock('../decisionFetchCache', () => ({ fetchDecisionCached: vi.fn() }));
 const fetchMock = vi.mocked(fetchDecisionCached);
 
-const KEY = 'cassazione:civile:10787:2024';
-const found = (motivazione: string) => ({ esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }, attributi: {}, testo: { motivazione }, fonte: { nome: 'f' }, avvisi: [] }) as never;
+const KEY = 'cassazione:civile:99999:2024';
+const found = (motivazione: string) => ({ esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }, attributi: {}, testo: { motivazione }, fonte: { nome: 'f' }, avvisi: [] }) as never;
 const hl = (normaKey: string, startOffset: number, text: string) => ({ id: `${normaKey}${startOffset}`, normaKey, articleId: '', text, startOffset, color: 'yellow' }) as never;
 const note = (normaKey: string, startOffset: number, anchorText: string) => ({ id: `n${startOffset}`, normaKey, articleId: '', text: 'nota', startOffset, anchorText }) as never;
 
@@ -48,6 +48,13 @@ describe('travellingAnchors', () => {
     expect(out.highlights).toHaveLength(3);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it('treats a note with a quote but no offset as anchored: it cannot land, so it is left out', async () => {
+    fetchMock.mockResolvedValue(found('Il ricorso è fondato.'));
+    const quoting = { id: 'q', normaKey: KEY, articleId: '', text: 'nota', anchorText: 'ricorso' } as never;
+    const out = await travellingAnchors({ annotations: [quoting], highlights: [] });
+    expect(out.annotations).toEqual([]);
+    expect(out.leftOut.annotations).toBe(1);
+  });
   it('lets a free note on a decision travel without asking the source: it quotes no words of the court', async () => {
     const free = { id: 'free', normaKey: KEY, articleId: '', text: 'da rivedere' } as never;
     const out = await travellingAnchors({ annotations: [free], highlights: [] });
@@ -56,7 +63,7 @@ describe('travellingAnchors', () => {
   });
   it.each([
     ['a malformed key', 'cassazione:civile:007:2024'],
-    ['a future year', 'cassazione:civile:10787:2999'],
+    ['a future year', 'cassazione:civile:99999:2999'],
     ['another shape', 'corte_costituzionale:civile:71:2020'],
   ])('leaves out the anchors on %s: it is a decision\'s key space, never an article\'s', async (_name, key) => {
     fetchMock.mockResolvedValue(found('Il ricorso è fondato.'));

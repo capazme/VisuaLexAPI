@@ -5,7 +5,7 @@ beforeEach(() => sessionStorage.clear());
 
 describe('the return address', () => {
   it('accepts only paths of the app itself', () => {
-    expect(safeReturnPath('/sentenze/cassazione/10787/2024?sezione=3')).toBe('/sentenze/cassazione/10787/2024?sezione=3');
+    expect(safeReturnPath('/sentenze/cassazione/99999/2024?sezione=3')).toBe('/sentenze/cassazione/99999/2024?sezione=3');
     for (const bad of ['//evil.example/x', '/\\evil.example', 'https://evil.example', 'javascript:alert(1)', '/\t/evil.example', '/\n/evil.example', '/\r/evil.example', '/..//x', '/.//x', '/a/..//x', '?x', '#x', '', null, 42]) {
       expect(safeReturnPath(bad)).toBeNull();
     }
