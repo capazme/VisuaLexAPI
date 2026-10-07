@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appStore } from '../useAppStore';
 
 const origin = vi.hoisted(() => ({ left: 0, top: 0, width: 0 }));
-vi.mock('../../utils/workspaceOrigin', () => ({
-  WORKSPACE_AREA_ID: 'tour-results-area',
+vi.mock('../../utils/workspaceOrigin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../utils/workspaceOrigin')>()),
   workspaceOrigin: () => ({ ...origin }),
 }));
 
@@ -113,6 +113,31 @@ describe('decision tabs', () => {
       expect(right.right).toBeLessThanOrEqual(1280 - MARGIN);
       expect(right.right).toBeGreaterThanOrEqual(1280 - MARGIN - 2);
     });
+
+    it('a decision opened with nothing on screen takes the whole free area, from the palette or the address alike', () => {
+      viewport(1280, 800, { left: 184, top: 32 });
+      appStore.setState({ sidebarVisible: true, workspaceTabs: [] });
+      const id = get().openDecisionTab(REF);
+      const t = get().workspaceTabs.find((x) => x.id === id)!;
+      expect(t.position.x + origin.left).toBe(64 + MARGIN);
+      expect(t.position.x + origin.left + t.size.width).toBe(1280 - MARGIN);
+      expect(t.position.y + origin.top + t.size.height).toBeLessThanOrEqual(DOCK_TOP(800));
+      expect(t.position.y + origin.top).toBeGreaterThanOrEqual(56);
+    });
+
+    it('a decision opened over a visible tab, without a tab to sit beside, keeps the cascade', () => {
+      viewport(1280, 800, { left: 184, top: 32 });
+      appStore.setState({ workspaceTabs: [] });
+      get().addWorkspaceTab('Codice civile');
+      const id = get().openDecisionTab(REF);
+      expect(get().workspaceTabs.find((x) => x.id === id)!.size).toEqual({ width: 800, height: 650 });
+    });
+  });
+
+  it('persists a cited section with the reference until the decision is found', () => {
+    const id = get().openDecisionTab({ ...REF, archivio: undefined, sezione: 'VII' });
+    const saved = appStore.persist.getOptions().partialize!(appStore.getState()) as { workspaceTabs: Array<{ id: string; view?: { reference: { sezione?: string } } }> };
+    expect(saved.workspaceTabs.find((t) => t.id === id)?.view?.reference.sezione).toBe('VII');
   });
 
   it('drops a malformed persisted view on rehydration, and the tab with it when empty', () => {

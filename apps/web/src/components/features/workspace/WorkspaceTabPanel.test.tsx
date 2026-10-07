@@ -24,6 +24,7 @@ vi.mock('../../../hooks/useCompare', () => ({ useCompare: () => ({ isOpen: false
 
 import { appStore } from '../../../store/useAppStore';
 import { WorkspaceTabPanel } from './WorkspaceTabPanel';
+import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
 const noop = () => {};
@@ -60,7 +61,7 @@ describe('WorkspaceTabPanel with a decision tab', () => {
       // the area is rendered together with the panel (as SearchPanel does on a reload), so it is not
       // in the document during the panel's first render
       vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-        return (this.id === 'tour-results-area' ? { ...rect } : { left: 0, top: 0, width: 0 }) as DOMRect;
+        return (this.id === WORKSPACE_AREA_ID ? { ...rect } : { left: 0, top: 0, width: 0 }) as DOMRect;
       });
     });
     afterEach(() => vi.restoreAllMocks());
@@ -69,7 +70,7 @@ describe('WorkspaceTabPanel with a decision tab', () => {
       const id = appStore.getState().addWorkspaceTab('Codice civile');
       const tab = appStore.getState().workspaceTabs.find((t) => t.id === id)!;
       return render(
-        <div id="tour-results-area"><WorkspaceTabPanel tab={tab} onViewPdf={noop} onCrossReference={noop} /></div>,
+        <div id={WORKSPACE_AREA_ID}><WorkspaceTabPanel tab={tab} onViewPdf={noop} onCrossReference={noop} /></div>,
       );
     };
 

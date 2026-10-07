@@ -130,6 +130,7 @@ export function LooseArticleCard({
             data={article}
             onCrossReferenceNavigate={onCrossReference}
             onOpenStudyMode={() => setStudyModeOpen(true)}
+            tabId={tabId}
           />
         </div>
       )}

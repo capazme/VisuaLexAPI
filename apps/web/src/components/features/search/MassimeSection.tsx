@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, Scale, ChevronDown, Filter } from 'lucide-react';
 import type { MassimaStructured } from '../../../types';
 import { cn } from '../../../lib/utils';
+import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { DecisionLink } from '../decisions/DecisionLink';
 import { brocardiDecisionRef, DECISION_PAGE_AVAILABLE, formatDecisionShort, linkableDecisionPath } from '../../../utils/decisionLinks';
 
@@ -9,6 +10,8 @@ interface MassimeSectionProps {
   massime: (string | MassimaStructured)[] | null;
   /** The workspace tab the article is in: a decision opens beside it. */
   besideTabId?: string;
+  /** The way back to the article, recorded when a decision is opened from here. */
+  backEntry?: ReadingBackEntry;
 }
 
 // Type guard to check if massima is structured
@@ -63,7 +66,7 @@ function getAuthorityColor(autorita: string | null): string {
   return 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
 }
 
-export function MassimeSection({ massime, besideTabId }: MassimeSectionProps) {
+export function MassimeSection({ massime, besideTabId, backEntry }: MassimeSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>('all');
@@ -214,11 +217,12 @@ export function MassimeSection({ massime, besideTabId }: MassimeSectionProps) {
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         {decision ? (
                           // A decision of the Cassazione or the Corte costituzionale: its short label
-                          // (source convention, D2), a link to its page when the data make one.
+                          // (source convention, D2), a link to its address when the data make one.
                           decisionPath ? (
                             <DecisionLink
                               to={decision}
                               besideTabId={besideTabId}
+                              backEntry={backEntry}
                               className={cn('px-2 py-0.5 rounded text-xs font-medium hover:underline', getAuthorityColor(m.autorita))}
                             >
                               {formatDecisionShort(decision)}

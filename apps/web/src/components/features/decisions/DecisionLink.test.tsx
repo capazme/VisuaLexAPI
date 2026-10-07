@@ -80,4 +80,41 @@ describe('DecisionLink', () => {
     expect(label).toHaveClass('chip');
     expect(label).not.toHaveAttribute('href');
   });
+
+  describe('the way back to the article', () => {
+    const BACK = { tabId: 't1', blockId: 'b1', articleId: 'a1', label: 'art. 2043 c.c.' };
+    beforeEach(() => appStore.setState({ readingBackStack: [] }));
+
+    it('is recorded before the tab opens, on a plain click on the search page', () => {
+      const order: string[] = [];
+      const push = appStore.getState().pushReadingBack;
+      appStore.setState({
+        pushReadingBack: (e: typeof BACK) => { order.push('push'); push(e); },
+        openDecisionTab: (() => { order.push('open'); return 'tab'; }) as never,
+      } as never);
+      renderAt('/', <DecisionLink to={REF} besideTabId="t1" backEntry={BACK}>x</DecisionLink>);
+      fireEvent.click(screen.getByRole('link'));
+      expect(order).toEqual(['push', 'open']);
+      expect(appStore.getState().readingBackStack).toEqual([BACK]);
+      appStore.setState({ pushReadingBack: push } as never);
+    });
+
+    it.each([
+      ['a click off the search page', '/dossier', {}],
+      ['a ctrl-click', '/', { ctrlKey: true }],
+    ])('is not recorded for %s', (_what, path, init) => {
+      renderAt(path, <DecisionLink to={REF} backEntry={BACK}>x</DecisionLink>);
+      const record = (e: Event) => e.preventDefault();
+      document.addEventListener('click', record);
+      fireEvent.click(screen.getByRole('link'), init);
+      document.removeEventListener('click', record);
+      expect(appStore.getState().readingBackStack).toEqual([]);
+    });
+
+    it('is not recorded when there is none to record', () => {
+      renderAt('/', <DecisionLink to={REF}>x</DecisionLink>);
+      fireEvent.click(screen.getByRole('link'));
+      expect(appStore.getState().readingBackStack).toEqual([]);
+    });
+  });
 });

@@ -483,7 +483,7 @@ Breaking one of these breaks the product. Read before editing.
     …" (85 characters). The rule is «at most 300 characters and mentions oscuramento»: such
     a text is never the court's. `decisions/italgiure.py` returns the decision with
     `testo == {}` and `testo_assente` `"oscuramento"`, `"valutazione_oscuramento"` or, for
-    the stub, none, which travels in `attributi` and through the caches: the page reads why
+    the stub, none, which travels in `attributi` and through the caches: the decision's tab reads why
     from it. A record with neither a text nor a notice (a missing `ocr`, a renamed field)
     comes back with `testo == {}`, no `testo_assente` and a logged warning: never present it
     as the source's anonymisation. The resolver keeps a decision without its text 24 hours

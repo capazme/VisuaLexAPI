@@ -43,7 +43,7 @@ function requiresDetails(actValue: string): boolean {
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
-    customAliases, trackAliasUsage, openAliasManager, openDecisionTab
+    customAliases, trackAliasUsage, openAliasManager, openDecisionTab, takeCommandPaletteQuery, commandPaletteQuery
   } = useAppStore(useShallow(s => ({
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
@@ -53,6 +53,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     trackAliasUsage: s.trackAliasUsage,
     openAliasManager: s.openAliasManager,
     openDecisionTab: s.openDecisionTab,
+    takeCommandPaletteQuery: s.takeCommandPaletteQuery,
+    commandPaletteQuery: s.commandPaletteQuery,
   })));
   // The box is focused as the palette opens; the first-open tour (driver.js, started 300 ms later)
   // can take that focus, so when the tour ends the box gets it back. Only if the box is still there:
@@ -73,6 +75,19 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   const [includeBrocardi, setIncludeBrocardi] = useState(true);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
+
+  // A citation handed over as the palette opens goes into the box (a decision that was not found).
+  // Adjusted during render (own state, no effect); the store's copy is then taken in an effect.
+  const [handedOver, setHandedOver] = useState<string | null>(null);
+  if (isOpen && commandPaletteQuery !== null && commandPaletteQuery !== handedOver) {
+    setHandedOver(commandPaletteQuery);
+    setInputValue(commandPaletteQuery);
+  } else if (commandPaletteQuery === null && handedOver !== null) {
+    setHandedOver(null);
+  }
+  useEffect(() => {
+    if (isOpen && commandPaletteQuery !== null) takeCommandPaletteQuery();
+  }, [isOpen, commandPaletteQuery, takeCommandPaletteQuery]);
 
   // Trigger Command Palette tour on first open
   useEffect(() => {

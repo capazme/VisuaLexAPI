@@ -12,7 +12,7 @@ const cost: SentenzaItem = { id: 's2', type: 'sentenza', addedAt: '',
   data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'C. cost. 1/2014' } };
 
 describe('DossierDecisionsSection', () => {
-  it('lists the decisions in their order, each citation a link to its page', () => {
+  it('lists the decisions in their order, each citation a link to its address', () => {
     render(<MemoryRouter><DossierDecisionsSection decisions={[cass, cost]} onRemove={vi.fn()} /></MemoryRouter>);
     const section = screen.getByRole('region', { name: 'Giurisprudenza (2)' });
     const links = within(section).getAllByRole('link');

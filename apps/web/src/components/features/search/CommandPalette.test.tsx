@@ -22,6 +22,14 @@ import { appStore } from '../../../store/useAppStore';
  * the client had no way to produce. These pin the server fallback that closes
  * that gap, and pin that it stays a FALLBACK.
  */
+// The server fallback waits 250 ms before it asks. Fake time lets a test step over that wait
+// instead of waiting for it on a loaded machine.
+function fakeTimeUser() {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  return userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+}
+const settle = () => act(async () => { await vi.advanceTimersByTimeAsync(300); });
+
 function renderPalette(onSearch = vi.fn()) {
   render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
   return onSearch;
@@ -41,31 +49,23 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('CommandPalette — act names the client does not carry', () => {
   it('asks the server when the local parse cannot name the act', async () => {
-    const user = userEvent.setup();
+    const user = fakeTimeUser();
     renderPalette();
 
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
+    await settle();
 
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/parse_query', expect.objectContaining({ method: 'POST' }));
-    }, { timeout: 3000 });
+    expect(fetch).toHaveBeenCalledWith('/parse_query', expect.objectContaining({ method: 'POST' }));
 
     // Resolved: the hint flips from "completa" to "ricerca".
-    //
-    // Same 3s budget as the wait above, deliberately. This waits on the RESULT
-    // of that very round trip, and the default 1s expired roughly once every
-    // twenty full-suite runs — never when this file runs alone, which is the
-    // signature of CPU contention rather than of a real regression.
-    await waitFor(
-      () => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument(),
-      { timeout: 3000 },
-    );
+    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
   });
 
   it('does not ask the server for a query the client already resolved', async () => {
@@ -87,12 +87,13 @@ describe('CommandPalette — act names the client does not carry', () => {
     vi.spyOn(console, 'error').mockImplementation((...args) => { errors.push(args); });
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })));
 
-    const user = userEvent.setup();
+    const user = fakeTimeUser();
     renderPalette();
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
+    await settle();
 
     // A backend that stopped answering must not be silent (CLAUDE.md gotcha 18).
-    await waitFor(() => expect(errors.length).toBeGreaterThan(0), { timeout: 3000 });
+    await waitFor(() => expect(errors.length).toBeGreaterThan(0));
     expect(screen.queryByText(/Invio Ricerca/i)).not.toBeInTheDocument();
   });
 });
@@ -164,22 +165,17 @@ describe('CommandPalette — naming an act the server resolved', () => {
       json: async () => (url === '/parse_query' ? AI_ACT : { presets: {}, known_acts: [] }),
     })));
 
-    const user = userEvent.setup();
+    const user = fakeTimeUser();
     renderPalette();
 
     const input = screen.getByPlaceholderText(/art 2043 cc/i);
     await user.type(input, 'ai act');
-    await waitFor(
-      () => expect(fetch).toHaveBeenCalledWith('/parse_query', expect.anything()),
-      { timeout: 3000 },
-    );
+    await settle();
+    expect(fetch).toHaveBeenCalledWith('/parse_query', expect.anything());
     await user.type(input, '{Enter}');
 
     // No article in the parse, so the palette moves on to collect one.
-    // Explicit budget for the same reason as above.
-    expect(
-      await screen.findByText(/Regolamento UE n\. 1689 del 2024/i, undefined, { timeout: 3000 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Regolamento UE n\. 1689 del 2024/i)).toBeInTheDocument();
     expect(screen.getByText('Regolamento UE')).toBeInTheDocument();
   });
 });
@@ -299,13 +295,14 @@ describe('CommandPalette — a decision named in the box', () => {
 
   it('opens the decision even when a norm answer from the server is still around', async () => {
     appStore.setState({ openDecisionTab } as never);
-    const user = userEvent.setup();
+    const user = fakeTimeUser();
     const onSearch = vi.fn();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
 
     // a norm query is answered by the server first, then the box turns into a decision
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument(), { timeout: 3000 });
+    await settle();
+    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
     await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 10787/2024');
     await user.keyboard('{Enter}');
@@ -365,18 +362,31 @@ describe('CommandPalette — focus on opening', () => {
     renderPalette();
     const box = screen.getByPlaceholderText(/art 2043 cc/i);
     // the tour took the focus (driver.js moves it into its popover)
+    vi.useFakeTimers();
     box.blur();
     expect(box).not.toHaveFocus();
     act(() => { tour.onComplete?.('commandPalette'); });
-    await waitFor(() => expect(box).toHaveFocus());
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(box).toHaveFocus();
   });
 
   it('leaves the focus alone when another tour ends', async () => {
     renderPalette();
     const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    vi.useFakeTimers();
     box.blur();
     act(() => { tour.onComplete?.('welcome'); });
-    await new Promise((r) => setTimeout(r, 20));
+    act(() => { vi.advanceTimersByTime(1000); });
     expect(box).not.toHaveFocus();
+  });
+});
+
+describe('CommandPalette — a citation handed over as it opens', () => {
+  it('puts it in the box, reads it as a decision, and takes it once', async () => {
+    appStore.setState({ commandPaletteQuery: 'Cass. civ., n. 10787/2024' });
+    renderPalette();
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('Cass. civ., n. 10787/2024');
+    expect(await screen.findByText('Sentenza → Cass. civ., n. 10787/2024')).toBeInTheDocument();
+    expect(appStore.getState().commandPaletteQuery).toBeNull();
   });
 });

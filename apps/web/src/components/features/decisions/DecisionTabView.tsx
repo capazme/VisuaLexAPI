@@ -13,13 +13,17 @@ import { DecisionView } from './DecisionView';
  */
 export function DecisionTabView({ tabId, reference }: { tabId: string; reference: DecisionReference }) {
   const setIdentity = useAppStore((s) => s.setDecisionTabIdentity);
-  const openPalette = useAppStore((s) => s.openCommandPalette);
+  const openPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const takeFocusRequest = useAppStore((s) => s.takeDecisionFocusRequest);
   const focusRequested = useAppStore((s) => s.decisionFocusRequest === tabId);
   const panelRef = useRef<HTMLDivElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; answer: FetchDecisionAnswer } | null>(null);
-  const [current, setCurrent] = useState(reference);
+  // A candidate the reader chose in this copy. It stands only while the tab's own reference is the
+  // one it was chosen from: once the store learns the identity (`setDecisionTabIdentity`), the
+  // reference changes and every copy of this tab, the hidden one too, follows it.
+  const [chosen, setChosen] = useState<{ from: string; reference: DecisionReference } | null>(null);
+  const current = chosen && chosen.from === decisionPath(reference) ? chosen.reference : reference;
   const key = `${decisionPath(current)}#${attempt}`;
 
   useEffect(() => {
@@ -44,10 +48,12 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
 
   // The reader chose a candidate in another tab that turned out to be this one: the tab they were
   // in is gone, so keyboard focus comes here rather than falling to the page.
+  // The desktop panel and the phone view are both mounted at every width and one of them is hidden:
+  // only the copy that is on screen takes the request (a hidden element cannot be focused).
   useEffect(() => {
-    if (focusRequested && takeFocusRequest(tabId)) {
-      const panel = panelRef.current;
-      (panel?.querySelector<HTMLElement>('[data-decision-heading]') ?? panel)?.focus();
+    const panel = panelRef.current;
+    if (focusRequested && panel && panel.getClientRects().length > 0 && takeFocusRequest(tabId)) {
+      (panel.querySelector<HTMLElement>('[data-decision-heading]') ?? panel)?.focus();
     }
   }, [focusRequested, takeFocusRequest, tabId]);
 
@@ -57,8 +63,8 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
         answer={answer}
         reference={current}
         onRetry={() => { forgetDecision(current); setAttempt((a) => a + 1); }}
-        onChooseCandidate={(identity) => setCurrent(identity)}
-        onOpenPalette={openPalette}
+        onChooseCandidate={(identity) => setChosen({ from: decisionPath(reference), reference: identity })}
+        onOpenPalette={() => openPaletteWith(formatDecisionShort(current))}
       />
     </div>
   );

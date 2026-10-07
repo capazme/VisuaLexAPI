@@ -3,7 +3,7 @@ import type { FetchDecisionAnswer } from '../../types/decisions';
 
 vi.mock('../../services/decisionService', () => ({ fetchDecision: vi.fn() }));
 import { fetchDecision } from '../../services/decisionService';
-import { fetchDecisionCached, forgetDecision } from '../decisionFetchCache';
+import { clearDecisionCache, fetchDecisionCached, forgetDecision } from '../decisionFetchCache';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
 const mocked = vi.mocked(fetchDecision);
@@ -69,6 +69,16 @@ describe('fetchDecisionCached', () => {
     await fetchDecisionCached(REF);
     reject(new Error('late'));
     await expect(old).rejects.toThrow('late');
+    await fetchDecisionCached(REF);
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('clearDecisionCache', () => {
+  it('forgets every answer, so the next caller asks again', async () => {
+    mocked.mockResolvedValue(answer('trovata'));
+    await fetchDecisionCached(REF);
+    clearDecisionCache();
     await fetchDecisionCached(REF);
     expect(mocked).toHaveBeenCalledTimes(2);
   });

@@ -49,7 +49,7 @@ export function linkableDecisionPath(raw: LooseDecisionRef, now: Date = new Date
  * §4). The paths are a contract with LibreLex and the MERL-T graph: never rename them.
  */
 
-// --- The strict part: resolved identities and parsed references (the page, the dossier). ---
+// --- The strict part: resolved identities and parsed references (the decision tab, the dossier). ---
 
 export const DECISIONS_PATH = '/sentenze';
 export const MAX_NUMERO = 999_999;
@@ -118,7 +118,7 @@ const TIPO_ABBR: Record<string, string> = {
   sentenza: 'sent.', ordinanza: 'ord.', 'ordinanza interlocutoria': 'ord. interl.', decreto: 'decr.',
 };
 
-/** A section code as the source gives it (1-7, L, U, F) in the page's words. */
+/** A section code as the source gives it (1-7, L, U, F) in the view's words. */
 export function sectionName(code: string): string {
   if (code === 'U') return 'Sezioni Unite';
   if (code === 'L') return 'Sez. Lavoro';
@@ -251,10 +251,10 @@ function sectionWithArticle(code: string): { of: string; the: string; plural: bo
 const ARCHIVE_PLURAL: Record<DecisionArchive, string> = { civile: 'civili', penale: 'penali' };
 
 /**
- * A notice in the page's words. `citata`, sent only for a short plain form, is quoted as
- * written, and the page renders the string as text, never HTML. `attrs` says why a text is
+ * A notice in the view's words. `citata`, sent only for a short plain form, is quoted as
+ * written, and the view renders the string as text, never HTML. `attrs` says why a text is
  * missing (`testo_assente`), and only when the source said so; without it no reason is given.
- * A kind of notice this page does not know gets a plain sentence, never nothing.
+ * A kind of notice this view does not know gets a plain sentence, never nothing.
  */
 export function describeNotice(notice: DecisionNotice, attrs: DecisionAttributes = {}): string {
   switch (notice.tipo) {
@@ -296,7 +296,7 @@ export function describeNotice(notice: DecisionNotice, attrs: DecisionAttributes
 /**
  * Why a decision was not found, in words that never claim it does not exist: an archive holds
  * what it holds. The archive's start is read from the archive and can be missing. A reason this
- * page does not know gets a sentence that only says the decision was not found.
+ * view does not know gets a sentence that only says the decision was not found.
  */
 export function notFoundMessage(answer: NotFoundDecision, ref: DecisionReference): string {
   if (answer.motivo === 'fuori_archivio') {
@@ -329,7 +329,7 @@ export function notFoundMessage(answer: NotFoundDecision, ref: DecisionReference
 /**
  * An address that may go into an `href`: the one given, as it parses, when it is an absolute https
  * address; null for anything else (http, `javascript:`, `data:`, a protocol-relative `//host`, a
- * relative path, a string that is no address, nothing). The page links what was checked: the parsed
+ * relative path, a string that is no address, nothing). The view links what was checked: the parsed
  * form leaves a browser no second reading of `https:host`. Our server builds the source links from
  * fixed bases, so this is defence in depth, for the day that stops being so.
  */

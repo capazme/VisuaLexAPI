@@ -21,7 +21,7 @@ Python API and MERL-T. Design: `docs/superpowers/specs/2026-10-04-source-convent
     "id": "…", "note": "…",
     "input": { "reference": { "corte": "cassazione", "archivio": "civile", "numero": 31310, "anno": 2024, "sezione": "U" },
                "attributes": { "tipo": "sentenza", "data_deposito": "2024-12-06" }, "rv": ["…"], "legacy_keys": ["…"] },
-    "identity": { "fields": E, "key": E, "path": E, "reference_path": E },   // reference_path: a reference with no archive, which the page resolves
+    "identity": { "fields": E, "key": E, "path": E, "reference_path": E },   // reference_path: a reference with no archive, which the route resolves
     "labels": { "citation": E, "short": E, "short_with_rv": E }
   }]
 }

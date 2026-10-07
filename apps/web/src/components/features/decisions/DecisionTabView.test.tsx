@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { DecisionReference, FetchDecisionAnswer } from '../../../types/decisions';
 
 const fetchDecision = vi.fn();
@@ -9,6 +9,7 @@ vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => nu
 import { appStore } from '../../../store/useAppStore';
 import { forgetDecision } from '../../../utils/decisionFetchCache';
 import { DecisionTabView } from './DecisionTabView';
+import { renderTabView } from '../workspace/renderTabView';
 
 const CIVILE = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
 const PENALE = { ...CIVILE, archivio: 'penale' as const };
@@ -42,22 +43,34 @@ beforeEach(() => {
   appStore.setState({ workspaceTabs: [], commandPaletteOpen: false });
 });
 
+// jsdom has no layout: an element counts as rendered unless it sits under a [data-copy="hidden"] one
+const originalClientRects = HTMLElement.prototype.getClientRects;
+beforeEach(() => {
+  HTMLElement.prototype.getClientRects = function (this: HTMLElement) {
+    return (this.closest('[data-copy="hidden"]') ? [] : [{}]) as unknown as DOMRectList;
+  };
+});
+afterEach(() => { HTMLElement.prototype.getClientRects = originalClientRects; });
+
 describe('DecisionTabView', () => {
-  it('names the tab with the short form, section included, and keeps the section out of the stored reference', async () => {
+  it('sends the cited section to the route, names the tab with it, and stores the bare identity once found', async () => {
     fetchDecision.mockResolvedValue(foundOf(PENALE, '7'));
-    const { id, tab } = openTab({ ...PENALE, sezione: 'VII' });
-    render(<DecisionTabView tabId={id} reference={{ ...PENALE, sezione: 'VII' }} />);
+    // the production path: the store holds the reference, renderTabView draws the tab from it
+    const { id, tab } = openTab({ ...AMBIGUA_REF, sezione: 'VII' });
+    expect(tab().view).toEqual({ kind: 'decision', reference: { ...AMBIGUA_REF, sezione: 'VII' } });
+    render(<>{renderTabView(tab(), tab().view!)}</>);
     expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(fetchDecision).toHaveBeenCalledWith({ ...AMBIGUA_REF, sezione: 'VII' });
     await waitFor(() => expect(tab().label).toBe('Cass. pen., sez. VII, n. 10787/2024'));
     expect(tab().view).toEqual({ kind: 'decision', reference: PENALE });
-    expect(fetchDecision).toHaveBeenCalledWith({ ...PENALE, sezione: 'VII' });
+    expect(id).toBe(tab().id);
   });
 
   it('opens a candidate in the same tab', async () => {
     fetchDecision.mockImplementation(async (ref: DecisionReference) => (ref.archivio ? foundOf(ref, '7') : AMBIGUOUS));
     const { id, tab } = openTab(AMBIGUA_REF);
     render(<DecisionTabView tabId={id} reference={AMBIGUA_REF} />);
-    fireEvent.click((await screen.findAllByRole('link'))[1]);
+    fireEvent.click(await screen.findByRole('link', { name: /Sez\. VII penale/ }));
     expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
     await waitFor(() => expect(tab().view).toEqual({ kind: 'decision', reference: PENALE }));
     expect(appStore.getState().workspaceTabs).toHaveLength(1);
@@ -73,7 +86,7 @@ describe('DecisionTabView', () => {
     const { id, tab } = openTab(AMBIGUA_REF);
     render(<DecisionTabView tabId={id} reference={AMBIGUA_REF} />);
     const labelBefore = tab().label;
-    fireEvent.click((await screen.findAllByRole('link'))[0]);
+    fireEvent.click(await screen.findByRole('link', { name: /Sez\. III civile/ }));
     expect(await screen.findByRole('status')).toBeInTheDocument();
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(tab().label).toBe(labelBefore);
@@ -121,6 +134,8 @@ describe('DecisionTabView', () => {
     render(<DecisionTabView tabId={id} reference={CIVILE} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Cerca nella barra di ricerca' }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
+    // with the citation typed in, ready to be corrected
+    expect(appStore.getState().commandPaletteQuery).toBe('Cass. civ., n. 10787/2024');
   });
 });
 
@@ -145,5 +160,48 @@ describe('DecisionTabView — focus after a merge of two tabs', () => {
     expect(Object.keys(saved)).not.toContain('decisionFocusRequest');
     appStore.setState({ decisionFocusRequest: null });
     expect(appStore.getState().workspaceTabs.map((t) => t.id)).toEqual([penal.id]);
+  });
+});
+
+describe('DecisionTabView — the desktop panel and the phone view, both mounted', () => {
+  function renderTwoCopies(ref: DecisionReference, id: string) {
+    return render(
+      <>
+        <div data-copy="hidden"><DecisionTabView tabId={id} reference={ref} /></div>
+        <div data-copy="shown"><DecisionTabView tabId={id} reference={ref} /></div>
+      </>,
+    );
+  }
+
+  it('gives the focus request to the copy that is on screen, hidden one first in the tree', async () => {
+    fetchDecision.mockResolvedValue(foundOf(PENALE, '7'));
+    const penal = openTab(PENALE);
+    renderTwoCopies(PENALE, penal.id);
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(2));
+    const [, shownHeading] = screen.getAllByRole('heading', { level: 4 });
+    const other = openTab(CIVILE);
+    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 10787/2024'); });
+    await waitFor(() => expect(shownHeading).toHaveFocus());
+    expect(appStore.getState().decisionFocusRequest).toBeNull();
+  });
+
+  it('follows the identity the store learns in both copies, not only in the one the reader used', async () => {
+    fetchDecision.mockImplementation(async (ref: DecisionReference) => (ref.archivio ? foundOf(ref, '7') : AMBIGUOUS));
+    const { id } = openTab(AMBIGUA_REF);
+    const view = (ref: DecisionReference) => (
+      <>
+        <div data-copy="hidden"><DecisionTabView tabId={id} reference={ref} /></div>
+        <div data-copy="shown"><DecisionTabView tabId={id} reference={ref} /></div>
+      </>
+    );
+    const { rerender, container } = render(view(AMBIGUA_REF));
+    const shown = () => container.querySelector('[data-copy="shown"]') as HTMLElement;
+    const hidden = () => container.querySelector('[data-copy="hidden"]') as HTMLElement;
+    fireEvent.click(await within(shown()).findByRole('link', { name: /Sez\. VII penale/ }));
+    expect(await within(shown()).findByRole('heading', { level: 4 })).toHaveTextContent(/penale/);
+    // the store now holds the identity; the tab's reference changes for both copies
+    rerender(view(PENALE));
+    expect(await within(hidden()).findByRole('heading', { level: 4 })).toHaveTextContent(/penale/);
+    expect(within(hidden()).queryAllByRole('link')).toHaveLength(0);
   });
 });

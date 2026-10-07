@@ -9,8 +9,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
-  address queues the decision for the search space to open as a tab, `/sentenze` alone or an
-  address that does not parse opens the palette, and says why in the error toast (`pushSyncError`); the addresses stay the contract with LibreLex
+  address queues the decision for the search space to open as a tab; `/sentenze` alone and an
+  address that does not parse both open the palette, and only the address that does not parse
+  says why, in the error toast (`pushSyncError`); the addresses stay the contract with LibreLex
   and the graph), then the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
   `/grafo` (`/merlt/qa` and `/merlt/chiedi` redirect to `/grafo`), and a 404 for
   anything else. The MERL-T routes are always registered: `VITE_FEATURE_MERLT`
@@ -264,15 +265,21 @@ one tab per decision (`openDecisionTab` brings an open one to the front; `setDec
 closes the tab a candidate was chosen in when another already holds that decision, and asks the
 survivor to take keyboard focus), it opens beside the article when given `besideTabId`
 (`placeSideBySide`, in viewport pixels converted through `utils/workspaceOrigin.ts`), and it is
-persisted by identity only: the text is fetched again through `utils/decisionFetchCache.ts`. On a
+persisted by its reference until the route has found it, then by identity (a cited section
+travels with the reference to the route, which uses it to tell homonyms apart): the text is fetched again through `utils/decisionFetchCache.ts`. On a
 phone one tab shows at a time, and a decision just opened becomes the visible one. The ways in:
 the palette (a citation such as «Cass. civ. 10787/2024» is read by `decisionCitationParser.ts`
 before the norm parser, unless the first word is one of the user's alias triggers; Enter opens
-the tab), `DecisionLink` (a plain click on the search page opens the tab beside the article, any
+the tab; with no other tab on screen a new decision takes the whole free area), `DecisionLink` (a
+plain click on the search page opens the tab beside the article and, given a `backEntry`, records
+the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as for a citation jump; any
 other click follows the real `href`, which `DecisionAddress` turns into the same tab), the
 sidebar's «Sentenze» (a button: it opens the palette, there is no page) and the address itself
 (queued in `pendingDecision`, drained by `SearchPanel`). Highlights and notes do not exist on
-decisions yet (gotcha 23).
+decisions yet (gotcha 23). «Cerca nella barra di ricerca», on a decision that was not found, opens the
+palette with its citation typed in (`openCommandPaletteWith`, taken once). The desktop panel and
+the phone view both mount a `DecisionTabView` for the same tab, one of them hidden: only the copy
+on screen takes the focus request, and both follow the identity the store learns.
 
 ### Dossier
 
@@ -392,10 +399,10 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/decisionCitationParser.ts` — `parseDecisionCitation(input, { aliasTriggers })`: a decision as
   typed in the palette; it reads only an input that starts with a court and needs number and year.
   `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session
-  (50 answers, least recently used out; a failure is not kept). `utils/workspaceOrigin.ts` — where a
+  (50 answers, least recently used out; a failure is not kept; `clearDecisionCache` at logout). `utils/workspaceOrigin.ts` — where a
   tab's (0, 0) is on screen, and the drag limits.
 - `utils/decisionLinks.ts` — the addresses of court decisions (`decisionPath`,
-  `parseDecisionPath`, `decisionKey`) and their names (`formatDecisionHeading`,
+  `parseDecisionPath`, `decisionKey`, `identityFromKey` and `isDecisionKey`, which read a key back) and their names (`formatDecisionHeading`,
   `formatDecisionCitation`, and `formatDecisionShort` — «Cass. civ., sez. un., n.
   31310/2024 · Rv. …», for chips and lists — both pinned to
   `conventions/sources/golden.json`); `brocardiDecisionRef` reads the court a Brocardi

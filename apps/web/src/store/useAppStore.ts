@@ -299,6 +299,9 @@ interface AppState {
     // UI State
     sidebarVisible: boolean;
     commandPaletteOpen: boolean;
+    /** A citation to put in the palette's box as it opens («Cerca nella barra di ricerca» on a decision
+     *  that was not found); taken once by the palette. Session-only, absent from `partialize`. */
+    commandPaletteQuery: string | null;
     quickNormsManagerOpen: boolean;
     aliasManagerOpen: boolean;
     searchPanelState: SearchPanelState;
@@ -357,6 +360,8 @@ interface AppState {
     toggleSidebar: () => void;
     setSidebarVisible: (visible: boolean) => void;
     openCommandPalette: () => void;
+    openCommandPaletteWith: (query: string) => void;
+    takeCommandPaletteQuery: () => string | null;
     closeCommandPalette: () => void;
     openQuickNormsManager: () => void;
     closeQuickNormsManager: () => void;
@@ -577,6 +582,7 @@ const appStore = createStore<AppState>()(
             // UI State
             sidebarVisible: true,
             commandPaletteOpen: false,
+            commandPaletteQuery: null,
             quickNormsManagerOpen: false,
             aliasManagerOpen: false,
             searchPanelState: {
@@ -691,6 +697,10 @@ const appStore = createStore<AppState>()(
                 // Each user should start with a clean workspace
                 state.workspaceTabs = [];
                 state.highestZIndex = 100;
+                // a decision asked for, a focus asked for, a citation waiting for the palette
+                state.pendingDecision = null;
+                state.decisionFocusRequest = null;
+                state.commandPaletteQuery = null;
             }),
 
             // UI Actions
@@ -705,6 +715,17 @@ const appStore = createStore<AppState>()(
             openCommandPalette: () => set((state) => {
                 state.commandPaletteOpen = true;
             }),
+
+            openCommandPaletteWith: (query) => set((state) => {
+                state.commandPaletteOpen = true;
+                state.commandPaletteQuery = query;
+            }),
+
+            takeCommandPaletteQuery: () => {
+                const query = get().commandPaletteQuery;
+                if (query !== null) set((state) => { state.commandPaletteQuery = null; });
+                return query;
+            },
 
             closeCommandPalette: () => set((state) => {
                 state.commandPaletteOpen = false;
@@ -740,11 +761,14 @@ const appStore = createStore<AppState>()(
                 set((state) => {
                     const existing = state.workspaceTabs.find(t =>
                         t.view?.kind === 'decision' && sameDecision(t.view.reference, reference));
-                    const tab = existing ?? newViewTab(state, formatDecisionShort(reference), { kind: 'decision', reference: stripSection(reference) });
+                    const nothingOnScreen = !state.workspaceTabs.some(t => !t.isHidden && !t.isMinimized);
+                    const tab = existing ?? newViewTab(state, formatDecisionShort(reference), { kind: 'decision', reference });
                     tab.isHidden = false;
                     tab.isMinimized = false;
                     if (existing) tab.zIndex = ++state.highestZIndex;
                     if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
+                    // with nothing else on screen a new decision takes the free area (design §2.2)
+                    else if (!existing && nothingOnScreen) fillFreeArea(state, tab.id);
                     tabId = tab.id;
                 });
                 return tabId;
@@ -3128,14 +3152,6 @@ function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
     });
 }
 
-/** A reference keeps its section only until the route has resolved it; a tab is keyed by court,
- *  archive, number and year, so two citations of one decision share a tab. */
-function stripSection(ref: DecisionReference): DecisionReference {
-    const { sezione: _sezione, ...rest } = ref;
-    void _sezione;
-    return rest;
-}
-
 /** A query as a string that does not depend on key order. */
 function stableQueryKey(query: DecisionSearchQuery): string {
     const sorted = (o: object) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)));
@@ -3179,21 +3195,37 @@ const SIDE_BY_SIDE_BOTTOM = 88; // above the collapsed dock (24 + ~44) with a ga
  *  pixels (minus the static sidebar when shown, clear of the floating buttons and the dock), then
  *  each target is turned into tab coordinates by subtracting the workspace origin, because a
  *  tab's x/y are offsets from there (utils/workspaceOrigin.ts). */
-function placeSideBySide(state: AppState, leftId: string, rightId: string) {
-    const left = state.workspaceTabs.find(t => t.id === leftId);
-    const right = state.workspaceTabs.find(t => t.id === rightId);
-    if (!left || !right || left.id === right.id) return;
+function freeArea(state: AppState) {
     const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
     const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
     const origin = workspaceOrigin();
     const sidebarShown = vw >= LAYOUT_LG_BREAKPOINT && state.sidebarVisible && !state.settings.focusMode;
     const x0 = sidebarShown ? LAYOUT_SIDEBAR_WIDTH : 0;
     const m = SIDE_BY_SIDE_MARGIN;
-    const half = Math.floor((vw - x0 - m * 3) / 2);
-    const height = Math.max(240, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_BOTTOM);
-    const y = SIDE_BY_SIDE_TOP - origin.top;
+    return {
+        origin, x0, m,
+        width: vw - x0 - m * 2,
+        height: Math.max(240, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_BOTTOM),
+        y: SIDE_BY_SIDE_TOP - origin.top,
+    };
+}
+
+function placeSideBySide(state: AppState, leftId: string, rightId: string) {
+    const left = state.workspaceTabs.find(t => t.id === leftId);
+    const right = state.workspaceTabs.find(t => t.id === rightId);
+    if (!left || !right || left.id === right.id) return;
+    const { origin, x0, m, width, height, y } = freeArea(state);
+    const half = Math.floor((width - m) / 2);
     Object.assign(left, { position: { x: x0 + m - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
     Object.assign(right, { position: { x: x0 + m * 2 + half - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
+}
+
+/** One tab on the whole free area (same clearances as `placeSideBySide`). */
+function fillFreeArea(state: AppState, tabId: string) {
+    const tab = state.workspaceTabs.find(t => t.id === tabId);
+    if (!tab) return;
+    const { origin, x0, m, width, height, y } = freeArea(state);
+    Object.assign(tab, { position: { x: x0 + m - origin.left, y }, size: { width, height }, isHidden: false, isMinimized: false });
 }
 
 export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };

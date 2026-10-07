@@ -32,6 +32,11 @@ export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisi
   return pending;
 }
 
+/** Everything kept, at logout: the next reader of this browser starts with nothing of the last one's. */
+export function clearDecisionCache(): void {
+  answers.clear();
+}
+
 export function forgetDecision(ref: DecisionReference): void {
   answers.delete(decisionPath(ref));
 }
