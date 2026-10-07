@@ -18,6 +18,7 @@ vi.mock('../../../plugins/PluginSlot', () => ({
 }));
 import { searchDecisions } from '../../../services/decisionSearchService';
 import { CaseLawSection } from './CaseLawSection';
+import { massimeStateOf } from './massimeState';
 
 const NORMA: NormaVisitata = {
   tipo_atto: 'codice civile', numero_articolo: '2043', data: '1942-03-16', numero_atto: '262', allegato: '2',
@@ -112,6 +113,8 @@ describe('CaseLawSection', () => {
     expect(screen.getByRole('heading', { name: 'Massime (Brocardi)' })).toBeInTheDocument();
     expect(screen.getByText('Brocardi.it non ha risposto: le massime non sono disponibili ora.')).toBeInTheDocument();
     expect(screen.queryByText(/non riporta massime/)).toBeNull();
+    // a source that gave nothing is not credited
+    expect(screen.queryByText('Fonte: Brocardi.it')).toBeNull();
   });
 
   it('shows no massime subsection when Brocardi was not asked', async () => {
@@ -154,5 +157,16 @@ describe('CaseLawSection', () => {
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
     get.mockRestore();
     set.mockRestore();
+  });
+});
+
+describe('massimeStateOf', () => {
+  it.each([
+    ['a past text', false, { Massime: [] }, undefined, 'hidden'],
+    ['Brocardi answered', true, { Massime: [] }, undefined, 'answered'],
+    ['Brocardi failed', true, undefined, 'timeout', 'failed'],
+    ['Brocardi not asked', true, undefined, undefined, 'hidden'],
+  ] as const)('%s', (_label, doctrineVisible, info, error, expected) => {
+    expect(massimeStateOf(doctrineVisible, info, error)).toBe(expected);
   });
 });

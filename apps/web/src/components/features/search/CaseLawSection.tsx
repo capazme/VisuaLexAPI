@@ -12,6 +12,7 @@ import { PluginSlot } from '../../../plugins/PluginSlot';
 import { getSlotComponents } from '../../../plugins/registry';
 import { DecisionResultList } from '../decisions/DecisionResultList';
 import { MassimeSection } from './MassimeSection';
+import type { MassimeState } from './massimeState';
 
 interface CaseLawSectionProps {
   norma: NormaVisitata;
@@ -22,7 +23,7 @@ interface CaseLawSectionProps {
    * saying it did not answer: a failure is never shown as an absence), `hidden` (a past text, gotcha 32,
    * or Brocardi was not asked): no subsection.
    */
-  massimeState?: 'answered' | 'failed' | 'hidden';
+  massimeState?: MassimeState;
   /** The article's page on Brocardi, credited beside the massime. */
   brocardiLink?: string | null;
   articleUrn?: string;
@@ -121,13 +122,13 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
                 <h4 id={`${panelId}-massime`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Massime (Brocardi)
                 </h4>
-                <p className="text-[11px] text-slate-400">
+                {massimeState === 'answered' && <p className="text-[11px] text-slate-400">
                   {sourceLink ? (
                     <a href={sourceLink} target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600 dark:hover:text-slate-200">
                       {DOCTRINE_ATTRIBUTION}
                     </a>
                   ) : DOCTRINE_ATTRIBUTION}
-                </p>
+                </p>}
                 {massimeState === 'failed' ? (
                   <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non ha risposto: le massime non sono disponibili ora.`}</p>
                 ) : hasMassime ? (

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { CaseLawSection } from './CaseLawSection';
+import { massimeStateOf } from './massimeState';
 import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
@@ -1196,7 +1197,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 norma={norma_data}
                 massime={brocardi_info?.Massime ?? null}
                 // Brocardi answered (info present), or failed (error present); not asked: no subsection
-                massimeState={!display.doctrineVisible ? 'hidden' : brocardi_info !== undefined ? 'answered' : data.brocardi_error ? 'failed' : 'hidden'}
+                massimeState={massimeStateOf(display.doctrineVisible, brocardi_info, data.brocardi_error)}
                 brocardiLink={brocardi_info?.link}
                 articleUrn={norma_data.urn}
                 tabId={originTabId ?? tabId}
