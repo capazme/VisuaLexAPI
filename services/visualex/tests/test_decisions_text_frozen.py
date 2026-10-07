@@ -55,12 +55,16 @@ def _pdf_with_dispositivo() -> bytes:
                           "Ministero competente, avverso la sentenza della Corte di appello,",
                           "visti gli atti della CORTE DEI CONTI -",
                           "SEZIONI RIUNITE, depositati il giorno stabilito."])        # space joins
-    p0 += _flow(85, 560, ["Udita la relazione svolta dal consigliere, si osserva che il",
+    p0 += [Text(85, 584, "Il giudice del (cid:9)rinvio ha deciso la causa."),             # an unmapped glyph
+           Text(85, 570, "la parte ricorrente nei confronti dell'"),                      # one baseline,
+           Text(330, 570, "ASSESSORATO COMPETENTE"),                                       # two pieces
+           Text(540, 560, "(A,", size=18)]                                                # margin debris
+    p0 += _flow(85, 536, ["Udita la relazione svolta dal consigliere, si osserva che il",
                           "territorio dell'Emilia-", "Romagna era compreso nell'appalto."])  # a gap, a hyphen
-    p0 += [Text(255, 500, "FATTI DI CAUSA"),                                              # a heading
-           Text(85, 486, "La societa ricorrente ha agito in giudizio contro l'amministrazione."),
-           Text(100, 472, "La Corte di appello ha rigettato la domanda,"),                # an indent
-           Text(85, 458, "ritenendo il contratto privo dei requisiti di forma.")]
+    p0 += [Text(255, 490, "FATTI DI CAUSA"),                                              # a heading
+           Text(85, 476, "La societa ricorrente ha agito in giudizio contro l'amministrazione."),
+           Text(100, 462, "La Corte di appello ha rigettato la domanda,"),                # an indent
+           Text(85, 448, "ritenendo il contratto privo dei requisiti di forma.")]
     p0 += [Text(85, 74, "Il Presidente estensore"),
            Text(85, 51, "Ric. 2020 n. 12345 sez. SU - ud. 14-12-2021")]
     p1 = [Text(85, 800, "r.g. n. 27512/2022"),
@@ -71,7 +75,7 @@ def _pdf_with_dispositivo() -> bytes:
           Text(65, 652, "612.000,00 subordinatamente alla prova della somma."),            # not a point
           Text(85, 76, "Il Presidente estensore"),
           Text(85, 51, "2"), Text(140, 51, "Ric. 2021 n. 09083 sez. SU - ud. 08-02-2022"),
-          Text(290, 32, "-2-")]
+          Text(290, 32, "-2-"), Text(250, 20, "Pag. 2 di 3")]
     p2 = [Text(85, 800, "r.g. n. 27512/2022"),
           Text(85, 700, "Il secondo motivo e' fondato e la sentenza va cassata."),
           Text(255, 660, "P.Q.M."),
@@ -176,4 +180,8 @@ def test_the_cases_exercise_what_they_claim():
     assert "dispositivo" not in CASES["synthetic_pdf_without_dispositivo"]
     assert CASES["synthetic_corte_cost_epigrafe_split"]["motivazione"].startswith("Ritenuto")
     assert "Emilia-Romagna" in projection(CASES["synthetic_pdf_with_dispositivo"])
-    assert "CONTI - SEZIONI" in projection(CASES["synthetic_pdf_with_dispositivo"])
+    pdf = projection(CASES["synthetic_pdf_with_dispositivo"])
+    assert "CONTI - SEZIONI" in pdf
+    assert "del rinvio ha deciso" in pdf and "cid:" not in pdf
+    assert "dell'ASSESSORATO" not in pdf and "dell' ASSESSORATO COMPETENTE" in pdf
+    assert "(A," not in pdf and "Pag. 2 di 3" not in pdf and "Pag." not in pdf

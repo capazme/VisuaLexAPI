@@ -126,19 +126,21 @@ did not create.
     elements but never add, drop or change one — `articleRender.test.ts`
     checks the rendered text nodes against `article_text` on 27 real texts,
     with the annotation signs on (a sign has no text node).
-    Decision texts are held to the same contract since 2026-10-05 (notes and
-    highlights on decisions): the readers in
+    (Inserting only `\n` would not move any offset — newlines are invisible in
+    the projection — but the saved-norm watcher compares `article_text`
+    verbatim, so it would still raise false "changed" notifications.)
+    Decision texts are held to the same contract (notes and highlights on
+    decisions, planned): the readers in
     `services/visualex/visualex_api/services/decisions/` — the Cassazione's text
     from the court's PDF (`pdf_text.py`), its fallback from the text field, the
     Corte costituzionale's open data — may add or move `\n` and move a boundary
     between blocks, never change another character. The anchors count characters
     in the projection: each block stripped at its edges, concatenated, every `\n`
     removed. `test_decisions_text_frozen.py` (synthetic cases) and its `_local`
-    twin (real decisions kept out of the repository) compare each reader's
-    projection with a stored SHA-256 and length, never the text, and
-    `decisionRender.test.ts` checks the rendered text nodes; an anchor that no
-    longer matches is listed in the decision tab, never dropped. The freeze takes
-    effect with the pull request that first stores notes on decisions.
-    (Inserting only `\n` would not move any offset — newlines are invisible in
-    the projection — but the saved-norm watcher compares `article_text`
-    verbatim, so it would still raise false "changed" notifications.)
+    twin (real decisions kept out of the repository) are in place now: they
+    compare each reader's projection with a stored SHA-256 and length, never the
+    text. The freeze binds from the pull request that first stores notes on
+    decisions (plan PR 4); until then readers may still change and the golden is
+    re-recorded deliberately. That pull request also adds `decisionRender.test.ts`
+    (the rendered text nodes spell the projection) and the decision tab's list of
+    anchors that no longer match, so none is dropped.
