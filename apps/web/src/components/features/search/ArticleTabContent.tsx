@@ -14,7 +14,8 @@ import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
-import { wrapCitationsInHtml, deserializeCitation, isSameCitationTarget, type ParsedCitationData } from '../../../utils/citationMatcher';
+import { useCitationLinks } from '../../../hooks/useCitationLinks';
+import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
@@ -110,7 +111,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         removeHighlight,
         loadHighlightsForArticle,
         triggerSearch,
-        pushReadingBack,
         addQuickNorm,
         removeQuickNormByParams,
         isQuickNorm,
@@ -126,7 +126,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         removeHighlight: s.removeHighlight,
         loadHighlightsForArticle: s.loadHighlightsForArticle,
         triggerSearch: s.triggerSearch,
-        pushReadingBack: s.pushReadingBack,
         addQuickNorm: s.addQuickNorm,
         removeQuickNormByParams: s.removeQuickNormByParams,
         isQuickNorm: s.isQuickNorm,
@@ -878,95 +877,34 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         });
     }, [uniqueArticleId, openUpdates]);
 
-    // Handle citation hover and click events
-    useEffect(() => {
-        const container = contentRef.current;
-        if (!container) return;
-
-        // Click handler for citations - navigate to article
-        const handleClick = (event: Event) => {
-            const target = event.target as HTMLElement;
-            const citationElement = target.closest('.citation-hover');
-            if (citationElement) {
-                const citationData = citationElement.getAttribute('data-citation');
-                if (citationData) {
-                    const parsed = deserializeCitation(citationData);
-                    if (parsed && onCrossReferenceNavigate) {
-                        // Record where we are leaving from BEFORE jumping. This
-                        // is the single origin of both jump kinds below, which
-                        // is why one push covers them both.
-                        if (originTabId && originBlockId) {
-                            pushReadingBack({
-                                tabId: originTabId,
-                                blockId: originBlockId,
-                                articleId: uniqueArticleIdFromNorma(norma_data),
-                                label: shortNorm(norma_data),
-                            });
-                        }
-                        // Navigate within same norma if possible
-                        if (parsed.act_type === norma_data.tipo_atto &&
-                            parsed.act_number === norma_data.numero_atto) {
-                            onCrossReferenceNavigate(parsed.article, norma_data);
-                        } else {
-                            // Open in new search
-                            triggerSearch({
-                                act_type: parsed.act_type,
-                                act_number: parsed.act_number || '',
-                                date: parsed.date || '',
-                                article: parsed.article,
-                                version: 'vigente',
-                                show_brocardi_info: true,
-                            });
-                        }
-                        hidePreview();
-                    }
-                }
-            }
-        };
-
-        // Hover handler for citations - show preview
-        const handleMouseEnter = (event: Event) => {
-            const target = event.target as HTMLElement;
-            const citationElement = target.closest('.citation-hover') as HTMLElement;
-            if (citationElement) {
-                const citationData = citationElement.getAttribute('data-citation');
-                const cacheKey = citationElement.getAttribute('data-cache-key');
-                if (citationData && cacheKey) {
-                    const parsed = deserializeCitation(citationData);
-                    if (parsed) {
-                        showPreview(citationElement, parsed, cacheKey);
-                    }
-                }
-            }
-        };
-
-        // Mouse leave handler
-        const handleMouseLeave = (event: Event) => {
-            const target = event.target as HTMLElement;
-            const citationElement = target.closest('.citation-hover');
-            if (citationElement) {
-                // A citation wrapped per segment is several spans sharing one
-                // cache key: crossing from one to the next is not leaving it.
-                if (isSameCitationTarget(citationElement, (event as MouseEvent).relatedTarget)) return;
-                // Delay hide to allow moving to popup
-                setTimeout(() => {
-                    if (!isHoveringPopupRef.current) {
-                        hidePreview();
-                    }
-                }, 100);
-            }
-        };
-
-        container.addEventListener('click', handleClick);
-        container.addEventListener('mouseenter', handleMouseEnter, true);
-        container.addEventListener('mouseleave', handleMouseLeave, true);
-
-        return () => {
-            container.removeEventListener('click', handleClick);
-            container.removeEventListener('mouseenter', handleMouseEnter, true);
-            container.removeEventListener('mouseleave', handleMouseLeave, true);
-        };
-    }, [onCrossReferenceNavigate, norma_data, triggerSearch, showPreview, hidePreview, originTabId, originBlockId, pushReadingBack]);
+    // Citation hover and click: a click jumps within the same act or opens a search, recording the
+    // way back from this block first.
+    const citationOrigin = useMemo(() => (originTabId && originBlockId
+        ? { tabId: originTabId, blockId: originBlockId, articleId: uniqueArticleIdFromNorma(norma_data), label: shortNorm(norma_data) }
+        : undefined), [originTabId, originBlockId, norma_data]);
+    const openCitation = useCallback((parsed: ParsedCitationData) => {
+        // Navigate within same norma if possible
+        if (parsed.act_type === norma_data.tipo_atto && parsed.act_number === norma_data.numero_atto) {
+            onCrossReferenceNavigate?.(parsed.article, norma_data);
+        } else {
+            // Open in new search
+            triggerSearch({
+                act_type: parsed.act_type,
+                act_number: parsed.act_number || '',
+                date: parsed.date || '',
+                article: parsed.article,
+                version: 'vigente',
+                show_brocardi_info: true,
+            });
+        }
+    }, [onCrossReferenceNavigate, norma_data, triggerSearch]);
+    useCitationLinks(contentRef, {
+        onOpen: onCrossReferenceNavigate ? openCitation : undefined,
+        origin: citationOrigin,
+        showPreview,
+        hidePreview,
+        isHoveringPopupRef,
+    });
 
     return (
         <div className="animate-in fade-in duration-300 relative">

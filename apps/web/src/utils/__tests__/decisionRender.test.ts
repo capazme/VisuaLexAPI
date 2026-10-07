@@ -66,6 +66,21 @@ describe('renderDecisionHtml', () => {
         root.innerHTML = html;
         expect(root.innerHTML).toBe(html.replace(/\u00a0/g, '&nbsp;').replace(/&#13;/g, '\r')); // kept as written (only nbsp is serialised as an entity): well-formed
       });
+
+      it(`${name}: every mark placed lands, and with signs on each annotated paragraph has its sign`, () => {
+        const { highlights, annotations } = marksOn(testo);
+        expect(unmatchedAnchors(testo, highlights, annotations)).toEqual({ highlights: [], annotations: [] });
+        const root = document.createElement('div');
+        root.innerHTML = renderDecisionHtml({ testo, highlights, annotations, signs });
+        const annotated = new Set<number>();
+        const touch = (start: number, end: number) => decisionStructure(testo).blocks.forEach((b, i) => {
+          if (start < b.end && end > b.start) annotated.add(i);
+        });
+        highlights.forEach((h) => touch(h.startOffset ?? 0, (h.startOffset ?? 0) + h.text.length));
+        annotations.forEach((a) => touch(a.startOffset ?? 0, (a.startOffset ?? 0) + (a.anchorText?.length ?? 0)));
+        const drawn = [...root.querySelectorAll<HTMLElement>('.vlx-sign')].map((e) => Number(e.dataset.block));
+        expect(signs ? drawn.sort((a, b) => a - b) : drawn).toEqual(signs ? [...annotated].sort((a, b) => a - b) : []);
+      });
     }
   }
 

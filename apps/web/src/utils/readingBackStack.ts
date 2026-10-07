@@ -1,8 +1,9 @@
 /**
  * The "go back" stack for reading navigation.
  *
- * It records jumps taken from a citation in the article text and the jump from an article to a
- * decision opened beside it. Picking an
+ * It records jumps taken from a citation in the article text, the jump from an article to a
+ * decision opened beside it, and the jump from a decision to a norm it cites (the entry names the
+ * decision's tab as its own block). Picking an
  * article from the structure window does not lose your place — the article
  * appears inside the block you are already reading — and a previous/next arrow
  * is already undone by the opposite arrow. Recording those would fill the
@@ -33,6 +34,8 @@ export const READING_BACK_STACK_CAP = 50;
 interface BackStackTab {
   id: string;
   content: Array<{ type: string; id: string }>;
+  /** A decision (or a search) tab holds no blocks: it is its own place to come back to. */
+  view?: { kind: string };
 }
 
 /**
@@ -48,7 +51,9 @@ export function findLiveBackIndex(
   for (let i = stack.length - 1; i >= 0; i--) {
     const entry = stack[i];
     const tab = tabs.find(t => t.id === entry.tabId);
-    if (tab?.content.some(c => c.type === 'norma' && c.id === entry.blockId)) {
+    // A decision tab has no norma block: its entry names the tab itself as the block.
+    const isDecision = tab?.view?.kind === 'decision' && entry.blockId === tab.id;
+    if (isDecision || tab?.content.some(c => c.type === 'norma' && c.id === entry.blockId)) {
       return i;
     }
   }

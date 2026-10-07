@@ -99,3 +99,16 @@ export function codePointRangesToUtf16(text: string, ranges: ReadonlyArray<reado
   }
   return out;
 }
+
+/**
+ * The browser's selection, written as the text reads, when it lies wholly inside `root` (one
+ * decision's text): null for a selection that reaches outside it, none, or nothing. Shared by the
+ * plain text view and the reading surface, so both copy the same way.
+ */
+export function selectionAsRead(root: Element): string | null {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+  return decisionClipboardText(range.cloneContents()) || null;
+}

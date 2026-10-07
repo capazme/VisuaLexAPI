@@ -3,6 +3,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import type { DecisionNotice, DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
 import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
 import { decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
+import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionView } from './DecisionView';
 
 /** Notices about what was cited (its section, the archive deduced from it), not about the decision:
@@ -86,6 +87,14 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
         onRetry={() => { forgetDecision(current); setAttempt((a) => a + 1); }}
         onChooseCandidate={(identity) => setChosen({ from: decisionPath(reference), reference: identity })}
         onOpenPalette={() => openPaletteWith(formatDecisionShort(current))}
+        textSlot={answer?.esito === 'trovata' ? (
+          <DecisionReadingSurface
+            identity={answer.identita}
+            testo={answer.testo}
+            attributi={answer.attributi}
+            hostTabId={tabId}
+          />
+        ) : undefined}
       />
     </div>
   );
