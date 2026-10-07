@@ -530,5 +530,8 @@ Breaking one of these breaks the product. Read before editing.
     cache version bump is for shape only. `tests/test_decisions_text_frozen.py` (synthetic PDFs
     and records in CI; real ones in the `_local` twin) pins the projection (blocks stripped,
     concatenated, `\n` removed) as a SHA-256 and a length in `fixtures/decisions/frozen_projections.json`.
-    The test is in place now; the freeze binds from the pull request that first stores notes on
-    decisions (plan PR 4), and until then a reader may still change.
+    The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a
+    reader that moves the projection's hash is a bug in the reader, never a reason to re-record the
+    golden. The web app reads the same projection (`decisionProjection` in
+    `apps/web/src/utils/decisionRender.ts`) and its `decisionRender.test.ts` checks the rendered
+    text against it.
