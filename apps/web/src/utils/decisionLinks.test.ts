@@ -5,6 +5,7 @@ import {
   decisionPath,
   describeNotice,
   formatDecisionCitation,
+  formatDecisionDeposit,
   formatDecisionHeading,
   formatDecisionShort,
   httpsUrl,
@@ -340,5 +341,21 @@ describe('brocardiDecisionRef', () => {
     }
     expect(brocardiDecisionRef('Cass. civ.', null, '2020')).toBeNull();
     expect(brocardiDecisionRef('Cass. civ.', 'x', '2020')).toBeNull();
+  });
+});
+
+describe('formatDecisionDeposit', () => {
+  it.each([
+    ['sentenza', 'Sentenza depositata il 1 settembre 2026'],
+    ['ordinanza', 'Ordinanza depositata il 1 settembre 2026'],
+    ['ordinanza interlocutoria', 'Ordinanza interlocutoria depositata il 1 settembre 2026'],
+    ['decreto', 'Decreto depositato il 1 settembre 2026'],
+  ])('%s agrees in gender', (tipo, expected) => {
+    expect(formatDecisionDeposit({ tipo, data_deposito: '2026-09-01' })).toBe(expected);
+  });
+  it('says only what is known', () => {
+    expect(formatDecisionDeposit({ tipo: 'sentenza' })).toBe('Sentenza');
+    expect(formatDecisionDeposit({ data_deposito: '2026-09-08' })).toBe("Depositata l'8 settembre 2026");
+    expect(formatDecisionDeposit({})).toBeNull();
   });
 });

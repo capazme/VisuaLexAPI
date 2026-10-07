@@ -273,6 +273,9 @@ class SearchHit:
 
 @dataclass(frozen=True)
 class SearchPage:
+    """One page of a search. `totale` is Solr's `numFound`: in index mode it counts records the
+    re-check of the citation (`cites`) may still drop from the page (about 2% measured), so it can
+    exceed the decisions the pages hold in all; a client ends the list by `totale`, not by rows."""
     totale: int
     decisioni: list[SearchHit]
 

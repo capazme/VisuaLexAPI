@@ -2,6 +2,9 @@
 import { legalFetch } from './legalFetch';
 import type { DecisionSearchQuery, SearchDecisionsAnswer } from '../types/decisions';
 
+/** Decisions per page: fixed by the route (`ROWS` in search_route.py), which pages by 20. */
+export const DECISION_PAGE_SIZE = 20;
+
 /** The five answers the route writes: a new one fails to compile here. */
 const ESITI: Record<SearchDecisionsAnswer['esito'], true> = {
   risultati: true,

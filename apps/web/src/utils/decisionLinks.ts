@@ -159,6 +159,20 @@ export function formatDecisionHeading(identity: DecisionIdentity, attrs: Decisio
 }
 
 /**
+ * "Ordinanza depositata il 1° settembre 2026", "Decreto depositato il …": the type of a decision
+ * and its day of deposit, the participle agreeing with the type. Only what is known is said:
+ * a type alone, a date alone ("Depositata il …") or null.
+ */
+export function formatDecisionDeposit(attrs: DecisionAttributes): string | null {
+  const title = attrs.tipo && Object.hasOwn(TIPO_TITLE, attrs.tipo) ? TIPO_TITLE[attrs.tipo] : null;
+  const masculine = attrs.tipo === 'decreto';
+  const deposited = attrs.data_deposito
+    ? `${title ? (masculine ? 'depositato' : 'depositata') : 'Depositata'} ${withPreposition('il', formatDateItalianLong(attrs.data_deposito))}`
+    : null;
+  return [title, deposited].filter(Boolean).join(' ') || null;
+}
+
+/**
  * The citation as lawyers write it, its date as `formatDateForCitation` writes it ("1° aprile 2024").
  * Italgiure gives only the date of deposit: a penal decision names it "dep."
  * ("Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787").

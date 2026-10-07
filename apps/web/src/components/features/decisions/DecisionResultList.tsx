@@ -1,8 +1,8 @@
 // apps/web/src/components/features/decisions/DecisionResultList.tsx
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCw } from 'lucide-react';
-import { searchDecisions } from '../../../services/decisionSearchService';
-import { formatDecisionShort } from '../../../utils/decisionLinks';
+import { DECISION_PAGE_SIZE, searchDecisions } from '../../../services/decisionSearchService';
+import { decisionPath, formatDecisionDeposit, formatDecisionShort } from '../../../utils/decisionLinks';
 import { codePointRangesToUtf16 } from '../../../utils/decisionText';
 import { formatDateItalianLong, withPreposition } from '../../../utils/dateUtils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
@@ -13,7 +13,6 @@ import { DecisionLink } from './DecisionLink';
 
 /** The server pages by 20 and stops at the tenth page. */
 const MAX_PAGE = 10;
-const PAGE_SIZE = 20;
 
 type Page = Extract<SearchDecisionsAnswer, { esito: 'risultati' }>;
 type Problem = Exclude<SearchDecisionsAnswer, { esito: 'risultati' }>;
@@ -28,6 +27,8 @@ interface DecisionResultListProps {
   onArchiveChange?: (archivio: DecisionArchive | undefined) => void;
 }
 
+const INDEX_REFUSED = 'L’indice della Cassazione non esprime questo atto';
+
 const KIND_LABEL: Record<DecisionSearchHit['trovata'], string> = {
   indice: 'norma citata (indice della Cassazione)',
   testo: 'menzionato nel testo',
@@ -38,7 +39,7 @@ const problemMessage = (problem: Problem): string => {
     case 'non_supportata':
       return 'La ricerca nelle sentenze non è disponibile per questo atto.';
     case 'richiesta_non_valida':
-      return 'La ricerca non è stata accettata: controlla l’articolo e il tema cercati.';
+      return 'La ricerca non è valida: controllala e riprova.';
     case 'errore_interno':
       return 'La ricerca non è riuscita per un errore dell’applicazione.';
     case 'fonte_non_raggiungibile':
@@ -63,10 +64,7 @@ function Fragment({ testo, evidenziati }: NonNullable<DecisionSearchHit['frammen
 
 function Row({ hit, besideTabId, backEntry }: { hit: DecisionSearchHit; besideTabId?: string; backEntry?: ReadingBackEntry }) {
   const { identita, attributi } = hit;
-  const tipo = attributi.tipo ? attributi.tipo.charAt(0).toUpperCase() + attributi.tipo.slice(1) : null;
-  const deposited = attributi.data_deposito
-    ? `depositata ${withPreposition('il', formatDateItalianLong(attributi.data_deposito))}`
-    : null;
+  const deposit = formatDecisionDeposit(attributi);
   return (
     <li className="space-y-1 border-b border-slate-200 py-3 dark:border-slate-700">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -78,7 +76,7 @@ function Row({ hit, besideTabId, backEntry }: { hit: DecisionSearchHit; besideTa
         >
           {formatDecisionShort({ ...identita, sezione: attributi.sezione })}
         </DecisionLink>
-        <span className="text-sm text-slate-500 dark:text-slate-400">{[tipo, deposited].filter(Boolean).join(' ')}</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400">{deposit}</span>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           {KIND_LABEL[hit.trovata]}
         </span>
@@ -90,8 +88,8 @@ function Row({ hit, besideTabId, backEntry }: { hit: DecisionSearchHit; besideTa
 
 function Segmented<T extends string>({ label, options, pressed, disabled, onPick }: {
   label: string;
-  options: Array<{ value: T; text: string; title?: string; disabled?: boolean }>;
-  pressed: T;
+  options: Array<{ value: T; text: string; title?: string; disabled?: boolean; describedBy?: string }>;
+  pressed: T | null;
   disabled?: boolean;
   onPick: (value: T) => void;
 }) {
@@ -104,6 +102,7 @@ function Segmented<T extends string>({ label, options, pressed, disabled, onPick
           aria-pressed={pressed === o.value}
           disabled={disabled || o.disabled}
           title={o.title}
+          aria-describedby={o.describedBy}
           onClick={() => onPick(o.value)}
           className={`px-3 py-1.5 text-sm ${TOUCH_TARGET_RESPONSIVE} disabled:cursor-not-allowed disabled:opacity-50 ${
             pressed === o.value
@@ -133,19 +132,27 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
   const [last, setLast] = useState<Page | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
+  // what the route said about this query, each tied to the query it was learned for:
+  // the archive it applies on its own (null: it searches both) and whether it refused the index
+  const [learned, setLearned] = useState<{ key: string; defaultArchive?: DecisionArchive | null; indexRefused?: boolean } | null>(null);
   // only the latest request writes: a slower earlier one is dropped
   const token = useRef(0);
   const dropPending = useCallback(() => { token.current++; }, []);
 
   const hasNorma = Boolean(query.norma);
   const queryKey = JSON.stringify({ norma: query.norma, tema: query.tema });
+  const known = learned?.key === queryKey ? learned : null;
+  // a refusal is kept for the query, so later pages and reloads ask for the text straight away
+  const refusedRef = useRef(false);
+  refusedRef.current = Boolean(known?.indexRefused);
 
   const load = useCallback((pagina: number) => {
     const mine = ++token.current;
     setLoading(true);
     setProblem(null);
     const asked = { norma: query.norma, tema: query.tema, archivio };
-    searchDecisions(asked, pagina, hasNorma ? modo : undefined)
+    const sentModo = hasNorma ? (refusedRef.current ? 'testo' : modo) : undefined;
+    searchDecisions(asked, pagina, sentModo)
       .catch((error): SearchDecisionsAnswer => {
         console.error('search_decisions: no answer', error);
         return { esito: 'fonte_non_raggiungibile', fonte: 'rete' };
@@ -155,7 +162,23 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
         setLoading(false);
         if (answer.esito === 'risultati') {
           setLast(answer);
-          setHits((previous) => (pagina === 1 ? answer.decisioni : [...previous, ...answer.decisioni]));
+          // new deposits shift the pages: a decision seen already is not listed twice
+          setHits((previous) => {
+            if (pagina === 1) return answer.decisioni;
+            const seen = new Set(previous.map((h) => decisionPath(h.identita)));
+            return [...previous, ...answer.decisioni.filter((h) => !seen.has(decisionPath(h.identita)))];
+          });
+          const refused = sentModo === 'indice' && answer.modo === 'testo';
+          if (!asked.archivio || refused) {
+            setLearned((previous) => {
+              const base = previous?.key === queryKey ? previous : { key: queryKey };
+              return {
+                ...base,
+                ...(asked.archivio ? {} : { defaultArchive: answer.archivio }),
+                ...(refused ? { indexRefused: true } : {}),
+              };
+            });
+          }
         } else {
           setProblem(answer);
         }
@@ -172,15 +195,21 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
     return dropPending;
   }, [load, dropPending]);
 
+  const shownModo = last?.modo ?? modo;
+  const indexRefused = hasNorma && Boolean(known?.indexRefused);
+  // «Entrambi» exists where the route can search both: a topic, or an article it answered with no
+  // archive of its own (the Constitution, the preleggi, a numbered act), never a code's
+  const canSearchBoth = !hasNorma || known?.defaultArchive === null;
+  const archiveShown: ArchiveChoice | null = last
+    ? (last.archivio ?? 'entrambi')
+    : archivio ?? (hasNorma ? null : 'entrambi');
   const pickArchive = (choice: ArchiveChoice) => {
+    if (choice === archiveShown) return; // the same query again
     const next = choice === 'entrambi' ? undefined : choice;
     setArchivio(next);
     onArchiveChange?.(next);
   };
 
-  const shownModo = last?.modo ?? modo;
-  const indexRefused = hasNorma && modo === 'indice' && last?.modo === 'testo';
-  const archiveShown: ArchiveChoice = last ? (last.archivio ?? 'entrambi') : (archivio ?? 'entrambi');
 
   const total = last?.totale ?? 0;
   const since = last?.archivio_dal ? ` (${withPreposition('dal', formatDateItalianLong(last.archivio_dal))})` : '';
@@ -189,8 +218,9 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
       ? 'Nessuna decisione negli ultimi cinque anni dell’archivio pubblico della Cassazione.'
       : `${total.toLocaleString('it-IT', { useGrouping: 'always' } as unknown as Intl.NumberFormatOptions)} ${total === 1 ? 'decisione' : 'decisioni'} nell’archivio pubblico della Cassazione${since}`
     : null;
-  const atEnd = last !== null && (last.pagina >= MAX_PAGE || hits.length >= total);
-  const capped = last !== null && last.pagina >= MAX_PAGE && total > hits.length;
+  // the route may return fewer records than `totale` counts, so the end is the count, not the rows
+  const atEnd = last !== null && (last.pagina >= MAX_PAGE || last.pagina * DECISION_PAGE_SIZE >= total);
+  const capped = last !== null && last.pagina >= MAX_PAGE && total > MAX_PAGE * DECISION_PAGE_SIZE;
 
   return (
     <section aria-label="Sentenze" className="space-y-3">
@@ -202,26 +232,30 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
           options={[
             { value: 'civile', text: 'Civile' },
             { value: 'penale', text: 'Penale' },
-            { value: 'entrambi', text: 'Entrambi' },
+            ...(canSearchBoth ? [{ value: 'entrambi' as const, text: 'Entrambi' }] : []),
           ]}
         />
         {hasNorma && (
           <Segmented<'indice' | 'testo'>
             label="Modo di ricerca"
             pressed={shownModo}
-            onPick={setModo}
+            onPick={(value) => { if (value !== shownModo) setModo(value); }}
             options={[
               {
                 value: 'indice',
                 text: 'Indice della Cassazione',
                 disabled: indexRefused,
-                title: indexRefused ? 'L’indice della Cassazione non esprime questo atto' : undefined,
+                title: indexRefused ? INDEX_REFUSED : undefined,
+                describedBy: indexRefused ? 'decision-index-refused' : undefined,
               },
               { value: 'testo', text: 'Nel testo' },
             ]}
           />
         )}
       </div>
+      {indexRefused && (
+        <p id="decision-index-refused" className="text-xs text-slate-500 dark:text-slate-400">{INDEX_REFUSED}</p>
+      )}
 
       {countLine && <p className="text-sm text-slate-700 dark:text-slate-200">{countLine}</p>}
 
@@ -255,7 +289,7 @@ export function DecisionResultList({ query, besideTabId, backEntry, onArchiveCha
       )}
       {capped && !loading && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Mostrate le prime {MAX_PAGE * PAGE_SIZE}: restringi la ricerca con un tema.
+          Mostrate le prime {MAX_PAGE * DECISION_PAGE_SIZE}: restringi la ricerca con un tema.
         </p>
       )}
     </section>

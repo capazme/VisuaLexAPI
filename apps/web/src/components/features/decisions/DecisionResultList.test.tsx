@@ -60,6 +60,8 @@ describe('DecisionResultList', () => {
     const index = screen.getByRole('button', { name: 'Indice della Cassazione' });
     expect(index).toBeDisabled();
     expect(index).toHaveAttribute('title', 'L’indice della Cassazione non esprime questo atto');
+    // the reason is also visible text, tied to the button
+    expect(screen.getByText('L’indice della Cassazione non esprime questo atto')).toHaveAttribute('id', index.getAttribute('aria-describedby')!);
   });
 
   it('emphasises the matched words as text, never as HTML, past an astral character', async () => {
@@ -90,7 +92,7 @@ describe('DecisionResultList', () => {
   it('has its own line for an invalid request, an internal error, and a rejected call', async () => {
     mockSearch({ esito: 'richiesta_non_valida', errori: { pagina: 'La pagina va da 1 a 10' } });
     const first = render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
-    expect(await screen.findByText(/La ricerca non è stata accettata/)).toBeInTheDocument();
+    expect(await screen.findByText('La ricerca non è valida: controllala e riprova.')).toBeInTheDocument();
     expect(screen.queryByText(/pagina/)).toBeNull();
     first.unmount();
     mockSearch({ esito: 'errore_interno' });
@@ -137,5 +139,87 @@ describe('DecisionResultList', () => {
     expect(onArchiveChange).toHaveBeenCalledWith('penale');
     await waitFor(() => expect(searchMock).toHaveBeenLastCalledWith({ norma: NORMA, tema: undefined, archivio: 'penale' }, 1, 'indice'));
     expect(await screen.findByRole('button', { name: 'Penale' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps the index refused after the reader clicks the text, and asks the text from then on', async () => {
+    mockSearch(PAGE_TEXT); mockSearch({ ...PAGE_TEXT, pagina: 1 });
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    await screen.findByText('menzionato nel testo');
+    await userEvent.click(screen.getByRole('button', { name: 'Nel testo' })); // already pressed: nothing
+    expect(searchMock).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Penale' }));
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(2));
+    expect(searchMock).toHaveBeenLastCalledWith(expect.anything(), 1, 'testo');
+    expect(screen.getByRole('button', { name: 'Indice della Cassazione' })).toBeDisabled();
+  });
+
+  it('offers «Entrambi» only where the route can search both archives', async () => {
+    // an article of a code: the route applies the code's archive
+    mockSearch(PAGE);
+    const code = render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+    expect(screen.getByRole('button', { name: 'Civile' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: 'Entrambi' })).toBeNull();
+    code.unmount();
+    // a numbered act answered with no archive: both are searched
+    mockSearch({ ...PAGE_TEXT, archivio: null });
+    const numbered = render(<Wrapper><DecisionResultList query={{ norma: { tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008', numero_articolo: '2' } }} /></Wrapper>);
+    await screen.findByText('menzionato nel testo');
+    expect(screen.getByRole('button', { name: 'Entrambi' })).toHaveAttribute('aria-pressed', 'true');
+    numbered.unmount();
+    // a topic
+    mockSearch({ ...PAGE, archivio: null });
+    render(<Wrapper><DecisionResultList query={{ tema: 'danno' }} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+    expect(screen.getByRole('button', { name: 'Entrambi' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('ignores a pick equal to the archive shown', async () => {
+    mockSearch(PAGE);
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    await userEvent.click(await screen.findByRole('button', { name: 'Civile' }));
+    expect(searchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops where totale says, even when the pages return fewer records', async () => {
+    const hitN = (n: number): DecisionSearchHit => ({ ...HIT, identita: { ...HIT.identita, numero: n } });
+    mockSearch({ ...PAGE, totale: 45, pagina: 1, decisioni: Array.from({ length: 18 }, (_, i) => hitN(100 + i)) });
+    mockSearch({ ...PAGE, totale: 45, pagina: 2, decisioni: Array.from({ length: 18 }, (_, i) => hitN(200 + i)) });
+    mockSearch({ ...PAGE, totale: 45, pagina: 3, decisioni: Array.from({ length: 5 }, (_, i) => hitN(300 + i)) });
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    for (const p of [2, 3]) {
+      await userEvent.click(await screen.findByRole('button', { name: 'Altri risultati' }));
+      await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(p));
+      await screen.findByRole('link', { name: new RegExp(`n\\. ${p * 100}/2026`) });
+    }
+    expect(screen.queryByRole('button', { name: 'Altri risultati' })).toBeNull();
+    expect(searchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('never says «Mostrate le prime 200» when there are 200 or fewer', async () => {
+    for (let p = 1; p <= 8; p++) mockSearch({ ...PAGE, totale: 150, pagina: p, decisioni: [{ ...HIT, identita: { ...HIT.identita, numero: 500 + p } }] });
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    for (let p = 2; p <= 8; p++) {
+      await userEvent.click(await screen.findByRole('button', { name: 'Altri risultati' }));
+      await screen.findByRole('link', { name: new RegExp(`n\\. ${500 + p}/2026`) });
+    }
+    expect(screen.queryByRole('button', { name: 'Altri risultati' })).toBeNull();
+    expect(searchMock).toHaveBeenCalledTimes(8);
+    expect(screen.queryByText(/Mostrate le prime/)).toBeNull();
+  });
+
+  it('lists a decision once when a later page repeats it', async () => {
+    mockSearch({ ...PAGE, totale: 40, decisioni: [HIT] });
+    mockSearch({ ...PAGE, totale: 40, pagina: 2, decisioni: [HIT, { ...HIT, identita: { ...HIT.identita, numero: 7 } }] });
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    await userEvent.click(await screen.findByRole('button', { name: 'Altri risultati' }));
+    await screen.findByRole('link', { name: /n\. 7\/2026/ });
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+
+  it('names the type and the deposit in agreement', async () => {
+    mockSearch({ ...PAGE, decisioni: [{ ...HIT, attributi: { sezione: '1', tipo: 'decreto', data_deposito: '2026-09-08' } }] });
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    expect(await screen.findByText('Decreto depositato l\'8 settembre 2026')).toBeInTheDocument();
   });
 });
