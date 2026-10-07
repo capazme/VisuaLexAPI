@@ -61,6 +61,7 @@ import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { AddNoteModal } from './AddNoteModal';
+import { saveBlob } from '../../../utils/saveBlob';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -342,13 +343,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   const exportDossierJSON = () => {
     const data = JSON.stringify(dossier, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${dossier.title.replace(/[^a-z0-9]/gi, '_')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    saveBlob(new Blob([data], { type: 'application/json' }), `${dossier.title.replace(/[^a-z0-9]/gi, '_')}.json`);
   };
 
   const copyShareLink = async () => {

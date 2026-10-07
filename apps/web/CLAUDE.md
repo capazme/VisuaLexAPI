@@ -214,8 +214,9 @@ environment's export file, its share link and the Forum (publishing, editing, su
 current text» is the server's cached copy (up to 30 days, the owner's choice), so words a court
 has withdrawn can travel until it expires; lookups run per distinct decision, at most four at a
 time, and a failure is not cached. `isAnchoredNote` (`decisionRender.ts`) is the one definition of
-a note that quotes words (a note without a quote is free). Every file the app saves goes through
-`utils/saveBlob.ts` (the object URL is revoked later, not at once). `DecisionTextView` renders a
+a note that quotes words (a note without a quote is free). The decision downloads, the notes and
+highlights .txt, an environment's file and a dossier's JSON go through `utils/saveBlob.ts` (the
+object URL is revoked later, not at once); a few older exports still make their own link. `DecisionTextView` renders a
 found decision only for a host that mounts `DecisionView` without the reading surface; the
 workspace tab always passes the surface. The personal files
 are not filtered: the .txt export and the PDF «Con le mie evidenziazioni e note» list the anchors
