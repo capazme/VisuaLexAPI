@@ -4,17 +4,23 @@ import type { MassimaStructured, NormaVisitata } from '../../../types';
 import type { DecisionSearchNorma } from '../../../types/decisions';
 import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
-import { DOCTRINE_ATTRIBUTION } from '../../../utils/doctrineLabel';
+import { DOCTRINE_ATTRIBUTION, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLabel';
+import { httpsUrl } from '../../../utils/decisionLinks';
 import { citeNorm } from '../../../utils/sources';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { PluginSlot } from '../../../plugins/PluginSlot';
+import { getSlotComponents } from '../../../plugins/registry';
 import { DecisionResultList } from '../decisions/DecisionResultList';
 import { MassimeSection } from './MassimeSection';
 
 interface CaseLawSectionProps {
   norma: NormaVisitata;
-  /** Brocardi's massime; `null` when the source gave none or the text is not the one in force. */
+  /** Brocardi's massime; `null` when the source gave none. */
   massime: (string | MassimaStructured)[] | null;
+  /** False on a past text (gotcha 32): the massime subsection is not shown at all. */
+  massimeVisible?: boolean;
+  /** The article's page on Brocardi, credited beside the massime. */
+  brocardiLink?: string | null;
   articleUrn?: string;
   /** The workspace tab the article is in: a decision opens beside it. */
   tabId?: string;
@@ -64,7 +70,7 @@ function searchNorma(norma: NormaVisitata): DecisionSearchNorma {
  * can search both archives only from a request sent without one (Task 15), so each opening of
  * the section starts from the route's own choice.
  */
-export function CaseLawSection({ norma, massime, articleUrn, tabId, backEntry, isHistorical = false }: CaseLawSectionProps) {
+export function CaseLawSection({ norma, massime, massimeVisible = true, brocardiLink, articleUrn, tabId, backEntry, isHistorical = false }: CaseLawSectionProps) {
   const panelId = useId();
   const [open, setOpen] = useState(() => readOpen(tabId));
   const [searched, setSearched] = useState(false);
@@ -82,6 +88,8 @@ export function CaseLawSection({ norma, massime, articleUrn, tabId, backEntry, i
   };
 
   const hasMassime = Boolean(massime && massime.length > 0);
+  const sourceLink = httpsUrl(brocardiLink);
+  const hasMassimario = getSlotComponents('article_case_law').length > 0;
 
   return (
     <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
@@ -104,23 +112,36 @@ export function CaseLawSection({ norma, massime, articleUrn, tabId, backEntry, i
       <div id={panelId} hidden={!open} className="mt-3 space-y-6">
         {open && (
           <>
-            {hasMassime && (
+            {massimeVisible && (
               <section aria-labelledby={`${panelId}-massime`} className="space-y-2">
                 <h4 id={`${panelId}-massime`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Massime (Brocardi)
                 </h4>
-                <p className="text-[11px] text-slate-400">{DOCTRINE_ATTRIBUTION}</p>
-                <MassimeSection massime={massime} besideTabId={tabId} backEntry={backEntry} />
+                <p className="text-[11px] text-slate-400">
+                  {sourceLink ? (
+                    <a href={sourceLink} target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600 dark:hover:text-slate-200">
+                      {DOCTRINE_ATTRIBUTION}
+                    </a>
+                  ) : DOCTRINE_ATTRIBUTION}
+                </p>
+                {hasMassime ? (
+                  <MassimeSection massime={massime} besideTabId={tabId} backEntry={backEntry} />
+                ) : (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non riporta massime per questo articolo.`}</p>
+                )}
               </section>
             )}
 
-            {/* The Massimario's panel brings its own heading and renders nothing when there is nothing to say. */}
-            <section aria-label="Rassegne del Massimario">
-              <PluginSlot
-                slot="article_case_law"
-                props={{ articleUrn, isHistorical, besideTabId: tabId, backEntry }}
-              />
-            </section>
+            {/* The Massimario's panel is its own heading ("Nelle rassegne della Cassazione", with the
+                count) and renders nothing when there are no reviews, so no wrapper of ours names it. */}
+            {hasMassimario && (
+              <div>
+                <PluginSlot
+                  slot="article_case_law"
+                  props={{ articleUrn, isHistorical, besideTabId: tabId, backEntry }}
+                />
+              </div>
+            )}
 
             <section aria-labelledby={`${panelId}-cassazione`} className="space-y-3">
               <h4 id={`${panelId}-cassazione`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">

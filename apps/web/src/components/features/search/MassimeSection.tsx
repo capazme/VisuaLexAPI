@@ -129,12 +129,14 @@ export function MassimeSection({ massime, besideTabId, backEntry }: MassimeSecti
     <div className="card border border-slate-200 dark:border-slate-700 shadow-sm rounded-md overflow-hidden">
       {/* Header with collapse button */}
       <button
+        type="button"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left"
+        className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
-        <strong className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+        <strong className="text-xs font-bold text-slate-500 flex items-center gap-2">
           <Scale size={14} className="text-blue-600" />
-          Massime ({filteredMassime.length}/{normalizedMassime.length})
+          {filteredMassime.length} di {normalizedMassime.length}
         </strong>
         <span className={cn("transition-transform text-slate-400", isOpen ? "rotate-180" : "")}>
           ▼

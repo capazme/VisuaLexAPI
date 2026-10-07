@@ -328,6 +328,10 @@ describe('brocardiDecisionRef', () => {
     expect(brocardiDecisionRef('Corte Costituzionale', '71', '2020')?.corte).toBe('corte_costituzionale');
   });
 
+  it('reads «Cassazione» spelled out as a bare Cass., naming no archive', () => {
+    expect(brocardiDecisionRef('Cassazione', '2633', '1982')).toEqual({ corte: 'cassazione', numero: 2633, anno: 1982 });
+  });
+
   it('names no archive for a bare «Cass.», and is linked as a reference', () => {
     const ref = brocardiDecisionRef('Cass', '2633', '1982');
     expect(ref).toEqual({ corte: 'cassazione', numero: 2633, anno: 1982 });

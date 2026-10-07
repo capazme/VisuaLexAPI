@@ -1194,7 +1194,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 Massimario's reviews and the Cassazione on request. It stays on a past text. */}
             <CaseLawSection
                 norma={norma_data}
-                massime={display.doctrineVisible ? brocardi_info?.Massime ?? null : null}
+                massime={brocardi_info?.Massime ?? null}
+                massimeVisible={display.doctrineVisible}
+                brocardiLink={brocardi_info?.link}
                 articleUrn={norma_data.urn}
                 tabId={originTabId ?? tabId}
                 backEntry={decisionBackEntry}

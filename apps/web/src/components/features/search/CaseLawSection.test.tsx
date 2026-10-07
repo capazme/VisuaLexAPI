@@ -92,17 +92,32 @@ describe('CaseLawSection', () => {
   });
 
   it('on a past text keeps the section, the Massimario and the search, and drops the massime', async () => {
-    show({ massime: null, isHistorical: true });
+    show({ massime: null, massimeVisible: false, isHistorical: true });
     await userEvent.click(toggle());
     expect(screen.queryByText('Massime (Brocardi)')).toBeNull();
     expect(slotCalls.at(-1)?.props).toMatchObject({ isHistorical: true });
     expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
   });
 
-  it('omits the massime subsection when the source gave none', async () => {
+  it('says so when Brocardi gave no massime for the text in force', async () => {
     show({ massime: [] });
     await userEvent.click(toggle());
-    expect(screen.queryByText('Massime (Brocardi)')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Massime (Brocardi)' })).toBeInTheDocument();
+    expect(screen.getByText('Brocardi.it non riporta massime per questo articolo.')).toBeInTheDocument();
+  });
+
+  it('links the source credit to the article on Brocardi, https only', async () => {
+    const view = show({ brocardiLink: 'https://www.brocardi.it/codice-civile/art2043.html' });
+    await userEvent.click(toggle());
+    const link = screen.getByRole('link', { name: 'Fonte: Brocardi.it' });
+    expect(link).toHaveAttribute('href', 'https://www.brocardi.it/codice-civile/art2043.html');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    view.unmount();
+    show({ brocardiLink: 'http://www.brocardi.it/x', tabId: 'tab-9' });
+    await userEvent.click(toggle());
+    expect(screen.queryByRole('link', { name: 'Fonte: Brocardi.it' })).toBeNull();
+    expect(screen.getByText('Fonte: Brocardi.it')).toBeInTheDocument();
   });
 
   it('remembers whether it is open for the tab, and not for another', async () => {
