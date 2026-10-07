@@ -556,7 +556,7 @@ year is never read from a copy that could not be refreshed (`fonte_non_raggiungi
 The Cassazione decisions that cite an article (through the archive's index) or mention an
 article or a topic (in the text). Italgiure only, the last five years; the Corte costituzionale
 is not searched. Behind the ingress the route needs a login like the other scraping routes.
-A call sends one Solr `POST` (rows fixed at 20) and, for an uncached archive start, one more.
+A call sends one Solr `POST` (rows fixed at 20, 25 s limit), run alongside the archive start lookup(s) when they are not cached.
 A page is cached for 24 hours per query and page. Design:
 `docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md` §5.
 
@@ -564,15 +564,15 @@ A page is cached for 24 hours per query and page. Design:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `norma` | object | One of the two | The article, as the `/fetch_*` routes take it: `tipo_atto`, `numero_articolo`, and `numero_atto` and `data` for a numbered act |
+| `norma` | object | One of the two | The article, as the `/fetch_*` routes take it: `tipo_atto`, `numero_articolo`, and `numero_atto` and `data` for a numbered act. A field that is not a string or a number is a 400 on `norma`. With `tema` too, an act no way can phrase still answers `non_supportata` |
 | `tema` | string | One of the two | A topic, searched as a phrase in the text (at most 80 characters kept) |
-| `archivio` | string | No | `civile` or `penale`. Without it, the article's own archive (codes and the Constitution), else both |
-| `pagina` | integer | No | 1 to 10, default 1 |
-| `modo` | string | No | `indice` (default for an article) or `testo`. The index serves the codes and the Constitution; for any other act, or an article suffix it does not know, the text is searched and the answer says `modo: "testo"` |
+| `archivio` | string | No | `civile` or `penale`. Null is the same as left out. Without it, the article's own archive (codes and the Constitution), else both |
+| `pagina` | integer | No | 1 to 10, default 1 (null is 1) |
+| `modo` | string | No | `indice` (default for an article) or `testo`. The index serves the codes and the Constitution; for any other act, or an article suffix it does not know, the text is searched and the answer says `modo: "testo"`. Null is `indice` |
 
 | `esito` | Status | Content |
 |---------|--------|---------|
-| `risultati` | 200 | `totale`, `pagina`, `modo`, `archivio`, `archivio_dal` (first deposit of the archive, `null` without an archive), `decisioni` |
+| `risultati` | 200 | `totale`, `pagina`, `modo`, `archivio`, `archivio_dal` (first deposit covered: the archive's, or the earlier of the two when both are searched; `null` if unknown, and such an answer is not cached), `decisioni` |
 | `non_supportata` | 200 | nothing else: an act the search cannot phrase |
 | `richiesta_non_valida` | 400 | `errori`: each bad field, with what was expected |
 | `fonte_non_raggiungibile` | 503 | `fonte`: `cassazione`. A source that does not answer is never an empty page |

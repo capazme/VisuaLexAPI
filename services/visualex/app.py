@@ -1071,7 +1071,13 @@ class NormaController:
     async def search_decisions(self):
         """Decisions whose text mentions an article or a topic (design 2026-10-05 §5). JSON with
         `esito`: risultati and non_supportata 200, richiesta_non_valida 400,
-        fonte_non_raggiungibile 503, errore_interno 500 (a bug: a fixed body)."""
+        fonte_non_raggiungibile 503, errore_interno 500 (a bug: a fixed body).
+
+        Answers this handler does not write are not JSON with `esito`: the per-IP rate limit
+        (429 `{"error": …}`) and the login gate's 401 or 429, passed through by the ingress,
+        come before it; the framework answers with its own pages a method other than POST or
+        OPTIONS (405), a stalled body (408) and a body over 16 MB (413; 1 MB behind the
+        ingress, whose own page answers)."""
         try:
             body = await request.get_json(silent=True)
         except (RecursionError, UnicodeDecodeError):
