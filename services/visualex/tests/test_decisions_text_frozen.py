@@ -1,14 +1,17 @@
 """A decision's text is a data contract (design 2026-10-05 §8.2 and §8.5, root rule 23).
 
 Highlights and notes on a decision are pinned by offset and text over its projection: the blocks
-in reading order (epigrafe, motivazione, dispositivo), each stripped at its two edges, then
-concatenated, then every `\\n` removed. A reader may add or move `\\n` and move a boundary between
-blocks across whitespace; it may never add, drop or change another character.
+in reading order (epigrafe, motivazione, dispositivo), each stripped of ASCII whitespace at its
+two edges, then concatenated, then every `\\n` removed. A reader may add or move `\\n` and move a
+boundary between blocks across whitespace; it may never add, drop or change another character.
 
 `frozen_projections.json` stores, per case, the SHA-256 of the projection's UTF-8 and its length,
 never the text (the repository is public). The cases here are synthetic, or open data of the
-Corte costituzionale, or withheld records; every rule that moves a character has a case of its
-own. The same check on real decisions runs in `test_decisions_text_frozen_local.py`, which skips
+Corte costituzionale, or withheld records. The synthetic PDF carries the page-furniture rules
+(a running header in the top band only, a running footer in the bottom band only, page numbers,
+a stamp, an unmapped glyph), both joins, the paragraph rules and a heading 60 points in: moving
+`TOP_BAND`, `BOTTOM_BAND` or `CENTER_INDENT` across them fails it (checked by mutation). Rules
+the synthetic cases do not reach are covered only by the private run below. The same check on real decisions runs in `test_decisions_text_frozen_local.py`, which skips
 without the git-ignored `fixtures/decisions/private/` folder. A deliberate change of characters
 is not recorded over this file: it is refused (the freeze takes effect with the pull request that
 first stores notes on decisions).
@@ -29,8 +32,11 @@ GOLDEN_PATH = FIX / "frozen_projections.json"
 BLOCKS = ("epigrafe", "motivazione", "dispositivo")
 
 
+STRIP = " \t\n\r\f\v"  # ASCII whitespace only (spec §8.2): the web's regex strips the same set
+
+
 def projection(testo: dict) -> str:
-    return "".join((testo.get(k) or "").strip() for k in BLOCKS).replace("\n", "")
+    return "".join((testo.get(k) or "").strip(STRIP) for k in BLOCKS).replace("\n", "")
 
 
 def fingerprint(testo: dict) -> dict:
@@ -68,19 +74,25 @@ def _pdf_with_dispositivo() -> bytes:
     p0 += [Text(85, 74, "Il Presidente estensore"),
            Text(85, 51, "Ric. 2020 n. 12345 sez. SU - ud. 14-12-2021")]
     p1 = [Text(85, 800, "r.g. n. 27512/2022"),
+          Text(85, 768, "Ufficio del ruolo generale"),                                   # a running header in TOP_BAND only
           Text(255, 720, "CONSIDERATO CHE"),
           Text(85, 704, "il ricorso si articola nei motivi che seguono, esaminati insieme."),
           Text(65, 690, "7. va premessa la questione di giurisdizione, rilevabile"),     # an outdented point
           Text(85, 676, "anche d'ufficio in ogni stato e grado del giudizio."),
           Text(65, 652, "612.000,00 subordinatamente alla prova della somma."),            # not a point
+          Text(85, 95, "Documento riservato alle parti"),                                # a running footer in BOTTOM_BAND only
           Text(85, 76, "Il Presidente estensore"),
           Text(85, 51, "2"), Text(140, 51, "Ric. 2021 n. 09083 sez. SU - ud. 08-02-2022"),
           Text(290, 32, "-2-"), Text(250, 20, "Pag. 2 di 3")]
     p2 = [Text(85, 800, "r.g. n. 27512/2022"),
+          Text(85, 768, "Ufficio del ruolo generale"),
           Text(85, 700, "Il secondo motivo e' fondato e la sentenza va cassata."),
+          Text(145, 686, "SVOLGIMENTO DEL PROCESSO"),                                    # a heading, 60 pt in
+          Text(85, 672, "Le parti hanno svolto le difese nei termini."),
           Text(255, 660, "P.Q.M."),
           Text(85, 646, "La Corte accoglie il ricorso, cassa la sentenza impugnata e rinvia."),
           Text(100, 618, "Cosi deciso in Roma, nella camera di consiglio."),
+          Text(85, 95, "Documento riservato alle parti"),
           Text(85, 51, "3"), Text(140, 51, "Ric. 2021 n. 09083 sez. SU - ud. 08-02-2022")]
     return make_pdf([p0, p1, p2])
 

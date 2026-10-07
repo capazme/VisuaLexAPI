@@ -80,8 +80,8 @@
     "sha256": "65468598dd316c8a5616386c748826b3dda2934885641e56b91426115ee7ee8d"
   },
   "synthetic_pdf_with_dispositivo": {
-    "length": 1040,
-    "sha256": "352fd78133609fffb43fbe5d66030b04014312ef270d2ee9982b1e373c38abc3"
+    "length": 1108,
+    "sha256": "de11f3c7257f5fec3ae18d2fedb85a1dde9208b11ccef135620d3d5b56b52e09"
   },
   "synthetic_pdf_without_dispositivo": {
     "length": 169,
