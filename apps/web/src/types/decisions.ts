@@ -18,8 +18,9 @@ export interface DecisionReference extends DecisionIdentity {
   sezione?: string;
 }
 
-/** The norm a decision search is anchored to (the same fields that identify an article). */
-export type DecisionSearchNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo' | 'allegato'>;
+/** The norm a decision search is anchored to: the four fields `/search_decisions` reads
+ *  (`NORMA_FIELDS` in search_route.py); any other field of an article is ignored there. */
+export type DecisionSearchNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_articolo'> & Partial<Pick<NormaVisitata, 'numero_atto' | 'data'>>;
 
 /** What a decision-search tab asks for: decisions citing a norm, matching a text, or both. */
 export interface DecisionSearchQuery {
@@ -101,6 +102,32 @@ export type FetchDecisionAnswer =
   | NotFoundDecision
   | { esito: 'fonte_non_raggiungibile'; fonte: string }
   | { esito: 'richiesta_non_valida'; errori: Record<string, string> }
+  | { esito: 'errore_interno' };
+
+/** One decision of a search page. `trovata` says how it was found: cited in the Cassazione's
+ *  index, or mentioned in its text. The `evidenziati` ranges count Python code points. */
+export interface DecisionSearchHit {
+  identita: DecisionIdentity;
+  attributi: DecisionAttributes;
+  trovata: 'indice' | 'testo';
+  frammento: { testo: string; evidenziati: Array<[number, number]> } | null;
+}
+
+/** The five answers `/search_decisions` writes (search_route.py); `fonte` is also `quota`, `rete`
+ *  or `risposta <status>` when the web app made it up. */
+export type SearchDecisionsAnswer =
+  | {
+      esito: 'risultati';
+      totale: number;
+      pagina: number;
+      modo: 'indice' | 'testo';
+      archivio: DecisionArchive | null;
+      archivio_dal: string | null;
+      decisioni: DecisionSearchHit[];
+    }
+  | { esito: 'non_supportata' }
+  | { esito: 'richiesta_non_valida'; errori: Record<string, string> }
+  | { esito: 'fonte_non_raggiungibile'; fonte: string }
   | { esito: 'errore_interno' };
 
 /** A decision kept in a dossier: its identity and what the row shows, never its text. */

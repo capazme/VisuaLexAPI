@@ -73,3 +73,29 @@ export function decisionClipboardText(fragment: DocumentFragment): string {
   endParagraph();
   return paragraphs.join('\n\n');
 }
+
+/**
+ * Highlight ranges from `/search_decisions` count Python code points; a JS string counts UTF-16
+ * units, and a character outside the BMP (an astral one) is two. Converts the ranges so they
+ * can slice `text`. A range that is empty, out of range, or overlaps (or precedes) the one before
+ * it once sorted is dropped, never thrown on: a highlight is only decoration.
+ */
+export function codePointRangesToUtf16(text: string, ranges: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
+  // units[i] = the UTF-16 index of code point i; units[length] = text.length
+  const units: number[] = [];
+  let at = 0;
+  for (const char of text) {
+    units.push(at);
+    at += char.length;
+  }
+  units.push(at);
+  const count = units.length - 1;
+  const out: Array<[number, number]> = [];
+  let end = 0;
+  for (const [start, stop] of [...ranges].sort((a, b) => a[0] - b[0])) {
+    if (!Number.isInteger(start) || !Number.isInteger(stop) || start < end || start >= stop || stop > count) continue;
+    out.push([units[start], units[stop]]);
+    end = stop;
+  }
+  return out;
+}
