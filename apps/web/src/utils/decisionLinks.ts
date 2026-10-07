@@ -201,7 +201,7 @@ export function identityFromKey(key: string, now: Date = new Date()): DecisionId
   const corte: DecisionCourt = m[1] ? 'cassazione' : 'corte_costituzionale';
   const numero = Number(m[2] ?? m[4]);
   const anno = Number(m[3] ?? m[5]);
-  if (numero > MAX_NUMERO || anno < FIRST_YEAR[corte] || anno > now.getFullYear()) return null;
+  if (anno < FIRST_YEAR[corte] || anno > now.getFullYear()) return null;
   return corte === 'cassazione' ? { corte, archivio: m[1] as DecisionArchive, numero, anno } : { corte, numero, anno };
 }
 

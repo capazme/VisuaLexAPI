@@ -19,11 +19,11 @@ export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisi
   }
   const pending = fetchDecision(ref).then(
     (answer) => {
-      if (!KEPT.has(answer.esito)) answers.delete(key);
+      if (!KEPT.has(answer.esito) && answers.get(key) === pending) answers.delete(key);
       return answer;
     },
     (error: unknown) => {
-      answers.delete(key);
+      if (answers.get(key) === pending) answers.delete(key);
       throw error;
     },
   );

@@ -1,5 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appStore } from '../useAppStore';
+
+const origin = vi.hoisted(() => ({ left: 0, top: 0, width: 0 }));
+vi.mock('../../utils/workspaceOrigin', () => ({
+  WORKSPACE_AREA_ID: 'tour-results-area',
+  workspaceOrigin: () => ({ ...origin }),
+}));
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
 const get = () => appStore.getState();
@@ -47,45 +53,66 @@ describe('decision tabs', () => {
   });
 
   describe('side by side', () => {
-    const original = window.innerWidth;
-    const at = (w: number) => Object.defineProperty(window, 'innerWidth', { value: w, configurable: true, writable: true });
-    afterEach(() => at(original));
+    const original = { w: window.innerWidth, h: window.innerHeight };
+    const viewport = (w: number, h: number, o: { left: number; top: number }) => {
+      Object.defineProperty(window, 'innerWidth', { value: w, configurable: true, writable: true });
+      Object.defineProperty(window, 'innerHeight', { value: h, configurable: true, writable: true });
+      Object.assign(origin, o, { width: w - o.left });
+    };
+    afterEach(() => {
+      viewport(original.w, original.h, { left: 0, top: 0 });
+    });
+    const MARGIN = 16;
+    const DOCK_TOP = (h: number) => h - 24 - 44; // fixed bottom-6, ~44px collapsed
     const place = () => {
       const article = get().addWorkspaceTab('art. 2043 c.c.');
       const decision = get().openDecisionTab(REF, { besideTabId: article });
       const of = (id: string) => get().workspaceTabs.find((t) => t.id === id)!;
-      return { left: of(article), right: of(decision) };
+      const view = (t: ReturnType<typeof of>) => ({
+        x: t.position.x + origin.left, y: t.position.y + origin.top,
+        right: t.position.x + origin.left + t.size.width, bottom: t.position.y + origin.top + t.size.height,
+      });
+      return { left: view(of(article)), right: view(of(decision)) };
     };
 
-    it('starts right of the 64px sidebar at 1280 and fills the free width', () => {
-      at(1280);
+    it('at 1280x800 sits right of the sidebar, inside the viewport, above the dock, filling the width', () => {
+      viewport(1280, 800, { left: 184, top: 32 });
       appStore.setState({ sidebarVisible: true });
       const { left, right } = place();
-      expect(left.position.x).toBeGreaterThanOrEqual(64);
-      expect(left.position.x + left.size.width).toBeLessThanOrEqual(right.position.x);
-      const gaps = left.position.x - 64 + (right.position.x - left.position.x - left.size.width) + (1280 - right.position.x - right.size.width);
-      expect(left.size.width + right.size.width + gaps).toBe(1280 - 64);
-      expect(1280 - (right.position.x + right.size.width)).toBeLessThanOrEqual(17);
+      expect(left.x).toBeGreaterThanOrEqual(64 + MARGIN);
+      expect(right.right).toBeLessThanOrEqual(1280 - MARGIN);
+      expect(left.right).toBeLessThanOrEqual(right.x);
+      expect(Math.max(left.bottom, right.bottom)).toBeLessThanOrEqual(DOCK_TOP(800));
+      expect(Math.min(left.y, right.y)).toBeGreaterThanOrEqual(56);
+      // free width = 1280 - 64 - two margins; the gap between the tabs is one margin
+      expect(right.right - left.x + MARGIN).toBeGreaterThanOrEqual(1280 - 64 - 2 * MARGIN - 2);
+      expect(right.x - left.right).toBeGreaterThanOrEqual(MARGIN - 2);
+      expect(right.x - left.right).toBeLessThanOrEqual(MARGIN + 2);
+      expect(right.right - left.x).toBeGreaterThanOrEqual(1280 - 64 - 2 * MARGIN - 2);
     });
 
-    it('has no sidebar at 900 and keeps clear of the menu button', () => {
-      at(900);
+    it('at 900x700 has no sidebar, clears the menu button and stays inside the viewport', () => {
+      viewport(900, 700, { left: 56, top: 32 });
       appStore.setState({ sidebarVisible: true });
       const { left, right } = place();
-      expect(left.position.x).toBe(16);
-      expect(left.position.y).toBeGreaterThanOrEqual(56);
-      expect(right.position.y).toBeGreaterThanOrEqual(56);
-      expect(900 - (right.position.x + right.size.width)).toBeLessThanOrEqual(17);
-      expect(left.size.width + right.size.width + 16 * 3).toBeGreaterThanOrEqual(900 - 1);
+      expect(left.x).toBeGreaterThanOrEqual(MARGIN);
+      expect(left.x).toBeLessThanOrEqual(MARGIN + 1);
+      expect(Math.min(left.y, right.y)).toBeGreaterThanOrEqual(56);
+      expect(right.right).toBeLessThanOrEqual(900 - MARGIN);
+      expect(right.right).toBeGreaterThanOrEqual(900 - MARGIN - 2);
+      expect(left.right).toBeLessThanOrEqual(right.x);
+      expect(Math.max(left.bottom, right.bottom)).toBeLessThanOrEqual(DOCK_TOP(700));
     });
 
     it('uses the whole width in focus mode', () => {
-      at(1280);
-      appStore.setState({ sidebarVisible: true });
-      appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
-      const { left } = place();
-      expect(left.position.x).toBe(16);
-      appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
+      viewport(1280, 800, { left: 328, top: 120 });
+      appStore.setState((st) => ({ sidebarVisible: true, settings: { ...st.settings, focusMode: true } }));
+      const { left, right } = place();
+      appStore.setState((st) => ({ settings: { ...st.settings, focusMode: false } }));
+      expect(left.x).toBeGreaterThanOrEqual(MARGIN);
+      expect(left.x).toBeLessThanOrEqual(MARGIN + 1);
+      expect(right.right).toBeLessThanOrEqual(1280 - MARGIN);
+      expect(right.right).toBeGreaterThanOrEqual(1280 - MARGIN - 2);
     });
   });
 
@@ -96,14 +123,17 @@ describe('decision tabs', () => {
     const out = merge({
       workspaceTabs: [
         { ...base, id: 'ok', content: [], view: { kind: 'decision', reference: REF } },
+        { ...base, id: 'bare', content: [], view: { kind: 'decision', reference: { corte: 'cassazione', numero: 5, anno: 2020 } } },
+        { ...base, id: 'cc', content: [], view: { kind: 'decision', reference: { corte: 'corte_costituzionale', numero: 5, anno: 2020 } } },
+        { ...base, id: 'search', content: [], view: { kind: 'decision-search', query: { tema: 'danno' } } },
         { ...base, id: 'badkind', content: [], view: { kind: 'wat' } },
         { ...base, id: 'noyear', content: [], view: { kind: 'decision', reference: { corte: 'cassazione', numero: 5 } } },
         { ...base, id: 'withcontent', content: [{ type: 'x' }], view: { kind: 'decision', reference: { numero: 5, anno: 2000 } } },
         { ...base, id: 'plain', content: [] },
       ],
     }, get());
-    expect(out.workspaceTabs.map((t) => t.id)).toEqual(['ok', 'withcontent', 'plain']);
-    expect(out.workspaceTabs[1]).not.toHaveProperty('view');
+    expect(out.workspaceTabs.map((t) => t.id)).toEqual(['ok', 'bare', 'cc', 'search', 'withcontent', 'plain']);
+    expect(out.workspaceTabs[4]).not.toHaveProperty('view');
   });
 
   it('keeps the identity once found, so a reload asks for exactly it', () => {

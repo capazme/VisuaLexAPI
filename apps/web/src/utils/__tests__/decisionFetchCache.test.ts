@@ -59,4 +59,17 @@ describe('fetchDecisionCached', () => {
     expect(mocked).toHaveBeenCalledTimes(52);
     for (let n = 1; n <= 51; n++) forgetDecision(ref(n));
   });
+
+  it('an old failing request does not delete a newer entry under the same key', async () => {
+    let reject!: (e: Error) => void;
+    mocked.mockImplementationOnce(() => new Promise((_, r) => { reject = r; }));
+    const old = fetchDecisionCached(REF);
+    forgetDecision(REF);
+    mocked.mockResolvedValue(answer('trovata'));
+    await fetchDecisionCached(REF);
+    reject(new Error('late'));
+    await expect(old).rejects.toThrow('late');
+    await fetchDecisionCached(REF);
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
 });

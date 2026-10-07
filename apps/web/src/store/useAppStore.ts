@@ -1,4 +1,5 @@
 import { useStore } from 'zustand/react';
+import { workspaceOrigin } from '../utils/workspaceOrigin';
 import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -3123,29 +3124,34 @@ function newViewTab(state: AppState, label: string, view: TabView): WorkspaceTab
 
 // Layout.tsx: the static sidebar is 64px wide from the `lg` breakpoint (1024px) up; below it the
 // menu button (fixed top-4 left-4) and, from `md`, the focus toggle (fixed top-4 right-4) are each
-// about 40px square at 16px from the edge. Tabs are position: fixed, so these are viewport pixels.
+// about 40px square at 16px from the edge. The workspace dock is fixed bottom-6, about 44px high
+// collapsed (more when expanded), centred. All of these are viewport pixels.
 const LAYOUT_SIDEBAR_WIDTH = 64;
 const LAYOUT_LG_BREAKPOINT = 1024;
 const SIDE_BY_SIDE_MARGIN = 16;
 const SIDE_BY_SIDE_TOP = 72; // below the two floating buttons
-const SIDE_BY_SIDE_DOCK = 72;
+const SIDE_BY_SIDE_BOTTOM = 88; // above the collapsed dock (24 + ~44) with a gap
 
 /** The left tab on the left half of the free area, the right one on the right half, both as tall
- *  as the free area (design 2026-10-05 §2.2, reading 1). The free area is the viewport minus the
- *  static sidebar, when it is shown, and clear of the floating buttons. */
+ *  as the free area (design 2026-10-05 §2.2, reading 1). The free area is worked out in viewport
+ *  pixels (minus the static sidebar when shown, clear of the floating buttons and the dock), then
+ *  each target is turned into tab coordinates by subtracting the workspace origin, because a
+ *  tab's x/y are offsets from there (utils/workspaceOrigin.ts). */
 function placeSideBySide(state: AppState, leftId: string, rightId: string) {
     const left = state.workspaceTabs.find(t => t.id === leftId);
     const right = state.workspaceTabs.find(t => t.id === rightId);
     if (!left || !right || left.id === right.id) return;
     const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
     const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
+    const origin = workspaceOrigin();
     const sidebarShown = vw >= LAYOUT_LG_BREAKPOINT && state.sidebarVisible && !state.settings.focusMode;
     const x0 = sidebarShown ? LAYOUT_SIDEBAR_WIDTH : 0;
     const m = SIDE_BY_SIDE_MARGIN;
     const half = Math.floor((vw - x0 - m * 3) / 2);
-    const height = Math.max(400, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_DOCK);
-    Object.assign(left, { position: { x: x0 + m, y: SIDE_BY_SIDE_TOP }, size: { width: half, height }, isHidden: false, isMinimized: false });
-    Object.assign(right, { position: { x: x0 + m * 2 + half, y: SIDE_BY_SIDE_TOP }, size: { width: half, height }, isHidden: false, isMinimized: false });
+    const height = Math.max(240, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_BOTTOM);
+    const y = SIDE_BY_SIDE_TOP - origin.top;
+    Object.assign(left, { position: { x: x0 + m - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
+    Object.assign(right, { position: { x: x0 + m * 2 + half - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
 }
 
 export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };

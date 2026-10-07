@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
@@ -681,7 +682,7 @@ export function SearchPanel() {
 
       {/* Workspace Manager - renders all tabs */}
       {/* Desktop: Workspace floating panels - hidden on mobile */}
-      <div id="tour-results-area" className="hidden md:block">
+      <div id={WORKSPACE_AREA_ID} className="hidden md:block">
         <WorkspaceManager
           onViewPdf={handleViewPdf}
           onCrossReference={handleCrossReferenceNavigate}
