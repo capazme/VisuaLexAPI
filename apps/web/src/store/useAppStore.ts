@@ -732,13 +732,9 @@ const appStore = createStore<AppState>()(
                     const existing = state.workspaceTabs.find(t =>
                         t.view?.kind === 'decision' && sameDecision(t.view.reference, reference));
                     const tab = existing ?? newViewTab(state, formatDecisionShort(reference), { kind: 'decision', reference: stripSection(reference) });
-                    // a tab opened before the archive was known learns it from the citation that has it
-                    if (tab.view?.kind === 'decision' && !tab.view.reference.archivio && reference.archivio) {
-                        tab.view.reference.archivio = reference.archivio;
-                    }
                     tab.isHidden = false;
                     tab.isMinimized = false;
-                    tab.zIndex = ++state.highestZIndex;
+                    if (existing) tab.zIndex = ++state.highestZIndex;
                     if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
                     tabId = tab.id;
                 });
@@ -754,7 +750,7 @@ const appStore = createStore<AppState>()(
                     const tab = existing ?? newViewTab(state, label, { kind: 'decision-search', query });
                     tab.isHidden = false;
                     tab.isMinimized = false;
-                    tab.zIndex = ++state.highestZIndex;
+                    if (existing) tab.zIndex = ++state.highestZIndex;
                     if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
                     tabId = tab.id;
                 });
@@ -3036,6 +3032,7 @@ const appStore = createStore<AppState>()(
                 return {
                     ...current,
                     ...p,
+                    ...(p.workspaceTabs !== undefined ? { workspaceTabs: sanitizeViews(p.workspaceTabs) ?? current.workspaceTabs } : {}),
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
@@ -3064,11 +3061,36 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 export { appStore };
 
 // Export types
-/** One decision whatever the citation said: same court, number and year, and the same archive
- *  unless one side does not know it yet (a reference the route has not resolved). */
-function sameDecision(a: DecisionReference, b: DecisionReference): boolean {
-    return a.corte === b.corte && a.numero === b.numero && a.anno === b.anno &&
-        (a.archivio === undefined || b.archivio === undefined || a.archivio === b.archivio);
+/** Does the tab's reference (`tab`) show the decision a citation (`wanted`) names? Same court,
+ *  number and year; a citation with an archive matches only a tab of that archive (civil and
+ *  penal numbers run in separate series), one without matches a tab of either. */
+function sameDecision(tab: DecisionReference, wanted: DecisionReference): boolean {
+    return tab.corte === wanted.corte && tab.numero === wanted.numero && tab.anno === wanted.anno &&
+        (wanted.archivio === undefined || tab.archivio === wanted.archivio);
+}
+
+function isValidView(view: unknown): boolean {
+    if (!view || typeof view !== 'object') return false;
+    const v = view as { kind?: unknown; reference?: Record<string, unknown>; query?: unknown };
+    if (v.kind === 'decision') {
+        const r = v.reference;
+        return !!r && typeof r.corte === 'string' && r.corte !== '' &&
+            Number.isInteger(r.numero) && (r.numero as number) > 0 &&
+            Number.isInteger(r.anno) && (r.anno as number) > 0;
+    }
+    if (v.kind === 'decision-search') return !!v.query && typeof v.query === 'object';
+    return false;
+}
+
+/** Drops a persisted tab's malformed `view`; a tab left without content goes with it. */
+function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
+    if (!Array.isArray(tabs)) return undefined;
+    return (tabs as WorkspaceTab[]).flatMap((tab) => {
+        if (!tab || tab.view === undefined || isValidView(tab.view)) return [tab];
+        const { view: _view, ...rest } = tab;
+        void _view;
+        return Array.isArray(rest.content) && rest.content.length > 0 ? [rest as WorkspaceTab] : [];
+    });
 }
 
 /** A reference keeps its section only until the route has resolved it; a tab is keyed by court,
@@ -3082,7 +3104,10 @@ function stripSection(ref: DecisionReference): DecisionReference {
 /** A query as a string that does not depend on key order. */
 function stableQueryKey(query: DecisionSearchQuery): string {
     const sorted = (o: object) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)));
-    return JSON.stringify(sorted({ ...query, norma: query.norma ? sorted(query.norma) : undefined }));
+    // the label is presentation, not query
+    const { normaLabel: _label, ...rest } = query;
+    void _label;
+    return JSON.stringify(sorted({ ...rest, norma: rest.norma ? sorted(rest.norma) : undefined }));
 }
 
 function newViewTab(state: AppState, label: string, view: TabView): WorkspaceTab {
@@ -3096,21 +3121,31 @@ function newViewTab(state: AppState, label: string, view: TabView): WorkspaceTab
     return state.workspaceTabs[state.workspaceTabs.length - 1];
 }
 
-/** The left tab on the left half of the workspace, the right one on the right half, both as tall
- *  as the workspace (design 2026-10-05 §2.2, reading 1). Tab coordinates start at the workspace,
- *  which sits after the 64px sidebar (Layout.tsx) when that is shown. */
+// Layout.tsx: the static sidebar is 64px wide from the `lg` breakpoint (1024px) up; below it the
+// menu button (fixed top-4 left-4) and, from `md`, the focus toggle (fixed top-4 right-4) are each
+// about 40px square at 16px from the edge. Tabs are position: fixed, so these are viewport pixels.
+const LAYOUT_SIDEBAR_WIDTH = 64;
+const LAYOUT_LG_BREAKPOINT = 1024;
+const SIDE_BY_SIDE_MARGIN = 16;
+const SIDE_BY_SIDE_TOP = 72; // below the two floating buttons
+const SIDE_BY_SIDE_DOCK = 72;
+
+/** The left tab on the left half of the free area, the right one on the right half, both as tall
+ *  as the free area (design 2026-10-05 §2.2, reading 1). The free area is the viewport minus the
+ *  static sidebar, when it is shown, and clear of the floating buttons. */
 function placeSideBySide(state: AppState, leftId: string, rightId: string) {
     const left = state.workspaceTabs.find(t => t.id === leftId);
     const right = state.workspaceTabs.find(t => t.id === rightId);
     if (!left || !right || left.id === right.id) return;
-    const sidebar = state.sidebarVisible && !state.settings.focusMode ? 64 : 0;
-    const w = (typeof window === 'undefined' ? 1280 : window.innerWidth) - sidebar;
-    const h = typeof window === 'undefined' ? 800 : window.innerHeight;
-    const margin = 16, top = 16, dock = 72;
-    const half = Math.floor((w - margin * 3) / 2);
-    const height = Math.max(400, h - top - dock);
-    Object.assign(left, { position: { x: margin, y: top }, size: { width: half, height }, isHidden: false, isMinimized: false });
-    Object.assign(right, { position: { x: margin * 2 + half, y: top }, size: { width: half, height }, isHidden: false, isMinimized: false });
+    const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
+    const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
+    const sidebarShown = vw >= LAYOUT_LG_BREAKPOINT && state.sidebarVisible && !state.settings.focusMode;
+    const x0 = sidebarShown ? LAYOUT_SIDEBAR_WIDTH : 0;
+    const m = SIDE_BY_SIDE_MARGIN;
+    const half = Math.floor((vw - x0 - m * 3) / 2);
+    const height = Math.max(400, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_DOCK);
+    Object.assign(left, { position: { x: x0 + m, y: SIDE_BY_SIDE_TOP }, size: { width: half, height }, isHidden: false, isMinimized: false });
+    Object.assign(right, { position: { x: x0 + m * 2 + half, y: SIDE_BY_SIDE_TOP }, size: { width: half, height }, isHidden: false, isMinimized: false });
 }
 
 export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };

@@ -45,4 +45,18 @@ describe('fetchDecisionCached', () => {
     await fetchDecisionCached(REF);
     expect(mocked).toHaveBeenCalledTimes(2);
   });
+
+  it('keeps at most 50 answers, least recently used out, a hit refreshing recency', async () => {
+    mocked.mockResolvedValue(answer('trovata'));
+    const ref = (n: number) => ({ ...REF, numero: n });
+    for (let n = 1; n <= 50; n++) await fetchDecisionCached(ref(n));
+    await fetchDecisionCached(ref(1)); // refresh the oldest
+    await fetchDecisionCached(ref(51)); // evicts 2, not 1
+    expect(mocked).toHaveBeenCalledTimes(51);
+    await fetchDecisionCached(ref(1));
+    expect(mocked).toHaveBeenCalledTimes(51);
+    await fetchDecisionCached(ref(2));
+    expect(mocked).toHaveBeenCalledTimes(52);
+    for (let n = 1; n <= 51; n++) forgetDecision(ref(n));
+  });
 });

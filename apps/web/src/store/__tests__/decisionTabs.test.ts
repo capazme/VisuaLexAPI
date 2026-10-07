@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appStore } from '../useAppStore';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
@@ -20,21 +20,90 @@ describe('decision tabs', () => {
     expect(tabs[0].zIndex).toBeGreaterThan(z);
   });
 
-  it('shares a tab between a citation without archive and the resolved decision', () => {
-    const a = get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024 });
-    expect(get().openDecisionTab(REF)).toBe(a);
-    expect(get().openDecisionTab({ ...REF, archivio: 'penale' })).not.toBe(a);
+  it('matches an archive only to a tab of that archive; a citation without one matches either', () => {
+    const bare = get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024 });
+    const civil = get().openDecisionTab(REF);
+    expect(civil).not.toBe(bare);
+    const penal = get().openDecisionTab({ ...REF, archivio: 'penale' });
+    expect(penal).not.toBe(civil);
+    expect(get().workspaceTabs).toHaveLength(3);
+    expect(get().workspaceTabs.find((t) => t.id === bare)!.view).toEqual({ kind: 'decision', reference: { corte: 'cassazione', numero: 10787, anno: 2024 } });
+    expect(get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024 })).toBe(bare);
+    expect(get().workspaceTabs).toHaveLength(3);
   });
 
-  it('places the decision on the right half beside the article tab', () => {
-    const article = get().addWorkspaceTab('art. 2043 c.c.');
-    const decision = get().openDecisionTab(REF, { besideTabId: article });
-    const tabOf = (id: string) => get().workspaceTabs.find((t) => t.id === id)!;
-    const left = tabOf(article);
-    const right = tabOf(decision);
-    expect(left.position.x).toBeLessThan(right.position.x);
-    expect(left.position.x + left.size.width).toBeLessThanOrEqual(right.position.x);
-    expect(left.size.height).toBe(right.size.height);
+  it('bumps the z-index once per opened tab', () => {
+    const before = get().highestZIndex;
+    get().openDecisionTab(REF);
+    expect(get().highestZIndex).toBe(before + 1);
+    get().openDecisionSearchTab({ tema: 'x' }, 'x');
+    expect(get().highestZIndex).toBe(before + 2);
+  });
+
+  it('does not tell two labels of one norm search apart', () => {
+    const norma = { tipo_atto: 'codice civile', data: '1942-03-16', numero_articolo: '2043' };
+    const a = get().openDecisionSearchTab({ norma, normaLabel: 'art. 2043 c.c.' }, 'a');
+    expect(get().openDecisionSearchTab({ norma, normaLabel: 'Art. 2043 codice civile' }, 'b')).toBe(a);
+  });
+
+  describe('side by side', () => {
+    const original = window.innerWidth;
+    const at = (w: number) => Object.defineProperty(window, 'innerWidth', { value: w, configurable: true, writable: true });
+    afterEach(() => at(original));
+    const place = () => {
+      const article = get().addWorkspaceTab('art. 2043 c.c.');
+      const decision = get().openDecisionTab(REF, { besideTabId: article });
+      const of = (id: string) => get().workspaceTabs.find((t) => t.id === id)!;
+      return { left: of(article), right: of(decision) };
+    };
+
+    it('starts right of the 64px sidebar at 1280 and fills the free width', () => {
+      at(1280);
+      appStore.setState({ sidebarVisible: true });
+      const { left, right } = place();
+      expect(left.position.x).toBeGreaterThanOrEqual(64);
+      expect(left.position.x + left.size.width).toBeLessThanOrEqual(right.position.x);
+      const gaps = left.position.x - 64 + (right.position.x - left.position.x - left.size.width) + (1280 - right.position.x - right.size.width);
+      expect(left.size.width + right.size.width + gaps).toBe(1280 - 64);
+      expect(1280 - (right.position.x + right.size.width)).toBeLessThanOrEqual(17);
+    });
+
+    it('has no sidebar at 900 and keeps clear of the menu button', () => {
+      at(900);
+      appStore.setState({ sidebarVisible: true });
+      const { left, right } = place();
+      expect(left.position.x).toBe(16);
+      expect(left.position.y).toBeGreaterThanOrEqual(56);
+      expect(right.position.y).toBeGreaterThanOrEqual(56);
+      expect(900 - (right.position.x + right.size.width)).toBeLessThanOrEqual(17);
+      expect(left.size.width + right.size.width + 16 * 3).toBeGreaterThanOrEqual(900 - 1);
+    });
+
+    it('uses the whole width in focus mode', () => {
+      at(1280);
+      appStore.setState({ sidebarVisible: true });
+      appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
+      const { left } = place();
+      expect(left.position.x).toBe(16);
+      appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
+    });
+  });
+
+  it('drops a malformed persisted view on rehydration, and the tab with it when empty', () => {
+    const merge = (appStore as unknown as { persist: { getOptions: () => { merge: (p: unknown, c: unknown) => { workspaceTabs: Array<{ id: string; view?: unknown }> } } } })
+      .persist.getOptions().merge;
+    const base = { position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1, isMinimized: false, isHidden: false, label: 'l' };
+    const out = merge({
+      workspaceTabs: [
+        { ...base, id: 'ok', content: [], view: { kind: 'decision', reference: REF } },
+        { ...base, id: 'badkind', content: [], view: { kind: 'wat' } },
+        { ...base, id: 'noyear', content: [], view: { kind: 'decision', reference: { corte: 'cassazione', numero: 5 } } },
+        { ...base, id: 'withcontent', content: [{ type: 'x' }], view: { kind: 'decision', reference: { numero: 5, anno: 2000 } } },
+        { ...base, id: 'plain', content: [] },
+      ],
+    }, get());
+    expect(out.workspaceTabs.map((t) => t.id)).toEqual(['ok', 'withcontent', 'plain']);
+    expect(out.workspaceTabs[1]).not.toHaveProperty('view');
   });
 
   it('keeps the identity once found, so a reload asks for exactly it', () => {

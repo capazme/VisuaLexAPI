@@ -4,13 +4,19 @@ import { fetchDecision } from '../services/decisionService';
 import type { DecisionReference, FetchDecisionAnswer } from '../types/decisions';
 import { decisionPath } from './decisionLinks';
 
+/** Answers kept, least recently used out: a trovata holds the whole text. */
+const MAX_KEPT_ANSWERS = 50;
 const answers = new Map<string, Promise<FetchDecisionAnswer>>();
 const KEPT: ReadonlySet<FetchDecisionAnswer['esito']> = new Set(['trovata', 'ambigua', 'non_trovata']);
 
 export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisionAnswer> {
   const key = decisionPath(ref);
   const held = answers.get(key);
-  if (held) return held;
+  if (held) {
+    answers.delete(key); // a hit is the most recent use
+    answers.set(key, held);
+    return held;
+  }
   const pending = fetchDecision(ref).then(
     (answer) => {
       if (!KEPT.has(answer.esito)) answers.delete(key);
@@ -22,6 +28,7 @@ export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisi
     },
   );
   answers.set(key, pending);
+  while (answers.size > MAX_KEPT_ANSWERS) answers.delete(answers.keys().next().value as string);
   return pending;
 }
 
