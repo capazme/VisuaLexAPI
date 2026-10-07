@@ -228,6 +228,11 @@ describe('how a decision is named', () => {
     expect(describeNotice({ tipo: 'testo_non_disponibile' })).toBe('Testo non disponibile presso la fonte.');
   });
 
+  it('a text read from the archive, not the court\'s PDF, is declared provisional', () => {
+    expect(describeNotice({ tipo: 'testo_da_archivio' }))
+      .toBe("Testo dell'archivio della Cassazione, provvisorio: potrebbe essere incompleto, e le note potrebbero non ritrovarsi nel testo completo.");
+  });
+
   it('not-found messages say what an archive holds, never that a decision does not exist', () => {
     const ref = { corte: 'cassazione', numero: 1, anno: 2019 } as const;
     expect(notFoundMessage({ esito: 'non_trovata', motivo: 'fuori_archivio', archivio_dal: '2021-02-17' }, ref))

@@ -28,6 +28,8 @@ export interface DecisionAttributes {
   materia?: string;
   /** Why there is no text, only when the source said why: `oscuramento` or `valutazione_oscuramento`. */
   testo_assente?: string;
+  /** Where the Cassazione's text was read: the court's original PDF, or Italgiure's text field (provisional, with the notice `testo_da_archivio`). */
+  testo_origine?: 'pdf' | 'archivio';
 }
 
 /** The blocks, each whole and each optional; `{}` when the decision comes without its text
@@ -52,7 +54,8 @@ export type DecisionNotice =
   | { tipo: 'sezione_diversa'; citata?: string; effettiva: string }
   | { tipo: 'sezione_non_riconosciuta'; citata?: string }
   | { tipo: 'archivio_dedotto'; archivio: DecisionArchive; sezione: string }
-  | { tipo: 'testo_non_disponibile' };
+  | { tipo: 'testo_non_disponibile' }
+  | { tipo: 'testo_da_archivio' };
 
 export interface DecisionCandidate {
   identita: DecisionIdentity;

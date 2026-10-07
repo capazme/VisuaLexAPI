@@ -264,6 +264,8 @@ export function describeNotice(notice: DecisionNotice, attrs: DecisionAttributes
         default:
           return 'Testo non disponibile presso la fonte.';
       }
+    case 'testo_da_archivio':
+      return "Testo dell'archivio della Cassazione, provvisorio: potrebbe essere incompleto, e le note potrebbero non ritrovarsi nel testo completo.";
     default: {
       // a new kind of notice fails to compile here, until it has its sentence
       const unhandled: never = notice;

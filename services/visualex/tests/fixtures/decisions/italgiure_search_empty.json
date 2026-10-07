@@ -1,0 +1,24 @@
+{
+ "responseHeader": {
+  "status": 0,
+  "QTime": 0,
+  "params": {
+   "hl.fragsize": "200",
+   "sort": "pd desc",
+   "fl": "id,numdec,anno,datdep,szdec,tipoprov,kind",
+   "hl.snippets": "1",
+   "q": "kind:\"snciv\" AND ocr:\"art. 99999 c.c.\"",
+   "hl.fl": "ocr",
+   "wt": "json",
+   "app.query": "",
+   "hl": "true",
+   "rows": "3"
+  }
+ },
+ "response": {
+  "numFound": 0,
+  "start": 0,
+  "docs": []
+ },
+ "highlighting": {}
+}

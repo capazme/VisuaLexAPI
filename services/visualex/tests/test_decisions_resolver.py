@@ -1,4 +1,5 @@
 """One reference in, one outcome out (design 2026-10-01 §2-§3)."""
+import base64
 import json
 import threading
 from datetime import date
@@ -25,17 +26,24 @@ def _cass(archivio, numero, anno, sezione):
 
 
 class FakeItalgiure:
-    def __init__(self, decisions=(), start=(2021, "2021-02-17"), down=False):
+    def __init__(self, decisions=(), start=(2021, "2021-02-17"), down=False, pdfs=None):
         self.decisions = {(d.identita.archivio, d.identita.numero, d.identita.anno): d
                           for d in decisions}
         # down: True for the whole source, or the archives that fail
         self.start, self.down, self.calls, self.start_calls = start, down, [], 0
+        self.with_pdf_calls = []
+        self.pdfs = pdfs or {}  # the PDF bytes of the decisions that were read from theirs
 
     async def lookup(self, archivio, numero, anno):
         self.calls.append((archivio, numero, anno))
         if self.down is True or (self.down and archivio in self.down):
             raise NetworkError("Exceeded retry budget")
         return self.decisions.get((archivio, numero, anno))
+
+    async def lookup_with_pdf(self, archivio, numero, anno, with_pdf=True):
+        self.with_pdf_calls.append(with_pdf)
+        decision = await self.lookup(archivio, numero, anno)
+        return None if decision is None else (decision, self.pdfs.get((archivio, numero, anno)))
 
     async def archive_start(self, archivio):
         self.start_calls += 1
@@ -56,6 +64,9 @@ class FakeStore(dict):
 
     async def set(self, key, value):
         self[key] = value
+
+    async def delete(self, key):
+        self.pop(key, None)
 
 
 class FakeCache:
@@ -190,12 +201,12 @@ async def test_found_and_absent_are_cached_per_archive_errors_are_not():
     await resolver.resolve(ref(numero=2, anno=2024, archivio="civile"))
     await resolver.resolve(ref(numero=2, anno=2024, archivio="civile"))
     assert italgiure.calls == [("civile", 10787, 2024), ("civile", 2, 2024)]
-    assert "italgiure:v2:civile:10787:2024" in cache.stores["decisions_found"]
-    assert "italgiure:v2:civile:2:2024" in cache.stores["decisions_absent"]
+    assert "italgiure:v3:civile:10787:2024" in cache.stores["decisions_found"]
+    assert "italgiure:v3:civile:2:2024" in cache.stores["decisions_absent"]
     italgiure.down = True
     with pytest.raises(SourceUnavailable):
         await resolver.resolve(ref(numero=3, anno=2024, archivio="civile"))
-    assert "italgiure:v2:civile:3:2024" not in cache.stores["decisions_absent"]
+    assert "italgiure:v3:civile:3:2024" not in cache.stores["decisions_absent"]
 
 
 async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
@@ -205,8 +216,8 @@ async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
     resolver = _resolver(italgiure, cache=cache)
     out = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
     assert out.esito == "trovata" and out.avvisi == [{"tipo": "testo_non_disponibile"}]
-    assert "italgiure:v2:civile:10787:2024" in cache.stores["decisions_pending"]
-    assert "italgiure:v2:civile:10787:2024" not in cache.stores["decisions_found"]
+    assert "italgiure:v3:civile:10787:2024" in cache.stores["decisions_pending"]
+    assert "italgiure:v3:civile:10787:2024" not in cache.stores["decisions_found"]
     again = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
     assert again.avvisi == [{"tipo": "testo_non_disponibile"}]
     assert italgiure.calls == [("civile", 10787, 2024)]
@@ -254,10 +265,10 @@ async def test_a_search_sends_at_most_ten_requests_to_italgiure(monkeypatch):
     resolver = _resolver(ItalgiureReader())
     out = await resolver.resolve(ref(numero=123, anno=2023))
     assert (out.esito, out.motivo) == ("non_trovata", "inesistente")
-    assert len(methods) == 10
+    assert methods == ["POST"] * 5
     methods.clear()
     await resolver.resolve(ref(numero=124, anno=2023))  # each archive's start: once a day
-    assert len(methods) == 6
+    assert methods == ["POST"] * 3
 
 
 async def test_a_corte_costituzionale_decision_cached_before_the_split_is_never_served():
@@ -291,7 +302,83 @@ async def test_a_cassazione_decision_cached_before_the_paragraphs_is_never_serve
         ref(numero=10787, anno=2024, archivio="civile"))
     assert out.decisione.testo == text.testo
     assert italgiure.calls == [("civile", 10787, 2024)]  # the reader was asked, not the old entry
-    assert "italgiure:v2:civile:10787:2024" in cache.stores["decisions_found"]
+    assert "italgiure:v3:civile:10787:2024" in cache.stores["decisions_found"]
+
+
+async def test_a_text_read_from_the_pdf_has_no_notice_and_keeps_the_pdf():
+    d = _cass("civile", 5, 2022, "1")
+    d.testo_origine = "pdf"
+    cache = FakeCache()
+    out = await _resolver(FakeItalgiure([d], pdfs={("civile", 5, 2022): b"%PDF-1.4 bytes"}),
+                          cache=cache).resolve(ref(numero=5, anno=2022, archivio="civile"))
+    assert out.avvisi == [] and out.decisione.testo_origine == "pdf"
+    assert out.to_dict()["attributi"]["testo_origine"] == "pdf"
+    assert "italgiure:v3:civile:5:2022" in cache.stores["decisions_found"]
+    assert base64.b64decode(cache.stores["decisions_pdf"]["cassazione:civile:5:2022"]) == b"%PDF-1.4 bytes"
+
+
+async def test_a_text_from_the_archive_says_so_and_is_kept_a_day_only():
+    d = _cass("civile", 5, 2022, "1")
+    d.testo_origine = "archivio"
+    cache, italgiure = FakeCache(), FakeItalgiure([d])
+    resolver = _resolver(italgiure, cache=cache)
+    out = await resolver.resolve(ref(numero=5, anno=2022, archivio="civile"))
+    assert out.avvisi == [{"tipo": "testo_da_archivio"}] and out.decisione.testo
+    assert "italgiure:v3:civile:5:2022" in cache.stores["decisions_pending"]
+    assert "italgiure:v3:civile:5:2022" not in cache.stores.get("decisions_found", {})
+    assert "decisions_pdf" not in cache.stores or not cache.stores["decisions_pdf"]
+    again = await resolver.resolve(ref(numero=5, anno=2022, archivio="civile"))
+    assert again.avvisi == [{"tipo": "testo_da_archivio"}]  # the notice survives the cache
+    assert len(italgiure.calls) == 1
+
+
+async def test_a_pdf_cache_that_cannot_be_written_is_not_an_unreachable_court():
+    d = _cass("civile", 5, 2022, "1")
+    d.testo_origine = "pdf"
+
+    class Broken(FakeStore):
+        async def set(self, key, value):
+            raise OSError("disk full")
+
+    cache = FakeCache()
+    cache.stores["decisions_pdf"] = Broken()
+    out = await _resolver(FakeItalgiure([d], pdfs={("civile", 5, 2022): b"%PDF"}),
+                          cache=cache).resolve(ref(numero=5, anno=2022, archivio="civile"))
+    assert out.esito == "trovata" and out.decisione.testo
+
+
+async def test_a_suggestion_reads_the_record_only_and_keeps_nothing():
+    d = _cass("penale", 1399, 2025, "1")
+    cache, italgiure = FakeCache(), FakeItalgiure([d])
+    out = await _resolver(italgiure, cache=cache).resolve(ref(numero=1399, anno=2024, archivio="penale"))
+    assert out.suggerimento == d.identita
+    assert italgiure.with_pdf_calls[-1] is False
+    assert "italgiure:v3:penale:1399:2025" not in cache.stores.get("decisions_found", {})
+    assert "italgiure:v3:penale:1399:2025" not in cache.stores.get("decisions_pending", {})
+
+
+async def test_a_search_with_a_suggestion_hit_stays_within_ten_requests(monkeypatch):
+    # the worst cold case ends in a hit of the penal next year: the record is read, its PDF is not
+    methods, urls = [], []
+    start = json.dumps({"response": {"docs": [{"datdep": "20210217"}]}})
+    empty = json.dumps({"response": {"numFound": 0, "docs": []}})
+    hit = json.dumps({"response": {"numFound": 1, "docs": [{
+        "numdec": "00123", "anno": "2024", "kind": "snpen", "szdec": "1", "ocr": "testo " * 100,
+        "filename": "./20240101/snpen@s10@a2024@n123@tO.pdf"}]}})
+
+    async def fake_request(method, url, **kwargs):
+        methods.append(method)
+        urls.append(url)
+        if method == "GET":
+            return HttpResult(text="", status=200, headers={})
+        data = kwargs["data"]
+        body = start if "sort" in data else hit if "anno:2024" in data["q"] else empty
+        return HttpResult(text=body, status=200, headers={})
+
+    monkeypatch.setattr(decisions_http_client, "request", fake_request)
+    out = await _resolver(ItalgiureReader()).resolve(ref(numero=123, anno=2023))
+    assert out.esito == "non_trovata" and out.suggerimento is not None
+    assert len(methods) <= 10 and not any("verbo=attach" in u for u in urls)
 
 
 def test_the_outcomes_as_json():
@@ -334,4 +421,85 @@ async def test_the_sweep_reaches_the_decision_caches_only():
     assert threading.get_ident() not in found.threads + absent.threads
     assert cache.stores["normattiva"].threads == []
     assert set(cache.stores) == {"decisions_found", "decisions_absent", "decisions_pending",
-                                 "normattiva"}
+                                 "decisions_pdf", "decisions_search", "normattiva"}
+
+
+# --- the court's original PDF (design 2026-10-05 §12.2) ---
+
+class PdfItalgiure:
+    def __init__(self, data=b"%PDF-1.4 bytes", error=None):
+        self.data, self.error, self.calls = data, error, []
+
+    async def original_pdf(self, archivio, numero, anno):
+        self.calls.append((archivio, numero, anno))
+        if self.error:
+            raise self.error
+        return self.data
+
+
+FOUND_KEY = "italgiure:v3:civile:5:2022"
+PDF_KEY = "cassazione:civile:5:2022"
+
+
+async def test_original_pdf_is_read_from_the_cache_without_a_request():
+    cache = FakeCache()
+    cache.stores["decisions_found"] = FakeStore({FOUND_KEY: {"text": "kept"}})
+    cache.stores["decisions_pdf"] = FakeStore(
+        {"cassazione:civile:5:2022": base64.b64encode(b"%PDF-1.4 cached").decode()})
+    italgiure = PdfItalgiure()
+    out = await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out == b"%PDF-1.4 cached" and italgiure.calls == []
+
+
+async def test_original_pdf_is_fetched_once_and_cached():
+    cache, italgiure = FakeCache(), PdfItalgiure()
+    resolver = _resolver(italgiure, cache=cache)
+    identity = Identity("cassazione", 5, 2022, "civile")
+    assert await resolver.original_pdf(identity) == b"%PDF-1.4 bytes"
+    # the copy is served again only once the decision's text is cached (a lookup does that)
+    await resolver.found.set(FOUND_KEY, {"text": "kept"})
+    assert await resolver.original_pdf(identity) == b"%PDF-1.4 bytes"
+    assert italgiure.calls == [("civile", 5, 2022)]
+    assert base64.b64decode(cache.stores["decisions_pdf"]["cassazione:civile:5:2022"]) == b"%PDF-1.4 bytes"
+
+
+@pytest.mark.parametrize("data", [None, b"<html>", b"%PDF-" + b"0" * (5 * 1024 * 1024)])
+async def test_original_pdf_that_is_none_or_not_a_pdf_caches_nothing(data):
+    cache = FakeCache()
+    out = await _resolver(PdfItalgiure(data), cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out is None and not cache.stores.get("decisions_pdf")
+
+
+async def test_a_cached_entry_that_is_not_a_pdf_is_ignored():
+    cache = FakeCache()
+    cache.stores["decisions_found"] = FakeStore({FOUND_KEY: {"text": "kept"}})
+    cache.stores["decisions_pdf"] = FakeStore(
+        {"cassazione:civile:5:2022": base64.b64encode(b"<html>").decode()})
+    italgiure = PdfItalgiure()
+    await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert italgiure.calls == [("civile", 5, 2022)]
+
+
+async def test_original_pdf_source_errors_propagate():
+    with pytest.raises(NetworkError):
+        await _resolver(PdfItalgiure(error=NetworkError("down")), cache=FakeCache()).original_pdf(
+            Identity("cassazione", 5, 2022, "civile"))
+
+
+async def test_a_cached_entry_that_is_not_base64_is_ignored_and_refetched():
+    cache = FakeCache()
+    cache.stores["decisions_found"] = FakeStore({FOUND_KEY: {"text": "kept"}})
+    cache.stores["decisions_pdf"] = FakeStore({PDF_KEY: "!!!"})
+    italgiure = PdfItalgiure()
+    out = await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out == b"%PDF-1.4 bytes" and italgiure.calls == [("civile", 5, 2022)]
+
+
+async def test_a_cached_pdf_without_the_text_entry_is_not_served_and_is_dropped():
+    # the court withheld the decision: the source now gives no PDF, and the old copy is gone
+    cache = FakeCache()
+    cache.stores["decisions_pdf"] = FakeStore({PDF_KEY: base64.b64encode(b"%PDF-1.4 old").decode()})
+    italgiure = PdfItalgiure(None)
+    out = await _resolver(italgiure, cache=cache).original_pdf(Identity("cassazione", 5, 2022, "civile"))
+    assert out is None and italgiure.calls == [("civile", 5, 2022)]
+    assert PDF_KEY not in cache.stores["decisions_pdf"]

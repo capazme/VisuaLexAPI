@@ -197,9 +197,21 @@ POST unless noted, JSON bodies.
   Cassazione's have no source link. Lookups cached per archive: found 30 days, absent 1
   hour, a decision found without its text 24 hours (with the notice
   `testo_non_disponibile`; `attributi.testo_assente` says why only when the source did:
-  `oscuramento` or `valutazione_oscuramento`), errors never. Expired entries are swept at
+  `oscuramento` or `valutazione_oscuramento`), a text read from the archive's field
+  instead of the PDF 24 hours too (notice `testo_da_archivio`), errors never. Expired entries are swept at
   start and every six hours (`sweep_decision_caches`). Design:
   docs/superpowers/specs/2026-10-01-sentenze-design.md
+- `/search_decisions` — the Cassazione decisions that mention an article or a topic:
+  `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?}` → `esito`
+  risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, and per decision its identity,
+  attributes, `trovata` and `frammento`; cached a day), non_supportata, richiesta_non_valida
+  400, fonte_non_raggiungibile 503. Italgiure only, the last five years; the index serves
+  codes and the Constitution, any other act goes to the text search. Design:
+  docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md
+- `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
+  PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
+  fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.
+  Served only behind the login
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
 - `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
@@ -475,14 +487,26 @@ Breaking one of these breaks the product. Read before editing.
     from it. A record with neither a text nor a notice (a missing `ocr`, a renamed field)
     comes back with `testo == {}`, no `testo_assente` and a logged warning: never present it
     as the source's anonymisation. The resolver keeps a decision without its text 24 hours
-    (`decisions_pending`), never 30 days, and adds the notice `testo_non_disponibile`. Never
+    (`decisions_pending`), never 30 days, and adds the notice `testo_non_disponibile`; one read
+    from the archive's field instead of the PDF is kept the same way. Never
     pass a notice on as `motivazione`: the page would show it as the court's reasons and a
     note could anchor to it (the first reader did, with the second notice and the stub, and
     the caches kept them 30 days). The decision caches hold whole texts, with whatever
     personal data the source left: `sweep_decision_caches` deletes their expired entries at
     start and every six hours, since the filesystem cache deletes one only when its key is
     read again.
-    Italgiure's text is one line (45 of 45 sampled texts): `paragraphs` inserts blank lines
+    The Cassazione's text is read from the court's original PDF (`decisions/pdf_text.py`, then
+    `italgiure.py`): one more request per decision found, with a budget of its own (one try, 8 s,
+    parse 6 s, the whole step 15 s of the resolver's 25) so a slow PDF falls back instead of
+    failing the lookup. The PDF is refused when its filename or its first-page header names
+    another decision (a filename without tags or a PDF without a header is accepted; a damaged
+    PDF is never accepted); it must also be at least 70% of the field's length and share 10 of
+    the field's first 20 words with its first 250 (`_plausible`). Otherwise the field's text
+    stands, `testo_origine` is `"archivio"`, a warning logs the reason, and the resolver adds the
+    notice `testo_da_archivio` and keeps the decision 24 hours in `decisions_pending`, so the PDF
+    is tried again soon; a text from the PDF is kept 30 days and its bytes under `decisions_pdf`
+    (30 days). A suggestion (the penal next year) reads the record only and keeps nothing. The
+    field's text is one line (45 of 45 sampled texts): `paragraphs` inserts blank lines
     before the headings, «P.Q.M.» and the numbered points and changes nothing else (a combined
     heading, «RITENUTO IN FATTO E CONSIDERATO IN DIRITTO», stays one; a point keeps the words
     it opens, so there is no break between «3.» and a «P.Q.M.» right after it), and line
@@ -494,6 +518,13 @@ Breaking one of these breaks the product. Read before editing.
     characters (the texts before about 2001): the page draws a paragraph only between blank
     lines, so without it a block is one paragraph. Both add line breaks and nothing else.
     Whatever changes the shape of what a reader returns must raise the version in its cache
-    key (`italgiure:v2:…`, `corte_cost:v2:…`), or the entries cached before are served for up
-    to 30 days. The `v2` keys cover the readers of Tasks 7a to 7c, none of which had shipped,
+    key (`italgiure:v3:…`, `corte_cost:v2:…`), or the entries cached before are served for up
+    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.
+    The characters of a decision's text are to be frozen like an article's (root rule 23): the readers
+    may add or move `\n` and move a boundary between blocks, never change another character, and a
+    cache version bump is for shape only. `tests/test_decisions_text_frozen.py` (synthetic PDFs
+    and records in CI; real ones in the `_local` twin) pins the projection (blocks stripped,
+    concatenated, `\n` removed) as a SHA-256 and a length in `fixtures/decisions/frozen_projections.json`.
+    The test is in place now; the freeze binds from the pull request that first stores notes on
+    decisions (plan PR 4), and until then a reader may still change.

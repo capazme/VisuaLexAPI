@@ -1,0 +1,90 @@
+{
+  "cassazione_civile_05626_2022_campo": {
+    "length": 12907,
+    "sha256": "134f2576107f8496024d479b13503ed720c4f064f767f1349004330568c59b99"
+  },
+  "cassazione_civile_05626_2022_pdf": {
+    "length": 12901,
+    "sha256": "64afcc422c7eff43bd3c7d536a7e7828e4a04d522f080ad0d09f23fe2cb814c1"
+  },
+  "cassazione_civile_05628_2022_campo": {
+    "length": 23670,
+    "sha256": "dec5fb56c1c77102f6af48a627f5e0b4c9db245298e7b4c0169f139cfacb5854"
+  },
+  "cassazione_civile_05628_2022_pdf": {
+    "length": 23237,
+    "sha256": "24d6c592dd479e1ff6d7040551db3faa7d68dd4849480a4d96074c2ee94f7e86"
+  },
+  "cassazione_civile_26034_2026_campo": {
+    "length": 10439,
+    "sha256": "a6e4726041f7c9d825d7d6fc14a90b15cb4a266e64757395d69658d71c694721"
+  },
+  "cassazione_civile_26034_2026_pdf": {
+    "length": 9769,
+    "sha256": "b6fe78ddc23fbb03323bdaef6125e23d6837949d6fa5cc136aacb0f16562574f"
+  },
+  "cassazione_civile_26035_2026_campo": {
+    "length": 9922,
+    "sha256": "5e646a755fb0c403f7890e3f902973dadf6cfaa16caf8faf06227fa571ce75e7"
+  },
+  "cassazione_civile_26035_2026_pdf": {
+    "length": 9141,
+    "sha256": "49209e65f4b88cfa340e07c67f3a5f3cb587220eace4011f8f30bb0e9ac9ff7a"
+  },
+  "corte_cost_2014_0001": {
+    "length": 1787,
+    "sha256": "98df2096d47ee99be22cdca9b5c5db54c8bd9540f00ae45f07557675e06d270b"
+  },
+  "corte_cost_2014_0002": {
+    "length": 1773,
+    "sha256": "404b613eba9a272f50f9a22d75da35d6fdfc1db4be3049523d9d0482d321f7eb"
+  },
+  "corte_cost_2014_0003": {
+    "length": 871,
+    "sha256": "cb1dfebe7d54ed561ae7a54b89a70fc2d842b06197bbf2a20ae322cca475941e"
+  },
+  "italgiure_snciv_10787_2024.json": {
+    "length": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "italgiure_snpen_10787_2024.json": {
+    "length": 51,
+    "sha256": "9a8c33304745bb0c279eda6592a98da341b385b118ea12b6d964a86129f18e93"
+  },
+  "synthetic_corte_cost_epigrafe_split": {
+    "length": 255,
+    "sha256": "956a68da6ca83a95a6edab5023631eb8f11411bad7e21716d4b3bf59b3171cf3"
+  },
+  "synthetic_corte_cost_epigrafe_whole": {
+    "length": 48,
+    "sha256": "b0a20f410445d183050ce3d2bb1d306d6149fd36be12064fdf3b4ff97eff5c5c"
+  },
+  "synthetic_corte_cost_full": {
+    "length": 221,
+    "sha256": "aeb8b3c2e36a4c2bae00e1a3c34a4febba3b6ecfff50d932eddfb04e6830ce4b"
+  },
+  "synthetic_field_full": {
+    "length": 342,
+    "sha256": "868066ddd4882f4b92961e78e1d7c748914b85bace69209a641b0685c8ef1c80"
+  },
+  "synthetic_field_multivalued": {
+    "length": 47,
+    "sha256": "71e8cda2de59d033c007892e8ac6fd4f0d44ecb792d3f40ce491b570996c7654"
+  },
+  "synthetic_field_withheld": {
+    "length": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "synthetic_field_without_dispositivo": {
+    "length": 343,
+    "sha256": "65468598dd316c8a5616386c748826b3dda2934885641e56b91426115ee7ee8d"
+  },
+  "synthetic_pdf_with_dispositivo": {
+    "length": 1108,
+    "sha256": "de11f3c7257f5fec3ae18d2fedb85a1dde9208b11ccef135620d3d5b56b52e09"
+  },
+  "synthetic_pdf_without_dispositivo": {
+    "length": 169,
+    "sha256": "72c5a7502981be75a0e804930e9c443d5a59615a04abcf1c25c23f2ac460ff00"
+  }
+}

@@ -76,10 +76,14 @@ class CacheManager:
             # Court decisions (design 2026-10-01 §3): a deposited decision does not change;
             # "not found" is kept for an hour because indexing lags; a decision found without
             # its text (withheld by the source while it removes personal data, or missing at
-            # the source) is kept for a day.
+            # the source), or read from the archive's text field rather than the court's PDF, is kept
+            # for a day. The PDFs' bytes are kept a month (decisions_pdf).
             "decisions_found": _create_cache("decisions_found", ttl=30 * 24 * 3600),
+            "decisions_pdf": _create_cache("decisions_pdf", ttl=30 * 24 * 3600),
             "decisions_absent": _create_cache("decisions_absent", ttl=3600),
             "decisions_pending": _create_cache("decisions_pending", ttl=24 * 3600),
+            # One page of /search_decisions, per query: a day.
+            "decisions_search": _create_cache("decisions_search", ttl=24 * 3600),
             # A found act date never changes: keep it a year (act_dates.py).
             "act_dates": _create_cache("act_dates", ttl=365 * 24 * 3600),
         }

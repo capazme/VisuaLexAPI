@@ -3,6 +3,8 @@ __pycache__
 *.log
 *.pem
 *.pdf
+# real decisions: local only, the repository is public
+services/visualex/tests/fixtures/decisions/private/
 download
 .vscode/*
 .DS_Store
