@@ -30,7 +30,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionTabView`,
   its workspace tab and the phone view; `DecisionAddress`, the `/sentenze/…` route element;
   `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
-  `DecisionTextView`: a court decision's text; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
+  `DecisionTextView`: a court decision's text; `DecisionResultList`, the Cassazione's decisions for an
+  article or a topic, and `DecisionSearchTabView`, its workspace tab; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
@@ -142,6 +143,12 @@ doctrine is shown — gotcha 32), the Massimario's panel (the plugin slot
 `backEntry`) and the Cassazione's decisions that mention the article, searched
 only when the reader presses the button (`DecisionResultList`). On a past text the
 section stays; the massime do not. A decision opens beside the article with the way back.
+A topic opens a `decision-search` tab (`renderTabView` draws `DecisionSearchTabView`: heading
+«Tema: …», the article when the query has one, «Solo il tema» to drop it, the limits line, the
+list; a decision opened from it sits beside that tab, with no way back): from a Brocardi glossary
+term («Sentenze su questo tema», beside the article's tab, with its norm) or from the palette
+(a line «Cerca "…" nelle sentenze della Cassazione», shown only when the box is neither a decision,
+a norm, nor starts with a custom alias, and announced in the palette's status region).
 
 **Normattiva's update notes** are interactive and out of the way:
 `useArticleTextInteractions` delegates click and Enter/Space on the body — a

@@ -410,7 +410,8 @@ searched in the text. Answers, all JSON with `esito` like `/fetch_decision`:
 
 `frammento` is plain text plus the ranges to emphasise
 (`{ testo, evidenziati: [[start, end], …] }`), built on the server from Solr's
-`<em>` markers. The client never receives or renders HTML from Italgiure.
+`<em>` markers. The client receives plain text and ranges: `<em>` is the only markup read,
+any other stays as literal characters, to be rendered as text, never as HTML.
 
 #### 5.2 How an article is searched
 
