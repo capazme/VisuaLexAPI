@@ -53,47 +53,84 @@ _NUMBERED_ACT_TYPES = frozenset({
 # One article: a number, an optional bis/ter/.../terdecies suffix or a range
 # ("1-10"). The suffix table is the shared one — numbering goes far past
 # "decies" — and the \b closing it keeps a suffix from matching the head of an
-# ordinary word.
+# ordinary word. Court texts write the suffix three ways, «615-bis», «615 bis»
+# and «615bis»: reading only the hyphen turned the other two into art. 615, an
+# article that exists, so the wrong link looked right (2026-10-07).
+_SUFFIX_SOURCE = r"(?:" + ARTICLE_SUFFIX_ALTERNATION + r")\b"
 _ARTICLE_NUMBER_RE = re.compile(
-    r"\d+(?:\s*-\s*(?:(?:" + ARTICLE_SUFFIX_ALTERNATION + r")\b|\d+))?",
+    r"\d+(?:\s*+(?:-\s*+)?" + _SUFFIX_SOURCE + r"|\s*+-\s*+\d+)?",
     re.IGNORECASE,
 )
+_SPELLED_SUFFIX_RE = re.compile(r"^(\d+)-?(" + ARTICLE_SUFFIX_ALTERNATION + r")$", re.IGNORECASE)
+
+
+def _article(raw: str) -> str:
+    """An article as the convention writes it: «615 bis», «615bis», «615 - BIS» →
+    «615-bis». A range («1-10») and a plain number come back without spaces."""
+    flat = re.sub(r"\s+", "", raw)
+    return _SPELLED_SUFFIX_RE.sub(lambda m: f"{m.group(1)}-{m.group(2).lower()}", flat)
+
+
+# The word that opens a reference: «art.», «artt.», «articolo», «articoli».
+# Italgiure's texts often leave no space after the dot («all'art.615 ter cod.
+# pen.»); without one, «art» must still be a word of its own.
+_ARTICLE_PREFIX_SOURCE = r"((?<![A-Za-zÀ-ÿ])(?:artt?\.\s*+|(?:artt?|articol[oi])\s++))"
 # "articoli 8 e 9", "artt. 1, 2 e 3": every number of the list is an article
 # of the act it is attached to.
 _ARTICLE_LIST_SOURCE = (
     _ARTICLE_NUMBER_RE.pattern
-    + r"(?:\s*(?:,|\be\b)\s*" + _ARTICLE_NUMBER_RE.pattern + r")*"
+    + r"(?:\s*+(?:,|\be\b)\s*+" + _ARTICLE_NUMBER_RE.pattern + r")*"
 )
 # "comma 1", "co. 3", "commi 1 e 2", "comma 1, lett. b)": qualifies the
 # article, never the act. The closing comma ("art. 5, comma 1, del …") is
 # ordinary Italian punctuation and is consumed by the act-binding patterns.
+# Texts also write the paragraph as a word, after or before «comma» («commi
+# secondo, terzo e quarto»; «secondo comma», as Normattiva's own texts do), with
+# its own suffix («comma 3-bis»), and follow it with a number («comma 2, n. 3»;
+# «n.1»). Unread, the clause broke the match and the article fell to the bare
+# pattern and the context: «articolo 52, commi secondo, terzo e quarto, del
+# codice penale» in art. 2044 c.c. became art. 52 c.c. in the graph.
+_COMMA_ORDINAL_SOURCE = r"(?:primo|secondo|terzo|quarto|quinto|sesto|settimo|ottavo|nono|decimo)\b"
+# A list goes on in the kind it started with: after «comma 4,» an ordinal is the
+# sentence's («secondo periodo», «secondo la Corte»), never a paragraph; and an
+# ordinal before «periodo» is a sentence of the paragraph, not another paragraph.
+_COMMA_ORDINAL_ITEM_SOURCE = _COMMA_ORDINAL_SOURCE + r"(?!\s++periodo\b)"
+_COMMA_DIGITS_SOURCE = r"\d+(?:\s*+(?:-\s*+)?" + _SUFFIX_SOURCE + r")?"
+_LIST_SEPARATOR_SOURCE = r"\s*+(?:,|\be\b)\s*+"
 _COMMA_CLAUSE_SOURCE = (
-    r"(?:\s*,?\s*(?:comm[ai]|co)\.?\s*\d+(?:\s*(?:,|\be\b)\s*\d+)*)?"
-    r"(?:\s*,?\s*(?:lett\.?|lettera)\s*[a-z]\b\)?)?"
+    r"(?:\s*+(?:,\s*+)?(?:"
+    r"(?:comm[ai]|co)\.?\s*+(?:"
+    + _COMMA_DIGITS_SOURCE + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_DIGITS_SOURCE + r")*"
+    r"|" + _COMMA_ORDINAL_ITEM_SOURCE
+    + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_ORDINAL_ITEM_SOURCE + r")*)"
+    r"|" + _COMMA_ORDINAL_SOURCE + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_ORDINAL_SOURCE + r")*"
+    r"\s++comm[ai]\b)"
+    r"(?:\s*+(?:,\s*+)?nn?\.\s*+\d+(?:" + _LIST_SEPARATOR_SOURCE + r"\d+)*)?)?"
+    r"(?:\s*+(?:,\s*+)?(?:lett\.?|lettera)\s*+[a-z]\b\)?)?"
 )
 
 # Pattern: "art. N [suffix] [comma N] <act_abbrev>"
 _EXPLICIT_CITE_RE = re.compile(
-    r"((?:artt?\.?|articol[oi])\s+)"  # group 1: article prefix
+    _ARTICLE_PREFIX_SOURCE +  # group 1: article prefix
     r"(" + _ARTICLE_NUMBER_RE.pattern + r")"  # group 2: article number
-    r"(?:\s*(?:e|,)\s*" + _ARTICLE_NUMBER_RE.pattern + r")*"  # optional additional articles
+    r"(?:\s*+(?:e|,)\s*+" + _ARTICLE_NUMBER_RE.pattern + r")*"  # optional additional articles
     + _COMMA_CLAUSE_SOURCE +
-    r"\s*,?\s+"  # separator — ", comma 1, c.c." closes the clause with a comma
-    r"(?:delle\s+|dello\s+|della\s+|degli\s+|dei\s+|del\s+|dell['']\s*)?"  # optional preposition
+    r"(?:\s*+,\s++|\s++)"  # separator — ", comma 1, c.c." closes the clause with a comma
+    r"(?:(?:delle|dello|della|degli|dei|del)\s++|dell['\u2019]\s*+)?"  # optional preposition
     r"(" + _ACT_ABBREV_PATTERN + r")"  # group 3: act abbreviation
-    r"(?:\s+(\d+)\s*/\s*(\d{4}|\d{2})\b)?"  # group 4,5: optional act_number/year
+    r"(?:\s++(\d+)\s*+/\s*+(\d{4}|\d{2})\b)?"  # group 4,5: optional act_number/year
     ,
     re.IGNORECASE,
 )
 
 # Pattern: "art. N del <act_type> N/YYYY" (article before act with a preposition)
 _ART_DEL_ACT_RE = re.compile(
-    r"((?:artt?\.?|articol[oi])\s+)"
+    _ARTICLE_PREFIX_SOURCE +
     r"(" + _ARTICLE_NUMBER_RE.pattern + r")"
     + _COMMA_CLAUSE_SOURCE +
-    r"\s*,?\s+(?:delle|dello|della|degli|dei|del|dell['\u2019]\s*)\s*"
+    r"(?:\s*+,\s++|\s++)(?:delle|dello|della|degli|dei|del|dell['\u2019])\s*+"
     r"(" + _ACT_ABBREV_PATTERN + r")"
-    r"(?:\s+(\d+)\s*/\s*(\d{4}|\d{2})\b)?"
+    r"(?:\s++(\d+)\s*+/\s*+(\d{4}|\d{2})\b)?"
     ,
     re.IGNORECASE,
 )
@@ -102,7 +139,7 @@ _ART_DEL_ACT_RE = re.compile(
 _STANDALONE_ACT_RE = re.compile(
     r"(?:^|(?<=[\s\u00a0])|(?<=[''(]))"
     r"(" + _ACT_ABBREV_PATTERN + r")"  # group 1: act abbreviation
-    r"\s+(\d+)\s*/\s*(\d{4}|\d{2})\b"  # group 2,3: number/year — two or four digits, "241/456" is no year
+    r"\s++(\d+)\s*+/\s*+(\d{4}|\d{2})\b"  # group 2,3: number/year — two or four digits, "241/456" is no year
     ,
     re.IGNORECASE,
 )
@@ -116,24 +153,24 @@ _EU_ACT_SOURCE = build_eu_act_pattern()
 # Groups 1-5: the EU act; group 6: the article list that follows it.
 _EU_ACT_ART_AFTER_RE = re.compile(
     _EU_ACT_SOURCE
-    + r"(?:\s*,?\s*(?:artt?\.?|articol[oi])\s+(" + _ARTICLE_LIST_SOURCE + r"))?",
+    + r"(?:\s*+(?:,\s*+)?(?:artt?\.\s*+|(?:artt?|articol[oi])\s++)(" + _ARTICLE_LIST_SOURCE + r"))?",
     re.IGNORECASE,
 )
 # Group 1: article prefix; group 2: the article list; groups 3-7: the EU act.
 # "art. 5, comma 1, del regolamento (UE) 2016/679": the clause closes with a
 # comma before "del", and that comma is ordinary Italian punctuation.
 _ART_DEL_EU_ACT_RE = re.compile(
-    r"((?:artt?\.?|articol[oi])\s+)"
+    _ARTICLE_PREFIX_SOURCE +
     r"(" + _ARTICLE_LIST_SOURCE + r")"
     + _COMMA_CLAUSE_SOURCE +
-    r"\s*,?\s+(?:delle|dello|della|degli|dei|del|dell['\u2019]\s*)\s*"
+    r"(?:\s*+,\s++|\s++)(?:delle|dello|della|degli|dei|del|dell['\u2019])\s*+"
     + _EU_ACT_SOURCE,
     re.IGNORECASE,
 )
 
 # Pattern: bare article reference (no act specified)
 _BARE_ART_RE = re.compile(
-    r"((?:artt?\.?|articol[oi])\s+)"
+    _ARTICLE_PREFIX_SOURCE +
     r"(" + _ARTICLE_NUMBER_RE.pattern + r")"
     + _COMMA_CLAUSE_SOURCE
     ,
@@ -266,7 +303,7 @@ def extract_citations(
         if len(numbers) <= 1:
             _register(Citation(
                 start=m.start(), end=m.end(), display_text=m.group(0),
-                article=list_text.strip() if list_text else None,
+                article=_article(list_text) if list_text else None,
                 act_type=act_type, act_number=act_number, date=year,
             ))
             return
@@ -274,7 +311,7 @@ def extract_citations(
         for n in numbers:
             _register(Citation(
                 start=base + n.start(), end=base + n.end(), display_text=n.group(0),
-                article=n.group(0).strip(), act_type=act_type,
+                article=_article(n.group(0)), act_type=act_type,
                 act_number=act_number, date=year,
             ))
         _register(Citation(
@@ -302,7 +339,7 @@ def extract_citations(
 
     # Pass 1: Find explicit citations (article + act abbreviation)
     for m in _EXPLICIT_CITE_RE.finditer(text):
-        article = m.group(2).strip()
+        article = _article(m.group(2))
         act_abbrev = m.group(3)
         act_number = m.group(4)
         year = m.group(5)
@@ -326,7 +363,7 @@ def extract_citations(
     for m in _ART_DEL_ACT_RE.finditer(text):
         if _overlaps(m.start(), m.end()):
             continue
-        article = m.group(2).strip()
+        article = _article(m.group(2))
         act_abbrev = m.group(3)
         act_number = m.group(4)
         year = m.group(5)
@@ -373,7 +410,7 @@ def extract_citations(
     for m in _BARE_ART_RE.finditer(text):
         if _overlaps(m.start(), m.end()):
             continue
-        article = m.group(2).strip()
+        article = _article(m.group(2))
 
         c = Citation(
             start=m.start(),

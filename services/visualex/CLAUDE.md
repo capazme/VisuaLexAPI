@@ -143,7 +143,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     through `nl_parser`'s shared pattern, with the marker mandatory for
     regulations — a bare "regolamento n. 5/2020" in a text is a national
     one. A bare "art. 7" after a numbered act inherits its number and year,
-    not only its type
+    not only its type. An ordinal suffix is read spaced, joined or hyphenated
+    («615 bis», «615bis», «615-bis») and always emitted as `615-bis`; before
+    2026-10-07 only the hyphen was read and the other two came out as art. 615,
+    so MERL-T's citation edges built from them may point at the wrong article
   - `circuit_breaker.py` — per-source breaker. **State is in-memory
     per-instance** — single-instance deployment only. Status at
     `GET /api/circuit-breakers`
@@ -419,6 +422,9 @@ Breaking one of these breaks the product. Read before editing.
    include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
    (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
    normaliser and the archive (`tools/archivio-normativo/archivio_normativo/hierarchy.py`).
+   `parse_article_input` also takes a table suffix joined to its number, as
+   Normattiva's URNs spell it (`615bis` → `615-bis`); a joined word outside the
+   table (`5a`) is still refused.
 24. **A missing article gets you a different one.** Normattiva answers a request
     for a nonexistent article with the act's Art. 1 and HTTP 200. The existence
     check in `create_norma_visitata_from_data` is what turns that into a 404

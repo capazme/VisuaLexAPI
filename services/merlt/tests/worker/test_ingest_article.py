@@ -176,11 +176,30 @@ def _p(tipo, art, key, data=None, numero=None, allegato=None):
             N2LS + "urn:nir:stato:regio.decreto:1941-01-30;12~art2",
             _p("regio decreto", "2", N2LS + "urn:nir:stato:regio.decreto:1941-01-30;12~art2", "1941-01-30", "12"),
         ),
-        # An article with its latin suffix, and an annex of an ordinary act.
+        # An article with its latin suffix goes to VisuaLex as the convention
+        # writes it ("21-octies"): the URN's joined "21octies" was refused with a
+        # 400 (2026-10-07). The node keeps the URN's key.
         (
             N2LS + "urn:nir:stato:legge:1990-08-07;241~art21octies",
-            _p("legge", "21octies", N2LS + "urn:nir:stato:legge:1990-08-07;241~art21octies", "1990-08-07", "241"),
+            _p("legge", "21-octies", N2LS + "urn:nir:stato:legge:1990-08-07;241~art21octies", "1990-08-07", "241"),
         ),
+        (
+            N2LS + "urn:nir:stato:regio.decreto:1930-10-19;1398:1~art615bis",
+            _p("codice penale", "615-bis", N2LS + "urn:nir:stato:regio.decreto:1930-10-19;1398:1~art615bis"),
+        ),
+        (
+            N2LS + "urn:nir:stato:regio.decreto:1930-10-19;1398:1~art270bis.1",
+            _p("codice penale", "270-bis.1", N2LS + "urn:nir:stato:regio.decreto:1930-10-19;1398:1~art270bis.1"),
+        ),
+        (
+            N2LS + "urn:nir:stato:legge:1990-08-07;241~art21nonies",
+            _p("legge", "21-nonies", N2LS + "urn:nir:stato:legge:1990-08-07;241~art21nonies", "1990-08-07", "241"),
+        ),
+        (
+            N2LS + "urn:nir:stato:regio.decreto:1942-03-16;262:2~art2409terdecies",
+            _p("codice civile", "2409-terdecies", N2LS + "urn:nir:stato:regio.decreto:1942-03-16;262:2~art2409terdecies"),
+        ),
+        # An annex of an ordinary act.
         (
             N2LS + "urn:nir:stato:decreto.legislativo:2011-06-23;118:1~art3",
             _p("decreto legislativo", "3", N2LS + "urn:nir:stato:decreto.legislativo:2011-06-23;118:1~art3", "2011-06-23", "118", "1"),
