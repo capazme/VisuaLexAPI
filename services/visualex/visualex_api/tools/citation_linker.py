@@ -91,16 +91,21 @@ _ARTICLE_LIST_SOURCE = (
 # pattern and the context: «articolo 52, commi secondo, terzo e quarto, del
 # codice penale» in art. 2044 c.c. became art. 52 c.c. in the graph.
 _COMMA_ORDINAL_SOURCE = r"(?:primo|secondo|terzo|quarto|quinto|sesto|settimo|ottavo|nono|decimo)\b"
-_COMMA_NUMBER_SOURCE = (
-    r"(?:\d+(?:\s*+(?:-\s*+)?" + _SUFFIX_SOURCE + r")?|" + _COMMA_ORDINAL_SOURCE + r")"
-)
+# A list goes on in the kind it started with: after «comma 4,» an ordinal is the
+# sentence's («secondo periodo», «secondo la Corte»), never a paragraph; and an
+# ordinal before «periodo» is a sentence of the paragraph, not another paragraph.
+_COMMA_ORDINAL_ITEM_SOURCE = _COMMA_ORDINAL_SOURCE + r"(?!\s++periodo\b)"
+_COMMA_DIGITS_SOURCE = r"\d+(?:\s*+(?:-\s*+)?" + _SUFFIX_SOURCE + r")?"
+_LIST_SEPARATOR_SOURCE = r"\s*+(?:,|\be\b)\s*+"
 _COMMA_CLAUSE_SOURCE = (
     r"(?:\s*+(?:,\s*+)?(?:"
-    r"(?:comm[ai]|co)\.?\s*+" + _COMMA_NUMBER_SOURCE
-    + r"(?:\s*+(?:,|\be\b)\s*+" + _COMMA_NUMBER_SOURCE + r")*"
-    r"|" + _COMMA_ORDINAL_SOURCE + r"(?:\s*+(?:,|\be\b)\s*+" + _COMMA_ORDINAL_SOURCE + r")*"
+    r"(?:comm[ai]|co)\.?\s*+(?:"
+    + _COMMA_DIGITS_SOURCE + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_DIGITS_SOURCE + r")*"
+    r"|" + _COMMA_ORDINAL_ITEM_SOURCE
+    + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_ORDINAL_ITEM_SOURCE + r")*)"
+    r"|" + _COMMA_ORDINAL_SOURCE + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_ORDINAL_SOURCE + r")*"
     r"\s++comm[ai]\b)"
-    r"(?:\s*+(?:,\s*+)?nn?\.\s*+\d+(?:\s*+(?:,|\be\b)\s*+\d+)*)?)?"
+    r"(?:\s*+(?:,\s*+)?nn?\.\s*+\d+(?:" + _LIST_SEPARATOR_SOURCE + r"\d+)*)?)?"
     r"(?:\s*+(?:,\s*+)?(?:lett\.?|lettera)\s*+[a-z]\b\)?)?"
 )
 

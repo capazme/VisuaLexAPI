@@ -69,9 +69,11 @@ _ANNEX_TAIL_RE = re.compile(r":\d+$")
 # The URN joins an article's suffix to its number ("~art615bis"); VisuaLex reads
 # the article as the convention writes it, "615-bis", and refused "615bis" with a
 # 400 (2026-10-07: every lazy ingestion of a suffixed article failed). Only the
-# first suffix of the table takes the hyphen: the URN generator splits on it
-# once, so "270bis.1" -> "270-bis.1" and "135viciessemel" -> "135-viciessemel"
-# keep their key.
+# first suffix of the table takes the hyphen, because the URN generator splits on
+# one hyphen: "270bis.1" -> "270-bis.1" keeps its key. A compound ordinal is not
+# solved: "135viciessemel" -> "135-viciessemel" passes the identity check, but
+# VisuaLex keys that article "135-vicies-semel", so its existence check answers
+# 404 (before, a 400); that needs urngenerator to read every hyphen.
 _JOINED_SUFFIX_RE = re.compile(r"^(\d+)(?=(?:" + ARTICLE_SUFFIX_ALTERNATION + r"))")
 
 

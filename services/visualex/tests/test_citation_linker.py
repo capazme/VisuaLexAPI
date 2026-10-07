@@ -502,7 +502,9 @@ class TestOrdinalSpellings:
         citations = extract_citations("Si veda l'art. 615 bis.", context_act_type="codice penale")
         assert [c.article for c in citations] == ["615-bis"]
 
-    def test_a_list_reads_every_suffix(self):
+    def test_a_list_reads_its_first_suffix(self):
+        # a national list emits its first article only (as before); that one
+        # must keep its suffix
         citations = extract_citations("Si vedano gli artt. 615 bis e 615ter c.p.")
         assert citations[0].article == "615-bis"
 
@@ -531,6 +533,17 @@ class TestTheParagraphClause:
             ("52", "codice penale"), ("55", "codice penale")]
         assert self.ART_2044_CC[citations[1].start:citations[1].end] == (
             "articolo 55, secondo comma, del codice penale")
+
+    @pytest.mark.parametrize("text, cited", [
+        # d.lgs. 231/2001 and l. 241/1990 as Normattiva writes them
+        ("ai sensi dell'articolo 258, comma 4, secondo periodo, c.p. e", "articolo 258, comma 4"),
+        ("l'articolo 19, commi 3 e 6-bis, primo periodo, c.p. e", "articolo 19, commi 3 e 6-bis"),
+        ("l'art. 5, comma 1, secondo la Corte c.p.", "art. 5, comma 1"),
+        ("l'art. 5, comma primo, secondo periodo, c.p.", "art. 5, comma primo"),
+    ])
+    def test_a_sentence_of_the_paragraph_is_not_another_paragraph(self, text, cited):
+        c = extract_citations(text, context_act_type="codice civile")[0]
+        assert text[c.start:c.end] == cited
 
     @pytest.mark.parametrize("clause", [
         "comma 3-bis", "comma 3 bis", "commi primo e secondo", "secondo comma",
