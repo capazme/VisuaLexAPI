@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
   GripVertical,
+  Gavel,
 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -25,6 +26,8 @@ export interface SortableWorkspaceTabProps {
 }
 
 function getTabSummary(tab: WorkspaceTab) {
+  // a decision tab has no content list: it is not empty
+  if (tab.view) return tab.view.kind === 'decision' ? 'Sentenza' : 'Ricerca di sentenze';
   const normaCount = tab.content.filter(c => c.type === 'norma').length;
   const looseCount = tab.content.filter(c => c.type === 'loose-article').length;
   const collectionCount = tab.content.filter(c => c.type === 'collection').length;
@@ -41,6 +44,7 @@ function getContentIcons(tab: WorkspaceTab) {
   const types = new Set(tab.content.map(c => c.type));
   return (
     <div className="flex gap-1">
+      {tab.view && <Gavel size={10} className="text-primary-500" />}
       {types.has('norma') && <FileText size={10} className="text-primary-500" />}
       {types.has('loose-article') && <File size={10} className="text-amber-500" />}
       {types.has('collection') && <Folder size={10} className="text-purple-500" />}
@@ -49,6 +53,7 @@ function getContentIcons(tab: WorkspaceTab) {
 }
 
 function getArticleCount(tab: WorkspaceTab) {
+  if (tab.view) return 1; // the one decision, or the one search
   let count = 0;
   tab.content.forEach(item => {
     if (item.type === 'norma') {

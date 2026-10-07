@@ -15,6 +15,12 @@ import { useTour } from '../../../hooks/useTour';
 import { useCompare } from '../../../hooks/useCompare';
 import { Z_INDEX_VALUES } from '../../../constants/zIndex';
 import { normaForDossier } from '../dossier/dossierUtils';
+import { dragLimits, workspaceOrigin } from '../../../utils/workspaceOrigin';
+import { DecisionTabView } from '../decisions/DecisionTabView';
+
+function assertNever(x: never): never {
+  throw new Error(`unhandled tab view ${JSON.stringify(x)}`);
+}
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -127,8 +133,10 @@ export function WorkspaceTabPanel({
   };
 
   // Make this tab a drop zone
+  // (a decision tab draws no content list: an article dropped in would be invisible)
   const { setNodeRef, isOver } = useDroppable({
     id: tab.id,
+    disabled: tab.view !== undefined,
   });
 
   // Drag controls for handle-based dragging
@@ -163,16 +171,17 @@ export function WorkspaceTabPanel({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Very permissive drag constraints
+  // A tab's x/y are offsets from the workspace origin (utils/workspaceOrigin.ts), not from the
+  // viewport corner: the limits are expressed in viewport pixels and shifted by that origin, so the
+  // tab's rect stays inside the window. At least `minVisible` of its width and of its header stay
+  // on screen.
   const tabWidth = tab.isMinimized ? 300 : tab.size.width;
   const minVisible = 50;
 
-  const dragConstraints = useMemo(() => ({
-    left: -(tabWidth - minVisible),
-    top: 0,
-    right: windowSize.width - minVisible,
-    bottom: windowSize.height - minVisible
-  }), [windowSize.width, windowSize.height, tabWidth]);
+  const dragConstraints = useMemo(
+    () => dragLimits(workspaceOrigin(), windowSize, tabWidth, minVisible),
+    [windowSize, tabWidth],
+  );
 
   useEffect(() => {
     if (!isDragging) {
@@ -288,6 +297,18 @@ export function WorkspaceTabPanel({
     bringTabToFront(tab.id);
   };
 
+  // One branch per kind of view: a new kind fails to compile here until it is drawn.
+  const renderView = (view: NonNullable<WorkspaceTab['view']>): React.ReactNode => {
+    switch (view.kind) {
+      case 'decision':
+        return <DecisionTabView key={tab.id} tabId={tab.id} reference={view.reference} />;
+      case 'decision-search':
+        return null; // drawn by the search tab (Task 17)
+      default:
+        return assertNever(view);
+    }
+  };
+
   // When heavy overlays are open, hide the tab panels
   if (shouldHide) return null;
 
@@ -360,7 +381,7 @@ export function WorkspaceTabPanel({
 
             <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
 
-            {isEditingLabel ? (
+            {isEditingLabel && !tab.view ? (
               <input
                 type="text"
                 value={labelInput}
@@ -390,7 +411,7 @@ export function WorkspaceTabPanel({
             ) : (
               <div
                 className="flex items-center gap-2 flex-1 min-w-0 group"
-                onDoubleClick={() => {
+                onDoubleClick={tab.view ? undefined : () => {
                   setLabelInput(tab.label);
                   setIsEditingLabel(true);
                 }}
@@ -398,23 +419,27 @@ export function WorkspaceTabPanel({
                 <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">
                   {tab.label}
                 </h3>
-                <button
-                  onClick={() => {
-                    setLabelInput(tab.label);
-                    setIsEditingLabel(true);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-opacity"
-                  title="Modifica nome"
-                >
-                  <Edit2 size={12} className="text-slate-500" />
-                </button>
+                {/* a decision's label is its citation, set from the decision itself */}
+                {!tab.view && (
+                  <button
+                    onClick={() => {
+                      setLabelInput(tab.label);
+                      setIsEditingLabel(true);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-opacity"
+                    title="Modifica nome"
+                  >
+                    <Edit2 size={12} className="text-slate-500" />
+                  </button>
+                )}
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Add to Dossier button with dropdown */}
+            {/* Add to Dossier button with dropdown: a decision has its own, in its view */}
+            {!tab.view && (
             <div className="relative" ref={dossierMenuRef} onPointerDown={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setShowDossierMenu(!showDossierMenu)}
@@ -498,6 +523,7 @@ export function WorkspaceTabPanel({
                 </div>
               )}
             </div>
+            )}
 
           </div>
         </div>
@@ -505,7 +531,9 @@ export function WorkspaceTabPanel({
         {/* Content area */}
         {!tab.isMinimized && (
           <div className="flex-1 overflow-auto p-4 space-y-4">
-            {tab.content.length === 0 ? (
+            {tab.view ? (
+              renderView(tab.view)
+            ) : tab.content.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400">
                 <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-3">
                   <FileText size={24} className="opacity-50" />

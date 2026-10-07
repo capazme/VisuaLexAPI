@@ -24,8 +24,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
   user drops in — parsed in the browser, never uploaded — each opening the
   reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
-  (`DecisionPage`, `DecisionLookupForm`, `DecisionTextView`: a court decision
-  by its address; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
+  (`DecisionView`, the body of a decision wherever it is drawn; `DecisionTabView`,
+  its workspace tab and the phone view; `DecisionPage`, `DecisionLookupForm`,
+  `DecisionTextView`: a court decision by its address; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.

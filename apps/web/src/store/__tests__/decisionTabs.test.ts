@@ -85,7 +85,6 @@ describe('decision tabs', () => {
       expect(Math.max(left.bottom, right.bottom)).toBeLessThanOrEqual(DOCK_TOP(800));
       expect(Math.min(left.y, right.y)).toBeGreaterThanOrEqual(56);
       // free width = 1280 - 64 - two margins; the gap between the tabs is one margin
-      expect(right.right - left.x + MARGIN).toBeGreaterThanOrEqual(1280 - 64 - 2 * MARGIN - 2);
       expect(right.x - left.right).toBeGreaterThanOrEqual(MARGIN - 2);
       expect(right.x - left.right).toBeLessThanOrEqual(MARGIN + 2);
       expect(right.right - left.x).toBeGreaterThanOrEqual(1280 - 64 - 2 * MARGIN - 2);

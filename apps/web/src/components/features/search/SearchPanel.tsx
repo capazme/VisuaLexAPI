@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
@@ -9,6 +8,7 @@ import { AliasManager } from '../settings/AliasManager';
 const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
 import { NormaCard } from './NormaCard';
+import { DecisionTabView } from '../decisions/DecisionTabView';
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
 import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight, Info } from 'lucide-react';
@@ -29,6 +29,7 @@ import { deriveVersionInfo, requestIsHistorical, versionTabSuffix } from '../../
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
 import { shortAct } from '../../../utils/sources';
+import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 
 // Estimate the number of articles a search will return based on the `article`
 // field. Used both for the streaming progress bar and the loading skeleton.
@@ -121,6 +122,26 @@ export function SearchPanel() {
       setMobileActiveTabIndex(workspaceTabs.length - 1);
     }
   }, [workspaceTabs.length, mobileActiveTabIndex]);
+
+  // Mobile shows one tab at a time: a decision that has just been opened (a new frontmost tab with
+  // a `view`) becomes the visible one. Only a frontmost tab not seen before switches, so the
+  // reader's own swipe to another tab is never undone by a later render.
+  const frontTabIdRef = useRef<string | null>(null);
+  const frontTabSeenRef = useRef(false);
+  useEffect(() => {
+    let front: (typeof workspaceTabs)[number] | undefined;
+    for (const t of workspaceTabs) if (!front || t.zIndex > front.zIndex) front = t;
+    const previous = frontTabIdRef.current;
+    frontTabIdRef.current = front?.id ?? null;
+    // the first run only records what is in front at mount
+    if (!frontTabSeenRef.current) { frontTabSeenRef.current = true; return; }
+    if (front?.view && front.id !== previous) {
+      const index = workspaceTabs.findIndex((t) => t.id === front.id);
+      // (gotcha 11) syncs the local phone index with the store's new frontmost tab, an external change
+      // with nothing to derive it from during render; the lint rule does not flag it, so no disable
+      if (index >= 0) setMobileActiveTabIndex(index);
+    }
+  }, [workspaceTabs]);
 
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({
@@ -626,9 +647,9 @@ export function SearchPanel() {
       // excluded from processResult's merge heuristics, so every later search
       // for this act — a citation jump included — would spawn a duplicate tab.
       // That is the accumulation this round exists to reduce.
-      const targetTabId = workspaceTabs.length > 0
-        ? workspaceTabs[workspaceTabs.length - 1].id
-        : addWorkspaceTab(params.act_type);
+      // (a decision tab draws no content list, so the index would land where nothing shows it)
+      const lastNormTab = [...workspaceTabs].reverse().find((t) => !t.view);
+      const targetTabId = lastNormTab ? lastNormTab.id : addWorkspaceTab(params.act_type);
 
       addNormaIndexToTab(targetTabId, norma);
     } catch (e) {
@@ -661,6 +682,7 @@ export function SearchPanel() {
   };
 
   const hasTabs = workspaceTabs.length > 0;
+  const activeMobileTab = workspaceTabs[mobileActiveTabIndex];
 
   return (
     <>
@@ -775,6 +797,9 @@ export function SearchPanel() {
                   }}
                   className="h-full overflow-y-auto p-4 space-y-4 custom-scrollbar"
                 >
+                  {activeMobileTab?.view?.kind === 'decision' && (
+                    <DecisionTabView key={activeMobileTab.id} tabId={activeMobileTab.id} reference={activeMobileTab.view.reference} />
+                  )}
                   {workspaceTabs[mobileActiveTabIndex].content
                     .filter((item): item is typeof item & { type: 'norma' } => item.type === 'norma')
                     .map((normaBlock) => {

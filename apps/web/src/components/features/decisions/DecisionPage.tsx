@@ -1,26 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Copy, ExternalLink, FolderPlus, Gavel, RotateCw } from 'lucide-react';
-import { Button } from '../../ui/Button';
-import { SkeletonText } from '../../ui/Skeleton';
-import { Toast, type ToastProps } from '../../ui/Toast';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { AlertCircle, Gavel } from 'lucide-react';
 import { fetchDecision } from '../../../services/decisionService';
-import type { DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
-import {
-  decisionPath,
-  describeNotice,
-  formatDecisionCitation,
-  formatDecisionHeading,
-  httpsUrl,
-  notFoundMessage,
-  parseDecisionPath,
-} from '../../../utils/decisionLinks';
-import { hasDecisionText } from '../../../utils/decisionText';
-import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
-import { sentenzaFromDecision } from '../dossier/dossierUtils';
+import { useAppStore } from '../../../store/useAppStore';
+import type { DecisionReference, FetchDecisionAnswer } from '../../../types/decisions';
+import { decisionPath, parseDecisionPath } from '../../../utils/decisionLinks';
 import { DecisionLookupForm } from './DecisionLookupForm';
-import { DecisionTextView } from './DecisionTextView';
+import { DecisionView } from './DecisionView';
 
 /** «Sentenze» is the h1 of every screen that shows no decision; the decision has its own heading,
  *  and is then the h1 of its screen. */
@@ -37,88 +23,6 @@ function Shell({ decisionShown, children }: { decisionShown: boolean; children: 
   );
 }
 
-function Alert({ children }: { children: React.ReactNode }) {
-  return (
-    <div role="alert" className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-      <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden />
-      <div>{children}</div>
-    </div>
-  );
-}
-
-type ShowToast = (message: string, type: ToastProps['type']) => void;
-
-function FoundView({ answer, onCopy, onToast }: { answer: FoundDecision; onCopy: () => void; onToast: ShowToast }) {
-  // The source's own page, only ever over https: the address comes from our server, built on fixed
-  // bases, so this is defence in depth.
-  const sourceUrl = httpsUrl(answer.fonte.url);
-  const [dossierAnchor, setDossierAnchor] = useState<HTMLElement | null>(null);
-  return (
-    <article className="space-y-5">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
-        {formatDecisionHeading(answer.identita, answer.attributi)}
-      </h1>
-      {answer.avvisi.map((notice, i) => (
-        <Alert key={i}>{describeNotice(notice, answer.attributi)}</Alert>
-      ))}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" icon={<Copy size={16} />} className={TOUCH_TARGET_RESPONSIVE} onClick={onCopy}>
-          Copia citazione
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<FolderPlus size={16} />}
-          className={TOUCH_TARGET_RESPONSIVE}
-          onClick={(e) => setDossierAnchor(e.currentTarget)}
-        >
-          Aggiungi al dossier
-        </Button>
-        {sourceUrl && (
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400"
-          >
-            <ExternalLink size={16} aria-hidden /> Apri sulla fonte
-          </a>
-        )}
-      </div>
-      {/* Found without its text: the notice above says so, and no empty block is drawn. */}
-      {hasDecisionText(answer.testo) && <DecisionTextView testo={answer.testo} />}
-      {/* No licence line (the owner's decision, confirmed on 2026-10-04): fonte.licenza stays in
-          the data. */}
-      <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        Fonte: {answer.fonte.nome}
-      </footer>
-      {/* The item keeps the identity and the citation computed from what it keeps (source
-          convention, Q9), never the text. */}
-      <AddToDossierPopover
-        isOpen={dossierAnchor !== null}
-        anchorEl={dossierAnchor}
-        onClose={() => setDossierAnchor(null)}
-        sentenza={sentenzaFromDecision(answer.identita, answer.attributi)}
-        onAdded={(_dossierId, title) => onToast(`Aggiunta a «${title}»`, 'success')}
-        onDuplicate={(title) => onToast(`Già presente in «${title}»`, 'info')}
-      />
-    </article>
-  );
-}
-
-/**
- * Who did not answer, in the page's words. `quota`: the limit of requests. `rete`: the request never
- * reached our server. `risposta <status>`: something answered that was not the route (the ingress, the
- * login gate or the framework: a 502 while VisuaLex's Python service is down). Those are ours, and are
- * never blamed on the source; only the name of a source (`cassazione`, `corte_costituzionale`) is.
- */
-function unreachableMessage(fonte: string): string {
-  if (fonte === 'quota') return 'Hai raggiunto il limite di richieste: riprova tra un minuto.';
-  if (fonte === 'rete') return 'Il server non ha risposto: controlla la connessione e riprova.';
-  if (fonte.startsWith('risposta ')) return 'Il servizio non ha risposto correttamente: riprova tra poco.';
-  return 'La fonte non risponde in questo momento.';
-}
-
 export function DecisionPage() {
   const params = useParams<{ corte?: string; numero?: string; anno?: string }>();
   const [searchParams] = useSearchParams();
@@ -126,7 +30,7 @@ export function DecisionPage() {
   const navigate = useNavigate();
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; answer: FetchDecisionAnswer } | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
+  const openCommandPalette = useAppStore((s) => s.openCommandPalette);
 
   const search = searchParams.toString();
   const hasPath = Boolean(params.corte);
@@ -165,119 +69,41 @@ export function DecisionPage() {
     if (canonical !== location.pathname + location.search) navigate(canonical, { replace: true });
   }, [answer, location.pathname, location.search, navigate]);
 
-  const copy = async (found: FoundDecision) => {
-    try {
-      await navigator.clipboard.writeText(formatDecisionCitation(found.identita, found.attributi));
-      setToast({ message: 'Citazione copiata', type: 'success' });
-    } catch (error) {
-      // no clipboard (a page that is not secure, an old browser), or the browser refused
-      console.error('copying the citation failed', error);
-      setToast({ message: 'Copia non riuscita', type: 'error' });
-    }
-  };
-
-  const retry = (
-    <div className="mt-2">
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={<RotateCw size={16} />}
-        className={TOUCH_TARGET_RESPONSIVE}
-        onClick={() => setAttempt((a) => a + 1)}
-      >
-        Riprova
-      </Button>
-    </div>
-  );
-
   let body: React.ReactNode;
   if (!parsed) {
     body = <DecisionLookupForm />;
   } else if (!parsed.ok) {
     body = (
       <>
-        <Alert>L'indirizzo non indica una sentenza leggibile: {Object.values(parsed.errors).join('; ')}.</Alert>
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+          <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden />
+          <div>L'indirizzo non indica una sentenza leggibile: {Object.values(parsed.errors).join('; ')}.</div>
+        </div>
         <DecisionLookupForm initial={parsed.partial} errors={parsed.errors} />
       </>
     );
-  } else if (!answer) {
-    // the status is announced on its own: inside an aria-busy container it would not be
-    body = (
-      <div>
-        <p className="sr-only" role="status">Caricamento della decisione…</p>
-        <SkeletonText lines={8} />
-      </div>
-    );
-  } else if (answer.esito === 'trovata') {
-    body = (
-      <FoundView
-        answer={answer}
-        onCopy={() => { void copy(answer); }}
-        onToast={(message, type) => setToast({ message, type })}
-      />
-    );
-  } else if (answer.esito === 'ambigua') {
-    body = (
-      <section className="space-y-3">
-        <Alert>Con questi estremi esistono più decisioni: scegli quella citata.</Alert>
-        <ul className="space-y-2">
-          {answer.candidati.map((c) => (
-            <li key={decisionPath(c.identita)}>
-              <Link
-                to={decisionPath(c.identita)}
-                className={`inline-flex items-center text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE}`}
-              >
-                {formatDecisionHeading(c.identita, c.attributi)}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-    );
-  } else if (answer.esito === 'non_trovata') {
-    const ref = parsed.reference;
+  } else {
+    // The outcomes are DecisionView's; the form under a missing or refused decision is the page's
+    // own, until the lookup moves into the palette.
     body = (
       <>
-        <Alert>
-          <p>{notFoundMessage(answer, ref)}</p>
-          {answer.suggerimento && (
-            <p className="mt-1">
-              Per le decisioni penali il numero segue l'anno di deposito: prova{' '}
-              <Link to={decisionPath(answer.suggerimento)} className="font-medium underline">
-                n. {answer.suggerimento.numero}/{answer.suggerimento.anno}
-              </Link>.
-            </p>
-          )}
-        </Alert>
-        <DecisionLookupForm initial={ref} />
+        <DecisionView
+          answer={answer}
+          reference={parsed.reference}
+          headingLevel={1}
+          onRetry={() => setAttempt((a) => a + 1)}
+          onChooseCandidate={(identity) => navigate(decisionPath(identity))}
+          onOpenPalette={openCommandPalette}
+        />
+        {answer?.esito === 'non_trovata' && <DecisionLookupForm initial={parsed.reference} />}
+        {answer?.esito === 'richiesta_non_valida' && <DecisionLookupForm initial={parsed.reference} errors={answer.errori} />}
       </>
     );
-  } else if (answer.esito === 'fonte_non_raggiungibile') {
-    // Our own failures (the limit of requests, the network, an answer that was not the route's) are
-    // told apart from a source that is silent, and never blamed on it (`unreachableMessage`). A source
-    // that is silent includes a Corte costituzionale copy that could not be refreshed and lacks the
-    // number: it confirms, it never denies.
-    body = (
-      <Alert>
-        <p>{unreachableMessage(answer.fonte)}</p>
-        {retry}
-      </Alert>
-    );
-  } else if (answer.esito === 'errore_interno') {
-    body = (
-      <Alert>
-        <p>Errore imprevisto: non è stato possibile caricare la decisione.</p>
-        {retry}
-      </Alert>
-    );
-  } else {
-    body = <DecisionLookupForm initial={parsed.reference} errors={answer.errori} />;
   }
 
   return (
     <Shell decisionShown={answer?.esito === 'trovata'}>
       {body}
-      {toast && <Toast message={toast.message} type={toast.type} isVisible onClose={() => setToast(null)} />}
     </Shell>
   );
 }

@@ -1,5 +1,4 @@
 import { useStore } from 'zustand/react';
-import { workspaceOrigin } from '../utils/workspaceOrigin';
 import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -16,6 +15,7 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
+import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
