@@ -102,6 +102,28 @@ EU_ACT_RE = re.compile(build_eu_act_pattern(), re.IGNORECASE)
 _EU_YEAR_FLOOR = 1950
 _EU_NEW_NUMBERING_FROM = 2015
 
+# An annex, as the convention writes it ("(Allegato A)", "(All. A)"): read
+# from the raw input, before lower-casing, because the URN keeps its case
+# ("…;81:A"). A letter annex is written in capitals whatever the user typed.
+# One letter, a roman numeral or a number: "allegato al decreto" is no annex.
+_ANNEX_RE = re.compile(
+    r"(\(\s*)?\b(?:allegato|all\.)\s*([a-z]|[ivxlc]{1,7}|\d+)\b\s*\)?",
+    re.IGNORECASE,
+)
+# A word after a bare lower-case letter: "allegato a d.lgs. 81/2008" is the
+# participle and a preposition, not annex A.
+_WORD_AHEAD_RE = re.compile(r"\s*[^\W\d_]")
+
+# The first day of a month, as citations write it: "1° settembre 1993" (also
+# with the ordinal indicator, "1º"). Without this the day was dropped and only
+# the year was read.
+_FIRST_DAY_RE = re.compile(r"\b(\d{1,2})\s*[°º]")
+
+# The Costituzione has no number and no date: an act type that reads as it
+# alongside either is another act the tables do not know ("l. cost" with a
+# number is a legge costituzionale), and is refused rather than guessed.
+_UNNUMBERED_ACTS = frozenset({"costituzione"})
+
 # Date patterns
 _DATE_PATTERNS = [
     # "7/8/1990" or "07/08/1990" or "7-8-1990"
@@ -122,6 +144,7 @@ class ParsedQuery:
     date: Optional[str] = None
     act_number: Optional[str] = None
     article: Optional[str] = None
+    annex: Optional[str] = None
 
     def to_api_params(self) -> dict:
         """Convert to API request parameters, omitting None values."""
@@ -134,6 +157,8 @@ class ParsedQuery:
             params["act_number"] = self.act_number
         if self.article:
             params["article"] = self.article
+        if self.annex:
+            params["annex"] = self.annex
         return params
 
     @property
@@ -162,6 +187,7 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
     if len(raw_input) > 500:
         return None
 
+    raw_input, annex = _extract_annex(raw_input)
     text = _normalize(raw_input)
 
     result = ParsedQuery()
@@ -215,12 +241,29 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
     if not result.is_valid:
         return None
 
+    if result.act_type in _UNNUMBERED_ACTS and (result.act_number or result.date):
+        return None
+
+    result.annex = annex
     return result
+
+
+def _extract_annex(text: str) -> tuple[str, Optional[str]]:
+    """Take the annex out of the raw input. Returns (remaining_text, annex)."""
+    m = _ANNEX_RE.search(text)
+    if not m:
+        return text, None
+    annex = m.group(2)
+    if (not m.group(1) and len(annex) == 1 and annex.islower()
+            and _WORD_AHEAD_RE.match(text, m.end())):
+        return text, None
+    annex = annex if annex.isdigit() else annex.upper()
+    return text[:m.start()] + " " + text[m.end():], annex
 
 
 def _normalize(text: str) -> str:
     """Normalize whitespace, lowercase, clean up punctuation."""
-    text = text.strip().lower()
+    text = _FIRST_DAY_RE.sub(r"\1", text.strip().lower())
     # "(UE)" is the official spelling of the marker, not noise: with the
     # parentheses in place "regolamento (ue)" matched no act at all.
     text = re.sub(r"[()\[\]]+", " ", text)
