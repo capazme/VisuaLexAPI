@@ -186,8 +186,8 @@ changed — without it they could no longer be removed.
 (`ReadingToolbar`, both its desktop row and its phone row, and `DecisionReadingToolbar`) opens
 `FindInTextBox` (`useFindInText` + `FindInTextBar`) in a row of its own inside the sticky toolbar;
 it is mounted only while open, so closing clears the highlights and forgets the query. The
-article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»;
-a decision only when it has text (`hasDecisionText`). The search reads the text nodes and paints with
+article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
+a decision only when it has text (`hasDecisionText`). The search reads the text nodes, joined by one virtual space at every block boundary, `<br>` and skipped hidden subtree, and paints with
 the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-current)`); it adds,
 moves and changes nothing in the DOM (gotcha 23), and where the API is missing it only fails to
 draw. Matching ignores case, accents and marks, folded 1:1 per UTF-16 unit so offsets are the
@@ -195,6 +195,7 @@ original's; a query needs two characters (digits count); past 1000 matches the r
 searching at once keep both sets of ranges (the registry is keyed by owner). Browser floor: the
 Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
 `decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
+«Cerca nel testo» has no shortcut: Cmd/Ctrl+F is the app's existing «Cerca negli articoli aperti» (`Layout.tsx`), a different tool that searches the open articles, not decisions.
 
 **Passage discussions on the reading surface**: the discussion wiring of a reading surface
 lives in one hook, `useDiscussionWiring` (passage threads load and reload, the ones that still

@@ -2980,7 +2980,7 @@ Added 2026-10-08 (the owner: «mettiamo anche una funzione di ricerca all'intern
 ### Task 31: The find box
 
 **Files:**
-- Create: `apps/web/src/hooks/useFindInText.ts` (`useFindInText(rootRef, { open, query })`: matches over `collectSearchableText`, the current index, `next`/`previous` (wrapping), scrolling the current match to the middle of the nearest scrolling ancestor, the registry under an id of its own, recomputed when the root's content changes (a `MutationObserver` on child lists and character data, coalesced to one frame) keeping the current match where it still exists; everything cleared when closed or unmounted)
+- Create: `apps/web/src/hooks/useFindInText.ts` (`useFindInText(rootRef, { open, query })`: matches over `collectSearchableText`, the current index, `next`/`previous` (wrapping), scrolling the current match to the middle of the nearest scrolling ancestor, the registry under an id of its own, recomputed when the root's content changes (a `MutationObserver` on child lists, character data and the `class`, `style` and `hidden` attributes, coalesced to one frame) keeping the current match where it still exists; everything cleared when closed or unmounted)
 - Create: `apps/web/src/components/features/search/FindInTextBar.tsx` (the field «Cerca nel testo», the counter «N di M» / «Nessun risultato» / «oltre 1000: affina la ricerca» in an `aria-live="polite"` region, ↑ «Risultato precedente», ↓ «Risultato successivo», × «Chiudi la ricerca»; Enter / Shift+Enter / Esc; 150 ms debounce on typing; 44 px targets below `md`, full width on a phone; focus to the field on open, back to the opener on close)
 - Create: `apps/web/src/components/features/search/FindInTextButton.tsx` (the magnifier toggle, `aria-pressed`, shared by both toolbars like `DiscussionButton`)
 - Modify: `apps/web/src/index.css` (`::highlight(vlx-find)` and `::highlight(vlx-find-current)`, light and dark tokens; READING SURFACE)
@@ -2993,7 +2993,7 @@ Added 2026-10-08 (the owner: «mettiamo anche una funzione di ricerca all'intern
 
 **Files:**
 - Modify: `apps/web/src/components/features/decisions/DecisionReadingToolbar.tsx` and `DecisionReadingSurface.tsx` (the button and the box over the decision's text root; only with text)
-- Modify: `apps/web/src/components/features/search/ReadingToolbar.tsx` (the button in the desktop row and in the phone row, which wraps) and `ArticleTabContent.tsx` (the box over the article's text root, `ArticleBody`'s `textRef`)
+- Modify: `apps/web/src/components/features/search/ReadingToolbar.tsx` (the button in the desktop row and in the phone row, which wraps) and `ArticleTabContent.tsx` (the box over the article's text root, `ArticleBody`'s `textRootRef`)
 - Modify: `apps/web/CLAUDE.md` («Reading surface»: find in the text; the shared utilities `findInText`, `findHighlights`, `useFindInText`)
 - Test: `DecisionFind.test.tsx`, the article's toolbar and tab tests; `decisionRender.test.ts` and `articleRender.test.ts` (with a search open on the rendered HTML, the text nodes still spell the projection / `article_text` minus `\n`)
 
@@ -3469,3 +3469,17 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - The limit, restated: the API still returns a withdrawn quotation to any signed-in user; server-side withholding is a precondition for the public opening (spec §8.7 and its «Before VisuaLex opens to the public» list).
 
 **Amendment, 2026-10-08 — PR 4c added (the owner: «mettiamo anche una funzione di ricerca all'interno delle sentenze», «sì, insieme»).** «Cerca nel testo» on decisions and articles, one component (spec §13, Tasks 30–32). The matches are drawn with the CSS Custom Highlight API rather than with elements in the text: the orchestrator's scope asked that highlighting only wrap characters (root rule 23); drawing ranges adds nothing to the page, so the rule holds by construction and the search needs no nesting rules with marks, signs or the discussion focus.
+
+**Amendment, 2026-10-08 — PR 4c as built (`feat/find-in-text`), after the final review.** Tasks 30–32 above are corrected where the code differs (the observer also watches `class`, `style` and `hidden`; the article's root is `textRootRef`); what the rounds decided:
+- Separators: one virtual space at every block boundary, at `<br>` and where a hidden subtree was skipped; a match never begins or ends on one.
+- Accents and the query: combining marks may follow every query unit (`\p{M}*`), so decomposed text is found; the query is folded unit by unit after NFC (Hangul, «ς»), then marks, soft hyphens and zero-width spaces are dropped on both sides; the final sigma reads as «σ»; `isSearchableQuery` is the one minimum (two base characters, counted in code points).
+- `mapThroughEdit`: when the text changes before the current match, the current match is kept by position.
+- The observer watches `class`, `style` and `hidden` too, so hiding or showing text recomputes the matches.
+- Focus: `returnFocusRef` hands the box the button of the row on screen; the bar's own «what held focus» fallback and the hook's `open: false` stay as documented API.
+- One look for the toolbar toggles: `toolbarToggle.ts` (`toolbarToggleClass`), shared by `DiscussionButton` and `FindInTextButton`; the box is `FindInTextBox`, and the test fixture `utils/__fixtures__/openFind.ts` (with `FakeHighlight`).
+- Colours: violet tokens with `--vlx-find-fg` for the text of a match (the Dark Reader finding).
+- The placeholder moved out of the text root: `ArticleBody` draws it beside the root, so the root holds only the text (`textRootRef`).
+- When the text goes (hidden), the box closes and the query resets (`textVisible`, reset during render).
+- Button order on both surfaces: «Discussioni», then «Cerca nel testo». The magnifier is 16 px beside 16 px neighbours and 20 px in the article's phone row.
+- Phone layout: the field takes a row of its own, the counter and the three buttons share the next; targets are 44 px below `md`. Esc in the field stops there (an open discussion panel or citation preview stays open). The search landmark is named «Cerca nel testo» plus the surface.
+- Cmd/Ctrl+F is the app's «Cerca negli articoli aperti» (`Layout.tsx`), unchanged; «Cerca nel testo» has no shortcut.

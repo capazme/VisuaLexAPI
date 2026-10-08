@@ -894,14 +894,14 @@ goes to the next, Shift+Enter to the previous (both wrap), Esc closes the box, c
 highlights and returns the focus to the button. The current match is scrolled into the middle of
 the tab's view. A query shorter than two characters highlights nothing. Past 1,000 matches the
 first 1,000 are highlighted and the counter says «oltre 1000: affina la ricerca». On a phone the
-box takes the toolbar's full width. No keyboard shortcut: Cmd/Ctrl+F stays the browser's.
+box takes the toolbar's full width, the field on a row of its own. «Cerca nel testo» has no keyboard shortcut of its own. The app's Cmd/Ctrl+F is a different tool, the existing «Cerca negli articoli aperti» (`Layout.tsx`, unchanged by this PR): it searches the open articles, not decisions, and marks them in amber in the text.
 A past text (gotcha 32) can be searched: searching stores nothing. A decision shown without its
 text has no button.
 
 **What is searched.** The text the reader sees: the rendered text nodes of the surface's text
 root, which spell the projection on a decision (§8.2) and `article_text` without `\n` on an
 article (root rule 23). A node inside an element that is not displayed (the folded update notes of
-an article, a heading Study Mode hides) is not searched. Labels drawn by CSS are not text and are
+an article, or a node under `.vlx-hidden`) is not searched. Labels drawn by CSS are not text and are
 not found.
 
 **How it matches.** Case and accents are ignored: «perche» finds «perché», «Perché» and
@@ -911,11 +911,12 @@ and the result is kept only when it is still one unit (otherwise the unit lower-
 unit itself: «ß» and astral characters stay as they are; «İ» reads as «i»; a lone combining mark
 stays itself). The typographic apostrophes (’ ‘ ʼ), the acute accent «´» and the grave «`» read
 as «'», and the no-break and other Unicode spaces as a space, so «dell'articolo» finds
-«dell’articolo». The query is folded fully (NFD, marks dropped, lower-cased) because its own
-offsets do not matter; in the pattern every query unit may be followed by combining marks, so a
+«dell’articolo». The query is folded unit by unit after NFC (so it folds the way the text does:
+Hangul syllables, «ς»), then any leftover combining marks, soft hyphens and zero-width spaces are
+dropped; the final sigma «ς» reads as «σ»; in the pattern every query unit may be followed by combining marks, so a
 decomposed «perché» in the text (the Cassazione's PDF is not normalised) is found by «perche»,
 «perché» and «perche no», the mark inside the match, and a decomposed query finds precomposed
-text. A soft hyphen or a zero-width space inside a word of the text is ignored («responsabilita»
+text. A soft hyphen or a zero-width space inside a word, in the text or in the query, is ignored («responsabilita»
 finds «respon­sabilità»). Ligatures (ﬁ, ﬂ, ﬃ) are not matched: they cannot fold one unit to one.
 In the query, a run of spaces matches any run of whitespace in the text; the query is trimmed at
 its edges, and the two-character minimum counts folded base characters (code points after the
@@ -923,8 +924,8 @@ marks are dropped), so one emoji or one accented letter is not enough.
 
 **Where one block ends.** The text nodes of two blocks touch without a space, so the search runs
 over the text nodes joined by one virtual space wherever a block ends and another begins (a
-change of the nearest block-like ancestor: `div`, `p`, `li`, `section`, `article`,
-`blockquote`, `h1`–`h6`, an article's `vlx-b`, a decision's line), at a `<br>`, and wherever a
+change of the nearest block-like ancestor: `div`, `p`, `li`, `ul`, `ol`, `pre`, `table`, `tr`,
+`td`, `th`, `section`, `article`, `blockquote`, `h1`–`h6`, an article's `vlx-b`, a decision's line), at a `<br>`, and wherever a
 hidden subtree was skipped between two nodes. «Fatto diritto» finds «Fatto» and «Diritto» in two
 blocks, and «todi» does not. A virtual space maps to no character: a match never begins or ends
 on one, and its range starts and ends inside real text nodes.
@@ -934,7 +935,7 @@ CSS Custom Highlight API (`CSS.highlights`, `::highlight()`): ranges over the ex
 nodes, painted by the browser, no element added or moved. Root rule 23 is untouched by
 construction (a test checks that the text root's HTML is identical with the search open), and the
 search coexists with highlights, note anchors, signs and the discussion focus without nesting
-rules. Two names are registered once for the document, `vlx-find` (every match) and
+rules. Two names are registered once for the document, `vlx-find` (every match except the current one) and
 `vlx-find-current` (the current one, a stronger colour), each the union of the ranges of every
 open search, so two tabs searching at once do not clear each other. When the text is drawn again
 (a note added, highlights hidden), the matches are computed again and the current one is kept
