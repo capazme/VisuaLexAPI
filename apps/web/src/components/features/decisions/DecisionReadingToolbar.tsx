@@ -13,8 +13,8 @@ export interface DecisionReadingToolbarProps {
   highlightsButtonRef?: Ref<HTMLButtonElement | null>;
   onToggleNotes: () => void;
   onToggleHighlights: () => void;
-  /** The discussion button is drawn only with its toggle: a decision whose identity was found passes it. */
-  onToggleDiscussion?: () => void;
+  /** The discussion button's toggle: the toolbar is drawn for a found decision, which always takes discussions. */
+  onToggleDiscussion: () => void;
   isDiscussionOpen?: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface DecisionReadingToolbarProps {
  * The decision's reading toolbar: the article's own notes and highlights buttons
  * (`NotesHighlightsButtons`) in the same glass bar. `ReadingToolbar` as a whole needs an article's
  * props (quick norm, dossier, copy, export, version, compare), so only these two are drawn, with
- * the article's discussion button (`DiscussionButton`) when the decision takes discussions.
+ * the article's discussion button (`DiscussionButton`).
  */
 export function DecisionReadingToolbar({
   notesCount, highlightsCount, isNotesOpen, isHighlightsOpen, notesButtonRef, highlightsButtonRef, onToggleNotes, onToggleHighlights, onToggleDiscussion, isDiscussionOpen = false,
@@ -39,9 +39,7 @@ export function DecisionReadingToolbar({
         onToggleNotes={onToggleNotes}
         onToggleHighlights={onToggleHighlights}
       />
-      {onToggleDiscussion && (
-        <DiscussionButton isOpen={isDiscussionOpen} onToggle={onToggleDiscussion} name="Discussioni sulla decisione" />
-      )}
+      <DiscussionButton isOpen={isDiscussionOpen} onToggle={onToggleDiscussion} name="Discussioni sulla decisione" />
     </div>
   );
 }

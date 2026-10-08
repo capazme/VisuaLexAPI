@@ -290,6 +290,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         label={label}
         heading="Discussioni sulla decisione"
         textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa discussione."
+        detachedPassageNotice="Il passo citato non è più nel testo della decisione."
+        textUnavailableNotice="Il passo citato non è mostrato: il testo della decisione non è disponibile."
         withholdDetachedPassage
         {...discussion.panelProps}
       />

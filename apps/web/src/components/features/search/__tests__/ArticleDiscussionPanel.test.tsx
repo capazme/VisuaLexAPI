@@ -477,6 +477,10 @@ describe('ArticleDiscussionPanel', () => {
           onClose={vi.fn()}
           passageStates={detachedStates}
           withholdDetachedPassage={withhold}
+          {...(withhold ? {
+            detachedPassageNotice: 'Il passo citato non è più nel testo della decisione.',
+            textUnavailableNotice: 'Il passo citato non è mostrato: il testo della decisione non è disponibile.',
+          } : {})}
           {...extra}
         />,
       );

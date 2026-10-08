@@ -88,15 +88,12 @@ beforeEach(() => {
 });
 
 describe('discussions on a decision — what shows them', () => {
-  it('the toolbar draws the button only when it is given the toggle, as a 44px target', () => {
-    const base = {
-      notesCount: 0, highlightsCount: 0, isNotesOpen: false, isHighlightsOpen: false,
-      onToggleNotes: vi.fn(), onToggleHighlights: vi.fn(),
-    };
-    const { rerender } = render(<DecisionReadingToolbar {...base} />);
-    expect(screen.queryByRole('button', { name: 'Discussioni sulla decisione' })).toBeNull();
+  it('the toolbar draws the discussion button as a 44px target', () => {
     const onToggleDiscussion = vi.fn();
-    rerender(<DecisionReadingToolbar {...base} onToggleDiscussion={onToggleDiscussion} />);
+    render(<DecisionReadingToolbar
+      notesCount={0} highlightsCount={0} isNotesOpen={false} isHighlightsOpen={false}
+      onToggleNotes={vi.fn()} onToggleHighlights={vi.fn()} onToggleDiscussion={onToggleDiscussion}
+    />);
     const button = screen.getByRole('button', { name: 'Discussioni sulla decisione' });
     expect(button.className).toContain('min-h-[44px]');
     fireEvent.click(button);

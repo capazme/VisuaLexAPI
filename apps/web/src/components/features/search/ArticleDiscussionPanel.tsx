@@ -16,6 +16,10 @@ interface Props {
   heading?: string;
   /** Shown on a discussion opened on a different text than the one on screen; the article's sentence by default. */
   textChangedNotice?: string;
+  /** Said of a passage that is no longer in the text on screen; the article's sentence by default. */
+  detachedPassageNotice?: string;
+  /** With `withholdDetachedPassage` and no text to check against: why the quotation is not shown. */
+  textUnavailableNotice?: string;
   isOpen: boolean;
   onClose: () => void;
   /** Recorded on every new discussion: the URN of what is discussed (none for a decision) and the SHA-256 of the text (projection) on screen. */
@@ -59,6 +63,8 @@ export function ArticleDiscussionPanel({
   label,
   heading = 'Discussioni sull’articolo',
   textChangedNotice = 'Il testo dell’articolo è cambiato da quando è stata aperta questa discussione.',
+  detachedPassageNotice = 'Il passo discusso non si trova nel testo che stai leggendo.',
+  textUnavailableNotice = 'Il passo citato non è mostrato: il testo non è disponibile.',
   isOpen,
   onClose,
   articleUrn,
@@ -475,19 +481,17 @@ export function ArticleDiscussionPanel({
                     {quoteWithheld ? (
                       <p className="font-medium">
                         {isDetached
-                          ? 'Il passo citato non è più nel testo della decisione.'
+                          ? detachedPassageNotice
                           : passageTextAvailable
                             ? 'Il passo citato è in verifica: le parole compaiono quando il testo è stato controllato.'
-                            : 'Il passo citato non è mostrato: il testo della decisione non è disponibile.'}
+                            : textUnavailableNotice}
                       </p>
                     ) : (
                       <>
                         <p className="font-medium">
                           {isUnknown && !thread.passageReleased
                             ? 'Gli altri lettori non vedono questo passo finché non è ritrovato nel testo.'
-                            : withholdDetachedPassage
-                              ? 'Il passo citato non è più nel testo della decisione.'
-                              : 'Il passo discusso non si trova nel testo che stai leggendo.'}
+                            : detachedPassageNotice}
                         </p>
                         <p className="mt-1 italic">
                           «{thread.passage?.quote}»

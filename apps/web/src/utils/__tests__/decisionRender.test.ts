@@ -306,7 +306,8 @@ describe('discussions: signs count threads, the focus nests, the text nodes stil
   });
 
   it('every fixture with a discussion and its focus on: the text nodes spell the projection', () => {
-    for (const [name, testo] of Object.entries(DECISION_TEXTS)) {
+    // READER_TEXTS carries the reader-derived cases, the astral one included.
+    for (const [name, testo] of [...Object.entries(DECISION_TEXTS), ...Object.entries(READER_TEXTS)]) {
       const plain = decisionProjection(testo);
       if (plain === '') continue;
       const { highlights, annotations } = marksOn(testo);
