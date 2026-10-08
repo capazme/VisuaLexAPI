@@ -195,9 +195,10 @@ words light up only for the discussion open in the panel (`focusedThreadId` →
 `.vlx-thread-focus`), nesting inside any highlight over the same words. When the
 article text changes, a discussion whose words moved re-attaches to the new location;
 a detached one stays listed in the panel with a notice and its original quotation,
-never hidden or deleted. Only the article tab uses this today; decisions are coming
-(Task 28 of PR 4b), through the same hook and panel with a decision anchor
-(`articleId: ''`).
+never hidden or deleted. The article tab and a found decision's surface (`DecisionReadingSurface`) use this, the
+decision through the same hook and panel with its anchor (`articleId: ''`); its
+`renderDecisionHtml` takes `threads` and `focusedThreadId` and the text hash is that of the
+projection. The toolbar's button is the shared `DiscussionButton`.
 
 **A court decision takes the same tools** (`DecisionReadingSurface`, PR 4): notes and
 highlights are stored under `normaKey = decisionKey(identity)` with `articleId = ''` (wire key
@@ -286,8 +287,8 @@ is admin-only, `PATCH /admin/article-discussions/:id`). A new discussion can als
 start from a selection via the "Discuti" button in `SelectionPopup`, which opens
 the panel composer with a draft passage block and makes the title optional (the
 quotation stands in for it). Every new discussion records `articleUrn` and the
-`textHash` (SHA-256 fingerprint) of the text on screen. Only the article mounts
-the panel today; a decision's anchor (`articleId: ''`) is for Task 28. The panel is mounted
+`textHash` (SHA-256 fingerprint) of the text on screen. The article and a found
+decision's surface mount the panel (the decision's anchor is `articleId: ''`, with its own heading and notice). The panel is mounted
 for every rendered article and fetches **only while open** — a load on mount
 cost one GET per article of a range.
 
@@ -603,7 +604,7 @@ Duplicating any of these is a defect, not a shortcut.
   plainText? })`: the anchor comes from the caller. Loads passage discussions for
   the signs via `GET /article-discussions/passages` and, given `plainText`, returns
   `locations` (the one place a passage is found or `detached`). Used by the article
-  tab; decisions are coming (Task 28).
+  tab and the decision's surface.
 - `utils/threadPassages.ts` — `buildPassage`, `textFingerprint`, `locatePassage`
   (exact → whitespace-tolerant search → the occurrence whose context agrees;
   never guesses: ambiguous or missing = `detached`).

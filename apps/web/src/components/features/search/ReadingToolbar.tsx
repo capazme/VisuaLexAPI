@@ -6,6 +6,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import type { VersionChip } from '../../../utils/versionDisplay';
 import { VersionStatusChip } from './VersionStatusChip';
 import { NotesHighlightsButtons } from './NotesHighlightsButtons';
+import { DiscussionButton } from './DiscussionButton';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
@@ -194,16 +195,12 @@ export function ReadingToolbar({
                     onToggleHighlights={onToggleHighlightsPeek}
                     lockedReason={lockedReason}
                 />
-                <button
-                    onClick={onToggleDiscussion}
-                    aria-expanded={isDiscussionOpen}
-                    aria-haspopup="dialog"
-                    className={cn("p-1.5 rounded-md transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500")}
-                    title={tip("Discussioni sull’articolo", lockedReason)}
-                    {...lock(lockedReason)}
-                >
-                    <MessageCircle size={16} />
-                </button>
+                <DiscussionButton
+                    isOpen={isDiscussionOpen}
+                    onToggle={onToggleDiscussion}
+                    name="Discussioni sull’articolo"
+                    lockedReason={lockedReason}
+                />
                 <button
                     onClick={onOpenCopyModal}
                     className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"

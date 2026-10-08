@@ -13,8 +13,8 @@
  */
 import type { Annotation, Highlight } from '../types';
 import type { DecisionText } from '../types/decisions';
-import { groupAnchorsByBlock, resolveAnchors } from './articleAnnotations';
-import { highlightOpen, noteOpen, renderSpan, signHtml, type Mark } from './articleRender';
+import { groupAnchorsByBlock, resolveAnchors, type LocatedThread, type ResolvedAnchor } from './articleAnnotations';
+import { highlightOpen, noteOpen, renderSpan, signHtml, threadFocusOpen, type Mark } from './articleRender';
 import type { ArticleStructure } from './articleStructure';
 import { decisionParagraphs } from './decisionText';
 
@@ -89,9 +89,13 @@ export interface RenderDecisionInput {
   annotations: readonly Annotation[];
   /** Draw each annotated paragraph's sign (round B), as the article tab does. */
   signs?: boolean;
+  /** Passage discussions located in the projection: counted on the signs, never drawn as marks. */
+  threads?: readonly LocatedThread[];
+  /** The discussion open in the panel: its words light up (`.vlx-thread-focus`), nested as an article's. */
+  focusedThreadId?: string | null;
 }
 
-export function renderDecisionHtml({ testo, highlights, annotations, signs = false }: RenderDecisionInput): string {
+export function renderDecisionHtml({ testo, highlights, annotations, signs = false, threads = [], focusedThreadId = null }: RenderDecisionInput): string {
   const plain = decisionProjection(testo);
   const anchors = resolveAnchors(plain, highlights, annotations);
   const marks: Mark[] = [];
@@ -103,8 +107,14 @@ export function renderDecisionHtml({ testo, highlights, annotations, signs = fal
     }
   });
 
+  const focused = focusedThreadId ? threads.find((t) => t.thread.id === focusedThreadId) : undefined;
+  if (focused && focused.end > focused.start && focused.end <= plain.length) {
+    marks.push({ start: focused.start, end: focused.end, kind: 'thread', open: threadFocusOpen(focused.thread.id), close: '</span>', seq: marks.length });
+  }
+
   const layout = layoutDecision(testo);
-  const groups = signs ? groupAnchorsByBlock(plain, decisionStructure(testo), anchors) : null;
+  const threadAnchors: ResolvedAnchor[] = threads.map((lt) => ({ kind: 'thread', thread: lt.thread, start: lt.start, end: lt.end }));
+  const groups = signs ? groupAnchorsByBlock(plain, decisionStructure(testo), [...anchors, ...threadAnchors]) : null;
 
   let index = 0;
   return layout

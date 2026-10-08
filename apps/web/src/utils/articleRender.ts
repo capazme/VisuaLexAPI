@@ -119,6 +119,10 @@ export function highlightOpen(h: Highlight): string {
 export const noteOpen = (a: Annotation): string =>
   `<span class="note-anchor" data-note-id="${escapeAttr(a.id)}" title="${escapeAttr(a.text)}" style="${NOTE_ANCHOR_STYLE}">`;
 
+/** The opening tag of the words of the discussion open in the panel. */
+export const threadFocusOpen = (id: string): string =>
+  `<span class="vlx-thread-focus" data-thread-focus="${escapeAttr(id)}">`;
+
 export function renderArticleHtml(input: RenderArticleInput): string {
   const raw = input.raw || '';
   if (!raw) return '';
@@ -161,7 +165,7 @@ export function renderArticleHtml(input: RenderArticleInput): string {
         focused.start,
         focused.end,
         'thread',
-        `<span class="vlx-thread-focus" data-thread-focus="${escapeAttr(focused.thread.id)}">`,
+        threadFocusOpen(focused.thread.id),
         '</span>',
       );
     }
