@@ -241,6 +241,23 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   projection when the thread was opened); the title is optional only for passage
   threads; `GET /article-discussions/passages` lists an article's passage threads
   without bodies. The stored passage is never rewritten; the reader's browser locates it.
+  A thread may be anchored on a **court decision** (spec 2026-10-05 §8.7), in
+  columns of its own (`target_kind` `'article'|'decision'`, `decision_key`,
+  CHECKs in the migration `20261011100000_article_threads_decision_target`).
+  The server derives the target from `normaKey` (`norms/decisionKey.ts`
+  `readDecisionKey`, the twin of the web's `identityFromKey`): a key in the
+  `cassazione:` / `corte_costituzionale:` space must read back (else 400) and
+  comes with `articleId` `''` and no `version` or `articleUrn`; an optional body
+  `target: { kind, key }` is accepted only if it agrees. The answer carries
+  `target` and `passageReleased`. The list queries may omit `articleId` for a
+  decision; a decision thread never shows in an article's list nor the reverse.
+  `textHash` and passage offsets are on the decision's projection (the client
+  computes them). A withdrawn quotation is hidden by the panel from everyone
+  but its author and admins; `PATCH /admin/article-discussions/:id` takes
+  `{ hidden?, passageReleased? }` and sets or clears `passage_released_at` /
+  `passage_released_by` (the admin's id) on a decision thread with a passage.
+  The API still returns the stored quotation. Deleting the releasing admin
+  sets `passage_released_by` null and keeps the release (the CHECK allows it).
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing

@@ -2,13 +2,33 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
+import { inDecisionKeySpace, readDecisionKey } from '../norms/decisionKey';
 
 const anchorSchema = z.object({
   normaKey: z.string().min(1).max(500),
-  articleId: z.string().min(1).max(120),
+  // '' only for a decision (checked in `checkAnchor`)
+  articleId: z.string().max(120),
   articleLabel: z.string().max(300).optional(),
   version: z.string().max(120).optional(),
 });
+
+const INVALID_DECISION_KEY = 'La chiave della decisione non è valida';
+
+/**
+ * The target is derived from the key, never trusted: a key in the decision key space is a decision
+ * and must read back; anything else is an article's, which needs an article id.
+ */
+function checkAnchor(anchor: { normaKey: string; articleId: string; version?: string; articleUrn?: string }) {
+  if (inDecisionKeySpace(anchor.normaKey)) {
+    if (!readDecisionKey(anchor.normaKey)) throw new AppError(400, INVALID_DECISION_KEY);
+    if (anchor.articleId !== '') throw new AppError(400, 'Una discussione su una decisione non ha un articolo');
+    if (anchor.version !== undefined) throw new AppError(400, 'Una discussione su una decisione non ha una versione');
+    if (anchor.articleUrn !== undefined) throw new AppError(400, 'Una discussione su una decisione non ha un URN');
+    return 'decision' as const;
+  }
+  if (anchor.articleId.length < 1) throw new AppError(400, 'L’articolo è obbligatorio');
+  return 'article' as const;
+}
 
 const passageSchema = z.object({
   quote: z.string().min(1).max(2000)
@@ -19,6 +39,8 @@ const passageSchema = z.object({
 });
 
 const createThreadSchema = anchorSchema.extend({
+  // optional, redundant with normaKey: accepted only when it agrees with it
+  target: z.object({ kind: z.enum(['article', 'decision']), key: z.string().max(500).optional() }).optional(),
   title: z.string().trim().max(200).optional(),
   body: z.string().trim().min(3).max(10000),
   passage: passageSchema.optional(),
@@ -82,6 +104,9 @@ function threadView(thread: {
   passageSuffix: string | null;
   articleUrn: string | null;
   textHash: string | null;
+  targetKind: string;
+  decisionKey: string | null;
+  passageReleasedAt: Date | null;
   title: string;
   body: string;
   user: { id: string; username: string };
@@ -97,6 +122,10 @@ function threadView(thread: {
     articleId: thread.articleId,
     articleLabel: thread.articleLabel,
     version: thread.version,
+    target: thread.targetKind === 'decision' && thread.decisionKey
+      ? { kind: 'decision' as const, key: thread.decisionKey }
+      : { kind: 'article' as const },
+    passageReleased: thread.passageReleasedAt !== null,
     title: thread.title,
     body: thread.body,
     passage: thread.passageQuote === null || thread.passageStart === null
@@ -119,8 +148,17 @@ function threadView(thread: {
   };
 }
 
+/** The list queries: a decision's articleId is '' and may be left out. */
+function parseListAnchor(query: unknown) {
+  const { normaKey, articleId } = anchorSchema.pick({ normaKey: true }).extend({ articleId: z.string().max(120).optional() }).parse(query);
+  const anchor = { normaKey, articleId: articleId ?? '' };
+  if (articleId === undefined && !inDecisionKeySpace(normaKey)) throw new AppError(400, 'L’articolo è obbligatorio');
+  checkAnchor(anchor);
+  return anchor;
+}
+
 export const listThreads = async (req: Request, res: Response) => {
-  const { normaKey, articleId } = anchorSchema.pick({ normaKey: true, articleId: true }).parse(req.query);
+  const { normaKey, articleId } = parseListAnchor(req.query);
   const sort = req.query.sort === 'popular' ? 'popular' : req.query.sort === 'active' ? 'active' : 'recent';
   const page = Math.max(1, Number(req.query.page ?? 1));
   const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)));
@@ -156,7 +194,7 @@ export const listThreads = async (req: Request, res: Response) => {
 };
 
 export const listPassages = async (req: Request, res: Response) => {
-  const { normaKey, articleId } = anchorSchema.pick({ normaKey: true, articleId: true }).parse(req.query);
+  const { normaKey, articleId } = parseListAnchor(req.query);
 
   const threads = await prisma.articleThread.findMany({
     where: {
@@ -203,8 +241,14 @@ export const listPassages = async (req: Request, res: Response) => {
 
 export const createThread = async (req: Request, res: Response) => {
   const data = createThreadSchema.parse(req.body);
+  const kind = checkAnchor(data);
+  if (data.target && (data.target.kind !== kind || (kind === 'decision' && data.target.key !== data.normaKey))) {
+    throw new AppError(400, 'La destinazione non corrisponde alla chiave');
+  }
   const thread = await prisma.articleThread.create({
     data: {
+      targetKind: kind,
+      decisionKey: kind === 'decision' ? data.normaKey : null,
       normaKey: data.normaKey,
       articleId: data.articleId,
       articleLabel: data.articleLabel,
@@ -291,7 +335,20 @@ export const reportThread = async (req: Request, res: Response) => {
 };
 
 export const moderateThread = async (req: Request, res: Response) => {
-  const hidden = z.object({ hidden: z.boolean() }).parse(req.body).hidden;
-  const thread = await prisma.articleThread.update({ where: { id: req.params.threadId }, data: { isHidden: hidden } });
-  res.json({ id: thread.id, isHidden: thread.isHidden });
+  const body = z.object({ hidden: z.boolean().optional(), passageReleased: z.boolean().optional() })
+    .refine((b) => b.hidden !== undefined || b.passageReleased !== undefined, 'Nessuna modifica richiesta')
+    .parse(req.body);
+  const data: { isHidden?: boolean; passageReleasedAt?: Date | null; passageReleasedById?: string | null } = {};
+  if (body.hidden !== undefined) data.isHidden = body.hidden;
+  if (body.passageReleased !== undefined) {
+    const existing = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
+    if (!existing) throw new AppError(404, 'Discussione non trovata');
+    if (existing.targetKind !== 'decision' || existing.passageQuote === null) {
+      throw new AppError(400, 'Solo una discussione su un passo di una decisione può essere rilasciata');
+    }
+    data.passageReleasedAt = body.passageReleased ? new Date() : null;
+    data.passageReleasedById = body.passageReleased ? req.user!.id : null;
+  }
+  const thread = await prisma.articleThread.update({ where: { id: req.params.threadId }, data });
+  res.json({ id: thread.id, isHidden: thread.isHidden, passageReleased: thread.passageReleasedAt !== null });
 };
