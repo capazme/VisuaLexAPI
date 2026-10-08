@@ -559,13 +559,14 @@ class TestRunsOfSpaces:
     def test_long_runs_of_spaces_stay_fast(self):
         # «\s*,?\s*» over a run of spaces tries every split of the run: 500 KB of
         # «art. 5» followed by 400 spaces took 83 s before the whitespace became
-        # possessive (2026-10-07), well within what /extract_citations accepts
+        # possessive (2026-10-07), well within what /extract_citations accepts.
+        # CPU time, not the wall clock: a busy machine must not fail it (about 0.9 s).
         import time
         text = ("art. 5" + " " * 200 + "- " + " " * 200 + "x ") * 1_200
         assert len(text) > 400_000
-        started = time.perf_counter()
+        started = time.process_time()
         c = extract_citations(text, context_act_type="codice civile")
-        assert time.perf_counter() - started < 3.0
+        assert time.process_time() - started < 3.0
         assert len(c) == 1_200
 
 

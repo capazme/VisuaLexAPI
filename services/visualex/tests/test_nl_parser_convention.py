@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from visualex_api.services import act_dates
 from visualex_api.tools.map import codice_urn
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import _TYPES, cite_article, eu_identity, normalize_norm_urn
@@ -45,6 +46,14 @@ def _default_annex(act_type: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _urn_kind(act_type: str) -> str:
+    return normalize_act_type(act_type).strip().lower().replace(" ", ".")
+
+
+def _date_lookup_covers(act_type: str) -> bool:
+    return _urn_kind(act_type) in act_dates._TITLES
+
+
 def _identity(params: dict, date: str | None) -> str:
     act_type, number, article = params["act_type"], params.get("act_number"), params["article"]
     celex = eu_identity(act_type, date, number, article)
@@ -65,21 +74,25 @@ def test_a_convention_label_reads_back_to_its_norm(case, kind):
 
     stored_date = source.get("data")
     parsed_date = params.get("date")
+    identity = case["identity"].get("article", {}).get("value")
     if parsed_date and stored_date and parsed_date != stored_date:
-        # A short label carries the year alone; the day is the date lookup's to find. A
-        # citation spells the day, and must keep it.
+        # A short label carries the year alone. A citation spells the day, and must keep it.
         assert kind == "short", label
         assert _ISO_DAY.fullmatch(stored_date) and parsed_date == stored_date[:4], label
-        parsed_date = stored_date
+        if _date_lookup_covers(params["act_type"]):
+            # The day is the date lookup's to find (act_dates.complete_year).
+            parsed_date = stored_date
+        else:
+            # A kind the lookup does not cover (a d.m.) keeps its year: the parts must match.
+            identity = None
 
-    identity = case["identity"].get("article", {}).get("value")
     if identity:
         assert _identity(params, parsed_date) == identity, label
     else:
         # Known by its year only: no identity yet (spec §1.3), so the parts must match.
-        assert normalize_act_type(params["act_type"], search=True) == source["tipo_atto"], label
+        assert _urn_kind(params["act_type"]) == _urn_kind(source.get("tipo_atto_reale") or source["tipo_atto"]), label
         assert params.get("act_number") == source.get("numero_atto"), label
-        assert parsed_date == stored_date, label
+        assert parsed_date == (stored_date or "")[:4], label
 
 
 def test_every_label_case_is_read():
@@ -112,6 +125,9 @@ class TestLeggeCostituzionaleIsNeverTheCostituzione:
         "art. 1 l. cost. 1/2012",
         "art. 1 l.cost. 1/2012",
         "art. 1 legge costituzionale 1/2012",
+        "art. 1 legge cost. 20 aprile 2012, n. 1",
+        "art. 1 l. costituzionale 1/2012",
+        "art. 1 l.cost 1/2012",
     ])
     def test_the_convention_and_its_spellings_name_a_legge_costituzionale(self, label):
         parsed = parse_nl_query(label)
@@ -120,6 +136,7 @@ class TestLeggeCostituzionaleIsNeverTheCostituzione:
 
     @pytest.mark.parametrize("label", [
         "art. 1 l cost 1/2012",      # a spelling the tables do not know
+        "art. 1 Costituzione 1948",
         "art. 3 cost. n. 1",
         "art. 3 Cost. 2012",
         "art. 3 costituzione 20 aprile 2012",
@@ -140,15 +157,22 @@ class TestAnnex:
         ("art. 1 d.lgs. 81/2008 allegato a", "A"),
         ("art. 2 d.lgs. 81/2008 (Allegato 3)", "3"),
         ("art. 2 d.lgs. 81/2008 (Allegato IV)", "IV"),
+        ("art. 2 d.lgs. 81/2008 allegato XL", "XL"),
+        ("art. 2 d.lgs. 81/2008 Allegato XXXVIII", "XXXVIII"),
+        ("art. 1 d.lgs. 81/2008 (allegato a) comma 2", "A"),
     ])
     def test_the_annex_is_read_and_sent(self, label, annex):
         parsed = parse_nl_query(label)
         assert (parsed.act_type, parsed.act_number, parsed.annex) == ("decreto legislativo", "81", annex)
         assert parsed.to_api_params()["annex"] == annex
 
-    def test_a_word_after_allegato_is_no_annex(self):
-        parsed = parse_nl_query("art. 1 d.lgs. 81/2008 allegato al decreto")
-        assert parsed.annex is None
+    @pytest.mark.parametrize("label", [
+        "art. 1 d.lgs. 81/2008 allegato al decreto",
+        "art. 5 del regolamento allegato a d.lgs. 81/2008",   # the participle and «a»
+    ])
+    def test_a_word_after_allegato_is_no_annex(self, label):
+        parsed = parse_nl_query(label)
+        assert (parsed.act_number, parsed.annex) == ("81", None)
 
     def test_no_annex_sends_no_annex(self):
         assert "annex" not in parse_nl_query("art. 2 l. 241/1990").to_api_params()

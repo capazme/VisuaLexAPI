@@ -107,9 +107,12 @@ _EU_NEW_NUMBERING_FROM = 2015
 # ("…;81:A"). A letter annex is written in capitals whatever the user typed.
 # One letter, a roman numeral or a number: "allegato al decreto" is no annex.
 _ANNEX_RE = re.compile(
-    r"\(?\s*\b(?:allegato|all\.)\s*([a-z]|[ivx]{1,4}|\d+)\b\s*\)?",
+    r"(\(\s*)?\b(?:allegato|all\.)\s*([a-z]|[ivxlc]{1,7}|\d+)\b\s*\)?",
     re.IGNORECASE,
 )
+# A word after a bare lower-case letter: "allegato a d.lgs. 81/2008" is the
+# participle and a preposition, not annex A.
+_WORD_AHEAD_RE = re.compile(r"\s*[^\W\d_]")
 
 # The first day of a month, as citations write it: "1° settembre 1993" (also
 # with the ordinal indicator, "1º"). Without this the day was dropped and only
@@ -250,7 +253,10 @@ def _extract_annex(text: str) -> tuple[str, Optional[str]]:
     m = _ANNEX_RE.search(text)
     if not m:
         return text, None
-    annex = m.group(1)
+    annex = m.group(2)
+    if (not m.group(1) and len(annex) == 1 and annex.islower()
+            and _WORD_AHEAD_RE.match(text, m.end())):
+        return text, None
     annex = annex if annex.isdigit() else annex.upper()
     return text[:m.start()] + " " + text[m.end():], annex
 
