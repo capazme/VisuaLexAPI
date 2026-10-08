@@ -49,7 +49,7 @@ These failure modes are implied by the spec, but no other task's tests would exe
 
 **Files:**
 - Modify: `apps/server/prisma/schema.prisma` (model `LingoCard`)
-- Create: `apps/server/prisma/migrations/20261008100000_lingo_card_origin/migration.sql`
+- Create: `apps/server/prisma/migrations/20261012100000_lingo_card_origin/migration.sql`
 - Modify: `apps/server/src/lingo/cards.ts`, `apps/server/src/routes/lingoCards.ts`
 - Test: `apps/server/tests/lingoCardsRoutes.test.ts`
 
@@ -390,7 +390,7 @@ const MyCardsView = lazy(() => import('./components/features/studia/MyCardsView'
 
 **Files:**
 - Modify: `apps/server/prisma/schema.prisma`, `apps/server/tests/setup.ts` (truncate the new tables), `apps/server/src/controllers/authController.ts` (export), `apps/server/src/controllers/adminController.ts` (the flag)
-- Create: `apps/server/prisma/migrations/20261009100000_lingo_validation/migration.sql`
+- Create: `apps/server/prisma/migrations/20261013100000_lingo_validation/migration.sql`
 - Test: `apps/server/tests/lingoAccountErasure.test.ts`, `apps/server/tests/accountData.test.ts`, `apps/server/tests/lingoValidation.schema.test.ts`
 
 **Interfaces:**
@@ -588,7 +588,7 @@ await prisma.$transaction(async (tx) => {
 
 **Files:**
 - Modify: `apps/server/prisma/schema.prisma`, `apps/server/tests/setup.ts`, `apps/server/src/controllers/authController.ts` (export)
-- Create: `apps/server/prisma/migrations/20261010100000_lingo_review/migration.sql`
+- Create: `apps/server/prisma/migrations/20261014100000_lingo_review/migration.sql`
 - Test: `apps/server/tests/lingoAccountErasure.test.ts`, `apps/server/tests/accountData.test.ts`
 
 **Interfaces:**
