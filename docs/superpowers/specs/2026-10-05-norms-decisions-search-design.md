@@ -908,7 +908,7 @@ not found.
 «PERCHÉ». Folding works one UTF-16 unit at a time, so every match keeps the offsets of the
 original text: a unit is decomposed (NFD), its combining marks dropped and the rest lower-cased,
 and the result is kept only when it is still one unit (otherwise the unit lower-cased, or the
-unit itself: «ß», «İ», astral characters stay as they are). The typographic apostrophes (’ ‘ ʼ)
+unit itself: «ß» and astral characters stay as they are; «İ» reads as «i»). The typographic apostrophes (’ ‘ ʼ)
 read as «'», and the no-break and other Unicode spaces as a space, so «dell'articolo» finds
 «dell’articolo». In the query, a run of spaces matches any run of whitespace in the text; the
 query is trimmed at its edges.
