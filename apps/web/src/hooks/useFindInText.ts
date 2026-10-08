@@ -24,6 +24,21 @@ interface FindState {
   searched: boolean;
 }
 
+/**
+ * Where `pos` of `oldText` sits in `newText`: unchanged before the common prefix, shifted by the length difference
+ * after the common suffix, and at the start of the change when it falls inside what changed.
+ */
+function mapThroughEdit(oldText: string, newText: string, pos: number): number {
+  const max = Math.min(oldText.length, newText.length);
+  let prefix = 0;
+  while (prefix < max && oldText[prefix] === newText[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < max - prefix && oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix += 1;
+  if (pos < prefix) return pos;
+  if (pos >= oldText.length - suffix) return pos + newText.length - oldText.length;
+  return prefix;
+}
+
 const EMPTY: FindState = { count: 0, index: -1, truncated: false, searched: false };
 
 /**
@@ -47,6 +62,8 @@ export function useFindInText(
   const indexRef = useRef(-1);
   /** Start offset of every drawn match in the search string: how the current match is recognised after a redraw. */
   const startsRef = useRef<number[]>([]);
+  /** The search string of the last run: a redraw maps the current match through what changed in it. */
+  const textRef = useRef('');
   const appliedRef = useRef('');
   const queryRef = useRef(query);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,12 +115,15 @@ export function useFindInText(
       const starts = ranges.map((r) => (segmentStart.get(r.startContainer as Text) ?? 0) + r.startOffset);
       let index = ranges.length ? 0 : -1;
       let scroll = true;
-      const oldStart = indexRef.current >= 0 ? startsRef.current[indexRef.current] : undefined;
-      if (keep && oldStart !== undefined && ranges.length) {
+      const previous = indexRef.current >= 0 ? startsRef.current[indexRef.current] : undefined;
+      if (keep && previous !== undefined && ranges.length) {
+        // The old start, carried through the edit of the text before it: the same match, or the first after it.
+        const oldStart = mapThroughEdit(textRef.current, collected.text, previous);
         const after = starts.findIndex((v) => v >= oldStart);
         index = after >= 0 ? after : 0;
         scroll = starts[index] !== oldStart;
       }
+      textRef.current = collected.text;
       commit(ranges, starts, index, truncated, isSearchableQuery(q), scroll);
     },
     [rootRef, commit],
@@ -165,6 +185,7 @@ export function useFindInText(
       rangesRef.current = [];
       indexRef.current = -1;
       startsRef.current = [];
+      textRef.current = '';
       appliedRef.current = '';
       setLatest(EMPTY);
     };

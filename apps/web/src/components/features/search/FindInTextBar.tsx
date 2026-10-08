@@ -65,7 +65,7 @@ export function FindInTextBar({ query, onQueryChange, find, onClose, returnFocus
         <div
             role="search"
             className={cn(
-                'flex w-full items-center gap-1 px-2 py-1 border-b border-slate-200 dark:border-slate-700',
+                'flex w-full flex-wrap items-center gap-1 px-2 py-1 border-b border-slate-200 dark:border-slate-700',
                 'bg-white dark:bg-slate-900',
             )}
         >
@@ -81,11 +81,11 @@ export function FindInTextBar({ query, onQueryChange, find, onClose, returnFocus
                 autoComplete="off"
                 spellCheck={false}
                 className={cn(
-                    'min-h-[44px] md:min-h-0 min-w-0 flex-1 rounded-md border border-slate-300 bg-transparent px-2 py-1 text-sm text-slate-800 dark:border-slate-600 dark:text-slate-100',
+                    'min-h-[44px] md:min-h-0 w-full basis-full md:basis-0 min-w-0 md:flex-1 rounded-md border border-slate-300 bg-transparent px-2 py-1 text-sm text-slate-800 dark:border-slate-600 dark:text-slate-100',
                     FOCUS_RING,
                 )}
             />
-            <span role="status" aria-live="polite" className="whitespace-nowrap px-1 text-xs text-slate-500 dark:text-slate-400">
+            <span role="status" aria-live="polite" className="flex-1 md:flex-none whitespace-nowrap px-1 text-xs text-slate-500 dark:text-slate-400">
                 {counterText(find)}
             </span>
             <button type="button" onClick={find.previous} aria-label="Risultato precedente" title="Risultato precedente" className={ICON_BUTTON}>

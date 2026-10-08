@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { appStore } from '../../../store/useAppStore';
-import type { DecisionIdentity, DecisionText } from '../../../types/decisions';
+import type { DecisionIdentity, DecisionText, FoundDecision } from '../../../types/decisions';
 import { FakeHighlight } from '../../../utils/__fixtures__/openFind';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionView } from './DecisionView';
@@ -13,7 +13,7 @@ const TESTO: DecisionText = {
   dispositivo: 'P.Q.M. rigetta il ricorso principale e il ricorso incidentale.',
 };
 
-const FOUND_WITHOUT_TEXT = {
+const FOUND_WITHOUT_TEXT: FoundDecision = {
   esito: 'trovata',
   identita: IDENTITY,
   attributi: { testo_assente: 'oscuramento' },
@@ -55,7 +55,7 @@ describe('«Cerca nel testo» on a decision', () => {
   it('has none on a decision without text', () => {
     render(
       <DecisionView
-        answer={FOUND_WITHOUT_TEXT as never}
+        answer={FOUND_WITHOUT_TEXT}
         reference={IDENTITY}
         onRetry={vi.fn()}
         onChooseCandidate={vi.fn()}
@@ -76,6 +76,25 @@ describe('«Cerca nel testo» on a decision', () => {
     typeIn(screen, 'perche');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 di 1'));
     expect(drawn('vlx-find-current')).toBe(1);
+  });
+
+  it('searches the decision text only: not the toolbar or the heading around it', async () => {
+    render(surface());
+    // «Discussioni» is the discussion button's label: on the page, outside the text root
+    expect(screen.getByRole('button', { name: /Discussioni/ })).toBeInTheDocument();
+    openIn(screen);
+    typeIn(screen, 'Discussioni');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
+    typeIn(screen, 'Cerca nel testo');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
+    expect(drawn('vlx-find')).toBe(0);
+  });
+
+  it('orders the buttons as the article does: discussion, then find', () => {
+    render(surface());
+    const find = screen.getByRole('button', { name: 'Cerca nel testo' });
+    const discussion = screen.getByRole('button', { name: /Discussioni/ });
+    expect(discussion.compareDocumentPosition(find) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('steps with Enter and Shift+Enter, and closes on Esc giving focus back to the button', async () => {

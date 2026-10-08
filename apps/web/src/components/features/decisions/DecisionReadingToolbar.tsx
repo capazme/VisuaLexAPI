@@ -47,8 +47,8 @@ export function DecisionReadingToolbar({
         onToggleNotes={onToggleNotes}
         onToggleHighlights={onToggleHighlights}
       />
-      <FindInTextButton ref={findButtonRef} isOpen={isFindOpen} onToggle={onToggleFind} />
       <DiscussionButton isOpen={isDiscussionOpen} onToggle={onToggleDiscussion} name="Discussioni sulla decisione" />
+      <FindInTextButton ref={findButtonRef} isOpen={isFindOpen} onToggle={onToggleFind} />
       {isFindOpen && findBar}
     </div>
   );

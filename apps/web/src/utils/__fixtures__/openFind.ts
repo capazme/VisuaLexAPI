@@ -33,8 +33,8 @@ export function openFindOn(root: HTMLElement, query: string): { drawn: number; c
   };
 }
 
-/** A query that is surely in the text: its longest word, which a fixture of any size has. */
-export function wordOf(plain: string): string {
-  const words = plain.match(/\p{L}{3,}/gu) ?? [];
+/** A query that is surely in the text: its longest word of at least `min` letters, which a fixture of any size has. */
+export function wordOf(plain: string, min = 3): string {
+  const words = plain.match(new RegExp(`\\p{L}{${min},}`, 'gu')) ?? [];
   return words.reduce((best, w) => (w.length > best.length ? w : best), words[0] ?? '');
 }

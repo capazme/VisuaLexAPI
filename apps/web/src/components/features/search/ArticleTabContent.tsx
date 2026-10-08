@@ -192,6 +192,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // by article, not by version, so they would attach to the wrong words, and
     // Brocardi's commentary carries no date.
     const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
+    // No text on screen, no find box: it must not come back open (and take focus) when the text does.
+    if (!display.textVisible && isFindOpen) setIsFindOpen(false);
     const readOnly = display.readOnly;
     // Where a decision opened from the article's case law walks back to
     const decisionBackEntry = useMemo(() => originTabId && originBlockId ? {

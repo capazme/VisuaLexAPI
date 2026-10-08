@@ -172,6 +172,32 @@ describe('useFindInText', () => {
     expect(latest.index).toBe(1);
   });
 
+  it('keeps the current match when text with a match is inserted before it', async () => {
+    const { rerender } = render(<Harness open query="fatto" html="<p>fatto a</p><p>fatto b</p><p>fatto c</p>" />);
+    await settle();
+    act(() => latest.next());
+    expect(latest.index).toBe(1);
+    rerender(<Harness open query="fatto" html="<p>fatto nuovo</p><p>fatto a</p><p>fatto b</p><p>fatto c</p>" />);
+    await settle(50);
+    expect(latest.count).toBe(4);
+    expect(latest.index).toBe(2);
+    expect(currentText()).toBe('fatto');
+    expect(registry.get('vlx-find-current')?.ranges[0].startContainer.textContent).toBe('fatto b');
+  });
+
+  it('keeps the current match when a match before it is removed', async () => {
+    const { rerender } = render(<Harness open query="fatto" html="<p>fatto a</p><p>fatto b</p><p>fatto c</p>" />);
+    await settle();
+    act(() => latest.next());
+    act(() => latest.next());
+    expect(latest.index).toBe(2);
+    rerender(<Harness open query="fatto" html="<p>fatto b</p><p>fatto c</p>" />);
+    await settle(50);
+    expect(latest.count).toBe(2);
+    expect(latest.index).toBe(1);
+    expect(registry.get('vlx-find-current')?.ranges[0].startContainer.textContent).toBe('fatto c');
+  });
+
   it('counts again when a class hides a match', async () => {
     const { getByTestId } = render(
       <Harness open query="fatto" html='<p>fatto uno</p><p class="fold">fatto due</p>' />,
@@ -274,7 +300,6 @@ describe('useFindInText', () => {
     act(() => latest.next());
     act(() => latest.previous());
     expect(root.innerHTML).toBe(before);
-    expect([...root.querySelectorAll('p')].map((p) => p.firstChild)).toEqual(nodesBefore);
     nodesBefore.forEach((n, i) => expect(root.querySelectorAll('p')[i].firstChild).toBe(n));
   });
 });

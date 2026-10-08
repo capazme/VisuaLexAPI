@@ -47,6 +47,26 @@ function openBar() {
   return button;
 }
 
+describe('FindInTextBar — layout classes (jsdom has no layout)', () => {
+  const find = { count: 0, index: -1, truncated: false, searched: false, next: () => {}, previous: () => {} };
+
+  it('below md the field takes a full row and the counter and buttons wrap onto a second one', () => {
+    render(<FindInTextBar query="" onQueryChange={() => {}} find={find} onClose={() => {}} />);
+    const bar = screen.getByRole('search');
+    expect(bar).toHaveClass('flex', 'flex-wrap', 'w-full');
+    const field = screen.getByRole('searchbox');
+    expect(field).toHaveClass('w-full', 'basis-full', 'min-w-0');
+    // from md up it is one row again: the field grows, the rest keeps its size
+    expect(field).toHaveClass('md:flex-1');
+    expect(screen.getByRole('status')).toHaveClass('flex-1', 'md:flex-none');
+  });
+
+  it('draws the phone row icon at the size of its neighbours (20 px)', () => {
+    render(<FindInTextButton isOpen={false} onToggle={() => {}} />);
+    expect(screen.getByRole('button').querySelector('svg')).toHaveAttribute('width', '20');
+  });
+});
+
 describe('FindInTextBar', () => {
   beforeEach(() => {
     vi.useFakeTimers();

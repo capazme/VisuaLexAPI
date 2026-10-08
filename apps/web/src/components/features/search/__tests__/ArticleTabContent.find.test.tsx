@@ -1,13 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import type { ArticleData, Highlight, NormaVisitata, SearchParams } from '../../../../types';
+import type { ArticleData, ArticleValidity, Highlight, NormaVisitata } from '../../../../types';
 
-const { listPassages, listDiscussions, checkNorma, slotCalls } = vi.hoisted(() => ({
+const { listPassages, listDiscussions, checkNorma } = vi.hoisted(() => ({
   listPassages: vi.fn(),
   listDiscussions: vi.fn(),
   checkNorma: vi.fn(),
-  slotCalls: [] as Array<{ slot: string; props: Record<string, unknown> }>,
 }));
 
 vi.mock('../../../../services/articleDiscussionService', () => ({
@@ -26,24 +25,14 @@ vi.mock('../../../../services/notificationService', () => ({ notificationService
 vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true }),
 }));
-vi.mock('../../../../plugins/PluginSlot', () => ({
-  PluginSlot: ({ slot, props }: { slot: string; props: Record<string, unknown> }) => {
-    slotCalls.push({ slot, props });
-    return null;
-  },
-}));
-vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi" /> }));
-// The real comparison state, with the call to open it recorded.
-vi.mock('../../../../hooks/useCompare', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../hooks/useCompare')>();
-  return { ...actual, openCompareWithArticle: vi.fn(actual.openCompareWithArticle) };
-});
+vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
+// Brocardi's section shows real words: the scope test searches one.
+vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi">Nemo iudex sine actore</div> }));
 
 import { ArticleTabContent } from '../ArticleTabContent';
 import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
-import { fixtureText } from '../../../../utils/__fixtures__/articleTexts';
-import { ARTICLE_FIXTURES } from '../../../../utils/__fixtures__/articleTexts';
+import { fixtureText, ARTICLE_FIXTURES } from '../../../../utils/__fixtures__/articleTexts';
 import { FakeHighlight } from '../../../../utils/__fixtures__/openFind';
 
 const TEXT = fixtureText('nrm-cc-1284');
@@ -51,7 +40,7 @@ const NORMA: NormaVisitata = {
   tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '1284', allegato: '2',
   urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284',
 };
-const BROCARDI = { position: null, link: null, Brocardi: ['Nemo iudex'], Ratio: null, Spiegazione: null, Massime: null };
+const BROCARDI = { position: null, link: null, Brocardi: ['Nemo iudex sine actore'], Ratio: null, Spiegazione: null, Massime: null };
 
 
 function article(over: Partial<ArticleData> = {}): ArticleData {
@@ -78,8 +67,6 @@ const highlight: Highlight = {
 
 const g = globalThis as unknown as Record<string, unknown>;
 let registry: Map<string, FakeHighlight>;
-let triggerSearch: Mock<(params: SearchParams) => void>;
-let writeText: Mock<(text: string) => Promise<void>>;
 
 afterEach(() => {
   delete g.CSS;
@@ -88,20 +75,15 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  slotCalls.length = 0;
   listDiscussions.mockResolvedValue({ data: [], pagination: { page: 1, limit: 20, total: 0, pages: 1 } });
   listPassages.mockResolvedValue([]);
   checkNorma.mockResolvedValue({ changed: false });
-  triggerSearch = vi.fn<(params: SearchParams) => void>();
-  writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
-  Object.assign(navigator, { clipboard: { writeText } });
   registry = new Map();
   g.CSS = { highlights: registry };
   g.Highlight = FakeHighlight;
   appStore.setState({
     loadAnnotationsForArticle: vi.fn(),
     loadHighlightsForArticle: vi.fn(),
-    triggerSearch,
     highlights: [highlight],
     annotations: [],
     bookmarks: [],
@@ -134,11 +116,39 @@ describe('ArticleTabContent — «Cerca nel testo»', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
   });
 
-  it('searches the article text only: not the Brocardi section around it', async () => {
+  it('searches the article text only: not Brocardi, not «Giurisprudenza», not the toolbar', async () => {
     show(article({ article_text: ACCENTED.text }));
+    // each of the three words is on the page, outside the text root
+    expect(screen.getByTestId('brocardi')).toHaveTextContent('Nemo iudex');
+    expect(screen.getByText('Giurisprudenza')).toBeInTheDocument();
+    expect(document.body.textContent).toContain('Allegato');
     openFind();
-    typeQuery('Nemo iudex');
+    for (const word of ['Nemo iudex', 'Giurisprudenza', 'Allegato']) {
+      typeQuery(word);
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
+      expect(drawn()).toBe(0);
+    }
+  });
+
+  it('does not find the loading placeholder', async () => {
+    show(article({ article_text: '' }));
+    expect(screen.getByText('Caricamento testo...')).toBeInTheDocument();
+    openFind();
+    typeQuery('caricamento');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
+  });
+
+  it('closes the box when the text goes away, and does not bring it back open', () => {
+    const notYet: ArticleValidity = { state: 'not_yet', valid_from: null, valid_to: null, version_number: null, act_updated: null, request_in_window: true };
+    const ui = (data: ArticleData) => <MemoryRouter><ArticleTabContent data={data} /></MemoryRouter>;
+    const { rerender } = render(ui(article({ article_text: ACCENTED.text })));
+    openFind();
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    rerender(ui(article({ article_text: ACCENTED.text, validity: notYet })));
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    rerender(ui(article({ article_text: ACCENTED.text })));
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Cerca nel testo' })[0]).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('closing clears the highlights and returns focus to the button', async () => {

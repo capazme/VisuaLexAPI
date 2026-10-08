@@ -26,7 +26,7 @@ export function FindInTextButton({ isOpen, onToggle, ref }: FindInTextButtonProp
             title="Cerca nel testo"
             className={cn(toolbarToggleClass(isOpen), FOCUS_RING)}
         >
-            <Search size={16} aria-hidden />
+            <Search size={20} aria-hidden />
         </button>
     );
 }

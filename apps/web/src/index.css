@@ -155,6 +155,7 @@
 
     /* Find in text — violet, the one hue the highlights (yellow, green, red, blue) and the thread focus (primary) leave free */
     --vlx-find-bg: 285 80% 88%;
+    --vlx-find-fg: 285 60% 15%;
     --vlx-find-current-bg: 285 70% 40%;
     --vlx-find-current-fg: 0 0% 100%;
   }
@@ -211,6 +212,7 @@
 
     /* Find in text — dark: a muted violet for matches, a bright one for the current */
     --vlx-find-bg: 285 45% 32%;
+    --vlx-find-fg: 285 40% 96%;
     --vlx-find-current-bg: 285 85% 75%;
     --vlx-find-current-fg: 285 60% 12%;
 
@@ -389,6 +391,7 @@
    tokens sit with the --hl-* ones, in a violet hue none of them uses. */
 ::highlight(vlx-find) {
   background-color: hsl(var(--vlx-find-bg));
+  color: hsl(var(--vlx-find-fg));
 }
 ::highlight(vlx-find-current) {
   background-color: hsl(var(--vlx-find-current-bg));
