@@ -20,6 +20,8 @@ export interface ArticleBodyProps {
     copyOnly?: boolean;
     /** The classes of the text root (typography and structure): `vlx-art` for an article. */
     className?: string;
+    /** Receives the text root (without the selection popup), for «Cerca nel testo». */
+    textRootRef?: RefObject<HTMLDivElement | null>;
 }
 
 export function ArticleBody({
@@ -34,10 +36,12 @@ export function ArticleBody({
     updatesOpen = false,
     copyOnly = false,
     className = 'vlx-art',
+    textRootRef,
 }: ArticleBodyProps) {
     // The text alone, without the selection popup: stored offsets are measured
     // from here (see SelectionPopup's textRootRef).
-    const textRef = useRef<HTMLDivElement>(null);
+    const ownTextRef = useRef<HTMLDivElement>(null);
+    const textRef = textRootRef ?? ownTextRef;
     // Article text — typography and structure from `.vlx-art` (index.css, READING SURFACE)
     return (
         <div className="relative group/content" ref={contentRef}>

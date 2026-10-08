@@ -93,6 +93,7 @@ describe('discussions on a decision — what shows them', () => {
     render(<DecisionReadingToolbar
       notesCount={0} highlightsCount={0} isNotesOpen={false} isHighlightsOpen={false}
       onToggleNotes={vi.fn()} onToggleHighlights={vi.fn()} onToggleDiscussion={onToggleDiscussion}
+      isFindOpen={false} onToggleFind={vi.fn()}
     />);
     const button = screen.getByRole('button', { name: 'Discussioni sulla decisione' });
     expect(button.className).toContain('min-h-[44px]');

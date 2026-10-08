@@ -6,6 +6,7 @@ import { useCitationLinks } from '../../../hooks/useCitationLinks';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { Toast, type ToastProps } from '../../ui/Toast';
 import { ArticleBody } from '../search/ArticleBody';
+import { FindInTextBox } from '../search/FindInTextBox';
 import { NotesPeekPanel } from '../search/NotesPeekPanel';
 import { HighlightsActionsPicker } from '../search/HighlightsActionsPicker';
 import { InlineNotePopover } from '../search/InlineNotePopover';
@@ -134,6 +135,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
   const [highlightsHidden, setHighlightsHidden] = useState(false);
+  const [isFindOpen, setIsFindOpen] = useState(false);
+  const findButtonRef = useRef<HTMLButtonElement>(null);
+  const textRootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
 
   useEffect(() => {
@@ -208,6 +212,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         onToggleHighlights={() => setIsHighlightsOpen((v) => !v)}
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
+        isFindOpen={isFindOpen}
+        onToggleFind={() => setIsFindOpen((v) => !v)}
+        findButtonRef={findButtonRef}
+        findBar={<FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} onClose={() => setIsFindOpen(false)} />}
       />
       <NotesPeekPanel
         isOpen={isNotesOpen}
@@ -251,6 +259,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
       )}
       <ArticleBody
         contentRef={contentRef}
+        textRootRef={textRootRef}
         itemKey={key}
         processedContent={html}
         className="vlx-art vlx-decision"

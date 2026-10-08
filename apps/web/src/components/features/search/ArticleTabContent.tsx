@@ -27,6 +27,7 @@ import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
+import { FindInTextBox } from './FindInTextBox';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
@@ -153,6 +154,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // not persisted across sessions.
     const [highlightsHidden, setHighlightsHidden] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
+    // «Cerca nel testo» searches ArticleBody's text root only: not Brocardi, not the case law below it.
+    const textRootRef = useRef<HTMLDivElement>(null);
+    const findButtonRef = useRef<HTMLElement | null>(null);
+    const [isFindOpen, setIsFindOpen] = useState(false);
     // Loop β #2 "missed" surface: a selection the user flagged as a legal
     // reference the citation detector did not link. Offset is in the same
     // marker projection as highlights; the rect was captured before the
@@ -796,6 +801,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onOpenAdvancedExport={() => setShowAdvancedExport(true)}
                 onOpenVersionInput={() => setShowVersionInput(true)}
                 onCompare={handleCompare}
+                find={display.textVisible ? {
+                    isOpen: isFindOpen,
+                    onToggle: (button) => { findButtonRef.current = button; setIsFindOpen(v => !v); },
+                    bar: <FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} onClose={() => setIsFindOpen(false)} />,
+                } : undefined}
             />
 
             <NotesPeekPanel
@@ -862,6 +872,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             {display.textVisible && (
                 <ArticleBody
                     contentRef={contentRef}
+                    textRootRef={textRootRef}
                     itemKey={itemKey}
                     processedContent={processedContent}
                     onPopupHighlight={handlePopupHighlight}
