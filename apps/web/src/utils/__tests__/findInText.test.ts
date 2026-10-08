@@ -233,3 +233,22 @@ describe('DOM collection', () => {
     el.remove();
   });
 });
+
+describe('the query folds as the text does', () => {
+  it('finds a text in a script the decomposition would split (Hangul, a final sigma)', () => {
+    expect(findMatches('한국 법원', '한국').matches).toEqual([[0, 2]]);
+    expect(findMatches('ΝΟΜΟΣ', 'ΝΟΜΟΣ').matches).toEqual([[0, 5]]);
+    expect(findMatches('νομος', 'ΝΟΜΟΣ').matches).toEqual([[0, 5]]);
+  });
+
+  it('ignores a soft hyphen or a zero-width space pasted into the query', () => {
+    const text = 'la responsabilità del debitore';
+    expect(findMatches(text, 'respon\u00adsabilita').matches).toEqual([[3, 17]]);
+    expect(findMatches(text, 'respon\u200bsabilita').matches).toEqual([[3, 17]]);
+  });
+
+  it('reads a decomposed query as composed', () => {
+    expect(findMatches('perché no', 'perche\u0301').matches).toEqual([[0, 6]]);
+  });
+});
+

@@ -16,6 +16,8 @@ const COMBINING_MARKS = /\p{M}/gu;
 function foldUnit(unit: string): string {
   if (APOSTROPHES.has(unit)) return "'";
   if (UNICODE_SPACE.test(unit)) return ' ';
+  // A final sigma is the same letter: «νομος» and «ΝΟΜΟΣ» (Σ → σ) read alike.
+  if (unit === 'ς') return 'σ';
   const stripped = unit.normalize('NFD').replace(COMBINING_MARKS, '').toLowerCase();
   if (stripped.length === 1) return stripped;
   const lower = unit.toLowerCase();
@@ -48,17 +50,13 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * The query, folded fully: NFD, combining marks dropped, lower-cased. Its own
- * offsets do not matter, so it need not keep the length.
+ * The query, folded the way the text is (unit by unit, so a Hangul syllable or
+ * a final «Σ» folds on both sides alike), after composing it (NFC: a typed
+ * «e» + U+0301 is «é»); then the marks the fold could not absorb are dropped,
+ * and so are soft hyphens and zero-width spaces. Its own offsets do not matter.
  */
 function foldQuery(query: string): string {
-  let out = '';
-  for (const ch of query.normalize('NFD').replace(COMBINING_MARKS, '').toLowerCase()) {
-    if (APOSTROPHES.has(ch)) out += "'";
-    else if (UNICODE_SPACE.test(ch)) out += ' ';
-    else out += ch;
-  }
-  return out;
+  return foldForSearch(query.normalize('NFC')).replace(COMBINING_MARKS, '').replace(/[\u00ad\u200b]/g, '');
 }
 
 /** One word of the folded query as a pattern: every unit may carry marks and be split by an invisible character. */
@@ -113,7 +111,7 @@ export interface TextSegment {
 }
 
 const BLOCK_TAGS = new Set([
-  'DIV', 'P', 'LI', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'DIV', 'P', 'LI', 'UL', 'OL', 'PRE', 'TABLE', 'TR', 'TD', 'TH', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
 ]);
 
 /** Block-like: the tags above, the article's blocks (`vlx-b`) and the decision's lines. */
