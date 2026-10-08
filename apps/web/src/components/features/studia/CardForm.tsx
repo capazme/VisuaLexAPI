@@ -81,6 +81,12 @@ function exceeds(length: number, limit: number, label: string): string | null {
   return length > limit ? `${label} supera i ${countFormat(limit)} caratteri` : null;
 }
 
+/** The chip of an act the parser does not read, in the interface's voice and not as a server fault (the server's words are generic). */
+const unrecognisedAct = (fromReader: boolean): string =>
+  fromReader
+    ? 'Atto non riconosciuto: per ora una scheda non si può ancorare a quest’atto.'
+    : 'Atto non riconosciuto: scrivi articolo e atto, ad esempio «art. 1453 c.c.».';
+
 /** What the failed call says to the person, never the server's raw text (some of it is English). */
 function failureMessage(error: unknown, editing: boolean): string {
   const status = typeof error === 'object' && error !== null && 'status' in error ? (error as { status?: unknown }).status : undefined;
@@ -211,7 +217,11 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
   };
 
   const removeAnchor = (key: string) => {
-    setAnchors((list) => list.filter((a) => a.key !== key));
+    setAnchors((list) => {
+      const rest = list.filter((a) => a.key !== key);
+      // The server marks the first anchor primary when none is: the screen says the same.
+      return rest.length > 0 && !rest.some((a) => a.principale) ? rest.map((a, i) => ({ ...a, principale: i === 0 })) : rest;
+    });
     setErrors((e) => ({ ...e, ancore: undefined }));
   };
 
@@ -237,7 +247,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
     const details = new Map<string, string>();
     for (const outcome of refused) {
       const key = byReference.get(outcome.reference.trim());
-      if (key) details.set(key, outcome.detail);
+      const chip = list.find((a) => a.key === key);
+      if (key && chip) details.set(key, outcome.outcome === 'not_recognised' ? unrecognisedAct(chip.fixed) : outcome.detail);
       else unplaced.push(`${outcome.reference}: ${outcome.detail}`);
     }
     setAnchors(list.map((a) => ({ ...a, detail: details.get(a.key) })));

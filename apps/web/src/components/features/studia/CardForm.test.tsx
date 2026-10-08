@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../services/studiaService', () => ({
@@ -184,6 +184,39 @@ describe('CardForm, opened from an article', () => {
     expect(onSaved).toHaveBeenCalledWith('new-2');
   });
 
+  it.each([
+    ['the reader’s own anchor', 'art. 1453 c.c.', 'Atto non riconosciuto: per ora una scheda non si può ancorare a quest’atto.'],
+    ['an anchor typed by hand', 'art. 3, d.l. 17 marzo 2020, n. 18', 'Atto non riconosciuto: scrivi articolo e atto, ad esempio «art. 1453 c.c.».'],
+  ])('says plainly that the act was not recognised on %s, not the server’s generic words', async (_name, reference, expected) => {
+    const user = userEvent.setup();
+    create.mockResolvedValue({
+      outcome: 'refused', detail: 'Un’ancora non è verificabile: la scheda non è stata creata.',
+      anchors: [{ outcome: 'not_recognised', reference, detail: 'Riferimento non riconosciuto: indica articolo e atto (es. «art. 2043 c.p.c.»).' }],
+    });
+    renderForm(fromReader());
+    await fillRequired(user);
+    if (reference !== 'art. 1453 c.c.') {
+      await user.click(screen.getByRole('button', { name: '+ Ancora' }));
+      await user.type(screen.getByLabelText('Riferimento dell’ancora'), `${reference}{Enter}`);
+    }
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    const detail = await screen.findByText(expected);
+    expect(detail.closest('li')).toHaveTextContent(reference);
+    expect(screen.queryByText(/Riferimento non riconosciuto/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the server’s words for the other refusals, such as an article that does not exist', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue({
+      outcome: 'refused', detail: 'x',
+      anchors: [{ outcome: 'ambiguous', reference: 'art. 1453 c.c.', detail: 'Il riferimento non individua un solo articolo.' }],
+    });
+    renderForm(fromReader());
+    await fillRequired(user);
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByText('Il riferimento non individua un solo articolo.')).toBeInTheDocument();
+  });
+
   it('keeps a reference typed but not yet added', async () => {
     const user = userEvent.setup();
     create.mockResolvedValue({ outcome: 'created', id: 'new-3' });
@@ -259,6 +292,41 @@ describe('CardForm, editing a draft', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['a law', 'urn:nir:stato:legge:1990-08-07;241~art2', 'art. 2, l. 7 agosto 1990, n. 241'],
+    ['a legislative decree, article 2-bis', 'urn:nir:stato:decreto.legislativo:2003-06-30;196~art2bis', 'art. 2-bis, d.lgs. 30 giugno 2003, n. 196'],
+    ['the Constitution', 'urn:nir:stato:costituzione~art3', 'art. 3 Cost.'],
+    ['the preleggi', 'urn:nir:stato:regio.decreto:1942-03-16;262:1~art12', 'art. 12 preleggi'],
+    ['the codice civile', 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453', 'art. 1453 c.c.'],
+    ['an address with no article, as it stands', 'urn:nir:stato:legge:1990-08-07;241', 'urn:nir:stato:legge:1990-08-07;241'],
+  ])('writes the stored anchor of %s back as its citation', (_name, urn, expected) => {
+    const card = { ...draft, ancore: [{ normaKey: 'x', articleId: 'y', urn, isPrimary: true }] };
+    renderForm({ kind: 'edit', card });
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it('makes the first remaining anchor the primary one when the primary is taken out', async () => {
+    const user = userEvent.setup();
+    update.mockResolvedValue({ outcome: 'updated', card: draft });
+    const card = {
+      ...draft,
+      ancore: [
+        { normaKey: 'codice_civile', articleId: 'art_1453', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453', isPrimary: true },
+        { normaKey: 'codice_civile', articleId: 'art_1454', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1454', isPrimary: false },
+        { normaKey: 'codice_civile', articleId: 'art_1455', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1455', isPrimary: false },
+      ],
+    };
+    renderForm({ kind: 'edit', card });
+    await user.click(screen.getByRole('button', { name: /togli l’ancora art\. 1453 c\.c\./i }));
+    expect(screen.getByText('art. 1454 c.c.').closest('li')).toHaveTextContent('principale');
+    expect(screen.getByText('art. 1455 c.c.').closest('li')).not.toHaveTextContent('principale');
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(update.mock.calls[0][1].ancore).toEqual([
+      { riferimento: 'art. 1454 c.c.', principale: true },
+      { riferimento: 'art. 1455 c.c.', principale: false },
+    ]);
+  });
+
   it('replaces the primary anchor and saves with update', async () => {
     const user = userEvent.setup();
     update.mockResolvedValue({ outcome: 'updated', card: { ...draft, istituto: 'Risoluzione' } });
@@ -322,6 +390,45 @@ describe('CardFormDialog', () => {
     expect(screen.getByRole('dialog', { name: 'Modifica scheda' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Annulla' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['desktop', true],
+    ['phone', false],
+  ])('is not closed by Esc on %s, so typed work is not dropped', async (_name, desktop) => {
+    setDesktop(desktop);
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<CardFormDialog open onClose={onClose} mode={fromReader()} onSaved={vi.fn()} />);
+    await user.type(screen.getByLabelText('Domanda'), 'Quando?');
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Domanda')).toHaveValue('Quando?');
+    await user.click(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the anchor field on Esc, leaving the dialog open', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<CardFormDialog open onClose={onClose} mode={fromReader()} onSaved={vi.fn()} />);
+    // the dialog moves the focus to the first field to fill once it has opened: wait for it
+    await waitFor(() => expect(screen.getByLabelText('Istituto')).toHaveFocus());
+    await user.click(screen.getByRole('button', { name: '+ Ancora' }));
+    await user.type(screen.getByLabelText('Riferimento dell’ancora'), 'art. 14');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByLabelText('Riferimento dell’ancora')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps the page behind the phone’s sheet from scrolling, and gives it back on close', () => {
+    setDesktop(false);
+    document.body.style.overflow = 'auto';
+    const { rerender } = render(<CardFormDialog open onClose={vi.fn()} mode={fromReader()} onSaved={vi.fn()} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<CardFormDialog open={false} onClose={vi.fn()} mode={fromReader()} onSaved={vi.fn()} />);
+    expect(document.body.style.overflow).toBe('auto');
+    document.body.style.overflow = '';
   });
 
   it('draws nothing while closed', () => {

@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
-import { FloatingFocusManager, FloatingPortal, useDismiss, useFloating, useInteractions, useRole } from '@floating-ui/react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { FloatingFocusManager, FloatingPortal, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { X } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { Toast } from '../../ui/Toast';
@@ -25,10 +25,19 @@ interface SheetProps {
 
 /** A phone's bottom sheet, after `AddToDossierPopover`'s: a backdrop, the sheet, the focus kept inside. */
 function Sheet({ title, onClose, initialFocusRef, children }: SheetProps) {
-  const { refs, context } = useFloating({ open: true, onOpenChange: (open) => { if (!open) onClose(); } });
-  const dismiss = useDismiss(context, { outsidePress: false, escapeKey: true });
+  // Neither Esc nor a press outside dismisses it: closing is «Annulla», the X, or a save.
+  const { refs, context } = useFloating({ open: true });
   const role = useRole(context, { role: 'dialog' });
-  const { getFloatingProps } = useInteractions([dismiss, role]);
+  const { getFloatingProps } = useInteractions([role]);
+
+  // The page behind does not scroll under the sheet, as under `Modal`.
+  useEffect(() => {
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, []);
 
   return (
     <FloatingPortal>
@@ -65,7 +74,8 @@ function Sheet({ title, onClose, initialFocusRef, children }: SheetProps) {
 }
 
 /**
- * The card form in its dialog: a `Modal` on desktop, a bottom sheet on a phone. It closes itself
+ * The card form in its dialog: a `Modal` on desktop, a bottom sheet on a phone. Esc does not close
+ * it (a stray key would drop what was typed); «Annulla» and the X do. It closes itself
  * after a save and says «Scheda salvata» from a toast of its own, which outlives the dialog: keep
  * the component mounted and drive it with `open`.
  */
@@ -94,7 +104,7 @@ export function CardFormDialog({ open, onClose, mode, onSaved }: CardFormDialogP
   return (
     <>
       {desktop ? (
-        <Modal isOpen={open} onClose={onClose} title={title} size="lg" closeOnBackdrop={false} initialFocusRef={initialFocusRef} contentClassName="flex min-h-0 flex-col overflow-hidden p-0">
+        <Modal isOpen={open} onClose={onClose} title={title} size="lg" closeOnBackdrop={false} closeOnEscape={false} initialFocusRef={initialFocusRef} contentClassName="flex min-h-0 flex-col overflow-hidden p-0">
           {open ? form : null}
         </Modal>
       ) : (
