@@ -305,7 +305,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `urn:nir:…` as identity, `normaKey`/`articleId` derived in one place, the AKN
   fingerprint from the part matched to the annex by article numbers, refused
   when ambiguous; a card with an unverifiable anchor is refused, the others
-  created; always the author's draft), `GET /` and `GET /:id` (own cards only),
+  created; always the author's draft, with the connected application that wrote
+  it in `created_by_client_id`/`_name`, answered as `origine: { clientName } | null`,
+  the client's id never), `GET /` and `GET /:id` (own cards only; the list
+  filters by `materia`, `stato`, `tipo`, `normaKey` — any anchor on the act —
+  `q` — 1–100 characters, in the institute or the question, case-insensitive —
+  and `origine=applicazione`, ordered `ordine=recenti` (default) or `materia`,
+  then institute, newest, id),
   `POST /trash` (personal states only, `PERSONAL_STATES`). Scopes
   `lingo:cards:read` / `lingo:cards:write`; two points per reference, one of
   the day's hundred per card.
@@ -315,7 +321,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   at most one primary, and the caller cannot set state, score, author or id.
   `is_primary` defaults to false in the database: the service is the only thing
   that decides which anchor is the primary one.
-  `lingo/cards.ts` `createLingoCard(authorId, input)` is one nested write that
+  `lingo/cards.ts` `createLingoCard(authorId, input, client?, origin?)` is one nested write that
   starts the card as `BOZZA_PERSONALE`; `lingo/cardStates.ts` holds the
   lifecycle (`canTransition`). The author is optional: when an account goes
   (`deleteUserAccount`, used by `DELETE /auth/account` and by the administrator's

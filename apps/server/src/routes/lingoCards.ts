@@ -1,4 +1,4 @@
-import { LingoCardStato, LingoMateria, type Prisma } from '@prisma/client';
+import { LingoCardStato, LingoCardTipo, LingoMateria, type Prisma } from '@prisma/client';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -50,6 +50,11 @@ const createSchema = z
 const listSchema = z.object({
   materia: z.nativeEnum(LingoMateria).optional(),
   stato: z.nativeEnum(LingoCardStato).optional(),
+  tipo: z.nativeEnum(LingoCardTipo).optional(),
+  normaKey: z.string().max(100).regex(/^[a-z0-9]+(_[a-z0-9]+)*$/).optional(),
+  q: z.string().trim().min(1).max(100).optional(),
+  origine: z.literal('applicazione').optional(),
+  ordine: z.enum(['recenti', 'materia']).default('recenti'),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).max(100000).default(0),
 });
@@ -68,6 +73,8 @@ const serialize = (card: CardRow) => ({
   stato: card.stato,
   createdAt: card.createdAt,
   updatedAt: card.updatedAt,
+  // Which connected application wrote the card; the client's id stays on the server.
+  origine: card.createdByClientId ? { clientName: card.createdByClientName } : null,
   ancore: card.ancore.map((a) => ({ normaKey: a.normaKey, articleId: a.articleId, urn: a.urn, isPrimary: a.isPrimary })),
 });
 
@@ -104,10 +111,11 @@ router.post('/', async (req, res) => {
     return { index, input };
   });
 
+  const origin = req.delegation ? { clientId: req.delegation.clientId, clientName: req.delegation.clientName } : null;
   const created = await prisma.$transaction(async (tx) => {
     const ids = new Map<number, string>();
     for (const plan of planned) {
-      if ('input' in plan) ids.set(plan.index, (await createLingoCard(req.user!.id, plan.input, tx)).id);
+      if ('input' in plan) ids.set(plan.index, (await createLingoCard(req.user!.id, plan.input, tx, origin)).id);
     }
     return ids;
   });
@@ -129,12 +137,26 @@ router.post('/trash', async (req: Request, res) => {
 });
 
 router.get('/', async (req, res) => {
-  const { materia, stato, limit, offset } = listSchema.parse(req.query);
+  const { materia, stato, tipo, normaKey, q, origine, ordine, limit, offset } = listSchema.parse(req.query);
+  const where: Prisma.LingoCardWhereInput = {
+    autoreId: req.user!.id,
+    ...(materia ? { materia } : {}),
+    ...(stato ? { stato } : {}),
+    ...(tipo ? { tipo } : {}),
+    // Any anchor on the act, not only the primary one.
+    ...(normaKey ? { ancore: { some: { normaKey } } } : {}),
+    ...(q ? { OR: [{ istituto: { contains: q, mode: 'insensitive' } }, { domanda: { contains: q, mode: 'insensitive' } }] } : {}),
+    ...(origine ? { createdByClientId: { not: null } } : {}),
+  };
+  const orderBy: Prisma.LingoCardOrderByWithRelationInput[] =
+    ordine === 'materia'
+      ? [{ materia: 'asc' }, { istituto: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }]
+      : [{ createdAt: 'desc' }, { id: 'desc' }];
   const cards = await prisma.lingoCard.findMany({
-    where: { autoreId: req.user!.id, ...(materia ? { materia } : {}), ...(stato ? { stato } : {}) },
+    where,
     include: { ancore: true },
     // The id breaks ties: restored cards keep their creation time, and pages must not repeat or skip one.
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy,
     take: limit + 1,
     skip: offset,
   });

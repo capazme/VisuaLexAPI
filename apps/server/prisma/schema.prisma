@@ -1014,6 +1014,9 @@ model LingoCard {
   authorityScore Float          @default(0) @map("authority_score")
   // Set when the validators disagree beyond the threshold, so the minority view is kept.
   isControversa  Boolean        @default(false) @map("is_controversa")
+  // The connected application that created the card (Claude Code, LibreLex), as on DossierItem.
+  createdByClientId   String?        @map("created_by_client_id")
+  createdByClientName String?        @map("created_by_client_name")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 

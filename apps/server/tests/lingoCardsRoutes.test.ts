@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import nock from 'nock';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
@@ -257,6 +258,106 @@ describe('the study-card routes', () => {
     const refused = await create(write, [CARD, CARD]);
     expect(refused.status).toBe(429);
     expect(refused.body.quota).toBe('card');
+  });
+
+  describe('the list for the Studia area', () => {
+    const list = (who: Record<string, string>, query = '') => request(app).get(`/api/lingo/cards${query}`).set(who);
+    const idsOf = (response: { body: { cards: { id: string }[] } }) => response.body.cards.map((c) => c.id);
+    /** Seeds rows directly: the list's filters do not depend on how a card was written. */
+    const seed = (autoreId: string, fields: Partial<Omit<Prisma.LingoCardUncheckedCreateInput, 'ancore'>> = {}, normaKeys: string[] = ['codice_civile']) =>
+      prisma.lingoCard.create({
+        data: {
+          autoreId,
+          materia: 'DIRITTO_CIVILE',
+          istituto: 'Istituto',
+          domanda: 'Domanda?',
+          risposta: 'Risposta.',
+          ...fields,
+          ancore: { create: normaKeys.map((normaKey, i) => ({ normaKey, articleId: `art_${i + 1}`, urn: `urn:${normaKey}:${fields.istituto ?? 'x'}:${i}`, aknFingerprint: 'a'.repeat(64), isPrimary: i === 0 })) },
+        },
+      });
+
+    it('records the application that created a card, and nothing for one made from the web app', async () => {
+      const write = await delegated(alice, 'lingo:cards:write');
+      const client = await prisma.oAuthClient.findFirst();
+      const viaClient = (await create(write, [CARD])).body.results[0].id;
+      const viaWeb = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      const read = await list(authHeader(alice));
+      const byId = new Map<string, { origine: unknown }>(read.body.cards.map((c: { id: string; origine: unknown }) => [c.id, c]));
+      expect(client).not.toBeNull();
+      expect(byId.get(viaClient)!.origine).toEqual({ clientName: client!.clientName });
+      expect(byId.get(viaWeb)!.origine).toBeNull();
+      expect(JSON.stringify(read.body)).not.toContain(client!.id);
+      expect((await list(authHeader(alice), `/${viaClient}`)).body.origine).toEqual({ clientName: client!.clientName });
+    });
+
+    it('filters by kind', async () => {
+      const caso = await seed(alice.id, { tipo: 'CASO_APPLICATIVO' });
+      await seed(alice.id, { tipo: 'ISTITUTO_DEFINIZIONE' });
+      expect(idsOf(await list(authHeader(alice), '?tipo=CASO_APPLICATIVO'))).toEqual([caso.id]);
+      expect((await list(authHeader(alice), '?tipo=NOPE')).status).toBe(400);
+    });
+
+    it('filters by act on any anchor, not only the primary one', async () => {
+      const second = await seed(alice.id, { istituto: 'Secondo' }, ['codice_penale', 'codice_civile']);
+      const first = await seed(alice.id, { istituto: 'Primo' }, ['codice_civile']);
+      await seed(alice.id, { istituto: 'Altro' }, ['codice_penale']);
+      expect(idsOf(await list(authHeader(alice), '?normaKey=codice_civile')).sort()).toEqual([first.id, second.id].sort());
+      expect((await list(authHeader(alice), '?normaKey=Codice%20Civile')).status).toBe(400);
+      expect((await list(authHeader(alice), `?normaKey=${'a'.repeat(101)}`)).status).toBe(400);
+    });
+
+    it('searches the institute and the question, case-insensitively, and refuses an empty or over-long text', async () => {
+      const byInstitute = await seed(alice.id, { istituto: 'Risoluzione per inadempimento', domanda: 'Quando?' });
+      const byQuestion = await seed(alice.id, { istituto: 'Recesso', domanda: 'Come si ottiene la RISOLUZIONE?' });
+      await seed(alice.id, { istituto: 'Usucapione', domanda: 'Quanto dura?' });
+      expect(idsOf(await list(authHeader(alice), '?q=risoluz')).sort()).toEqual([byInstitute.id, byQuestion.id].sort());
+      expect(idsOf(await list(authHeader(alice), '?q=%20%20usucap%20'))).toHaveLength(1);
+      expect((await list(authHeader(alice), '?q=')).status).toBe(400);
+      expect((await list(authHeader(alice), '?q=%20%20')).status).toBe(400);
+      expect((await list(authHeader(alice), `?q=${'a'.repeat(101)}`)).status).toBe(400);
+      expect((await list(authHeader(alice), `?q=${'a'.repeat(100)}`)).status).toBe(200);
+    });
+
+    it('filters to the cards a connected application wrote', async () => {
+      const write = await delegated(alice, 'lingo:cards:write');
+      const viaClient = (await create(write, [CARD])).body.results[0].id;
+      await create(authHeader(alice), [CARD]);
+      expect(idsOf(await list(authHeader(alice), '?origine=applicazione'))).toEqual([viaClient]);
+      expect((await list(authHeader(alice), '?origine=web')).status).toBe(400);
+    });
+
+    it('orders by subject, then institute, then newest, and pages never repeat or skip a card', async () => {
+      const at = (day: number) => new Date(`2026-10-0${day}T10:00:00Z`);
+      const rows = [
+        await seed(alice.id, { materia: 'DIRITTO_PENALE', istituto: 'Dolo', createdAt: at(1) }),
+        await seed(alice.id, { materia: 'DIRITTO_CIVILE', istituto: 'Recesso', createdAt: at(2) }),
+        await seed(alice.id, { materia: 'DIRITTO_CIVILE', istituto: 'Caparra', createdAt: at(3) }),
+        await seed(alice.id, { materia: 'DIRITTO_CIVILE', istituto: 'Caparra', createdAt: at(4) }),
+        await seed(alice.id, { materia: 'DIRITTO_PENALE', istituto: 'Dolo', createdAt: at(5) }),
+        await seed(alice.id, { materia: 'DIRITTO_PENALE', istituto: 'Colpa', createdAt: at(6) }),
+      ];
+      const expected = [rows[3], rows[2], rows[1], rows[5], rows[4], rows[0]].map((r) => r.id);
+      const pages: string[] = [];
+      let offset: number | null = 0;
+      while (offset !== null) {
+        const page = await list(authHeader(alice), `?ordine=materia&limit=2&offset=${offset}`);
+        pages.push(...idsOf(page));
+        offset = page.body.nextOffset;
+      }
+      expect(pages).toEqual(expected);
+      expect((await list(authHeader(alice), '?ordine=altro')).status).toBe(400);
+      // The default stays newest first.
+      expect(idsOf(await list(authHeader(alice)))).toEqual([...rows].reverse().map((r) => r.id));
+    });
+
+    it('never shows another user’s cards, whatever the filter', async () => {
+      const bob = await createTestUser('cards-bob3');
+      await seed(bob.id, { tipo: 'CASO_APPLICATIVO', istituto: 'Risoluzione', createdByClientId: 'client-x', createdByClientName: 'Claude Code' });
+      for (const query of ['', '?tipo=CASO_APPLICATIVO', '?normaKey=codice_civile', '?q=risoluz', '?origine=applicazione', '?ordine=materia']) {
+        expect((await list(authHeader(alice), query)).body.cards, query).toEqual([]);
+      }
+    });
   });
 
   describe('deleting cards through a connected application', () => {
