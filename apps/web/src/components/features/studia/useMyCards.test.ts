@@ -85,6 +85,21 @@ describe('useMyCards', () => {
     expect(result.current.cards.map((c) => c.id)).toEqual(['new']);
   });
 
+  it('drops a next page that arrives after the filters changed', async () => {
+    list.mockResolvedValueOnce({ cards: [card('a', 'DIRITTO_CIVILE', 'X')], nextOffset: 1 });
+    const { result, rerender } = renderHook(({ q }: { q?: string }) => useMyCards({ q }), { initialProps: {} });
+    await waitFor(() => expect(result.current.hasMore).toBe(true));
+    let slow!: (page: { cards: Scheda[]; nextOffset: number | null }) => void;
+    list.mockImplementationOnce(() => new Promise((resolve) => { slow = resolve; }));
+    act(() => result.current.loadMore());
+    list.mockResolvedValueOnce({ cards: [card('new', 'DIRITTO_PENALE', 'Y')], nextOffset: null });
+    rerender({ q: 'furto' });
+    await waitFor(() => expect(result.current.cards.map((c) => c.id)).toEqual(['new']));
+    await act(async () => slow({ cards: [card('old', 'DIRITTO_CIVILE', 'X')], nextOffset: 5 }));
+    expect(result.current.cards.map((c) => c.id)).toEqual(['new']);
+    expect(result.current.hasMore).toBe(false);
+  });
+
   it('says when the cards cannot be read, and reads them again on refresh', async () => {
     list.mockRejectedValueOnce(new Error('down'));
     const { result } = renderHook(() => useMyCards({}));

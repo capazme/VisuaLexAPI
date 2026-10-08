@@ -7,7 +7,8 @@ import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
 import { ClaudeMark } from '../../ui/ClaudeMark';
-import { claudeMarkSentence, formatTimestampLong } from './dossierUtils';
+import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
+import { formatTimestampLong } from './dossierUtils';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;

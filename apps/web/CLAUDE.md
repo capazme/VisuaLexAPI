@@ -428,7 +428,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   the closed row, the notes above the text when open, «Aggiungi una nota
   all'articolo»; a note whose article is no longer in the dossier shows among
   the free notes. An entry an application wrote carries `ClaudeMark` (`components/ui/`,
-  shared with Studia; «scritta da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
+  shared with Studia, its sentence `claudeMarkSentence` beside it; «scritta da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
   gives the article a new id: `restoreDossierItem` reattaches its notes at once
   (`PUT …/items/:noteId {aboutItemId}`, reverted with a sync error if refused);
   an undone note comes back through the notes route, about its article if the

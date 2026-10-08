@@ -147,6 +147,24 @@ describe('«Le mie schede», the filters', () => {
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ q: 'caparra', ordine: 'materia' }));
   });
 
+  it('clears the filters in one request, with no stale search left to settle', async () => {
+    renderView();
+    await screen.findAllByRole('link');
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Materia' }), { target: { value: 'DIRITTO_PENALE' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nelle schede' }), { target: { value: 'caparra' } });
+    list.mockResolvedValue(page([]));
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(screen.getByText('Nessuna scheda con questi filtri.')).toBeInTheDocument();
+
+    list.mockClear();
+    list.mockResolvedValue(page(FIVE));
+    fireEvent.click(screen.getByRole('button', { name: 'Azzera i filtri' }));
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(list.mock.calls.map(([query]) => query)).toEqual([{ ordine: 'materia' }]);
+    expect(screen.getByRole('searchbox', { name: 'Cerca nelle schede' })).toHaveValue('');
+  });
+
   it('asks for the cards Claude wrote and the user has yet to read', async () => {
     renderView();
     await screen.findAllByRole('link');

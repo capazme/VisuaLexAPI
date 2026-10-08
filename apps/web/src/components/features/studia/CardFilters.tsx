@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../../constants/zIndex';
 import type { Materia, StatoScheda, TipoScheda } from '../../../types/studia';
 import type { ActOption, FilterState } from './useMyCards';
 import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL } from './studiaLabels';
@@ -57,7 +58,7 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
       role="group"
       aria-label="Filtri"
       // Opaque, bled over the page padding (StudiaPage p-4 md:p-6) so cards scrolling under it do not show.
-      className="sticky top-0 z-20 -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950"
+      className={cn('sticky top-0 -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950', Z_INDEX.sticky)}
     >
       <div className="flex gap-2">
         <div className="relative min-w-0 flex-1">

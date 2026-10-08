@@ -21,13 +21,14 @@ const LIST_PATH = '/studia/schede';
 
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
-function useDebounced<T>(value: T, ms: number): T {
+/** The value after `ms` of quiet, and a way to settle it at once (clearing the filters must not wait for the old text to expire). */
+function useDebounced<T>(value: T, ms: number): [T, (next: T) => void] {
   const [settled, setSettled] = useState(value);
   useEffect(() => {
     const timer = setTimeout(() => setSettled(value), ms);
     return () => clearTimeout(timer);
   }, [value, ms]);
-  return settled;
+  return [settled, setSettled];
 }
 
 /** The acts the cards rest on (by `normaKey`), each named by the source convention; what was seen once stays on offer. */
@@ -58,7 +59,7 @@ export function MyCardsView() {
 
   const [filterState, setFilterState] = useState<FilterState>(NO_FILTERS);
   const [search, setSearch] = useState('');
-  const q = useDebounced(search.trim(), SEARCH_DEBOUNCE_MS);
+  const [q, settleSearch] = useDebounced(search.trim(), SEARCH_DEBOUNCE_MS);
   const filters = useMemo<CardQuery>(
     () => ({
       materia: filterState.materia,
@@ -152,6 +153,7 @@ export function MyCardsView() {
   const resetFilters = () => {
     setFilterState(NO_FILTERS);
     setSearch('');
+    settleSearch('');
   };
   const filtered = Boolean(q) || Object.values(filterState).some(Boolean);
   const showList = desktop || !id;
