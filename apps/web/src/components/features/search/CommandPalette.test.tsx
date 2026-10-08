@@ -101,6 +101,34 @@ describe('CommandPalette — act names the client does not carry', () => {
   });
 });
 
+describe('CommandPalette — the annex a citation names', () => {
+  it('searches the annex the client read', async () => {
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 d.lgs. 81/2008 (All. A){Enter}');
+
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'decreto legislativo', act_number: '81', annex: 'A' }));
+  });
+
+  it('keeps the annex the server read', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ recognized: true, parsed: { act_type: 'decreto legislativo', act_number: '81', date: '2008', article: '1', annex: 'A' } }),
+    })));
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 tusl (All. A)');
+    await settle();
+    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await user.keyboard('{Enter}');
+
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_number: '81', annex: 'A' }));
+  });
+});
+
 /**
  * The alias section used to be gated on `sortedAliases.length > 0`. That hid
  * the only route to the alias manager behind already owning an alias — the

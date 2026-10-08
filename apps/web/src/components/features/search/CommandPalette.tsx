@@ -209,6 +209,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                   act_number: parsed.act_number || undefined,
                   date: parsed.date || undefined,
                   article: parsed.article || undefined,
+                  annex: parsed.annex || undefined,
                   // Named by the server's curated tables, not guessed.
                   confidence: 0.9,
                 }
