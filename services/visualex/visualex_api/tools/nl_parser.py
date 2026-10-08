@@ -117,7 +117,7 @@ _WORD_AHEAD_RE = re.compile(r"\s*[^\W\d_]")
 # The first day of a month, as citations write it: "1° settembre 1993" (also
 # with the ordinal indicator, "1º"). Without this the day was dropped and only
 # the year was read.
-_FIRST_DAY_RE = re.compile(r"\b(\d{1,2})\s*[°º]")
+_FIRST_DAY_RE = re.compile(r"\b(\d{1,2})\s*[°º]\s*")
 
 # The Costituzione has no number and no date: an act type that reads as it
 # alongside either is another act the tables do not know ("l. cost" with a
@@ -263,7 +263,7 @@ def _extract_annex(text: str) -> tuple[str, Optional[str]]:
 
 def _normalize(text: str) -> str:
     """Normalize whitespace, lowercase, clean up punctuation."""
-    text = _FIRST_DAY_RE.sub(r"\1", text.strip().lower())
+    text = _FIRST_DAY_RE.sub(r"\1 ", text.strip().lower())
     # "(UE)" is the official spelling of the marker, not noise: with the
     # parentheses in place "regolamento (ue)" matched no act at all.
     text = re.sub(r"[()\[\]]+", " ", text)

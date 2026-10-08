@@ -98,15 +98,15 @@ export function shortNorm(norm: LabelledNorm): string {
   return `art. ${text(norm.numero_articolo)}${joiner}${cited}${annex(norm, true)}`;
 }
 
-/** What a search or a parser gives (`act_type`, `act_number`, `date`, `article`). */
-export interface LabelParams { act_type?: string; act_number?: string; date?: string; article?: string }
+/** What a search or a parser gives (`act_type`, `act_number`, `date`, `article`, `annex`). */
+export interface LabelParams { act_type?: string; act_number?: string; date?: string; article?: string; annex?: string }
 
 /**
  * The short label of what a search or a parser names: the article's («art. 2 l. 241/1990»)
  * or, with no article, the act's («l. 241/1990»). Previews, in-text links, quick norms.
  */
 export function labelFromParams(params: LabelParams): string {
-  const norm: LabelledNorm = { tipo_atto: params.act_type, numero_atto: params.act_number, data: params.date };
+  const norm: LabelledNorm = { tipo_atto: params.act_type, numero_atto: params.act_number, data: params.date, allegato: params.annex };
   return params.article?.trim() ? shortNorm({ ...norm, numero_articolo: params.article.trim() }) : shortAct(norm);
 }
 

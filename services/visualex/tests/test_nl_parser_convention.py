@@ -183,6 +183,7 @@ class TestFirstOfTheMonth:
         "art. 127, d.lgs. 1° settembre 1993, n. 385",
         "art. 127, d.lgs. 1º settembre 1993, n. 385",
         "art. 127 d.lgs. 1 ° settembre 1993 n. 385",
+        "art. 127, d.lgs. 1°settembre 1993, n. 385",
     ])
     def test_the_day_is_kept(self, label):
         parsed = parse_nl_query(label)

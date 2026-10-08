@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { isSearchReady, parseLegalCitation, toSearchParams, type ParsedCitation } from '../citationParser';
+import { formatParsedCitation, isSearchReady, parseLegalCitation, toSearchParams, type ParsedCitation } from '../citationParser';
 import { citeNorm, shortNorm, type LabelledNorm } from '../sources';
 import { ACT_TYPES } from '../sources/actTypes';
 
@@ -90,8 +90,14 @@ describe('a legge costituzionale is never the Costituzione', () => {
     },
   );
 
-  it.each(['art. 81 Cost.', 'art 3 cost', 'art. 3 costituzione'])('the Costituzione itself still reads: «%s»', (label) => {
-    expect(parseLegalCitation(label)?.act_type).toBe('costituzione');
+  it.each([
+    'art. 81 Cost.', 'art 3 cost', 'art. 3 costituzione',
+    // A paragraph after the act is not its number.
+    'art. 24 Cost., comma 2', 'art. 3 Cost. co. 1', 'art. 3 Cost. comma 1', 'art. 3 Cost. 1° comma', 'art 32 cost 2 comma',
+  ])('the Costituzione itself still reads: «%s»', (label) => {
+    const parsed = parseLegalCitation(label);
+    expect(parsed?.act_type).toBe('costituzione');
+    expect(isSearchReady(parsed)).toBe(true);
   });
 });
 
@@ -106,6 +112,7 @@ describe('the annex', () => {
     const parsed = parseLegalCitation(label);
     expect(parsed).toMatchObject({ act_type: 'decreto legislativo', act_number: '81', annex });
     expect(toSearchParams(parsed!).annex).toBe(annex);
+    expect(formatParsedCitation(parsed!)).toContain(`(All. ${annex})`);
   });
 
   it.each(['art. 1 d.lgs. 81/2008 allegato al decreto', 'art. 5 del regolamento allegato a d.lgs. 81/2008'])(
@@ -120,7 +127,7 @@ describe('the annex', () => {
 });
 
 describe('the first of the month', () => {
-  it.each(['art. 127, d.lgs. 1° settembre 1993, n. 385', 'art. 127, d.lgs. 1º settembre 1993, n. 385'])('«%s»', (label) => {
+  it.each(['art. 127, d.lgs. 1° settembre 1993, n. 385', 'art. 127, d.lgs. 1º settembre 1993, n. 385', 'art. 127, d.lgs. 1°settembre 1993, n. 385'])('«%s»', (label) => {
     expect(parseLegalCitation(label)).toMatchObject({ date: '1993-09-01', act_number: '385' });
   });
 });

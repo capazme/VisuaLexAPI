@@ -235,6 +235,10 @@ const ARTICLE_PATTERN = new RegExp(
  * numero dell'atto. Va tolto dopo l'articolo o "1" diventa l'atto n. 1.
  */
 const COMMA_CLAUSE_PATTERN = /\s*,?\s*(?:comma|co\.|c\.)\s*\d+(?:\s*,?\s*(?:lett\.?|lettera)\s*[a-z]\b\)?)?/i;
+// La stessa clausola altrove, dopo l'atto ("art. 24 Cost., comma 2", "art. 3
+// Cost. 1° comma"): lasciata lì, il "2" diventava il numero dell'atto e la
+// Costituzione con un numero si rifiuta. Senza "c.", che altrove è un codice.
+const STRAY_COMMA_CLAUSE = /\b(?:comma|co\.)\s*\d+(?:\s*,?\s*(?:lett\.?|lettera)\s*[a-z]\b\)?)?|\b\d+\s+comma\b/gi;
 
 /**
  * Date complete, da riconoscere PRIMA della coppia numero/anno: in
@@ -316,7 +320,7 @@ function normalizeInput(input: string): string {
     .toLowerCase()
     // "1° settembre 1993": il primo del mese, come lo scrivono le citazioni.
     // Senza, il giorno cadeva e restava solo l'anno.
-    .replace(/(\d)\s*[°º]/g, '$1')
+    .replace(/(\d)\s*[°º]\s*/g, '$1 ')
     // "(UE)" è la grafia ufficiale del marcatore, non rumore: senza questo
     // passaggio "regolamento (ue)" non combaciava con nessuna abbreviazione.
     .replace(/[()[\]]+/g, ' ')
@@ -570,6 +574,7 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
 
   // Step 2: Estrai articolo
   let { article, remaining: afterArticle } = extractArticle(afterActType);
+  afterArticle = afterArticle.replace(STRAY_COMMA_CLAUSE, ' ').replace(/\s+/g, ' ').trim();
 
   // Step 3: Estrai numero e anno (ma se da alias reference, usa quelli dell'alias)
   let actNumber = actTypeResult.actNumber;
