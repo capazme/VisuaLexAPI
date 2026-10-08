@@ -713,7 +713,8 @@ SHA-256 of the decision's projection (§8.2), and a passage's
 `start`/`prefix`/`suffix` are measured on that projection. Only a found identity
 takes a discussion (as §8.1). The server reads the key back before storing it
 (`identityFromKey`'s server twin: the same shapes and bounds), so a malformed key
-is refused. The migration is hand-written (`apps/server/CLAUDE.md`, «Prisma
+is refused. A decision found without its text still takes general discussions (no
+passage, no text hash, no «Discuti»). The migration is hand-written (`apps/server/CLAUDE.md`, «Prisma
 migrations») and announced in the register before its code.
 
 **Where.** The decision tab's toolbar has the discussion button where the
@@ -729,9 +730,14 @@ When the decision's current text no longer holds the quoted words (§8.4: the
 court obscured or corrected it), the article's rule would keep showing the
 original quotation beside a «detached» notice. On a decision the panel shows it
 only to its author and the admins; everyone else reads «Il passo citato non è
-più nel testo della decisione». An admin can put a quotation back in the clear,
+più nel testo della decisione». The rule fails closed: a passage the panel cannot place in the
+current text (the list loading, reloading or failed, a thread not in it, a decision shown without
+text) is withheld the same way, and an admin may release a quotation in any of those states (the
+release stays with the thread). An admin can put a quotation back in the clear,
 and hide it again: a per-thread override stored with the thread
-(`passage_released_at`, `passage_released_by`, in the same migration; set and
+(`passage_released_at`, `passage_released_by`, in the same migration; `passage_released_by` only
+with `passage_released_at`, a one-way CHECK, so an admin's deletion keeps the release; only on a
+decision thread with a passage; set and
 cleared through the moderation route), so the panel shows the quotation to every
 reader while it is set. This is §8.6's caution applied to the one place where a
 user's quotation is public. The limit, said plainly: the server does not read
@@ -741,7 +747,9 @@ app is behind the login).
 
 **Unchanged.** Reports, votes, moderation (`PATCH /admin/article-discussions/:id`),
 the user's data export (`authController` already exports every thread) and
-account deletion (cascade) work as they do for articles.
+account deletion (cascade) work as they do for articles. Every 400 of these routes is in Italian
+(the first message alone). The author's export leaves out the releasing admin's id and keeps the
+release time.
 
 ### 9. The Cronologia
 
@@ -984,3 +992,6 @@ senso che l'admin può rimetterlo in chiaro)»; 7 «sì».
   when a suggestion is stored or taken. A share link is built in the browser (the environment
   encoded in the URL) and never reaches the server: before the opening it either becomes
   server-held (and so checked) or stays checked by the client only. That choice is the owner's.
+  The same holds for a decision discussion's withdrawn quotation (§8.7, the limit): the API returns
+  it to every signed-in caller and the panel's withholding is presentation, not access control, so
+  the server must withhold it itself before the opening.

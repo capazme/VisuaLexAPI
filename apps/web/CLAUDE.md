@@ -209,7 +209,11 @@ projection. A decision found without its text still takes general discussions
 hash). The toolbar's button is the shared `DiscussionButton`. A decision's panel withholds a
 withdrawn passage's quotation from every reader but the thread's author and the admins, until an
 admin releases it, and fails closed: a passage whose state is not known (loading, reloading,
-failed load) is withheld like a detached one.
+failed load, a thread missing from the passages list, a decision shown without its text) is
+withheld like a detached one. The rule is the panel's alone: the API still returns the stored
+quotation to any signed-in caller (spec §8.7), so withholding is presentation, not access control,
+and no other view may show a decision thread's `passage.quote` without the same rule. Server-side
+withholding is a precondition for opening VisuaLex to the public.
 
 **A court decision takes the same tools** (`DecisionReadingSurface`, PR 4): notes and
 highlights are stored under `normaKey = decisionKey(identity)` with `articleId = ''` (wire key
