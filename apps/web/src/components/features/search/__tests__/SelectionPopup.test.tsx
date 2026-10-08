@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRef } from 'react';
 import { SelectionPopup } from '../SelectionPopup';
 
@@ -48,6 +48,10 @@ async function selectText(needle: string, popupMarker: RegExp = /aggiungi nota/i
   selection.addRange(range);
   fireEvent.mouseUp(screen.getByTestId('container'));
   await waitFor(() => expect(screen.getByTitle(popupMarker)).toBeInTheDocument());
+  // The popup is set from a timer, outside act: its DOM is there before React has run the
+  // passive effect that attaches the keyboard shortcuts. Let that effect land, or a loaded
+  // machine presses 'h' before anyone listens.
+  await act(async () => {});
 }
 
 const originalRect = Range.prototype.getBoundingClientRect;

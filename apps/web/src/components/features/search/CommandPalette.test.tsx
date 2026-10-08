@@ -69,12 +69,15 @@ describe('CommandPalette — act names the client does not carry', () => {
   });
 
   it('does not ask the server for a query the client already resolved', async () => {
-    const user = userEvent.setup();
+    const user = fakeTimeUser();
     renderPalette();
 
     // "cc" is in the client ABBREVIATION_MAP, so the fallback must stay quiet —
     // the local result has to keep winning or behaviour that works today shifts.
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    // Step over the 250 ms wait: without it the assertion below can run before the fallback
+    // could have fired, and a slow typist (a loaded machine) could fire it on a half-typed query.
+    await settle();
 
     await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
     // Scoped to /parse_query on purpose: the palette also fetches the alias
