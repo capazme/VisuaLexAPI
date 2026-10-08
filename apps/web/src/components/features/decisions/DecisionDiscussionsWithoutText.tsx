@@ -28,6 +28,7 @@ export function DecisionDiscussionsWithoutText({ identity, attributi }: { identi
         heading="Discussioni sulla decisione"
         textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa discussione."
         withholdDetachedPassage
+        passageTextAvailable={false}
         {...discussion.panelProps}
         textHash={null}
       />

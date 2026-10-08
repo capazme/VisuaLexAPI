@@ -156,6 +156,18 @@ describe('discussions on a decision — what shows them', () => {
     expect(anchor).toMatchObject({ normaKey: KEY, articleId: '' });
     expect(extras).toEqual({ passage: undefined, articleUrn: undefined, textHash: undefined });
   });
+
+  it('without text, a passage discussion does not promise that its words will appear', async () => {
+    fetchDecision.mockResolvedValue(found({}));
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [fullThread({ id: 't-old', title: 'Vecchio dubbio', isOwner: false, passageReleased: false, passage: { quote: 'ricorso', start: 3, prefix: 'Il ', suffix: ' è fondato' } })],
+      pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+    });
+    render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Discussioni sulla decisione' }));
+    expect(await screen.findByText('Il passo citato non è mostrato: il testo della decisione non è disponibile.')).toBeInTheDocument();
+    expect(screen.queryByText(/in verifica/)).toBeNull();
+  });
 });
 
 describe('discussions on a decision — the passage', () => {

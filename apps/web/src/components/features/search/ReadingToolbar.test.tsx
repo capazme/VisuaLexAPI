@@ -91,6 +91,13 @@ describe('ReadingToolbar — it fits a 375 px screen', () => {
         expect(mobile).toHaveClass('ml-auto');
     });
 
+    it('wraps the mobile icons onto a second line at 320 px, keeping the 44 px targets', () => {
+        const { container } = setup({ url: 'https://example.org/art' });
+        const mobile = container.querySelector('.md\\:hidden')!;
+        expect(mobile).toHaveClass('flex-wrap', 'justify-end');
+        expect(mobile.querySelectorAll('.min-h-\\[44px\\]').length).toBeGreaterThanOrEqual(6);
+    });
+
     it('hides the separator between the chip and the annex badge below md', () => {
         setup(WITH_CHIP_AND_ANNEX);
         expect(screen.getByText('|')).toHaveClass('hidden', 'md:inline');

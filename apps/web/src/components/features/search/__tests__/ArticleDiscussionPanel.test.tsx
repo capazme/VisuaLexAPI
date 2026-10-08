@@ -463,7 +463,7 @@ describe('ArticleDiscussionPanel', () => {
     const renderPanel = async (
       thread: ArticleDiscussionThread,
       withhold = true,
-      extra: { passageStates?: Record<string, 'exact' | 'moved' | 'detached'>; passageLoadError?: boolean; passageThreadsLoading?: boolean } = {},
+      extra: { passageStates?: Record<string, 'exact' | 'moved' | 'detached'>; passageLoadError?: boolean; passageThreadsLoading?: boolean; passageTextAvailable?: boolean } = {},
       titled = true,
     ) => {
       vi.mocked(articleDiscussionService.list).mockResolvedValue({
@@ -568,6 +568,27 @@ describe('ArticleDiscussionPanel', () => {
     it('still shows the author and a released quotation when the state is not known', async () => {
       await renderPanel(decisionThread({ isOwner: true }), true, { passageStates: {} });
       expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+    });
+
+    it('tells the author, with the quotation, that other readers do not see an unknown passage', async () => {
+      await renderPanel(decisionThread({ isOwner: true }), true, { passageStates: {} });
+      expect(screen.getByText('Gli altri lettori non vedono questo passo finché non è ritrovato nel testo.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Mostra a tutti' })).not.toBeInTheDocument();
+    });
+
+    it('lets an admin release an unknown passage, with the notice', async () => {
+      authState.isAdmin = true;
+      await renderPanel(decisionThread(), true, { passageStates: {} });
+      expect(screen.getByText('Gli altri lettori non vedono questo passo finché non è ritrovato nel testo.')).toBeInTheDocument();
+      expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole('button', { name: 'Mostra a tutti' }));
+      expect(articleDiscussionService.setPassageReleased).toHaveBeenCalledWith('thread-p', true);
+    });
+
+    it('does not promise the words when the decision has no text', async () => {
+      await renderPanel(decisionThread(), true, { passageStates: {}, passageTextAvailable: false });
+      expect(screen.getByText('Il passo citato non è mostrato: il testo della decisione non è disponibile.')).toBeInTheDocument();
+      expect(screen.queryByText(IN_CHECK)).not.toBeInTheDocument();
     });
 
     it('shows a located passage\'s quotation to another reader', async () => {

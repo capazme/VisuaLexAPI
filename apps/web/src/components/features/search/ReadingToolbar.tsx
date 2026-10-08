@@ -103,7 +103,7 @@ export function ReadingToolbar({
             </div>
 
             {/* Mobile: Quick Actions + Study Mode toggle */}
-            <div className="flex md:hidden ml-auto items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
+            <div className="flex md:hidden ml-auto flex-wrap justify-end items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
                 <button
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}

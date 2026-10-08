@@ -47,6 +47,11 @@ interface Props {
    * the admins, until an admin releases it. Off by default: an article keeps showing it.
    */
   withholdDetachedPassage?: boolean;
+  /**
+   * With `withholdDetachedPassage`: false when the caller has no text to check a passage
+   * against (a decision found without its text), so the note does not promise a check.
+   */
+  passageTextAvailable?: boolean;
 }
 
 export function ArticleDiscussionPanel({
@@ -69,6 +74,7 @@ export function ArticleDiscussionPanel({
   onThreadCreated,
   onGoToPassage,
   withholdDetachedPassage = false,
+  passageTextAvailable = true,
 }: Props) {
   const { isAdmin } = useAuth();
   // Keyed on the fields, not on the object: a caller may build the anchor inline.
@@ -412,7 +418,9 @@ export function ArticleDiscussionPanel({
             // a failed load, a thread missing from the list) it is withheld like a detached one.
             const isPrivileged = thread.isOwner || isAdmin;
             const quoteWithheld = withholdDetachedPassage && isPassage && !isLocated && !isPrivileged && !thread.passageReleased;
-            const canRelease = withholdDetachedPassage && isDetached && isAdmin;
+            // Unknown = not located and not detached (loading, failed, not in the list, no text).
+            const isUnknown = isPassage && !isLocated && !isDetached;
+            const canRelease = withholdDetachedPassage && isPassage && !isLocated && isAdmin;
             const shownQuote = passage && !quoteWithheld ? truncateQuote(passage.quote) : null;
 
             const headingText =
@@ -459,7 +467,7 @@ export function ArticleDiscussionPanel({
                   </button>
                 </div>
 
-                {(isDetached || quoteWithheld) && (
+                {(isDetached || (withholdDetachedPassage && isUnknown)) && (
                   <div
                     role="note"
                     className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
@@ -468,14 +476,18 @@ export function ArticleDiscussionPanel({
                       <p className="font-medium">
                         {isDetached
                           ? 'Il passo citato non è più nel testo della decisione.'
-                          : 'Il passo citato è in verifica: le parole compaiono quando il testo è stato controllato.'}
+                          : passageTextAvailable
+                            ? 'Il passo citato è in verifica: le parole compaiono quando il testo è stato controllato.'
+                            : 'Il passo citato non è mostrato: il testo della decisione non è disponibile.'}
                       </p>
                     ) : (
                       <>
                         <p className="font-medium">
-                          {withholdDetachedPassage
-                            ? 'Il passo citato non è più nel testo della decisione.'
-                            : 'Il passo discusso non si trova nel testo che stai leggendo.'}
+                          {isUnknown && !thread.passageReleased
+                            ? 'Gli altri lettori non vedono questo passo finché non è ritrovato nel testo.'
+                            : withholdDetachedPassage
+                              ? 'Il passo citato non è più nel testo della decisione.'
+                              : 'Il passo discusso non si trova nel testo che stai leggendo.'}
                         </p>
                         <p className="mt-1 italic">
                           «{thread.passage?.quote}»
