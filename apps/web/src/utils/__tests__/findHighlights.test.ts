@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { setFindRanges, clearFindRanges } from '../findHighlights';
-
-class FakeHighlight {
-  ranges: Range[];
-  constructor(...ranges: Range[]) {
-    this.ranges = ranges;
-  }
-}
+import { FakeHighlight } from '../__fixtures__/openFind';
 
 function range(text: string): Range {
   const n = document.createTextNode(text);

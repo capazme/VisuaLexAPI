@@ -4,6 +4,8 @@ import { appStore } from '../../../store/useAppStore';
 import type { DecisionIdentity, DecisionText, FoundDecision } from '../../../types/decisions';
 import { FakeHighlight } from '../../../utils/__fixtures__/openFind';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
+import { decisionKey } from '../../../utils/decisionLinks';
+import type { Highlight } from '../../../types';
 import { DecisionView } from './DecisionView';
 
 const IDENTITY: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
@@ -78,14 +80,17 @@ describe('«Cerca nel testo» on a decision', () => {
     expect(drawn('vlx-find-current')).toBe(1);
   });
 
-  it('searches the decision text only: not the toolbar or the heading around it', async () => {
+  it('searches the decision text only: not the notices around it', async () => {
+    // A highlight whose words are not in the text is listed by UnmatchedAnchors, outside the text root
+    const lost = { id: 'h1', normaKey: decisionKey(IDENTITY), articleId: '', rangeSerialized: '', text: 'parole sparite', color: 'red', startOffset: 3 } as Highlight;
+    appStore.setState({ highlights: [lost] });
     render(surface());
-    // «Discussioni» is the discussion button's label: on the page, outside the text root
-    expect(screen.getByRole('button', { name: /Discussioni/ })).toBeInTheDocument();
+    expect(document.body.textContent).toContain('parole sparite');
+    expect(document.body.textContent).toContain('Il testo della fonte è cambiato');
     openIn(screen);
-    typeIn(screen, 'Discussioni');
+    typeIn(screen, 'parole sparite');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
-    typeIn(screen, 'Cerca nel testo');
+    typeIn(screen, 'fonte è cambiato');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
     expect(drawn('vlx-find')).toBe(0);
   });
@@ -111,6 +116,16 @@ describe('«Cerca nel testo» on a decision', () => {
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
     expect(registry.size).toBe(0);
     expect(screen.getByRole('button', { name: 'Cerca nel testo' })).toHaveFocus();
+  });
+
+  it('Esc in the field does not reach the document, so an open panel stays open', () => {
+    const onDocKey = vi.fn();
+    document.addEventListener('keydown', onDocKey);
+    render(surface());
+    openIn(screen);
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
+    document.removeEventListener('keydown', onDocKey);
+    expect(onDocKey).not.toHaveBeenCalled();
   });
 
   it('two decisions searching at once keep both sets of ranges', async () => {

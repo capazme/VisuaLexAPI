@@ -12,6 +12,8 @@ export interface FindInTextBarProps {
     onClose: () => void;
     /** Where focus goes on close: the toolbar's toggle button. Without it, the element focused when the bar opened. */
     returnFocusRef?: RefObject<HTMLElement | null>;
+    /** Names the surface in the landmark's label: «della decisione», «dell'articolo». */
+    label?: string;
 }
 
 const ICON_BUTTON =
@@ -29,7 +31,7 @@ function counterText({ count, index, truncated, searched }: FindInText): string 
  * takes focus when it opens and gives it back when it closes: to
  * `returnFocusRef`, or else to what held focus when it opened (never the field itself).
  */
-export function FindInTextBar({ query, onQueryChange, find, onClose, returnFocusRef }: FindInTextBarProps) {
+export function FindInTextBar({ query, onQueryChange, find, onClose, returnFocusRef, label }: FindInTextBarProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const openerRef = useRef<HTMLElement | null>(null);
 
@@ -46,6 +48,7 @@ export function FindInTextBar({ query, onQueryChange, find, onClose, returnFocus
 
     const close = () => {
         onClose();
+        // `openerRef` is the documented fallback for a caller without a toggle button to hand back (tests, other hosts).
         const opener = returnFocusRef?.current ?? openerRef.current;
         if (opener?.isConnected) opener.focus();
     };
@@ -57,6 +60,8 @@ export function FindInTextBar({ query, onQueryChange, find, onClose, returnFocus
             else find.next();
         } else if (e.key === 'Escape') {
             e.preventDefault();
+            // An open discussion panel or citation preview closes on Esc at the document: this Esc is the field's.
+            e.stopPropagation();
             close();
         }
     };
@@ -64,6 +69,7 @@ export function FindInTextBar({ query, onQueryChange, find, onClose, returnFocus
     return (
         <div
             role="search"
+            aria-label={label ? `Cerca nel testo ${label}` : 'Cerca nel testo'}
             className={cn(
                 'flex w-full flex-wrap items-center gap-1 px-2 py-1 border-b border-slate-200 dark:border-slate-700',
                 'bg-white dark:bg-slate-900',

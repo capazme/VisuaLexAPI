@@ -806,7 +806,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 find={display.textVisible ? {
                     isOpen: isFindOpen,
                     onToggle: (button) => { findButtonRef.current = button; setIsFindOpen(v => !v); },
-                    bar: <FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} onClose={() => setIsFindOpen(false)} />,
+                    bar: <FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} label="dell’articolo" onClose={() => setIsFindOpen(false)} />,
                 } : undefined}
             />
 

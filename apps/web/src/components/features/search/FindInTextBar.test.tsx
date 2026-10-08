@@ -4,13 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FindInTextBar } from './FindInTextBar';
 import { FindInTextButton } from './FindInTextButton';
 import { useFindInText } from '../../../hooks/useFindInText';
+import { FakeHighlight } from '../../../utils/__fixtures__/openFind';
 
-class FakeHighlight {
-  ranges: Range[];
-  constructor(...ranges: Range[]) {
-    this.ranges = ranges;
-  }
-}
 const g = globalThis as unknown as Record<string, unknown>;
 let registry: Map<string, FakeHighlight>;
 let saved: { css: unknown; highlight: unknown };
@@ -61,9 +56,17 @@ describe('FindInTextBar — layout classes (jsdom has no layout)', () => {
     expect(screen.getByRole('status')).toHaveClass('flex-1', 'md:flex-none');
   });
 
-  it('draws the phone row icon at the size of its neighbours (20 px)', () => {
-    render(<FindInTextButton isOpen={false} onToggle={() => {}} />);
+  it('draws the icon at 16 px like its neighbours, and at 20 px in the article\'s phone row', () => {
+    const { rerender } = render(<FindInTextButton isOpen={false} onToggle={() => {}} />);
+    expect(screen.getByRole('button').querySelector('svg')).toHaveAttribute('width', '16');
+    rerender(<FindInTextButton isOpen={false} onToggle={() => {}} size={20} />);
     expect(screen.getByRole('button').querySelector('svg')).toHaveAttribute('width', '20');
+  });
+
+  it('names the search landmark, with the surface when it is given', () => {
+    const find = { count: 0, index: 0, truncated: false, searched: false, next: () => {}, previous: () => {} } as unknown as Parameters<typeof FindInTextBar>[0]['find'];
+    render(<FindInTextBar query="" onQueryChange={() => {}} find={find} onClose={() => {}} label="della decisione" />);
+    expect(screen.getByRole('search', { name: 'Cerca nel testo della decisione' })).toBeInTheDocument();
   });
 });
 

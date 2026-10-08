@@ -194,7 +194,7 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
         isOpen: false, onToggle: vi.fn(), bar: <div role="search" />, ...over,
     });
 
-    it('has the button in the desktop row and in the phone row, and none without text', () => {
+    it('has the button in the desktop row and in the phone row', () => {
         setup({ find: find() });
         expect(screen.getAllByRole('button', { name: 'Cerca nel testo' })).toHaveLength(2);
     });

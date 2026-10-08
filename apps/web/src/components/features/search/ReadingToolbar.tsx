@@ -148,7 +148,7 @@ export function ReadingToolbar({
                 >
                     <MessageCircle size={20} />
                 </button>
-                {find && <FindInTextButton ref={phoneFindRef} isOpen={find.isOpen} onToggle={toggleFind} />}
+                {find && <FindInTextButton ref={phoneFindRef} isOpen={find.isOpen} onToggle={toggleFind} size={20} />}
                 <button
                     onClick={() => { void onMobileCopy(); }}
                     className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"

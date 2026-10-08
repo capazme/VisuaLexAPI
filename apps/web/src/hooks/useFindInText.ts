@@ -49,6 +49,7 @@ const EMPTY: FindState = { count: 0, index: -1, truncated: false, searched: fals
  */
 export function useFindInText(
   rootRef: RefObject<HTMLElement | null>,
+  // `open: false` is part of the hook's API (nothing is searched or drawn); the find box always passes true because it is mounted only while open.
   { open, query }: { open: boolean; query: string },
 ): FindInText {
   const ownerId = `find-${useId()}`;

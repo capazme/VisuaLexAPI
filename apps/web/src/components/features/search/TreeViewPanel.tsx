@@ -36,7 +36,7 @@ function normalizeArticleId(id: string): string {
  * Fold a string for filtering: accents stripped, lowercased.
  * A lawyer types "responsabilita" and expects "Responsabilità del debitore".
  */
-function foldForSearch(value: string): string {
+function foldIndexLabel(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
@@ -386,7 +386,7 @@ export function TreeViewPanel({
     return null;
   }, [displayArticles, parsedSections, annexLabel]);
 
-  const normalizedQuery = foldForSearch(filterQuery.trim());
+  const normalizedQuery = foldIndexLabel(filterQuery.trim());
   const isFiltering = normalizedQuery.length > 0;
 
   // Sections carry their original index so a collapse choice survives the
@@ -400,8 +400,8 @@ export function TreeViewPanel({
       .map(section => ({
         ...section,
         articles: section.articles.filter(articleNum =>
-          foldForSearch(articleNum).startsWith(normalizedQuery) ||
-          foldForSearch(rubricheNormalized[normalizeArticleId(articleNum)] ?? '').includes(normalizedQuery) ||
+          foldIndexLabel(articleNum).startsWith(normalizedQuery) ||
+          foldIndexLabel(rubricheNormalized[normalizeArticleId(articleNum)] ?? '').includes(normalizedQuery) ||
           (abrogatiNormalized.has(normalizeArticleId(articleNum)) && 'abrogato'.includes(normalizedQuery))
         ),
       }))

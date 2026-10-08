@@ -8,14 +8,16 @@ export interface FindInTextBoxProps {
     onClose: () => void;
     /** The toolbar's toggle, where focus goes on close. */
     returnFocusRef?: RefObject<HTMLElement | null>;
+    /** Names the surface for the search landmark: «della decisione», «dell'articolo». */
+    label?: string;
 }
 
 /**
  * «Cerca nel testo» for one reading surface: the find box over `useFindInText`, mounted only while it is open (closing
  * clears the highlights and forgets the query). Shared by the article's tab and the decision's.
  */
-export function FindInTextBox({ rootRef, onClose, returnFocusRef }: FindInTextBoxProps) {
+export function FindInTextBox({ rootRef, onClose, returnFocusRef, label }: FindInTextBoxProps) {
     const [query, setQuery] = useState('');
     const find = useFindInText(rootRef, { open: true, query });
-    return <FindInTextBar query={query} onQueryChange={setQuery} find={find} onClose={onClose} returnFocusRef={returnFocusRef} />;
+    return <FindInTextBar query={query} onQueryChange={setQuery} find={find} onClose={onClose} returnFocusRef={returnFocusRef} label={label} />;
 }

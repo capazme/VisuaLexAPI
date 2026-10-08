@@ -215,7 +215,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         isFindOpen={isFindOpen}
         onToggleFind={() => setIsFindOpen((v) => !v)}
         findButtonRef={findButtonRef}
-        findBar={<FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} onClose={() => setIsFindOpen(false)} />}
+        findBar={<FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} label="della decisione" onClose={() => setIsFindOpen(false)} />}
       />
       <NotesPeekPanel
         isOpen={isNotesOpen}

@@ -3,13 +3,7 @@ import { Profiler, useEffect, useMemo, useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isSearchableQuery } from '../utils/findInText';
 import { useFindInText, type FindInText } from './useFindInText';
-
-class FakeHighlight {
-  ranges: Range[];
-  constructor(...ranges: Range[]) {
-    this.ranges = ranges;
-  }
-}
+import { FakeHighlight } from '../utils/__fixtures__/openFind';
 
 const g = globalThis as unknown as Record<string, unknown>;
 let registry: Map<string, FakeHighlight>;
