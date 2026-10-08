@@ -11,6 +11,9 @@ ADD COLUMN     "target_kind" TEXT NOT NULL DEFAULT 'article';
 -- AddForeignKey
 ALTER TABLE "article_threads" ADD CONSTRAINT "article_threads_passage_released_by_fkey" FOREIGN KEY ("passage_released_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- CreateIndex (the SET NULL of an admin's deletion looks the column up)
+CREATE INDEX "article_threads_passage_released_by_idx" ON "article_threads"("passage_released_by");
+
 -- Checks (not in Prisma's model)
 ALTER TABLE "article_threads" ADD CONSTRAINT "article_threads_target_kind_check"
   CHECK ("target_kind" IN ('article', 'decision'));
@@ -22,8 +25,8 @@ ALTER TABLE "article_threads" ADD CONSTRAINT "article_threads_target_shape_check
         AND "article_id" = '' AND "version" IS NULL AND "article_urn" IS NULL)
   );
 
--- Both release columns set, or both null. The user reference may become null later (SET NULL on
--- the admin's deletion), so the pair is only required while the user exists: released_at set with
--- released_by null is allowed, released_by set without released_at is not.
+-- A release names its admin (passage_released_by) only together with its time. The admin may be
+-- deleted later (SET NULL), which leaves the time: released_at set with released_by null is
+-- allowed, released_by set without released_at is not.
 ALTER TABLE "article_threads" ADD CONSTRAINT "article_threads_passage_release_check"
   CHECK ("passage_released_by" IS NULL OR "passage_released_at" IS NOT NULL);

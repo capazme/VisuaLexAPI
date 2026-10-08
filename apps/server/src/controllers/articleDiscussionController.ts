@@ -30,6 +30,25 @@ function checkAnchor(anchor: { normaKey: string; articleId: string; version?: st
   return 'article' as const;
 }
 
+// Optional and redundant with normaKey: accepted only when it agrees with it.
+const targetSchema = z.object({
+  kind: z.enum(['article', 'decision'], { message: 'La destinazione deve essere «article» o «decision»' }),
+  key: z.string({ message: 'La chiave della destinazione non è valida' }).max(500, 'La chiave della destinazione non è valida').optional(),
+}, { message: 'La destinazione non è valida' }).optional();
+
+const moderationSchema = z.object({
+  hidden: z.boolean({ message: '«hidden» deve essere vero o falso' }).optional(),
+  passageReleased: z.boolean({ message: '«passageReleased» deve essere vero o falso' }).optional(),
+}, { message: 'La richiesta non è valida' })
+  .refine((b) => b.hidden !== undefined || b.passageReleased !== undefined, 'Nessuna modifica richiesta');
+
+/** Parses with Zod but answers with the first message alone: the global handler's English prefix is not for these routes. */
+function parseItalian<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> {
+  const result = schema.safeParse(value);
+  if (!result.success) throw new AppError(400, result.error.issues[0].message);
+  return result.data;
+}
+
 const passageSchema = z.object({
   quote: z.string().min(1).max(2000)
     .refine((s) => s.trim().length > 0, 'La citazione non può essere vuota'),
@@ -39,8 +58,6 @@ const passageSchema = z.object({
 });
 
 const createThreadSchema = anchorSchema.extend({
-  // optional, redundant with normaKey: accepted only when it agrees with it
-  target: z.object({ kind: z.enum(['article', 'decision']), key: z.string().max(500).optional() }).optional(),
   title: z.string().trim().max(200).optional(),
   body: z.string().trim().min(3).max(10000),
   passage: passageSchema.optional(),
@@ -241,9 +258,13 @@ export const listPassages = async (req: Request, res: Response) => {
 
 export const createThread = async (req: Request, res: Response) => {
   const data = createThreadSchema.parse(req.body);
+  const target = parseItalian(targetSchema, req.body?.target);
   const kind = checkAnchor(data);
-  if (data.target && (data.target.kind !== kind || (kind === 'decision' && data.target.key !== data.normaKey))) {
-    throw new AppError(400, 'La destinazione non corrisponde alla chiave');
+  if (target) {
+    if (kind === 'article' && target.key !== undefined) throw new AppError(400, 'Una destinazione articolo non ha una chiave');
+    if (target.kind !== kind || (kind === 'decision' && target.key !== data.normaKey)) {
+      throw new AppError(400, 'La destinazione non corrisponde alla chiave');
+    }
   }
   const thread = await prisma.articleThread.create({
     data: {
@@ -335,16 +356,14 @@ export const reportThread = async (req: Request, res: Response) => {
 };
 
 export const moderateThread = async (req: Request, res: Response) => {
-  const body = z.object({ hidden: z.boolean().optional(), passageReleased: z.boolean().optional() })
-    .refine((b) => b.hidden !== undefined || b.passageReleased !== undefined, 'Nessuna modifica richiesta')
-    .parse(req.body);
+  const body = parseItalian(moderationSchema, req.body);
   const data: { isHidden?: boolean; passageReleasedAt?: Date | null; passageReleasedById?: string | null } = {};
   if (body.hidden !== undefined) data.isHidden = body.hidden;
   if (body.passageReleased !== undefined) {
     const existing = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
     if (!existing) throw new AppError(404, 'Discussione non trovata');
     if (existing.targetKind !== 'decision' || existing.passageQuote === null) {
-      throw new AppError(400, 'Solo una discussione su un passo di una decisione può essere rilasciata');
+      throw new AppError(400, 'Solo il passo citato di una decisione può essere rimesso in chiaro');
     }
     data.passageReleasedAt = body.passageReleased ? new Date() : null;
     data.passageReleasedById = body.passageReleased ? req.user!.id : null;

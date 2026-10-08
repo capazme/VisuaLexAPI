@@ -1,6 +1,6 @@
 // The server twin of the web's `identityFromKey` (apps/web/src/utils/decisionLinks.ts): the key
 // of a court decision read back to its identity. Same shapes, same bounds; keep the two in step
-// (tests/decisionKey.test.ts keeps its own table of cases; there is no shared fixture).
+// (both are pinned to conventions/sources/decision-keys.json).
 
 export interface DecisionKeyIdentity {
   corte: 'cassazione' | 'corte_costituzionale';

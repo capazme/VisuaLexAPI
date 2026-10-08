@@ -69,3 +69,11 @@ type, fixed forms for every cited field, unknown keys dropped). The file holds t
 for each, the norm kept or the Italian reason it is refused; the server's
 `apps/server/src/schemas/normEntry.ts` and the web's `apps/web/src/utils/sources/normEntry.ts`
 both assert it.
+
+## `decision-keys.json`
+
+A decision's key (`cassazione:civile:99999:2024`, `corte_costituzionale:99999:2020`) read back to
+its identity, or refused: the shapes, the leading zeros, the whitespace, the first year of each
+court and the current-year bound (`{currentYear}`, `{nextYear}` stand for the reader's clock). Every
+number is fictional. The web's `identityFromKey` and the server's `readDecisionKey` both assert it
+(`apps/web/src/utils/__tests__/decisionLinks.key.test.ts`, `apps/server/tests/decisionKey.test.ts`).

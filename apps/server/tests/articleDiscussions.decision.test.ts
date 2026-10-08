@@ -100,9 +100,15 @@ describe('discussions anchored on a court decision', () => {
       expect(res.status, normaKey).toBe(400);
       expect(res.body.detail).toContain('La chiave della decisione non è valida');
     }
-    expect((await open(alice, { version: 'vigente' })).status).toBe(400);
-    expect((await open(alice, { articleUrn: 'urn:nir:stato:legge:1990-08-07;241' })).status).toBe(400);
-    expect((await open(alice, { articleId: '12' })).status).toBe(400);
+    for (const [extra, detail] of [
+      [{ version: 'vigente' }, 'non ha una versione'],
+      [{ articleUrn: 'urn:nir:stato:legge:1990-08-07;241' }, 'non ha un URN'],
+      [{ articleId: '12' }, 'non ha un articolo'],
+    ] as const) {
+      const res = await open(alice, extra);
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toContain(detail);
+    }
     expect(await prisma.articleThread.count({ where: { userId: alice.id } })).toBe(0);
   });
 
@@ -114,6 +120,26 @@ describe('discussions anchored on a court decision', () => {
       normaKey: 'codice-civile--art-2043', articleId: '2043', title: 'Una domanda', body: 'Sul testo.', target: { kind: 'decision', key: KEY },
     });
     expect(norm.status).toBe(400);
+  });
+
+  it('answers the target and moderation 400s in Italian', async () => {
+    const bad = await open(alice, { target: { kind: 'case' } });
+    expect(bad.status).toBe(400);
+    expect(bad.body.detail).toContain('La destinazione deve essere');
+    const keyed = await request(app).post('/api/article-discussions').set(authHeader(alice)).send({
+      normaKey: 'codice-civile--art-2043', articleId: '2043', title: 'Una domanda', body: 'Sul testo.', target: { kind: 'article', key: 'x' },
+    });
+    expect(keyed.status).toBe(400);
+    expect(keyed.body.detail).toBe('Una destinazione articolo non ha una chiave');
+
+    const created = await open(alice);
+    const url = `/api/admin/article-discussions/${created.body.id}`;
+    const empty = await request(app).patch(url).set(authHeader(admin)).send({});
+    expect(empty.body.detail).toBe('Nessuna modifica richiesta');
+    const notBool = await request(app).patch(url).set(authHeader(admin)).send({ passageReleased: 'yes' });
+    expect(notBool.status).toBe(400);
+    expect(notBool.body.detail).toContain('vero o falso');
+    expect((await request(app).patch(url).set(authHeader(admin)).send({ hidden: 'yes' })).body.detail).toContain('vero o falso');
   });
 
   describe('the table refuses what the controller would not write', () => {
@@ -137,6 +163,10 @@ describe('discussions anchored on a court decision', () => {
       ['an article with a decision key', { kind: 'article', article: '12', norma: 'norma-a', key: KEY }],
     ])('refuses %s', async (_label, patch) => {
       await expect(insert({ ...good, ...patch }, alice.id)).rejects.toThrow(/target_shape_check/);
+    });
+    it('accepts a release time with no author (the admin was deleted)', async () => {
+      await expect(prisma.$executeRaw`INSERT INTO article_threads (id, norma_key, article_id, title, body, user_id, passage_released_at, created_at, updated_at)
+        VALUES (gen_random_uuid()::text, 'n', '1', 't', 'b', ${alice.id}, now(), now(), now())`).resolves.toBe(1);
     });
     it('refuses a release author without a release time', async () => {
       await expect(prisma.$executeRaw`INSERT INTO article_threads (id, norma_key, article_id, title, body, user_id, passage_released_by, created_at, updated_at)
@@ -164,6 +194,21 @@ describe('discussions anchored on a court decision', () => {
       expect(cleared.body.passageReleased).toBe(false);
       const after = await prisma.articleThread.findUniqueOrThrow({ where: { id: created.body.id } });
       expect(after).toMatchObject({ passageReleasedById: null, passageReleasedAt: null });
+    });
+
+    it('answers 404 for a thread that does not exist', async () => {
+      const res = await request(app).patch('/api/admin/article-discussions/no-such-thread').set(authHeader(admin)).send({ passageReleased: true });
+      expect(res.status).toBe(404);
+    });
+
+    it('refuses the release of an article thread and leaves hidden unchanged', async () => {
+      const article = await request(app).post('/api/article-discussions').set(authHeader(alice)).send({
+        normaKey: 'norma-a', articleId: '1', body: 'Sul passo.', passage: PASSAGE,
+      });
+      const res = await request(app).patch(`/api/admin/article-discussions/${article.body.id}`).set(authHeader(admin)).send({ hidden: true, passageReleased: true });
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toContain('rimesso in chiaro');
+      expect((await prisma.articleThread.findUniqueOrThrow({ where: { id: article.body.id } })).isHidden).toBe(false);
     });
 
     it('refuses a thread that is not a decision passage', async () => {

@@ -245,10 +245,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   columns of its own (`target_kind` `'article'|'decision'`, `decision_key`,
   CHECKs in the migration `20261011100000_article_threads_decision_target`).
   The server derives the target from `normaKey` (`norms/decisionKey.ts`
-  `readDecisionKey`, the twin of the web's `identityFromKey`): a key in the
+  `readDecisionKey`, the twin of the web's `identityFromKey`, both pinned to
+  `conventions/sources/decision-keys.json`): a key in the
   `cassazione:` / `corte_costituzionale:` space must read back (else 400) and
   comes with `articleId` `''` and no `version` or `articleUrn`; an optional body
-  `target: { kind, key }` is accepted only if it agrees. The answer carries
+  `target: { kind, key }` is accepted only if it agrees (an article target takes no key). The answer carries
   `target` and `passageReleased`. The list queries may omit `articleId` for a
   decision; a decision thread never shows in an article's list nor the reverse.
   `textHash` and passage offsets are on the decision's projection (the client

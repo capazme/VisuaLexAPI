@@ -502,7 +502,8 @@ model ArticleThread {
   textHash      String? @map("text_hash")
   // What the thread is anchored on. 'decision': normaKey = decisionKey, articleId = '',
   // no version, no URN (CHECKs in the migration). The release columns lift the panel's hiding of
-  // a withdrawn quotation (set together or not at all).
+  // a withdrawn quotation: a release names its admin only together with its time; the admin may
+  // later be deleted, which leaves the time (the CHECK is one-way).
   targetKind          String    @default("article") @map("target_kind")
   decisionKey         String?   @map("decision_key")
   passageReleasedAt   DateTime? @map("passage_released_at") @db.Timestamptz(6)
@@ -522,6 +523,7 @@ model ArticleThread {
 
   @@index([normaKey, articleId, createdAt])
   @@index([userId])
+  @@index([passageReleasedById])
   @@map("article_threads")
 }
 
