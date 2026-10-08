@@ -998,10 +998,16 @@ const appStore = createStore<AppState>()(
                 state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== id);
             }),
 
+            // Also surfaces a minimised or hidden tab (as focusArticleInTab already does for an
+            // article's own tab): raising a tab that stays collapsed would still show nothing, and
+            // the find window's "go to" (Task 33) brings a tab to front expecting its content, a
+            // decision's included, to actually mount so its root can register.
             bringTabToFront: (id) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === id);
                 if (tab) {
                     tab.zIndex = ++state.highestZIndex;
+                    tab.isMinimized = false;
+                    tab.isHidden = false;
                 }
             }),
 

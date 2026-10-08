@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react';
-import { collectSearchableText, findMatches, isSearchableQuery, rangesForMatches } from '../utils/findInText';
+import { collectSearchableText, findMatches, isSearchableQuery, mapThroughEdit, rangesForMatches } from '../utils/findInText';
 import { clearFindRanges, setFindRanges } from '../utils/findHighlights';
 
 const DEBOUNCE_MS = 150;
@@ -22,21 +22,6 @@ interface FindState {
   index: number;
   truncated: boolean;
   searched: boolean;
-}
-
-/**
- * Where `pos` of `oldText` sits in `newText`: unchanged before the common prefix, shifted by the length difference
- * after the common suffix, and at the start of the change when it falls inside what changed.
- */
-function mapThroughEdit(oldText: string, newText: string, pos: number): number {
-  const max = Math.min(oldText.length, newText.length);
-  let prefix = 0;
-  while (prefix < max && oldText[prefix] === newText[prefix]) prefix += 1;
-  let suffix = 0;
-  while (suffix < max - prefix && oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix += 1;
-  if (pos < prefix) return pos;
-  if (pos >= oldText.length - suffix) return pos + newText.length - oldText.length;
-  return prefix;
 }
 
 const EMPTY: FindState = { count: 0, index: -1, truncated: false, searched: false };

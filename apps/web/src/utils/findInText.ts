@@ -104,6 +104,23 @@ export function findMatches(
   return { matches, truncated };
 }
 
+/**
+ * Where `pos` of `oldText` sits in `newText`: unchanged before the common prefix, shifted by the
+ * length difference after the common suffix, and at the start of the change when it falls inside
+ * what changed. How a caller keeping a current match carries its position through a redraw
+ * (`useFindInText`, `useFindWindow`) without re-finding it by content.
+ */
+export function mapThroughEdit(oldText: string, newText: string, pos: number): number {
+  const max = Math.min(oldText.length, newText.length);
+  let prefix = 0;
+  while (prefix < max && oldText[prefix] === newText[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < max - prefix && oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix += 1;
+  if (pos < prefix) return pos;
+  if (pos >= oldText.length - suffix) return pos + newText.length - oldText.length;
+  return prefix;
+}
+
 export interface TextSegment {
   node: Text;
   /** Offset of the node's first character in the concatenated text. */

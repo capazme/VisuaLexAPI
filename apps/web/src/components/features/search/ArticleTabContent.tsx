@@ -52,6 +52,7 @@ import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
+import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
 import { plainText } from '../../../utils/threadPassages';
 import { PassageThreadsStatus } from './PassageThreadsStatus';
 import { VersionBanner } from './VersionBanner';
@@ -64,6 +65,7 @@ import {
     describeVersion,
     isEuropeanAct,
     requestIsHistorical,
+    versionKey,
     versionTabSuffix,
     type BannerAction,
     type TextAtDateChoice,
@@ -180,6 +182,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { canContribute, qaAskable, consentLevel, merltEnabled } = useMerltFeatures();
 
     const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
+    // The find window's target for this article (spec §13.1, Task 33 ruling 1): the tab this
+    // surface reads in, `readingOrigin` winning like everywhere else it is given. No tab (a
+    // preview outside the workspace, such as the palette's result card) registers nothing.
+    const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
+    useRegisterFindRoot(originTabId ?? tabId, findTargetKey, shortNorm(norma_data), textRootRef);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],

@@ -19,6 +19,7 @@ import { UnmatchedAnchors } from './UnmatchedAnchors';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
@@ -139,6 +140,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const findButtonRef = useRef<HTMLButtonElement>(null);
   const textRootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
+
+  // The find window's target for this decision (spec §13.1, Task 33 ruling 1): one text, keyed by
+  // its own `decisionKey`. No `hostTabId` (a host with no tab) registers nothing.
+  useRegisterFindRoot(hostTabId, key, label, textRootRef);
 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
