@@ -2961,6 +2961,47 @@ Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it nee
 
 **PR 4b:** title «feat: discussions on court decisions»; body names the migration (announced in the register), the quotation rule and the owner's answers of 7 October. Browser pass: open a discussion on a decision and on a passage, reply, vote, report as a second test account, moderate as admin; the sign counts; a detached passage seen by its author and by another account. Merge: `merge: feat/decision-discussions — discussions on decisions, the article's panel and rules`.
 
+## PR 4c — `feat/find-in-text` (apps/web)
+
+Added 2026-10-08 (the owner: «mettiamo anche una funzione di ricerca all'interno delle sentenze»; decisions and articles «sì, insieme»; spec §13). After PR 4b. No server change, no migration.
+
+### Task 30: The matcher and the highlight registry
+
+**Files:**
+- Create: `apps/web/src/utils/findInText.ts` (`foldForSearch(text)`: one output unit per input unit, spec §13's table; `findMatches(text, query, { limit = 1000 })`: `{ matches: [start, end][]; truncated: boolean }`, nothing under two characters after trimming, query whitespace runs matching any whitespace run; `collectSearchableText(root)`: the displayed text nodes in document order and their concatenation, skipping nodes inside an element whose computed `display` is `none`, up to the root (jsdom computes inline styles and stylesheets, never layout, so no client-rect test); `rangesForMatches(nodes, matches)`: DOM `Range`s spanning node boundaries)
+- Create: `apps/web/src/utils/findHighlights.ts` (the document's registry: `setFindRanges(ownerId, ranges, current)` and `clearFindRanges(ownerId)` compose the union into two `Highlight`s registered as `vlx-find` and `vlx-find-current`; a no-op where `CSS.highlights` is missing)
+- Test: `apps/web/src/utils/__tests__/findInText.test.ts`, `findHighlights.test.ts`
+
+- [ ] **Step 1: Failing tests.** Folding: «perche» finds «perché», «PERCHÉ», «Perchè»; «dell'articolo» finds «dell’articolo»; a no-break space; «ß», «İ» and an astral character keep the length (every fold has `length === input.length`); matches at the same offsets in the original; a two-word query across a double space and a newline-free block join; under two characters → no match; the cap at 1,000 sets `truncated`. DOM: a match split by a `<mark>` and a `<span class="vlx-sign">` becomes one range whose `toString()` is the original words; a node in a `display: none` element is skipped. Registry (with a stubbed `CSS.highlights` and `Highlight`): two owners' ranges both present, clearing one leaves the other; missing API → no throw.
+- [ ] **Step 2: Run to see them fail.**
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run; web build and lint. Step 5: Commit** — «feat(web): a text matcher that ignores case and accents, and one highlight registry for the document».
+
+### Task 31: The find box
+
+**Files:**
+- Create: `apps/web/src/hooks/useFindInText.ts` (`useFindInText(rootRef, { open, query })`: matches over `collectSearchableText`, the current index, `next`/`previous` (wrapping), scrolling the current match to the middle of the nearest scrolling ancestor, the registry under an id of its own, recomputed when the root's content changes (a `MutationObserver` on child lists and character data, coalesced to one frame) keeping the current match where it still exists; everything cleared when closed or unmounted)
+- Create: `apps/web/src/components/features/search/FindInTextBar.tsx` (the field «Cerca nel testo», the counter «N di M» / «Nessun risultato» / «oltre 1000: affina la ricerca» in an `aria-live="polite"` region, ↑ «Risultato precedente», ↓ «Risultato successivo», × «Chiudi la ricerca»; Enter / Shift+Enter / Esc; 150 ms debounce on typing; 44 px targets below `md`, full width on a phone; focus to the field on open, back to the opener on close)
+- Create: `apps/web/src/components/features/search/FindInTextButton.tsx` (the magnifier toggle, `aria-pressed`, shared by both toolbars like `DiscussionButton`)
+- Modify: `apps/web/src/index.css` (`::highlight(vlx-find)` and `::highlight(vlx-find-current)`, light and dark tokens; READING SURFACE)
+- Test: `useFindInText.test.tsx`, `FindInTextBar.test.tsx`
+
+- [ ] **Step 1: Failing tests**: typing finds and counts; Enter/Shift+Enter move and wrap; Esc closes, clears the registry and refocuses the opener; a mutation of the root recomputes and keeps the current match; unmount clears; the live region's text; the root's `innerHTML` is the same before, during and after a search.
+- [ ] **Steps 2–4**, then commit — «feat(web): the find box: counter, next and previous, Escape, and the current match in view».
+
+### Task 32: Find on the decision's and the article's tab
+
+**Files:**
+- Modify: `apps/web/src/components/features/decisions/DecisionReadingToolbar.tsx` and `DecisionReadingSurface.tsx` (the button and the box over the decision's text root; only with text)
+- Modify: `apps/web/src/components/features/search/ReadingToolbar.tsx` (the button in the desktop row and in the phone row, which wraps) and `ArticleTabContent.tsx` (the box over the article's text root, `ArticleBody`'s `textRef`)
+- Modify: `apps/web/CLAUDE.md` («Reading surface»: find in the text; the shared utilities `findInText`, `findHighlights`, `useFindInText`)
+- Test: `DecisionFind.test.tsx`, the article's toolbar and tab tests; `decisionRender.test.ts` and `articleRender.test.ts` (with a search open on the rendered HTML, the text nodes still spell the projection / `article_text` minus `\n`)
+
+- [ ] **Step 1: Failing tests**: the button on a decision with text and on an article, none on a decision without text; a search on each surface finds a word with and without its accent; two surfaces searching at once keep both sets of ranges; the article's other toolbar buttons unchanged.
+- [ ] **Steps 2–4**, then commit — «feat(web): «Cerca nel testo» on decisions and articles, one component».
+
+**PR 4c:** title «feat: find in the text of decisions and articles»; body names spec §13 and the Highlight API's browser floor. Browser pass (one test account on the dev stack: no migration): a Cassazione decision and an article, an accented word typed without its accent, Enter / Shift+Enter / Esc, two tabs searching at once, highlights and signs still drawn, a phone width (320 and 360 px). Merge: `merge: feat/find-in-text — «Cerca nel testo» on decisions and articles`.
+
 ## PR 5 — `feat/decision-history` (apps/server, apps/web)
 
 Announce the migration to the orchestrator before Step 3 of Task 23, and ask its go before any `npm --prefix apps/server test`.
@@ -3426,3 +3467,5 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - The article's mobile toolbar keeps its own discussion button (larger icon, other classes); the phone row has 44 px targets and wraps.
 - The decision's sentences in the shared panel come from the caller (`detachedPassageNotice`, `textUnavailableNotice`, with the article's wording as defaults). The author's data export leaves out the releasing admin's id.
 - The limit, restated: the API still returns a withdrawn quotation to any signed-in user; server-side withholding is a precondition for the public opening (spec §8.7 and its «Before VisuaLex opens to the public» list).
+
+**Amendment, 2026-10-08 — PR 4c added (the owner: «mettiamo anche una funzione di ricerca all'interno delle sentenze», «sì, insieme»).** «Cerca nel testo» on decisions and articles, one component (spec §13, Tasks 30–32). The matches are drawn with the CSS Custom Highlight API rather than with elements in the text: the orchestrator's scope asked that highlighting only wrap characters (root rule 23); drawing ranges adds nothing to the page, so the rule holds by construction and the search needs no nesting rules with marks, signs or the discussion focus.
