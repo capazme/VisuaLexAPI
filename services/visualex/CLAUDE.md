@@ -137,7 +137,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `cite_act` for a query with no article. A year-only URN and anything that is not a NIR
     URN pass through `normalize_norm_urn` unchanged
   - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
-    exposed at `POST /parse_query`
+    exposed at `POST /parse_query`. Every label the source convention writes reads
+    back to the norm it was written from (`tests/test_nl_parser_convention.py`, driven
+    by the golden file): «d.l.», «l. cost.», «r.d.l.», «d.lgs.lgt.», «1° settembre»,
+    and «(Allegato A)» / «(All. A)», sent on as `annex`. The Costituzione has no
+    number and no date: a type that reads as it next to either is refused, never
+    guessed («l. cost.» was once read as `cost.`)
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
     Regolamento UE 2016/679); runs before the NL parser
   - `citation_linker.py` — citation detection in article text, emits

@@ -532,7 +532,7 @@ class NormaController:
         params = parsed.to_api_params()
         if "act_type" in result and result["act_type"] != params.get("act_type"):
             return result
-        for key in ("act_type", "date", "act_number", "article"):
+        for key in ("act_type", "date", "act_number", "article", "annex"):
             if key not in result and key in params:
                 result[key] = params[key]
         return result

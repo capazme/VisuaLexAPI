@@ -52,7 +52,7 @@ holding `conventions/`, and fails when it is not there.
 | Suite | Test |
 |---|---|
 | web | `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (today: shape, decided citations, current decision paths and reference paths) |
-| Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys) |
+| Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys); `services/visualex/tests/test_nl_parser_convention.py` (every citation and short label reads back through the parser to its norm) |
 | server, MCP, MERL-T | added by each area's adoption PR (plan `docs/superpowers/plans/2026-10-04-source-convention.md`) |
 
 ## Changing it
