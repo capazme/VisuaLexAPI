@@ -45,8 +45,13 @@ describe('findHighlights registry', () => {
     const b1 = range('b1');
     setFindRanges('a', [a1, a2], a2);
     setFindRanges('b', [b1], null);
-    expect(registry.get('vlx-find')?.ranges).toEqual([a1, b1]);
-    expect(registry.get('vlx-find-current')?.ranges).toEqual([a2]);
+    const all = registry.get('vlx-find')?.ranges ?? [];
+    expect(all).toHaveLength(2);
+    expect(all[0]).toBe(a1);
+    expect(all[1]).toBe(b1);
+    const cur = registry.get('vlx-find-current')?.ranges ?? [];
+    expect(cur).toHaveLength(1);
+    expect(cur[0]).toBe(a2);
   });
 
   it('clearing one owner leaves the other', () => {
@@ -56,7 +61,9 @@ describe('findHighlights registry', () => {
     setFindRanges('b', [b1], b1);
     clearFindRanges('a');
     expect(registry.get('vlx-find')?.ranges ?? []).toEqual([]);
-    expect(registry.get('vlx-find-current')?.ranges).toEqual([b1]);
+    const cur = registry.get('vlx-find-current')?.ranges ?? [];
+    expect(cur).toHaveLength(1);
+    expect(cur[0]).toBe(b1);
     clearFindRanges('b');
     expect(registry.has('vlx-find')).toBe(false);
     expect(registry.has('vlx-find-current')).toBe(false);
@@ -67,7 +74,9 @@ describe('findHighlights registry', () => {
     const a2 = range('a2');
     setFindRanges('a', [a1], null);
     setFindRanges('a', [a2], null);
-    expect(registry.get('vlx-find')?.ranges).toEqual([a2]);
+    const all = registry.get('vlx-find')?.ranges ?? [];
+    expect(all).toHaveLength(1);
+    expect(all[0]).toBe(a2);
   });
 
   it('is a no-op where the API is missing', () => {

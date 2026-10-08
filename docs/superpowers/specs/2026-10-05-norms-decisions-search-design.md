@@ -905,13 +905,29 @@ an article, a heading Study Mode hides) is not searched. Labels drawn by CSS are
 not found.
 
 **How it matches.** Case and accents are ignored: «perche» finds «perché», «Perché» and
-«PERCHÉ». Folding works one UTF-16 unit at a time, so every match keeps the offsets of the
+«PERCHÉ». The text is folded one UTF-16 unit at a time, so every match keeps the offsets of the
 original text: a unit is decomposed (NFD), its combining marks dropped and the rest lower-cased,
 and the result is kept only when it is still one unit (otherwise the unit lower-cased, or the
-unit itself: «ß» and astral characters stay as they are; «İ» reads as «i»). The typographic apostrophes (’ ‘ ʼ)
-read as «'», and the no-break and other Unicode spaces as a space, so «dell'articolo» finds
-«dell’articolo». In the query, a run of spaces matches any run of whitespace in the text; the
-query is trimmed at its edges.
+unit itself: «ß» and astral characters stay as they are; «İ» reads as «i»; a lone combining mark
+stays itself). The typographic apostrophes (’ ‘ ʼ), the acute accent «´» and the grave «`» read
+as «'», and the no-break and other Unicode spaces as a space, so «dell'articolo» finds
+«dell’articolo». The query is folded fully (NFD, marks dropped, lower-cased) because its own
+offsets do not matter; in the pattern every query unit may be followed by combining marks, so a
+decomposed «perché» in the text (the Cassazione's PDF is not normalised) is found by «perche»,
+«perché» and «perche no», the mark inside the match, and a decomposed query finds precomposed
+text. A soft hyphen or a zero-width space inside a word of the text is ignored («responsabilita»
+finds «respon­sabilità»). Ligatures (ﬁ, ﬂ, ﬃ) are not matched: they cannot fold one unit to one.
+In the query, a run of spaces matches any run of whitespace in the text; the query is trimmed at
+its edges, and the two-character minimum counts folded base characters (code points after the
+marks are dropped), so one emoji or one accented letter is not enough.
+
+**Where one block ends.** The text nodes of two blocks touch without a space, so the search runs
+over the text nodes joined by one virtual space wherever a block ends and another begins (a
+change of the nearest block-like ancestor: `div`, `p`, `li`, `section`, `article`,
+`blockquote`, `h1`–`h6`, an article's `vlx-b`, a decision's line), at a `<br>`, and wherever a
+hidden subtree was skipped between two nodes. «Fatto diritto» finds «Fatto» and «Diritto» in two
+blocks, and «todi» does not. A virtual space maps to no character: a match never begins or ends
+on one, and its range starts and ends inside real text nodes.
 
 **How it highlights: nothing is added to the page.** The matches are drawn with the browser's
 CSS Custom Highlight API (`CSS.highlights`, `::highlight()`): ranges over the existing text
