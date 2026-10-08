@@ -7,6 +7,7 @@ HTTP requests and responses.
 
 import asyncio
 import json
+import re
 import time
 from collections import defaultdict, deque
 from typing import Dict, Any, List, Optional, Tuple, Union
@@ -26,7 +27,7 @@ from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.tools.sys_op import WebDriverManager
-from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
+from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
 from visualex_api.tools.cache_warmup import warmup_cache_background
@@ -311,7 +312,6 @@ class NormaController:
         if 'article' not in data:
             raise ValidationError("Missing required field: article")
 
-        allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         act_type = data.get('act_type')
         act_number = data.get('act_number')
         norma_date = data.get('date')
@@ -326,21 +326,14 @@ class NormaController:
             tipo_atto_reale = codice_details['tipo_atto_reale']
             # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
 
-        # Process and complete date if needed
-        if act_type in allowed_types:
-            logger.debug("Act type is allowed", extra={"act_type": act_type})
-            data_completa = await complete_date_or_parse_async(
-                date=norma_date,
-                act_type=act_type,
-                act_number=act_number
-            )
-            logger.debug("Completed date parsed", extra={"data_completa": data_completa})
+        # Complete a year-only date (never with another act's day); this server writes
+        # a full ISO date in words ("8 giugno 2001") and keeps a year as it is.
+        data_completa = await complete_request_date(act_type, norma_date, act_number)
+        if data_completa and re.fullmatch(r"\d{4}-\d{2}-\d{2}", data_completa):
             data_completa_estesa = format_date_to_extended(data_completa)
-            logger.debug("Extended date formatted", extra={"data_completa_estesa": data_completa_estesa})
         else:
-            logger.debug("Act type is not in allowed types", extra={"act_type": act_type})
-            data_completa_estesa = norma_date
-            logger.debug("Using provided date", extra={"data_completa_estesa": data_completa_estesa})
+            data_completa_estesa = data_completa
+        logger.debug("Using date", extra={"data_completa_estesa": data_completa_estesa})
 
         # Create Norma instance
         norma = Norma(

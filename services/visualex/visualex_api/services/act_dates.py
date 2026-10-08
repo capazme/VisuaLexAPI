@@ -1,12 +1,15 @@
 # services/visualex/visualex_api/services/act_dates.py
 """Completes the date of acts cited by year only (`urn:nir:stato:legge:1983;184`).
 
-The Massimario portal links acts the way Normattiva resolves them, often with
-the year alone; the graph and VisuaLex key acts by their full date. Normattiva's
-resolver answers a year-only URN with the act's page, whose title carries the
-type, the date and the number ("LEGGE 4 maggio 1983, n. 184 - Normattiva"). One
-plain request per act: no browser, unlike `complete_date` in urngenerator, which
-drives Playwright.
+Two callers: a search that names an act by its year («d.lgs. 231/2001»), through
+`complete_year`, and the Massimario portal, which links acts the way Normattiva
+resolves them, often with the year alone (`resolve_many`, MERL-T); the graph and
+VisuaLex key acts by their full date. Normattiva's resolver answers a year-only
+URN with the act's page, whose title carries the type, the date and the number
+("LEGGE 4 maggio 1983, n. 184 - Normattiva"). One plain request per act, no
+browser. It replaced `complete_date` (urngenerator, 9 October 2026), which typed
+the act into the portal's search with Playwright and took the first hit without
+reading it: d.lgs. 231/2001 came back dated 2025-12-31, another act's day.
 
 The resolver does not check what it is asked: a regional law's URN comes back
 as the page of the State's act with the same year and number. So only State
@@ -17,6 +20,7 @@ transient error page.
 """
 from __future__ import annotations
 
+import asyncio
 import html
 import re
 import time
@@ -27,6 +31,7 @@ import structlog
 
 from ..tools.cache_manager import get_cache_manager
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
+from ..tools.text_op import normalize_act_type
 from .http_client import http_client
 from .massimario_portal import USER_AGENT
 
@@ -37,6 +42,9 @@ MAX_URNS = 20
 # The caller (MERL-T) waits at most 180 s for a batch: stop starting new requests at 120,
 # and let each act cost one retry at most (two attempts plus one back-off).
 BATCH_BUDGET = 120.0
+# A search waits for its act's date at most this long, then goes on with the year.
+LOOKUP_BUDGET = 15.0
+_FULL_DATE = re.compile(r":([0-9]{4}-[0-9]{2}-[0-9]{2});")
 _YEAR_ONLY = re.compile(r"urn:nir:([a-z.]{1,60}):([a-z.]{1,60}):([0-9]{4});([0-9]{1,6})", re.ASCII)
 _MESI = {
     "gennaio": 1, "febbraio": 2, "marzo": 3, "aprile": 4, "maggio": 5, "giugno": 6,
@@ -139,3 +147,24 @@ async def resolve_many(urns) -> dict[str, Optional[str]]:
             log.warning("act_dates.network_error", urn=urn, status=exc.status_code, error=str(exc))
             resolved[urn] = None
     return resolved
+
+
+async def complete_year(act_type: str, year: str, act_number) -> str:
+    """The ISO date of the State act of that type, year and number, or the year itself.
+
+    The year stands whenever the act cannot be told for certain: a kind the titles do
+    not cover, a number that is not plain digits, no page, a page of another act, a
+    network failure, a lookup past LOOKUP_BUDGET seconds. Never another act's date.
+    """
+    kind = normalize_act_type(act_type).strip().lower().replace(" ", ".")
+    number = str(act_number or "").strip()
+    if kind not in _TITLES or not number.isdigit() or not re.fullmatch(r"[0-9]{4}", year):
+        return year
+    urn = f"urn:nir:stato:{kind}:{year};{int(number)}"
+    try:
+        full = await asyncio.wait_for(_resolve_one(urn), LOOKUP_BUDGET)
+    except Exception as exc:  # the search goes on with the year; the reason is logged
+        log.warning("act_dates.lookup_failed", urn=urn, error=f"{type(exc).__name__}: {exc}")
+        return year
+    found = _FULL_DATE.search(full or "")
+    return found.group(1) if found else year

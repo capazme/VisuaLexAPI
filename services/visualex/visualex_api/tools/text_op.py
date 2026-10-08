@@ -292,29 +292,6 @@ def normalize_act_type(input_type, search=False, source='normattiva'):
     logging.debug(f"Normalized act type: {normalized_type}")
     return normalized_type
 
-def estrai_data_da_denominazione(denominazione):
-    """
-    Extracts a date from a denomination string.
-    
-    Arguments:
-    denominazione -- The input string containing a date
-    
-    Returns:
-    str -- The extracted date or the original denomination if no date is found
-    """
-    logging.debug(f"Extracting date from denomination")
-    
-    pattern = r"\b(\d{1,2})\s([Gg]ennaio|[Ff]ebbraio|[Mm]arzo|[Aa]prile|[Mm]aggio|[Gg]iugno|[Ll]uglio|[Aa]gosto|[Ss]ettembre|[Oo]ttobre|[Nn]ovembre|[Dd]icembre)\s(\d{4})\b"
-    match = re.search(pattern, denominazione)
-    
-    if match:
-        extracted_date = match.group(0)
-        logging.debug(f"Extracted date: {extracted_date}")
-        return extracted_date
-    
-    logging.debug("No date found in denomination")
-    return denominazione
-
 def estrai_numero_da_estensione(estensione):
     """
     Extracts the corresponding number from an extension (e.g., 'bis', 'tris').
