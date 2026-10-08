@@ -38,6 +38,8 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   'art. 40 preleggi': { parsed: { act_type: 'preleggi', article: '40' }, recognized: true },
   'art. 12 preleggi': { parsed: { act_type: 'preleggi', article: '12' }, recognized: true },
   'art. 99 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', article: '99' }, recognized: true },
+  'art. 22 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', article: '22' }, recognized: true },
+  'art. 35 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', article: '35' }, recognized: true },
   'art. 3 l. 241/1990': { parsed: { act_type: 'legge', act_number: '241', date: '1990', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
   'art. 3 l. 247/2012': { parsed: { act_type: 'legge', act_number: '247', date: '2012', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
   'art. 3 l. 49/2023': { parsed: { act_type: 'legge', act_number: '49', date: '2023', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
@@ -51,7 +53,8 @@ const lawUrl = (number: string) => `https://www.normattiva.it/uri-res/N2Ls?urn:n
 const GDPR_5 = {
   allegato: null, data: '2016-04-27', data_versione: null, numero_articolo: '5', numero_atto: '679',
   tipo_atto: 'regolamento UE', url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita',
-  urn: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita~art5', versione: null,
+  // The real API gives an EU article the urn of its act, with no `~art<N>` (generate_urn returns early for EUR-Lex).
+  urn: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita', versione: null,
 };
 
 const calls: Record<string, number> = {};
@@ -85,7 +88,7 @@ function stubPythonApi() {
     count('/fetch_norma_data');
     const f = forced('/fetch_norma_data');
     if (f) return f;
-    if (body.act_type === 'regolamento UE') return [200, { norma_data: [{ ...GDPR_5, numero_articolo: body.article, urn: `${GDPR_5.url}~art${body.article}` }] }];
+    if (body.act_type === 'regolamento UE') return [200, { norma_data: [{ ...GDPR_5, numero_articolo: body.article, urn: GDPR_5.url }] }];
     if (body.act_type === 'legge' && !body.act_number) {
       return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: null, numero_atto: null, allegato: null,
         url: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None', urn: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:None;None~art2' }] }];
@@ -263,6 +266,14 @@ describe('POST /api/dossiers/:id/norms', () => {
     const second = await addNorms(alice, dossierId, ['art. 2043 c.c.']);
     expect(second.body.results[0].outcome).toBe('already_present');
     expect(await prisma.dossierItem.count()).toBe(1);
+  });
+
+  it('tells apart the articles of one EU act, whose urn is the act\'s', async () => {
+    const first = await addNorms(alice, dossierId, ['art. 5 gdpr', 'art. 5 gdpr']);
+    expect(first.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['added', 'already_present']);
+    const second = await addNorms(alice, dossierId, ['art. 5 gdpr', 'art. 22 gdpr', 'art. 35 gdpr']);
+    expect(second.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['already_present', 'added', 'added']);
+    expect(await prisma.dossierItem.count()).toBe(3);
   });
 
   it('says the sources are unavailable, and saves nothing unchecked', async () => {
