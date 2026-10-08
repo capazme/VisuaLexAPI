@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import type { Annotation, Dossier, Highlight, CustomAlias, QuickNorm } from '../../../types';
 import type { EnvironmentCategory } from '../../../types';
@@ -48,9 +48,6 @@ export function CreateEnvironmentModal({
   const [version, setVersion] = useState('');
   const [category, setCategory] = useState<EnvironmentCategory>('other');
   const [includeContent, setIncludeContent] = useState(true);
-  // The submit waits for the decisions' current texts: one click is one environment.
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const submitting = useRef(false);
 
   // Create environment representation of current state
   const currentAsEnv = {
@@ -83,30 +80,23 @@ export function CreateEnvironmentModal({
     currentState.annotations.length > 0 ||
     currentState.highlights.length > 0;
 
-  const handleSubmit = async () => {
-    if (!name.trim() || submitting.current) return;
-    submitting.current = true;
-    setIsSubmitting(true);
-    try {
-      // A private save keeps every anchor, decisions included (spec §8.6): only an export, a link or the Forum filter.
-      const selectionToUse = includeContent && selectedCount > 0 ? selection : null;
-      onCreate(name.trim(), selectionToUse, {
-        description: description.trim() || undefined,
-        author: author.trim() || undefined,
-        version: version.trim() || undefined,
-        category
-      });
-      setName('');
-      setDescription('');
-      setAuthor('');
-      setVersion('');
-      setCategory('other');
-      setIncludeContent(true);
-      setSelection(createFullSelection(currentAsEnv));
-    } finally {
-      submitting.current = false;
-      setIsSubmitting(false);
-    }
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    // A private save keeps every anchor, decisions included (spec §8.6): only an export, a link or the Forum filter.
+    const selectionToUse = includeContent && selectedCount > 0 ? selection : null;
+    onCreate(name.trim(), selectionToUse, {
+      description: description.trim() || undefined,
+      author: author.trim() || undefined,
+      version: version.trim() || undefined,
+      category
+    });
+    setName('');
+    setDescription('');
+    setAuthor('');
+    setVersion('');
+    setCategory('other');
+    setIncludeContent(true);
+    setSelection(createFullSelection(currentAsEnv));
   };
 
   const toggleSelectAll = () => {
@@ -256,7 +246,7 @@ export function CreateEnvironmentModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!name.trim() || isSubmitting}
+            disabled={!name.trim()}
             className="flex-1 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-lg transition-colors disabled:cursor-not-allowed min-h-[44px]"
           >
             Crea {includeContent && selectedCount > 0 && `(${selectedCount} elementi)`}

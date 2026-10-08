@@ -844,11 +844,16 @@ PDF (`DossierDetailView`), with the same typeface and margins:
 - the notices, if any (as on screen, with `describeNotice`);
 - the text in its blocks («Epigrafe», «Motivazione», «Dispositivo», or «Testo»)
   and paragraphs, the characters of the screen;
-- at the foot of the last page: «Fonte: <source name> · consultata il <day>»
+- at the foot of every page: «Fonte: <source name> · consultata il <day>»
   (the day the text was read, `todayInRome`), and, for the Corte
   costituzionale only, «· licenza <licence of the source>» (e.g. CC BY-SA 3.0)
   after the source name (the owner, 8 Oct, superseding the earlier «no
   licence line»); the Cassazione's PDF and the page carry none;
+- for the Corte costituzionale only, a closing line after the text on its own,
+  not in the 8-pt footer: «Dati aperti della Corte costituzionale, licenza
+  CC BY-SA 3.0 — https://creativecommons.org/licenses/by-sa/3.0/» (the name
+  from `fonte.licenza`, the address from a small table of known licences; no
+  line when the licence is not in it);
 - an option «Con le mie evidenziazioni e note»: highlights printed as marked
   passages, notes after the paragraph they anchor to, the unmatched ones of
   §8.4 listed at the end under their heading.
@@ -974,5 +979,8 @@ senso che l'admin può rimetterlo in chiaro)»; 7 «sì».
 - Norms by topic: a VisuaLex glossary from Brocardi's dictionary (§6), or MERL-T's concept layer.
 - Notes and highlights in the dossier's decision reader (dossier PR 3).
 - **Before VisuaLex opens to the public** (the owner, 8 October): the server checks the words a
-  court withdrew when an environment is published to the Forum or shared by link. Today the check
-  is the web client's (§8.6) and the server stores that content as it receives it.
+  court withdrew. Today the check is the web client's (§8.6) and the server stores content as it
+  receives it; it is to check them when an environment is published or updated on the Forum and
+  when a suggestion is stored or taken. A share link is built in the browser (the environment
+  encoded in the URL) and never reaches the server: before the opening it either becomes
+  server-held (and so checked) or stays checked by the client only. That choice is the owner's.

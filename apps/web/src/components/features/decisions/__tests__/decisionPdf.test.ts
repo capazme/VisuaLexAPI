@@ -34,8 +34,12 @@ describe('decisionPdfModel', () => {
     const cc = { ...FOUND, identita: { corte: 'corte_costituzionale', numero: 71, anno: 2020 }, fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'CC BY-SA 3.0' } };
     const m = decisionPdfModel(cc as never, { consultedOn: '2026-10-05' });
     expect(m.footer).toBe('Fonte: Corte costituzionale — dati aperti · licenza CC BY-SA 3.0 · consultata il 5 ottobre 2026');
+    expect(m.licenceLine).toBe('Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0 — https://creativecommons.org/licenses/by-sa/3.0/');
+    const unknown = { ...cc, fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'Altra 1.0' } };
+    expect(decisionPdfModel(unknown as never, { consultedOn: '2026-10-05' }).licenceLine).toBeNull();
     const ccNoLicence = { ...cc, fonte: { nome: 'Corte costituzionale — dati aperti' } };
     expect(decisionPdfModel(ccNoLicence as never, { consultedOn: '2026-10-05' }).footer).not.toMatch(/licenza/);
+    expect(decisionPdfModel(ccNoLicence as never, { consultedOn: '2026-10-05' }).licenceLine).toBeNull();
     const cass = { ...FOUND, fonte: { ...FOUND.fonte, licenza: 'x' } };
     expect(JSON.stringify(decisionPdfModel(cass as never, { consultedOn: '2026-10-05' }))).not.toMatch(/licenz/i);
   });

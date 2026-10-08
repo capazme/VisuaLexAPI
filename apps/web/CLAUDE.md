@@ -232,7 +232,9 @@ over the same projection; free notes follow the text; anchors that no longer lan
 «Non ritrovate nel testo attuale», switchable with the `includeUnmatched` option of
 `decisionPdfModel`); «PDF originale della Corte», for the Cassazione only, is the court's own file
 through `/fetch_decision_pdf` (`services/decisionPdfService.ts`, via `legalFetch`). The footer of
-the Corte costituzionale's PDF adds «· licenza <fonte.licenza>» (e.g. CC BY-SA 3.0); the
+the Corte costituzionale's PDF adds «· licenza <fonte.licenza>» (e.g. CC BY-SA 3.0), and the text ends with its
+own line «Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0 — <licence address>» (`licenceLine`; the
+address from a small table, no line for an unknown licence); the
 Cassazione's PDF and the page (`DecisionView` footer) carry no licence line (the owner, 8 Oct 2026).
 
 **A past text is a reading** (round "Testo alla data", spec

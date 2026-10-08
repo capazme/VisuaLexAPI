@@ -24,12 +24,13 @@ describe('CreateEnvironmentModal: a private save keeps every anchor', () => {
         currentState={{ dossiers: [], quickNorms: [], customAliases: [], annotations: [decisionNote, articleNote], highlights: [decisionHighlight, articleHighlight] }}
       />,
     );
-    expect(screen.queryByText(/non incluse/)).toBeNull();
     fireEvent.change(screen.getByPlaceholderText(/DPO Compliance/), { target: { value: 'Prova' } });
     fireEvent.click(screen.getByRole('button', { name: /^Crea/ }));
     await vi.waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
     const selection = onCreate.mock.calls[0][1];
     expect(selection.annotationIds).toEqual(['n-dec', 'n-art']);
+    expect(screen.queryByText(/non incluse/)).toBeNull();
+    expect(fetchDecisionCached).not.toHaveBeenCalled();
     expect(selection.highlightIds).toEqual(['h-dec', 'h-art']);
   });
 });

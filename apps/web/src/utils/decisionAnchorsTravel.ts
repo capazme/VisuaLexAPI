@@ -1,5 +1,5 @@
 /**
- * Which notes and highlights may leave the user's account (an environment, a file, the Forum). On
+ * Which notes and highlights may leave the user's account (an environment's file or share link, the Forum). On
  * a decision, only those whose words are still in its current text: VisuaLex never spreads words a
  * court has withdrawn (design 2026-10-05 §8.6, the owner's caution). A decision that cannot be
  * fetched now sends nothing on trust. A free note (no anchor) quotes no words of the court and

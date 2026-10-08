@@ -56,4 +56,12 @@ describe('environments: a private save keeps every anchor (owner, 8 Oct)', () =>
     expect(sent('update').annotations.map((a) => a.id)).toEqual(['n-dec', 'n-art']);
     expect(sent('update').highlights.map((h) => h.id)).toEqual(['h-dec', 'h-art']);
   });
+
+  it('refreshEnvironmentFromCurrent keeps every anchor', async () => {
+    appStore.setState({ environments: [{ id: 'e1', name: 'A', createdAt: '', dossiers: [], quickNorms: [], customAliases: [], annotations: [], highlights: [] }] as never });
+    await appStore.getState().refreshEnvironmentFromCurrent('e1');
+    expect(sent('update').annotations.map((a) => a.id)).toEqual(['n-dec', 'n-art']);
+    expect(sent('update').highlights.map((h) => h.id)).toEqual(['h-dec', 'h-art']);
+    expect(fetchDecisionCached).not.toHaveBeenCalled();
+  });
 });

@@ -3,7 +3,7 @@
  * and how it is drawn (`writeDecisionPdf`). The reader's highlights and notes are optional. They
  * are placed with the same `resolveAnchors` over the same projection the reading surface uses
  * (root rule 23), so a mark lands in the PDF exactly where it lands on screen; those that do not
- * land are listed at the end, never dropped. The Corte costituzionale's PDF carries its licence in the footer (owner, 8 Oct
+ * land are listed at the end, never dropped. The Corte costituzionale's PDF carries its licence in the footer and in a closing line (owner, 8 Oct
  * 2026); the Cassazione's PDF and the page do not.
  */
 import { jsPDF } from 'jspdf';
@@ -37,6 +37,8 @@ export interface DecisionPdfModel {
   freeNotes: string[];
   /** Anchors that no longer land in the text, as quoted passages. */
   unmatched: string[];
+  /** The Corte costituzionale's attribution line (open data under a known licence), at the end of the text; null otherwise. */
+  licenceLine: string | null;
   footer: string;
   fileName: string;
 }
@@ -84,6 +86,11 @@ export function decisionFileName(identity: DecisionIdentity, attributes: Decisio
   return `${formatDecisionShort({ ...identity, sezione: attributes.sezione }).replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')}.pdf`;
 }
 
+/** The licences the Corte costituzionale's open data are published under, with the licence's own page. */
+const LICENCE_URIS: Record<string, string> = {
+  'CC BY-SA 3.0': 'https://creativecommons.org/licenses/by-sa/3.0/',
+};
+
 export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOptions): DecisionPdfModel {
   const { annotations, consultedOn, includeUnmatched = true } = options;
   const { identita, attributi, testo } = answer;
@@ -116,6 +123,9 @@ export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOpti
 
   const licence = identita.corte === 'corte_costituzionale' && answer.fonte.licenza ? ` · licenza ${answer.fonte.licenza}` : '';
 
+  const licenceUri = identita.corte === 'corte_costituzionale' && answer.fonte.licenza ? LICENCE_URIS[answer.fonte.licenza] : undefined;
+  const licenceLine = licenceUri ? `Dati aperti della Corte costituzionale, licenza ${answer.fonte.licenza} — ${licenceUri}` : null;
+
   const lost = annotations && includeUnmatched ? unmatchedAnchors(testo, highlights, notes) : { highlights: [], annotations: [] };
   const unmatched = [
     ...lost.highlights.map((h) => `«${h.text}»`),
@@ -129,6 +139,7 @@ export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOpti
     blocks,
     freeNotes: annotations ? notes.filter((n) => !isAnchoredNote(n)).map((n) => n.text) : [],
     unmatched,
+    licenceLine,
     footer: `Fonte: ${answer.fonte.nome}${licence} · consultata ${withPreposition('il', formatDateItalianLong(consultedOn))}`,
     fileName: decisionFileName(identita, attributi),
   };
@@ -206,6 +217,12 @@ export function writeDecisionPdf(model: DecisionPdfModel): jsPDF {
     w.y += 10;
     w.write('Non ritrovate nel testo attuale', 11, 'bold', 16);
     model.unmatched.forEach((item) => w.write(item, 9, 'normal', 12, true));
+  }
+
+  if (model.licenceLine) {
+    w.ensureSpace(48);
+    w.y += 14;
+    w.write(model.licenceLine, 9, 'italic', 12, true);
   }
 
   w.footer();
