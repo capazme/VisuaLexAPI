@@ -6,6 +6,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../types';
 import { articleDiscussionService, type DiscussionAnchor } from '../../../services/articleDiscussionService';
 import { cn } from '../../../lib/utils';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface Props {
   anchor: DiscussionAnchor;
@@ -40,6 +41,12 @@ interface Props {
   onThreadCreated?: (thread: ArticleDiscussionThread) => void;
   /** Scroll the text to a discussion's passage. */
   onGoToPassage?: (threadId: string) => void;
+  /**
+   * The caller's policy for a passage that no longer locates in the text on screen:
+   * when true, its quotation is withheld from every reader but the thread's author and
+   * the admins, until an admin releases it. Off by default: an article keeps showing it.
+   */
+  withholdDetachedPassage?: boolean;
 }
 
 export function ArticleDiscussionPanel({
@@ -61,7 +68,9 @@ export function ArticleDiscussionPanel({
   onDraftConsumed,
   onThreadCreated,
   onGoToPassage,
+  withholdDetachedPassage = false,
 }: Props) {
+  const { isAdmin } = useAuth();
   // Keyed on the fields, not on the object: a caller may build the anchor inline.
   const { normaKey, articleId, articleLabel, version } = anchorProp;
   const anchor = useMemo(
@@ -235,6 +244,19 @@ export function ArticleDiscussionPanel({
     }
   };
 
+  // Admin only, optimistic: flip `passageReleased` at once, put it back if the server refuses.
+  const setPassageReleased = async (threadId: string, released: boolean) => {
+    const patch = (value: boolean) =>
+      setThreads(prev => prev.map(item => item.id === threadId ? { ...item, passageReleased: value } : item));
+    patch(released);
+    try {
+      await articleDiscussionService.setPassageReleased(threadId, released);
+    } catch {
+      patch(!released);
+      setError('Impossibile aggiornare la visibilità del passo. Riprova.');
+    }
+  };
+
   const voteComment = async (threadId: string, commentId: string) => {
     try {
       const result = await articleDiscussionService.voteComment(commentId);
@@ -367,9 +389,18 @@ export function ArticleDiscussionPanel({
               Boolean(textHash) &&
               thread.textHash !== textHash;
 
+            // The rule lives here, not in the API: the server still returns the stored
+            // quotation to everyone (spec §8.7's stated limit), and this panel withholds it
+            // from readers who are neither the author nor an admin, unless an admin released it.
+            // The caller decides whether it applies (a decision does, an article does not).
+            const isPrivileged = thread.isOwner || isAdmin;
+            const quoteWithheld = withholdDetachedPassage && isDetached && !isPrivileged && !thread.passageReleased;
+            const canRelease = withholdDetachedPassage && isDetached && isAdmin;
+            const shownQuote = passage && !quoteWithheld ? truncateQuote(passage.quote) : null;
+
             const headingText =
               passage && !thread.title.trim()
-                ? `«${truncateQuote(passage.quote)}»`
+                ? (shownQuote !== null ? `«${shownQuote}»` : 'Discussione su un passo non più nel testo')
                 : thread.title;
 
             return (
@@ -388,9 +419,9 @@ export function ArticleDiscussionPanel({
                       <h4 className="font-semibold text-slate-900 dark:text-white">
                         {headingText}
                       </h4>
-                      {passage && thread.title.trim() && (
+                      {passage && thread.title.trim() && shownQuote !== null && (
                         <span className="mt-0.5 block text-xs italic text-slate-600 dark:text-slate-300">
-                          Sul passo «{truncateQuote(passage.quote)}»
+                          Sul passo «{shownQuote}»
                         </span>
                       )}
                       <span className="mt-1 block text-xs text-slate-400">
@@ -414,12 +445,36 @@ export function ArticleDiscussionPanel({
                     role="note"
                     className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
                   >
-                    <p className="font-medium">
-                      Il passo discusso non si trova nel testo che stai leggendo.
-                    </p>
-                    <p className="mt-1 italic">
-                      «{thread.passage?.quote}»
-                    </p>
+                    {quoteWithheld ? (
+                      <p className="font-medium">Il passo citato non è più nel testo della decisione</p>
+                    ) : (
+                      <>
+                        <p className="font-medium">
+                          {withholdDetachedPassage
+                            ? 'Il passo citato non è più nel testo della decisione.'
+                            : 'Il passo discusso non si trova nel testo che stai leggendo.'}
+                        </p>
+                        <p className="mt-1 italic">
+                          «{thread.passage?.quote}»
+                        </p>
+                        {withholdDetachedPassage && (
+                          <p className="mt-1">
+                            {thread.passageReleased
+                              ? 'Le parole sono visibili a tutti.'
+                              : 'Le parole sono visibili solo all’autore e agli amministratori.'}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {canRelease && (
+                      <button
+                        type="button"
+                        onClick={() => void setPassageReleased(thread.id, !thread.passageReleased)}
+                        className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-amber-300 px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                      >
+                        {thread.passageReleased ? 'Nascondi di nuovo' : 'Mostra a tutti'}
+                      </button>
+                    )}
                   </div>
                 )}
 

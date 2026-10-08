@@ -4,6 +4,9 @@ import { ArticleDiscussionPanel } from '../ArticleDiscussionPanel';
 import { articleDiscussionService } from '../../../../services/articleDiscussionService';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../../types';
 
+const authState = vi.hoisted(() => ({ isAdmin: false }));
+vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: authState.isAdmin }) }));
+
 vi.mock('../../../../services/articleDiscussionService', () => ({
   articleDiscussionService: {
     list: vi.fn(),
@@ -12,6 +15,7 @@ vi.mock('../../../../services/articleDiscussionService', () => ({
     report: vi.fn(),
     voteThread: vi.fn(),
     voteComment: vi.fn(),
+    setPassageReleased: vi.fn(),
   },
 }));
 
@@ -69,6 +73,7 @@ describe('ArticleDiscussionPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    authState.isAdmin = false;
     vi.mocked(articleDiscussionService.list).mockResolvedValue({
       data: [dummyThread],
       pagination: { page: 1, limit: 20, total: 1, pages: 1 },
@@ -439,6 +444,92 @@ describe('ArticleDiscussionPanel', () => {
       rerender(ui({ ...decisionAnchor }));
       rerender(ui({ ...decisionAnchor }));
       expect(articleDiscussionService.list).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('a withdrawn passage (withholdDetachedPassage)', () => {
+    const decisionAnchor = { normaKey: 'cassazione:civile:99999:2024', articleId: '' };
+    const detachedStates = { 'thread-p': 'detached' as const };
+    const decisionThread = (over: Partial<ArticleDiscussionThread> = {}): ArticleDiscussionThread => ({
+      ...dummyPassageThread,
+      normaKey: decisionAnchor.normaKey,
+      articleId: '',
+      target: { kind: 'decision', key: decisionAnchor.normaKey },
+      ...over,
+    });
+    const WITHHELD = 'Il passo citato non è più nel testo della decisione';
+
+    const renderPanel = async (thread: ArticleDiscussionThread, withhold = true) => {
+      vi.mocked(articleDiscussionService.list).mockResolvedValue({
+        data: [thread],
+        pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+      });
+      render(
+        <ArticleDiscussionPanel
+          anchor={decisionAnchor}
+          isOpen={true}
+          onClose={vi.fn()}
+          passageStates={detachedStates}
+          withholdDetachedPassage={withhold}
+        />,
+      );
+      await screen.findByText('Discussione sul risarcimento');
+    };
+
+    it('shows another reader the sentence, not the quotation', async () => {
+      await renderPanel(decisionThread());
+      expect(screen.getByText(WITHHELD)).toBeInTheDocument();
+      expect(screen.queryAllByText(/risarcimento del danno/)).toHaveLength(0);
+      expect(screen.queryByRole('button', { name: 'Mostra a tutti' })).not.toBeInTheDocument();
+    });
+
+    it('shows the author the quotation with a notice', async () => {
+      await renderPanel(decisionThread({ isOwner: true }));
+      expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/visibili solo all’autore e agli amministratori/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Mostra a tutti' })).not.toBeInTheDocument();
+    });
+
+    it('shows an admin the quotation with a notice and the release button', async () => {
+      authState.isAdmin = true;
+      await renderPanel(decisionThread());
+      expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/visibili solo all’autore e agli amministratori/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mostra a tutti' })).toHaveClass('min-h-[44px]');
+    });
+
+    it('shows everyone the quotation once released', async () => {
+      await renderPanel(decisionThread({ passageReleased: true }));
+      expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/visibili a tutti/)).toBeInTheDocument();
+    });
+
+    it('lets an admin release and hide again, optimistically', async () => {
+      authState.isAdmin = true;
+      vi.mocked(articleDiscussionService.setPassageReleased).mockResolvedValue({ passageReleased: true });
+      await renderPanel(decisionThread());
+      fireEvent.click(screen.getByRole('button', { name: 'Mostra a tutti' }));
+      expect(await screen.findByRole('button', { name: 'Nascondi di nuovo' })).toBeInTheDocument();
+      expect(articleDiscussionService.setPassageReleased).toHaveBeenCalledWith('thread-p', true);
+      fireEvent.click(screen.getByRole('button', { name: 'Nascondi di nuovo' }));
+      expect(await screen.findByRole('button', { name: 'Mostra a tutti' })).toBeInTheDocument();
+      expect(articleDiscussionService.setPassageReleased).toHaveBeenLastCalledWith('thread-p', false);
+    });
+
+    it('reverts and says so when the server refuses', async () => {
+      authState.isAdmin = true;
+      vi.mocked(articleDiscussionService.setPassageReleased).mockRejectedValue(new Error('boom'));
+      await renderPanel(decisionThread());
+      fireEvent.click(screen.getByRole('button', { name: 'Mostra a tutti' }));
+      expect(await screen.findByText(/Impossibile aggiornare la visibilità del passo/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mostra a tutti' })).toBeInTheDocument();
+    });
+
+    it('leaves an article\'s detached passage unchanged', async () => {
+      await renderPanel({ ...dummyPassageThread }, false);
+      expect(screen.getByText('Il passo discusso non si trova nel testo che stai leggendo.')).toBeInTheDocument();
+      expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+      expect(screen.queryByText(WITHHELD)).not.toBeInTheDocument();
     });
   });
 });

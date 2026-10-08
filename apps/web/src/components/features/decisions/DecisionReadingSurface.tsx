@@ -339,6 +339,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         passageThreadsLoading={passageThreadsLoading}
         onRetryPassageLoad={reloadPassageThreads}
         passageStates={passageStates}
+        withholdDetachedPassage
         focusThreadId={discussionFocus}
         onFocusThread={setFocusedThreadId}
         draft={discussionDraft}

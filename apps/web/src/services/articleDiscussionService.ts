@@ -71,4 +71,9 @@ export const articleDiscussionService = {
   async report(threadId: string, reason: string, details?: string): Promise<void> {
     await apiClient.post(`/article-discussions/${threadId}/report`, { reason, details });
   },
+  /** Admin only: release (or withdraw again) a decision thread's withdrawn quotation. */
+  async setPassageReleased(threadId: string, passageReleased: boolean): Promise<{ passageReleased: boolean }> {
+    const response = await apiClient.patch(`/admin/article-discussions/${threadId}`, { passageReleased });
+    return response.data;
+  },
 };
