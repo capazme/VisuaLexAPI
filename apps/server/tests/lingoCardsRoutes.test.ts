@@ -448,6 +448,25 @@ describe('the study-card routes', () => {
       expect(await prisma.lingoCard.count({ where: { id: { in: [id, bobs] } } })).toBe(2);
     });
 
+    it('refuses an id with a NUL byte instead of failing in the database', async () => {
+      expect((await trash(authHeader(alice), ['ab\u0000c'])).status).toBe(400);
+    });
+
+    it('stores the card as an edit in flight left it: the deletion waits for the edit’s lock', async () => {
+      const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      let deletion: Promise<{ status: number }> | undefined;
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id = ${id} FOR UPDATE`;
+        deletion = trash(authHeader(alice), [id]).then((response) => response);
+        // Long enough for a deletion that does not wait to have read the card.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        await tx.lingoCard.update({ where: { id }, data: { domanda: 'Domanda dopo la modifica?' } });
+      });
+      expect((await deletion!).status).toBe(200);
+      const entry = await prisma.trashEntry.findFirstOrThrow();
+      expect((entry.payload as { cards: { domanda: string }[] }).cards[0].domanda).toBe('Domanda dopo la modifica?');
+    });
+
     it('is restored with its anchors', async () => {
       const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
       const before = await prisma.lingoCard.findUniqueOrThrow({ where: { id }, include: { ancore: { orderBy: { articleId: 'asc' } } } });
@@ -489,6 +508,11 @@ describe('the study-card routes', () => {
       const response = await patch(authHeader(alice), id, { ...NEW_CARD, istituto: 'Altro istituto' });
       expect(response.body.origine).toEqual({ clientName: 'Claude Code' });
       expect(await read(id)).toMatchObject({ createdByClientId: 'client-x', createdByClientName: 'Claude Code', istituto: 'Altro istituto' });
+    });
+
+    it('answers 404 for an id with a NUL byte, as it does when reading', async () => {
+      expect((await patch(authHeader(alice), 'ab%00c', NEW_CARD)).status).toBe(404);
+      expect((await request(app).get('/api/lingo/cards/ab%00c').set(authHeader(alice))).status).toBe(404);
     });
 
     it('answers 404 for another user’s card and changes nothing', async () => {
@@ -571,6 +595,7 @@ describe('the study-card routes', () => {
       expect((await ofArticle(authHeader(alice), '')).status).toBe(400);
       expect((await ofArticle(authHeader(alice), 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita')).status).toBe(400);
       expect((await ofArticle(authHeader(alice), 'a'.repeat(601))).status).toBe(400);
+      expect((await ofArticle(authHeader(alice), 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art14\u000053')).status).toBe(400);
     });
 
     it('is not reachable by an exchanged token', async () => {

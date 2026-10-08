@@ -193,6 +193,9 @@ export async function trashLingoCards(
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
     const wanted = [...new Set(cardIds)];
+    // Lock the rows first, in id order: an edit in flight (PATCH) finishes before the payload is read, and one
+    // that comes after waits, then finds no card.
+    await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id IN (${Prisma.join(wanted)}) AND autore_id = ${userId} ORDER BY id FOR UPDATE`;
     const cards = await tx.lingoCard.findMany({ where: { id: { in: wanted }, autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } });
     const movable = cards.filter((card) => PERSONAL_STATES.includes(card.stato));
     const moved = movable.map((card) => card.id);

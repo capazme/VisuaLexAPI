@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createLingoCard } from '../lingo/cards';
+import { hasNoNul } from '../lingo/noNul';
 import { cardInputSchema, planCards } from '../lingo/planCards';
 import { serialize } from '../lingo/serializeCard';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
@@ -25,6 +26,8 @@ import { trashLingoCards } from '../trash/trash';
  */
 const router = Router();
 router.use(authenticate);
+// An id with a NUL byte names no card (and would be a 500 in the database).
+router.param('id', (_req, _res, next, id: string) => next(hasNoNul(id) ? undefined : new AppError(404, 'Scheda non trovata.')));
 
 export const MAX_CARDS_PER_CALL = 10;
 /** Distinct anchor references checked against the sources in one call, as a cost cap (each one is fetched). */
@@ -41,14 +44,13 @@ const listSchema = z.object({
   stato: z.nativeEnum(LingoCardStato).optional(),
   tipo: z.nativeEnum(LingoCardTipo).optional(),
   normaKey: z.string().max(100).regex(/^[a-z0-9]+(_[a-z0-9]+)*$/).optional(),
-  // Postgres text cannot hold a NUL byte: it would answer 500.
-  q: z.string().trim().min(1).max(100).refine((text) => !text.includes('\u0000'), { message: 'Il testo contiene un carattere non valido.' }).optional(),
+  q: z.string().trim().min(1).max(100).refine(hasNoNul, { message: 'Il testo contiene un carattere non valido.' }).optional(),
   origine: z.literal('applicazione').optional(),
   ordine: z.enum(['recenti', 'materia']).default('recenti'),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).max(100000).default(0),
 });
-const trashSchema = z.object({ cardIds: z.array(z.string().min(1).max(64)).min(1).max(MAX_CARDS_PER_CALL) }).strict();
+const trashSchema = z.object({ cardIds: z.array(z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' })).min(1).max(MAX_CARDS_PER_CALL) }).strict();
 
 router.post('/', async (req, res) => {
   const { cards } = createSchema.parse(req.body);

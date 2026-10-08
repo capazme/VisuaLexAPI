@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { anchorUrn } from '../lingo/anchors';
+import { hasNoNul } from '../lingo/noNul';
 import { serialize } from '../lingo/serializeCard';
 
 /**
@@ -17,7 +18,7 @@ import { serialize } from '../lingo/serializeCard';
 const router = Router();
 router.use(authenticate);
 
-const querySchema = z.object({ urn: z.string().min(1).max(600) });
+const querySchema = z.object({ urn: z.string().min(1).max(600).refine(hasNoNul, { message: 'Indirizzo dell’articolo non valido.' }) });
 
 router.get('/', async (req, res) => {
   const urn = anchorUrn(querySchema.parse(req.query).urn);
