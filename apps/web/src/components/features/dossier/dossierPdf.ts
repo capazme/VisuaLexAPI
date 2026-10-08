@@ -1,8 +1,10 @@
+import { jsPDF } from 'jspdf';
 import type { DossierItem } from '../../../types';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import { describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
 import { articleLabel, layoutDossier } from './dossierLayout';
+import { PDF_MARGIN, createPdfWriter } from '../../../utils/pdfWriter';
 import { claudeMarkSentence } from './dossierUtils';
 
 /**
@@ -101,4 +103,60 @@ export function buildPdfBlocks(
     });
   }
   return blocks;
+}
+
+export interface DossierPdfHeader {
+  title: string;
+  description?: string;
+  tags?: string[];
+  /** «3 norme · 1 sentenza»: what the page says under the title. */
+  countsLine: string;
+  /** The day of the export, already written for the page. */
+  exportedOn: string;
+}
+
+/** Draws the dossier's PDF: the header, then the sections `buildPdfBlocks` made. */
+export function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): jsPDF {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const w = createPdfWriter(doc, { footerLeft: `${header.title} · VisuaLex` });
+  const { ensureSpace, write } = w;
+
+  doc.setFillColor(30, 64, 175);
+  doc.rect(0, 0, 595, 12, 'F');
+  write(header.title, 22, 'bold', 28);
+  write(`Fascicolo normativo · ${header.countsLine} · Esportato il ${header.exportedOn}`, 9, 'normal', 18, true);
+  if (header.description) {
+    write(header.description, 11, 'italic', 14);
+    w.y += 6;
+  }
+  if (header.tags?.length) write(`Tag: ${header.tags.join(' · ')}`, 9, 'normal', 13, true);
+  doc.setDrawColor(190);
+  doc.line(PDF_MARGIN, w.y + 4, 551, w.y + 4);
+  w.y += 22;
+
+  blocks.forEach((block) => {
+    if (block.kind === 'notes') {
+      ensureSpace(32);
+      write('Note', 14, 'bold', 18);
+      block.notes.forEach((text) => { write(text, 10, 'normal', 13); w.y += 6; });
+      w.y += 10;
+      return;
+    }
+    ensureSpace(48);
+    write(block.heading, 14, 'bold', 18);
+    if (block.title) write(block.title, 10, 'italic', 13, true);
+    w.y += 6;
+    block.articles.forEach((article) => {
+      ensureSpace(32);
+      const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
+      write(head, 11, 'bold', 15);
+      article.notes.forEach((text) => write(`Nota: ${text}`, 9, 'italic', 12));
+      write(article.text, 9, article.missing === 'none' ? 'normal' : 'italic', 12, article.missing !== 'none');
+      w.y += 10;
+    });
+    w.y += 8;
+  });
+
+  w.footer();
+  return doc;
 }

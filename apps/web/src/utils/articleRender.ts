@@ -50,7 +50,7 @@ export interface RenderArticleInput {
   focusedThreadId?: string | null;
 }
 
-type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread' | 'search';
+export type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread' | 'search';
 
 /**
  * Nesting order, outermost first. The printed enumerator is outermost and so
@@ -74,7 +74,7 @@ const RANK: Record<MarkKind, number> = {
   hidden: 9,
 };
 
-interface Mark {
+export interface Mark {
   start: number;
   end: number;
   kind: MarkKind;
@@ -109,14 +109,14 @@ function decorationOpen(kind: DecorationKind, noteId?: string): string {
   }
 }
 
-function highlightOpen(h: Highlight): string {
+export function highlightOpen(h: Highlight): string {
   const author = h.originalAuthor?.username ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
   const title = author ? ` title="${escapeAttr(`Evidenziato da @${author}`)}"` : '';
   const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
   return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark"${title}>`;
 }
 
-const noteOpen = (a: Annotation): string =>
+export const noteOpen = (a: Annotation): string =>
   `<span class="note-anchor" data-note-id="${escapeAttr(a.id)}" title="${escapeAttr(a.text)}" style="${NOTE_ANCHOR_STYLE}">`;
 
 export function renderArticleHtml(input: RenderArticleInput): string {
@@ -239,7 +239,7 @@ function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[], g
  * (gotcha 23). useArticleTextInteractions opens it; the popover finds it
  * again by `data-block`.
  */
-function signHtml(index: number, group: BlockAnnotations | undefined): string {
+export function signHtml(index: number, group: BlockAnnotations | undefined): string {
   const notes = group?.notes.length ?? 0;
   const highlights = group?.highlights.length ?? 0;
   const threads = group?.threads.length ?? 0;
@@ -272,7 +272,7 @@ const byNesting = (x: Mark, y: Mark): number =>
  * newline renders only between two visible characters; on an edge it is
  * dropped — the block boundary already breaks the line.
  */
-function renderSpan(raw: string, start: number, end: number, marks: Mark[], flat: boolean): string {
+export function renderSpan(raw: string, start: number, end: number, marks: Mark[], flat: boolean): string {
   const local = marks.filter((m) => m.start < end && m.end > start);
   const cuts = new Set<number>([start, end]);
   for (const m of local) {

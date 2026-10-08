@@ -328,8 +328,8 @@ describe('dossierItemFromApi', () => {
   });
 });
 
-const SENTENZA = { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024, sezione: '7',
-  tipo: 'sentenza', data_deposito: '2024-03-12', etichetta: 'Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787' } as const;
+const SENTENZA = { corte: 'cassazione', archivio: 'penale', numero: 99999, anno: 2024, sezione: '7',
+  tipo: 'sentenza', data_deposito: '2024-03-12', etichetta: 'Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 99999' } as const;
 
 describe('decision items', () => {
   const at = '2026-10-01T00:00:00Z';
@@ -390,7 +390,7 @@ describe('decision items', () => {
   });
 
   it('the stored label is a copy: what is shown and written is the citation recomputed (source convention, Q9)', () => {
-    const stale = { ...SENTENZA, etichetta: 'Cass. pen. n. 10787/2024 (vecchia forma)' };
+    const stale = { ...SENTENZA, etichetta: 'Cass. pen. n. 99999/2024 (vecchia forma)' };
     const item = { id: '1', type: 'sentenza' as const, data: stale, addedAt: '', status: 'important' as const };
     expect(decisionCitationOf(stale)).toBe(SENTENZA.etichetta);
     expect(serverItemFor(item)).toEqual({ itemType: 'sentenza', title: SENTENZA.etichetta });
@@ -403,8 +403,8 @@ describe('decision items', () => {
     expect(computeItemCounts([item, { id: '2', type: 'note', data: 'x', addedAt: '' }]))
       .toEqual({ norme: 0, sentenze: 1, note: 1, important: 0 });
     const kept = { id: 'd', title: 'D', createdAt: '', items: [item] };
-    expect(dossierContainsDecision(kept, { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 })).toBe(true);
-    expect(dossierContainsDecision(kept, { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 })).toBe(false);
+    expect(dossierContainsDecision(kept, { corte: 'cassazione', archivio: 'penale', numero: 99999, anno: 2024 })).toBe(true);
+    expect(dossierContainsDecision(kept, { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 })).toBe(false);
   });
 
   it('sentenzaFromDecision keeps only what the item schema accepts, and labels it from that', () => {
@@ -412,7 +412,7 @@ describe('decision items', () => {
       { sezione: '6-3', tipo: 'provvedimento', data_deposito: '2022-01-10', relatore: 'X' }))
       .toEqual({ corte: 'cassazione', archivio: 'civile', numero: 5, anno: 2022, data_deposito: '2022-01-10',
         etichetta: 'Cass. civ., 10 gennaio 2022, n. 5' });
-    expect(sentenzaFromDecision({ corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 },
+    expect(sentenzaFromDecision({ corte: 'cassazione', archivio: 'penale', numero: 99999, anno: 2024 },
       { sezione: '7', tipo: 'sentenza', data_deposito: '2024-03-12' })).toEqual(SENTENZA);
   });
 
@@ -466,7 +466,7 @@ describe('an imported dossier', () => {
 
   it('a Forum suggestion carries decisions as sentenzaRef, with the citation recomputed', () => {
     const payload = dossierSuggestionPayload({ id: 'd', title: 'D', createdAt: '', items: [
-      { id: '1', type: 'sentenza', data: { ...SENTENZA, etichetta: 'Cass. pen. 10787/2024' }, addedAt: '', status: 'important' },
+      { id: '1', type: 'sentenza', data: { ...SENTENZA, etichetta: 'Cass. pen. 99999/2024' }, addedAt: '', status: 'important' },
       { id: '2', type: 'note', data: 'n', addedAt: '' },
     ] });
     expect(payload.entries).toEqual([

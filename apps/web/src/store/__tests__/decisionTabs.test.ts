@@ -7,7 +7,7 @@ vi.mock('../../utils/workspaceOrigin', async (importOriginal) => ({
   workspaceOrigin: () => ({ ...origin }),
 }));
 
-const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 const get = () => appStore.getState();
 
 beforeEach(() => appStore.setState({ workspaceTabs: [], pendingDecision: null }));
@@ -22,19 +22,19 @@ describe('decision tabs', () => {
     expect(tabs).toHaveLength(1);
     expect(tabs[0].view).toEqual({ kind: 'decision', reference: REF });
     expect(tabs[0].content).toEqual([]);
-    expect(tabs[0].label).toBe('Cass. civ., n. 10787/2024');
+    expect(tabs[0].label).toBe('Cass. civ., n. 99999/2024');
     expect(tabs[0].zIndex).toBeGreaterThan(z);
   });
 
   it('matches an archive only to a tab of that archive; a citation without one matches either', () => {
-    const bare = get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024 });
+    const bare = get().openDecisionTab({ corte: 'cassazione', numero: 99999, anno: 2024 });
     const civil = get().openDecisionTab(REF);
     expect(civil).not.toBe(bare);
     const penal = get().openDecisionTab({ ...REF, archivio: 'penale' });
     expect(penal).not.toBe(civil);
     expect(get().workspaceTabs).toHaveLength(3);
-    expect(get().workspaceTabs.find((t) => t.id === bare)!.view).toEqual({ kind: 'decision', reference: { corte: 'cassazione', numero: 10787, anno: 2024 } });
-    expect(get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024 })).toBe(bare);
+    expect(get().workspaceTabs.find((t) => t.id === bare)!.view).toEqual({ kind: 'decision', reference: { corte: 'cassazione', numero: 99999, anno: 2024 } });
+    expect(get().openDecisionTab({ corte: 'cassazione', numero: 99999, anno: 2024 })).toBe(bare);
     expect(get().workspaceTabs).toHaveLength(3);
   });
 
@@ -189,13 +189,13 @@ describe('decision tabs', () => {
   });
 
   it('gives an unresolved tab the section a later citation adds, and its label', () => {
-    const bare = { corte: 'cassazione' as const, numero: 10787, anno: 2024 };
+    const bare = { corte: 'cassazione' as const, numero: 99999, anno: 2024 };
     const id = get().openDecisionTab({ ...bare, sezione: 'VII' });
     const again = get().openDecisionTab({ ...bare, sezione: 'III' });
     expect(again).toBe(id);
     const tab = get().workspaceTabs.find((t) => t.id === id)!;
     expect(tab.view).toEqual({ kind: 'decision', reference: { ...bare, sezione: 'III' } });
-    expect(tab.label).toBe('Cass., sez. III, n. 10787/2024');
+    expect(tab.label).toBe('Cass., sez. III, n. 99999/2024');
     // a tab that already has its archive keeps its reference
     const resolved = get().openDecisionTab({ ...REF, numero: 5 });
     get().openDecisionTab({ ...REF, numero: 5, sezione: 'III' });
@@ -229,11 +229,11 @@ describe('decision tabs', () => {
   });
 
   it('keeps the identity once found, so a reload asks for exactly it', () => {
-    const id = get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024, sezione: 'III' });
-    get().setDecisionTabIdentity(id, REF, 'Cass. civ., sez. III, n. 10787/2024');
+    const id = get().openDecisionTab({ corte: 'cassazione', numero: 99999, anno: 2024, sezione: 'III' });
+    get().setDecisionTabIdentity(id, REF, 'Cass. civ., sez. III, n. 99999/2024');
     const tab = get().workspaceTabs[0];
     expect(tab.view).toEqual({ kind: 'decision', reference: REF });
-    expect(tab.label).toBe('Cass. civ., sez. III, n. 10787/2024');
+    expect(tab.label).toBe('Cass. civ., sez. III, n. 99999/2024');
   });
 
   it('focuses a search tab with the same query whatever the key order', () => {
@@ -314,15 +314,15 @@ describe('decision tabs', () => {
     it('brings the tab that already holds the decision to the front and closes this one', () => {
       const penal = get().openDecisionTab(PENAL);
       const civil = get().openDecisionTab(REF);
-      get().setDecisionTabIdentity(civil, PENAL, 'Cass. pen., n. 10787/2024');
+      get().setDecisionTabIdentity(civil, PENAL, 'Cass. pen., n. 99999/2024');
       const tabs = get().workspaceTabs;
       expect(tabs.map((t) => t.id)).toEqual([penal]);
       expect(tabs[0].zIndex).toBe(get().highestZIndex);
     });
 
     it('just renames the tab when no other tab holds the decision', () => {
-      const bare = get().openDecisionTab({ corte: 'cassazione', numero: 10787, anno: 2024 });
-      get().setDecisionTabIdentity(bare, PENAL, 'Cass. pen., n. 10787/2024');
+      const bare = get().openDecisionTab({ corte: 'cassazione', numero: 99999, anno: 2024 });
+      get().setDecisionTabIdentity(bare, PENAL, 'Cass. pen., n. 99999/2024');
       expect(get().workspaceTabs).toHaveLength(1);
       expect(get().workspaceTabs[0].view).toEqual({ kind: 'decision', reference: PENAL });
     });

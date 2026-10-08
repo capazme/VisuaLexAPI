@@ -1,6 +1,6 @@
 import type { ClipboardEvent } from 'react';
 import type { DecisionText } from '../../../types/decisions';
-import { decisionClipboardText, decisionParagraphs } from '../../../utils/decisionText';
+import { decisionParagraphs, selectionAsRead } from '../../../utils/decisionText';
 
 const BLOCKS: Array<[keyof DecisionText, string]> = [
   ['epigrafe', 'Epigrafe'],
@@ -16,17 +16,17 @@ export interface DecisionTextViewProps {
  *  between two lines is CSS, which the browser's own copy leaves out («ordinanzadel»). A selection
  *  that reaches outside the text, or none, is left to the browser. Nothing in the DOM changes (S6). */
 function copyAsRead(event: ClipboardEvent<HTMLDivElement>) {
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return;
-  const range = selection.getRangeAt(0);
-  if (!event.currentTarget.contains(range.commonAncestorContainer)) return;
-  const text = decisionClipboardText(range.cloneContents());
+  const text = selectionAsRead(event.currentTarget);
   if (!text) return;
   event.clipboardData.setData('text/plain', text);
   event.preventDefault();
 }
 
-/** The decision as received: blocks as the reader divides them, one span per line. The space
+/** The fallback for a host that mounts `DecisionView` without the reading surface
+ *  (`DecisionReadingSurface`, which the workspace tab always passes as `textSlot`): the same
+ *  structure and copy behaviour, with no notes, highlights or links.
+ *
+ *  The decision as received: blocks as the reader divides them, one span per line. The space
  *  between two lines and each block's label come from CSS (index.css, "Court decisions"). An
  *  epigrafe without a motivazione holds the reasoning too, its start unmarked (the reader splits
  *  one only at a line beginning «Ritenuto» or «Considerato»: corte_cost.split_epigrafe), so it

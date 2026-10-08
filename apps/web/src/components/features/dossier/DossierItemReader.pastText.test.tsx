@@ -120,7 +120,7 @@ describe('DossierItemReader — the citation', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Copia citazione/ }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toMatch(
-      /^art\. 1284 c\.c\., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 \(Normattiva, testo consolidato, consultato il /,
+      /^art\. 1284 c\.c\., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 \(Normattiva, testo consolidato, consultato (?:il |l')/,
     );
   });
 
@@ -135,7 +135,7 @@ describe('DossierItemReader — the citation', () => {
     read(CURRENT_ITEM, { ...MIDDLE, state: 'current', valid_to: null });
     fireEvent.click(await screen.findByRole('button', { name: /Copia citazione/ }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\. \(Normattiva, testo vigente, consultato il .+\)$/);
+    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\. \(Normattiva, testo vigente, consultato (?:il |l').+\)$/);
   });
 });
 
@@ -160,7 +160,7 @@ describe('DossierItemReader — an act of the Union opened with a stale day', ()
     expect(button).toBeEnabled();
     fireEvent.click(button);
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 5, reg\. \(UE\) 2016\/679 \(EUR-Lex, testo vigente, consultato il .+\)$/);
+    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 5, reg\. \(UE\) 2016\/679 \(EUR-Lex, testo vigente, consultato (?:il |l').+\)$/);
   });
 });
 

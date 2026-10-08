@@ -15,7 +15,7 @@ vi.mock('../decisions/DecisionTabView', () => ({ DecisionTabView: () => null }))
 import { appStore } from '../../../store/useAppStore';
 import { SearchPanel } from './SearchPanel';
 
-const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 const decisionTabs = () => appStore.getState().workspaceTabs.filter((t) => t.view?.kind === 'decision');
 
 beforeEach(() => appStore.setState({ workspaceTabs: [], pendingDecision: null }));

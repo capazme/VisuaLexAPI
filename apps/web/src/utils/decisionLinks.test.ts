@@ -20,27 +20,27 @@ const none = new URLSearchParams();
 
 describe('decision addresses', () => {
   it('builds the readable paths of spec §2', () => {
-    expect(decisionPath({ corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }))
-      .toBe('/sentenze/cassazione-civile/10787/2024');
-    expect(decisionPath({ corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 }))
-      .toBe('/sentenze/cassazione-penale/10787/2024');
-    expect(decisionPath({ corte: 'cassazione', numero: 10787, anno: 2024, sezione: '3' }))
-      .toBe('/sentenze/cassazione/10787/2024?sezione=3');
+    expect(decisionPath({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }))
+      .toBe('/sentenze/cassazione-civile/99999/2024');
+    expect(decisionPath({ corte: 'cassazione', archivio: 'penale', numero: 99999, anno: 2024 }))
+      .toBe('/sentenze/cassazione-penale/99999/2024');
+    expect(decisionPath({ corte: 'cassazione', numero: 99999, anno: 2024, sezione: '3' }))
+      .toBe('/sentenze/cassazione/99999/2024?sezione=3');
     expect(decisionPath({ corte: 'corte_costituzionale', numero: 1, anno: 2014, sezione: 'III' }))
       .toBe('/sentenze/corte-costituzionale/1/2014');
   });
 
   it('reads them back, leading zeros dropped, the section kept as written', () => {
-    expect(parseDecisionPath({ corte: 'cassazione', numero: '010787', anno: '2024' },
+    expect(parseDecisionPath({ corte: 'cassazione', numero: '099999', anno: '2024' },
       new URLSearchParams('sezione=III'), NOW)).toEqual({
-      ok: true, reference: { corte: 'cassazione', numero: 10787, anno: 2024, sezione: 'III' } });
+      ok: true, reference: { corte: 'cassazione', numero: 99999, anno: 2024, sezione: 'III' } });
     expect(parseDecisionPath({ corte: 'cassazione-penale', numero: '1399', anno: '2000' }, none, NOW))
       .toEqual({ ok: true, reference: { corte: 'cassazione', archivio: 'penale', numero: 1399, anno: 2000 } });
   });
 
   it('reads the civil slug, and drops the section for the Corte costituzionale', () => {
-    expect(parseDecisionPath({ corte: 'cassazione-civile', numero: '10787', anno: '2024' }, none, NOW))
-      .toEqual({ ok: true, reference: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 } });
+    expect(parseDecisionPath({ corte: 'cassazione-civile', numero: '99999', anno: '2024' }, none, NOW))
+      .toEqual({ ok: true, reference: { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 } });
     expect(parseDecisionPath({ corte: 'corte-costituzionale', numero: '1', anno: '2014' },
       new URLSearchParams('sezione=III'), NOW))
       .toStrictEqual({ ok: true, reference: { corte: 'corte_costituzionale', numero: 1, anno: 2014 } });
@@ -85,8 +85,8 @@ describe('decision addresses', () => {
   });
 
   it('keys are the shared contract', () => {
-    expect(decisionKey({ corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 }))
-      .toBe('cassazione:penale:10787:2024');
+    expect(decisionKey({ corte: 'cassazione', archivio: 'penale', numero: 99999, anno: 2024 }))
+      .toBe('cassazione:penale:99999:2024');
     expect(decisionKey({ corte: 'corte_costituzionale', numero: 1, anno: 2014 }))
       .toBe('corte_costituzionale:1:2014');
   });
@@ -101,10 +101,10 @@ describe('links from data that names a decision loosely (shared with the rassegn
   });
 
   it('without the archive, the section as written, encoded', () => {
-    expect(linkableDecisionPath({ corte: 'cassazione', archivio: null, numero: 10787, anno: 2024, sezione: '6-3 ' }, NOW))
-      .toBe('/sentenze/cassazione/10787/2024?sezione=6-3');
-    expect(linkableDecisionPath({ corte: 'cassazione', numero: 10787, anno: 2024, sezione: 'sez. un.' }, NOW))
-      .toBe('/sentenze/cassazione/10787/2024?sezione=sez.%20un.');
+    expect(linkableDecisionPath({ corte: 'cassazione', archivio: null, numero: 99999, anno: 2024, sezione: '6-3 ' }, NOW))
+      .toBe('/sentenze/cassazione/99999/2024?sezione=6-3');
+    expect(linkableDecisionPath({ corte: 'cassazione', numero: 99999, anno: 2024, sezione: 'sez. un.' }, NOW))
+      .toBe('/sentenze/cassazione/99999/2024?sezione=sez.%20un.');
   });
 
   it('null when the data cannot make a link', () => {
@@ -133,7 +133,7 @@ describe('a link and the page it opens agree', () => {
       { corte: 'cassazione', archivio: 'civile', numero: 13319, anno: 2024, sezione: 'U' },
       { corte: 'cassazione', archivio: 'penale', numero: 1, anno: 1900 },
       { corte: 'cassazione', archivio: null, numero: 999_999, anno: year, sezione: 'sez. un.' },
-      { corte: 'cassazione', numero: 10787, anno: 2024 },
+      { corte: 'cassazione', numero: 99999, anno: 2024 },
       { corte: 'corte_costituzionale', numero: 1, anno: 1956 },
       { corte: 'corte_costituzionale', numero: 999_999, anno: year },
     ];
@@ -152,15 +152,15 @@ describe('a link and the page it opens agree', () => {
 });
 
 describe('how a decision is named', () => {
-  const civ = { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 } as const;
-  const pen = { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 } as const;
+  const civ = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 } as const;
+  const pen = { corte: 'cassazione', archivio: 'penale', numero: 99999, anno: 2024 } as const;
   const cost = { corte: 'corte_costituzionale', numero: 1, anno: 2014 } as const;
 
   it('heading', () => {
     expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-22' }))
-      .toBe('Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata il 22 aprile 2024');
+      .toBe('Corte di cassazione · Sez. III civile · Ordinanza n. 99999/2024 · depositata il 22 aprile 2024');
     expect(formatDecisionHeading(pen, { sezione: 'U', tipo: 'sentenza' }))
-      .toBe('Corte di cassazione · Sezioni Unite penali · Sentenza n. 10787/2024');
+      .toBe('Corte di cassazione · Sezioni Unite penali · Sentenza n. 99999/2024');
     expect(formatDecisionHeading(cost, { tipo: 'sentenza', data_decisione: '2013-12-04',
       data_deposito: '2014-01-13', ecli: 'ECLI:IT:COST:2014:1' }))
       .toBe('Corte costituzionale · Sentenza n. 1/2014 · decisa il 4 dicembre 2013 · depositata il 13 gennaio 2014 · ECLI:IT:COST:2014:1');
@@ -168,35 +168,35 @@ describe('how a decision is named', () => {
 
   it('the heading agrees «depositato» with a decreto', () => {
     expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'decreto', data_deposito: '2024-04-22' }))
-      .toBe('Corte di cassazione · Sez. III civile · Decreto n. 10787/2024 · depositato il 22 aprile 2024');
+      .toBe('Corte di cassazione · Sez. III civile · Decreto n. 99999/2024 · depositato il 22 aprile 2024');
   });
 
   it('the heading writes "il" as "l\'" before 8 and 11, and keeps the plain date for the 1st', () => {
     expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-01' }))
-      .toBe('Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata il 1 aprile 2024');
+      .toBe('Corte di cassazione · Sez. III civile · Ordinanza n. 99999/2024 · depositata il 1 aprile 2024');
     expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-08' }))
-      .toBe("Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata l'8 aprile 2024");
+      .toBe("Corte di cassazione · Sez. III civile · Ordinanza n. 99999/2024 · depositata l'8 aprile 2024");
     expect(formatDecisionHeading(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-11' }))
-      .toBe("Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata l'11 aprile 2024");
+      .toBe("Corte di cassazione · Sez. III civile · Ordinanza n. 99999/2024 · depositata l'11 aprile 2024");
     expect(formatDecisionHeading(cost, { tipo: 'sentenza', data_decisione: '2013-11-08', data_deposito: '2014-01-11' }))
       .toBe("Corte costituzionale · Sentenza n. 1/2014 · decisa l'8 novembre 2013 · depositata l'11 gennaio 2014");
   });
 
   it('citation, as lawyers write it', () => {
     expect(formatDecisionCitation(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-22' }))
-      .toBe('Cass. civ., sez. III, ord. 22 aprile 2024, n. 10787');
+      .toBe('Cass. civ., sez. III, ord. 22 aprile 2024, n. 99999');
     expect(formatDecisionCitation(pen, { sezione: '7', tipo: 'sentenza', data_deposito: '2024-03-12' }))
-      .toBe('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787');
-    expect(formatDecisionCitation(civ, { sezione: 'U' })).toBe('Cass. civ., sez. un., n. 10787/2024');
+      .toBe('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 99999');
+    expect(formatDecisionCitation(civ, { sezione: 'U' })).toBe('Cass. civ., sez. un., n. 99999/2024');
     expect(formatDecisionCitation(cost, { tipo: 'sentenza', data_deposito: '2014-01-13' }))
       .toBe('Corte cost., sent. 13 gennaio 2014, n. 1');
   });
 
   it('a citation writes the first of a month as 1°, and no other day differently', () => {
     expect(formatDecisionCitation(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-01' }))
-      .toBe('Cass. civ., sez. III, ord. 1° aprile 2024, n. 10787');
+      .toBe('Cass. civ., sez. III, ord. 1° aprile 2024, n. 99999');
     expect(formatDecisionCitation(civ, { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-08' }))
-      .toBe('Cass. civ., sez. III, ord. 8 aprile 2024, n. 10787');
+      .toBe('Cass. civ., sez. III, ord. 8 aprile 2024, n. 99999');
   });
 
   it('notices, with and without the section as cited', () => {

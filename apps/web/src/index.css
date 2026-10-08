@@ -731,7 +731,8 @@
    dots and discussions a sign is ~7rem): every sign moves to the right margin, level with
    its block's first line, all at the same x. */
 @container vlx-frame (min-width: calc(68ch + 14rem)) {
-  .vlx-art .vlx-b {
+  .vlx-art .vlx-b,
+  .vlx-decision .vlx-dec-para {
     position: relative;
   }
 

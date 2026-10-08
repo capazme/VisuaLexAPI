@@ -94,7 +94,7 @@ describe('App routing', () => {
     expect(window.location.pathname).toBe('/');
     lookup.unmount();
 
-    renderAt('/sentenze/cassazione-civile/10787/2024');
+    renderAt('/sentenze/cassazione-civile/99999/2024');
     expect(await screen.findByTestId('search-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
   });

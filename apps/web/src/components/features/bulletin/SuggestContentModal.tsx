@@ -5,6 +5,8 @@ import { sharedEnvironmentService } from '../../../services/sharedEnvironmentSer
 import { useAppStore } from '../../../store/useAppStore';
 import type { SharedEnvironment, Environment } from '../../../types';
 import type { EnvironmentSelection } from '../../../utils/environmentUtils';
+import { useLeftOutNotice } from '../environments/useLeftOutNotice';
+import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
 import { dossierSuggestionPayload } from '../dossier/dossierUtils';
 
 interface SuggestContentModalProps {
@@ -45,6 +47,10 @@ export function SuggestContentModal({
     createdAt: new Date().toISOString(),
   }), [dossiers, quickNorms, customAliases, annotations, highlights]);
 
+  const chosenAnnotations = useMemo(() => annotations.filter(a => selection.annotationIds.includes(a.id)), [annotations, selection.annotationIds]);
+  const chosenHighlights = useMemo(() => highlights.filter(h => selection.highlightIds.includes(h.id)), [highlights, selection.highlightIds]);
+  const leftOutNotice = useLeftOutNotice(chosenAnnotations, chosenHighlights);
+
   const hasSelection = useMemo(() => {
     return (
       selection.dossierIds.length > 0 ||
@@ -69,9 +75,11 @@ export function SuggestContentModal({
     setError(null);
 
     try {
+      // Words a court withdrew are not suggested (spec §8.6).
+      const travelling = await travellingSelection(chosenAnnotations, chosenHighlights);
       const items: Array<{ itemType: 'annotation' | 'highlight' | 'dossier' | 'quickNorm' | 'alias'; payload: unknown }> = [];
 
-      for (const id of selection.annotationIds) {
+      for (const id of selection.annotationIds.filter(i => travelling.annotationIds.has(i))) {
         const a = annotations.find(x => x.id === id);
         if (a) items.push({ itemType: 'annotation', payload: {
           normaKey: a.normaKey,
@@ -81,7 +89,7 @@ export function SuggestContentModal({
           text: a.text,
         }});
       }
-      for (const id of selection.highlightIds) {
+      for (const id of selection.highlightIds.filter(i => travelling.highlightIds.has(i))) {
         const h = highlights.find(x => x.id === id);
         if (h) items.push({ itemType: 'highlight', payload: {
           normaKey: h.normaKey,
@@ -115,6 +123,7 @@ export function SuggestContentModal({
         }});
       }
 
+      if (items.length === 0) { setError('Nessun elemento da inviare.'); return; }
       await sharedEnvironmentService.createSuggestion(environment.id, {
         items,
         message: message.trim() || undefined,
@@ -224,6 +233,10 @@ export function SuggestContentModal({
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
             />
           </div>
+
+          {leftOutNotice && (
+            <p role="status" className="text-sm text-amber-700 dark:text-amber-400">{leftOutNotice}</p>
+          )}
 
           {/* Error */}
           {error && (

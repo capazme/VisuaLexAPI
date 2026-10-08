@@ -17,7 +17,7 @@ import { appStore } from '../../../store/useAppStore';
 import { SearchPanel } from './SearchPanel';
 
 const PREVIOUS = 'Tab precedente';
-const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 
 beforeEach(() => appStore.setState({ workspaceTabs: [], pendingDecision: null }));
 
@@ -30,8 +30,8 @@ describe('SearchPanel on a phone', () => {
     expect(screen.queryByTestId('decision')).toBeNull();
 
     act(() => { appStore.getState().openDecisionTab(REF); });
-    expect(await screen.findByTestId('decision')).toHaveTextContent('n. 10787');
-    expect(screen.getByText('Cass. civ., n. 10787/2024')).toBeInTheDocument(); // the header names it
+    expect(await screen.findByTestId('decision')).toHaveTextContent('n. 99999');
+    expect(screen.getByText('Cass. civ., n. 99999/2024')).toBeInTheDocument(); // the header names it
 
     // the reader goes back to the first tab (the previous-tab chevron is the first button)
     fireEvent.click(screen.getByRole('button', { name: PREVIOUS }));
@@ -64,14 +64,14 @@ describe('SearchPanel on a phone', () => {
     render(<MemoryRouter><SearchPanel /></MemoryRouter>);
     act(() => { appStore.getState().addWorkspaceTab('Codice civile'); });
     // the reader starts on the penal decision (first tab) and moves on to the civil one
-    expect(screen.getByText('Cass. pen., n. 10787/2024')).toBeInTheDocument();
+    expect(screen.getByText('Cass. pen., n. 99999/2024')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Tab successiva' }));
-    await waitFor(() => expect(screen.getByText('Cass. civ., n. 10787/2024')).toBeInTheDocument());
-    act(() => { appStore.getState().setDecisionTabIdentity(civil, { ...REF, archivio: 'penale' }, 'Cass. pen., n. 10787/2024'); });
-    expect(await screen.findByTestId('decision')).toHaveTextContent('n. 10787');
+    await waitFor(() => expect(screen.getByText('Cass. civ., n. 99999/2024')).toBeInTheDocument());
+    act(() => { appStore.getState().setDecisionTabIdentity(civil, { ...REF, archivio: 'penale' }, 'Cass. pen., n. 99999/2024'); });
+    expect(await screen.findByTestId('decision')).toHaveTextContent('n. 99999');
     // the header names the survivor, not the closed civil tab
-    expect(screen.getByText('Cass. pen., n. 10787/2024')).toBeInTheDocument();
-    expect(screen.queryByText('Cass. civ., n. 10787/2024')).toBeNull();
+    expect(screen.getByText('Cass. pen., n. 99999/2024')).toBeInTheDocument();
+    expect(screen.queryByText('Cass. civ., n. 99999/2024')).toBeNull();
     expect(appStore.getState().workspaceTabs.map((t) => t.id)).not.toContain(civil);
     expect(appStore.getState().workspaceTabs.map((t) => t.id)).toContain(penal);
   });

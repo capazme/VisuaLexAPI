@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { useNavigate } from 'react-router-dom';
-import { jsPDF } from 'jspdf';
 import {
   DndContext,
   closestCenter,
@@ -51,7 +50,7 @@ import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout'
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
-import { buildPdfBlocks, loadDossierTexts } from './dossierPdf';
+import { buildPdfBlocks, loadDossierTexts, writeDossierPdf } from './dossierPdf';
 import { resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
@@ -62,6 +61,7 @@ import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { AddNoteModal } from './AddNoteModal';
+import { saveBlob } from '../../../utils/saveBlob';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -343,13 +343,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   const exportDossierJSON = () => {
     const data = JSON.stringify(dossier, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${dossier.title.replace(/[^a-z0-9]/gi, '_')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    saveBlob(new Blob([data], { type: 'application/json' }), `${dossier.title.replace(/[^a-z0-9]/gi, '_')}.json`);
   };
 
   const copyShareLink = async () => {
@@ -416,79 +410,10 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       }));
       const blocks = buildPdfBlocks(dossier.items, texts, titles);
 
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-      const margin = 44;
-      const bottom = 770;
-      const width = 507;
-      let y = 54;
-
-      const footer = () => {
-        const page = doc.getNumberOfPages();
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(120);
-        doc.text(`${dossier.title} · VisuaLex`, margin, 810);
-        doc.text(`Pagina ${page}`, 555, 810, { align: 'right' });
-        doc.setTextColor(0);
-      };
-      const ensureSpace = (height: number) => {
-        if (y + height <= bottom) return;
-        footer();
-        doc.addPage();
-        y = 54;
-      };
-      const writeLines = (lines: string[], lineHeight: number) => {
-        lines.forEach(line => {
-          ensureSpace(lineHeight);
-          doc.text(line, margin, y);
-          y += lineHeight;
-        });
-      };
-      const write = (text: string, size: number, style: 'normal' | 'bold' | 'italic', lineHeight: number, grey = false) => {
-        doc.setFontSize(size);
-        doc.setFont('helvetica', style);
-        doc.setTextColor(grey ? 100 : 0);
-        writeLines(doc.splitTextToSize(text, width) as string[], lineHeight);
-        doc.setTextColor(0);
-      };
-
-      doc.setFillColor(30, 64, 175);
-      doc.rect(0, 0, 595, 12, 'F');
-      write(dossier.title, 22, 'bold', 28);
-      write(`Fascicolo normativo · ${countsLine} · Esportato il ${new Date().toLocaleDateString('it-IT')}`, 9, 'normal', 18, true);
-      if (dossier.description) {
-        write(dossier.description, 11, 'italic', 14);
-        y += 6;
-      }
-      if (dossier.tags?.length) write(`Tag: ${dossier.tags.join(' · ')}`, 9, 'normal', 13, true);
-      doc.setDrawColor(190);
-      doc.line(margin, y + 4, 551, y + 4);
-      y += 22;
-
-      blocks.forEach((block) => {
-        if (block.kind === 'notes') {
-          ensureSpace(32);
-          write('Note', 14, 'bold', 18);
-          block.notes.forEach((text) => { write(text, 10, 'normal', 13); y += 6; });
-          y += 10;
-          return;
-        }
-        ensureSpace(48);
-        write(block.heading, 14, 'bold', 18);
-        if (block.title) write(block.title, 10, 'italic', 13, true);
-        y += 6;
-        block.articles.forEach((article) => {
-          ensureSpace(32);
-          const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
-          write(head, 11, 'bold', 15);
-          article.notes.forEach((text) => write(`Nota: ${text}`, 9, 'italic', 12));
-          write(article.text, 9, article.missing === 'none' ? 'normal' : 'italic', 12, article.missing !== 'none');
-          y += 10;
-        });
-        y += 8;
-      });
-
-      footer();
+      const doc = writeDossierPdf(
+        { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine, exportedOn: new Date().toLocaleDateString('it-IT') },
+        blocks,
+      );
       doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
       const missing = blocks.reduce((n, b) => n + (b.kind === 'act' ? b.articles.filter((a) => a.missing === 'unavailable').length : 0), 0);
       if (missing > 0) {

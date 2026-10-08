@@ -167,15 +167,16 @@ export function EnvironmentPage() {
     }
   };
 
-  const handleExportJSON = (env: Environment) => {
-    exportEnvironmentToFile(env);
+  const handleExportJSON = async (env: Environment) => {
+    const message = await exportEnvironmentToFile(env);
+    if (message) showToast(message, 'info');
   };
 
   const handleShareLink = async (env: Environment) => {
-    const link = createEnvironmentShareLink(env);
+    const { link, message } = await createEnvironmentShareLink(env);
     if (link) {
       await navigator.clipboard.writeText(link);
-      showToast('Link copiato negli appunti', 'success');
+      showToast(message ? `Link copiato negli appunti. ${message}` : 'Link copiato negli appunti', 'success');
     } else {
       showToast('Ambiente troppo grande per condivisione via link. Usa l\'export JSON.', 'error');
     }

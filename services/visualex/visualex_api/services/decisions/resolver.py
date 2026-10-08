@@ -88,7 +88,7 @@ def _text_notices(decision: Decision) -> list[dict[str, str]]:
 
 def _cass_key(archivio: str, numero: int, anno: int) -> str:
     """The cache key of a Cassazione decision's text (see the version note in `_cass`)."""
-    return f"italgiure:v3:{archivio}:{numero}:{anno}"
+    return f"italgiure:v4:{archivio}:{numero}:{anno}"
 
 
 def _citata(raw: str | None) -> str | None:
@@ -150,7 +150,7 @@ class Resolver:
         # (the sweep deletes them once expired). Raise the version whenever the reader changes the
         # shape of what it returns — the shape only (blocks, `\n`): a change of characters is refused
         # by test_decisions_text_frozen.py (design 2026-10-05 §8.5); the last change of characters
-        # was italgiure:v3's.
+        # was italgiure:v4's (carriage returns normalised, 7 October).
         pdf: list[bytes] = []
 
         async def read() -> Decision | None:

@@ -21,7 +21,7 @@
 - An original PDF is untrusted input: at most 5 MB and 200 pages, `%PDF-` checked, parsed in a worker thread under a time limit; any failure falls back to the text field with the notice `testo_da_archivio` (spec §11, Security).
 - New Python dependency: `pdfminer.six` (MIT), pinned; nothing else.
 - Each row of a decision list says how it was found: «norma citata (indice della Cassazione)» or «menzionato nel testo» (spec N5). Fragments are shown as the source gives them (only `<em>` becomes ranges).
-- The decision PDF has no licence line, for the Corte costituzionale too (spec §12.1).
+- The Corte costituzionale's decision PDF carries its licence (footer and a closing line); the Cassazione's has none (spec §12.1; owner, 8 Oct, amended).
 - Topic words: letters, digits, spaces, `'` and `-` only; at most 80 characters; sent as one quoted phrase (spec §5.4).
 - Prisma: one hand-written migration dated after every migration on `develop` (today the last is `20261005120000_add_trash_entries`), announced to the orchestrator before it is written; never `prisma migrate dev` or `reset`.
 - `npm --prefix apps/server test` only after the orchestrator's go (shared test database).
@@ -3091,7 +3091,7 @@ git commit -m "feat(web): the Cronologia lists the decisions opened and reopens 
   9. the Cronologia: the decision listed, reopened;
   10. a phone width (390 px): the decision tab full width, the back control;
   11. a Cassazione decision whose archive text is cut short (n. 5625/2022 civile) reads to «Roma, 14.12.2021», with no «copia non ufficiale», header or footer in it;
-  12. «Scarica PDF» with and without «Con le mie evidenziazioni e note»; «PDF originale della Corte» downloads the court's file; a Corte costituzionale decision has no original button and no licence line.
+  12. «Scarica PDF» with and without «Con le mie evidenziazioni e note»; «PDF originale della Corte» downloads the court's file; a Corte costituzionale decision has no original button and its PDF carries the licence (footer and closing line).
 - [ ] **Step 2: All suites** — `npm --prefix apps/web run test -- --run`, `run build`, `run lint`; `(cd services/visualex && <python> -m pytest tests/ -q)`; `node --test infra/ingress/paths.test.mjs`; the server suite with the orchestrator's go.
 - [ ] **Step 3: Docs** as listed above; commit on a `docs/norms-decisions-search-closing` branch, PR, merge `merge: docs/norms-decisions-search-closing — the round's notes`.
 - [ ] **Step 4: Handoff** to the orchestrator: done, left, the owner's decisions verbatim, the PRs, the test account deleted.
@@ -3389,7 +3389,7 @@ checks together):
 thresholds were chosen with margin below this floor, not fitted exactly to it, so a decision
 Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 
-**Amendment, 2026-10-05 (evening) — the Sentenze session's review of §8, and privacy.** Accepted in full (spec §8.2, §8.4, §8.5, §11.6): the projection strips each block's edges; a decision read from the text field is cached 24 h with a «provvisorio» notice; the freeze takes effect with PR 4 and `italgiure:v3:` is the last change of characters; `line_paragraphs`/`paragraphs` may still change; Corte costituzionale corrections are a cause in §8.4. Privacy: real decisions stay in the git-ignored `private/` folder, CI tests run on synthetic PDFs and records, freeze goldens are SHA-256 and length. With the owner's «46 sì» the branch was rebuilt from c98e1f40 so that no commit holds a real PDF or record (Tasks 2–3 now in 5d6d11dd and e42ad740). Tasks 4, 9 and 18 carry the amendment at their head.
+**Amendment, 2026-10-05 (evening) — the Sentenze session's review of §8, and privacy.** Accepted in full (spec §8.2, §8.4, §8.5, §11.6): the projection strips each block's edges; a decision read from the text field is cached 24 h with a «provvisorio» notice; the freeze takes effect with PR 4 and `italgiure:v4:` is the last change of characters (v4: carriage returns normalised, 7 October); `line_paragraphs`/`paragraphs` may still change; Corte costituzionale corrections are a cause in §8.4. Privacy: real decisions stay in the git-ignored `private/` folder, CI tests run on synthetic PDFs and records, freeze goldens are SHA-256 and length. With the owner's «46 sì» the branch was rebuilt from c98e1f40 so that no commit holds a real PDF or record (Tasks 2–3 now in 5d6d11dd and e42ad740). Tasks 4, 9 and 18 carry the amendment at their head.
 
 **Amendments, 2026-10-07 — the rulings of 6–7 October, as the code has them.**
 - The index serves the codes and the Constitution only (c.c. `CC`, c.p.c. `PC`, c.p. `CP`, c.p.p. `PV`, Cost. `LC`). Numbered acts, the preleggi and the disp. att. go to the text search. Among the suffixes only «-bis» (`02`) is established.
@@ -3414,3 +3414,5 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - Discussions on decisions are new scope: spec §8.7 and PR 4b (Tasks 26–29), after PR 4. The owner answered questions 5–7 the same day: columns of their own (a migration, announced in the register before its code), a withdrawn quotation hidden by the panel and released by an admin, signs per paragraph.
 - Environments keep decisions: the web already rebuilt them on import; the server now rebuilds a published environment's decision entries from closed values on publish, update and restore, refuses an entry of an unknown type and a note that is not a text of at most 4,000 characters (`fix/environment-decision-entries`, a pull request of its own after PR 2). The dev database held no entry those refusals would reject (read-only count, 7 October). Annotations on decisions inside environments stay Task 21's.
 
+
+**Amendment, 2026-10-08 — the owner's answer C.** The Corte costituzionale's decision PDF carries its licence («· licenza CC BY-SA 3.0» in the footer, and a closing line with the licence's address); the Cassazione's PDF and the page carry none. Global constraints and the closing task's browser pass corrected accordingly.

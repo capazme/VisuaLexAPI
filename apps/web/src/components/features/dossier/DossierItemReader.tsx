@@ -19,6 +19,7 @@ import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
+import { highlightColorName } from '../../../utils/highlightColors';
 
 interface Props {
   norma: NormaVisitata;
@@ -199,7 +200,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
       return;
     }
     addHighlight(itemKey, uniqueArticleId, text, '', color, startOffset);
-    showToast(`Testo evidenziato in ${color}`, 'success');
+    showToast(`Testo evidenziato in ${highlightColorName(color)}`, 'success');
   };
 
   const handlePopupCopy = async (text: string) => {

@@ -15,7 +15,7 @@ import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight, In
 import { addToHistory } from '../../../services/historyService';
 import { isAuthenticated } from '../../../services/authService';
 import { useSearchParams } from 'react-router-dom';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
 import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
@@ -338,6 +338,16 @@ export function SearchPanel() {
     // search starts clean.
     let parseFailures = 0;
 
+    // A search started from another tab (a norm cited in a decision): once its first result has
+    // landed, the tab that holds it goes beside that one, the asking tab on the left. Once per search.
+    let placed = !params.besideTabId;
+    const placeBeside = () => {
+      const destination = streamingTabRef.current?.tabId;
+      if (placed || !destination || !params.besideTabId) return;
+      placed = true;
+      appStore.getState().placeTabsSideBySide(params.besideTabId, destination);
+    };
+
     try {
       // Always use streaming endpoint (now supports Brocardi too!)
       const response = await legalFetch('/stream_article_text', {
@@ -368,6 +378,7 @@ export function SearchPanel() {
             try {
               const result = JSON.parse(line);
               processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters, params.version);
+              placeBeside();
             } catch (e) {
               parseFailures += 1;
               console.error("Error parsing line", line, e);
@@ -381,6 +392,7 @@ export function SearchPanel() {
         try {
           const result = JSON.parse(buffer);
           processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters, params.version);
+          placeBeside();
         } catch (e) {
           parseFailures += 1;
           console.error("Error parsing final buffer", e);

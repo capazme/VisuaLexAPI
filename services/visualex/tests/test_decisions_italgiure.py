@@ -555,3 +555,19 @@ async def test_a_damaged_pdf_is_not_given(monkeypatch):
     pdf = _pdf_of(LINES)
     _serve_with_pdf(monkeypatch, _record(LINES), pdf[: len(pdf) // 3])
     assert await ItalgiureReader().original_pdf("civile", 12345, 2026) is None
+
+
+def test_a_field_text_with_carriage_returns_comes_out_with_line_feeds():
+    d = to_decision({"numdec": "10787", "anno": "2024", "szdec": "3", "datdep": ["20240422"],
+                     "ocr": ["riga uno\rriga due\r\nterza riga"], "ocrdis": ["Rigetta.\r"]}, "civile")
+    assert "\r" not in "".join(d.testo.values())
+    assert "riga uno\nriga due\nterza riga" in d.testo["motivazione"]
+
+
+def test_a_pdf_derived_text_with_carriage_returns_comes_out_with_line_feeds(monkeypatch):
+    from visualex_api.services.decisions import pdf_text
+    monkeypatch.setattr(pdf_text, "_paragraphs", lambda body: ["Considerato che\rla parte\r\ndice", "P.Q.M. Rigetta."])
+    pdf = make_pdf([[Text(85, 700, "Considerato che la parte dice"), Text(85, 650, "P.Q.M. Rigetta.")]])
+    text, _ = read_decision_pdf(pdf)
+    assert "\r" not in "".join(text.values())
+    assert text["motivazione"] == "Considerato che\nla parte\ndice"

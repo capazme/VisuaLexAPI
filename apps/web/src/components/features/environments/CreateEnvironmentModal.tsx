@@ -82,6 +82,7 @@ export function CreateEnvironmentModal({
 
   const handleSubmit = () => {
     if (!name.trim()) return;
+    // A private save keeps every anchor, decisions included (spec §8.6): only an export, a link or the Forum filter.
     const selectionToUse = includeContent && selectedCount > 0 ? selection : null;
     onCreate(name.trim(), selectionToUse, {
       description: description.trim() || undefined,

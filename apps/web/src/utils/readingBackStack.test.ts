@@ -75,6 +75,21 @@ describe('findLiveBackIndex', () => {
   });
 });
 
+describe('findLiveBackIndex with a decision tab', () => {
+  const decisionEntry: ReadingBackEntry = { tabId: 'dec-1', blockId: 'dec-1', articleId: '', label: 'Cass. civ., n. 1/2024' };
+
+  it('is live while the decision tab is open, its block being the tab itself', () => {
+    const decisionTab = { id: 'dec-1', content: [], view: { kind: 'decision' } };
+    expect(findLiveBackIndex([decisionEntry], [decisionTab])).toBe(0);
+  });
+
+  it('is dead once the tab is closed, or when it is not a decision', () => {
+    expect(findLiveBackIndex([decisionEntry], [])).toBe(-1);
+    expect(findLiveBackIndex([decisionEntry], [{ id: 'dec-1', content: [], view: { kind: 'decision-search' } }])).toBe(-1);
+    expect(findLiveBackIndex([decisionEntry], [{ id: 'dec-1', content: [] }])).toBe(-1);
+  });
+});
+
 describe('peekReadingBack', () => {
   it('returns the entry the control would take you to', () => {
     const stack = [entry('1'), entry('2')];

@@ -18,6 +18,8 @@ export interface ArticleBodyProps {
     updatesOpen?: boolean;
     /** A past text: the selection popup offers only "Copia" (see SelectionPopup). */
     copyOnly?: boolean;
+    /** The classes of the text root (typography and structure): `vlx-art` for an article. */
+    className?: string;
 }
 
 export function ArticleBody({
@@ -31,6 +33,7 @@ export function ArticleBody({
     onPopupReportCitation,
     updatesOpen = false,
     copyOnly = false,
+    className = 'vlx-art',
 }: ArticleBodyProps) {
     // The text alone, without the selection popup: stored offsets are measured
     // from here (see SelectionPopup's textRootRef).
@@ -51,7 +54,7 @@ export function ArticleBody({
             {/* A size container: with room beside the 68ch column, each
                 block's annotation sign moves to the right margin (index.css). */}
             <div className="vlx-frame">
-                <div ref={textRef} className={cn('vlx-art px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
+                <div ref={textRef} className={cn(className, 'px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
                     {processedContent ? (
                         <SafeHTML html={processedContent} />
                     ) : (

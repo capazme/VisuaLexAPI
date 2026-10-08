@@ -62,7 +62,7 @@ describe('StudyModeContent — copying the words of the text in force', () => {
     fireEvent.click(await screen.findByTitle(/^Copia \(/));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toMatch(
-      new RegExp(`^art\\. 1284 c\\.c\\. \\(Normattiva, testo vigente, consultato il [^)]+\\)\\n\\n${WORDS}$`),
+      new RegExp(`^art\\. 1284 c\\.c\\. \\(Normattiva, testo vigente, consultato (?:il |l')[^)]+\\)\\n\\n${WORDS}$`),
     );
   });
 });

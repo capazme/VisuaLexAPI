@@ -3,16 +3,16 @@ import { parseDecisionCitation } from '../decisionCitationParser';
 
 const NOW = new Date('2026-10-05T12:00:00Z');
 const CASES: Array<[string, Record<string, unknown> | null]> = [
-  ['Cass. 10787/2024', { corte: 'cassazione', numero: 10787, anno: 2024 }],
-  ['Cassazione n. 10787 del 2024', { corte: 'cassazione', numero: 10787, anno: 2024 }],
-  ['Cass. civ. 10787/2024', { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }],
-  ['Cass. civ., sez. III, n. 10787/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'III', numero: 10787, anno: 2024 }],
-  ['Cass. pen., sez. VII, 10787/2024', { corte: 'cassazione', archivio: 'penale', sezione: 'VII', numero: 10787, anno: 2024 }],
+  ['Cass. 99999/2024', { corte: 'cassazione', numero: 99999, anno: 2024 }],
+  ['Cassazione n. 99999 del 2024', { corte: 'cassazione', numero: 99999, anno: 2024 }],
+  ['Cass. civ. 99999/2024', { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }],
+  ['Cass. civ., sez. III, n. 99999/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'III', numero: 99999, anno: 2024 }],
+  ['Cass. pen., sez. VII, 99999/2024', { corte: 'cassazione', archivio: 'penale', sezione: 'VII', numero: 99999, anno: 2024 }],
   ['Cass. SU 31310/2024', { corte: 'cassazione', sezione: 'U', numero: 31310, anno: 2024 }],
   ['Cass. civ., sez. un., n. 31310/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'U', numero: 31310, anno: 2024 }],
   ['S.U. 31310/2024', { corte: 'cassazione', sezione: 'U', numero: 31310, anno: 2024 }],
   ['Cass. civ., sez. lav., 21 aprile 2022, n. 12789', { corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: 12789, anno: 2022 }],
-  ['Cass. pen., sez. VII, 10 gennaio 2024 (dep. 14 marzo 2024), n. 10787', { corte: 'cassazione', archivio: 'penale', sezione: 'VII', numero: 10787, anno: 2024 }],
+  ['Cass. pen., sez. VII, 10 gennaio 2024 (dep. 14 marzo 2024), n. 99999', { corte: 'cassazione', archivio: 'penale', sezione: 'VII', numero: 99999, anno: 2024 }],
   ['Cass. civ. 1234/99', { corte: 'cassazione', archivio: 'civile', numero: 1234, anno: 1999 }],
   ['Corte cost. 71/2020', { corte: 'corte_costituzionale', numero: 71, anno: 2020 }],
   ['C. cost. n. 71 del 2020', { corte: 'corte_costituzionale', numero: 71, anno: 2020 }],
@@ -24,9 +24,9 @@ const CASES: Array<[string, Record<string, unknown> | null]> = [
   ['Cass. pen. n. 1399/1999, depositata il 14/03/2000', { corte: 'cassazione', archivio: 'penale', numero: 1399, anno: 2000 }],
   ['Cass. civ., sez. III, n. 12789 del 21 aprile 2022', { corte: 'cassazione', archivio: 'civile', sezione: 'III', numero: 12789, anno: 2022 }],
   ['Cass. pen. n. 1399 del 15/12/1999', { corte: 'cassazione', archivio: 'penale', numero: 1399, anno: 1999 }],
-  ['Cass. civ. n. 10787 del 14/03/2024', { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }],
-  ['Cass. civ., sez. 6-1, n. 10787/2024', { corte: 'cassazione', archivio: 'civile', sezione: '6', numero: 10787, anno: 2024 }],
-  ['Cass. civ., sez. VI-1, n. 10787/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'VI', numero: 10787, anno: 2024 }],
+  ['Cass. civ. n. 99999 del 14/03/2024', { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }],
+  ['Cass. civ., sez. 6-1, n. 99999/2024', { corte: 'cassazione', archivio: 'civile', sezione: '6', numero: 99999, anno: 2024 }],
+  ['Cass. civ., sez. VI-1, n. 99999/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'VI', numero: 99999, anno: 2024 }],
   ['Cass. civ., Sez. L, n. 12789/2022', { corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: 12789, anno: 2022 }],
   ['su questo punto 12/2020', null],
   ['SU n. 31310/2024', { corte: 'cassazione', sezione: 'U', numero: 31310, anno: 2024 }],
@@ -36,9 +36,9 @@ const CASES: Array<[string, Record<string, unknown> | null]> = [
   ['art 2043 cc', null],
   ['art. 2043 c.c.', null],
   ['Cass. civ.', null],
-  ['Cass. 10787', null],
+  ['Cass. 99999', null],
   ['Cass. 0/2024', null],
-  ['Cass. 10787/2030', null],
+  ['Cass. 99999/2030', null],
   ['Corte cost. 1/1950', null],
 ];
 
@@ -48,12 +48,12 @@ describe('parseDecisionCitation', () => {
   }
 
   it("leaves the input to the user's alias that starts it", () => {
-    expect(parseDecisionCitation('cass 10787/2024', { aliasTriggers: ['cass'], now: NOW })).toBeNull();
+    expect(parseDecisionCitation('cass 99999/2024', { aliasTriggers: ['cass'], now: NOW })).toBeNull();
   });
 
   it('compares alias triggers without dots, on both sides', () => {
-    expect(parseDecisionCitation('cass 10787/2024', { aliasTriggers: ['cass.'], now: NOW })).toBeNull();
-    expect(parseDecisionCitation('cass. 10787/2024', { aliasTriggers: ['cass'], now: NOW })).toBeNull();
+    expect(parseDecisionCitation('cass 99999/2024', { aliasTriggers: ['cass.'], now: NOW })).toBeNull();
+    expect(parseDecisionCitation('cass. 99999/2024', { aliasTriggers: ['cass'], now: NOW })).toBeNull();
   });
 
   it('returns quickly on a long hostile paste', () => {

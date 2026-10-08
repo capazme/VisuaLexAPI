@@ -11,9 +11,9 @@ import { fetchDecisionCached, forgetDecision } from '../../../utils/decisionFetc
 import { DecisionTabView } from './DecisionTabView';
 import { renderTabView } from '../workspace/renderTabView';
 
-const CIVILE = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
+const CIVILE = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 const PENALE = { ...CIVILE, archivio: 'penale' as const };
-const AMBIGUA_REF = { corte: 'cassazione' as const, numero: 10787, anno: 2024 };
+const AMBIGUA_REF = { corte: 'cassazione' as const, numero: 99999, anno: 2024 };
 
 const foundOf = (identita: DecisionReference, sezione: string): FetchDecisionAnswer => ({
   esito: 'trovata',
@@ -59,9 +59,9 @@ describe('DecisionTabView', () => {
     const { id, tab } = openTab({ ...AMBIGUA_REF, sezione: 'VII' });
     expect(tab().view).toEqual({ kind: 'decision', reference: { ...AMBIGUA_REF, sezione: 'VII' } });
     render(<>{renderTabView(tab(), tab().view!)}</>);
-    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 99999\/2024/)).toBeInTheDocument();
     expect(fetchDecision).toHaveBeenCalledWith({ ...AMBIGUA_REF, sezione: 'VII' });
-    await waitFor(() => expect(tab().label).toBe('Cass. pen., sez. VII, n. 10787/2024'));
+    await waitFor(() => expect(tab().label).toBe('Cass. pen., sez. VII, n. 99999/2024'));
     expect(tab().view).toEqual({ kind: 'decision', reference: PENALE });
     expect(id).toBe(tab().id);
   });
@@ -71,7 +71,7 @@ describe('DecisionTabView', () => {
     const { id, tab } = openTab(AMBIGUA_REF);
     render(<DecisionTabView tabId={id} reference={AMBIGUA_REF} />);
     fireEvent.click(await screen.findByRole('link', { name: /Sez\. VII penale/ }));
-    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sez\. VII penale · Sentenza n\. 99999\/2024/)).toBeInTheDocument();
     await waitFor(() => expect(tab().view).toEqual({ kind: 'decision', reference: PENALE }));
     expect(appStore.getState().workspaceTabs).toHaveLength(1);
     expect(fetchDecision).toHaveBeenLastCalledWith(PENALE);
@@ -92,7 +92,7 @@ describe('DecisionTabView', () => {
     expect(tab().label).toBe(labelBefore);
     await act(async () => { answerCivile(foundOf(CIVILE, '3')); });
     expect(await screen.findByText(/Sez\. III civile/)).toBeInTheDocument();
-    await waitFor(() => expect(tab().label).toBe('Cass. civ., sez. III, n. 10787/2024'));
+    await waitFor(() => expect(tab().label).toBe('Cass. civ., sez. III, n. 99999/2024'));
   });
 
   it('an answer that arrives after the tab was closed reaches nothing', async () => {
@@ -114,7 +114,7 @@ describe('DecisionTabView', () => {
     render(<DecisionTabView tabId={id} reference={CIVILE} />);
     expect(await screen.findByText('La fonte non risponde in questo momento.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByText(/Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sentenza n\. 99999\/2024/)).toBeInTheDocument();
     expect(fetchDecision).toHaveBeenCalledTimes(2);
   });
 
@@ -135,7 +135,7 @@ describe('DecisionTabView', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Cerca nella barra di ricerca' }));
     expect(appStore.getState().commandPaletteOpen).toBe(true);
     // with the citation typed in, ready to be corrected
-    expect(appStore.getState().commandPaletteQuery).toBe('Cass. civ., n. 10787/2024');
+    expect(appStore.getState().commandPaletteQuery).toBe('Cass. civ., n. 99999/2024');
   });
 });
 
@@ -150,7 +150,7 @@ describe('DecisionTabView — focus after a merge of two tabs', () => {
     const panel = screen.getByRole('heading', { level: 4 });
     expect(panel).not.toHaveFocus();
 
-    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 10787/2024'); });
+    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 99999/2024'); });
 
     await waitFor(() => expect(panel).toHaveFocus());
     expect(appStore.getState().decisionFocusRequest).toBeNull();
@@ -180,7 +180,7 @@ describe('DecisionTabView — the desktop panel and the phone view, both mounted
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(2));
     const [, shownHeading] = screen.getAllByRole('heading', { level: 4 });
     const other = openTab(CIVILE);
-    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 10787/2024'); });
+    act(() => { appStore.getState().setDecisionTabIdentity(other.id, PENALE, 'Cass. pen., n. 99999/2024'); });
     await waitFor(() => expect(shownHeading).toHaveFocus());
     expect(appStore.getState().decisionFocusRequest).toBeNull();
   });

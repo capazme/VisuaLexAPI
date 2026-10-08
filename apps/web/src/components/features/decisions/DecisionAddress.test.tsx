@@ -23,14 +23,14 @@ beforeEach(() => appStore.setState({ pendingDecision: null, commandPaletteOpen: 
 
 describe('DecisionAddress', () => {
   it('queues the decision and lands on the search page, once', async () => {
-    renderAt('/sentenze/cassazione-civile/10787/2024');
+    renderAt('/sentenze/cassazione-civile/99999/2024');
     await screen.findByTestId('search-page');
-    expect(appStore.getState().pendingDecision).toEqual({ corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 });
+    expect(appStore.getState().pendingDecision).toEqual({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 });
     expect(appStore.getState().commandPaletteOpen).toBe(false);
   });
 
   it('keeps the section of a reference without the archive', async () => {
-    renderAt('/sentenze/cassazione/10787/2024?sezione=III');
+    renderAt('/sentenze/cassazione/99999/2024?sezione=III');
     await screen.findByTestId('search-page');
     expect(appStore.getState().pendingDecision).toMatchObject({ corte: 'cassazione', sezione: 'III' });
   });
@@ -45,7 +45,7 @@ describe('DecisionAddress', () => {
     ['/sentenze', '/sentenze alone'],
     ['/sentenze/tar-lazio/1/2024', 'an unknown court'],
     ['/sentenze/cassazione-civile/0/2024', 'a number out of range'],
-    ['/sentenze/cassazione-civile/10787/1800', 'a year out of range'],
+    ['/sentenze/cassazione-civile/99999/1800', 'a year out of range'],
   ])('opens the palette and queues nothing for %s (%s)', async (path) => {
     renderAt(path);
     await screen.findByTestId('search-page');
@@ -64,7 +64,7 @@ describe('DecisionAddress', () => {
     await screen.findByTestId('search-page');
     expect(appStore.getState().lastSyncError).toBeNull();
     alone.unmount();
-    renderAt('/sentenze/cassazione-civile/10787/2024');
+    renderAt('/sentenze/cassazione-civile/99999/2024');
     await screen.findByTestId('search-page');
     expect(appStore.getState().lastSyncError).toBeNull();
   });

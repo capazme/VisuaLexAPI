@@ -1,3 +1,5 @@
+import { annotationTargetLabel } from '../environments/annotationLabels';
+import { isDecisionKey } from '../../../utils/decisionLinks';
 import type { ReactNode } from 'react';
 import { Check, X as XIcon, Clock, FileText, Highlighter, Folder, Zap, Link2 } from 'lucide-react';
 import type { SuggestionItem, SuggestionItemType } from '../../../types';
@@ -74,12 +76,18 @@ function StatusChip({ status, reviewedAt }: { status: SuggestionItem['status']; 
   );
 }
 
+/** Where a note or highlight sits: a decision by its short citation (its articleId is empty), a norm by its article. */
+function targetLabel(p: Record<string, unknown>): string {
+  if (typeof p.normaKey === 'string' && isDecisionKey(p.normaKey)) return annotationTargetLabel(p.normaKey);
+  return typeof p.articleId === 'string' ? p.articleId : '';
+}
+
 function ItemPreview({ item }: { item: SuggestionItem }) {
   const p = item.payload as Record<string, unknown>;
   switch (item.itemType) {
     case 'annotation': {
       const anchor = typeof p.anchorText === 'string' ? p.anchorText : undefined;
-      const articleId = typeof p.articleId === 'string' ? p.articleId : '';
+      const articleId = targetLabel(p);
       const text = typeof p.text === 'string' ? p.text : '';
       return (
         <div>
@@ -94,7 +102,7 @@ function ItemPreview({ item }: { item: SuggestionItem }) {
       const color = typeof p.colorVar === 'string' ? p.colorVar : 'yellow';
       const swatchBg = HIGHLIGHT_SWATCH_BG[color] ?? HIGHLIGHT_SWATCH_BG.yellow;
       const anchor = typeof p.anchorText === 'string' ? p.anchorText : '';
-      const articleId = typeof p.articleId === 'string' ? p.articleId : '';
+      const articleId = targetLabel(p);
       return (
         <div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{articleId}</p>

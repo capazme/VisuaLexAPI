@@ -30,8 +30,8 @@ beforeEach(() => { login.mockReset().mockResolvedValue(undefined); sessionStorag
 
 describe('LoginForm: where the reader lands', () => {
   it('back on the whole address a protected route saved, query included', async () => {
-    renderLogin({ from: { pathname: '/sentenze/cassazione/10787/2024', search: '?sezione=3', hash: '' } });
-    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/sentenze/cassazione/10787/2024?sezione=3'));
+    renderLogin({ from: { pathname: '/sentenze/cassazione/99999/2024', search: '?sezione=3', hash: '' } });
+    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/sentenze/cassazione/99999/2024?sezione=3'));
   });
 
   it('back on the address stashed when the session ended, and the stash is spent', async () => {

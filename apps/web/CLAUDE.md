@@ -30,7 +30,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionTabView`,
   its workspace tab and the phone view; `DecisionAddress`, the `/sentenze/…` route element;
   `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
-  `DecisionTextView`: a court decision's text; `DecisionResultList`, the Cassazione's decisions for an
+  `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
+  reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, and `DecisionSearchTabView`, its workspace tab; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
@@ -194,6 +195,48 @@ article text changes, a discussion whose words moved re-attaches to the new loca
 a detached one stays listed in the panel with a notice and its original quotation,
 never hidden or deleted. Supported on the article tab for now.
 
+**A court decision takes the same tools** (`DecisionReadingSurface`, PR 4): notes and
+highlights are stored under `normaKey = decisionKey(identity)` with `articleId = ''` (wire key
+`<key>::art::`), through the store's ordinary actions; the surface mounts the article's own
+`SelectionPopup`, `InlineNoteComposer`/`InlineNotePopover`, `NotesPeekPanel`,
+`HighlightsActionsPicker`, the round-B signs and `BlockAnnotationsPopover` (a paragraph is the
+block; `decisionStructure` names them). `DecisionReadingToolbar` draws the two toolbar buttons
+(`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
+(`UnmatchedAnchors`; a decision found without text hosts it through `DecisionAnchorsWithoutText`).
+No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRender.ts` is the
+renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
+`decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks
+that the rendered text nodes spell the projection (root rule 23). The .txt export of notes and
+highlights is shared with the article (`utils/annotationExport.ts`). Only what really
+leaves the account carries just the anchors whose words are still in the decision's text: an
+environment's export file, its share link and the Forum (publishing, editing, suggestions), through
+`utils/decisionAnchorsTravel.ts` (`travellingAnchors`, `travellingSelection`): «the decision's
+current text» is the server's cached copy (up to 30 days, the owner's choice), so words a court
+has withdrawn can travel until it expires; lookups run per distinct decision, at most four at a
+time, and a failure is not cached. `isAnchoredNote` (`decisionRender.ts`) is the one definition of
+a note that quotes words (a note without a quote is free). The decision downloads, the notes and
+highlights .txt, an environment's file and a dossier's JSON go through `utils/saveBlob.ts` (the
+object URL is revoked later, not at once); a few older exports still make their own link. `DecisionTextView` renders a
+found decision only for a host that mounts `DecisionView` without the reading surface; the
+workspace tab always passes the surface. A private
+environment save (create, create from a selection, update, refresh) stays in the account and keeps
+every anchor, decisions included (the owner, 8 Oct 2026). The personal files are not filtered
+either: the .txt export and the PDF «Con le mie evidenziazioni e note» list the anchors that no
+longer land (the PDF under «Non ritrovate nel testo attuale»), like the account export — the user's
+own data (decided by the owner, 8 Oct 2026).
+**Downloads** (`DecisionDownloads`, among `DecisionView`'s actions for a found decision):
+«Scarica PDF» is a PDF of ours (`decisionPdf.ts`: `decisionPdfModel` is pure,
+`writeDecisionPdf` draws it with jsPDF through `utils/pdfWriter.ts`, the page layout the
+dossier's PDF shares), optionally «Con le mie evidenziazioni e note» (placed by `resolveAnchors`
+over the same projection; free notes follow the text; anchors that no longer land are listed under
+«Non ritrovate nel testo attuale», switchable with the `includeUnmatched` option of
+`decisionPdfModel`); «PDF originale della Corte», for the Cassazione only, is the court's own file
+through `/fetch_decision_pdf` (`services/decisionPdfService.ts`, via `legalFetch`). The footer of
+the Corte costituzionale's PDF adds «· licenza <fonte.licenza>» (e.g. CC BY-SA 3.0), and the text ends with its
+own line «Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0 — <licence address>» (`licenceLine`; the
+address from a small table, no line for an unknown licence); the
+Cassazione's PDF and the page (`DecisionView` footer) carry no licence line (the owner, 8 Oct 2026).
+
 **A past text is a reading** (round "Testo alla data", spec
 `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`). The server
 states, next to `article_text`, the window the source's own page gives
@@ -291,8 +334,9 @@ plain click on the search page opens the tab beside the article and, given a `ba
 the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as for a citation jump; any
 other click follows the real `href`, which `DecisionAddress` turns into the same tab), the
 sidebar's «Sentenze» (a button: it opens the palette, there is no page) and the address itself
-(queued in `pendingDecision`, drained by `SearchPanel`). Highlights and notes do not exist on
-decisions yet (gotcha 23). «Cerca nella barra di ricerca», on a decision that was not found, opens the
+(queued in `pendingDecision`, drained by `SearchPanel`). The tab reads the decision on the
+reading surface, where highlights and notes work as on an article (see «A court decision takes
+the same tools»). «Cerca nella barra di ricerca», on a decision that was not found, opens the
 palette with its citation typed in (`openCommandPaletteWith`, taken once). The desktop panel and
 the phone view both mount a `DecisionTabView` for the same tab, one of them hidden: only the copy
 on screen takes the focus request, and both follow the identity the store learns, keeping the answer already shown (notices included) and seeding it

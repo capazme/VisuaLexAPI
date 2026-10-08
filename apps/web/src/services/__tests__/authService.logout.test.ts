@@ -22,7 +22,7 @@ describe('logout', () => {
   it('forgets the address kept for the next login, drops the tokens and goes to the login', () => {
     localStorage.setItem('access_token', 'a');
     localStorage.setItem('refresh_token', 'r');
-    sessionStorage.setItem('vlx:return-to', '/sentenze/cassazione/10787/2024');
+    sessionStorage.setItem('vlx:return-to', '/sentenze/cassazione/99999/2024');
     logout();
     expect(sessionStorage.getItem('vlx:return-to')).toBeNull();
     expect(localStorage.getItem('access_token')).toBeNull();

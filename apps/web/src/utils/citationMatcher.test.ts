@@ -368,3 +368,58 @@ describe('extractCitations — article suffixes past decies', () => {
     },
   );
 });
+
+// An act's abbreviation is never read inside a longer one: "art. 110 c.p.a." (codice del
+// processo amministrativo) used to link to the codice penale's art. 110, and "c.p.c." to the
+// codice penale too, because the shorter alternative came first.
+describe('extractCitations — an abbreviation is not the head of a longer one', () => {
+  const norma = { tipo_atto: 'codice civile' } as never;
+  const read = (text: string) => extractCitations(text, norma).map((c) => [c.text, c.parsed.act_type, c.parsed.article]);
+
+  it('"c.p.a." is the codice del processo amministrativo, never the codice penale', () => {
+    expect(read("ai sensi dell'art. 110 c.p.a. il ricorso")).toEqual([["dell'art. 110 c.p.a.", 'codice del processo amministrativo', '110']]);
+    expect(read('art. 110 c.p.a')).toEqual([['art. 110 c.p.a', 'codice del processo amministrativo', '110']]);
+  });
+
+  it('"c.p." and "c.p.c." and "c.p.p." still link to their own code', () => {
+    expect(read('art. 110 c.p.')).toEqual([['art. 110 c.p.', 'codice penale', '110']]);
+    expect(read('art. 360 c.p.c.')).toEqual([['art. 360 c.p.c.', 'codice di procedura civile', '360']]);
+    expect(read('art. 360 c.p.p.')).toEqual([['art. 360 c.p.p.', 'codice di procedura penale', '360']]);
+    expect(read('artt. 1 e 2 c.p.c.')[0][1]).toBe('codice di procedura civile');
+  });
+
+  it('"c.c.i." (codice della crisi) is not "c.c." and gets no link at all', () => {
+    expect(read('art. 5 c.c.i. prevede')).toEqual([]);
+    expect(read('art. 5 c.c. prevede')).toEqual([['art. 5 c.c.', 'codice civile', '5']]);
+  });
+
+  it('a word that begins like an abbreviation is not one', () => {
+    expect(read("l'art. 5 costituzionale")).toEqual([]);
+  });
+
+  it('"c.p." followed by a word that starts with c or p stays the codice penale', () => {
+    expect(read("art. 640 c.p. c'è truffa")[0]).toEqual(['art. 640 c.p.', 'codice penale', '640']);
+    expect(read('art. 640 c.p. c) la frode')[0]).toEqual(['art. 640 c.p.', 'codice penale', '640']);
+    expect(read('art. 2 c.p. p.')[0]).toEqual(['art. 2 c.p.', 'codice penale', '2']);
+  });
+
+  it('a closing quote after the abbreviation does not hide the citation', () => {
+    expect(read('«art. 2043 c.c.»')[0]).toEqual(['art. 2043 c.c.', 'codice civile', '2043']);
+    expect(read('‘art. 2043 c.c.’')[0]).toEqual(['art. 2043 c.c.', 'codice civile', '2043']);
+    expect(read("'art. 2043 c.c.'")[0]).toEqual(['art. 2043 c.c.', 'codice civile', '2043']);
+    expect(read('l’“art. 3 Cost.’')[0][1]).toBe('costituzione');
+    expect(read("art. 640 c.p.'")[0][1]).toBe('codice penale');
+    // …while an apostrophe before a letter is still the next word
+    expect(read("art. 640 c.p. c'è truffa")[0][1]).toBe('codice penale');
+    expect(read("art. 5 cost'")).toEqual([['art. 5 cost', 'costituzione', '5']]);
+  });
+
+  it('the fully spaced forms are still the code of civil and of penal procedure', () => {
+    expect(read('art. 5 c. p. c.')).toEqual([['art. 5 c. p. c.', 'codice di procedura civile', '5']]);
+    expect(read('art. 5 c. p. p.')).toEqual([['art. 5 c. p. p.', 'codice di procedura penale', '5']]);
+  });
+
+  it('a final "c.p." before the next sentence still links', () => {
+    expect(read('previsto dall\'art. 110 c.p. Il ricorso è infondato')).toEqual([["dall'art. 110 c.p.", 'codice penale', '110']]);
+  });
+});

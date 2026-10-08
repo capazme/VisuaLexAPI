@@ -77,6 +77,9 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
   'c.p': 'codice penale',
   'cp': 'codice penale',
   'cod. pen.': 'codice penale',
+  'c.p.a.': 'codice del processo amministrativo',
+  'c.p.a': 'codice del processo amministrativo',
+  'cpa': 'codice del processo amministrativo',
   'c.p.c.': 'codice di procedura civile',
   'c.p.c': 'codice di procedura civile',
   'cpc': 'codice di procedura civile',
@@ -96,6 +99,26 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
   'tfue': 'TFUE',
   'cdfue': 'CDFUE',
 };
+
+// L'abbreviazione di un atto dopo "art. N" (c.c., c.p.c., c.p.a., ...), una sola
+// copia per i pattern 2 e 3. Le alternative vanno dalla più lunga alla più
+// corta (in JS vince la prima che combacia: "c.p." davanti a "c.p.c." leggeva
+// il codice penale), e il lookahead `(?!\.?[a-zà-ÿ'’])` impedisce a un'abbreviazione
+// di essere letta dentro una più lunga o dentro una parola: "c.p.a." non è
+// "c.p.", "c.c.i." non è "c.c.", "costituzionale" non è "cost", "c.p. c'è" non
+// è "c.p.c". Un apostrofo blocca solo se segue una lettera: «art. 2043 c.c.’» (virgolette
+// che si chiudono) resta un link. Un punto finale seguito da spazio resta valido ("art. 110 c.p.
+// Il ricorso"). Le forme di tre lettere si scrivono attaccate ("c.p.c.", "cpc")
+// o del tutto spaziate con tutti i punti ("c. p. c."): una lettera dopo uno
+// spazio senza la sua serie di punti è la parola seguente ("c.p. c) la frode",
+// "c.p. p."), mai parte dell'abbreviazione. Stesso lookahead di
+// `_ACT_ABBREV_PATTERN` in citation_linker.py (che non ammette spazi interni).
+const ACT_SUFFIX_PATTERN =
+  '(' +
+  '(?:c\\.?p\\.?c|c\\.\\s+p\\.\\s+c(?=\\.)|c\\.?p\\.?p|c\\.\\s+p\\.\\s+p(?=\\.)|c\\.?p\\.?a|' +
+  'c\\.?\\s*c|c\\.?\\s*p|' +
+  'cost|c\\.?\\s*d\\.?\\s*s|c\\.?\\s*n|prel|cod\\.?\\s*civ|cod\\.?\\s*pen)' +
+  "(?!\\.?[a-zà-ÿ])(?!\\.?['’][a-zà-ÿ])\\.?)";
 
 // Suffissi articolo (bis, ter, ... terdecies, sexiesdecies): la tabella sta in
 // articleSuffixes.ts, ed è la sola copia. Il \b è obbligatorio: senza, il
@@ -401,9 +424,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
     '(?:\\s*[,e]\\s*\\d+' + ARTICLE_SUFFIX_PATTERN + ')*' +  // Altri articoli
     '\\s+' +
     // Suffisso tipo atto
-    '(c\\.?\\s*c\\.?|c\\.?\\s*p\\.?|c\\.?\\s*p\\.?\\s*c\\.?|c\\.?\\s*p\\.?\\s*p\\.?|' +
-    'cost\\.?|c\\.?\\s*d\\.?\\s*s\\.?|c\\.?\\s*n\\.?|prel\\.?|' +
-    'cod\\.?\\s*civ\\.?|cod\\.?\\s*pen\\.?)',
+    ACT_SUFFIX_PATTERN,
     'gi'
   );
 
@@ -433,9 +454,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
     '(?:\\s*,?\\s*(?:comma|co\\.|lett\\.?)\\s*[\\d\\w]+)*' +
     // Separatore e suffisso tipo atto
     '\\s*,?\\s*' +
-    '(c\\.?\\s*c\\.?|c\\.?\\s*p\\.?|c\\.?\\s*p\\.?\\s*c\\.?|c\\.?\\s*p\\.?\\s*p\\.?|' +
-    'cost\\.?|c\\.?\\s*d\\.?\\s*s\\.?|c\\.?\\s*n\\.?|prel\\.?|' +
-    'cod\\.?\\s*civ\\.?|cod\\.?\\s*pen\\.?)',
+    ACT_SUFFIX_PATTERN,
     'gi'
   );
 

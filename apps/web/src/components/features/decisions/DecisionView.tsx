@@ -16,6 +16,8 @@ import {
 import { hasDecisionText } from '../../../utils/decisionText';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { sentenzaFromDecision } from '../dossier/dossierUtils';
+import { DecisionDownloads } from './DecisionDownloads';
+import { DecisionAnchorsWithoutText } from './DecisionAnchorsWithoutText';
 import { DecisionTextView } from './DecisionTextView';
 
 export interface DecisionViewProps {
@@ -139,12 +141,16 @@ function FoundView({ answer, onToast, actions, textSlot }: {
             <ExternalLink size={16} aria-hidden /> Apri sulla fonte
           </a>
         )}
+        <DecisionDownloads answer={answer} identity={answer.identita} />
         {actions}
       </div>
-      {/* Found without its text: the notice above says so, and no empty block is drawn. */}
-      {hasDecisionText(answer.testo) && (textSlot ?? <DecisionTextView testo={answer.testo} />)}
-      {/* No licence line (the owner's decision, confirmed on 2026-10-04): fonte.licenza stays in
-          the data. */}
+      {/* Found without its text: the notice above says so, no empty block is drawn, and the reader's
+          notes and highlights on it are listed instead of dropped. */}
+      {hasDecisionText(answer.testo)
+        ? (textSlot ?? <DecisionTextView testo={answer.testo} />)
+        : <DecisionAnchorsWithoutText identity={answer.identita} />}
+      {/* The page carries no licence line; the Corte costituzionale's PDF does (owner, 8 Oct
+          2026): fonte.licenza stays in the data and goes into that footer. */}
       <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         Fonte: {answer.fonte.nome}
       </footer>

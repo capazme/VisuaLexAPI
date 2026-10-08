@@ -181,6 +181,9 @@ export interface SearchParams {
     // multiple queued searches all land in the same pre-created tab without
     // relying on label-matching timing in processResult).
     targetTabId?: string;
+    // The workspace tab the search was started from: the tab it opens is placed beside it
+    // (a norm cited in a decision opens next to the decision).
+    besideTabId?: string;
 }
 
 // Annex metadata returned by tree endpoint

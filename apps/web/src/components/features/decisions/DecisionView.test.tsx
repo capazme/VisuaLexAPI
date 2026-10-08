@@ -18,7 +18,7 @@ vi.mock('../dossier/AddToDossierPopover', () => ({
 
 import { DecisionView, type DecisionViewProps } from './DecisionView';
 
-const REF = { corte: 'cassazione' as const, archivio: 'penale' as const, numero: 10787, anno: 2024 };
+const REF = { corte: 'cassazione' as const, archivio: 'penale' as const, numero: 99999, anno: 2024 };
 
 const FOUND: FetchDecisionAnswer = {
   esito: 'trovata',
@@ -50,8 +50,8 @@ const CONSULTA: FetchDecisionAnswer = {
 const AMBIGUOUS = {
   esito: 'ambigua' as const,
   candidati: [
-    { identita: { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 }, attributi: { sezione: '3' } },
-    { identita: { corte: 'cassazione' as const, archivio: 'penale' as const, numero: 10787, anno: 2024 }, attributi: { sezione: '7' } },
+    { identita: { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 }, attributi: { sezione: '3' } },
+    { identita: { corte: 'cassazione' as const, archivio: 'penale' as const, numero: 99999, anno: 2024 }, attributi: { sezione: '7' } },
   ],
 } satisfies FetchDecisionAnswer;
 
@@ -68,7 +68,7 @@ beforeEach(() => {
 describe('DecisionView', () => {
   it('shows the decision, its notice and its source', () => {
     view(FOUND);
-    expect(screen.getByText(/Sez\. VII penale · Sentenza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(screen.getByText(/Sez\. VII penale · Sentenza n\. 99999\/2024/)).toBeInTheDocument();
     expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
     expect(screen.getByText(/Fonte: Corte di cassazione/)).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('DecisionView', () => {
     view(FOUND);
     expect(screen.queryAllByRole('heading', { level: 1 })).toHaveLength(0);
     const heading = screen.getByRole('heading', { level: 4 });
-    expect(heading).toHaveTextContent(/Sentenza n\. 10787\/2024/);
+    expect(heading).toHaveTextContent(/Sentenza n\. 99999\/2024/);
     expect(heading).toHaveAttribute('tabindex', '-1');
   });
 
@@ -91,14 +91,14 @@ describe('DecisionView', () => {
   it('copies the citation as lawyers write it', async () => {
     view(FOUND);
     fireEvent.click(screen.getByRole('button', { name: 'Copia citazione' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787');
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 99999');
     expect(await screen.findByText('Citazione copiata')).toBeInTheDocument();
   });
 
   it('copies a link to the decision on this site', async () => {
     view(FOUND);
     fireEvent.click(screen.getByRole('button', { name: 'Copia collegamento' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/sentenze/cassazione-penale/10787/2024`);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/sentenze/cassazione-penale/99999/2024`);
     expect(await screen.findByText('Collegamento copiato')).toBeInTheDocument();
   });
 
@@ -124,7 +124,7 @@ describe('DecisionView', () => {
     view(FOUND);
     expect(screen.queryByTestId('popover')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
-    expect(screen.getByTestId('popover')).toHaveTextContent('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787');
+    expect(screen.getByTestId('popover')).toHaveTextContent('Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 99999');
     fireEvent.click(screen.getByRole('button', { name: 'Scegli Pratica' }));
     expect(await screen.findByText('Aggiunta a «Pratica»')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
@@ -155,7 +155,7 @@ describe('DecisionView', () => {
     view(CONSULTA);
     expect(screen.getByRole('link', { name: /Apri sulla fonte/ }))
       .toHaveAttribute('href', 'https://www.cortecostituzionale.it/scheda-pronuncia/2014/1');
-    // the owner, 2026-10-04: no licence line; fonte.licenza stays in the data
+    // the owner, 8 Oct 2026: the page has no licence line (only the Corte costituzionale's PDF does)
     expect(screen.getByText('Fonte: Corte costituzionale — dati aperti')).toBeInTheDocument();
     expect(screen.queryByText(/licenza|CC BY-SA/i)).toBeNull();
   });
@@ -174,7 +174,7 @@ describe('DecisionView', () => {
 
   it('a decision without its text shows its particulars and why, and no text block', () => {
     const { container } = view(WITHHELD);
-    expect(screen.getByText(/Sez\. III civile · Ordinanza n\. 10787\/2024/)).toBeInTheDocument();
+    expect(screen.getByText(/Sez\. III civile · Ordinanza n\. 99999\/2024/)).toBeInTheDocument();
     expect(screen.getByText(
       'Testo non disponibile presso la fonte: la Corte di cassazione lo indica come in fase di oscuramento dei dati personali.',
     )).toBeInTheDocument();
@@ -194,7 +194,7 @@ describe('DecisionView', () => {
     it('are links to their addresses', () => {
       view(AMBIGUOUS);
       expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
-        '/sentenze/cassazione-civile/10787/2024', '/sentenze/cassazione-penale/10787/2024']);
+        '/sentenze/cassazione-civile/99999/2024', '/sentenze/cassazione-penale/99999/2024']);
     });
 
     it('open a candidate in the same tab', () => {

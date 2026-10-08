@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { X, Share2, FileText, Tag, Folder, Check, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { EnvironmentCategory, SharedEnvironment } from '../../../types';
 import { getEnvironmentStats } from '../../../utils/environmentUtils';
+import { useLeftOutNotice } from '../environments/useLeftOutNotice';
+import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
 import { getErrorMessage } from '../../../utils/errors';
 
 interface PublishEnvironmentModalProps {
@@ -39,6 +41,10 @@ export function PublishEnvironmentModal({ onClose, onPublished }: PublishEnviron
 
   // Selected environment
   const selectedEnv = environments.find(e => e.id === selectedEnvId);
+
+  const noticeAnnotations = useMemo(() => (includeNotes ? selectedEnv?.annotations ?? [] : []), [includeNotes, selectedEnv]);
+  const noticeHighlights = useMemo(() => (includeHighlights ? selectedEnv?.highlights ?? [] : []), [includeHighlights, selectedEnv]);
+  const leftOutNotice = useLeftOutNotice(noticeAnnotations, noticeHighlights);
 
   // Handle environment selection
   const handleEnvSelect = (envId: string) => {
@@ -86,6 +92,8 @@ export function PublishEnvironmentModal({ onClose, onPublished }: PublishEnviron
     setLoading(true);
 
     try {
+      // Words a court withdrew do not go to the Forum (spec §8.6).
+      const travelling = await travellingSelection(noticeAnnotations, noticeHighlights);
       const published = await sharedEnvironmentService.publish({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -93,8 +101,8 @@ export function PublishEnvironmentModal({ onClose, onPublished }: PublishEnviron
           dossiers: selectedEnv.dossiers,
           quickNorms: selectedEnv.quickNorms,
           customAliases: selectedEnv.customAliases || [],
-          annotations: includeNotes ? selectedEnv.annotations : [],
-          highlights: includeHighlights ? selectedEnv.highlights : [],
+          annotations: noticeAnnotations.filter(a => travelling.annotationIds.has(a.id)),
+          highlights: noticeHighlights.filter(h => travelling.highlightIds.has(h.id)),
         },
         category,
         tags,
@@ -301,6 +309,10 @@ export function PublishEnvironmentModal({ onClose, onPublished }: PublishEnviron
               </span>
             </label>
           </div>
+
+          {leftOutNotice && (
+            <p role="status" className="text-sm text-amber-700 dark:text-amber-400">{leftOutNotice}</p>
+          )}
 
           {/* Error */}
           {error && (

@@ -5,6 +5,8 @@ import { sharedEnvironmentService } from '../../../services/sharedEnvironmentSer
 import { useAppStore } from '../../../store/useAppStore';
 import type { SharedEnvironment, EnvironmentCategory, Environment } from '../../../types';
 import type { EnvironmentSelection } from '../../../utils/environmentUtils';
+import { useLeftOutNotice } from '../environments/useLeftOutNotice';
+import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
 
 interface EditSharedEnvironmentModalProps {
   environment: SharedEnvironment;
@@ -63,6 +65,10 @@ export function EditSharedEnvironmentModal({
     createdAt: new Date().toISOString(),
   }), [dossiers, quickNorms, customAliases, annotations, highlights]);
 
+  const chosenAnnotations = useMemo(() => annotations.filter(a => selection.annotationIds.includes(a.id)), [annotations, selection.annotationIds]);
+  const chosenHighlights = useMemo(() => highlights.filter(h => selection.highlightIds.includes(h.id)), [highlights, selection.highlightIds]);
+  const leftOutNotice = useLeftOutNotice(chosenAnnotations, chosenHighlights);
+
   const hasContent = useMemo(() => {
     return (
       selection.dossierIds.length > 0 ||
@@ -90,13 +96,15 @@ export function EditSharedEnvironmentModal({
     setError(null);
 
     try {
+      // Words a court withdrew do not go to the Forum (spec §8.6).
+      const travelling = await travellingSelection(chosenAnnotations, chosenHighlights);
       // Build the new content
       const content = {
         dossiers: dossiers.filter(d => selection.dossierIds.includes(d.id)),
         quickNorms: quickNorms.filter(qn => selection.quickNormIds.includes(qn.id)),
         customAliases: customAliases.filter(a => selection.aliasIds.includes(a.id)),
-        annotations: annotations.filter(a => selection.annotationIds.includes(a.id)),
-        highlights: highlights.filter(h => selection.highlightIds.includes(h.id)),
+        annotations: chosenAnnotations.filter(a => travelling.annotationIds.has(a.id)),
+        highlights: chosenHighlights.filter(h => travelling.highlightIds.has(h.id)),
       };
 
       const updated = await sharedEnvironmentService.updateWithVersion(environment.id, {
@@ -311,6 +319,10 @@ export function EditSharedEnvironmentModal({
               </label>
             </div>
           </div>
+
+          {leftOutNotice && (
+            <p role="status" className="text-sm text-amber-700 dark:text-amber-400">{leftOutNotice}</p>
+          )}
 
           {/* Error */}
           {error && (

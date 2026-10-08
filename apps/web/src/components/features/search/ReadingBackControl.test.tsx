@@ -9,7 +9,7 @@ const articleTab = {
 } as unknown as WorkspaceTab;
 
 beforeEach(() => {
-  const decisionTab = appStore.getState().openDecisionTab({ corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 });
+  const decisionTab = appStore.getState().openDecisionTab({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 });
   void decisionTab;
 });
 

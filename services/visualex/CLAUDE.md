@@ -522,13 +522,16 @@ Breaking one of these breaks the product. Read before editing.
     characters (the texts before about 2001): the page draws a paragraph only between blank
     lines, so without it a block is one paragraph. Both add line breaks and nothing else.
     Whatever changes the shape of what a reader returns must raise the version in its cache
-    key (`italgiure:v3:…`, `corte_cost:v2:…`), or the entries cached before are served for up
-    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05) cover the readers of Tasks 7a to 7c, none of which had shipped,
+    key (`italgiure:v4:…`, `corte_cost:v2:…`), or the entries cached before are served for up
+    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.
     The characters of a decision's text are to be frozen like an article's (root rule 23): the readers
     may add or move `\n` and move a boundary between blocks, never change another character, and a
     cache version bump is for shape only. `tests/test_decisions_text_frozen.py` (synthetic PDFs
     and records in CI; real ones in the `_local` twin) pins the projection (blocks stripped,
     concatenated, `\n` removed) as a SHA-256 and a length in `fixtures/decisions/frozen_projections.json`.
-    The test is in place now; the freeze binds from the pull request that first stores notes on
-    decisions (plan PR 4), and until then a reader may still change.
+    The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a
+    reader that moves the projection's hash is a bug in the reader, never a reason to re-record the
+    golden. The web app reads the same projection (`decisionProjection` in
+    `apps/web/src/utils/decisionRender.ts`) and its `decisionRender.test.ts` checks the rendered
+    text against it.

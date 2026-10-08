@@ -4,6 +4,13 @@ export type HighlightColor = 'yellow' | 'green' | 'red' | 'blue';
 
 export const HIGHLIGHT_COLORS: readonly HighlightColor[] = ['yellow', 'green', 'red', 'blue'] as const;
 
+/** A colour as the reader is told it («Testo evidenziato in giallo»); an unknown value is shown as is. */
+const HIGHLIGHT_COLOR_NAMES: Record<HighlightColor, string> = { yellow: 'giallo', green: 'verde', red: 'rosso', blue: 'blu' };
+
+export function highlightColorName(color: string): string {
+  return (HIGHLIGHT_COLOR_NAMES as Record<string, string>)[color] ?? color;
+}
+
 /**
  * CSS declaration strings ready to inject into `style="..."` attributes
  * when generating HTML from backend/parser output.
