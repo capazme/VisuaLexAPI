@@ -142,6 +142,24 @@ describe('discussions anchored on a court decision', () => {
     expect((await request(app).patch(url).set(authHeader(admin)).send({ hidden: 'yes' })).body.detail).toContain('vero o falso');
   });
 
+  it('answers the body, comment and report 400s in Italian', async () => {
+    const short = await open(alice, { body: 'no' });
+    expect(short.status).toBe(400);
+    expect(short.body.detail).toBe('Il testo deve avere almeno 3 caratteri');
+    const untitled = await open(alice, { title: undefined });
+    expect(untitled.body.detail).toBe('Il titolo è obbligatorio (almeno 3 caratteri) per una discussione senza un passo citato');
+    const badPassage = await open(alice, { title: undefined, passage: { ...PASSAGE, start: -1 } });
+    expect(badPassage.body.detail).toBe('La posizione del passo non è valida');
+
+    const created = await open(alice);
+    const emptyComment = await request(app).post(`/api/article-discussions/${created.body.id}/comments`).set(authHeader(bob)).send({ body: ' ' });
+    expect(emptyComment.status).toBe(400);
+    expect(emptyComment.body.detail).toBe('Il testo è obbligatorio');
+    const noReason = await request(app).post(`/api/article-discussions/${created.body.id}/report`).set(authHeader(bob)).send({});
+    expect(noReason.status).toBe(400);
+    expect(noReason.body.detail).toBe('Il motivo è obbligatorio');
+  });
+
   describe('the table refuses what the controller would not write', () => {
     const insert = (cols: { kind: string; key: string | null; norma: string; article: string; version: string | null; urn: string | null }, userId: string) =>
       prisma.$executeRaw`INSERT INTO article_threads (id, norma_key, article_id, version, article_urn, target_kind, decision_key, title, body, user_id, created_at, updated_at)
