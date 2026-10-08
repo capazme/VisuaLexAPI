@@ -606,3 +606,27 @@ class TestAbbreviationInsideALongerOne:
         assert self._read("art. 640 c.p. c'è truffa")[0][1] == "codice penale"
         assert self._read("art. 640 c.p. c) la frode")[0][1] == "codice penale"
         assert self._read("art. 2 c.p. p.")[0][1] == "codice penale"
+
+
+class TestConventionShortForms:
+    """The short forms the source convention writes are read in a text too: before 2026-10-09
+    «l. cost.» linked the Costituzione and «d.l.», «r.d.l.», «d.lgs.lgt.» linked nothing."""
+
+    def test_l_cost_is_never_the_costituzione(self):
+        got = extract_citations("ai sensi dell'art. 1 della l. cost. 20 aprile 2012, n. 1")
+        assert got and got[0].act_type == "legge costituzionale"
+
+    def test_dl_with_its_number_takes_the_context(self):
+        c = {x.article: x for x in extract_citations("l'art. 1 d.l. 18/2020 e l'art. 2")}
+        assert (c["1"].act_type, c["1"].act_number, c["1"].date) == ("decreto legge", "18", "2020")
+        assert (c["2"].act_type, c["2"].act_number) == ("decreto legge", "18")
+
+    def test_rdl_and_dlgslgt_are_their_own_types(self):
+        assert extract_citations("art. 2 r.d.l. 15 marzo 1927, n. 436")[0].act_type == "regio decreto legge"
+        assert extract_citations("art. 3 d.lgs.lgt. 10 marzo 1945, n. 2")[0].act_type == \
+            "decreto legislativo luogotenenziale"
+
+    def test_a_numberless_legge_costituzionale_does_not_take_the_context(self):
+        c = {x.article: x for x in extract_citations("art. 2043 c.c. e art. 5 l. cost. e art. 6")}
+        assert c["5"].act_type == "legge costituzionale"
+        assert c["6"].act_type == "codice civile"
