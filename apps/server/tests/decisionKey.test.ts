@@ -29,7 +29,7 @@ describe('readDecisionKey, the shared cases', () => {
 
 describe('inDecisionKeySpace', () => {
   it('knows the key space apart from validity', () => {
-    expect(inDecisionKeySpace('cassazione:civile:007:2024')).toBe(true);
+    expect(inDecisionKeySpace('cassazione:civile:099999:2024')).toBe(true);
     expect(inDecisionKeySpace('corte_costituzionale:x')).toBe(true);
     expect(inDecisionKeySpace('codice-civile--art-2043')).toBe(false);
   });
