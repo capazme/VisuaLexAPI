@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useMemo, useRef, useState } from 'react';
+import { StrictMode, useMemo, useRef, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FindInTextBar } from './FindInTextBar';
 import { FindInTextButton } from './FindInTextButton';
@@ -21,13 +21,14 @@ function Harness() {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const find = useFindInText(ref, { open, query });
   const inner = useMemo(() => ({ __html: HTML }), []);
   return (
     <div>
-      <FindInTextButton isOpen={open} onToggle={() => setOpen((o) => !o)} />
+      <FindInTextButton ref={buttonRef} isOpen={open} onToggle={() => setOpen((o) => !o)} />
       {open && (
-        <FindInTextBar query={query} onQueryChange={setQuery} find={find} onClose={() => setOpen(false)} />
+        <FindInTextBar query={query} onQueryChange={setQuery} find={find} onClose={() => setOpen(false)} returnFocusRef={buttonRef} />
       )}
       <div ref={ref} data-testid="root" dangerouslySetInnerHTML={inner} />
     </div>
@@ -42,7 +43,6 @@ async function settle(ms = 200) {
 
 function openBar() {
   const button = screen.getByRole('button', { name: 'Cerca nel testo' });
-  button.focus();
   fireEvent.click(button);
   return button;
 }
@@ -121,6 +121,48 @@ describe('FindInTextBar', () => {
     expect(button).toHaveFocus();
   });
 
+  it('returns focus to the toggle although the click never focused it, also under StrictMode', () => {
+    render(
+      <StrictMode>
+        <Harness />
+      </StrictMode>,
+    );
+    const button = screen.getByRole('button', { name: 'Cerca nel testo' });
+    expect(button).not.toHaveFocus();
+    fireEvent.click(button);
+    const field = screen.getByRole('searchbox', { name: 'Cerca nel testo' });
+    expect(field).toHaveFocus();
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(button).toHaveFocus();
+  });
+
+  it('falls back to the element focused when the bar opened, never the field', () => {
+    function Bare() {
+      const [open, setOpen] = useState(false);
+      const ref = useRef<HTMLDivElement>(null);
+      const find = useFindInText(ref, { open, query: '' });
+      return (
+        <div>
+          <button onClick={() => setOpen(true)}>apri</button>
+          {open && <FindInTextBar query="" onQueryChange={() => {}} find={find} onClose={() => setOpen(false)} />}
+          <div ref={ref} />
+        </div>
+      );
+    }
+    render(
+      <StrictMode>
+        <Bare />
+      </StrictMode>,
+    );
+    const opener = screen.getByRole('button', { name: 'apri' });
+    opener.focus();
+    fireEvent.click(opener);
+    const field = screen.getByRole('searchbox');
+    expect(field).toHaveFocus();
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(opener).toHaveFocus();
+  });
+
   it('says to narrow the search past 1000 matches', async () => {
     const many = '<p>' + 'ab '.repeat(1100) + '</p>';
     const { getByTestId } = render(<Harness />);
@@ -133,11 +175,16 @@ describe('FindInTextBar', () => {
 
   it('leaves the root HTML as it was before, during and after a search', async () => {
     const { getByTestId } = render(<Harness />);
-    const before = getByTestId('root').innerHTML;
+    const root = getByTestId('root');
+    const before = root.innerHTML;
+    const textNode = root.querySelector('p')?.firstChild;
     openBar();
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'fatto' } });
     await settle();
     expect(getByTestId('root').innerHTML).toBe(before);
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+    expect(getByTestId('root').innerHTML).toBe(before);
+    expect(root.querySelector('p')?.firstChild).toBe(textNode);
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
     expect(getByTestId('root').innerHTML).toBe(before);
   });

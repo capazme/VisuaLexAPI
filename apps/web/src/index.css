@@ -152,6 +152,11 @@
     --hl-red-fg: 0 70% 35%;
     --hl-blue-bg: 214 95% 93%;
     --hl-blue-fg: 226 71% 33%;
+
+    /* Find in text — violet, the one hue the highlights (yellow, green, red, blue) and the thread focus (primary) leave free */
+    --vlx-find-bg: 285 80% 88%;
+    --vlx-find-current-bg: 285 70% 40%;
+    --vlx-find-current-fg: 0 0% 100%;
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -203,6 +208,11 @@
     --hl-red-fg: 0 93% 94%;
     --hl-blue-bg: 226 71% 33%;
     --hl-blue-fg: 214 95% 93%;
+
+    /* Find in text — dark: a muted violet for matches, a bright one for the current */
+    --vlx-find-bg: 285 45% 32%;
+    --vlx-find-current-bg: 285 85% 75%;
+    --vlx-find-current-fg: 285 60% 12%;
 
     /* Feature colors — dark (reduced intensity, higher opacity bg) */
     --brocardi: 270 60% 70%;
@@ -375,23 +385,14 @@
 }
 
 /* Find in the text: painted through the CSS Custom Highlight API
-   (utils/findHighlights.ts), so the text nodes are never touched. */
-:root {
-  --vlx-find-bg: hsl(43 96% 56% / 0.3);
-  --vlx-find-current-bg: hsl(43 96% 56%);
-  --vlx-find-current-fg: hsl(24 80% 14%);
-}
-.dark {
-  --vlx-find-bg: hsl(43 96% 56% / 0.28);
-  --vlx-find-current-bg: hsl(43 96% 56%);
-  --vlx-find-current-fg: hsl(24 80% 14%);
-}
+   (utils/findHighlights.ts), so the text nodes are never touched. The colour
+   tokens sit with the --hl-* ones, in a violet hue none of them uses. */
 ::highlight(vlx-find) {
-  background-color: var(--vlx-find-bg);
+  background-color: hsl(var(--vlx-find-bg));
 }
 ::highlight(vlx-find-current) {
-  background-color: var(--vlx-find-current-bg);
-  color: var(--vlx-find-current-fg);
+  background-color: hsl(var(--vlx-find-current-bg));
+  color: hsl(var(--vlx-find-current-fg));
 }
 
 /* Hidden, not removed: hidden text still counts in the offsets. */

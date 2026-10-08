@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react';
-import { collectSearchableText, findMatches, rangesForMatches } from '../utils/findInText';
+import { collectSearchableText, findMatches, isSearchableQuery, rangesForMatches } from '../utils/findInText';
 import { clearFindRanges, setFindRanges } from '../utils/findHighlights';
 
 const DEBOUNCE_MS = 150;
@@ -26,22 +26,6 @@ interface FindState {
 
 const EMPTY: FindState = { count: 0, index: -1, truncated: false, searched: false };
 
-/** Where a match sits, to recognise it after the text is searched again. */
-interface Anchor {
-  sc: Node;
-  so: number;
-  ec: Node;
-  eo: number;
-}
-
-function anchorOf(r: Range): Anchor {
-  return { sc: r.startContainer, so: r.startOffset, ec: r.endContainer, eo: r.endOffset };
-}
-
-function sameAnchor(r: Range, a: Anchor): boolean {
-  return r.startContainer === a.sc && r.startOffset === a.so && r.endContainer === a.ec && r.endOffset === a.eo;
-}
-
 /**
  * Find in the text of the element `rootRef` points to. The hook reads the
  * root's text nodes and paints through the highlight registry; it adds,
@@ -54,9 +38,15 @@ export function useFindInText(
 ): FindInText {
   const ownerId = `find-${useId()}`;
   const [state, setState] = useState<FindState>(EMPTY);
+  const stateRef = useRef<FindState>(EMPTY);
+  const setLatest = useCallback((next: FindState) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
   const rangesRef = useRef<Range[]>([]);
   const indexRef = useRef(-1);
-  const anchorRef = useRef<Anchor | null>(null);
+  /** Start offset of every drawn match in the search string: how the current match is recognised after a redraw. */
+  const startsRef = useRef<number[]>([]);
   const appliedRef = useRef('');
   const queryRef = useRef(query);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,49 +61,61 @@ export function useFindInText(
   }, []);
 
   const commit = useCallback(
-    (ranges: Range[], index: number, truncated: boolean, searched: boolean, scroll: boolean) => {
+    (ranges: Range[], starts: number[], index: number, truncated: boolean, searched: boolean, scroll: boolean) => {
       rangesRef.current = ranges;
+      startsRef.current = starts;
       indexRef.current = index;
-      anchorRef.current = index >= 0 ? anchorOf(ranges[index]) : null;
+      // The ranges may sit on new nodes even when nothing moved: the registry always gets them.
       setFindRanges(ownerId, ranges, index >= 0 ? ranges[index] : null);
-      setState({ count: ranges.length, index, truncated, searched });
+      // Nothing a reader sees changed (same count, current match, flags): no render.
+      const prev = stateRef.current;
+      if (
+        prev.count !== ranges.length ||
+        prev.index !== index ||
+        prev.truncated !== truncated ||
+        prev.searched !== searched
+      ) {
+        setLatest({ count: ranges.length, index, truncated, searched });
+      }
       if (scroll && index >= 0) scrollToCurrent();
     },
-    [ownerId, scrollToCurrent],
+    [ownerId, scrollToCurrent, setLatest],
   );
 
-  /** Search `q` in the root now; `keep` leaves the current match where it still exists. */
+  /** Search `q` in the root now; `keep` leaves the current match where it still is (same start, else the next one). */
   const run = useCallback(
     (q: string, keep: boolean) => {
       appliedRef.current = q;
       const root = rootRef.current;
       if (!root) {
-        commit([], -1, false, false, false);
+        commit([], [], -1, false, false, false);
         return;
       }
-      const { nodes, text } = collectSearchableText(root);
-      const { matches, truncated } = findMatches(text, q);
-      const ranges = rangesForMatches(nodes, matches);
-      const searched = q.trim().length >= 2;
+      const collected = collectSearchableText(root);
+      const { matches, truncated } = findMatches(collected.text, q);
+      const ranges = rangesForMatches(collected.nodes, matches);
+      const segmentStart = new Map(collected.nodes.map((seg) => [seg.node, seg.start] as const));
+      const starts = ranges.map((r) => (segmentStart.get(r.startContainer as Text) ?? 0) + r.startOffset);
       let index = ranges.length ? 0 : -1;
       let scroll = true;
-      if (keep && anchorRef.current) {
-        const kept = ranges.findIndex((r) => sameAnchor(r, anchorRef.current as Anchor));
-        if (kept >= 0) {
-          index = kept;
-          scroll = false;
-        }
+      const oldStart = indexRef.current >= 0 ? startsRef.current[indexRef.current] : undefined;
+      if (keep && oldStart !== undefined && ranges.length) {
+        const after = starts.findIndex((v) => v >= oldStart);
+        index = after >= 0 ? after : 0;
+        scroll = starts[index] !== oldStart;
       }
-      commit(ranges, index, truncated, searched, scroll);
+      commit(ranges, starts, index, truncated, isSearchableQuery(q), scroll);
     },
     [rootRef, commit],
   );
 
-  const flush = useCallback(() => {
-    if (timerRef.current === null) return;
+  /** Apply a query still waiting; true when there was one. */
+  const flush = useCallback((): boolean => {
+    if (timerRef.current === null) return false;
     clearTimeout(timerRef.current);
     timerRef.current = null;
     run(queryRef.current, false);
+    return true;
   }, [run]);
 
   // Typing: apply the query after a pause.
@@ -129,7 +131,7 @@ export function useFindInText(
     };
   }, [open, query, run]);
 
-  // The text under the root changes (a version loads, a note folds): search again.
+  // The text under the root changes (a version loads, a note folds, a class hides text): search again.
   useEffect(() => {
     const root = rootRef.current;
     if (!open || !root || typeof MutationObserver === 'undefined') return;
@@ -138,10 +140,17 @@ export function useFindInText(
       if (frame !== null) return;
       frame = requestAnimationFrame(() => {
         frame = null;
-        if (timerRef.current === null) run(appliedRef.current, true);
+        if (timerRef.current === null && isSearchableQuery(appliedRef.current)) run(appliedRef.current, true);
       });
     });
-    observer.observe(root, { childList: true, characterData: true, subtree: true });
+    // Attributes too: a class or style that hides or shows text (a folded note) changes what is searchable.
+    observer.observe(root, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'hidden'],
+    });
     return () => {
       observer.disconnect();
       if (frame !== null) cancelAnimationFrame(frame);
@@ -155,25 +164,25 @@ export function useFindInText(
       clearFindRanges(ownerId);
       rangesRef.current = [];
       indexRef.current = -1;
-      anchorRef.current = null;
+      startsRef.current = [];
       appliedRef.current = '';
-      setState(EMPTY);
+      setLatest(EMPTY);
     };
-  }, [open, ownerId]);
+  }, [open, ownerId, setLatest]);
 
   const step = useCallback(
     (delta: 1 | -1) => {
-      flush();
+      // A fresh query lands on its first match: that is where the move ends.
+      if (flush()) return;
       const n = rangesRef.current.length;
       if (n === 0) return;
       const index = (indexRef.current + delta + n) % n;
       indexRef.current = index;
-      anchorRef.current = anchorOf(rangesRef.current[index]);
       setFindRanges(ownerId, rangesRef.current, rangesRef.current[index]);
-      setState((s) => ({ ...s, index }));
+      setLatest({ ...stateRef.current, index });
       scrollToCurrent();
     },
-    [flush, ownerId, scrollToCurrent],
+    [flush, ownerId, scrollToCurrent, setLatest],
   );
 
   const next = useCallback(() => step(1), [step]);

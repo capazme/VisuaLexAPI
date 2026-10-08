@@ -67,6 +67,11 @@ function wordPattern(word: string): string {
   return units.join(INVISIBLE);
 }
 
+/** Whether `query` is long enough to search: the rule `findMatches` applies (folded, trimmed, in base characters). */
+export function isSearchableQuery(query: string): boolean {
+  return [...foldQuery(query).trim()].length >= MIN_QUERY_LENGTH;
+}
+
 /**
  * Every match of `query` in `text`, as `[start, end)` offsets of the original
  * text. The query is folded and trimmed; under two characters (folded base
@@ -81,8 +86,8 @@ export function findMatches(
   query: string,
   { limit = 1000 }: { limit?: number } = {},
 ): FindResult {
+  if (!isSearchableQuery(query)) return { matches: [], truncated: false };
   const folded = foldQuery(query).trim();
-  if ([...folded].length < MIN_QUERY_LENGTH) return { matches: [], truncated: false };
 
   const pattern = folded.split(/\s+/).map(wordPattern).join('\\s+');
   const re = new RegExp(pattern, 'gu');
