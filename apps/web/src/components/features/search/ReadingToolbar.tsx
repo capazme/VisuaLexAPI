@@ -108,7 +108,7 @@ export function ReadingToolbar({
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}
                     className={cn(
-                        "p-2 lg:p-2.5 rounded-lg transition-colors",
+                        "inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg transition-colors",
                         isPinnedQuick
                             ? "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
                             : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500"
@@ -122,7 +122,7 @@ export function ReadingToolbar({
                     onClick={onToggleDiscussion}
                     aria-expanded={isDiscussionOpen}
                     aria-haspopup="dialog"
-                    className={cn("p-2 lg:p-2.5 rounded-lg transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary-500")}
+                    className={cn("inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary-500")}
                     title={tip("Discussioni sull’articolo", lockedReason)}
                     {...lock(lockedReason)}
                 >
@@ -130,7 +130,7 @@ export function ReadingToolbar({
                 </button>
                 <button
                     onClick={() => { void onMobileCopy(); }}
-                    className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
                     title={tip("Copia testo", copyLockedReason)}
                     {...lock(copyLockedReason)}
                 >
@@ -138,7 +138,7 @@ export function ReadingToolbar({
                 </button>
                 <button
                     onClick={onOpenDossier}
-                    className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
                     title={tip("Aggiungi a dossier", copyLockedReason)}
                     aria-label="Aggiungi a dossier"
                     {...lock(copyLockedReason)}
@@ -148,7 +148,7 @@ export function ReadingToolbar({
                 {/* Study Mode button - sempre visibile */}
                 <button
                     onClick={onOpenStudyMode}
-                    className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-purple-500 transition-colors"
+                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-purple-500 transition-colors"
                     title={tip("Modalità studio", lockedReason)}
                     {...lock(lockedReason)}
                 >
@@ -159,7 +159,7 @@ export function ReadingToolbar({
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500 transition-colors"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500 transition-colors"
                         title="Apri fonte"
                     >
                         <ExternalLink size={20} />

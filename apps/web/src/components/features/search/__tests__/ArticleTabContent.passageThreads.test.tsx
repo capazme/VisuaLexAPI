@@ -93,6 +93,17 @@ beforeEach(() => {
 });
 
 describe('ArticleTabContent passage discussions', () => {
+  it('sends no passage request for an article with an empty article id', async () => {
+    const noNumber: ArticleData = { ...articleData, norma_data: { ...articleData.norma_data, numero_articolo: '' } };
+    render(
+      <MemoryRouter>
+        <ArticleTabContent data={noNumber} />
+      </MemoryRouter>,
+    );
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(listPassages).not.toHaveBeenCalled();
+  });
+
   it('shows one failed-load state, retries visibly, then opens the recovered passage discussion from its sign', async () => {
     const retry = deferred<ArticleDiscussionPassageSummary[]>();
     listPassages

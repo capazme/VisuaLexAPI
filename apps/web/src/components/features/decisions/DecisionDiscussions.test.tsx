@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createHash } from 'node:crypto';
 import { appStore } from '../../../store/useAppStore';
-import type { ArticleDiscussionPassageSummary } from '../../../types';
-import type { DecisionIdentity, DecisionText } from '../../../types/decisions';
+import type { ArticleDiscussionPassageSummary, ArticleDiscussionThread } from '../../../types';
+import type { DecisionIdentity, DecisionText, FoundDecision } from '../../../types/decisions';
 import { decisionProjection } from '../../../utils/decisionRender';
 import { articleDiscussionService } from '../../../services/articleDiscussionService';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
-import { DecisionView } from './DecisionView';
+import { DecisionTabView } from './DecisionTabView';
+import { forgetDecision } from '../../../utils/decisionFetchCache';
 
 vi.mock('../../../services/articleDiscussionService', () => ({
   articleDiscussionService: {
@@ -18,6 +19,10 @@ vi.mock('../../../services/articleDiscussionService', () => ({
     comment: vi.fn(),
   },
 }));
+const fetchDecision = vi.fn();
+vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
+vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
 vi.mock('../../../services/authService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/authService')>()),
   isAuthenticated: () => true,
@@ -27,6 +32,15 @@ const IDENTITY: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', nu
 const KEY = 'cassazione:civile:99999:2024';
 const TESTO: DecisionText = { motivazione: 'Il ricorso è fondato.\n\nLe spese seguono la soccombenza.' };
 const PLAIN = decisionProjection(TESTO);
+const found = (testo: DecisionText): FoundDecision => ({
+  esito: 'trovata', identita: IDENTITY, attributi: {}, testo, avvisi: [], fonte: { nome: 'Italgiure' },
+});
+const fullThread = (over: Partial<ArticleDiscussionThread> = {}): ArticleDiscussionThread => ({
+  id: 'new', normaKey: KEY, articleId: '', title: 'Dubbio', body: 'x', passage: null, articleUrn: null, textHash: null,
+  target: { kind: 'decision', key: KEY }, passageReleased: false, comments: [], user: { id: 'u1', username: 'marta' },
+  createdAt: '2026-10-08T10:00:00Z', updatedAt: '2026-10-08T10:00:00Z', voteCount: 0, userVoted: false, isOwner: true,
+  ...over,
+});
 const HASH = createHash('sha256').update(PLAIN, 'utf8').digest('hex');
 
 const textOf = (root: Element) => {
@@ -46,7 +60,7 @@ const thread = (over: Partial<ArticleDiscussionPassageSummary> = {}): ArticleDis
   createdAt: '2026-10-08T10:00:00Z',
   user: { id: 'u1', username: 'marta' },
   ...over,
-} as ArticleDiscussionPassageSummary);
+});
 
 async function selectText(container: HTMLElement, lineIndex: number, from: number, to: number) {
   const line = container.querySelectorAll('.vlx-dec-line')[lineIndex];
@@ -63,6 +77,8 @@ Range.prototype.getBoundingClientRect ??= () => ({ x: 0, y: 0, top: 0, left: 0, 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  forgetDecision(IDENTITY);
+  forgetDecision({ corte: 'cassazione', numero: 99999, anno: 2024 });
   appStore.setState({
     searchTrigger: null, readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [],
     loadHighlightsForArticle: vi.fn(), loadAnnotationsForArticle: vi.fn(),
@@ -87,38 +103,64 @@ describe('discussions on a decision — what shows them', () => {
     expect(onToggleDiscussion).toHaveBeenCalled();
   });
 
-  it('a found decision shows the button and «Discuti»; a reference with no identity shows neither and asks nothing', async () => {
-    const { container, unmount } = render(
-      <DecisionView
-        answer={{ esito: 'trovata', identita: IDENTITY, attributi: {}, testo: TESTO, avvisi: [], fonte: { nome: 'Italgiure', url: 'https://x', licenza: 'x' } } as never}
-        reference={IDENTITY}
-        onRetry={() => {}} onChooseCandidate={() => {}} onOpenPalette={() => {}}
-        textSlot={<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />}
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Discussioni sulla decisione' })).toBeInTheDocument();
+  it('a found decision shows the button and «Discuti»', async () => {
+    fetchDecision.mockResolvedValue(found(TESTO));
+    const { container } = render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    expect(await screen.findByRole('button', { name: 'Discussioni sulla decisione' })).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('.vlx-dec-line')).not.toBeNull());
     await selectText(container, 0, 3, 10);
     expect(await screen.findByLabelText('Discuti con i colleghi')).toBeInTheDocument();
-    unmount();
+    expect(articleDiscussionService.listPassages).toHaveBeenCalledTimes(1);
+  });
 
-    render(
-      <DecisionView
-        answer={{ esito: 'ambigua', candidati: [{ identita: IDENTITY, attributi: {} }] } as never}
-        reference={IDENTITY}
-        onRetry={() => {}} onChooseCandidate={() => {}} onOpenPalette={() => {}}
-      />,
-    );
+  it('while loading, ambiguous or not found: no button, no «Discuti», no passage request', async () => {
+    let answer!: (value: unknown) => void;
+    fetchDecision.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const { unmount } = render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Caricamento della decisione');
     expect(screen.queryByRole('button', { name: 'Discussioni sulla decisione' })).toBeNull();
-    expect(articleDiscussionService.listPassages).toHaveBeenCalledTimes(1); // the found one only
+    unmount();
+    await act(async () => { answer({ esito: 'errore_interno' }); });
+
+    for (const reply of [
+      { esito: 'ambigua', candidati: [{ identita: IDENTITY, attributi: {} }] },
+      { esito: 'non_trovata', motivo: 'inesistente' },
+    ]) {
+      forgetDecision(IDENTITY);
+      fetchDecision.mockResolvedValueOnce(reply);
+      const view = render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+      await waitFor(() => expect(fetchDecision).toHaveBeenCalled());
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      expect(screen.queryByRole('button', { name: 'Discussioni sulla decisione' })).toBeNull();
+      expect(screen.queryByLabelText('Discuti con i colleghi')).toBeNull();
+      view.unmount();
+    }
+    expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
+  });
+
+  it('a found decision without text still takes general discussions: the button, no «Discuti», no passages, no hash', async () => {
+    fetchDecision.mockResolvedValue(found({}));
+    vi.mocked(articleDiscussionService.create).mockResolvedValue(fullThread());
+    render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Discussioni sulla decisione' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Discuti con i colleghi')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /nuova discussione/i }));
+    fireEvent.change(screen.getByPlaceholderText('Titolo della discussione'), { target: { value: 'Dubbio' } });
+    fireEvent.change(screen.getByPlaceholderText(/condividi una domanda/i), { target: { value: 'Una domanda' } });
+    fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
+    await waitFor(() => expect(articleDiscussionService.create).toHaveBeenCalled());
+    const [anchor, , , extras] = vi.mocked(articleDiscussionService.create).mock.calls[0];
+    expect(anchor).toMatchObject({ normaKey: KEY, articleId: '' });
+    expect(extras).toEqual({ passage: undefined, articleUrn: undefined, textHash: undefined });
   });
 });
 
 describe('discussions on a decision — the passage', () => {
   it('«Discuti» opens the composer on the words and creates under the key, with no article and the projection hash', async () => {
-    vi.mocked(articleDiscussionService.create).mockResolvedValue({
-      id: 'new', title: 'Dubbio', body: 'x', passage: null, comments: [], user: { id: 'u1', username: 'marta' },
-      createdAt: '2026-10-08T10:00:00Z', updatedAt: '2026-10-08T10:00:00Z', voteCount: 0, userVoted: false, isOwner: true,
-    } as never);
+    vi.mocked(articleDiscussionService.create).mockResolvedValue(fullThread());
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
     await waitFor(() => expect(articleDiscussionService.listPassages).toHaveBeenCalledWith({ normaKey: KEY, articleId: '' }));
     // let the fingerprint settle
@@ -133,6 +175,8 @@ describe('discussions on a decision — the passage', () => {
 
     await waitFor(() => expect(articleDiscussionService.create).toHaveBeenCalled());
     const [anchor, title, , extras] = vi.mocked(articleDiscussionService.create).mock.calls[0];
+    expect(Object.keys(anchor).sort()).toEqual(['articleId', 'articleLabel', 'normaKey', 'version']);
+    expect(anchor.version).toBeUndefined();
     expect(anchor).toMatchObject({ normaKey: KEY, articleId: '' });
     expect(title).toBe('Dubbio');
     expect(extras).toMatchObject({
@@ -141,6 +185,29 @@ describe('discussions on a decision — the passage', () => {
     });
     expect(extras!.passage!.start).toBe(PLAIN.indexOf('ricorso'));
     expect(extras!.articleUrn).toBeUndefined();
+    expect(Object.keys(extras!).sort()).toEqual(['articleUrn', 'passage', 'textHash']);
+  });
+
+  it('after a discussion is created, the hidden copy of the surface sees the new passage too', async () => {
+    const created = fullThread({ id: 't-new', passage: { quote: 'ricorso', start: 3, prefix: 'Il ', suffix: ' è fondato' } });
+    vi.mocked(articleDiscussionService.create).mockResolvedValue(created);
+    const summaryOfCreated = thread({ id: 't-new', passage: created.passage! });
+    vi.mocked(articleDiscussionService.listPassages)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([summaryOfCreated]);
+    const visible = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
+    const hidden = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
+    await waitFor(() => expect(articleDiscussionService.listPassages).toHaveBeenCalledTimes(2));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+
+    await selectText(visible.container, 0, 3, 10);
+    fireEvent.click(await screen.findByLabelText('Discuti con i colleghi'));
+    fireEvent.change(screen.getByLabelText('Testo della discussione'), { target: { value: 'Il passo non convince' } });
+    fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
+
+    await waitFor(() => expect(visible.container.querySelectorAll('.vlx-sign')).toHaveLength(1));
+    await waitFor(() => expect(hidden.container.querySelectorAll('.vlx-sign')).toHaveLength(1));
   });
 });
 

@@ -43,16 +43,16 @@ import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitati
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
-import type { Annotation, Highlight, ThreadPassage } from '../../../types';
+import type { Annotation, Highlight } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { citeNorm, shortNorm } from '../../../utils/sources';
 import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/annotationExport';
 import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
-import { useArticlePassageThreads } from '../../../hooks/useArticlePassageThreads';
-import { plainText, buildPassage, textFingerprint } from '../../../utils/threadPassages';
-import { revealAnnotation } from '../../../utils/revealAnnotation';
+import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
+import { plainText } from '../../../utils/threadPassages';
+import { PassageThreadsStatus } from './PassageThreadsStatus';
 import { VersionBanner } from './VersionBanner';
 import { TextAtDateDialog } from './TextAtDateDialog';
 import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
@@ -141,11 +141,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // react-hooks/refs lint and can miss the post-mount update.
     const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
     const [showMoreMenu, setShowMoreMenu] = useState(false);
-    const [discussionOpen, setDiscussionOpen] = useState(false);
-    const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
-    const [discussionFocus, setDiscussionFocus] = useState<string | null>(null);
-    const [discussionDraft, setDiscussionDraft] = useState<{ passage: ThreadPassage } | null>(null);
-    const [textHash, setTextHash] = useState<string | null>(null);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
     const [showVersionInput, setShowVersionInput] = useState(false);
@@ -220,37 +215,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     }), [itemKey, uniqueArticleId, norma_data.numero_articolo, norma_data.versione, norma_data.data_versione]);
 
     const plainArticle = useMemo(() => plainText(article_text || ''), [article_text]);
-    const {
-        threads: passageThreads,
-        isLoading: passageThreadsLoading,
-        error: passageThreadsError,
-        reload: reloadPassageThreads,
-        locations: passageLocations,
-    } = useArticlePassageThreads(
-        { normaKey: discussionAnchor.normaKey, articleId: discussionAnchor.articleId },
-        { enabled: Boolean(discussionAnchor.articleId) && Boolean(article_text) && !readOnly, plainText: plainArticle },
-    );
-    const locatedThreads = useMemo<LocatedThread[]>(
-        () => passageThreads.flatMap((t) => {
-            const at = passageLocations.get(t.id);
-            return at && at.state !== 'detached' ? [{ thread: t, start: at.start, end: at.end }] : [];
-        }),
-        [passageThreads, passageLocations],
-    );
-
-    useEffect(() => {
-        let cancelled = false;
-        textFingerprint(article_text || '')
-            .then((hash) => {
-                if (!cancelled) setTextHash(hash);
-            })
-            .catch((error) => {
-                console.warn('[ArticleTabContent] text fingerprint failed', error);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [article_text]);
+    const discussion = useDiscussionWiring({
+        anchor: { normaKey: discussionAnchor.normaKey, articleId: discussionAnchor.articleId },
+        text: article_text || '',
+        plain: plainArticle,
+        enabled: Boolean(discussionAnchor.articleId) && Boolean(article_text) && !readOnly,
+        contentRef,
+        onInvalidSelection: () => showToast('Non è possibile aprire una discussione su questa selezione', 'error'),
+    });
+    const { locatedThreads, textHash, focusedThreadId } = discussion;
 
     // Memo the four filters: without this, the full annotations/highlights
     // arrays being new-ref on every store mutation (even unrelated articles)
@@ -525,17 +498,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         } catch {
             showToast('Errore durante la copia', 'error');
         }
-    };
-
-    const handlePopupDiscuss = (text: string, startOffset: number) => {
-        if (readOnly) return;
-        const passage = buildPassage(plainArticle, startOffset, text);
-        if (!passage) {
-            showToast('Non è possibile aprire una discussione su questa selezione', 'error');
-            return;
-        }
-        setDiscussionDraft({ passage });
-        setDiscussionOpen(true);
     };
 
     // Handler for opening citation in new tab
@@ -817,11 +779,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isHighlightsPeekOpen={isHighlightsPeekOpen}
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={readOnly ? 0 : allPanelHighlights.length}
-                isDiscussionOpen={discussionOpen}
+                isDiscussionOpen={discussion.open}
                 showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
-                onToggleDiscussion={() => setDiscussionOpen(v => !v)}
+                onToggleDiscussion={discussion.toggle}
                 onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
@@ -905,29 +867,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onPopupHighlight={handlePopupHighlight}
                     onPopupAddNote={handlePopupAddNote}
                     onPopupCopy={handlePopupCopy}
-                    onPopupDiscuss={readOnly ? undefined : handlePopupDiscuss}
+                    onPopupDiscuss={readOnly ? undefined : discussion.popupDiscuss}
                     onPopupReportCitation={canContribute && !readOnly ? handlePopupReportCitation : undefined}
                     updatesOpen={updatesOpen}
                     copyOnly={readOnly}
                 />
             )}
 
-            {!discussionOpen && passageThreadsError && (
-                <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                    <span>Impossibile caricare le discussioni sui passaggi. I segni potrebbero non mostrarle.</span>
-                    <button
-                        type="button"
-                        onClick={reloadPassageThreads}
-                        className="font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                    >
-                        Riprova
-                    </button>
-                </div>
-            )}
-            {!discussionOpen && passageThreadsLoading && (
-                <p role="status" className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                    Aggiornamento discussioni sui passaggi…
-                </p>
+            {!discussion.open && (
+                <PassageThreadsStatus error={discussion.error} loading={discussion.loading} onRetry={discussion.reload} />
             )}
 
             <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
@@ -950,11 +898,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     group={openGroup}
                     contentKey={processedContent}
                     textHash={textHash}
-                    onOpenThread={(id) => {
-                        setDiscussionFocus(id);
-                        setFocusedThreadId(id);
-                        setDiscussionOpen(true);
-                    }}
+                    onOpenThread={discussion.openThread}
                     onClose={closeBlock}
                     onUpdateNote={updateAnnotation}
                     onRemoveNote={removeAnnotation}
@@ -965,35 +909,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             <ArticleDiscussionPanel
                 anchor={discussionAnchor}
                 label={`Art. ${discussionAnchor.articleLabel ?? discussionAnchor.articleId}`}
-                isOpen={discussionOpen}
                 articleUrn={norma_data.urn}
-                textHash={textHash}
-                passageLoadError={passageThreadsError}
-                passageThreadsLoading={passageThreadsLoading}
-                onRetryPassageLoad={reloadPassageThreads}
-                passageStates={Object.fromEntries(
-                    Array.from(passageLocations.entries()).map(([id, loc]) => [id, loc.state])
-                )}
-                focusThreadId={discussionFocus}
-                onFocusThread={setFocusedThreadId}
-                draft={discussionDraft}
-                onDraftConsumed={() => setDiscussionDraft(null)}
-                onThreadCreated={reloadPassageThreads}
-                onGoToPassage={(id) => {
-                    setFocusedThreadId(id);
-                    requestAnimationFrame(() =>
-                        requestAnimationFrame(() => {
-                            const root = contentRef.current;
-                            if (root) revealAnnotation(root, { kind: 'thread', id });
-                        })
-                    );
-                }}
-                onClose={() => {
-                    setDiscussionOpen(false);
-                    setFocusedThreadId(null);
-                    setDiscussionFocus(null);
-                    setDiscussionDraft(null);
-                }}
+                {...discussion.panelProps}
             />
 
             {/* It asks about the article by its URN: on a past text the answer would describe the current one. */}

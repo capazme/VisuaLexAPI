@@ -4,6 +4,11 @@ import { isAuthenticated } from '../services/authService';
 import { locatePassage, type PassageLocation } from '../utils/threadPassages';
 import type { ArticleDiscussionPassageSummary } from '../types';
 
+// Every mounted copy of one subject (the phone view and the desktop panel are both mounted, one
+// hidden) listens to the same key: a reload asked by one reaches all of them, and their requests
+// share the service's in-flight list.
+const reloadListeners = new Map<string, Set<() => void>>();
+
 export interface PassageThreadsResult {
   threads: ArticleDiscussionPassageSummary[];
   isLoading: boolean;
@@ -29,7 +34,8 @@ export interface PassageThreadsOptions {
 /**
  * The passage discussions of one article or decision, for its signs: one light
  * request (GET /article-discussions/passages) when it is shown, none when the
- * reader is not logged in. `reload` asks again (after a new discussion).
+ * reader is not logged in. `reload` asks again (after a new discussion), in every mounted copy
+ * of the same subject. While it reloads, the previous list stays (the signs do not flicker).
  *
  * The anchor comes from the caller, who decides what identifies the subject: an
  * article passes its key and article id (and folds `Boolean(articleId)` into
@@ -46,19 +52,35 @@ export function useArticlePassageThreads(
   const [reloadCount, setReloadCount] = useState(0);
   const [loadedData, setLoadedData] = useState<{
     requestId: string;
+    key: string;
     threads: ArticleDiscussionPassageSummary[];
     error: boolean;
   }>({
     requestId: '',
+    key: '',
     threads: [],
     error: false,
   });
 
-  const reload = useCallback(() => {
-    setReloadCount((c) => c + 1);
-  }, []);
-
   const currentKey = hasIdentity ? JSON.stringify([normaKey, articleId]) : '';
+
+  useEffect(() => {
+    if (!currentKey) return;
+    const bump = () => setReloadCount((c) => c + 1);
+    const set = reloadListeners.get(currentKey) ?? new Set<() => void>();
+    set.add(bump);
+    reloadListeners.set(currentKey, set);
+    return () => {
+      set.delete(bump);
+      if (set.size === 0) reloadListeners.delete(currentKey);
+    };
+  }, [currentKey]);
+
+  const reload = useCallback(() => {
+    const listeners = reloadListeners.get(currentKey);
+    if (listeners && listeners.size > 0) listeners.forEach((bump) => bump());
+    else setReloadCount((c) => c + 1);
+  }, [currentKey]);
   const currentRequestId = currentKey ? JSON.stringify([currentKey, reloadCount]) : '';
   const shouldLoad = enabled && Boolean(currentKey) && isAuthenticated();
 
@@ -74,7 +96,7 @@ export function useArticlePassageThreads(
       .listPassages({ normaKey, articleId })
       .then((threads) => {
         if (!cancelled) {
-          setLoadedData({ requestId, threads, error: false });
+          setLoadedData({ requestId, key: currentKey, threads, error: false });
         }
       })
       .catch((error) => {
@@ -84,7 +106,7 @@ export function useArticlePassageThreads(
             articleId,
             error,
           });
-          setLoadedData({ requestId, threads: [], error: true });
+          setLoadedData({ requestId, key: currentKey, threads: [], error: true });
         }
       });
 
@@ -95,8 +117,8 @@ export function useArticlePassageThreads(
 
   const hasCurrentData = loadedData.requestId === currentRequestId;
   const threads = useMemo(
-    () => (hasCurrentData ? loadedData.threads : []),
-    [hasCurrentData, loadedData.threads],
+    () => (hasCurrentData || loadedData.key === currentKey ? loadedData.threads : []),
+    [hasCurrentData, loadedData.key, loadedData.threads, currentKey],
   );
   const isLoading = shouldLoad && !hasCurrentData;
   const error = hasCurrentData && loadedData.error;

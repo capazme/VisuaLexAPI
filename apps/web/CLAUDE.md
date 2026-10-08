@@ -182,12 +182,18 @@ the article now lists only what no sign can reach (`LooseHighlightsList`,
 desktop): highlights made in the Brocardi sections and highlights whose text
 changed — without it they could no longer be removed.
 
-**Passage discussions on the reading surface**: discussions anchored to a
-specific passage of an article are loaded by `useArticlePassageThreads(anchor,
-{ enabled?, plainText? })` — the caller gives the anchor (`{normaKey, articleId}`; the
-article folds `Boolean(articleId)` into `enabled`) and the hook's `locations`,
-computed by `locatePassage` against the plain text by `locatePassage`, and counted on the round-B sign
-(`data-threads`, speech-bubble icon). In the text, words stay clean until a
+**Passage discussions on the reading surface**: the discussion wiring of a reading surface
+lives in one hook, `useDiscussionWiring` (passage threads load and reload, the ones that still
+land in the text, the panel's open state, the focused thread, the «Discuti» draft, the text
+fingerprint; it returns the props the panel takes), and one status component,
+`PassageThreadsStatus` (the loading line, the failed-load alert with its 44 px «Riprova»).
+The article and a decision's surface both use them. Under it, `useArticlePassageThreads(anchor,
+{ enabled?, plainText? })` loads the passages of one subject: the caller gives the anchor
+(`{normaKey, articleId}`; the article folds `Boolean(articleId)` into `enabled`) and the plain
+text, and the hook returns `locations`, where `locatePassage` says where each passage lands in
+that text (the one place «detached» is computed). A reload reaches every mounted copy of the
+subject (the phone view and the desktop panel) and keeps the previous list meanwhile. The result
+is counted on the round-B sign (`data-threads`, speech-bubble icon). In the text, words stay clean until a
 discussion is opened. The block popover (`BlockAnnotationsPopover`) lists the
 block's passage discussions with their quotation, title, author, reply count,
 and an "Apri discussione" action that opens the discussion panel. The discussed
@@ -198,15 +204,20 @@ a detached one stays listed in the panel with a notice and its original quotatio
 never hidden or deleted. The article tab and a found decision's surface (`DecisionReadingSurface`) use this, the
 decision through the same hook and panel with its anchor (`articleId: ''`); its
 `renderDecisionHtml` takes `threads` and `focusedThreadId` and the text hash is that of the
-projection. The toolbar's button is the shared `DiscussionButton`.
+projection. A decision found without its text still takes general discussions
+(`DecisionDiscussionsWithoutText`: the button and the panel, no «Discuti», no passages, no text
+hash). The toolbar's button is the shared `DiscussionButton`. A decision's panel withholds a
+withdrawn passage's quotation from every reader but the thread's author and the admins, until an
+admin releases it, and fails closed: a passage whose state is not known (loading, reloading,
+failed load) is withheld like a detached one.
 
 **A court decision takes the same tools** (`DecisionReadingSurface`, PR 4): notes and
 highlights are stored under `normaKey = decisionKey(identity)` with `articleId = ''` (wire key
 `<key>::art::`), through the store's ordinary actions; the surface mounts the article's own
 `SelectionPopup`, `InlineNoteComposer`/`InlineNotePopover`, `NotesPeekPanel`,
 `HighlightsActionsPicker`, the round-B signs and `BlockAnnotationsPopover` (a paragraph is the
-block; `decisionStructure` names them). `DecisionReadingToolbar` draws the two toolbar buttons
-(`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
+block; `decisionStructure` names them). `DecisionReadingToolbar` draws the notes and highlights
+buttons and the discussion button (`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
 (`UnmatchedAnchors`; a decision found without text hosts it through `DecisionAnchorsWithoutText`).
 No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRender.ts` is the
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
@@ -286,8 +297,9 @@ the load keys on the anchor's fields, so an inline object does not refetch)
 is admin-only, `PATCH /admin/article-discussions/:id`). A new discussion can also
 start from a selection via the "Discuti" button in `SelectionPopup`, which opens
 the panel composer with a draft passage block and makes the title optional (the
-quotation stands in for it). Every new discussion records `articleUrn` and the
-`textHash` (SHA-256 fingerprint) of the text on screen. The article and a found
+quotation stands in for it). Every new discussion records the `textHash` (SHA-256
+fingerprint) of the text on screen, and an article's also its `articleUrn` (a decision
+records no URN: the server refuses one). The article and a found
 decision's surface mount the panel (the decision's anchor is `articleId: ''`, with its own heading and notice). The panel is mounted
 for every rendered article and fetches **only while open** — a load on mount
 cost one GET per article of a range.

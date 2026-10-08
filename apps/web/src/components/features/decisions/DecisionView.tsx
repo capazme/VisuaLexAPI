@@ -31,6 +31,8 @@ export interface DecisionViewProps {
   actions?: React.ReactNode;
   /** Replaces the plain text (the reading surface, later). */
   textSlot?: React.ReactNode;
+  /** Beside the reader's anchors when the decision was found without its text (general discussions). */
+  noTextSlot?: React.ReactNode;
 }
 
 function Alert({ children }: { children: React.ReactNode }) {
@@ -67,11 +69,12 @@ function DecisionChoice({ identity, onChoose, className, children }: {
   );
 }
 
-function FoundView({ answer, onToast, actions, textSlot }: {
+function FoundView({ answer, onToast, actions, textSlot, noTextSlot }: {
   answer: FoundDecision;
   onToast: ShowToast;
   actions?: React.ReactNode;
   textSlot?: React.ReactNode;
+  noTextSlot?: React.ReactNode;
 }) {
   // The source's own page, only ever over https: the address comes from our server, built on fixed
   // bases, so this is defence in depth.
@@ -148,7 +151,12 @@ function FoundView({ answer, onToast, actions, textSlot }: {
           notes and highlights on it are listed instead of dropped. */}
       {hasDecisionText(answer.testo)
         ? (textSlot ?? <DecisionTextView testo={answer.testo} />)
-        : <DecisionAnchorsWithoutText identity={answer.identita} />}
+        : (
+          <>
+            {noTextSlot}
+            <DecisionAnchorsWithoutText identity={answer.identita} />
+          </>
+        )}
       {/* The page carries no licence line; the Corte costituzionale's PDF does (owner, 8 Oct
           2026): fonte.licenza stays in the data and goes into that footer. */}
       <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -183,7 +191,7 @@ function unreachableMessage(fonte: string): string {
 
 /** The body of a decision, wherever it is drawn: the workspace tab or the phone's view. */
 export function DecisionView({
-  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot,
+  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, noTextSlot,
 }: DecisionViewProps) {
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
   const linkClass = `inline-flex items-center text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE}`;
@@ -212,6 +220,7 @@ export function DecisionView({
         onToast={(message, type) => setToast({ message, type })}
         actions={actions}
         textSlot={textSlot}
+        noTextSlot={noTextSlot}
       />
     );
   } else if (answer.esito === 'ambigua') {

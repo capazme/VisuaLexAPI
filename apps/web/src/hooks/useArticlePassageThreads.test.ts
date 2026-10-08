@@ -213,6 +213,30 @@ describe('useArticlePassageThreads', () => {
     });
   });
 
+  it('keeps the previous threads while it reloads, and reloads every mounted copy of the subject', async () => {
+    const second = [{ ...dummyThreads[0], id: 't-new' }];
+    let release!: (value: ArticleDiscussionPassageSummary[]) => void;
+    vi.mocked(articleDiscussionService.listPassages)
+      .mockResolvedValueOnce(dummyThreads)
+      .mockResolvedValueOnce(dummyThreads)
+      .mockReturnValue(new Promise((resolve) => { release = resolve; }));
+
+    const visible = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
+    const hidden = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
+    await waitFor(() => expect(visible.result.current.threads).toEqual(dummyThreads));
+    await waitFor(() => expect(hidden.result.current.threads).toEqual(dummyThreads));
+
+    act(() => visible.result.current.reload());
+    await waitFor(() => expect(hidden.result.current.isLoading).toBe(true));
+    // no flicker: the list stays while the new one is on its way
+    expect(visible.result.current.threads).toEqual(dummyThreads);
+    expect(hidden.result.current.threads).toEqual(dummyThreads);
+
+    await act(async () => { release(second); });
+    await waitFor(() => expect(hidden.result.current.threads).toEqual(second));
+    expect(visible.result.current.threads).toEqual(second);
+  });
+
   describe('anchored on a decision', () => {
     const decisionKey = 'cassazione:civile:99999:2024';
     const plainText = 'Premesso che il ricorso e inammissibile. Il giudice ha deciso.';

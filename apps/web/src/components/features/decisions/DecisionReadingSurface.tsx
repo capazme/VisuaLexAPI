@@ -12,16 +12,14 @@ import { InlineNotePopover } from '../search/InlineNotePopover';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
 import { ArticleDiscussionPanel } from '../search/ArticleDiscussionPanel';
+import { PassageThreadsStatus } from '../search/PassageThreadsStatus';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, type LocatedThread } from '../../../utils/articleAnnotations';
-import { useArticlePassageThreads } from '../../../hooks/useArticlePassageThreads';
-import { buildPassage, textFingerprint } from '../../../utils/threadPassages';
-import { revealAnnotation } from '../../../utils/revealAnnotation';
-import type { ThreadPassage } from '../../../types';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
+import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { decisionKey, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
@@ -95,35 +93,17 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
 
   // Discussions: this surface is mounted for a decision whose identity was found, so it always
   // takes them. The anchor is one stable object (the panel reloads when its fields change).
-  const [discussionOpen, setDiscussionOpen] = useState(false);
-  const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
-  const [discussionFocus, setDiscussionFocus] = useState<string | null>(null);
-  const [discussionDraft, setDiscussionDraft] = useState<{ passage: ThreadPassage } | null>(null);
-  const [textHash, setTextHash] = useState<string | null>(null);
   const discussionAnchor = useMemo(() => ({ normaKey: key, articleId: NO_ARTICLE, articleLabel: label }), [key, label]);
-  const {
-    threads: passageThreads, isLoading: passageThreadsLoading, error: passageThreadsError,
-    reload: reloadPassageThreads, locations: passageLocations,
-  } = useArticlePassageThreads(discussionAnchor, { enabled: plain !== '', plainText: plain });
-  const locatedThreads = useMemo<LocatedThread[]>(
-    () => passageThreads.flatMap((t) => {
-      const at = passageLocations.get(t.id);
-      return at && at.state !== 'detached' ? [{ thread: t, start: at.start, end: at.end }] : [];
-    }),
-    [passageThreads, passageLocations],
-  );
-  const passageStates = useMemo(
-    () => Object.fromEntries(Array.from(passageLocations.entries()).map(([id, loc]) => [id, loc.state])),
-    [passageLocations],
-  );
-  // The projection has no newline, so its fingerprint is the SHA-256 of the projection itself.
-  useEffect(() => {
-    let cancelled = false;
-    textFingerprint(plain)
-      .then((hash) => { if (!cancelled) setTextHash(hash); })
-      .catch((error) => console.warn('[DecisionReadingSurface] text fingerprint failed', error));
-    return () => { cancelled = true; };
-  }, [plain]);
+  const discussion = useDiscussionWiring({
+    anchor: discussionAnchor,
+    // The projection has no newline, so its fingerprint is the SHA-256 of the projection itself.
+    text: plain,
+    plain,
+    enabled: plain !== '',
+    contentRef,
+    onInvalidSelection: () => setToast({ message: 'Non è possibile aprire una discussione su questa selezione', type: 'error' }),
+  });
+  const { locatedThreads, textHash, focusedThreadId } = discussion;
 
   // A bare «art. 5» with no act named stays text: a decision has no act of its own to default to.
   const html = useMemo(
@@ -179,16 +159,6 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
 
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef });
 
-  const handlePopupDiscuss = (text: string, startOffset: number) => {
-    const passage = buildPassage(plain, startOffset, text);
-    if (!passage) {
-      setToast({ message: 'Non è possibile aprire una discussione su questa selezione', type: 'error' });
-      return;
-    }
-    setDiscussionDraft({ passage });
-    setDiscussionOpen(true);
-  };
-
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
   const {
     noteAnchor, composerRect, clearAnchor, handlePopupHighlight, handlePopupAddNote, handleAddNote, closeComposer, commitComposer,
@@ -236,8 +206,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         highlightsButtonRef={setHighlightsButtonEl}
         onToggleNotes={() => setIsNotesOpen((v) => !v)}
         onToggleHighlights={() => setIsHighlightsOpen((v) => !v)}
-        isDiscussionOpen={discussionOpen}
-        onToggleDiscussion={() => setDiscussionOpen((v) => !v)}
+        isDiscussionOpen={discussion.open}
+        onToggleDiscussion={discussion.toggle}
       />
       <NotesPeekPanel
         isOpen={isNotesOpen}
@@ -287,19 +257,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         onPopupHighlight={handlePopupHighlight}
         onPopupAddNote={handlePopupAddNote}
         onPopupCopy={copySelection}
-        onPopupDiscuss={handlePopupDiscuss}
+        onPopupDiscuss={discussion.popupDiscuss}
       />
-      {!discussionOpen && passageThreadsError && (
-        <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-          <span>Impossibile caricare le discussioni sui passaggi. I segni potrebbero non mostrarle.</span>
-          <button
-            type="button"
-            onClick={reloadPassageThreads}
-            className="inline-flex min-h-[44px] items-center font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            Riprova
-          </button>
-        </div>
+      {!discussion.open && (
+        <PassageThreadsStatus error={discussion.error} loading={discussion.loading} onRetry={discussion.reload} />
       )}
       <UnmatchedAnchors
         highlights={lost.highlights}
@@ -317,11 +278,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
           group={openGroup}
           contentKey={html}
           textHash={textHash}
-          onOpenThread={(id) => {
-            setDiscussionFocus(id);
-            setFocusedThreadId(id);
-            setDiscussionOpen(true);
-          }}
+          onOpenThread={discussion.openThread}
           onClose={closeBlock}
           onUpdateNote={updateAnnotation}
           onRemoveNote={removeAnnotation}
@@ -333,33 +290,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         label={label}
         heading="Discussioni sulla decisione"
         textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa discussione."
-        isOpen={discussionOpen}
-        textHash={textHash}
-        passageLoadError={passageThreadsError}
-        passageThreadsLoading={passageThreadsLoading}
-        onRetryPassageLoad={reloadPassageThreads}
-        passageStates={passageStates}
         withholdDetachedPassage
-        focusThreadId={discussionFocus}
-        onFocusThread={setFocusedThreadId}
-        draft={discussionDraft}
-        onDraftConsumed={() => setDiscussionDraft(null)}
-        onThreadCreated={reloadPassageThreads}
-        onGoToPassage={(id) => {
-          setFocusedThreadId(id);
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => {
-              const root = contentRef.current;
-              if (root) revealAnnotation(root, { kind: 'thread', id });
-            }),
-          );
-        }}
-        onClose={() => {
-          setDiscussionOpen(false);
-          setFocusedThreadId(null);
-          setDiscussionFocus(null);
-          setDiscussionDraft(null);
-        }}
+        {...discussion.panelProps}
       />
       {toast && <Toast message={toast.message} type={toast.type} isVisible onClose={() => setToast(null)} />}
       <CitationPreviewPopup
