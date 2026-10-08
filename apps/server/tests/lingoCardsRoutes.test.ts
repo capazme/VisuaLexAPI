@@ -380,7 +380,7 @@ describe('the study-card routes', () => {
       expect(await prisma.lingoCard.count({ where: { id: { in: [draft, archived] } } })).toBe(0);
       expect(await prisma.lingoCard.count({ where: { id: { in: [proposed, bobs] } } })).toBe(2);
       const trash = (await request(app).get('/api/trash').set(authHeader(alice))).body;
-      expect(trash[0]).toMatchObject({ kind: 'LINGO_CARDS', dossierId: null, label: 'Schede LingoLex', itemCount: 2 });
+      expect(trash[0]).toMatchObject({ kind: 'LINGO_CARDS', dossierId: null, label: 'Schede di studio', itemCount: 2 });
       expect(trash[0].cards[0]).toEqual({ istituto: CARD.istituto, domanda: CARD.domanda });
     });
 

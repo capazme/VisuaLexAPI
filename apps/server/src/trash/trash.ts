@@ -208,7 +208,7 @@ export async function trashLingoCards(
         userId,
         kind: 'LINGO_CARDS',
         dossierId: null,
-        label: 'Schede LingoLex',
+        label: 'Schede di studio',
         summary: asJson({
           itemCount: movable.length,
           cards: movable.map((card) => ({ istituto: card.istituto, domanda: card.domanda.length > 120 ? `${card.domanda.slice(0, 119)}…` : card.domanda })),
