@@ -173,7 +173,10 @@ function threadView(thread: {
 
 /** The list queries: a decision's articleId is '' and may be left out. */
 function parseListAnchor(query: unknown) {
-  const { normaKey, articleId } = anchorSchema.pick({ normaKey: true }).extend({ articleId: z.string().max(120).optional() }).parse(query);
+  const { normaKey, articleId } = parseItalian(
+    anchorSchema.pick({ normaKey: true }).extend({ articleId: z.string({ message: 'L’articolo non è valido' }).max(120, 'L’articolo non è valido').optional() }),
+    query,
+  );
   const anchor = { normaKey, articleId: articleId ?? '' };
   if (articleId === undefined && !inDecisionKeySpace(normaKey)) throw new AppError(400, 'L’articolo è obbligatorio');
   checkAnchor(anchor);
@@ -365,9 +368,9 @@ export const moderateThread = async (req: Request, res: Response) => {
   const body = parseItalian(moderationSchema, req.body);
   const data: { isHidden?: boolean; passageReleasedAt?: Date | null; passageReleasedById?: string | null } = {};
   if (body.hidden !== undefined) data.isHidden = body.hidden;
+  const existing = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
+  if (!existing) throw new AppError(404, 'Discussione non trovata');
   if (body.passageReleased !== undefined) {
-    const existing = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
-    if (!existing) throw new AppError(404, 'Discussione non trovata');
     if (existing.targetKind !== 'decision' || existing.passageQuote === null) {
       throw new AppError(400, 'Solo il passo citato di una decisione può essere rimesso in chiaro');
     }

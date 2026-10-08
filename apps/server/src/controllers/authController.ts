@@ -229,7 +229,12 @@ export const exportAccountData = async (req: Request, res: Response) => {
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
     user,
-    data: { folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards },
+    data: {
+      folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases,
+      // The release time is the author's; the releasing admin's id is another person's identifier.
+      threads: threads.map(({ passageReleasedById: _releasedBy, ...thread }) => thread),
+      comments, lingoCards,
+    },
   });
 };
 

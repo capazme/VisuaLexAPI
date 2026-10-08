@@ -88,12 +88,23 @@ describe('discussions anchored on a court decision', () => {
     expect(wrong.status).toBe(400);
   });
 
+  it('answers the list, passages and moderation errors in Italian alone', async () => {
+    for (const path of ['/api/article-discussions', '/api/article-discussions/passages']) {
+      const res = await request(app).get(path).set(authHeader(alice)).query({});
+      expect(res.status, path).toBe(400);
+      expect(res.body.detail, path).toBe('La norma o la decisione è obbligatoria');
+    }
+    const missing = await request(app).patch('/api/admin/article-discussions/no-such-thread').set(authHeader(admin)).send({ hidden: true });
+    expect(missing.status).toBe(404);
+    expect(missing.body.detail).toBe('Discussione non trovata');
+  });
+
   it('refuses a malformed key, a bad court shape, a future year, a version, an URN or an article id', async () => {
     const nextYear = new Date().getFullYear() + 1;
     for (const normaKey of [
-      'cassazione:civile:007:2024',
+      'cassazione:civile:099999:2024',
       `cassazione:civile:99999:${nextYear}`,
-      'corte_costituzionale:civile:1:2020',
+      'corte_costituzionale:civile:99999:2020',
       'cassazione:99999:2024',
     ]) {
       const res = await open(alice, { normaKey });
@@ -246,6 +257,15 @@ describe('discussions anchored on a court decision', () => {
       expect(exported.status).toBe(200);
       const thread = exported.body.data.threads.find((t: { id: string }) => t.id === created.body.id);
       expect(thread).toMatchObject({ targetKind: 'decision', decisionKey: KEY, normaKey: KEY });
+    });
+
+    it("leaves the releasing admin's id out of the export and keeps the release time", async () => {
+      const created = await open(alice, { title: undefined, passage: PASSAGE });
+      await request(app).patch(`/api/admin/article-discussions/${created.body.id}`).set(authHeader(admin)).send({ passageReleased: true });
+      const exported = await request(app).get('/api/auth/export').set(authHeader(alice));
+      const thread = exported.body.data.threads.find((t: { id: string }) => t.id === created.body.id);
+      expect(thread).not.toHaveProperty('passageReleasedById');
+      expect(thread.passageReleasedAt).toEqual(expect.any(String));
     });
 
     it('removes the thread with the account', async () => {
