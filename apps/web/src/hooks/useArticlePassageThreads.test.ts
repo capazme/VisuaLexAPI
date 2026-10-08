@@ -213,4 +213,41 @@ describe('useArticlePassageThreads', () => {
       expect(articleDiscussionService.listPassages).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('anchored on a decision', () => {
+    const decisionKey = 'cassazione:civile:99999:2024';
+    const plainText = 'Premesso che il ricorso e inammissibile. Il giudice ha deciso.';
+    const decisionThreads: ArticleDiscussionPassageSummary[] = [
+      { ...dummyThreads[0], id: 'd-exact', articleUrn: null, passage: { quote: 'ricorso e inammissibile', start: 16, prefix: 'Premesso che il ', suffix: '. Il giudice ha ' } },
+      { ...dummyThreads[0], id: 'd-gone', articleUrn: null, passage: { quote: 'parole che non esistono piu', start: 3, prefix: '', suffix: '' } },
+    ];
+
+    it('loads with an empty articleId, because the key is the whole identity', async () => {
+      vi.mocked(articleDiscussionService.listPassages).mockResolvedValue(decisionThreads);
+
+      const { result } = renderHook(() => useArticlePassageThreads({ normaKey: decisionKey, articleId: '' }));
+
+      await waitFor(() => expect(result.current.threads).toEqual(decisionThreads));
+      expect(articleDiscussionService.listPassages).toHaveBeenCalledWith({ normaKey: decisionKey, articleId: '' });
+      expect(result.current.locations.size).toBe(0);
+    });
+
+    it('locates each passage on the projection it is given', async () => {
+      vi.mocked(articleDiscussionService.listPassages).mockResolvedValue(decisionThreads);
+
+      const { result } = renderHook(() =>
+        useArticlePassageThreads({ normaKey: decisionKey, articleId: '', plainText }),
+      );
+
+      await waitFor(() => expect(result.current.threads).toHaveLength(2));
+      expect(result.current.locations.get('d-exact')?.state).toBe('exact');
+      expect(result.current.locations.get('d-gone')?.state).toBe('detached');
+    });
+
+    it('does not load without a key, or when disabled', () => {
+      renderHook(() => useArticlePassageThreads({ normaKey: '', articleId: '' }));
+      renderHook(() => useArticlePassageThreads({ normaKey: decisionKey, articleId: '' }, false));
+      expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
+    });
+  });
 });

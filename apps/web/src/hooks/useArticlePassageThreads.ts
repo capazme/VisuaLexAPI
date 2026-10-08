@@ -1,23 +1,52 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { articleDiscussionService } from '../services/articleDiscussionService';
 import { isAuthenticated } from '../services/authService';
+import { locatePassage, type PassageLocation } from '../utils/threadPassages';
 import type { ArticleDiscussionPassageSummary } from '../types';
 
-/**
- * The passage discussions of one article, for its signs: one light request
- * (GET /article-discussions/passages) when the article is shown, none when the
- * reader is not logged in. `reload` asks again (after a new discussion).
- */
-export function useArticlePassageThreads(
-  normaKey: string,
-  articleId: string,
-  enabled = true,
-): {
+export interface PassageThreadsResult {
   threads: ArticleDiscussionPassageSummary[];
   isLoading: boolean;
   error: boolean;
   reload: () => void;
-} {
+  /** Where each thread's passage is in `plainText` (empty without it). */
+  locations: Map<string, PassageLocation>;
+}
+
+export interface PassageThreadsAnchor {
+  normaKey: string;
+  /** '' for a court decision (its key is the whole identity). */
+  articleId: string;
+  /** The plain text (the projection, for a decision) the passages are located against. */
+  plainText?: string;
+}
+
+/**
+ * The passage discussions of one article or decision, for its signs: one light
+ * request (GET /article-discussions/passages) when it is shown, none when the
+ * reader is not logged in. `reload` asks again (after a new discussion).
+ *
+ * Called with `(normaKey, articleId, enabled)` an article needs both parts; called
+ * with an anchor object the caller decides: a decision passes `articleId: ''`.
+ * With `plainText` in the anchor, `locations` says where each passage is in it.
+ */
+export function useArticlePassageThreads(
+  normaKey: string,
+  articleId: string,
+  enabled?: boolean,
+): PassageThreadsResult;
+export function useArticlePassageThreads(anchor: PassageThreadsAnchor, enabled?: boolean): PassageThreadsResult;
+export function useArticlePassageThreads(
+  first: string | PassageThreadsAnchor,
+  second?: string | boolean,
+  third = true,
+): PassageThreadsResult {
+  const fromAnchor = typeof first !== 'string';
+  const normaKey = fromAnchor ? first.normaKey : first;
+  const articleId = fromAnchor ? first.articleId : (second as string);
+  const plain = fromAnchor ? first.plainText : undefined;
+  const enabled = fromAnchor ? (second as boolean | undefined) ?? true : third;
+  const hasIdentity = Boolean(normaKey) && (fromAnchor || Boolean(articleId));
   const [reloadCount, setReloadCount] = useState(0);
   const [loadedData, setLoadedData] = useState<{
     requestId: string;
@@ -33,12 +62,12 @@ export function useArticlePassageThreads(
     setReloadCount((c) => c + 1);
   }, []);
 
-  const currentKey = normaKey && articleId ? JSON.stringify([normaKey, articleId]) : '';
+  const currentKey = hasIdentity ? JSON.stringify([normaKey, articleId]) : '';
   const currentRequestId = currentKey ? JSON.stringify([currentKey, reloadCount]) : '';
   const shouldLoad = enabled && Boolean(currentKey) && isAuthenticated();
 
   useEffect(() => {
-    if (!enabled || !normaKey || !articleId || !isAuthenticated()) {
+    if (!enabled || !hasIdentity || !isAuthenticated()) {
       return;
     }
 
@@ -66,12 +95,22 @@ export function useArticlePassageThreads(
     return () => {
       cancelled = true;
     };
-  }, [normaKey, articleId, currentKey, enabled, reloadCount]);
+  }, [normaKey, articleId, currentKey, enabled, hasIdentity, reloadCount]);
 
   const hasCurrentData = loadedData.requestId === currentRequestId;
-  const threads = hasCurrentData ? loadedData.threads : [];
+  const threads = useMemo(
+    () => (hasCurrentData ? loadedData.threads : []),
+    [hasCurrentData, loadedData.threads],
+  );
   const isLoading = shouldLoad && !hasCurrentData;
   const error = hasCurrentData && loadedData.error;
 
-  return { threads, isLoading, error, reload };
+  const locations = useMemo(
+    () => new Map<string, PassageLocation>(
+      plain === undefined ? [] : threads.map((t) => [t.id, locatePassage(plain, t.passage)]),
+    ),
+    [threads, plain],
+  );
+
+  return { threads, isLoading, error, reload, locations };
 }

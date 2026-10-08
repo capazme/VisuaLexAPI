@@ -345,4 +345,65 @@ describe('ArticleDiscussionPanel', () => {
 
     expect(screen.queryByRole('button', { name: /vai al passo/i })).not.toBeInTheDocument();
   });
+
+  describe('anchored on a decision', () => {
+    const decisionAnchor = { normaKey: 'cassazione:civile:99999:2024', articleId: '' };
+
+    it('lists, creates and replies with the caller\'s anchor, label and projection hash', async () => {
+      const decisionThread: ArticleDiscussionThread = {
+        ...dummyThread,
+        normaKey: decisionAnchor.normaKey,
+        articleId: '',
+        version: null,
+        articleUrn: null,
+        textHash: 'projection-hash',
+        target: { kind: 'decision', key: decisionAnchor.normaKey },
+        passageReleased: false,
+      };
+      vi.mocked(articleDiscussionService.list).mockResolvedValue({
+        data: [decisionThread],
+        pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+      });
+      vi.mocked(articleDiscussionService.create).mockResolvedValue({ ...decisionThread, id: 'thread-d-new', title: 'T', body: 'B' });
+      vi.mocked(articleDiscussionService.comment).mockResolvedValue({
+        id: 'c1', threadId: 'thread-1', body: 'Risposta', isHidden: false, user: { id: 'u3', username: 'anna' },
+        createdAt: '2026-10-08T10:00:00Z', updatedAt: '2026-10-08T10:00:00Z', voteCount: 0, userVoted: false, isOwner: true,
+      });
+
+      render(
+        <ArticleDiscussionPanel
+          anchor={decisionAnchor}
+          label="Cass. civ. n. 99999/2024"
+          heading="Discussioni sulla sentenza"
+          isOpen={true}
+          onClose={vi.fn()}
+          textHash="projection-hash"
+        />
+      );
+
+      await waitFor(() => expect(screen.getByText('Titolo discussione')).toBeInTheDocument());
+      expect(articleDiscussionService.list).toHaveBeenCalledWith(decisionAnchor, 'recent');
+      expect(screen.getByText('Discussioni sulla sentenza')).toBeInTheDocument();
+      expect(screen.getByText('Cass. civ. n. 99999/2024')).toBeInTheDocument();
+      expect(screen.queryByText(/^Art\./)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /nuova discussione/i }));
+      fireEvent.change(screen.getByPlaceholderText('Titolo della discussione'), { target: { value: 'T' } });
+      fireEvent.change(screen.getByPlaceholderText(/condividi una domanda/i), { target: { value: 'B' } });
+      fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
+
+      await waitFor(() => {
+        expect(articleDiscussionService.create).toHaveBeenCalledWith(
+          decisionAnchor, 'T', 'B',
+          { passage: undefined, articleUrn: undefined, textHash: 'projection-hash' },
+        );
+      });
+
+      // The new discussion is listed first and shown expanded.
+      fireEvent.click((await screen.findAllByRole('button', { name: /rispondi/i }))[0]);
+      fireEvent.change(screen.getByPlaceholderText(/rispondi|scrivi/i), { target: { value: 'Risposta' } });
+      fireEvent.submit(screen.getByPlaceholderText(/rispondi|scrivi/i).closest('form')!);
+      await waitFor(() => expect(articleDiscussionService.comment).toHaveBeenCalledWith('thread-d-new', 'Risposta'));
+    });
+  });
 });

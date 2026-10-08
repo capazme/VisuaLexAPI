@@ -7,6 +7,12 @@ import type {
   ThreadPassage,
 } from '../types';
 
+/**
+ * What a discussion hangs on, given by the caller. An article: its norm key, its
+ * article id, optionally the label and the version on screen. A court decision:
+ * the decision key as `normaKey`, `articleId: ''`, no version (the server derives
+ * the target from the key; the web sends nothing else).
+ */
 export interface DiscussionAnchor {
   normaKey: string;
   articleId: string;

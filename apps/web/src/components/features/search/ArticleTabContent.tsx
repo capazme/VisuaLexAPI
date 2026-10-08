@@ -964,6 +964,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
             <ArticleDiscussionPanel
                 anchor={discussionAnchor}
+                label={`Art. ${discussionAnchor.articleLabel ?? discussionAnchor.articleId}`}
                 isOpen={discussionOpen}
                 articleUrn={norma_data.urn}
                 textHash={textHash}

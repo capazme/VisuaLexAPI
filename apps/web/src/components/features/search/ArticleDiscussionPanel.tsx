@@ -9,9 +9,13 @@ import { cn } from '../../../lib/utils';
 
 interface Props {
   anchor: DiscussionAnchor;
+  /** Short name of what is discussed, beside the heading (e.g. «Art. 1453»). */
+  label?: string;
+  /** The panel's heading; the article's by default. */
+  heading?: string;
   isOpen: boolean;
   onClose: () => void;
-  /** Recorded on every new discussion: the article's URN and the SHA-256 of the text on screen. */
+  /** Recorded on every new discussion: the URN of what is discussed (none for a decision) and the SHA-256 of the text (projection) on screen. */
   articleUrn?: string;
   textHash?: string | null;
   /** Passage summaries are unavailable because their request failed. */
@@ -38,6 +42,8 @@ interface Props {
 
 export function ArticleDiscussionPanel({
   anchor,
+  label,
+  heading = 'Discussioni sull’articolo',
   isOpen,
   onClose,
   articleUrn,
@@ -254,8 +260,8 @@ export function ArticleDiscussionPanel({
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <MessageCircle size={18} className="text-primary-500" />
-          <h3 id="article-discussions-title" className="font-semibold text-slate-900 dark:text-white">Discussioni sull’articolo</h3>
-          <span className="text-xs text-slate-400">Art. {anchor.articleLabel ?? anchor.articleId}</span>
+          <h3 id="article-discussions-title" className="font-semibold text-slate-900 dark:text-white">{heading}</h3>
+          {label && <span className="text-xs text-slate-400">{label}</span>}
         </div>
         <div className="flex items-center gap-2">
           <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5">
