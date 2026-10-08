@@ -879,6 +879,69 @@ like the lookup) and caches them. Answers `application/pdf` with
 `richiesta_non_valida` 400, `errore_interno` 500. The Corte costituzionale keeps
 «Apri sulla fonte».
 
+### 13. Find in the text (the owner, 8 October)
+
+The owner: «mettiamo anche una funzione di ricerca all'interno delle sentenze»; asked whether
+decisions and articles share it, «sì, insieme». One tool, the same component, in the reading
+toolbar of a decision's tab and of an article's tab (desktop and phone). Not in the dossier
+reader or Study Mode for now (Later).
+
+**What it does.** A magnifier button («Cerca nel testo», `aria-pressed`) opens a box under the
+toolbar: a text field, a counter («3 di 12», announced in a polite live region; «Nessun
+risultato»), «Risultato precedente» and «Risultato successivo» (↑ ↓) and «Chiudi la ricerca» (×),
+all 44 px targets on a phone. Typing highlights every match and makes the first one current; Enter
+goes to the next, Shift+Enter to the previous (both wrap), Esc closes the box, clears the
+highlights and returns the focus to the button. The current match is scrolled into the middle of
+the tab's view. A query shorter than two characters highlights nothing. Past 1,000 matches the
+first 1,000 are highlighted and the counter says «oltre 1000: affina la ricerca». On a phone the
+box takes the toolbar's full width, the field on a row of its own. «Cerca nel testo» has no keyboard shortcut of its own. The app's Cmd/Ctrl+F is a different tool, the existing «Cerca negli articoli aperti» (`Layout.tsx`, unchanged by this PR): it searches the open articles, not decisions, and marks them in amber in the text.
+A past text (gotcha 32) can be searched: searching stores nothing. A decision shown without its
+text has no button.
+
+**What is searched.** The text the reader sees: the rendered text nodes of the surface's text
+root, which spell the projection on a decision (§8.2) and `article_text` without `\n` on an
+article (root rule 23). A node inside an element that is not displayed (the folded update notes of
+an article, or a node under `.vlx-hidden`) is not searched. Labels drawn by CSS are not text and are
+not found.
+
+**How it matches.** Case and accents are ignored: «perche» finds «perché», «Perché» and
+«PERCHÉ». The text is folded one UTF-16 unit at a time, so every match keeps the offsets of the
+original text: a unit is decomposed (NFD), its combining marks dropped and the rest lower-cased,
+and the result is kept only when it is still one unit (otherwise the unit lower-cased, or the
+unit itself: «ß» and astral characters stay as they are; «İ» reads as «i»; a lone combining mark
+stays itself). The typographic apostrophes (’ ‘ ʼ), the acute accent «´» and the grave «`» read
+as «'», and the no-break and other Unicode spaces as a space, so «dell'articolo» finds
+«dell’articolo». The query is folded unit by unit after NFC (so it folds the way the text does:
+Hangul syllables, «ς»), then any leftover combining marks, soft hyphens and zero-width spaces are
+dropped; the final sigma «ς» reads as «σ»; in the pattern every query unit may be followed by combining marks, so a
+decomposed «perché» in the text (the Cassazione's PDF is not normalised) is found by «perche»,
+«perché» and «perche no», the mark inside the match, and a decomposed query finds precomposed
+text. A soft hyphen or a zero-width space inside a word, in the text or in the query, is ignored («responsabilita»
+finds «respon­sabilità»). Ligatures (ﬁ, ﬂ, ﬃ) are not matched: they cannot fold one unit to one.
+In the query, a run of spaces matches any run of whitespace in the text; the query is trimmed at
+its edges, and the two-character minimum counts folded base characters (code points after the
+marks are dropped), so one emoji or one accented letter is not enough.
+
+**Where one block ends.** The text nodes of two blocks touch without a space, so the search runs
+over the text nodes joined by one virtual space wherever a block ends and another begins (a
+change of the nearest block-like ancestor: `div`, `p`, `li`, `ul`, `ol`, `pre`, `table`, `tr`,
+`td`, `th`, `section`, `article`, `blockquote`, `h1`–`h6`, an article's `vlx-b`, a decision's line), at a `<br>`, and wherever a
+hidden subtree was skipped between two nodes. «Fatto diritto» finds «Fatto» and «Diritto» in two
+blocks, and «todi» does not. A virtual space maps to no character: a match never begins or ends
+on one, and its range starts and ends inside real text nodes.
+
+**How it highlights: nothing is added to the page.** The matches are drawn with the browser's
+CSS Custom Highlight API (`CSS.highlights`, `::highlight()`): ranges over the existing text
+nodes, painted by the browser, no element added or moved. Root rule 23 is untouched by
+construction (a test checks that the text root's HTML is identical with the search open), and the
+search coexists with highlights, note anchors, signs and the discussion focus without nesting
+rules. Two names are registered once for the document, `vlx-find` (every match except the current one) and
+`vlx-find-current` (the current one, a stronger colour), each the union of the ranges of every
+open search, so two tabs searching at once do not clear each other. When the text is drawn again
+(a note added, highlights hidden), the matches are computed again and the current one is kept
+where it still exists. A browser without the API (Chrome and Edge before 105, Safari before
+17.2, Firefox before 140) still counts, moves and scrolls; it draws no highlight.
+
 ## Security and data
 
 - **Query injection (OWASP A03).** Topic words go into a Solr query: §5.4's
@@ -930,6 +993,10 @@ like the lookup) and caches them. Answers `application/pdf` with
   article; a highlight and a note on a decision, reload, still there; an
   unmatched anchor (forged on the test account) listed; the Cronologia; a phone
   width.
+- «Cerca nel testo» (§13): the folding table and the matcher without a DOM; the ranges over
+  text nodes split by marks; the text root's HTML identical with the search open; in a browser, a
+  word with and without its accent on a decision and on an article, Enter and Shift+Enter, Esc,
+  two tabs searching at once, a phone width.
 
 ## Questions for the owner — answered
 
@@ -986,6 +1053,7 @@ senso che l'admin può rimetterlo in chiaro)»; 7 «sì».
   disk, without the source).
 - Norms by topic: a VisuaLex glossary from Brocardi's dictionary (§6), or MERL-T's concept layer.
 - Notes and highlights in the dossier's decision reader (dossier PR 3).
+- «Cerca nel testo» in the dossier reader and in Study Mode (§13).
 - **Before VisuaLex opens to the public** (the owner, 8 October): the server checks the words a
   court withdrew. Today the check is the web client's (§8.6) and the server stores content as it
   receives it; it is to check them when an environment is published or updated on the Forum and

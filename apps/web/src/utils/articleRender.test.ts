@@ -7,6 +7,7 @@ import { groupAnnotationsByBlock, type LocatedThread } from './articleAnnotation
 import { ARTICLE_FIXTURES, fixtureText } from './__fixtures__/articleTexts';
 import { buildPassage } from './threadPassages';
 import type { Annotation, Highlight } from '../types';
+import { openFindOn, wordOf } from './__fixtures__/openFind';
 
 const hl = (id: string, text: string, startOffset: number, color: Highlight['color'] = 'yellow'): Highlight => ({
   id, normaKey: 'k', articleId: '1', rangeSerialized: '', text, color, startOffset,
@@ -486,4 +487,26 @@ describe('annotation signs', () => {
     expect(nested?.getAttribute('data-thread-focus')).toBe('t-nested');
     expect(nested?.parentElement?.getAttribute('data-highlight')).toBe('h-outer');
   });
+});
+
+describe('the projection invariant — with a search open', () => {
+  it.each(ARTICLE_FIXTURES.map((f) => [f.id, f.text] as const))(
+    '%s: the search draws ranges and leaves the text nodes spelling article_text minus \\n',
+    (_id, raw) => {
+      const plain = raw.replace(/\n/g, '');
+      const first = plain.slice(0, 30);
+      const div = mount(render(raw, { highlights: [hl('h0', first, 0)], annotations: [note('n0', plain.slice(5, 25), 5)], signs: true }));
+      document.body.appendChild(div);
+      const before = div.innerHTML;
+      const search = openFindOn(div, wordOf(plain));
+      try {
+        expect(search.drawn).toBeGreaterThan(0);
+        expect(div.textContent).toBe(plain);
+        expect(div.innerHTML).toBe(before);
+      } finally {
+        search.close();
+        div.remove();
+      }
+    },
+  );
 });

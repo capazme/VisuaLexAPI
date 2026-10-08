@@ -198,12 +198,24 @@ describe('DossierItemReader — a text the table says may not be copied', () => 
     throw new Error(`"${needle}" is not in the text`);
   }
 
+  /**
+   * Select `needle` until the popup's copy button shows. The text can be drawn again after the
+   * first paint (the reader's markers land), which detaches a selection made too early and the
+   * popup never opens: each attempt selects on the text as it is now.
+   */
+  function selectForCopy(container: HTMLElement, needle: string): Promise<HTMLElement> {
+    return waitFor(() => {
+      const button = screen.queryByTitle(/^Copia \(/);
+      if (button) return button;
+      select(container, needle);
+      throw new Error('the selection popup is not open yet');
+    }, { timeout: 3000 });
+  }
+
   it('does not copy the selected words of a version that does not contain the day, and says why', async () => {
     const showToast = vi.fn();
     const { container } = read(PAST_ITEM, { ...MIDDLE, request_in_window: false }, RAW, showToast);
-    await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
-    select(container, WORDS);
-    fireEvent.click(await screen.findByTitle(/^Copia \(/));
+    fireEvent.click(await selectForCopy(container, WORDS));
     await act(async () => { await Promise.resolve(); }); // the handler is async: let a write, if any, happen
     expect(writeText).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(UNRELIABLE_REASON, 'info');
@@ -225,9 +237,7 @@ describe('DossierItemReader — a text the table says may not be copied', () => 
   it('copies the selected words of a reliable past text with the citation first (the control)', async () => {
     const showToast = vi.fn();
     const { container } = read(PAST_ITEM, MIDDLE, RAW, showToast);
-    await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
-    select(container, WORDS);
-    fireEvent.click(await screen.findByTitle(/^Copia \(/));
+    fireEvent.click(await selectForCopy(container, WORDS));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied = writeText.mock.calls[0][0];
     expect(copied.startsWith('art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 (Normattiva')).toBe(true);

@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import { useRef, type ReactNode, type Ref } from 'react';
 import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -7,6 +7,7 @@ import type { VersionChip } from '../../../utils/versionDisplay';
 import { VersionStatusChip } from './VersionStatusChip';
 import { NotesHighlightsButtons } from './NotesHighlightsButtons';
 import { DiscussionButton } from './DiscussionButton';
+import { FindInTextButton } from './FindInTextButton';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
@@ -48,6 +49,16 @@ export interface ReadingToolbarProps {
     onOpenAdvancedExport: () => void;
     onOpenVersionInput: () => void;
     onCompare: () => void;
+    /**
+     * «Cerca nel testo»: the button (desktop row and phone row) and, while open, the box in a row of its own under the
+     * buttons, sticky with the toolbar. Absent when there is no text to search.
+     */
+    find?: {
+        isOpen: boolean;
+        /** Told which of the two buttons was on screen, for the box to give focus back to. */
+        onToggle: (button: HTMLElement | null) => void;
+        bar: ReactNode;
+    };
 }
 
 export function ReadingToolbar({
@@ -79,7 +90,16 @@ export function ReadingToolbar({
     onOpenAdvancedExport,
     onOpenVersionInput,
     onCompare,
+    find,
 }: ReadingToolbarProps) {
+    // Both rows are mounted and one is hidden by CSS: the box returns focus to the one on screen.
+    const desktopFindRef = useRef<HTMLButtonElement>(null);
+    const phoneFindRef = useRef<HTMLButtonElement>(null);
+    const toggleFind = () => {
+        if (!find) return;
+        const desktop = desktopFindRef.current;
+        find.onToggle(desktop && desktop.getClientRects().length > 0 ? desktop : phoneFindRef.current);
+    };
     // A switched-off tool keeps its name and gains the reason in its tooltip.
     const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);
     const lock = (reason?: string) => (reason ? { disabled: true } : {});
@@ -128,6 +148,7 @@ export function ReadingToolbar({
                 >
                     <MessageCircle size={20} />
                 </button>
+                {find && <FindInTextButton ref={phoneFindRef} isOpen={find.isOpen} onToggle={toggleFind} size={20} />}
                 <button
                     onClick={() => { void onMobileCopy(); }}
                     className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
@@ -201,6 +222,7 @@ export function ReadingToolbar({
                     name="Discussioni sull’articolo"
                     lockedReason={lockedReason}
                 />
+                {find && <FindInTextButton ref={desktopFindRef} isOpen={find.isOpen} onToggle={toggleFind} />}
                 <button
                     onClick={onOpenCopyModal}
                     className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
@@ -290,6 +312,7 @@ export function ReadingToolbar({
                     )}
                 </div>
             </div>
+            {find?.isOpen && find.bar}
         </div>
     );
 }

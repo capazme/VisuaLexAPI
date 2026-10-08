@@ -182,6 +182,21 @@ the article now lists only what no sign can reach (`LooseHighlightsList`,
 desktop): highlights made in the Brocardi sections and highlights whose text
 changed — without it they could no longer be removed.
 
+**Find in the text** («Cerca nel testo», spec §13): one `FindInTextButton` in the toolbar
+(`ReadingToolbar`, both its desktop row and its phone row, and `DecisionReadingToolbar`) opens
+`FindInTextBox` (`useFindInText` + `FindInTextBar`) in a row of its own inside the sticky toolbar;
+it is mounted only while open, so closing clears the highlights and forgets the query. The
+article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
+a decision only when it has text (`hasDecisionText`). The search reads the text nodes, joined by one virtual space at every block boundary, `<br>` and skipped hidden subtree, and paints with
+the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-current)`); it adds,
+moves and changes nothing in the DOM (gotcha 23), and where the API is missing it only fails to
+draw. Matching ignores case, accents and marks, folded 1:1 per UTF-16 unit so offsets are the
+original's; a query needs two characters (digits count); past 1000 matches the rest are not drawn. Two surfaces
+searching at once keep both sets of ranges (the registry is keyed by owner). Browser floor: the
+Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
+`decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
+«Cerca nel testo» has no shortcut: Cmd/Ctrl+F is the app's existing «Cerca negli articoli aperti» (`Layout.tsx`), a different tool that searches the open articles, not decisions.
+
 **Passage discussions on the reading surface**: the discussion wiring of a reading surface
 lives in one hook, `useDiscussionWiring` (passage threads load and reload, the ones that still
 land in the text, the panel's open state, the focused thread, the «Discuti» draft, the text
@@ -475,6 +490,13 @@ Duplicating any of these is a defect, not a shortcut.
   `uniqueArticleIdFromNorma(norma)`. Both keys share their act-level segments so
   they cannot drift. `buildItemKey` is the annotation/highlight key contract and
   must stay byte-identical across dashboard and dossier.
+- `utils/findInText.ts`, `utils/findHighlights.ts`, `hooks/useFindInText.ts` — find in the text:
+  `findMatches`/`collectSearchableText`/`rangesForMatches` (folded, 1:1 offsets; `isSearchableQuery`
+  is the one rule for «long enough»), the owner-keyed highlight registry (`setFindRanges`,
+  `clearFindRanges`) and the hook that debounces typing, keeps the current match across a redraw and
+  re-searches when the text changes. Read-only over the DOM. `features/search/toolbarToggle.ts`
+  (`toolbarToggleClass`) is the look shared by the toolbar toggles (`DiscussionButton`,
+  `FindInTextButton`): add a toggle with it, not with a copy of the classes.
 - `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.

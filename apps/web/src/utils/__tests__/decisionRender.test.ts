@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { decisionProjection, decisionStructure, isAnchoredNote, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
 import { DECISION_TEXTS, READER_TEXTS } from '../__fixtures__/decisionTexts';
 import type { Annotation, ArticleDiscussionPassageSummary, Highlight } from '../../types';
+import { openFindOn, wordOf } from '../__fixtures__/openFind';
 
 function textNodes(html: string): string {
   const root = document.createElement('div');
@@ -341,4 +342,31 @@ describe('discussions: signs count threads, the focus nests, the text nodes stil
     const html = renderDecisionHtml({ testo: { motivazione: 'abcdef' }, highlights: [], annotations: [], threads: [{ thread: summary('a'), start: 0, end: 3 }], focusedThreadId: 'zz' });
     expect(html).not.toContain('vlx-thread-focus');
   });
+});
+
+describe('the projection contract — with a search open', () => {
+  const texts = { ...DECISION_TEXTS, ...READER_TEXTS };
+  for (const [name, testo] of Object.entries(texts).filter(([, t]) => decisionProjection(t) !== '')) {
+    it(`${name}: the search draws ranges and the text nodes still spell the projection`, () => {
+      const plain = decisionProjection(testo);
+      const { highlights, annotations } = marksOn(testo);
+      const root = document.createElement('div');
+      root.innerHTML = renderDecisionHtml({ testo, highlights, annotations, signs: true });
+      document.body.appendChild(root);
+      const before = root.innerHTML;
+      // the projection glues the last word of a line to the first of the next: the query comes from within the lines
+      const query = wordOf([...root.querySelectorAll('.vlx-dec-line')].map((l) => l.textContent).join(' '), 2);
+      expect(query.length, 'a fixture with text has a word to search').toBeGreaterThanOrEqual(2);
+      const search = openFindOn(root, query);
+      try {
+        expect(search.drawn).toBeGreaterThan(0);
+        // textContent, not a re-parse of innerHTML: a raw carriage return survives in the DOM
+        expect(root.textContent).toBe(plain);
+        expect(root.innerHTML).toBe(before);
+      } finally {
+        search.close();
+        root.remove();
+      }
+    });
+  }
 });
