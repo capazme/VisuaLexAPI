@@ -241,6 +241,27 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   projection when the thread was opened); the title is optional only for passage
   threads; `GET /article-discussions/passages` lists an article's passage threads
   without bodies. The stored passage is never rewritten; the reader's browser locates it.
+  A thread may be anchored on a **court decision** (spec 2026-10-05 §8.7), in
+  columns of its own (`target_kind` `'article'|'decision'`, `decision_key`,
+  CHECKs in the migration `20261011100000_article_threads_decision_target`).
+  The server derives the target from `normaKey` (`norms/decisionKey.ts`
+  `readDecisionKey`, the twin of the web's `identityFromKey`, both pinned to
+  `conventions/sources/decision-keys.json`): a key in the
+  `cassazione:` / `corte_costituzionale:` space must read back (else 400) and
+  comes with `articleId` `''` and no `version` or `articleUrn`; an optional body
+  `target: { kind, key }` is accepted only if it agrees (an article target takes no key). The answer carries
+  `target` and `passageReleased`. The list queries may omit `articleId` for a
+  decision; a decision thread never shows in an article's list nor the reverse.
+  `textHash` and passage offsets are on the decision's projection (the client
+  computes them). A withdrawn quotation is hidden by the panel from everyone
+  but its author and admins; `PATCH /admin/article-discussions/:id` takes
+  `{ hidden?, passageReleased? }` and sets or clears `passage_released_at` /
+  `passage_released_by` (the admin's id) on a decision thread with a passage.
+  The API still returns the stored quotation. Deleting the releasing admin
+  sets `passage_released_by` null and keeps the release (the CHECK allows it).
+  Every discussion route answers its 400s and 404s in Italian (`parseItalian`,
+  not the global handler's English prefix); moderation on a missing thread is a
+  404 «Discussione non trovata».
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing
@@ -306,7 +327,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades, except the community's study cards, which stay without an
-  author: see LingoLex cards). Reached from the Settings modal.
+  author: see LingoLex cards). Reached from the Settings modal. The export's
+  discussion threads keep a release's time but not the releasing admin's id.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
   (see Key API Endpoints).

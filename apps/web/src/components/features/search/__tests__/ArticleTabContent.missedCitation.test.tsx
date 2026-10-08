@@ -75,7 +75,7 @@ async function selectNeedle() {
 }
 
 beforeEach(() => {
-  passageThreadState.mockReturnValue({ threads: [], error: null, reload: vi.fn() });
+  passageThreadState.mockReturnValue({ threads: [], error: null, reload: vi.fn(), locations: new Map() });
   sendNerFeedback.mockReset().mockResolvedValue({ received: true, feedback_id: 'f1', sample_weight: 1 });
   // The per-article loaders hit the backend; the flow under test does not need them.
   appStore.setState({ loadAnnotationsForArticle: vi.fn(), loadHighlightsForArticle: vi.fn() });
@@ -90,7 +90,7 @@ afterEach(() => {
 describe('ArticleTabContent: passage discussion loading', () => {
   it('shows a recoverable error for a failed passage load and invokes retry', async () => {
     const reload = vi.fn();
-    passageThreadState.mockReturnValue({ threads: [], error: true, reload });
+    passageThreadState.mockReturnValue({ threads: [], error: true, reload, locations: new Map() });
     features.mockReturnValue({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true });
 
     renderArticle();

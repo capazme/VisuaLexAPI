@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { decisionProjection, decisionStructure, isAnchoredNote, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
 import { DECISION_TEXTS, READER_TEXTS } from '../__fixtures__/decisionTexts';
-import type { Annotation, Highlight } from '../../types';
+import type { Annotation, ArticleDiscussionPassageSummary, Highlight } from '../../types';
 
 function textNodes(html: string): string {
   const root = document.createElement('div');
@@ -281,5 +281,64 @@ describe('labels and characters', () => {
       root.innerHTML = renderDecisionHtml({ testo: DECISION_TEXTS[name], highlights, annotations: [] });
       expect(root.querySelectorAll('mark').length, name).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('discussions: signs count threads, the focus nests, the text nodes still spell the projection', () => {
+  const summary = (id: string): ArticleDiscussionPassageSummary => ({
+    id, title: 't', passage: { quote: '', start: 0, prefix: '', suffix: '' }, articleUrn: null, textHash: null,
+    commentCount: 0, createdAt: '', user: { id: 'u', username: 'x' },
+  });
+
+  it('draws a sign with data-threads on a paragraph holding only a discussion', () => {
+    const testo = DECISION_TEXTS[Object.keys(DECISION_TEXTS).find((n) => decisionProjection(DECISION_TEXTS[n]).length > 30 && n !== 'carriage_return')!];
+    const plain = decisionProjection(testo);
+    const html = renderDecisionHtml({
+      testo, highlights: [], annotations: [], signs: true,
+      threads: [{ thread: summary('a'), start: 0, end: 5 }, { thread: summary('b'), start: 2, end: 9 }],
+    });
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    const sign = root.querySelector<HTMLElement>('.vlx-sign[data-block="0"]')!;
+    expect(sign.dataset.threads).toBe('2');
+    expect(sign.dataset.notes).toBe('0');
+    expect(textNodes(html)).toBe(plain);
+  });
+
+  it('every fixture with a discussion and its focus on: the text nodes spell the projection', () => {
+    // READER_TEXTS carries the reader-derived cases, the astral one included.
+    for (const [name, testo] of [...Object.entries(DECISION_TEXTS), ...Object.entries(READER_TEXTS)]) {
+      const plain = decisionProjection(testo);
+      if (plain === '') continue;
+      const { highlights, annotations } = marksOn(testo);
+      const end = Math.min(plain.length, 12);
+      const html = renderDecisionHtml({
+        testo, highlights, annotations, signs: true,
+        threads: [{ thread: summary('t'), start: 1, end }],
+        focusedThreadId: 't',
+      });
+      expect(textNodes(html), name).toBe(plain);
+      const root = document.createElement('div');
+      root.innerHTML = html;
+      expect(root.querySelector('.vlx-thread-focus'), name).not.toBeNull();
+    }
+  });
+
+  it('the focus nests inside the highlight it overlaps, and the text still spells the projection', () => {
+    const testo = { motivazione: 'abcdefghij klm' };
+    const html = renderDecisionHtml({
+      testo, highlights: [hl(2, 'cdef')], annotations: [], signs: true,
+      threads: [{ thread: summary('t'), start: 1, end: 6 }],
+      focusedThreadId: 't',
+    });
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    expect(root.querySelector('mark .vlx-thread-focus')?.textContent).toBe('cdef');
+    expect(textNodes(html)).toBe(decisionProjection(testo));
+  });
+
+  it('draws no focus for an unknown id', () => {
+    const html = renderDecisionHtml({ testo: { motivazione: 'abcdef' }, highlights: [], annotations: [], threads: [{ thread: summary('a'), start: 0, end: 3 }], focusedThreadId: 'zz' });
+    expect(html).not.toContain('vlx-thread-focus');
   });
 });

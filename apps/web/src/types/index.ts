@@ -584,6 +584,10 @@ export interface ArticleDiscussionThread {
     articleId: string;
     articleLabel?: string | null;
     version?: string | null;
+    /** What the thread hangs on, derived by the server from `normaKey` (always sent). */
+    target: { kind: 'article' } | { kind: 'decision'; key: string };
+    /** A decision thread's withdrawn-word quotation was released by an admin. */
+    passageReleased: boolean;
     title: string;
     body: string;
     passage: ThreadPassage | null;

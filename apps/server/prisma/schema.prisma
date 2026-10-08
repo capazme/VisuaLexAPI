@@ -27,7 +27,8 @@ model User {
   notificationLastSeenAt DateTime? @map("notification_last_seen_at")
   normaWatches           NormaWatch[]
   normaNotifications    NormaChangeNotification[]
-  articleThreads        ArticleThread[]
+  articleThreads        ArticleThread[]       @relation("ArticleThreadAuthor")
+  releasedThreadPassages ArticleThread[]      @relation("ArticleThreadPassageReleasedBy")
   articleComments       ArticleComment[]
   threadVotes           ArticleThreadVote[]
   commentVotes          ArticleCommentVote[]
@@ -499,6 +500,14 @@ model ArticleThread {
   passageSuffix String? @map("passage_suffix")
   articleUrn    String? @map("article_urn")
   textHash      String? @map("text_hash")
+  // What the thread is anchored on. 'decision': normaKey = decisionKey, articleId = '',
+  // no version, no URN (CHECKs in the migration). The release columns lift the panel's hiding of
+  // a withdrawn quotation: a release names its admin only together with its time; the admin may
+  // later be deleted, which leaves the time (the CHECK is one-way).
+  targetKind          String    @default("article") @map("target_kind")
+  decisionKey         String?   @map("decision_key")
+  passageReleasedAt   DateTime? @map("passage_released_at") @db.Timestamptz(6)
+  passageReleasedById String?   @map("passage_released_by")
   title       String
   body        String
   userId      String   @map("user_id")
@@ -506,13 +515,15 @@ model ArticleThread {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User                 @relation("ArticleThreadAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  passageReleasedBy User?         @relation("ArticleThreadPassageReleasedBy", fields: [passageReleasedById], references: [id], onDelete: SetNull)
   comments   ArticleComment[]
   votes      ArticleThreadVote[]
   reports    ArticleThreadReport[]
 
   @@index([normaKey, articleId, createdAt])
   @@index([userId])
+  @@index([passageReleasedById])
   @@map("article_threads")
 }
 

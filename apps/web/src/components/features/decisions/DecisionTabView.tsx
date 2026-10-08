@@ -4,6 +4,7 @@ import type { DecisionNotice, DecisionReference, FetchDecisionAnswer, FoundDecis
 import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
 import { decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
+import { DecisionDiscussionsWithoutText } from './DecisionDiscussionsWithoutText';
 import { DecisionView } from './DecisionView';
 
 /** Notices about what was cited (its section, the archive deduced from it), not about the decision:
@@ -94,6 +95,9 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
             attributi={answer.attributi}
             hostTabId={tabId}
           />
+        ) : undefined}
+        noTextSlot={answer?.esito === 'trovata' ? (
+          <DecisionDiscussionsWithoutText identity={answer.identita} attributi={answer.attributi} />
         ) : undefined}
       />
     </div>

@@ -76,7 +76,7 @@ describe('article discussions', () => {
     expect(created.body.comments).toEqual([]);
   });
 
-  it('rejects a whole-article thread without title (400, naming title)', async () => {
+  it('rejects a whole-article thread without title (400, in Italian)', async () => {
     const res = await request(app).post('/api/article-discussions').set(authHeader(alice)).send({
       normaKey: 'codice-civile--art-2043',
       articleId: '2043',
@@ -84,7 +84,7 @@ describe('article discussions', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(JSON.stringify(res.body)).toContain('title');
+    expect(res.body.detail).toBe('Il titolo è obbligatorio (almeno 3 caratteri) per una discussione senza un passo citato');
   });
 
   it('rejects a passage thread with a title of 2 characters (400)', async () => {
@@ -102,7 +102,7 @@ describe('article discussions', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(JSON.stringify(res.body)).toContain('title');
+    expect(res.body.detail).toBe('Il titolo, se indicato, deve avere almeno 3 caratteri');
   });
 
   it('rejects invalid passages with 400 for each validation rule', async () => {

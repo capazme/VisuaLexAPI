@@ -2,33 +2,76 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
+import { inDecisionKeySpace, readDecisionKey } from '../norms/decisionKey';
 
 const anchorSchema = z.object({
-  normaKey: z.string().min(1).max(500),
-  articleId: z.string().min(1).max(120),
-  articleLabel: z.string().max(300).optional(),
-  version: z.string().max(120).optional(),
+  normaKey: z.string({ message: 'La norma o la decisione è obbligatoria' }).min(1, 'La norma o la decisione è obbligatoria')
+    .max(500, 'La chiave della norma non è valida'),
+  // '' only for a decision (checked in `checkAnchor`)
+  articleId: z.string({ message: 'L’articolo non è valido' }).max(120, 'L’articolo non è valido'),
+  articleLabel: z.string({ message: 'L’etichetta non è valida' }).max(300, 'L’etichetta non è valida').optional(),
+  version: z.string({ message: 'La versione non è valida' }).max(120, 'La versione non è valida').optional(),
 });
+
+const INVALID_DECISION_KEY = 'La chiave della decisione non è valida';
+
+/**
+ * The target is derived from the key, never trusted: a key in the decision key space is a decision
+ * and must read back; anything else is an article's, which needs an article id.
+ */
+function checkAnchor(anchor: { normaKey: string; articleId: string; version?: string; articleUrn?: string }) {
+  if (inDecisionKeySpace(anchor.normaKey)) {
+    if (!readDecisionKey(anchor.normaKey)) throw new AppError(400, INVALID_DECISION_KEY);
+    if (anchor.articleId !== '') throw new AppError(400, 'Una discussione su una decisione non ha un articolo');
+    if (anchor.version !== undefined) throw new AppError(400, 'Una discussione su una decisione non ha una versione');
+    if (anchor.articleUrn !== undefined) throw new AppError(400, 'Una discussione su una decisione non ha un URN');
+    return 'decision' as const;
+  }
+  if (anchor.articleId.length < 1) throw new AppError(400, 'L’articolo è obbligatorio');
+  return 'article' as const;
+}
+
+// Optional and redundant with normaKey: accepted only when it agrees with it.
+const targetSchema = z.object({
+  kind: z.enum(['article', 'decision'], { message: 'La destinazione deve essere «article» o «decision»' }),
+  key: z.string({ message: 'La chiave della destinazione non è valida' }).max(500, 'La chiave della destinazione non è valida').optional(),
+}, { message: 'La destinazione non è valida' }).optional();
+
+const moderationSchema = z.object({
+  hidden: z.boolean({ message: '«hidden» deve essere vero o falso' }).optional(),
+  passageReleased: z.boolean({ message: '«passageReleased» deve essere vero o falso' }).optional(),
+}, { message: 'La richiesta non è valida' })
+  .refine((b) => b.hidden !== undefined || b.passageReleased !== undefined, 'Nessuna modifica richiesta');
+
+/** Parses with Zod but answers with the first message alone, in Italian: the global handler's English prefix is not for these routes. */
+function parseItalian<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> {
+  const result = schema.safeParse(value);
+  if (!result.success) throw new AppError(400, result.error.issues[0].message);
+  return result.data;
+}
 
 const passageSchema = z.object({
-  quote: z.string().min(1).max(2000)
+  quote: z.string({ message: 'La citazione non è valida' }).min(1, 'La citazione non può essere vuota')
+    .max(2000, 'La citazione può avere al massimo 2000 caratteri')
     .refine((s) => s.trim().length > 0, 'La citazione non può essere vuota'),
-  start: z.number().int().min(0).max(2_000_000),
-  prefix: z.string().max(32),
-  suffix: z.string().max(32),
-});
+  start: z.number({ message: 'La posizione del passo non è valida' }).int('La posizione del passo non è valida')
+    .min(0, 'La posizione del passo non è valida').max(2_000_000, 'La posizione del passo non è valida'),
+  prefix: z.string({ message: 'Il contesto del passo non è valido' }).max(32, 'Il contesto del passo non è valido'),
+  suffix: z.string({ message: 'Il contesto del passo non è valido' }).max(32, 'Il contesto del passo non è valido'),
+}, { message: 'Il passo citato non è valido' });
 
 const createThreadSchema = anchorSchema.extend({
-  title: z.string().trim().max(200).optional(),
-  body: z.string().trim().min(3).max(10000),
+  title: z.string({ message: 'Il titolo non è valido' }).trim().max(200, 'Il titolo può avere al massimo 200 caratteri').optional(),
+  body: z.string({ message: 'Il testo è obbligatorio' }).trim().min(3, 'Il testo deve avere almeno 3 caratteri')
+    .max(10000, 'Il testo può avere al massimo 10000 caratteri'),
   passage: passageSchema.optional(),
-  articleUrn: z.string().trim().min(1).max(1000).optional(),
+  articleUrn: z.string({ message: 'L’URN non è valido' }).trim().min(1, 'L’URN non è valido').max(1000, 'L’URN non è valido').optional(),
   textHash: z.string().regex(/^[0-9a-f]{64}$/, 'Impronta del testo non valida').optional(),
 }).superRefine((data, ctx) => {
   const title = data.title ?? '';
   if (!data.passage && title.length < 3) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['title'],
-      message: 'Il titolo è obbligatorio (almeno 3 caratteri) per una discussione sull’intero articolo' });
+      message: 'Il titolo è obbligatorio (almeno 3 caratteri) per una discussione senza un passo citato' });
   }
   if (data.passage && title.length > 0 && title.length < 3) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['title'],
@@ -37,13 +80,15 @@ const createThreadSchema = anchorSchema.extend({
 });
 
 const createCommentSchema = z.object({
-  body: z.string().trim().min(1).max(10000),
-  parentId: z.string().uuid().optional().nullable(),
+  body: z.string({ message: 'Il testo è obbligatorio' }).trim().min(1, 'Il testo è obbligatorio')
+    .max(10000, 'Il testo può avere al massimo 10000 caratteri'),
+  parentId: z.string().uuid('La risposta non è valida').optional().nullable(),
 });
 
 const reportSchema = z.object({
-  reason: z.string().trim().min(2).max(80),
-  details: z.string().trim().max(1000).optional(),
+  reason: z.string({ message: 'Il motivo è obbligatorio' }).trim().min(2, 'Il motivo è obbligatorio')
+    .max(80, 'Il motivo può avere al massimo 80 caratteri'),
+  details: z.string({ message: 'I dettagli non sono validi' }).trim().max(1000, 'I dettagli possono avere al massimo 1000 caratteri').optional(),
 });
 
 function userView(user: { id: string; username: string }) {
@@ -82,6 +127,9 @@ function threadView(thread: {
   passageSuffix: string | null;
   articleUrn: string | null;
   textHash: string | null;
+  targetKind: string;
+  decisionKey: string | null;
+  passageReleasedAt: Date | null;
   title: string;
   body: string;
   user: { id: string; username: string };
@@ -97,6 +145,10 @@ function threadView(thread: {
     articleId: thread.articleId,
     articleLabel: thread.articleLabel,
     version: thread.version,
+    target: thread.targetKind === 'decision' && thread.decisionKey
+      ? { kind: 'decision' as const, key: thread.decisionKey }
+      : { kind: 'article' as const },
+    passageReleased: thread.passageReleasedAt !== null,
     title: thread.title,
     body: thread.body,
     passage: thread.passageQuote === null || thread.passageStart === null
@@ -119,8 +171,20 @@ function threadView(thread: {
   };
 }
 
+/** The list queries: a decision's articleId is '' and may be left out. */
+function parseListAnchor(query: unknown) {
+  const { normaKey, articleId } = parseItalian(
+    anchorSchema.pick({ normaKey: true }).extend({ articleId: z.string({ message: 'L’articolo non è valido' }).max(120, 'L’articolo non è valido').optional() }),
+    query,
+  );
+  const anchor = { normaKey, articleId: articleId ?? '' };
+  if (articleId === undefined && !inDecisionKeySpace(normaKey)) throw new AppError(400, 'L’articolo è obbligatorio');
+  checkAnchor(anchor);
+  return anchor;
+}
+
 export const listThreads = async (req: Request, res: Response) => {
-  const { normaKey, articleId } = anchorSchema.pick({ normaKey: true, articleId: true }).parse(req.query);
+  const { normaKey, articleId } = parseListAnchor(req.query);
   const sort = req.query.sort === 'popular' ? 'popular' : req.query.sort === 'active' ? 'active' : 'recent';
   const page = Math.max(1, Number(req.query.page ?? 1));
   const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)));
@@ -156,7 +220,7 @@ export const listThreads = async (req: Request, res: Response) => {
 };
 
 export const listPassages = async (req: Request, res: Response) => {
-  const { normaKey, articleId } = anchorSchema.pick({ normaKey: true, articleId: true }).parse(req.query);
+  const { normaKey, articleId } = parseListAnchor(req.query);
 
   const threads = await prisma.articleThread.findMany({
     where: {
@@ -202,9 +266,19 @@ export const listPassages = async (req: Request, res: Response) => {
 };
 
 export const createThread = async (req: Request, res: Response) => {
-  const data = createThreadSchema.parse(req.body);
+  const data = parseItalian(createThreadSchema, req.body);
+  const target = parseItalian(targetSchema, req.body?.target);
+  const kind = checkAnchor(data);
+  if (target) {
+    if (kind === 'article' && target.key !== undefined) throw new AppError(400, 'Una destinazione articolo non ha una chiave');
+    if (target.kind !== kind || (kind === 'decision' && target.key !== data.normaKey)) {
+      throw new AppError(400, 'La destinazione non corrisponde alla chiave');
+    }
+  }
   const thread = await prisma.articleThread.create({
     data: {
+      targetKind: kind,
+      decisionKey: kind === 'decision' ? data.normaKey : null,
       normaKey: data.normaKey,
       articleId: data.articleId,
       articleLabel: data.articleLabel,
@@ -233,7 +307,7 @@ export const createThread = async (req: Request, res: Response) => {
 };
 
 export const createComment = async (req: Request, res: Response) => {
-  const data = createCommentSchema.parse(req.body);
+  const data = parseItalian(createCommentSchema, req.body);
   const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
   if (!thread || thread.isHidden) throw new AppError(404, 'Discussione non trovata');
 
@@ -279,7 +353,7 @@ export const toggleCommentVote = async (req: Request, res: Response) => {
 };
 
 export const reportThread = async (req: Request, res: Response) => {
-  const data = reportSchema.parse(req.body);
+  const data = parseItalian(reportSchema, req.body);
   const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
   if (!thread) throw new AppError(404, 'Discussione non trovata');
   await prisma.articleThreadReport.upsert({
@@ -291,7 +365,18 @@ export const reportThread = async (req: Request, res: Response) => {
 };
 
 export const moderateThread = async (req: Request, res: Response) => {
-  const hidden = z.object({ hidden: z.boolean() }).parse(req.body).hidden;
-  const thread = await prisma.articleThread.update({ where: { id: req.params.threadId }, data: { isHidden: hidden } });
-  res.json({ id: thread.id, isHidden: thread.isHidden });
+  const body = parseItalian(moderationSchema, req.body);
+  const data: { isHidden?: boolean; passageReleasedAt?: Date | null; passageReleasedById?: string | null } = {};
+  if (body.hidden !== undefined) data.isHidden = body.hidden;
+  const existing = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
+  if (!existing) throw new AppError(404, 'Discussione non trovata');
+  if (body.passageReleased !== undefined) {
+    if (existing.targetKind !== 'decision' || existing.passageQuote === null) {
+      throw new AppError(400, 'Solo il passo citato di una decisione può essere rimesso in chiaro');
+    }
+    data.passageReleasedAt = body.passageReleased ? new Date() : null;
+    data.passageReleasedById = body.passageReleased ? req.user!.id : null;
+  }
+  const thread = await prisma.articleThread.update({ where: { id: req.params.threadId }, data });
+  res.json({ id: thread.id, isHidden: thread.isHidden, passageReleased: thread.passageReleasedAt !== null });
 };

@@ -11,12 +11,15 @@ import { HighlightsActionsPicker } from '../search/HighlightsActionsPicker';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
+import { ArticleDiscussionPanel } from '../search/ArticleDiscussionPanel';
+import { PassageThreadsStatus } from '../search/PassageThreadsStatus';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
+import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { decisionKey, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
@@ -88,17 +91,34 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const plain = useMemo(() => decisionProjection(testo), [testo]);
   const structure = useMemo(() => decisionStructure(testo), [testo]);
 
+  // Discussions: this surface is mounted for a decision whose identity was found, so it always
+  // takes them. The anchor is one stable object (the panel reloads when its fields change).
+  const discussionAnchor = useMemo(() => ({ normaKey: key, articleId: NO_ARTICLE, articleLabel: label }), [key, label]);
+  const discussion = useDiscussionWiring({
+    anchor: discussionAnchor,
+    // The projection has no newline, so its fingerprint is the SHA-256 of the projection itself.
+    text: plain,
+    plain,
+    enabled: plain !== '',
+    contentRef,
+    onInvalidSelection: () => setToast({ message: 'Non è possibile aprire una discussione su questa selezione', type: 'error' }),
+  });
+  const { locatedThreads, textHash, focusedThreadId } = discussion;
+
   // A bare «art. 5» with no act named stays text: a decision has no act of its own to default to.
   const html = useMemo(
-    () => wrapCitationsInHtml(renderDecisionHtml({ testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true })),
-    [testo, decisionHighlights, decisionNotes],
+    () => wrapCitationsInHtml(renderDecisionHtml({
+      testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true,
+      threads: locatedThreads, focusedThreadId,
+    })),
+    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId],
   );
 
   // What each paragraph's sign counts, for the popover it opens (the renderer derives the signs
   // from the same structure through the same module).
   const blockGroups = useMemo(
-    () => groupAnnotationsByBlock(plain, structure, decisionHighlights, decisionNotes),
-    [plain, structure, decisionHighlights, decisionNotes],
+    () => groupAnnotationsByBlock(plain, structure, decisionHighlights, decisionNotes, locatedThreads),
+    [plain, structure, decisionHighlights, decisionNotes, locatedThreads],
   );
   const { openBlock, closeBlock } = useArticleTextInteractions(contentRef, key, { contentKey: html });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
@@ -186,6 +206,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         highlightsButtonRef={setHighlightsButtonEl}
         onToggleNotes={() => setIsNotesOpen((v) => !v)}
         onToggleHighlights={() => setIsHighlightsOpen((v) => !v)}
+        isDiscussionOpen={discussion.open}
+        onToggleDiscussion={discussion.toggle}
       />
       <NotesPeekPanel
         isOpen={isNotesOpen}
@@ -235,7 +257,11 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         onPopupHighlight={handlePopupHighlight}
         onPopupAddNote={handlePopupAddNote}
         onPopupCopy={copySelection}
+        onPopupDiscuss={discussion.popupDiscuss}
       />
+      {!discussion.open && (
+        <PassageThreadsStatus error={discussion.error} loading={discussion.loading} onRetry={discussion.reload} />
+      )}
       <UnmatchedAnchors
         highlights={lost.highlights}
         annotations={lost.annotations}
@@ -251,12 +277,24 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
           blockLabel={describeBlock(plain, structure.blocks[openBlock])}
           group={openGroup}
           contentKey={html}
+          textHash={textHash}
+          onOpenThread={discussion.openThread}
           onClose={closeBlock}
           onUpdateNote={updateAnnotation}
           onRemoveNote={removeAnnotation}
           onRemoveHighlight={removeHighlight}
         />
       )}
+      <ArticleDiscussionPanel
+        anchor={discussionAnchor}
+        label={label}
+        heading="Discussioni sulla decisione"
+        textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa discussione."
+        detachedPassageNotice="Il passo citato non è più nel testo della decisione."
+        textUnavailableNotice="Il passo citato non è mostrato: il testo della decisione non è disponibile."
+        withholdDetachedPassage
+        {...discussion.panelProps}
+      />
       {toast && <Toast message={toast.message} type={toast.type} isVisible onClose={() => setToast(null)} />}
       <CitationPreviewPopup
         isVisible={preview.isVisible}

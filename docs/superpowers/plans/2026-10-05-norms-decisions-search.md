@@ -2913,15 +2913,15 @@ Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it nee
 ### Task 26: The server takes a discussion on a decision
 
 **Files:**
-- Create: `apps/server/prisma/migrations/<timestamp>_article_threads_decision_target/migration.sql` (hand-written: `target_kind` text NOT NULL DEFAULT 'article', `decision_key` text NULL, `passage_released_at` timestamptz NULL, `passage_released_by` text NULL referencing `users(id)` ON DELETE SET NULL; CHECK `target_kind IN ('article','decision')`; CHECK `(target_kind = 'article' AND decision_key IS NULL) OR (target_kind = 'decision' AND decision_key IS NOT NULL AND norma_key = decision_key AND article_id = '' AND version IS NULL AND article_urn IS NULL)`; CHECK that the release columns are both set or both null; existing rows stay `article` by the default)
+- Create: `apps/server/prisma/migrations/<timestamp>_article_threads_decision_target/migration.sql` (hand-written: `target_kind` text NOT NULL DEFAULT 'article', `decision_key` text NULL, `passage_released_at` timestamptz NULL, `passage_released_by` text NULL referencing `users(id)` ON DELETE SET NULL; CHECK `target_kind IN ('article','decision')`; CHECK `(target_kind = 'article' AND decision_key IS NULL) OR (target_kind = 'decision' AND decision_key IS NOT NULL AND norma_key = decision_key AND article_id = '' AND version IS NULL AND article_urn IS NULL)`; CHECK `passage_released_by IS NULL OR passage_released_at IS NOT NULL` (one-way: deleting the releasing admin sets the name null and keeps the release time); existing rows stay `article` by the default)
 - Modify: `apps/server/prisma/schema.prisma` (`ArticleThread`: the four fields; the relation for `passage_released_by`; no `prisma format`)
 - Create: `apps/server/src/norms/decisionKey.ts` (`readDecisionKey(key): { corte, archivio?, numero, anno } | null`, the server twin of the web's `identityFromKey`: same shapes, same bounds — `[1-9]\d{0,5}`, a year from the court's first to the current one)
-- Modify: `apps/server/src/controllers/articleDiscussionController.ts` (create: a body with `target: { kind: 'decision', key }` stores `target_kind`/`decision_key`/`normaKey = key`/`articleId = ''`; a malformed key, a version or an URN on a decision is a 400 in Italian; lists unchanged; the thread's answer carries `target` and `passageReleased`; moderation: `PATCH /admin/article-discussions/:id` also takes `{ passageReleased: boolean }`, setting or clearing the two columns with the admin's id)
+- Modify: `apps/server/src/controllers/articleDiscussionController.ts` (create: the server derives the target from `normaKey` (a key in the decision key space is a decision) and stores `target_kind`/`decision_key`/`normaKey = key`/`articleId = ''`; an optional `target: { kind, key? }` is accepted only when it agrees (an article target takes no key); a malformed key, a version or an URN on a decision is a 400, and every 400 is the first Italian message alone (`parseItalian`); lists unchanged; the thread's answer carries `target` and `passageReleased`; moderation: `PATCH /admin/article-discussions/:id` also takes `{ passageReleased: boolean }`, setting or clearing the two columns with the admin's id)
 - Modify: `apps/server/CLAUDE.md` («Article discussions»: decisions, the columns, the release)
 - Test: `apps/server/tests/articleDiscussions.decision.test.ts`
 
 - [ ] **Step 0: Announce the migration in the register** (an «avvio» entry: the table, the four columns, the branch) and tell the orchestrator.
-- [ ] **Step 1: Failing tests.** Create, list, list passages, comment, vote, report and moderate a thread on `cassazione:civile:10787:2024`; the stored row has `target_kind = 'decision'` and `decision_key`; a norm thread is `article` with no key; `cassazione:civile:007:2024`, a future year, `corte_costituzionale:civile:1:2020`, a decision with a version → 400; the CHECKs refuse a direct insert that breaks them (one `prisma.$executeRaw` per CHECK); a decision thread never appears in an article's list and the reverse; an admin sets and clears `passageReleased` and a non-admin cannot; the user's export includes the thread with its target; account deletion removes it and an admin's deletion leaves `passage_released_by` null.
+- [ ] **Step 1: Failing tests.** Create, list, list passages, comment, vote, report and moderate a thread on `cassazione:civile:99999:2024` (fictional keys only, the shared `conventions/sources/decision-keys.json`); the stored row has `target_kind = 'decision'` and `decision_key`; a norm thread is `article` with no key; `cassazione:civile:099999:2024`, a future year, `corte_costituzionale:civile:99999:2020`, a decision with a version → 400; the CHECKs refuse a direct insert that breaks them (one `prisma.$executeRaw` per CHECK); a decision thread never appears in an article's list and the reverse; an admin sets and clears `passageReleased` and a non-admin cannot; the user's export includes the thread with its target; account deletion removes it and an admin's deletion leaves `passage_released_by` null.
 - [ ] **Step 2: Run to see them fail** (test DB, after the orchestrator's go).
 - [ ] **Step 3: Implement**, then `npx prisma migrate deploy` on the test database through the suite's setup (never `migrate dev`), `npx prisma generate`.
 - [ ] **Step 4: Run the touched tests, then the whole server suite once.** The dev stack's database gets the migration after the merge, by the orchestrator.
@@ -2931,7 +2931,7 @@ Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it nee
 
 **Files:**
 - Modify: `apps/web/src/services/articleDiscussionService.ts` (the anchor type: `{ normaKey, articleId, version? }` documented for both)
-- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (takes `anchor`, `label` and an optional `projectionHash` from its caller; nothing in it reads an article)
+- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (takes `anchor`, `label` and an optional `textHash` (the SHA-256 of `decisionProjection`) from its caller; nothing in it reads an article)
 - Modify: `apps/web/src/hooks/useArticlePassageThreads.ts` (takes the anchor and the plain text to locate against)
 - Test: their existing tests stay green; add a decision-anchored case to each
 
@@ -2944,7 +2944,7 @@ Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it nee
 **Files:**
 - Modify: `apps/web/src/components/features/decisions/DecisionReadingSurface.tsx` (the toolbar's discussion button; «Discuti» in `SelectionPopup`; the signs count the paragraph's discussions, `data-threads`, as on an article)
 - Modify: `apps/web/src/utils/decisionRender.ts` (the thread focus class `.vlx-thread-focus`, as the article renderer nests it)
-- Test: `DecisionReadingSurface.test.tsx` (add); the contract test with threads on (text nodes still spell the projection)
+- Test: `DecisionDiscussions.test.tsx` (the shared `useDiscussionWiring`, `PassageThreadsStatus` and `DiscussionButton` serve both surfaces); the contract test with threads on (text nodes still spell the projection)
 
 - [ ] **Step 1: Failing tests**: the button opens the panel anchored on the decision key; «Discuti» opens the composer with the passage (start/prefix/suffix on the projection, `textHash` = SHA-256 of the projection); a paragraph's sign shows its count; an open discussion lights its words.
 - [ ] **Step 3: Implement** with Task 27's props. Only a found identity shows the button (spec §8.1).
@@ -2953,8 +2953,8 @@ Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it nee
 ### Task 29: A withdrawn passage is not quoted to others
 
 **Files:**
-- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (a decision thread whose passage is `detached` shows «Il passo citato non è più nel testo della decisione» instead of the quotation, except to its author and to admins)
-- Modify: `ArticleDiscussionPanel.tsx` (admin only: on a decision thread whose passage is withdrawn, «Mostra a tutti» / «Nascondi di nuovo» through the moderation route's `passageReleased`, Task 26; while released, every reader sees the quotation). The rule is the panel's: the API still returns the stored quotation (spec §8.7, the limit), and a comment says so.
+- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (a decision thread whose passage is not located (`exact`/`moved`: detached, unknown, failed, or no text; it fails closed) withholds the quotation from everyone except its author and admins: a detached passage reads «Il passo citato non è più nel testo della decisione», one still being located «in verifica», one on a decision without text says the text is not available)
+- Modify: `ArticleDiscussionPanel.tsx` (admin only: on a decision thread whose passage is not located, «Mostra a tutti» / «Nascondi di nuovo» through the moderation route's `passageReleased`, Task 26; while released, every reader sees the quotation). The rule is the panel's: the API still returns the stored quotation (spec §8.7, the limit), and a comment says so.
 - Test: the panel cases (author, admin, other reader; released and not; the admin's two buttons).
 
 - [ ] Steps as above; commit — «feat(web): a decision's withdrawn words are not quoted to other readers».
@@ -3416,3 +3416,13 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 
 
 **Amendment, 2026-10-08 — the owner's answer C.** The Corte costituzionale's decision PDF carries its licence («· licenza CC BY-SA 3.0» in the footer, and a closing line with the licence's address); the Cassazione's PDF and the page carry none. Global constraints and the closing task's browser pass corrected accordingly.
+
+**Amendment, 2026-10-08 — PR 4b as built (`feat/decision-discussions`), after the final review.** The plan's Tasks 26–29 above are corrected where the code differs; what the rounds decided:
+- The release CHECK is one-way (`passage_released_by` only with `passage_released_at`): deleting the releasing admin keeps the release time.
+- The target is derived from `normaKey`; an optional `target` is accepted only when it agrees. Every 400 of the discussion routes (create, lists, passages, comment, report, moderation) is the first Italian message alone; a missing thread in moderation answers 404 «Discussione non trovata».
+- Tests use fictional keys only (99999); the text hash is the SHA-256 of `decisionProjection` (`textHash` in the code); the web tests are `DecisionDiscussions.test.tsx` and the panel's own, and the shared pieces are `useDiscussionWiring`, `PassageThreadsStatus` and `DiscussionButton`.
+- The withholding fails closed: a passage the panel cannot place (detached, unknown, failed load, a thread missing from the list, no text) is withheld from every reader but the author and the admins; the author and admins see it with a notice, and an admin can release it. An admin may release a quotation whose state is unknown too (decided; the release stays with the thread).
+- A found decision without its text takes general discussions (`DecisionDiscussionsWithoutText`).
+- The article's mobile toolbar keeps its own discussion button (larger icon, other classes); the phone row has 44 px targets and wraps.
+- The decision's sentences in the shared panel come from the caller (`detachedPassageNotice`, `textUnavailableNotice`, with the article's wording as defaults). The author's data export leaves out the releasing admin's id.
+- The limit, restated: the API still returns a withdrawn quotation to any signed-in user; server-side withholding is a precondition for the public opening (spec §8.7 and its «Before VisuaLex opens to the public» list).

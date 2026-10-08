@@ -41,7 +41,7 @@ describe('useArticlePassageThreads', () => {
   it('loads once for a key and returns the threads', async () => {
     vi.mocked(articleDiscussionService.listPassages).mockResolvedValue(dummyThreads);
 
-    const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
+    const { result } = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
 
     await waitFor(() => {
       expect(result.current.threads).toEqual(dummyThreads);
@@ -55,7 +55,7 @@ describe('useArticlePassageThreads', () => {
     vi.mocked(isAuthenticated).mockReturnValue(false);
 
     const { result, rerender } = renderHook(
-      ({ enabled }: { enabled?: boolean }) => useArticlePassageThreads('k1', 'art1', enabled),
+      ({ enabled }: { enabled?: boolean }) => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }, { enabled }),
       { initialProps: { enabled: true } },
     );
 
@@ -69,9 +69,8 @@ describe('useArticlePassageThreads', () => {
     expect(result.current.threads).toEqual([]);
     expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
 
-    // Empty normaKey or articleId
-    renderHook(() => useArticlePassageThreads('', 'art1'));
-    renderHook(() => useArticlePassageThreads('k1', ''));
+    // Empty normaKey (an empty articleId is a decision's anchor; the article guards it with enabled)
+    renderHook(() => useArticlePassageThreads({ normaKey: '', articleId: 'art1' }));
     expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
   });
 
@@ -83,7 +82,7 @@ describe('useArticlePassageThreads', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce(dummyThreads);
 
-    const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
+    const { result } = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
 
     await waitFor(() => {
       expect(result.current.error).toBe(true);
@@ -112,7 +111,7 @@ describe('useArticlePassageThreads', () => {
   it('returns an empty list without an error when the request succeeds with no discussions', async () => {
     vi.mocked(articleDiscussionService.listPassages).mockResolvedValue([]);
 
-    const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
+    const { result } = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.threads).toEqual([]);
@@ -124,7 +123,7 @@ describe('useArticlePassageThreads', () => {
       .mockRejectedValueOnce(new Error('Network error'))
       .mockResolvedValueOnce(dummyThreads);
 
-    const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
+    const { result } = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
 
     await waitFor(() => expect(result.current.error).toBe(true));
     act(() => result.current.reload());
@@ -139,7 +138,7 @@ describe('useArticlePassageThreads', () => {
       .mockResolvedValueOnce(dummyThreads);
 
     const { result, rerender } = renderHook(
-      ({ key }: { key: string }) => useArticlePassageThreads(key, 'art1'),
+      ({ key }: { key: string }) => useArticlePassageThreads({ normaKey: key, articleId: 'art1' }),
       { initialProps: { key: 'k1' } },
     );
     await waitFor(() => expect(result.current.error).toBe(true));
@@ -168,7 +167,7 @@ describe('useArticlePassageThreads', () => {
     });
 
     const { result, rerender } = renderHook(
-      ({ k, a }: { k: string; a: string }) => useArticlePassageThreads(k, a),
+      ({ k, a }: { k: string; a: string }) => useArticlePassageThreads({ normaKey: k, articleId: a }),
       { initialProps: { k: 'k1', a: 'art1' } },
     );
 
@@ -197,7 +196,7 @@ describe('useArticlePassageThreads', () => {
   it('reload() fetches again', async () => {
     vi.mocked(articleDiscussionService.listPassages).mockResolvedValue(dummyThreads);
 
-    const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
+    const { result } = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
 
     await waitFor(() => {
       expect(result.current.threads).toEqual(dummyThreads);
@@ -211,6 +210,67 @@ describe('useArticlePassageThreads', () => {
 
     await waitFor(() => {
       expect(articleDiscussionService.listPassages).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('keeps the previous threads while it reloads, and reloads every mounted copy of the subject', async () => {
+    const second = [{ ...dummyThreads[0], id: 't-new' }];
+    let release!: (value: ArticleDiscussionPassageSummary[]) => void;
+    vi.mocked(articleDiscussionService.listPassages)
+      .mockResolvedValueOnce(dummyThreads)
+      .mockResolvedValueOnce(dummyThreads)
+      .mockReturnValue(new Promise((resolve) => { release = resolve; }));
+
+    const visible = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
+    const hidden = renderHook(() => useArticlePassageThreads({ normaKey: 'k1', articleId: 'art1' }));
+    await waitFor(() => expect(visible.result.current.threads).toEqual(dummyThreads));
+    await waitFor(() => expect(hidden.result.current.threads).toEqual(dummyThreads));
+
+    act(() => visible.result.current.reload());
+    await waitFor(() => expect(hidden.result.current.isLoading).toBe(true));
+    // no flicker: the list stays while the new one is on its way
+    expect(visible.result.current.threads).toEqual(dummyThreads);
+    expect(hidden.result.current.threads).toEqual(dummyThreads);
+
+    await act(async () => { release(second); });
+    await waitFor(() => expect(hidden.result.current.threads).toEqual(second));
+    expect(visible.result.current.threads).toEqual(second);
+  });
+
+  describe('anchored on a decision', () => {
+    const decisionKey = 'cassazione:civile:99999:2024';
+    const plainText = 'Premesso che il ricorso e inammissibile. Il giudice ha deciso.';
+    const decisionThreads: ArticleDiscussionPassageSummary[] = [
+      { ...dummyThreads[0], id: 'd-exact', articleUrn: null, passage: { quote: 'ricorso e inammissibile', start: 16, prefix: 'Premesso che il ', suffix: '. Il giudice ha ' } },
+      { ...dummyThreads[0], id: 'd-gone', articleUrn: null, passage: { quote: 'parole che non esistono piu', start: 3, prefix: '', suffix: '' } },
+    ];
+
+    it('loads with an empty articleId, because the key is the whole identity', async () => {
+      vi.mocked(articleDiscussionService.listPassages).mockResolvedValue(decisionThreads);
+
+      const { result } = renderHook(() => useArticlePassageThreads({ normaKey: decisionKey, articleId: '' }));
+
+      await waitFor(() => expect(result.current.threads).toEqual(decisionThreads));
+      expect(articleDiscussionService.listPassages).toHaveBeenCalledWith({ normaKey: decisionKey, articleId: '' });
+      expect(result.current.locations.size).toBe(0);
+    });
+
+    it('locates each passage on the projection it is given', async () => {
+      vi.mocked(articleDiscussionService.listPassages).mockResolvedValue(decisionThreads);
+
+      const { result } = renderHook(() =>
+        useArticlePassageThreads({ normaKey: decisionKey, articleId: '' }, { plainText }),
+      );
+
+      await waitFor(() => expect(result.current.threads).toHaveLength(2));
+      expect(result.current.locations.get('d-exact')?.state).toBe('exact');
+      expect(result.current.locations.get('d-gone')?.state).toBe('detached');
+    });
+
+    it('does not load without a key, or when disabled', () => {
+      renderHook(() => useArticlePassageThreads({ normaKey: '', articleId: '' }));
+      renderHook(() => useArticlePassageThreads({ normaKey: decisionKey, articleId: '' }, { enabled: false }));
+      expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
     });
   });
 });
