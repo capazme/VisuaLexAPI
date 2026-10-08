@@ -189,7 +189,7 @@ the question the first draft left open (§13).
 | D11 | On the phone the table is the main screen (today's column, «Giurisprudenza» at the bottom); «Apri accanto» opens the article or the decision full screen with «‹ Pratica» to return; extracted articles no longer exist. | Q11 |
 | D12 | Removed: «Estrai come articolo loose» (replaced by «Apri accanto»), the article collections, the strip of article tabs (replaced by the continuous column). | Q12 |
 | D13 | On first load after the change, each tab becomes a practice with the same acts and articles; an extracted article joins its act; an open decision goes under «Giurisprudenza». Notes, highlights and discussions are tied to the article, not to the tab, so nothing is lost. | Q13 |
-| D14 | Spec first, then the plan. The interview placed the change after PR 3 and before PR 4 of the norms-decisions round; PR 3, 4, 4b and 4c have since merged, so the order relayed by the orchestrator on 8 October applies: this documentation PR, then PR 5 (decisions in the Cronologia) and the redesign code (§12). | Q14, as overtaken by events |
+| D14 | Spec first, then the plan. The interview placed the change after PR 3 and before PR 4 of the norms-decisions round; PR 3, 4, 4b and 4c have since merged, so the order the owner set on 8 October applies: this documentation PR, then PR 5 (decisions in the Cronologia) and the redesign code (§12). | Q14, as overtaken by events |
 | D15 | **A past text is a row of its act**, marked «Testo al …», beside the text in force, as the dossier shows it (dossier decision 8). It ends the «tab of its own» of «Testo alla data» (that spec's T5) and takes the place of that spec's in-page switch (its v2). | The owner, 8 October: «procedi» (§13) |
 
 ### Technical choices made here
@@ -206,7 +206,7 @@ an earlier decision was put to him and answered (§13, D15); none of the others 
 | T5 | **On the desktop, a row read beside is folded in the column** («Aperto accanto · Chiudi la finestra»). On the phone no row is folded. | One mounted reading surface per subject on the desktop: one saved-norm check, one discussions panel, one registered find root. The reader cannot see the same article twice, which nothing asked for. |
 | T6 | **Windows are docked in a row, not dragged.** Widths come from one pure function (§4.3). | The interview chose the proposal over «free and draggable as today»; a user-adjustable divider is Later. |
 | T7 | **Decisions sort newest first**: by date of deposit when known (`attributi.data_deposito`, learned when the decision is found), else by year; ties by number. | The interview fixed the key, not the direction; newest first is how the Cassazione's lists are ordered in the app (`/search_decisions`, `sort=pd desc`). A decision never read has no date and sorts by its year. |
-| T8 | **A topic search is a window, not an entry.** It is a question, not a source: it never enters «Giurisprudenza»; a decision opened from it does. | One fewer kind of row; a search is not kept once its window is replaced, as it is not kept once its tab is closed today. |
+| T8 | **A topic search is a window, not an entry.** It is a question, not a source: it never enters «Giurisprudenza»; a decision opened from it does. On the desktop it is a light window (from P4; a band at the top of the table in P3); on a phone it opens in the full-screen reader with «‹ Pratica» (from P5; the same band at the top of the phone's table in P3 and P4). | One fewer kind of row; a search is not kept once its window is replaced, as it is not kept once its tab is closed today. |
 | T9 | **Built behind `VITE_FEATURE_PRACTICE_TABLE`**, read by `isPracticeTableEnabled()` in `apps/web/src/features/practice/featureFlag.ts`, the house's place for flags, but **off unless the variable is `true`**, unlike the house's flags. The practices are persisted beside the tabs and seeded from them once, marked by `practicesSeeded` (§9); the last PR removes the flag, migrates every browser and deletes the tab model (§12). | The house's flags are on by default because they hide a finished area in a deployment; this one hides unfinished work on `develop`, so a build that does not ask for it must get the old surface. Develop stays usable between PRs (root CLAUDE.md: experiments sit behind flags). While the flag is on, the tabs and the practices diverge: turning it off shows the tabs as they were. Vite reads the flag when it starts, so a browser pass runs the branch's own Vite on its own port, never the shared stack on :5173 (§12). |
 | T10 | **Migration placement**: a decision tab goes under «Giurisprudenza» of the practice whose norm tab had the highest z-index, or of a new practice «Sentenze» when there is no norm tab; the topic-search tab with the highest z-index becomes a window of that practice; any other is not reopened, and the user is told which (§9). | «Highest z-index» everywhere, never «newest»: a tab records no creation time and the array order is the dock's drag order, while the z-index is the one last brought to the front — the one last looked at, and PR 4d's front tab. The old tabs do not record which tab a decision was opened from; the front tab is the likeliest. A search is re-run from the palette in one line. |
 | T11 | **A search lands in the active practice**, creating one (named after its first act, `shortAct`) when there is none. R3's merge heuristics, the custom-label matching and the historical split retire; `targetTabId` keeps its role for the dossier's «Apri tutto» and names a practice (gotcha 15); a `targetTabId` that names no practice (closed meanwhile) lands in the active practice. | Simpler and predictable: what you search goes on the table you are looking at. A user who wants a new practice makes one from the bar. |
@@ -217,7 +217,7 @@ an earlier decision was put to him and answered (§13, D15); none of the others 
 | T16 | **The window a link was clicked in is never the one replaced** (§4.2): with two windows, the oldest window *that is not the asker* goes. | Q10 says «the oldest»; read literally, a decision opened from an article read in the older window would close that article. The rule differs from the answer only in that case. |
 | T17 | **The whole dossier's «Apri tutto» also puts the dossier's decisions under «Giurisprudenza»**, unread (§5.1). New: today it opens only the articles. | The practice is the dossier's shape (D6); leaving the decisions out would make «Apri tutto» open half the dossier. No request is sent until a row or a window opens one. A single group or act opened from the dossier brings no decision. |
 | T18 | **With the flag on, the desktop and the phone both draw the practices from P3.** P3 brings a plain phone table (the switcher over practices and the column); P5 adds the full-screen reader and the practice list. | Every store action that routes into a practice is drawn on both breakpoints, so nothing is written where nothing draws it, the tabs and the practices never diverge by breakpoint, and P6's migration finds everything in the practices. The other way — routing only on the desktop until P5 — keeps P3 smaller but lets a phone with the flag on keep writing tabs that P6 then drops. |
-| T19 | **The phone's full-screen reader is session state of its own** (`phoneReader`, one subject or none), never the desktop's persisted `beside`. | A reload on a phone, or a desktop window narrowed below 768 px, lands on the table (D11); «‹ Pratica» always returns to the table; rows are folded only by the desktop's windows. |
+| T19 | **The phone's full-screen reader is session state of its own** (`phoneReader`, one subject — an article, a decision or a topic search — or none), never the desktop's persisted `beside`. | A reload on a phone, or a desktop window narrowed below 768 px, lands on the table (D11); «‹ Pratica» always returns to the table; rows are folded only by the desktop's windows. |
 | T20 | **The persist storage is wrapped** (P2): a failed save is caught, logged with context and shown once as a sync error, never thrown out of `set`. | The app keeps working in memory and says that the table is not being saved; without the wrapper an overflow throws out of every store action (searches, decisions, dossier actions). |
 
 ## Detailed design
@@ -479,8 +479,9 @@ their acts (D15). This holds for every way in: `DossierDetailView`'s action and 
 `DossierListView.openGroupOnDashboard` (one group: it calls `createPractice` in place of
 `addWorkspaceTab` and passes the practice's id). When every group of the dossier is opened (the
 picker's «Apri tutto», or a dossier with one group), the dossier's decisions also enter that
-practice's «Giurisprudenza» through `openDecision(reference, { practiceId, beside: false })`, unread:
-no request until a row or a window opens one (T17). One group picked brings no decision. A dossier
+practice's «Giurisprudenza» through `openDecision(reference, { practiceId, open: false })`, closed
+and unread: `open: false` adds the entry and nothing else — no window, no revealed row (so no
+`DecisionEntryView` is mounted and no request is sent) — until a row or a window opens one (T17). One group picked brings no decision. A dossier
 with no article still opens nothing, as today.
 
 «Apri l'indice e sfoglia» drops an article-less act on the active practice and points the
@@ -563,21 +564,33 @@ pratiche» (renamed from «Questa scheda» / «Tutte le schede»).
   pratica» with the first match taken in its own text, as PR 4d's magnifier does in its tab.
 - **«Tutte le pratiche»** covers every practice in the bar's order; inside a practice, the acts in
   table order, an act's articles in column order, then the decisions in `decisionOrder`. A subject
-  is one text wherever it is shown: one `targetKey` per subject (`actId/articleKey` or
-  `decisionId`), shared by its row and its window.
+  is one text wherever it is shown, under PR 4d's own keys, shared by its row and its window: an
+  article's `buildItemKey|versionKey`, which is its `practiceArticleKey` (unique within a practice,
+  since acts merge by `actKeyOf`), and a decision's `decisionKey(identity)`.
 - **Which text is searched.** A subject drawn on screen — an open row, a window, the phone's
   reader — is searched in its text root, and its matches are drawn. A subject read beside on the
   desktop is searched in its window's root (its row is folded, T5). A closed row is searched in its
   stored text (`article_text`, the projection), counted and not drawn. A decision not on screen is
   searched in the session cache of decisions, as PR 4d does; a decision never read (the dossier's
   «Apri tutto», T17) counts nothing.
-- `findScope.ts`'s `frontTabId` becomes the active practice's id (the phone's practice on screen
-  is the active one), and `registerFindRoot`'s `tabId` is the practice's id.
+- **Where a root registers.** PR 4d registers a root from the surface itself, under the tab the
+  surface reads in (`ArticleTabContent`: `readingOrigin.tabId ?? tabId`; `DecisionReadingSurface`:
+  `hostTabId`). With practices, every root registers under its **practice's id**: a row's
+  `readingOrigin.tabId` already is the practice's id; a light window carries its `practiceId` and
+  passes it to the surface as a separate find host (`findHostId`, used only for the registration),
+  while its `readingOrigin` and its `hostId` stay the window's own, for its way back (§6.3) and its
+  focus. The phone's reader draws the window's body and registers the same way. So «Questa pratica» finds the open rows and the windows on screen and draws their matches;
+  only closed rows are counted from their stored text. `findScope.ts`'s `frontTabId` becomes the
+  active practice's id (the phone's practice on screen is the active one). The new prop changes
+  nothing inside a text root (§11).
 
 **6.7 Find in the text: reaching a match, keeping it current.** Going to a match that is not drawn
 makes its practice active (`setActivePractice`) and opens its row (`pendingReveal`), in place of PR
 4d's `bringTabToFront` and `focusArticleInTab`; once the row's root registers, the match is taken by
-its ordinal as PR 4d does. A match in a subject read beside is already drawn. The window recomputes,
+its ordinal as PR 4d does. A match in a subject read beside is already drawn. On a phone, reaching
+a match in a row while the full-screen reader is open closes the reader first (`phoneReader`
+cleared), so the revealed row is on screen; a match in the reader's own subject is already drawn.
+The window recomputes,
 besides PR 4d's own triggers, when the active practice changes, a row opens or closes, a window
 opens or closes, and articles or decisions enter or leave a practice. Its default place: §4.4.
 
@@ -585,7 +598,8 @@ opens or closes, and articles or decisions enter or leave a practice. Its defaul
 name and the version suffix, instead of every tab's.
 
 **6.9 The palette** keeps every action: a norm search (§5.1), «Apri l'indice e sfoglia» (§5.1), a
-decision (§6.2), a topic (a `decision-search` window), aliases and quick norms untouched.
+decision (§6.2), a topic (a `decision-search` window on the desktop, the full-screen reader on a
+phone, T8), aliases and quick norms untouched.
 
 **6.10 The dossier's «Apri tutto»** (gotcha 15): §5.1. `searchesForGroups` keeps its signature; the
 callback returns the one practice's id for every group. P6 renames `SearchParams.targetTabId` to
@@ -621,14 +635,18 @@ One layout mounted (T4, `useIsDesktop`). From P3 the phone draws the practices t
 - **«Apri accanto» opens full screen** (`ReadingFullScreen`, P5): a header «‹ Pratica» (44 px) and
   the title; the body is the window's body (§4.1). A decision opened from a link opens this way too
   (as decision tabs do on a phone today). What the reader shows is `phoneReader` (T19): session
-  state, one subject or none, set by «Apri accanto», by a decision opened from a link and by the
-  back control; it never reads or writes the desktop's `beside`. «‹ Pratica» clears it and returns
+  state, one subject or none, set by «Apri accanto», by a decision opened from a link, by a topic
+  search and by the back control; it never reads or writes the desktop's `beside`. «‹ Pratica» clears it and returns
   to the table where it was: the phone view stores the column's scroll position when the reader
   opens and restores it when the reader closes (the open rows are already in the store). The column
   is not kept mounted under the reader: a hidden twin would mount the same article twice (T4,
   gotcha 26).
+- **A topic search on the phone** opens in the full-screen reader too (P5): the palette's topic and
+  «Tema: …» set `phoneReader` to a `decision-search` ref, never the desktop's `beside`; a decision
+  opened from its list replaces it in the reader. Before P5, the phone's table draws the practice's
+  topic searches in the same band at its top as the desktop's table in P3 (T8).
 - **A reload lands on the table** (`phoneReader` is not persisted), whatever windows the desktop
-  had beside.
+  had beside; a topic search read only in the phone's reader is not kept, as a closed tab today.
 - **Before P5**, a phone with the flag on reads a decision opened from a link in place: the entry
   enters «Giurisprudenza» and its row is revealed, as on the desktop in P3.
 - **Extracted articles are gone** (D12); the phone already never showed them.
@@ -673,8 +691,10 @@ user who closed every practice.
   the result (an empty workspace seeds nothing and is still seeded). The tabs stay as they are. A
   session with the flag off never sets the marker, so turning the flag on later seeds from the tabs
   as they are then. «Chiudi tutte» leaves the marker set: a reload shows no practice, never the old
-  tabs again. `clearUserData` resets it with everything else (it empties the tabs too, so the next
-  user's table is seeded, once, from that user's tabs).
+  tabs again. `clearUserData` sets it to `isPracticeTableEnabled()`, never clears it: with the flag
+  on, the tabs it empties hold nothing to seed, and a cleared marker would make the next reload
+  seed again and replace the table the next user built since logging in; with the flag off, it
+  stays unset, so the flag turned on later still seeds from that user's tabs.
 - **P6** sets the persist `version` to 1 with a `migrate` from version 0 that keeps the sanitized
   `practices` when `practicesSeeded` is `true` (even an empty list), else runs the same function
   over `workspaceTabs`; it drops `workspaceTabs`, `highestZIndex` and the marker.
@@ -701,7 +721,8 @@ empty tab, malformed entries (§10).
   `practicesSeeded` only as a boolean. What fails is dropped and logged, never thrown: a throw in
   `merge` would reset the whole store.
 - **User isolation.** `clearUserData` empties `practices`, `activePracticeId`, the open rows, the
-  pending reveal, `phoneReader` and `practiceNotice` and resets `practicesSeeded` at logout, as it
+  pending reveal, `phoneReader` and `practiceNotice` and sets `practicesSeeded` to
+  `isPracticeTableEnabled()` at logout (§9), as it
   empties the tabs today: a shared browser must not show the last user's table. Annotations and
   dossiers are server-side and already cleared.
 - **Labels are text.** A practice name and every label are rendered by React as text, never as
@@ -749,7 +770,7 @@ of that plan).
 
 **The redesign code starts after VisuaLex Studia PR A merges** (it touches `ArticleTabContent` and
 `SelectionPopup`); whoever merges second merges `origin/develop` into its branch first. P1 and P2
-touch neither file; if PR A is delayed the orchestrator may start them earlier, at no conflict risk.
+touch neither file; if PR A is delayed they may start earlier, agreed with the Studia session, at no conflict risk.
 
 **The redesign PRs**, each shippable on its own, P3–P5 behind `VITE_FEATURE_PRACTICE_TABLE` (T9).
 A browser pass runs the branch's own Vite on its own port with the flag in its environment
@@ -763,8 +784,8 @@ reloads it with the flag on restarts that same port's Vite without, then with, t
 | P1 | `refactor/workspace-groundwork` | Collections removed (a saved one becomes loose articles at load); `workspaceTabActions.ts` deleted; `utils/practice.ts` with the model, the rules and the migration, tested. No visible change. | none |
 | P2 | `feat/practice-store` | The flag; the practice slice, its actions, persistence, the seeding marker and the wrapped storage; decisions and windows in the store; the two-shape back-stack. Inert: no entry point calls it yet. | gates the seeding |
 | P3 | `feat/practice-table` | The table and the bar of practices on the desktop, and the plain table on the phone (T18); searches, the index, the dossier's «Apri tutto», decisions (opened in place until P4), topic searches (in a band of the table until P4), the find window's scope, compare and the `table` half of the way back routed to the practice; «Salva come dossier». | on = new desktop and phone |
-| P4 | `feat/reading-window` | The light window, «Apri accanto», the row of two and its layout, the find window's place; decisions and topic searches beside; citations from a window; the `beside` half of the way back. | on = windows |
-| P5 | `feat/practice-phone` | The phone's full-screen reader with «‹ Pratica» and its own state, the practice list. | on = phone reader |
+| P4 | `feat/reading-window` | The light window, «Apri accanto», the row of two and its layout, the find window's place; decisions and topic searches beside (on a phone topic searches stay in the table's band); the find root of a window under its practice (§6.6); citations from a window; the `beside` half of the way back. | on = windows |
+| P5 | `feat/practice-phone` | The phone's full-screen reader with «‹ Pratica» and its own state, for articles, decisions and topic searches; the practice list. | on = phone reader |
 | P6 | `refactor/retire-floating-tabs` | The flag removed; persist version 1 migrates every browser; the tab model, its components and actions deleted; `besideTabId` renamed; tours and `apps/web/CLAUDE.md`. | removed |
 
 The order is P1 → P6, one after another: each builds on the one before (P5's full-screen reader
@@ -795,20 +816,26 @@ alternative is dropped.
   and no marker; no seeding with the marker; a flag-off session then the flag on seeds; «Chiudi
   tutte» then a reload stays empty; P6's `migrate` with and without the marker); the wrapped storage
   (a `setItem` that throws `QuotaExceededError`: the action completes, nothing is thrown, one log
-  and one sync error); «Apri tutto» with two past groups creates one practice; an unknown
-  `targetTabId`; `clearUserData`.
+  and one sync error); «Apri tutto» with two past groups creates one practice, its decisions closed
+  and not fetched (`open: false`); an unknown `targetTabId`; `clearUserData`, and logout, login and
+  a reload with the flag on keeping the table built after the login.
 - **Components**: the act block (index line, rows, Studio locked on a past text, «Sposta in…»,
   «Rimuovi l'atto»), the row (rubrica, chips, «Apri accanto», folded when beside on the desktop
   only), «Giurisprudenza» order, the column's bottom padding, the window (compact toolbar, Brocardi
   closed, no Studia row), the bar (switch, rename, new, close with confirmation), the phone view and
   the full-screen reader (a reload on a phone lands on the table; two windows on the desktop, then
-  a phone width, show the table with no row folded; «‹ Pratica» returns to the same scroll), the
-  find window's scope and place, «Salva come dossier».
+  a phone width, show the table with no row folded; «‹ Pratica» returns to the same scroll; a topic
+  search in the phone's band, then in the reader; reaching a row's match closes the reader), the
+  find window's scope and place (a match in an open row and in a window is drawn, not only counted),
+  «Salva come dossier».
 - **Rule 23**: §11.
 - **Suites**: `npm --prefix apps/web run test -- --run`, `run build`, `run lint` at every PR; no
   server or Python change.
 - **Browser pass at every PR** (P3 on), logged in on the branch's own Vite (§12) with the flag on,
-  desktop and a phone width (390 px): before turning the flag on, build a workspace on the old
+  desktop and a phone width (390 px). A pass that exercises seeding or the migration starts from
+  cleared site data for that origin (devtools › Application › Storage › «Clear site data» on
+  `http://localhost:5174`, then log in again with the test account), because an earlier pass on the
+  same port leaves `practicesSeeded` set. Then, before turning the flag on, build a workspace on the old
   surface — two tabs, an act with three articles, an extracted article, a past text, a decision
   opened beside an article, two topic searches, a highlight and a note on an article and on a
   decision; add a forged collection to `visualex-storage` in devtools; restart the same port with
@@ -823,7 +850,7 @@ alternative is dropped.
   the plan's Tasks 2, 10, 13 and 16 are re-read against what merged.
 - **VisuaLex Studia PR A**: §12. The window and the phone's reader omit its row (§4.1); the row stays
   under every article in the table. Studia's spec needs one line in «Reader», to be applied by the
-  Studia session through the orchestrator, not here: «The row is drawn under an article in the
+  Studia session, as agreed with it, not here: «The row is drawn under an article in the
   practice's table; the light window beside the table and the phone's full-screen reader do not
   draw it (norm-tab-container spec §4.1).»
 - **Norms-decisions PR 5**: §12; P3 moves its record into `DecisionEntryView` and keeps its test.
