@@ -28,6 +28,8 @@ describe('ArticleDiscussionPanel', () => {
     passage: null,
     articleUrn: 'urn:nir:stato:legge:1942;262~art1453',
     textHash: 'hash-1',
+    target: { kind: 'article' },
+    passageReleased: false,
     voteCount: 3,
     userVoted: false,
     isOwner: false,
@@ -54,6 +56,8 @@ describe('ArticleDiscussionPanel', () => {
     passage: passageSample,
     articleUrn: 'urn:nir:stato:legge:1942;262~art1453',
     textHash: 'hash-orig',
+    target: { kind: 'article' },
+    passageReleased: false,
     voteCount: 1,
     userVoted: false,
     isOwner: false,
@@ -347,6 +351,7 @@ describe('ArticleDiscussionPanel', () => {
   });
 
   describe('anchored on a decision', () => {
+    const PROJECTION_HASH = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
     const decisionAnchor = { normaKey: 'cassazione:civile:99999:2024', articleId: '' };
 
     it('lists, creates and replies with the caller\'s anchor, label and projection hash', async () => {
@@ -356,7 +361,7 @@ describe('ArticleDiscussionPanel', () => {
         articleId: '',
         version: null,
         articleUrn: null,
-        textHash: 'projection-hash',
+        textHash: PROJECTION_HASH,
         target: { kind: 'decision', key: decisionAnchor.normaKey },
         passageReleased: false,
       };
@@ -366,7 +371,7 @@ describe('ArticleDiscussionPanel', () => {
       });
       vi.mocked(articleDiscussionService.create).mockResolvedValue({ ...decisionThread, id: 'thread-d-new', title: 'T', body: 'B' });
       vi.mocked(articleDiscussionService.comment).mockResolvedValue({
-        id: 'c1', threadId: 'thread-1', body: 'Risposta', isHidden: false, user: { id: 'u3', username: 'anna' },
+        id: 'c1', threadId: 'thread-d-new', body: 'Risposta', isHidden: false, user: { id: 'u3', username: 'anna' },
         createdAt: '2026-10-08T10:00:00Z', updatedAt: '2026-10-08T10:00:00Z', voteCount: 0, userVoted: false, isOwner: true,
       });
 
@@ -375,9 +380,10 @@ describe('ArticleDiscussionPanel', () => {
           anchor={decisionAnchor}
           label="Cass. civ. n. 99999/2024"
           heading="Discussioni sulla sentenza"
+          textChangedNotice="Il testo della sentenza è cambiato da quando è stata aperta questa discussione."
           isOpen={true}
           onClose={vi.fn()}
-          textHash="projection-hash"
+          textHash={PROJECTION_HASH}
         />
       );
 
@@ -386,6 +392,7 @@ describe('ArticleDiscussionPanel', () => {
       expect(screen.getByText('Discussioni sulla sentenza')).toBeInTheDocument();
       expect(screen.getByText('Cass. civ. n. 99999/2024')).toBeInTheDocument();
       expect(screen.queryByText(/^Art\./)).not.toBeInTheDocument();
+      expect(screen.queryByText(/dell’articolo/)).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /nuova discussione/i }));
       fireEvent.change(screen.getByPlaceholderText('Titolo della discussione'), { target: { value: 'T' } });
@@ -395,7 +402,7 @@ describe('ArticleDiscussionPanel', () => {
       await waitFor(() => {
         expect(articleDiscussionService.create).toHaveBeenCalledWith(
           decisionAnchor, 'T', 'B',
-          { passage: undefined, articleUrn: undefined, textHash: 'projection-hash' },
+          { passage: undefined, articleUrn: undefined, textHash: PROJECTION_HASH },
         );
       });
 
@@ -404,6 +411,34 @@ describe('ArticleDiscussionPanel', () => {
       fireEvent.change(screen.getByPlaceholderText(/rispondi|scrivi/i), { target: { value: 'Risposta' } });
       fireEvent.submit(screen.getByPlaceholderText(/rispondi|scrivi/i).closest('form')!);
       await waitFor(() => expect(articleDiscussionService.comment).toHaveBeenCalledWith('thread-d-new', 'Risposta'));
+    });
+
+    it('shows the caller\'s notice when the text changed, and loads once for an equal new anchor object', async () => {
+      const changed: ArticleDiscussionThread = {
+        ...dummyThread,
+        normaKey: decisionAnchor.normaKey,
+        articleId: '',
+        textHash: PROJECTION_HASH,
+        target: { kind: 'decision', key: decisionAnchor.normaKey },
+      };
+      vi.mocked(articleDiscussionService.list).mockClear();
+      vi.mocked(articleDiscussionService.list).mockResolvedValue({
+        data: [changed],
+        pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+      });
+      const otherHash = '1111111111111111111111111111111111111111111111111111111111111111';
+      const notice = 'Il testo della sentenza è cambiato da quando è stata aperta questa discussione.';
+      const ui = (anchor: { normaKey: string; articleId: string }) => (
+        <ArticleDiscussionPanel anchor={anchor} isOpen={true} onClose={vi.fn()} textHash={otherHash} textChangedNotice={notice} />
+      );
+
+      const { rerender } = render(ui({ ...decisionAnchor }));
+      await screen.findByText('Titolo discussione');
+      expect(screen.getByText(notice)).toBeInTheDocument();
+
+      rerender(ui({ ...decisionAnchor }));
+      rerender(ui({ ...decisionAnchor }));
+      expect(articleDiscussionService.list).toHaveBeenCalledTimes(1);
     });
   });
 });

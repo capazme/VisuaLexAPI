@@ -64,6 +64,8 @@ const passageThread: ArticleDiscussionThread = {
   normaKey: 'legge--241--1990-08-07--1',
   articleId: '1',
   version: 'vigente',
+  target: { kind: 'article' },
+  passageReleased: false,
   body: 'Discussione sulla portata del pagamento.',
   updatedAt: '2026-09-28T11:00:00Z',
   voteCount: 0,

@@ -51,7 +51,7 @@ import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
 import { useArticlePassageThreads } from '../../../hooks/useArticlePassageThreads';
-import { plainText, locatePassage, buildPassage, textFingerprint } from '../../../utils/threadPassages';
+import { plainText, buildPassage, textFingerprint } from '../../../utils/threadPassages';
 import { revealAnnotation } from '../../../utils/revealAnnotation';
 import { VersionBanner } from './VersionBanner';
 import { TextAtDateDialog } from './TextAtDateDialog';
@@ -219,16 +219,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         version: norma_data.versione || norma_data.data_versione,
     }), [itemKey, uniqueArticleId, norma_data.numero_articolo, norma_data.versione, norma_data.data_versione]);
 
+    const plainArticle = useMemo(() => plainText(article_text || ''), [article_text]);
     const {
         threads: passageThreads,
         isLoading: passageThreadsLoading,
         error: passageThreadsError,
         reload: reloadPassageThreads,
-    } = useArticlePassageThreads(discussionAnchor.normaKey, discussionAnchor.articleId, Boolean(article_text) && !readOnly);
-    const plainArticle = useMemo(() => plainText(article_text || ''), [article_text]);
-    const passageLocations = useMemo(
-        () => new Map(passageThreads.map((t) => [t.id, locatePassage(plainArticle, t.passage)])),
-        [passageThreads, plainArticle],
+        locations: passageLocations,
+    } = useArticlePassageThreads(
+        { normaKey: discussionAnchor.normaKey, articleId: discussionAnchor.articleId },
+        { enabled: Boolean(discussionAnchor.articleId) && Boolean(article_text) && !readOnly, plainText: plainArticle },
     );
     const locatedThreads = useMemo<LocatedThread[]>(
         () => passageThreads.flatMap((t) => {

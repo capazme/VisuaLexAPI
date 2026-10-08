@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { AlertTriangle, ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, ThumbsUp, X } from 'lucide-react';
@@ -13,6 +13,8 @@ interface Props {
   label?: string;
   /** The panel's heading; the article's by default. */
   heading?: string;
+  /** Shown on a discussion opened on a different text than the one on screen; the article's sentence by default. */
+  textChangedNotice?: string;
   isOpen: boolean;
   onClose: () => void;
   /** Recorded on every new discussion: the URN of what is discussed (none for a decision) and the SHA-256 of the text (projection) on screen. */
@@ -41,9 +43,10 @@ interface Props {
 }
 
 export function ArticleDiscussionPanel({
-  anchor,
+  anchor: anchorProp,
   label,
   heading = 'Discussioni sull’articolo',
+  textChangedNotice = 'Il testo dell’articolo è cambiato da quando è stata aperta questa discussione.',
   isOpen,
   onClose,
   articleUrn,
@@ -59,6 +62,12 @@ export function ArticleDiscussionPanel({
   onThreadCreated,
   onGoToPassage,
 }: Props) {
+  // Keyed on the fields, not on the object: a caller may build the anchor inline.
+  const { normaKey, articleId, articleLabel, version } = anchorProp;
+  const anchor = useMemo(
+    () => ({ normaKey, articleId, articleLabel, version }),
+    [normaKey, articleId, articleLabel, version],
+  );
   const [threads, setThreads] = useState<ArticleDiscussionThread[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -416,7 +425,7 @@ export function ArticleDiscussionPanel({
 
                 {isTextDifferent && (
                   <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
-                    Il testo dell’articolo è cambiato da quando è stata aperta questa discussione.
+                    {textChangedNotice}
                   </div>
                 )}
 

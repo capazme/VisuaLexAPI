@@ -183,8 +183,10 @@ desktop): highlights made in the Brocardi sections and highlights whose text
 changed — without it they could no longer be removed.
 
 **Passage discussions on the reading surface**: discussions anchored to a
-specific passage of an article are loaded per article by `useArticlePassageThreads`,
-located against the plain text by `locatePassage`, and counted on the round-B sign
+specific passage of an article are loaded by `useArticlePassageThreads(anchor,
+{ enabled?, plainText? })` — the caller gives the anchor (`{normaKey, articleId}`; the
+article folds `Boolean(articleId)` into `enabled`) and the hook's `locations`,
+computed by `locatePassage` against the plain text by `locatePassage`, and counted on the round-B sign
 (`data-threads`, speech-bubble icon). In the text, words stay clean until a
 discussion is opened. The block popover (`BlockAnnotationsPopover`) lists the
 block's passage discussions with their quotation, title, author, reply count,
@@ -193,7 +195,9 @@ words light up only for the discussion open in the panel (`focusedThreadId` →
 `.vlx-thread-focus`), nesting inside any highlight over the same words. When the
 article text changes, a discussion whose words moved re-attaches to the new location;
 a detached one stays listed in the panel with a notice and its original quotation,
-never hidden or deleted. Supported on the article tab for now.
+never hidden or deleted. Only the article tab uses this today; decisions are coming
+(Task 28 of PR 4b), through the same hook and panel with a decision anchor
+(`articleId: ''`).
 
 **A court decision takes the same tools** (`DecisionReadingSurface`, PR 4): notes and
 highlights are stored under `normaKey = decisionKey(identity)` with `articleId = ''` (wire key
@@ -273,13 +277,17 @@ Hiding them also hides the signs' colour dots and the signs that hold only
 highlights.
 
 **Discussions**: the toolbar's speech-bubble button opens
-`ArticleDiscussionPanel`, a draggable portal anchored on
-`{normaKey, articleId, version}` (threads, replies, votes, report; moderation
+`ArticleDiscussionPanel`, a draggable portal whose anchor
+(`{normaKey, articleId, articleLabel?, version?}`), `label`, `heading` and
+text-changed notice come from the caller (the article's wording is the default;
+the load keys on the anchor's fields, so an inline object does not refetch)
+(threads, replies, votes, report; moderation
 is admin-only, `PATCH /admin/article-discussions/:id`). A new discussion can also
 start from a selection via the "Discuti" button in `SelectionPopup`, which opens
 the panel composer with a draft passage block and makes the title optional (the
 quotation stands in for it). Every new discussion records `articleUrn` and the
-`textHash` (SHA-256 fingerprint) of the text on screen. The panel is mounted
+`textHash` (SHA-256 fingerprint) of the text on screen. Only the article mounts
+the panel today; a decision's anchor (`articleId: ''`) is for Task 28. The panel is mounted
 for every rendered article and fetches **only while open** — a load on mount
 cost one GET per article of a range.
 
@@ -591,8 +599,11 @@ Duplicating any of these is a defect, not a shortcut.
   rectangle and the virtual reference a block's popover is placed against.
 - `hooks/useNoteEditing.ts` + `features/search/NoteCard.tsx` — a note edited in
   place; the Notes panel and the block popover.
-- `hooks/useArticlePassageThreads.ts` — loads an article's passage discussions
-  for its signs via `GET /article-discussions/passages`.
+- `hooks/useArticlePassageThreads.ts` — one signature, `(anchor, { enabled?,
+  plainText? })`: the anchor comes from the caller. Loads passage discussions for
+  the signs via `GET /article-discussions/passages` and, given `plainText`, returns
+  `locations` (the one place a passage is found or `detached`). Used by the article
+  tab; decisions are coming (Task 28).
 - `utils/threadPassages.ts` — `buildPassage`, `textFingerprint`, `locatePassage`
   (exact → whitespace-tolerant search → the occurrence whose context agrees;
   never guesses: ambiguous or missing = `detached`).

@@ -17,6 +17,11 @@ export interface PassageThreadsAnchor {
   normaKey: string;
   /** '' for a court decision (its key is the whole identity). */
   articleId: string;
+}
+
+export interface PassageThreadsOptions {
+  /** False: no request (the caller's own guard, e.g. no text yet). Default true. */
+  enabled?: boolean;
   /** The plain text (the projection, for a decision) the passages are located against. */
   plainText?: string;
 }
@@ -26,27 +31,18 @@ export interface PassageThreadsAnchor {
  * request (GET /article-discussions/passages) when it is shown, none when the
  * reader is not logged in. `reload` asks again (after a new discussion).
  *
- * Called with `(normaKey, articleId, enabled)` an article needs both parts; called
- * with an anchor object the caller decides: a decision passes `articleId: ''`.
- * With `plainText` in the anchor, `locations` says where each passage is in it.
+ * The anchor comes from the caller, who decides what identifies the subject: an
+ * article passes its key and article id (and folds `Boolean(articleId)` into
+ * `enabled`), a decision passes `articleId: ''`. With `plainText`, `locations`
+ * says where each passage is in it (`locatePassage`): the one place "detached"
+ * is computed.
  */
 export function useArticlePassageThreads(
-  normaKey: string,
-  articleId: string,
-  enabled?: boolean,
-): PassageThreadsResult;
-export function useArticlePassageThreads(anchor: PassageThreadsAnchor, enabled?: boolean): PassageThreadsResult;
-export function useArticlePassageThreads(
-  first: string | PassageThreadsAnchor,
-  second?: string | boolean,
-  third = true,
+  anchor: PassageThreadsAnchor,
+  { enabled = true, plainText: plain }: PassageThreadsOptions = {},
 ): PassageThreadsResult {
-  const fromAnchor = typeof first !== 'string';
-  const normaKey = fromAnchor ? first.normaKey : first;
-  const articleId = fromAnchor ? first.articleId : (second as string);
-  const plain = fromAnchor ? first.plainText : undefined;
-  const enabled = fromAnchor ? (second as boolean | undefined) ?? true : third;
-  const hasIdentity = Boolean(normaKey) && (fromAnchor || Boolean(articleId));
+  const { normaKey, articleId } = anchor;
+  const hasIdentity = Boolean(normaKey);
   const [reloadCount, setReloadCount] = useState(0);
   const [loadedData, setLoadedData] = useState<{
     requestId: string;
