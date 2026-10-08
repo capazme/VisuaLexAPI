@@ -400,6 +400,9 @@ describe('CardFormDialog', () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(<CardFormDialog open onClose={onClose} mode={fromReader()} onSaved={vi.fn()} />);
+    // The dialog moves focus to the first field once it has opened (`Modal` waits 50 ms): typing before
+    // that lands would be cut short when the machine is busy.
+    await waitFor(() => expect(screen.getByLabelText('Istituto')).toHaveFocus());
     await user.type(screen.getByLabelText('Domanda'), 'Quando?');
     await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();

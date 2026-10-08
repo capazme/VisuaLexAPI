@@ -9,7 +9,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
   `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on, which
-  also hides the Sidebar's «Studia»; `/studia` redirects to `schede`),
+  also hides the Sidebar's «Studia»; `/studia` redirects to `schede`; «Le mie schede» is
+  `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
+  the selected card is the route `/studia/schede/:id`, an anchor opens its article through
+  `triggerSearch` as the dossier's rows do),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an
@@ -412,8 +415,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   through MCP. A note about an article (`aboutItemId`) sits with it: a count on
   the closed row, the notes above the text when open, «Aggiungi una nota
   all'articolo»; a note whose article is no longer in the dossier shows among
-  the free notes. An entry an application wrote carries `ClaudeMark` («scritta
-  da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
+  the free notes. An entry an application wrote carries `ClaudeMark` (`components/ui/`,
+  shared with Studia; «scritta da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
   gives the article a new id: `restoreDossierItem` reattaches its notes at once
   (`PUT …/items/:noteId {aboutItemId}`, reverted with a sync error if refused);
   an undone note comes back through the notes route, about its article if the
@@ -424,12 +427,14 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The trash** (what a connected application deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
-  «Da «dossier»», «Schede LingoLex» by their first questions) and a dossier's
+  «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
   which dossier to restore into — or emptied behind a danger confirmation; a
-  restore reloads that dossier from the server (`refreshDossier`). The web never
-  moves anything to the trash: its own deletions stay immediate, with an undo.
+  restore reloads that dossier from the server (`refreshDossier`). The web moves
+  no dossier or entry to the trash: its own deletions there stay immediate, with an undo.
+  Only study cards go through it: «Elimina» on a draft or an archived card in
+  «Le mie schede» (`studiaService.trash`).
   A decision in the trash is named by the server's citation.
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's tab

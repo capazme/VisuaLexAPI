@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { DossierItem } from '../../../types';
 import { formatTimestampLong } from './dossierUtils';
-import { ClaudeMark } from './ClaudeMark';
+import { ClaudeMark } from '../../ui/ClaudeMark';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 

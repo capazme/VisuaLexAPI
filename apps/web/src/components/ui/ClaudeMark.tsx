@@ -1,6 +1,6 @@
 import { Sparkles } from 'lucide-react';
-import type { DossierItem } from '../../../types';
-import { claudeMarkSentence } from './dossierUtils';
+import type { DossierItem } from '../../types';
+import { claudeMarkSentence } from '../features/dossier/dossierUtils';
 
 interface Props {
   createdBy: DossierItem['createdBy'];
