@@ -321,9 +321,8 @@ describe('ArticleTabContent — copying a past text', () => {
     fireEvent.click(copyButton());
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied: string = writeText.mock.calls[0][0];
-    expect(copied.startsWith(
-      'art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 (Normattiva, testo consolidato, consultato il ',
-    )).toBe(true);
+    // «consultato il 5 ottobre», «consultato l'8 ottobre»: the preposition elides before 8 and 11
+    expect(copied).toMatch(/^art\. 1284 c\.c\., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 \(Normattiva, testo consolidato, consultato (?:il |l')/);
     expect(copied).toContain('Il saggio degli interessi legali');
     expect(copied).not.toContain('Tratto da');
   });
@@ -333,7 +332,7 @@ describe('ArticleTabContent — copying a past text', () => {
     fireEvent.click(copyButton());
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied: string = writeText.mock.calls[0][0];
-    expect(copied).toMatch(/^art\. 1284 c\.c\. \(Normattiva, testo vigente, consultato il [^)]+\)\n\nArt\. 1284\./);
+    expect(copied).toMatch(/^art\. 1284 c\.c\. \(Normattiva, testo vigente, consultato (?:il |l')[^)]+\)\n\nArt\. 1284\./);
   });
 
   it('cites the window of a historical version reached with no day asked for, in a copy and from the banner', async () => {
@@ -341,9 +340,7 @@ describe('ArticleTabContent — copying a past text', () => {
     show(article(MIDDLE, noDay));
     fireEvent.click(copyButton());
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText.mock.calls[0][0].startsWith(
-      'art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 (Normattiva, testo consolidato, consultato il ',
-    )).toBe(true);
+    expect(writeText.mock.calls[0][0]).toMatch(/^art\. 1284 c\.c\., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 \(Normattiva, testo consolidato, consultato (?:il |l')/);
     fireEvent.click(screen.getByRole('button', { name: 'Copia citazione' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
   });
@@ -360,7 +357,7 @@ describe('ArticleTabContent — copying a past text', () => {
     fireEvent.click(copyButton());
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied: string = writeText.mock.calls[0][0];
-    expect(copied).toMatch(/^art\. 5, reg\. \(UE\) 2016\/679 \(EUR-Lex, testo vigente, consultato il [^)]+\)\n\n/);
+    expect(copied).toMatch(/^art\. 5, reg\. \(UE\) 2016\/679 \(EUR-Lex, testo vigente, consultato (?:il |l')[^)]+\)\n\n/);
     expect(copied).not.toContain('nel testo in vigore');
   });
 

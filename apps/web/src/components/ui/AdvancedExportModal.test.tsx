@@ -144,6 +144,6 @@ describe('AdvancedExportModal — the citation', () => {
     fireEvent.click(screen.getByRole('button', { name: /Copia negli appunti/ }));
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     expect(writeText.mock.calls[0][0] as string)
-      .toMatch(/--- Citazione ---\nart\. 2043 c\.c\. \(Normattiva, testo vigente, consultato il [^)]+\)/);
+      .toMatch(/--- Citazione ---\nart\. 2043 c\.c\. \(Normattiva, testo vigente, consultato (?:il |l')[^)]+\)/);
   });
 });
