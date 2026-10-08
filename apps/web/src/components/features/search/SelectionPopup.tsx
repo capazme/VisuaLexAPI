@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, X } from 'lucide-react';
+import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
@@ -29,6 +29,9 @@ interface SelectionPopupProps {
   // Optional "Discuti" action: rendered only when the host passes it.
   // Starts a discussion on the selected passage.
   onDiscuss?: (text: string, startOffset: number) => void;
+  // Optional "Crea scheda" action: rendered only when the host passes it. Gets the words as the
+  // reader sees them (the way copy does), to open a VisuaLex Studia card with them.
+  onCreateCard?: (text: string) => void;
   // A past text takes no highlight, note or discussion (they are keyed by
   // article, not by version): only "Copia" is offered, and the shortcuts of the
   // others are off too.
@@ -56,6 +59,7 @@ export function SelectionPopup({
   onSearch,
   onReportCitation,
   onDiscuss,
+  onCreateCard,
   copyOnly = false,
 }: SelectionPopupProps) {
   const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, displayText: '' });
@@ -193,7 +197,7 @@ export function SelectionPopup({
     return { x: r.x, y: r.y, width: r.width, height: r.height };
   };
 
-  const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search' | 'report' | 'discuss') => {
+  const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search' | 'report' | 'discuss' | 'card') => {
     switch (action) {
       case 'highlight':
         setShowColorPicker(true);
@@ -212,6 +216,11 @@ export function SelectionPopup({
         window.getSelection()?.removeAllRanges();
         break;
       }
+      case 'card':
+        onCreateCard?.(popup.displayText || popup.text);
+        hidePopup();
+        window.getSelection()?.removeAllRanges();
+        break;
       case 'copy':
         onCopy(popup.displayText || popup.text);
         hidePopup();
@@ -307,6 +316,19 @@ export function SelectionPopup({
                       aria-label="Discuti con i colleghi"
                     >
                       <MessageCircle size={16} className="text-sky-400" />
+                    </button>
+                  </>
+                )}
+                {onCreateCard && (
+                  <>
+                    <div className="w-px h-5 bg-slate-700" />
+                    <button
+                      onClick={() => handleAction('card')}
+                      className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                      title="Crea scheda"
+                      aria-label="Crea scheda"
+                    >
+                      <GraduationCap size={16} className="text-teal-400" />
                     </button>
                   </>
                 )}

@@ -203,6 +203,18 @@ Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.t
 `decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
 «Cerca nel testo» has no shortcut: Cmd/Ctrl+F is the app's existing «Cerca negli articoli aperti» (`Layout.tsx`), a different tool that searches the open articles, not decisions.
 
+**Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
+row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
+(find-in-text and the offsets never see it): «Schede su questo articolo (n) · + Nuova scheda». The count
+(`useArticleCards`: one read per address from `/api/lingo/articolo`, kept for the session, shared between
+copies, dropped at logout, `refresh()` after a save) opens `ArticleCardsPeek`; the row owns the
+`CardFormDialog`, and the selection popup's «Crea scheda» (`SelectionPopup.onCreateCard`, passed through
+`ArticleBody.onPopupCreateCard`, offered only by the article tab) reaches it through the row's `ref`
+(`createFromPassage`). `articleCardsOffer.ts` is the one rule: a row needs a `urn:` in `norma_data.urn`
+(an EU act has none), «+ Nuova scheda» and «Crea scheda» need the text in force (`readOnly` or
+`versionInfo.isHistorical` disables the first, with its reason, and withholds the second). The form's
+institute is suggested from the article's rubric (`getRubricText`).
+
 **Passage discussions on the reading surface**: the discussion wiring of a reading surface
 lives in one hook, `useDiscussionWiring` (passage threads load and reload, the ones that still
 land in the text, the panel's open state, the focused thread, the «Discuti» draft, the text

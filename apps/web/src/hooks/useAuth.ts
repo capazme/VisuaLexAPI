@@ -8,6 +8,7 @@ import { appStore } from '../store/useAppStore';
 import { getErrorMessage } from '../utils/errors';
 import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
+import { clearArticleCardsCache } from '../components/features/studia/useArticleCards';
 
 interface AuthState {
   user: UserResponse | null;
@@ -132,6 +133,7 @@ export function useAuth() {
     appStore.getState().clearUserData();
     clearDecisionCache();
     clearDecisionSearchCache();
+    clearArticleCardsCache();
     setState({
       user: null,
       loading: false,

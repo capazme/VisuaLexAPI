@@ -21,6 +21,8 @@ vi.mock('../../../../services/articleDiscussionService', () => ({
     voteComment: vi.fn(),
   },
 }));
+// The cards row reads the study cards of the article; they are not under test.
+vi.mock('../../../../services/studiaService', () => ({ studiaService: { forArticle: () => Promise.resolve([]) } }));
 vi.mock('../../../../services/authService', () => ({ isAuthenticated: () => true }));
 vi.mock('../../../../services/notificationService', () => ({ notificationService: { checkNorma } }));
 vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
