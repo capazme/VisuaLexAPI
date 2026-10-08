@@ -5,8 +5,9 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createLingoCard } from '../lingo/cards';
-import { resolveAnchors, type AnchorOutcome } from '../lingo/anchors';
-import { lingoCardCreateSchema, MAX_ANCHORS_PER_CARD, type LingoCardAncoraInput } from '../schemas/lingo/card';
+import { cardInputSchema, planCards } from '../lingo/planCards';
+import { serialize } from '../lingo/serializeCard';
+import { lingoCardCreateSchema } from '../schemas/lingo/card';
 import { trashLingoCards } from '../trash/trash';
 
 /**
@@ -16,10 +17,11 @@ import { trashLingoCards } from '../trash/trash';
  * like the dossier's norms, and anchored with the official URN and the
  * fingerprint the Python API computes (`lingo/anchors.ts`): the caller never
  * handles a hash. A card with an anchor that cannot be verified is refused,
- * and the others in the call go on. Open to the user's session and to
- * exchanged tokens (`lingo:cards:read` / `lingo:cards:write`); moving cards to
- * the trash is for connected applications only, and only for the user's
- * personal ones (drafts, archived: what account deletion removes too).
+ * and the others in the call go on. Creating, listing, reading and moving to
+ * the trash are open to the user's session and to exchanged tokens
+ * (`lingo:cards:read` / `lingo:cards:write`, `content:delete`); editing a
+ * draft is for the session only. Only the user's personal cards go to the
+ * trash (drafts, archived: what account deletion removes too).
  */
 const router = Router();
 router.use(authenticate);
@@ -28,19 +30,6 @@ export const MAX_CARDS_PER_CALL = 10;
 /** Distinct anchor references checked against the sources in one call, as a cost cap (each one is fetched). */
 export const MAX_REFERENCES_PER_CALL = 20;
 
-const anchorReferenceSchema = z
-  .object({ riferimento: z.string().trim().min(1).max(200), principale: z.boolean().optional() })
-  .strict();
-const cardInputSchema = lingoCardCreateSchema
-  .omit({ ancore: true })
-  .extend({
-    ancore: z
-      .array(anchorReferenceSchema)
-      .min(1)
-      .max(MAX_ANCHORS_PER_CARD)
-      .refine((ancore) => ancore.filter((a) => a.principale).length <= 1, { message: 'Al massimo un’ancora principale per scheda.' }),
-  })
-  .strict();
 const createSchema = z
   .object({ cards: z.array(cardInputSchema).min(1).max(MAX_CARDS_PER_CALL) })
   .strict()
@@ -52,7 +41,8 @@ const listSchema = z.object({
   stato: z.nativeEnum(LingoCardStato).optional(),
   tipo: z.nativeEnum(LingoCardTipo).optional(),
   normaKey: z.string().max(100).regex(/^[a-z0-9]+(_[a-z0-9]+)*$/).optional(),
-  q: z.string().trim().min(1).max(100).optional(),
+  // Postgres text cannot hold a NUL byte: it would answer 500.
+  q: z.string().trim().min(1).max(100).refine((text) => !text.includes('\u0000'), { message: 'Il testo contiene un carattere non valido.' }).optional(),
   origine: z.literal('applicazione').optional(),
   ordine: z.enum(['recenti', 'materia']).default('recenti'),
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -60,56 +50,12 @@ const listSchema = z.object({
 });
 const trashSchema = z.object({ cardIds: z.array(z.string().min(1).max(64)).min(1).max(MAX_CARDS_PER_CALL) }).strict();
 
-type CardRow = Prisma.LingoCardGetPayload<{ include: { ancore: true } }>;
-
-const serialize = (card: CardRow) => ({
-  id: card.id,
-  materia: card.materia,
-  istituto: card.istituto,
-  tipo: card.tipo,
-  domanda: card.domanda,
-  risposta: card.risposta,
-  spiegazione: card.spiegazione,
-  stato: card.stato,
-  createdAt: card.createdAt,
-  updatedAt: card.updatedAt,
-  // Which connected application wrote the card; the client's id stays on the server.
-  origine: card.createdByClientId ? { clientName: card.createdByClientName } : null,
-  ancore: card.ancore.map((a) => ({ normaKey: a.normaKey, articleId: a.articleId, urn: a.urn, isPrimary: a.isPrimary })),
-});
-
 router.post('/', async (req, res) => {
   const { cards } = createSchema.parse(req.body);
-  const references = [...new Set(cards.flatMap((card) => card.ancore.map((a) => a.riferimento)))];
-  const outcomes = new Map<string, AnchorOutcome>((await resolveAnchors(references)).map((o) => [o.reference, o]));
-  const failures = [...outcomes.values()].filter((o) => o.outcome !== 'anchored');
+  const { planned, failures, allTransient } = await planCards(cards);
 
   // Sources down for every reference: nothing could be checked, so nothing is written or spent (503).
-  if (failures.length === outcomes.size && failures.every((o) => o.transient)) {
-    throw new AppError(503, 'Le fonti non rispondono: nessuna scheda è stata creata, riprova più tardi.');
-  }
-
-  // Every card is decided before the first is written, so a call never stops halfway (code review of PR 5).
-  type Planned = { index: number; input: unknown } | { index: number; refused: { detail: string; anchors?: AnchorOutcome[] } };
-  const planned: Planned[] = cards.map((card, index) => {
-    const anchors = card.ancore.map((a) => outcomes.get(a.riferimento)!);
-    const failed = anchors.filter((a) => a.outcome !== 'anchored');
-    if (failed.length > 0) return { index, refused: { detail: 'Un’ancora non è verificabile: la scheda non è stata creata.', anchors: failed } };
-    // The URN is the identity (S6): two references to the same article are one anchor, primary if either was.
-    const byUrn = new Map<string, LingoCardAncoraInput>();
-    card.ancore.forEach((a, i) => {
-      const { anchor } = anchors[i] as Extract<AnchorOutcome, { outcome: 'anchored' }>;
-      const seen = byUrn.get(anchor.urn);
-      byUrn.set(anchor.urn, { ...anchor, isPrimary: Boolean(seen?.isPrimary || a.principale) });
-    });
-    const { ancore: _references, ...fields } = card;
-    const input = { ...fields, ancore: [...byUrn.values()] };
-    const valid = lingoCardCreateSchema.safeParse(input);
-    if (!valid.success) {
-      return { index, refused: { detail: `La scheda non rispetta il formato: ${valid.error.issues[0]?.message ?? 'dati non validi'}.` } };
-    }
-    return { index, input };
-  });
+  if (allTransient) throw new AppError(503, 'Le fonti non rispondono: nessuna scheda è stata creata, riprova più tardi.');
 
   const origin = req.delegation ? { clientId: req.delegation.clientId, clientName: req.delegation.clientName } : null;
   const created = await prisma.$transaction(async (tx) => {
@@ -130,9 +76,11 @@ router.post('/', async (req, res) => {
 });
 
 router.post('/trash', async (req: Request, res) => {
-  if (!req.delegation) throw new AppError(403, 'Il cestino raccoglie solo ciò che eliminano le applicazioni collegate.');
   const { cardIds } = trashSchema.parse(req.body);
-  const by = { clientId: req.delegation.clientId, clientName: req.delegation.clientName, grantId: req.delegation.grantId };
+  // The user's own deletion carries no application: the trash lists it as theirs.
+  const by = req.delegation
+    ? { clientId: req.delegation.clientId, clientName: req.delegation.clientName, grantId: req.delegation.grantId }
+    : { clientId: null, clientName: null, grantId: null };
   res.json(await trashLingoCards(req.user!.id, cardIds, by));
 });
 
@@ -167,6 +115,53 @@ router.get('/:id', async (req, res) => {
   const card = await prisma.lingoCard.findFirst({ where: { id: req.params.id, autoreId: req.user!.id }, include: { ancore: true } });
   if (!card) throw new AppError(404, 'Scheda non trovata.');
   res.json(serialize(card));
+});
+
+router.patch('/:id', async (req, res) => {
+  const body = cardInputSchema.parse(req.body);
+  const { planned, allTransient } = await planCards([body]);
+  // Sources down for every reference: nothing could be checked, so the draft stays as it is (503).
+  if (allTransient) throw new AppError(503, 'Le fonti non rispondono: la scheda non è stata modificata, riprova più tardi.');
+  const [plan] = planned;
+  if ('refused' in plan) {
+    const { detail, anchors } = plan.refused;
+    res.status(400).json({ detail: anchors ? 'Un’ancora non è verificabile: la scheda non è stata modificata.' : detail, anchors });
+    return;
+  }
+  const card = lingoCardCreateSchema.parse(plan.input);
+  const markFirstPrimary = !card.ancore.some((a) => a.isPrimary);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    // The row is locked, then read again: a state changed since the plan (a proposal, an archive) refuses the edit.
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_cards WHERE id = ${req.params.id} AND autore_id = ${req.user!.id} FOR UPDATE`;
+    if (locked.length !== 1) throw new AppError(404, 'Scheda non trovata.');
+    const current = await tx.lingoCard.findUniqueOrThrow({ where: { id: req.params.id }, select: { stato: true } });
+    if (current.stato !== 'BOZZA_PERSONALE') throw new AppError(409, 'Solo una bozza si può modificare.');
+    await tx.lingoCardAncora.deleteMany({ where: { cardId: req.params.id } });
+    // The origin columns are not touched: they say who created the card, and an edit by hand keeps it.
+    return tx.lingoCard.update({
+      where: { id: req.params.id },
+      data: {
+        materia: card.materia,
+        istituto: card.istituto,
+        tipo: card.tipo,
+        domanda: card.domanda,
+        risposta: card.risposta,
+        spiegazione: card.spiegazione ?? null,
+        ancore: {
+          create: card.ancore.map((a, i) => ({
+            normaKey: a.normaKey,
+            articleId: a.articleId,
+            urn: a.urn,
+            aknFingerprint: a.aknFingerprint,
+            isPrimary: a.isPrimary || (markFirstPrimary && i === 0),
+          })),
+        },
+      },
+      include: { ancore: true },
+    });
+  });
+  res.json(serialize(updated));
 });
 
 export default router;

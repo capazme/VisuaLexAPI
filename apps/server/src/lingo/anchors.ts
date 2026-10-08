@@ -9,8 +9,8 @@ import { articleKey, CONCURRENCY, mapLimited, postLegalApi, resolveReferences, S
  * (S7).
  *
  * The rules, with the test table in tests/lingoAnchors.test.ts:
- * - `urn`: the official URN, `urn:nir:…`, cut from Normattiva's address (an EU
- *   act has none: no anchor);
+ * - `urn`: the official URN, `urn:nir:…`, cut from Normattiva's address without
+ *   its version suffix (`anchorUrn`; an EU act has none: no anchor);
  * - `normaKey`: a named act (a code, the preleggi, the Constitution: no act
  *   number, or a type that is not the real one, «codice civile» over «regio
  *   decreto») is its name in snake case, `codice_civile`; any other act adds
@@ -37,14 +37,21 @@ const snake = (text: string): string =>
 const isNamedAct = (norm: NormaVisitata): boolean =>
   !norm.numero_atto || Boolean(norm.tipo_atto_reale && norm.tipo_atto_reale !== norm.tipo_atto);
 
+/** The anchor's identity from a Normattiva address: cut at `urn:`, without a version suffix (S6). */
+export function anchorUrn(raw: string): string | null {
+  const at = raw.indexOf('urn:');
+  if (at < 0) return null;
+  return raw.slice(at).replace(/(!vig=[^~@]*|@[^~!]*)$/, '');
+}
+
 /** The labels and identity of an anchor, or null when the norm has no official URN. */
 export function anchorKeys(norm: NormaVisitata): AnchorKeys | null {
-  const at = norm.urn.indexOf('urn:');
-  if (at < 0) return null;
+  const urn = anchorUrn(norm.urn);
+  if (!urn) return null;
   const named = isNamedAct(norm);
   const normaKey = named ? snake(norm.tipo_atto) : snake(`${norm.tipo_atto} ${norm.data ?? ''} ${norm.numero_atto ?? ''}`);
   const annex = !named && norm.allegato ? `all_${snake(norm.allegato)}_` : '';
-  return { normaKey, articleId: `${annex}art_${snake(norm.numero_articolo)}`, urn: norm.urn.slice(at) };
+  return { normaKey, articleId: `${annex}art_${snake(norm.numero_articolo)}`, urn };
 }
 
 type Fingerprints = Record<string, unknown>;

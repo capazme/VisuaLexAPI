@@ -134,9 +134,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `trash_entries` and deletes them in one transaction, the dossier row locked
   (`FOR UPDATE`): `POST /dossiers/:id/trash {itemIds}` (the entries the user
   saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
-  `/lingo/cards/trash` — exchanged tokens only, never the web app, whose own
-  deletions stay immediate. `GET /api/trash`, `POST /api/trash/:id/restore
-  {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
+  `/lingo/cards/trash` — the two dossier routes for exchanged tokens only,
+  whose own deletions in the web app stay immediate; the card trash is open to
+  the web app too: a deletion by the user's session is stored with no client,
+  no name and no grant (`DeletedBy` all null) and listed with
+  `byApplication: false`, while one through a connected application is
+  `byApplication: true` even when its name is unknown. `GET /api/trash`,
+  `POST /api/trash/:id/restore {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
   Restore brings every column back with the original ids; entries 30 days,
   then swept (awaited, at most every ten minutes). No route reachable by an
   exchanged token deletes for good.
@@ -312,9 +316,24 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `q` — 1–100 characters, in the institute or the question, case-insensitive —
   and `origine=applicazione`, ordered `ordine=recenti` (default) or `materia`,
   then institute, newest, id),
-  `POST /trash` (personal states only, `PERSONAL_STATES`). Scopes
+  `POST /trash` (personal states only, `PERSONAL_STATES`; the session and
+  exchanged tokens alike), and `PATCH /:id` for the session only (not in the
+  delegated table: a default-deny 403 for an exchanged token). The patch takes
+  one card in the shape of an element of `POST`'s `cards` and replaces its
+  fields and anchors whole: `lingo/planCards.ts` (shared with `POST`) checks
+  the references first — every one unreachable is a 503, an unverifiable one a
+  400 `{ detail, anchors }`, and the draft stays as it was — then one
+  transaction locks the row (`FOR UPDATE`) and re-reads author and state (404;
+  409 unless `BOZZA_PERSONALE`). It never touches `created_by_client_*`.
+  `q` refuses a NUL byte (400). Scopes
   `lingo:cards:read` / `lingo:cards:write`; two points per reference, one of
-  the day's hundred per card.
+  the day's hundred per card. `lingo/serializeCard.ts` is the one answer shape.
+- **`GET /api/lingo/articolo?urn=`** (`routes/lingoArticolo.ts`, session only):
+  the user's non-archived cards anchored on the article, each with `comunita`
+  and `approvazioni` (in PR A always `false` and `null`; the community's come
+  later). The address is the reader's (`…urn:nir:…~art1453!vig=…`); the
+  identity is `anchorUrn`, the same cut that stores an anchor's `urn`, so
+  storage and lookup agree. An address with no `urn:` is a 400.
 - **LingoLex cards** (data layer): `LingoCard` and
   `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
   is the strict contract: one to ten anchors, a lower-case SHA-256 fingerprint,

@@ -58,7 +58,7 @@ describe('the trash', () => {
     expect(await prisma.dossier.count({ where: { id: dossierId } })).toBe(0);
     const list = await request(app).get('/api/trash').set(authHeader(alice));
     expect(list.body).toHaveLength(1);
-    expect(list.body[0]).toMatchObject({ kind: 'DOSSIER', dossierId, label: 'Prova', itemCount: 3, clientName: 'Claude Code' });
+    expect(list.body[0]).toMatchObject({ kind: 'DOSSIER', dossierId, label: 'Prova', itemCount: 3, clientName: 'Claude Code', byApplication: true });
     expect(new Date(list.body[0].expiresAt).getTime() - new Date(list.body[0].deletedAt).getTime()).toBe(30 * 24 * 3600 * 1000);
   });
 

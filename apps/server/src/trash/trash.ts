@@ -16,11 +16,15 @@ import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const SWEEP_EVERY_MS = 10 * 60 * 1000;
 
-/** Which connection deleted: the trash outlives the client and the grant, so plain values. */
+/**
+ * Which connection deleted: the trash outlives the client and the grant, so
+ * plain values. All null when the user deleted from the web app themselves
+ * (study cards only; the dossier's routes stay for connected applications).
+ */
 export interface DeletedBy {
-  clientId: string;
+  clientId: string | null;
   clientName: string | null;
-  grantId: string;
+  grantId: string | null;
 }
 
 export interface TrashListEntry {
@@ -32,6 +36,8 @@ export interface TrashListEntry {
   items?: { itemType: string; citation: string | null; actCitation: string | null }[];
   cards?: { istituto: string; domanda: string }[];
   clientName: string | null;
+  /** Deleted through a connected application, whose name may still be unknown (null): not the user's own deletion. */
+  byApplication: boolean;
   deletedAt: string;
   expiresAt: string;
 }
@@ -237,6 +243,7 @@ export async function listTrash(userId: string): Promise<TrashListEntry[]> {
       ...(summary.items ? { items: summary.items } : {}),
       ...(summary.cards ? { cards: summary.cards } : {}),
       clientName: entry.clientName,
+      byApplication: entry.clientId !== null,
       deletedAt: entry.deletedAt.toISOString(),
       expiresAt: entry.expiresAt.toISOString(),
     };

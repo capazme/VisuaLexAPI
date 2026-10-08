@@ -25,6 +25,7 @@ import articleDiscussionRoutes from './routes/articleDiscussions';
 import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
 import lingoCardsRoutes from './routes/lingoCards';
+import lingoArticoloRoutes from './routes/lingoArticolo';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -126,6 +127,7 @@ app.use('/api/merlt', merltKillSwitch, merltRoutes);
 // of passing through every catch-all router below first.
 app.use('/api/lingo/simulazioni', lingoSimulazioniRoutes);
 app.use('/api/lingo/cards', lingoCardsRoutes);
+app.use('/api/lingo/articolo', lingoArticoloRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 app.use('/api', authRoutes);
