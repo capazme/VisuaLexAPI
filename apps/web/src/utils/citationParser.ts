@@ -9,27 +9,18 @@ import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarke
 import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 import { labelFromParams } from './sources';
+import { ACT_TYPES_REQUIRING_DETAILS } from '../constants/actTypes';
 
 export interface ParsedCitation {
   act_type?: string;
   act_number?: string;
   date?: string;
   article?: string;
+  annex?: string; // l'allegato, come lo scrive la convenzione: "(Allegato A)", "(All. A)"
   confidence: number; // 0-1 quanto siamo sicuri del parsing
   fromAlias?: boolean; // true se risolto da alias utente
   aliasId?: string; // ID dell'alias usato
 }
-
-// Tipi di atto che richiedono numero e data
-const ACT_TYPES_REQUIRING_DETAILS = [
-  'legge',
-  'decreto legge',
-  'decreto legislativo',
-  'decreto del presidente della repubblica',
-  'regio decreto',
-  'Regolamento UE',
-  'Direttiva UE',
-];
 
 /**
  * Mappatura completa abbreviazioni → act_type
@@ -58,6 +49,21 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'cost': 'costituzione',
   'cost.': 'costituzione',
   'costituzione': 'costituzione',
+  // Le forme brevi della convenzione delle fonti (sources/actTypes.ts): ognuna
+  // deve tornare al suo tipo. Senza queste "l. cost." era la Costituzione (il
+  // "cost." dentro), "r.d.l." un decreto-legge e "d.lgs.lgt." un decreto
+  // legislativo: atti veri, ma altri.
+  'decreto-legge': 'decreto legge',
+  'l. cost.': 'legge costituzionale',
+  'l.cost.': 'legge costituzionale',
+  'legge cost.': 'legge costituzionale',
+  'l. costituzionale': 'legge costituzionale',
+  'legge costituzionale': 'legge costituzionale',
+  'r.d.l.': 'regio decreto legge',
+  'regio decreto legge': 'regio decreto legge',
+  'regio decreto-legge': 'regio decreto legge',
+  'd.lgs.lgt.': 'decreto legislativo luogotenenziale',
+  'decreto legislativo luogotenenziale': 'decreto legislativo luogotenenziale',
 
   // === CODICI FONDAMENTALI ===
   'cc': 'codice civile',
@@ -185,6 +191,7 @@ const SORTED_ABBREVIATIONS = Object.keys(ABBREVIATION_MAP).sort((a, b) => b.leng
 const NUMBERED_ACT_TYPES = new Set([
   'legge', 'decreto legge', 'decreto legislativo',
   'decreto del presidente della repubblica', 'regio decreto',
+  'legge costituzionale', 'regio decreto legge', 'decreto legislativo luogotenenziale',
   'Regolamento UE', 'Direttiva UE',
 ]);
 
@@ -277,11 +284,39 @@ const EU_CITATION_PATTERN = new RegExp(
 );
 
 /**
+ * L'allegato, come lo scrive la convenzione ("(Allegato A)", "(All. A)"): una
+ * lettera, un numero romano o un numero. Si legge dall'input originale perché
+ * l'URN ne conserva le maiuscole ("…;81:A"); una lettera si scrive maiuscola.
+ */
+const ANNEX_PATTERN = /(\(\s*)?\b(?:allegato|all\.)\s*([a-z]|[ivxlc]{1,7}|\d+)\b\s*\)?/i;
+// Una parola dopo una lettera minuscola senza parentesi: in "allegato a d.lgs.
+// 81/2008" la "a" è una preposizione, non l'allegato A.
+const WORD_AHEAD = /^\s*\p{L}/u;
+
+function extractAnnex(input: string): { annex: string | undefined; remaining: string } {
+  const match = ANNEX_PATTERN.exec(input);
+  if (!match) return { annex: undefined, remaining: input };
+  const [whole, parenthesis, value] = match;
+  const end = match.index + whole.length;
+  if (!parenthesis && value.length === 1 && value === value.toLowerCase() && /\D/.test(value)
+      && WORD_AHEAD.test(input.slice(end))) {
+    return { annex: undefined, remaining: input };
+  }
+  return {
+    annex: /^\d+$/.test(value) ? value : value.toUpperCase(),
+    remaining: `${input.slice(0, match.index)} ${input.slice(end)}`,
+  };
+}
+
+/**
  * Normalizza l'input rimuovendo punteggiatura extra e spazi multipli
  */
 function normalizeInput(input: string): string {
   return input
     .toLowerCase()
+    // "1° settembre 1993": il primo del mese, come lo scrivono le citazioni.
+    // Senza, il giorno cadeva e restava solo l'anno.
+    .replace(/(\d)\s*[°º]/g, '$1')
     // "(UE)" è la grafia ufficiale del marcatore, non rumore: senza questo
     // passaggio "regolamento (ue)" non combaciava con nessuna abbreviazione.
     .replace(/[()[\]]+/g, ' ')
@@ -526,7 +561,8 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
     return null;
   }
 
-  const normalized = normalizeInput(input);
+  const { annex, remaining: withoutAnnex } = extractAnnex(input);
+  const normalized = normalizeInput(withoutAnnex);
 
   // Step 1: Estrai tipo atto (controlla prima alias utente, poi sistema)
   const actTypeResult = extractActType(normalized, customAliases);
@@ -559,11 +595,19 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
     return null;
   }
 
+  // La Costituzione non ha numero né data: con l'uno o l'altra è un altro atto
+  // che le tabelle non conoscono ("l cost 1/2012"), e si rifiuta invece di
+  // indovinare.
+  if (actType === 'costituzione' && (actNumber || date)) {
+    return null;
+  }
+
   const parsed: ParsedCitation = {
     act_type: actType,
     act_number: actNumber,
     date: date,
     article: article,
+    ...(annex ? { annex } : {}),
     confidence: 0,
     fromAlias,
     aliasId,
@@ -603,12 +647,14 @@ export function toSearchParams(parsed: ParsedCitation): {
   act_number: string;
   date: string;
   article: string;
+  annex?: string;
 } {
   return {
     act_type: parsed.act_type || '',
     act_number: parsed.act_number || '',
     date: parsed.date || '',
     article: parsed.article || '',
+    ...(parsed.annex ? { annex: parsed.annex } : {}),
   };
 }
 
