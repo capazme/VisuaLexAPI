@@ -219,37 +219,6 @@ def parse_date(input_date):
         logging.error("Invalid date format")
         raise ValueError("Formato data non valido")
 
-def format_date_to_extended(input_date):
-    """
-    Converts a date string in the format YYYY-MM-DD to its extended format in Italian.
-    
-    Arguments:
-    input_date -- The input date string in the format YYYY-MM-DD
-    
-    Returns:
-    str -- The date in extended format (e.g., "12 settembre 2024") or raises ValueError if invalid
-    """
-    logging.debug(f"Formatting date: {input_date}")
-
-    month_map = {
-        "01": "gennaio", "02": "febbraio", "03": "marzo", "04": "aprile",
-        "05": "maggio", "06": "giugno", "07": "luglio", "08": "agosto",
-        "09": "settembre", "10": "ottobre", "11": "novembre", "12": "dicembre"
-    }
-
-    try:
-        # Controlla il formato della data e prova a fare il parsing
-        date_obj = datetime.datetime.strptime(input_date, "%Y-%m-%d")
-        day = date_obj.day
-        month = month_map[date_obj.strftime("%m")]
-        year = date_obj.year
-        extended_date = f"{day} {month} {year}"
-        logging.debug(f"Extended format date: {extended_date}")
-        return extended_date
-    except ValueError:
-        logging.error("Invalid date format")
-        raise ValueError("Formato data non valido")
-
 def normalize_act_type(input_type, search=False, source='normattiva'):
     """
     Normalizes the type of legislative act based on the input.

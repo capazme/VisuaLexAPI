@@ -158,7 +158,8 @@ async def complete_year(act_type: str, year: str, act_number) -> str:
     """
     kind = normalize_act_type(act_type).strip().lower().replace(" ", ".")
     number = str(act_number or "").strip()
-    if kind not in _TITLES or not number.isdigit() or not re.fullmatch(r"[0-9]{4}", year):
+    # ASCII digits only: "²".isdigit() is true and int("²") is not.
+    if kind not in _TITLES or not re.fullmatch(r"[0-9]{1,6}", number) or not re.fullmatch(r"[0-9]{4}", year):
         return year
     urn = f"urn:nir:stato:{kind}:{year};{int(number)}"
     try:

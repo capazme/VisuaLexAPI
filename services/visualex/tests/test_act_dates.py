@@ -377,6 +377,8 @@ class TestCompleteYear:
         ("regolamento ue", "2016", "679"),
         ("decreto legislativo", "2001", "231-bis"),       # not plain digits
         ("decreto legislativo", "2001", ""),
+        ("decreto legislativo", "2001", "²"),             # isdigit() says yes, int() says no
+        ("decreto legislativo", "2001", "1234567"),       # longer than any act number
         ("decreto legislativo", "01", "231"),             # not a year
     ])
     async def test_what_cannot_be_told_keeps_the_year_without_a_request(self, cache, act_type, year, number):
@@ -446,3 +448,28 @@ class TestTheNormBuiltFromAYear:
         response = await client.post("/fetch_norma_data", json={
             "act_type": "legge", "act_number": "241", "date": "7 agostissimo 1990", "article": "2"})
         assert response.status_code == 400
+
+
+class TestTheApiTwinBuildsTheNorm:
+    """The /api server (visualex_api/app.py) shares the date step. It used to spell a completed
+    date in words, which Norma refuses: every act of the five looked-up types was a 500."""
+
+    async def _norm(self, data, lookup=AsyncMock(return_value="2001-06-08")):
+        from visualex_api.app import NormaController as ApiController
+
+        with patch("visualex_api.tools.urngenerator.complete_year", new=lookup):
+            return await ApiController().create_norma_visitata_from_data({**data, "annex": ""})
+
+    async def test_a_year_gets_the_acts_own_day(self):
+        [nv] = await self._norm({"act_type": "decreto legislativo", "act_number": "231", "date": "2001", "article": "5"})
+        assert nv.norma.data == "2001-06-08"
+
+    @pytest.mark.parametrize("data,expected", [
+        ({"act_type": "legge", "act_number": "241", "date": "1990-08-07", "article": "2"}, "1990-08-07"),
+        ({"act_type": "codice civile", "article": "2043"}, "1942-03-16"),
+        ({"act_type": "regolamento ue", "act_number": "679", "date": "2016", "article": "5"}, "2016"),
+    ])
+    async def test_other_dates_build_too(self, data, expected):
+        lookup = AsyncMock(return_value="2016")
+        [nv] = await self._norm(data, lookup)
+        assert nv.norma.data == expected
