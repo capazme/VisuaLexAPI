@@ -374,6 +374,26 @@
   color: color-mix(in srgb, currentColor 62%, transparent);
 }
 
+/* Find in the text: painted through the CSS Custom Highlight API
+   (utils/findHighlights.ts), so the text nodes are never touched. */
+:root {
+  --vlx-find-bg: hsl(43 96% 56% / 0.3);
+  --vlx-find-current-bg: hsl(43 96% 56%);
+  --vlx-find-current-fg: hsl(24 80% 14%);
+}
+.dark {
+  --vlx-find-bg: hsl(43 96% 56% / 0.28);
+  --vlx-find-current-bg: hsl(43 96% 56%);
+  --vlx-find-current-fg: hsl(24 80% 14%);
+}
+::highlight(vlx-find) {
+  background-color: var(--vlx-find-bg);
+}
+::highlight(vlx-find-current) {
+  background-color: var(--vlx-find-current-bg);
+  color: var(--vlx-find-current-fg);
+}
+
 /* Hidden, not removed: hidden text still counts in the offsets. */
 .vlx-hide-header .vlx-heading,
 .vlx-hide-header .vlx-rubrica,
