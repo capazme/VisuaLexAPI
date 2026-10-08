@@ -193,7 +193,7 @@ All on 2026-10-05 unless stated.
 | N13 | **Labels come only from `utils/decisionLinks.ts`** (`formatDecisionCitation`, `formatDecisionHeading`, and the short form of convention §4.2). | Convention §6: no second decision module. |
 | N14 | **The Cassazione's text is read from the court's original PDF**, cleaned of page furniture by position and repetition, with the archive's text field as a declared fallback (the notice `testo_da_archivio`, §11). This happens before N10 freezes the text, so the frozen text is the cleaned one (§11). | Answer 43 (1a): about a third of the field's texts are cut short, some without their dispositivo. |
 | N15 | **The decisions on an article come from the Cassazione's index of cited norms** (`rnc-*`), re-checked per decision on the server because the index's fields are parallel lists; the text search stays for topics, for acts the index cannot express, and as a switch («Nel testo») (§5.2). | Answer 43 (1d): 3,904 decisions against 939 for art. 2043 c.c., and a citation the court indexed, not a word found. |
-| N16 | **«Scarica PDF»**: a PDF made in the browser (jsPDF, as the dossier's), headed by the citation, with the text in its blocks and paragraphs, the source and the day it was consulted at the foot, no licence line, and an option with the user's highlights and notes (§12.1). | Answer 44 (2a). |
+| N16 | **«Scarica PDF»**: a PDF made in the browser (jsPDF, as the dossier's), headed by the citation, with the text in its blocks and paragraphs, the source and the day it was consulted at the foot, the Corte costituzionale's licence (none for the Cassazione), and an option with the user's highlights and notes (§12.1). | Answer 44 (2a). |
 | N17 | **«PDF originale della Corte»** for the Cassazione, served by VisuaLex behind the login from the cache §11 fills (§12.2). | Answer 44 (2b): a direct link to Italgiure does not work outside the archive's session. |
 
 ## Detailed design
@@ -676,8 +676,8 @@ labels them by the decision's short form instead of the raw key.
 
 **The caution: VisuaLex never spreads words a court has withdrawn.** A note or
 highlight on a decision travels only if it still lands in the decision's
-current text. When an environment is created or published, or an item is
-offered to the Forum, each anchor keyed by a decision is checked with
+current text. When an environment is exported to a file or a link, or published
+or offered to the Forum, each anchor keyed by a decision is checked with
 `resolveAnchors` against the decision's text fetched now (through the session
 cache); one that does not land — the text was obscured, anonymised or is
 missing — is left out, and so is every anchor of a decision that cannot be
@@ -686,7 +686,9 @@ server's cached copy (up to 30 days, the owner's choice), so words a court has
 withdrawn can still travel until it expires. The
 dialog says how many were left out and why («2 evidenziazioni su sentenze non
 incluse: il loro testo non è più presente nella fonte»). The anchors stay in
-the user's own account, in §8.4's box. A test covers each case: a landing
+the user's own account, in §8.4's box. A private environment (created, updated
+or refreshed from the account's own state) stays in the account and keeps every
+anchor (the owner, 8 Oct). A test covers each case: a landing
 anchor travels; an anchor on an obscured decision, one whose words changed, and
 one on a decision that cannot be fetched do not; the count is shown.
 
@@ -843,9 +845,10 @@ PDF (`DossierDetailView`), with the same typeface and margins:
 - the text in its blocks («Epigrafe», «Motivazione», «Dispositivo», or «Testo»)
   and paragraphs, the characters of the screen;
 - at the foot of the last page: «Fonte: <source name> · consultata il <day>»
-  (the day the text was read, `todayInRome`), and no licence line, for the
-  Corte costituzionale too (the owner's decision for the dossier, «sì togli
-  anche quella»);
+  (the day the text was read, `todayInRome`), and, for the Corte
+  costituzionale only, «· licenza <licence of the source>» (e.g. CC BY-SA 3.0)
+  after the source name (the owner, 8 Oct, superseding the earlier «no
+  licence line»); the Cassazione's PDF and the page carry none;
 - an option «Con le mie evidenziazioni e note»: highlights printed as marked
   passages, notes after the paragraph they anchor to, the unmatched ones of
   §8.4 listed at the end under their heading.
@@ -891,7 +894,7 @@ like the lookup) and caches them. Answers `application/pdf` with
 
 ## Verification
 
-- Web: «Scarica PDF» (heading, blocks, source line, no licence line, the
+- Web: «Scarica PDF» (heading, blocks, source line, the Corte costituzionale's licence, the
   option with highlights) and «PDF originale della Corte»; the palette parser's golden cases; the store actions (open, focus, place
   beside, drain the queue once under StrictMode); `DecisionView`'s outcomes
   (moved tests of `DecisionPage.test.tsx`); `decisionRender.test.ts` (§8.5);

@@ -207,8 +207,8 @@ No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRende
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
 `decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks
 that the rendered text nodes spell the projection (root rule 23). The .txt export of notes and
-highlights is shared with the article (`utils/annotationExport.ts`). Only three things
-that leave the account carry just the anchors whose words are still in the decision's text: an
+highlights is shared with the article (`utils/annotationExport.ts`). Only what really
+leaves the account carries just the anchors whose words are still in the decision's text: an
 environment's export file, its share link and the Forum (publishing, editing, suggestions), through
 `utils/decisionAnchorsTravel.ts` (`travellingAnchors`, `travellingSelection`): «the decision's
 current text» is the server's cached copy (up to 30 days, the owner's choice), so words a court
@@ -218,10 +218,12 @@ a note that quotes words (a note without a quote is free). The decision download
 highlights .txt, an environment's file and a dossier's JSON go through `utils/saveBlob.ts` (the
 object URL is revoked later, not at once); a few older exports still make their own link. `DecisionTextView` renders a
 found decision only for a host that mounts `DecisionView` without the reading surface; the
-workspace tab always passes the surface. The personal files
-are not filtered: the .txt export and the PDF «Con le mie evidenziazioni e note» list the anchors
-that no longer land (the PDF under «Non ritrovate nel testo attuale»), pending the owner's answer
-on whether they should.
+workspace tab always passes the surface. A private
+environment save (create, create from a selection, update, refresh) stays in the account and keeps
+every anchor, decisions included (the owner, 8 Oct 2026). The personal files are not filtered
+either: the .txt export and the PDF «Con le mie evidenziazioni e note» list the anchors that no
+longer land (the PDF under «Non ritrovate nel testo attuale»), like the account export — the user's
+own data (decided by the owner, 8 Oct 2026).
 **Downloads** (`DecisionDownloads`, among `DecisionView`'s actions for a found decision):
 «Scarica PDF» is a PDF of ours (`decisionPdf.ts`: `decisionPdfModel` is pure,
 `writeDecisionPdf` draws it with jsPDF through `utils/pdfWriter.ts`, the page layout the
@@ -229,7 +231,9 @@ dossier's PDF shares), optionally «Con le mie evidenziazioni e note» (placed b
 over the same projection; free notes follow the text; anchors that no longer land are listed under
 «Non ritrovate nel testo attuale», switchable with the `includeUnmatched` option of
 `decisionPdfModel`); «PDF originale della Corte», for the Cassazione only, is the court's own file
-through `/fetch_decision_pdf` (`services/decisionPdfService.ts`, via `legalFetch`).
+through `/fetch_decision_pdf` (`services/decisionPdfService.ts`, via `legalFetch`). The footer of
+the Corte costituzionale's PDF adds «· licenza <fonte.licenza>» (e.g. CC BY-SA 3.0); the
+Cassazione's PDF and the page (`DecisionView` footer) carry no licence line (the owner, 8 Oct 2026).
 
 **A past text is a reading** (round "Testo alla data", spec
 `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`). The server

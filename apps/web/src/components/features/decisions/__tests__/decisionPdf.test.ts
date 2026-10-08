@@ -30,10 +30,14 @@ describe('decisionPdfModel', () => {
     expect(m.fileName).toBe('Cass_civ_sez_III_n_99999_2024.pdf');
   });
 
-  it('never writes a licence line, for the Corte costituzionale too', () => {
+  it('the Corte costituzionale PDF carries the licence in its footer; the Cassazione PDF never does', () => {
     const cc = { ...FOUND, identita: { corte: 'corte_costituzionale', numero: 71, anno: 2020 }, fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'CC BY-SA 3.0' } };
     const m = decisionPdfModel(cc as never, { consultedOn: '2026-10-05' });
-    expect(JSON.stringify(m)).not.toMatch(/CC BY|licenz/i);
+    expect(m.footer).toBe('Fonte: Corte costituzionale — dati aperti · licenza CC BY-SA 3.0 · consultata il 5 ottobre 2026');
+    const ccNoLicence = { ...cc, fonte: { nome: 'Corte costituzionale — dati aperti' } };
+    expect(decisionPdfModel(ccNoLicence as never, { consultedOn: '2026-10-05' }).footer).not.toMatch(/licenza/);
+    const cass = { ...FOUND, fonte: { ...FOUND.fonte, licenza: 'x' } };
+    expect(JSON.stringify(decisionPdfModel(cass as never, { consultedOn: '2026-10-05' }))).not.toMatch(/licenz/i);
   });
 
   it('prints the notices, the archive fallback included', () => {

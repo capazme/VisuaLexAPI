@@ -32,27 +32,28 @@ beforeEach(() => {
   });
 });
 
-describe('environments: words a court withdrew never leave the account', () => {
-  it('createEnvironment from the current state sends only what still stands, and says so', async () => {
+describe('environments: a private save keeps every anchor (owner, 8 Oct)', () => {
+  it('createEnvironment from the current state keeps the decision anchors the source cannot serve', async () => {
     await appStore.getState().createEnvironment('Prova', { fromCurrent: true });
-    expect(sent('create').annotations.map((a) => a.id)).toEqual(['n-art']);
-    expect(sent('create').highlights.map((h) => h.id)).toEqual(['h-art']);
-    expect(appStore.getState().lastSyncError?.message).toMatch(/1 nota e 1 evidenziazione su sentenze non incluse/);
+    expect(sent('create').annotations.map((a) => a.id)).toEqual(['n-dec', 'n-art']);
+    expect(sent('create').highlights.map((h) => h.id)).toEqual(['h-dec', 'h-art']);
+    expect(appStore.getState().lastSyncError).toBeNull();
+    expect(fetchDecisionCached).not.toHaveBeenCalled();
   });
 
-  it('createEnvironmentWithSelection filters the selected anchors the same way', async () => {
+  it('createEnvironmentWithSelection keeps the selected anchors', async () => {
     await appStore.getState().createEnvironmentWithSelection('Prova', {
       dossierIds: [], quickNormIds: [], aliasIds: [], annotationIds: ['n-dec', 'n-art'], highlightIds: ['h-dec', 'h-art'],
     });
-    expect(sent('create').annotations.map((a) => a.id)).toEqual(['n-art']);
-    expect(sent('create').highlights.map((h) => h.id)).toEqual(['h-art']);
-    expect(appStore.getState().lastSyncError?.message).toMatch(/non incluse/);
+    expect(sent('create').annotations.map((a) => a.id)).toEqual(['n-dec', 'n-art']);
+    expect(sent('create').highlights.map((h) => h.id)).toEqual(['h-dec', 'h-art']);
+    expect(appStore.getState().lastSyncError).toBeNull();
   });
 
-  it('updateEnvironment filters the snapshot it ships', async () => {
+  it('updateEnvironment ships the snapshot whole', async () => {
     appStore.setState({ environments: [{ id: 'e1', name: 'A', createdAt: '', dossiers: [], quickNorms: [], customAliases: [], annotations: [], highlights: [] }] as never });
     await appStore.getState().updateEnvironment('e1', { annotations: [decisionNote, articleNote], highlights: [decisionHighlight, articleHighlight] });
-    expect(sent('update').annotations.map((a) => a.id)).toEqual(['n-art']);
-    expect(sent('update').highlights.map((h) => h.id)).toEqual(['h-art']);
+    expect(sent('update').annotations.map((a) => a.id)).toEqual(['n-dec', 'n-art']);
+    expect(sent('update').highlights.map((h) => h.id)).toEqual(['h-dec', 'h-art']);
   });
 });

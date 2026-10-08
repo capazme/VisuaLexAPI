@@ -149,8 +149,8 @@ function FoundView({ answer, onToast, actions, textSlot }: {
       {hasDecisionText(answer.testo)
         ? (textSlot ?? <DecisionTextView testo={answer.testo} />)
         : <DecisionAnchorsWithoutText identity={answer.identita} />}
-      {/* No licence line (the owner's decision, confirmed on 2026-10-04): fonte.licenza stays in
-          the data. */}
+      {/* The page carries no licence line; the Corte costituzionale's PDF does (owner, 8 Oct
+          2026): fonte.licenza stays in the data and goes into that footer. */}
       <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         Fonte: {answer.fonte.nome}
       </footer>

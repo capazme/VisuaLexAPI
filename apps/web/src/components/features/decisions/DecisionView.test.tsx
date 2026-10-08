@@ -155,7 +155,7 @@ describe('DecisionView', () => {
     view(CONSULTA);
     expect(screen.getByRole('link', { name: /Apri sulla fonte/ }))
       .toHaveAttribute('href', 'https://www.cortecostituzionale.it/scheda-pronuncia/2014/1');
-    // the owner, 2026-10-04: no licence line; fonte.licenza stays in the data
+    // the owner, 8 Oct 2026: the page has no licence line (only the Corte costituzionale's PDF does)
     expect(screen.getByText('Fonte: Corte costituzionale — dati aperti')).toBeInTheDocument();
     expect(screen.queryByText(/licenza|CC BY-SA/i)).toBeNull();
   });

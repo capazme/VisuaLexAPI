@@ -3,7 +3,8 @@
  * and how it is drawn (`writeDecisionPdf`). The reader's highlights and notes are optional. They
  * are placed with the same `resolveAnchors` over the same projection the reading surface uses
  * (root rule 23), so a mark lands in the PDF exactly where it lands on screen; those that do not
- * land are listed at the end, never dropped. No licence line, as on the page.
+ * land are listed at the end, never dropped. The Corte costituzionale's PDF carries its licence in the footer (owner, 8 Oct
+ * 2026); the Cassazione's PDF and the page do not.
  */
 import { jsPDF } from 'jspdf';
 import type { Annotation, Highlight } from '../../../types';
@@ -46,8 +47,8 @@ export interface DecisionPdfOptions {
   consultedOn: string;
   /**
    * Whether the anchors whose words the court withdrew are listed under «Non ritrovate nel testo
-   * attuale». The owner has not yet answered whether a personal export lists them (asked 7 Oct
-   * 2026): this default is the one place that answer changes. Built per the design: listed.
+   * attuale». Decided (owner, 8 Oct 2026): a personal export lists them, like the account export;
+   * the default stays true.
    */
   includeUnmatched?: boolean;
 }
@@ -113,6 +114,8 @@ export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOpti
       }),
     }));
 
+  const licence = identita.corte === 'corte_costituzionale' && answer.fonte.licenza ? ` · licenza ${answer.fonte.licenza}` : '';
+
   const lost = annotations && includeUnmatched ? unmatchedAnchors(testo, highlights, notes) : { highlights: [], annotations: [] };
   const unmatched = [
     ...lost.highlights.map((h) => `«${h.text}»`),
@@ -126,7 +129,7 @@ export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOpti
     blocks,
     freeNotes: annotations ? notes.filter((n) => !isAnchoredNote(n)).map((n) => n.text) : [],
     unmatched,
-    footer: `Fonte: ${answer.fonte.nome} · consultata ${withPreposition('il', formatDateItalianLong(consultedOn))}`,
+    footer: `Fonte: ${answer.fonte.nome}${licence} · consultata ${withPreposition('il', formatDateItalianLong(consultedOn))}`,
     fileName: decisionFileName(identita, attributi),
   };
 }
