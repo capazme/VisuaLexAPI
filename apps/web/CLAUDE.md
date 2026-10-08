@@ -7,6 +7,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 ### Frontend (`apps/web/src`)
 
 - `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
+  `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
+  `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on, which
+  also hides the Sidebar's «Studia»; `/studia` redirects to `schede`),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an

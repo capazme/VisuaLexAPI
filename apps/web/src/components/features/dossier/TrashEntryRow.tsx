@@ -19,7 +19,7 @@ interface Props {
 
 function titleOf(entry: TrashEntry, showSource: boolean): string {
   if (entry.kind === 'DOSSIER') return `Dossier «${entry.label}»`;
-  if (entry.kind === 'LINGO_CARDS') return entry.itemCount === 1 ? 'Scheda LingoLex' : `Schede LingoLex (${entry.itemCount})`;
+  if (entry.kind === 'LINGO_CARDS') return entry.itemCount === 1 ? 'Scheda di studio' : `Schede di studio (${entry.itemCount})`;
   return showSource ? `Da «${entry.label}»` : (entry.itemCount === 1 ? '1 elemento' : `${entry.itemCount} elementi`);
 }
 

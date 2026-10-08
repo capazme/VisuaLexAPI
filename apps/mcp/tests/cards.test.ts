@@ -57,6 +57,22 @@ const CARD = {
   ancore: [{ riferimento: 'art. 1453 c.c.' }],
 };
 
+describe('the card tools\' words', () => {
+  it('say VisuaLex Studia, never LingoLex, in what the user and the model read', async () => {
+    const client = await connect();
+    const tools = (await client.listTools()).tools.filter((t) => t.name.startsWith('lingolex_'));
+    expect(tools.map((t) => t.title)).toEqual([
+      'Come si scrive una scheda di VisuaLex Studia',
+      'Salva schede di VisuaLex Studia',
+      'Le mie schede di VisuaLex Studia',
+      'Elimina schede di VisuaLex Studia',
+    ]);
+    for (const tool of tools) expect(`${tool.title} ${tool.description}`).not.toMatch(/LingoLex/);
+    expect(text(await client.callTool({ name: 'lingolex_schema_card', arguments: {} }))).not.toMatch(/LingoLex/);
+    await client.close();
+  });
+});
+
 describe('lingolex_schema_card', () => {
   it('explains the card and the anchoring rules, and calls nothing', async () => {
     const client = await connect();
@@ -115,7 +131,7 @@ describe('lingolex_elimina_card', () => {
   it('asks, naming each card by its subject, state and date only — never by text someone wrote', async () => {
     const client = await connect();
     const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1a2b3c4-0000-4000-8000-000000000001'] } });
-    expect(asked[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 scheda LingoLex\?/);
+    expect(asked[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino 1 scheda di VisuaLex Studia\?/);
     // Told apart by what the server derived from a verified reference (the primary anchor) and the id's start (security review of PR 5, I1).
     expect(asked[0]).toContain('- Scheda di diritto civile su art. 1453, codice civile, bozza, creata il 5 ottobre 2026 (k1a2b3c4)');
     expect(asked[0]).not.toMatch(/premi Accept|Ignora tutto/);

@@ -13,6 +13,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ConnectPage } from './features/connections';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
+import { isStudiaEnabled } from './features/studia/featureFlag';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
 import { lazy, Suspense } from 'react';
@@ -28,6 +29,13 @@ const ContribPage = lazy(() =>
 );
 const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
+);
+
+const StudiaPage = lazy(() =>
+  import('./components/features/studia/StudiaPage').then(m => ({ default: m.StudiaPage })),
+);
+const MyCardsView = lazy(() =>
+  import('./components/features/studia/MyCardsView').then(m => ({ default: m.MyCardsView })),
 );
 
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
@@ -119,6 +127,21 @@ function App() {
               </Suspense>
             }
           />
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the cards (PR C will open the review). */}
+          {isStudiaEnabled() && (
+            <Route
+              path="studia"
+              element={
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <StudiaPage />
+                </Suspense>
+              }
+            >
+              <Route index element={<Navigate to="schede" replace />} />
+              <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+              <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+            </Route>
+          )}
           <Route path="sentenze" element={<DecisionAddress />} />
           <Route path="sentenze/:corte/:numero/:anno" element={<DecisionAddress />} />
           {/* Global 404 catch-all (inside the layout: sidebar stays visible) */}

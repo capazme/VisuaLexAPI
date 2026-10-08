@@ -2,8 +2,9 @@ import { formatDateForCitation, todayInRome, withPreposition } from '../../../ut
 
 /**
  * What a trash entry holds, in one line, and when it goes. The trash keeps
- * what a connected application deleted (MCP second round, spec §4.3); the
- * entries' shape was agreed with the dossier round (`items`, `cards`).
+ * what a connected application deleted (MCP second round, spec §4.3) and the
+ * study cards the user removed in the web app; the entries' shape was agreed
+ * with the dossier round (`items`, `cards`).
  */
 
 export interface TrashItemSummary {
@@ -69,9 +70,12 @@ export function trashCardsSummary(cards: TrashCardSummary[], max = 3): string {
 // The day in Rome, as the rest of the app reads a day.
 const romeDay = (iso: string) => todayInRome(new Date(iso));
 
-/** «Rimosso da Claude Code il 4 ottobre 2026 · resta nel cestino fino al 3 novembre 2026». */
-export function trashWhen(entry: { clientName: string | null; deletedAt: string; expiresAt: string }): string {
-  const who = entry.clientName?.trim() || "un'applicazione collegata";
+/**
+ * «Rimosso da Claude Code il 4 ottobre 2026 · resta nel cestino fino al 3 novembre 2026»;
+ * «Rimosso da te …» for what the user moved from the web app (`byApplication` false).
+ */
+export function trashWhen(entry: { clientName: string | null; byApplication: boolean; deletedAt: string; expiresAt: string }): string {
+  const who = entry.byApplication ? entry.clientName?.trim() || "un'applicazione collegata" : 'te';
   const deleted = withPreposition('il', formatDateForCitation(romeDay(entry.deletedAt)));
   const until = withPreposition('al', formatDateForCitation(romeDay(entry.expiresAt)));
   return `Rimosso da ${who} ${deleted} · resta nel cestino fino ${until}`;

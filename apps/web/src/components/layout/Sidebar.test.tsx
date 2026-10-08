@@ -116,3 +116,23 @@ describe('Sidebar — MERL-T graph entry (Slice 4 Decision A)', () => {
     expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
   });
 });
+
+describe('Sidebar — Studia entry', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('links to /studia by default, after Dossier', () => {
+    renderSidebar();
+    const links = screen.getAllByRole('link');
+    const studia = screen.getByRole('link', { name: /Studia/ });
+    expect(studia).toHaveAttribute('href', '/studia');
+    expect(links.indexOf(studia)).toBe(links.indexOf(screen.getByRole('link', { name: /Dossier/ })) + 1);
+  });
+
+  it('hides the entry when VITE_FEATURE_STUDIA is off', () => {
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    renderSidebar();
+    expect(screen.queryByRole('link', { name: /Studia/ })).not.toBeInTheDocument();
+  });
+});

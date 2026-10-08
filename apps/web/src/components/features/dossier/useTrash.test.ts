@@ -14,7 +14,7 @@ import type { TrashEntry } from '../../../services/trashService';
 
 const entry = (over: Partial<TrashEntry> = {}): TrashEntry => ({
   id: 't1', kind: 'DOSSIER_ITEMS', dossierId: 'd1', label: 'Prova', itemCount: 1,
-  items: [{ itemType: 'note', citation: null, actCitation: null }], clientName: 'Claude Code',
+  items: [{ itemType: 'note', citation: null, actCitation: null }], clientName: 'Claude Code', byApplication: true,
   deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z', ...over,
 });
 

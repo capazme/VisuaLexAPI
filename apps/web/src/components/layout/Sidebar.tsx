@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard, FileSearch, Gavel, Scale, Network } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard, FileSearch, Gavel, Scale, Network, GraduationCap } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
+import { isStudiaEnabled } from '../../features/studia/featureFlag';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '../../hooks/useAuth';
@@ -280,6 +281,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       <nav id="tour-sidebar" className="flex-1 flex flex-col items-center py-4 gap-3 md:gap-2">
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
+        {isStudiaEnabled() && (
+          <NavItem to="/studia" icon={GraduationCap} label="Studia" id="tour-nav-studia" onClick={closeMobile} />
+        )}
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />

@@ -8,7 +8,7 @@ const trash = (entries: TrashEntry[] | null, error: string | null = null) => ({
 });
 const entry: TrashEntry = {
   id: 't3', kind: 'DOSSIER', dossierId: 'd9', label: 'Vecchia pratica', itemCount: 2,
-  clientName: 'Claude Code', deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z',
+  clientName: 'Claude Code', byApplication: true, deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z',
 };
 
 describe('TrashPage', () => {

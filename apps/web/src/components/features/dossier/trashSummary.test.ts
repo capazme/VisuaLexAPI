@@ -39,9 +39,11 @@ describe('trashCardsSummary', () => {
 
 describe('trashWhen', () => {
   it('says who removed it, when, and until when it stays', () => {
-    expect(trashWhen({ clientName: 'Claude Code', deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z' }))
+    expect(trashWhen({ clientName: 'Claude Code', byApplication: true, deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z' }))
       .toBe('Rimosso da Claude Code il 4 ottobre 2026 · resta nel cestino fino al 3 novembre 2026');
-    expect(trashWhen({ clientName: null, deletedAt: '2026-10-01T10:00:00Z', expiresAt: '2026-10-31T10:00:00Z' }))
+    expect(trashWhen({ clientName: null, byApplication: true, deletedAt: '2026-10-01T10:00:00Z', expiresAt: '2026-10-31T10:00:00Z' }))
       .toBe("Rimosso da un'applicazione collegata il 1° ottobre 2026 · resta nel cestino fino al 31 ottobre 2026");
+    expect(trashWhen({ clientName: null, byApplication: false, deletedAt: '2026-10-01T10:00:00Z', expiresAt: '2026-10-31T10:00:00Z' }))
+      .toBe('Rimosso da te il 1° ottobre 2026 · resta nel cestino fino al 31 ottobre 2026');
   });
 });

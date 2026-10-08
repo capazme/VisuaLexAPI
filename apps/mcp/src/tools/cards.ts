@@ -45,7 +45,7 @@ const STATO_WORDS: Record<string, string> = {
 };
 
 const SCHEMA_TEXT = [
-  'Una scheda di studio LingoLex ha questi campi:',
+  'Una scheda di studio di VisuaLex Studia ha questi campi:',
   `- materia (obbligatoria): ${MATERIE.join(', ')};`,
   '- istituto (obbligatorio, fino a 200 caratteri): l’istituto giuridico, es. «Risoluzione per inadempimento»;',
   `- tipo (facoltativo, ISTITUTO_DEFINIZIONE se manca): ${TIPI.join(', ')};`,
@@ -116,8 +116,8 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_schema_card',
     {
-      title: 'Come si scrive una scheda LingoLex',
-      description: 'La forma di una scheda di studio LingoLex e le regole delle ancore, da leggere prima di lingolex_salva_card.',
+      title: 'Come si scrive una scheda di VisuaLex Studia',
+      description: 'La forma di una scheda di studio di VisuaLex Studia e le regole delle ancore, da leggere prima di lingolex_salva_card.',
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -127,7 +127,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_salva_card',
     {
-      title: 'Salva schede LingoLex',
+      title: 'Salva schede di VisuaLex Studia',
       description:
         'Salva da 1 a 10 schede di studio come bozze personali dell’utente, con le ancore scritte a parole (vedi lingolex_schema_card). ' +
         'Ogni scheda ha il suo esito: creata, o rifiutata con il motivo e l’ancora che non si è potuta verificare.',
@@ -147,7 +147,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_le_mie_card',
     {
-      title: 'Le mie schede LingoLex',
+      title: 'Le mie schede di VisuaLex Studia',
       description: 'Le schede di studio dell’utente, le più recenti prima, filtrabili per materia e stato (50 per pagina).',
       inputSchema: {
         materia: z.enum(MATERIE).optional(),
@@ -169,7 +169,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
   server.registerTool(
     'lingolex_elimina_card',
     {
-      title: 'Elimina schede LingoLex',
+      title: 'Elimina schede di VisuaLex Studia',
       description:
         `Sposta nel cestino da 1 a 10 schede dell’utente (gli id da lingolex_le_mie_card), solo bozze o archiviate: una scheda proposta alla community non si elimina. ` +
         `Prima chiede conferma all’utente con una finestra che il modello non può compilare; le schede restano ripristinabili da VisuaLex per ${TRASH_DAYS} giorni.`,
