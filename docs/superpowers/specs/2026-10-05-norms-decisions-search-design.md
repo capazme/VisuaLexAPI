@@ -973,3 +973,6 @@ senso che l'admin può rimetterlo in chiaro)»; 7 «sì».
   disk, without the source).
 - Norms by topic: a VisuaLex glossary from Brocardi's dictionary (§6), or MERL-T's concept layer.
 - Notes and highlights in the dossier's decision reader (dossier PR 3).
+- **Before VisuaLex opens to the public** (the owner, 8 October): the server checks the words a
+  court withdrew when an environment is published to the Forum or shared by link. Today the check
+  is the web client's (§8.6) and the server stores that content as it receives it.
