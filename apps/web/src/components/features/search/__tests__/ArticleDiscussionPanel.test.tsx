@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ArticleDiscussionPanel } from '../ArticleDiscussionPanel';
 import { articleDiscussionService } from '../../../../services/articleDiscussionService';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../../types';
@@ -457,9 +457,15 @@ describe('ArticleDiscussionPanel', () => {
       target: { kind: 'decision', key: decisionAnchor.normaKey },
       ...over,
     });
-    const WITHHELD = 'Il passo citato non è più nel testo della decisione';
+    const WITHHELD = 'Il passo citato non è più nel testo della decisione.';
+    const IN_CHECK = /Il passo citato è in verifica/;
 
-    const renderPanel = async (thread: ArticleDiscussionThread, withhold = true) => {
+    const renderPanel = async (
+      thread: ArticleDiscussionThread,
+      withhold = true,
+      extra: { passageStates?: Record<string, 'exact' | 'moved' | 'detached'>; passageLoadError?: boolean; passageThreadsLoading?: boolean } = {},
+      titled = true,
+    ) => {
       vi.mocked(articleDiscussionService.list).mockResolvedValue({
         data: [thread],
         pagination: { page: 1, limit: 20, total: 1, pages: 1 },
@@ -471,9 +477,11 @@ describe('ArticleDiscussionPanel', () => {
           onClose={vi.fn()}
           passageStates={detachedStates}
           withholdDetachedPassage={withhold}
+          {...extra}
         />,
       );
-      await screen.findByText('Discussione sul risarcimento');
+      if (titled) await screen.findByText('Discussione sul risarcimento');
+      else await screen.findByRole('heading', { level: 4 });
     };
 
     it('shows another reader the sentence, not the quotation', async () => {
@@ -504,16 +512,75 @@ describe('ArticleDiscussionPanel', () => {
       expect(screen.getByText(/visibili a tutti/)).toBeInTheDocument();
     });
 
-    it('lets an admin release and hide again, optimistically', async () => {
+    it('lets an admin release and hide again, optimistically (before the server answers)', async () => {
       authState.isAdmin = true;
-      vi.mocked(articleDiscussionService.setPassageReleased).mockResolvedValue({ passageReleased: true });
+      let answer!: (value: { passageReleased: boolean }) => void;
+      vi.mocked(articleDiscussionService.setPassageReleased).mockReturnValueOnce(
+        new Promise((resolve) => { answer = resolve; }),
+      );
       await renderPanel(decisionThread());
       fireEvent.click(screen.getByRole('button', { name: 'Mostra a tutti' }));
-      expect(await screen.findByRole('button', { name: 'Nascondi di nuovo' })).toBeInTheDocument();
+      // the flip is on screen while the request is still pending
+      expect(screen.getByRole('button', { name: 'Nascondi di nuovo' })).toBeDisabled();
       expect(articleDiscussionService.setPassageReleased).toHaveBeenCalledWith('thread-p', true);
+      await act(async () => { answer({ passageReleased: true }); });
+      expect(screen.getByRole('button', { name: 'Nascondi di nuovo' })).toBeEnabled();
+
+      vi.mocked(articleDiscussionService.setPassageReleased).mockResolvedValueOnce({ passageReleased: false });
       fireEvent.click(screen.getByRole('button', { name: 'Nascondi di nuovo' }));
       expect(await screen.findByRole('button', { name: 'Mostra a tutti' })).toBeInTheDocument();
       expect(articleDiscussionService.setPassageReleased).toHaveBeenLastCalledWith('thread-p', false);
+    });
+
+    it('sends one request while one is pending, and keeps the server\'s answer', async () => {
+      authState.isAdmin = true;
+      let answer!: (value: { passageReleased: boolean }) => void;
+      vi.mocked(articleDiscussionService.setPassageReleased).mockReturnValueOnce(
+        new Promise((resolve) => { answer = resolve; }),
+      );
+      await renderPanel(decisionThread());
+      fireEvent.click(screen.getByRole('button', { name: 'Mostra a tutti' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Nascondi di nuovo' }));
+      expect(articleDiscussionService.setPassageReleased).toHaveBeenCalledTimes(1);
+      // the server says the passage is NOT released: that is what stays
+      await act(async () => { answer({ passageReleased: false }); });
+      expect(screen.getByRole('button', { name: 'Mostra a tutti' })).toBeEnabled();
+    });
+
+    it('withholds the quotation while the passage state is not known (fail closed)', async () => {
+      await renderPanel(decisionThread(), true, { passageStates: {} });
+      expect(screen.queryAllByText(/risarcimento del danno/)).toHaveLength(0);
+      expect(screen.getByText(IN_CHECK)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Mostra a tutti' })).not.toBeInTheDocument();
+    });
+
+    it('withholds the quotation when the passage summaries failed to load', async () => {
+      await renderPanel(decisionThread(), true, { passageStates: {}, passageLoadError: true });
+      expect(screen.queryAllByText(/risarcimento del danno/)).toHaveLength(0);
+      expect(screen.getByText(IN_CHECK)).toBeInTheDocument();
+    });
+
+    it('withholds the quotation while the passage summaries reload', async () => {
+      await renderPanel(decisionThread(), true, { passageStates: {}, passageThreadsLoading: true });
+      expect(screen.queryAllByText(/risarcimento del danno/)).toHaveLength(0);
+    });
+
+    it('still shows the author and a released quotation when the state is not known', async () => {
+      await renderPanel(decisionThread({ isOwner: true }), true, { passageStates: {} });
+      expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+    });
+
+    it('shows a located passage\'s quotation to another reader', async () => {
+      await renderPanel(decisionThread(), true, { passageStates: { 'thread-p': 'exact' } });
+      expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
+      expect(screen.queryByText(WITHHELD)).not.toBeInTheDocument();
+    });
+
+    it('does not use the quotation as the heading of an untitled thread whose words are withheld', async () => {
+      await renderPanel(decisionThread({ title: '' }), true, {}, false);
+      const heading = screen.getByRole('heading', { level: 4 });
+      expect(heading).toHaveTextContent('Discussione su un passo non più nel testo');
+      expect(screen.queryAllByText(/risarcimento del danno/)).toHaveLength(0);
     });
 
     it('reverts and says so when the server refuses', async () => {

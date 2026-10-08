@@ -88,6 +88,7 @@ export function ArticleDiscussionPanel({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [releasing, setReleasing] = useState<Set<string>>(new Set());
 
   // Focus tracking state (derive during render when focusThreadId prop changes)
   const [prevFocusThreadId, setPrevFocusThreadId] = useState<string | null | undefined>(undefined);
@@ -245,15 +246,29 @@ export function ArticleDiscussionPanel({
   };
 
   // Admin only, optimistic: flip `passageReleased` at once, put it back if the server refuses.
+  // One request per thread at a time (the button is disabled meanwhile), and what stays is the
+  // server's answer.
   const setPassageReleased = async (threadId: string, released: boolean) => {
+    if (releasing.has(threadId)) return;
     const patch = (value: boolean) =>
       setThreads(prev => prev.map(item => item.id === threadId ? { ...item, passageReleased: value } : item));
+    const busy = (on: boolean) =>
+      setReleasing(prev => {
+        const next = new Set(prev);
+        if (on) next.add(threadId);
+        else next.delete(threadId);
+        return next;
+      });
+    busy(true);
     patch(released);
     try {
-      await articleDiscussionService.setPassageReleased(threadId, released);
+      const answer = await articleDiscussionService.setPassageReleased(threadId, released);
+      patch(answer.passageReleased);
     } catch {
       patch(!released);
       setError('Impossibile aggiornare la visibilità del passo. Riprova.');
+    } finally {
+      busy(false);
     }
   };
 
@@ -393,14 +408,18 @@ export function ArticleDiscussionPanel({
             // quotation to everyone (spec §8.7's stated limit), and this panel withholds it
             // from readers who are neither the author nor an admin, unless an admin released it.
             // The caller decides whether it applies (a decision does, an article does not).
+            // Fails closed: until the passage is known to land in the text (loading, reloading,
+            // a failed load, a thread missing from the list) it is withheld like a detached one.
             const isPrivileged = thread.isOwner || isAdmin;
-            const quoteWithheld = withholdDetachedPassage && isDetached && !isPrivileged && !thread.passageReleased;
+            const quoteWithheld = withholdDetachedPassage && isPassage && !isLocated && !isPrivileged && !thread.passageReleased;
             const canRelease = withholdDetachedPassage && isDetached && isAdmin;
             const shownQuote = passage && !quoteWithheld ? truncateQuote(passage.quote) : null;
 
             const headingText =
               passage && !thread.title.trim()
-                ? (shownQuote !== null ? `«${shownQuote}»` : 'Discussione su un passo non più nel testo')
+                ? (shownQuote !== null
+                  ? `«${shownQuote}»`
+                  : isDetached ? 'Discussione su un passo non più nel testo' : 'Discussione su un passo')
                 : thread.title;
 
             return (
@@ -440,13 +459,17 @@ export function ArticleDiscussionPanel({
                   </button>
                 </div>
 
-                {isDetached && (
+                {(isDetached || quoteWithheld) && (
                   <div
                     role="note"
                     className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
                   >
                     {quoteWithheld ? (
-                      <p className="font-medium">Il passo citato non è più nel testo della decisione</p>
+                      <p className="font-medium">
+                        {isDetached
+                          ? 'Il passo citato non è più nel testo della decisione.'
+                          : 'Il passo citato è in verifica: le parole compaiono quando il testo è stato controllato.'}
+                      </p>
                     ) : (
                       <>
                         <p className="font-medium">
@@ -470,7 +493,9 @@ export function ArticleDiscussionPanel({
                       <button
                         type="button"
                         onClick={() => void setPassageReleased(thread.id, !thread.passageReleased)}
-                        className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-amber-300 px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                        disabled={releasing.has(thread.id)}
+                        aria-busy={releasing.has(thread.id)}
+                        className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-amber-300 px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/30"
                       >
                         {thread.passageReleased ? 'Nascondi di nuovo' : 'Mostra a tutti'}
                       </button>
