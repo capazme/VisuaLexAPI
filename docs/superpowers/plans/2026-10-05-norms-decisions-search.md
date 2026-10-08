@@ -2953,7 +2953,7 @@ Added 2026-10-07 (the owner: «… e commenti»; spec §8.7). After PR 4: it nee
 ### Task 29: A withdrawn passage is not quoted to others
 
 **Files:**
-- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (a decision thread whose passage is not located (`exact`/`moved`: detached, unknown, failed, or no text; it fails closed) shows «Il passo citato non è più nel testo della decisione» instead of the quotation, except to its author and to admins)
+- Modify: `apps/web/src/components/features/search/ArticleDiscussionPanel.tsx` (a decision thread whose passage is not located (`exact`/`moved`: detached, unknown, failed, or no text; it fails closed) withholds the quotation from everyone except its author and admins: a detached passage reads «Il passo citato non è più nel testo della decisione», one still being located «in verifica», one on a decision without text says the text is not available)
 - Modify: `ArticleDiscussionPanel.tsx` (admin only: on a decision thread whose passage is not located, «Mostra a tutti» / «Nascondi di nuovo» through the moderation route's `passageReleased`, Task 26; while released, every reader sees the quotation). The rule is the panel's: the API still returns the stored quotation (spec §8.7, the limit), and a comment says so.
 - Test: the panel cases (author, admin, other reader; released and not; the admin's two buttons).
 

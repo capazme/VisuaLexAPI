@@ -259,6 +259,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `passage_released_by` (the admin's id) on a decision thread with a passage.
   The API still returns the stored quotation. Deleting the releasing admin
   sets `passage_released_by` null and keeps the release (the CHECK allows it).
+  Every discussion route answers its 400s and 404s in Italian (`parseItalian`,
+  not the global handler's English prefix); moderation on a missing thread is a
+  404 «Discussione non trovata».
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing
@@ -324,7 +327,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades, except the community's study cards, which stay without an
-  author: see LingoLex cards). Reached from the Settings modal.
+  author: see LingoLex cards). Reached from the Settings modal. The export's
+  discussion threads keep a release's time but not the releasing admin's id.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
   (see Key API Endpoints).
