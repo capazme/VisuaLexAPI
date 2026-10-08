@@ -67,6 +67,19 @@ the update link, the "Ultimo aggiornamento" line and `div.bodyTesto` — wrapped
   31-12-2026"), version 2. The control that a closure announced for the future leaves the
   state `current` and keeps its end. CRLF kept.
 
+Trimmed captures of 2026-10-09, for the date of an act searched by its year
+(`services/act_dates.py` `complete_year`): the resolver's page for a year-only URN, kept to
+its `<title>` exactly as served (the only part the reader looks at), wrapped in
+`<html><head>`. Three requests, 3 s apart, with the honest User-Agent:
+
+- `resolver_dlgs231_2001_title_trimmed.html` — `urn:nir:stato:decreto.legislativo:2001;231`:
+  "DECRETO LEGISLATIVO 8 giugno 2001, n. 231". The portal's search, which the date used to
+  come from, listed «DECRETO LEGISLATIVO 31 Dicembre 2025, n. 210» first for this act.
+- `resolver_dlgs163_2006_title_trimmed.html` — `…:decreto.legislativo:2006;163`:
+  "DECRETO LEGISLATIVO 12 aprile 2006, n. 163" (the search listed «DECRETO 28 Giugno 2024,
+  n. 127» first).
+- `resolver_l241_1990_title_trimmed.html` — `…:legge:1990;241`: "LEGGE 7 agosto 1990, n. 241".
+
 The portal prints the end of the window as `<span class="indent">al: <span id="artFine" class="rosso">29-12-2007</span></span>`
 when the window has a start (the start is `<span id="artInizio" class="rosso">`, preceded by `&nbsp;`),
 and as the bare text `<span>Testo in vigore al: 12-9-2014</span>`, with no `id` and no `class`, when it has none.

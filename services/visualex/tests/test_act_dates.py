@@ -295,3 +295,181 @@ class TestRoute:
     async def test_bad_input_is_400(self, client):
         response = await client.post("/resolve_act_dates", json={"urns": "x"})
         assert response.status_code == 400
+
+
+# --- A search that names an act by its year (complete_year, complete_request_date) ------------
+#
+# Until 9 October 2026 the year was completed by `complete_date`, which typed the act into the
+# portal's search with Playwright and took the first hit unread: d.lgs. 231/2001 came back dated
+# 2025-12-31 and d.lgs. 163/2006 2024-06-28, other acts' days (live, 2 October).
+
+import asyncio  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from visualex_api.tools.urngenerator import complete_request_date  # noqa: E402
+
+FIXTURES = Path(__file__).parent / "fixtures" / "normattiva"
+
+
+def real_page(name):
+    """The resolver's page for the act, its <title> as Normattiva served it (9 Oct 2026)."""
+    return HttpResult(text=(FIXTURES / name).read_text(encoding="utf-8"), status=200, headers={})
+
+
+class TestCompleteYear:
+    @pytest.mark.parametrize("act_type,year,number,fixture,expected", [
+        ("decreto legislativo", "2001", "231", "resolver_dlgs231_2001_title_trimmed.html", "2001-06-08"),
+        ("decreto legislativo", "2006", "163", "resolver_dlgs163_2006_title_trimmed.html", "2006-04-12"),
+        ("legge", "1990", "241", "resolver_l241_1990_title_trimmed.html", "1990-08-07"),
+    ])
+    async def test_the_acts_own_page_gives_its_day(self, cache, act_type, year, number, fixture, expected):
+        request = AsyncMock(return_value=real_page(fixture))
+        with patch.object(act_dates.http_client, "request", new=request):
+            assert await act_dates.complete_year(act_type, year, number) == expected
+        assert request.await_count == 1
+
+    @pytest.mark.parametrize("act_type,urn", [
+        ("decreto legislativo", "urn:nir:stato:decreto.legislativo:2001;231"),
+        ("decreto legge", "urn:nir:stato:decreto.legge:2001;231"),
+        ("d.p.r.", "urn:nir:stato:decreto.del.presidente.della.repubblica:2001;231"),
+        ("decreto del presidente della repubblica", "urn:nir:stato:decreto.del.presidente.della.repubblica:2001;231"),
+        ("regio decreto", "urn:nir:stato:regio.decreto:2001;231"),
+        ("legge costituzionale", "urn:nir:stato:legge.costituzionale:2001;231"),
+        ("regio decreto legge", "urn:nir:stato:regio.decreto.legge:2001;231"),
+    ])
+    async def test_each_kind_asks_the_resolver_for_its_own_urn(self, cache, act_type, urn):
+        request = AsyncMock(return_value=HttpResult(text="<html></html>", status=200, headers={}))
+        with patch.object(act_dates.http_client, "request", new=request):
+            assert await act_dates.complete_year(act_type, "2001", "231") == "2001"
+        assert request.await_args.args[1] == act_dates.RESOLVER + urn
+
+    @pytest.mark.parametrize("year,number,title", [
+        # What the old search took first, live on 2 October: never its day.
+        ("2001", "231", "DECRETO LEGISLATIVO 31 Dicembre 2025, n. 210"),
+        ("2006", "163", "DECRETO 28 Giugno 2024, n. 127"),
+        # The same number in another year, the same year and number of another type.
+        ("2001", "231", "DECRETO LEGISLATIVO 8 giugno 2002, n. 231"),
+        ("2001", "231", "LEGGE 8 giugno 2001, n. 231"),
+    ])
+    async def test_another_acts_page_keeps_the_year(self, cache, year, number, title):
+        request = AsyncMock(return_value=ok_page(title))
+        with patch.object(act_dates.http_client, "request", new=request):
+            assert await act_dates.complete_year("decreto legislativo", year, number) == year
+        assert cache.data == {}
+
+    @pytest.mark.parametrize("failure", [NetworkError("down", status_code=503), RuntimeError("bug")])
+    async def test_a_failure_keeps_the_year(self, cache, failure):
+        with patch.object(act_dates.http_client, "request", new=AsyncMock(side_effect=failure)):
+            assert await act_dates.complete_year("decreto legislativo", "2001", "231") == "2001"
+
+    async def test_a_slow_lookup_keeps_the_year(self, cache, monkeypatch):
+        monkeypatch.setattr(act_dates, "LOOKUP_BUDGET", 0.05)
+
+        async def slow(*args, **kwargs):
+            await asyncio.sleep(5)
+
+        with patch.object(act_dates.http_client, "request", new=AsyncMock(side_effect=slow)):
+            assert await act_dates.complete_year("decreto legislativo", "2001", "231") == "2001"
+
+    @pytest.mark.parametrize("act_type,year,number", [
+        ("decreto ministeriale", "2014", "55"),            # a kind the titles do not cover
+        ("decreto legislativo luogotenenziale", "1945", "2"),
+        ("regolamento ue", "2016", "679"),
+        ("decreto legislativo", "2001", "231-bis"),       # not plain digits
+        ("decreto legislativo", "2001", ""),
+        ("decreto legislativo", "2001", "²"),             # isdigit() says yes, int() says no
+        ("decreto legislativo", "2001", "1234567"),       # longer than any act number
+        ("decreto legislativo", "01", "231"),             # not a year
+    ])
+    async def test_what_cannot_be_told_keeps_the_year_without_a_request(self, cache, act_type, year, number):
+        request = AsyncMock(side_effect=AssertionError("no request may be made"))
+        with patch.object(act_dates.http_client, "request", new=request):
+            assert await act_dates.complete_year(act_type, year, number) == year
+
+    async def test_a_day_found_once_needs_no_request(self, cache):
+        cache.data["urn:nir:stato:decreto.legislativo:2001;231"] = "urn:nir:stato:decreto.legislativo:2001-06-08;231"
+        request = AsyncMock(side_effect=AssertionError("no request may be made"))
+        with patch.object(act_dates.http_client, "request", new=request):
+            assert await act_dates.complete_year("decreto legislativo", "2001", "231") == "2001-06-08"
+
+
+class TestCompleteRequestDate:
+    NO_LOOKUP = AsyncMock(side_effect=AssertionError("no lookup may be made"))
+
+    @pytest.mark.parametrize("given", [None, "", "  "])
+    async def test_no_date_stays_no_date(self, given):
+        with patch("visualex_api.tools.urngenerator.complete_year", new=self.NO_LOOKUP):
+            assert await complete_request_date("legge", given, "241") is None
+
+    async def test_a_year_with_a_number_is_looked_up(self):
+        lookup = AsyncMock(return_value="2001-06-08")
+        with patch("visualex_api.tools.urngenerator.complete_year", new=lookup):
+            assert await complete_request_date("decreto legislativo", " 2001 ", "231") == "2001-06-08"
+        lookup.assert_awaited_once_with("decreto legislativo", "2001", "231")
+
+    async def test_a_year_without_a_number_stays_a_year(self):
+        # It was a 500 ("Formato data non valido") for the five spelled types.
+        with patch("visualex_api.tools.urngenerator.complete_year", new=self.NO_LOOKUP):
+            assert await complete_request_date("legge", "1990", None) == "1990"
+
+    @pytest.mark.parametrize("act_type,given,expected", [
+        ("legge", "1990-08-07", "1990-08-07"),
+        ("legge", "7 agosto 1990", "1990-08-07"),
+        ("decreto ministeriale", "10 marzo 2014", "10 marzo 2014"),
+    ])
+    async def test_a_full_date_is_never_looked_up(self, act_type, given, expected):
+        with patch("visualex_api.tools.urngenerator.complete_year", new=self.NO_LOOKUP):
+            assert await complete_request_date(act_type, given, "1") == expected
+
+    async def test_a_malformed_date_is_the_callers_error(self):
+        with pytest.raises(ValidationError):
+            await complete_request_date("legge", "31/02/1990x", "241")
+
+
+class TestTheNormBuiltFromAYear:
+    async def _norm(self, lookup, date="2001"):
+        controller = NormaController()
+        with patch("visualex_api.tools.urngenerator.complete_year", new=lookup), \
+                patch.object(controller, "_article_exists_in_tree", new=AsyncMock(return_value=True)):
+            return await controller.create_norma_visitata_from_data(
+                {"act_type": "decreto legislativo", "act_number": "231", "date": date, "article": "5", "annex": ""})
+
+    async def test_the_act_gets_its_own_day(self):
+        [nv] = await self._norm(AsyncMock(return_value="2001-06-08"))
+        assert nv.norma.data == "2001-06-08"
+        assert "decreto.legislativo:2001-06-08;231~art5" in nv.urn
+
+    async def test_an_act_that_cannot_be_told_keeps_its_year(self):
+        [nv] = await self._norm(AsyncMock(return_value="2001"))
+        assert nv.norma.data == "2001"
+        assert "2025-12-31" not in nv.urn
+
+    async def test_a_malformed_date_answers_400(self, client):
+        response = await client.post("/fetch_norma_data", json={
+            "act_type": "legge", "act_number": "241", "date": "7 agostissimo 1990", "article": "2"})
+        assert response.status_code == 400
+
+
+class TestTheApiTwinBuildsTheNorm:
+    """The /api server (visualex_api/app.py) shares the date step. It used to spell a completed
+    date in words, which Norma refuses: every act of the five looked-up types was a 500."""
+
+    async def _norm(self, data, lookup=AsyncMock(return_value="2001-06-08")):
+        from visualex_api.app import NormaController as ApiController
+
+        with patch("visualex_api.tools.urngenerator.complete_year", new=lookup):
+            return await ApiController().create_norma_visitata_from_data({**data, "annex": ""})
+
+    async def test_a_year_gets_the_acts_own_day(self):
+        [nv] = await self._norm({"act_type": "decreto legislativo", "act_number": "231", "date": "2001", "article": "5"})
+        assert nv.norma.data == "2001-06-08"
+
+    @pytest.mark.parametrize("data,expected", [
+        ({"act_type": "legge", "act_number": "241", "date": "1990-08-07", "article": "2"}, "1990-08-07"),
+        ({"act_type": "codice civile", "article": "2043"}, "1942-03-16"),
+        ({"act_type": "regolamento ue", "act_number": "679", "date": "2016", "article": "5"}, "2016"),
+    ])
+    async def test_other_dates_build_too(self, data, expected):
+        lookup = AsyncMock(return_value="2016")
+        [nv] = await self._norm(data, lookup)
+        assert nv.norma.data == expected

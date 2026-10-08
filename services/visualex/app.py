@@ -47,9 +47,9 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
+from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
-from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
+from visualex_api.tools.text_op import parse_article_input, normalize_act_type
 from visualex_api.tools.map import codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import cite_act, cite_article
@@ -449,7 +449,6 @@ class NormaController:
         # it: every handler that reads an article starts from this method.
         reject_future_version_date(data.get('version_date'))
 
-        allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         act_type = data.get('act_type')
         act_number = data.get('act_number')
         norma_date = data.get('date')
@@ -472,19 +471,8 @@ class NormaController:
             tipo_atto_reale = codice_details['tipo_atto_reale']
             # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
 
-        if act_type in allowed_types:
-            log.info("Act type is allowed", act_type=act_type)
-            data_completa = await complete_date_or_parse_async(
-                date=norma_date,
-                act_type=act_type,
-                act_number=act_number
-            )
-            log.info("Completed date parsed", data_completa=data_completa)
-            # Keep YYYY-MM-DD format for Norma validation
-            norma_date = data_completa
-        else:
-            log.info("Act type is not in allowed types", act_type=act_type)
-            log.info("Using provided date", norma_date=norma_date)
+        norma_date = await complete_request_date(act_type, norma_date, act_number)
+        log.info("Using date", norma_date=norma_date)
 
         norma = Norma(
             tipo_atto=act_type,
