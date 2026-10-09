@@ -561,6 +561,21 @@ const addNormsSchema = z.object({
 
 type NormOutcome = 'added' | 'already_present' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
 
+type NormIdentityFields = { urn: string; numero_articolo: string; allegato: string | null };
+
+/**
+ * Which article of which act a stored norm is. The urn alone is not enough:
+ * the Python API gives an EU article the urn of its act (no `~art<N>`), so
+ * every article of the GDPR would read as the same one. The article number
+ * (and the annex, for a code that has them) is part of the identity; for a
+ * Normattiva norm it repeats what the urn already says.
+ */
+function normIdentity(norm: Partial<NormIdentityFields>): string | null {
+  if (typeof norm.urn !== 'string') return null;
+  const article = typeof norm.numero_articolo === 'string' ? norm.numero_articolo.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2') : '';
+  return `${norm.urn}|${norm.allegato ?? ''}|${article}`;
+}
+
 /**
  * Adds norms to a dossier from references in free text ("art. 2043 c.c."),
  * 1 to 50 per call (MCP spike, spec section 7). Each reference is resolved
@@ -581,9 +596,10 @@ export const addDossierNorms = async (req: Request, res: Response) => {
 
   const resolutions = await resolveReferences(references);
   const present = new Set(
-    dossier.items
-      .map((item) => (item.content && typeof item.content === 'object' ? (item.content as { urn?: unknown }).urn : undefined))
-      .filter((urn): urn is string => typeof urn === 'string'),
+    dossier.items.flatMap((item) => {
+      const key = item.content && typeof item.content === 'object' ? normIdentity(item.content as Partial<NormIdentityFields>) : null;
+      return key ? [key] : [];
+    }),
   );
 
   const toCreate: { index: number; urn: string }[] = [];
@@ -595,8 +611,9 @@ export const addDossierNorms = async (req: Request, res: Response) => {
         // `resolved` without a norm cannot happen; reported as unavailable rather than added.
         return { ...base, outcome: resolution.outcome === 'resolved' ? 'unavailable' : resolution.outcome };
       }
-      if (present.has(resolution.norm.urn)) return { ...base, outcome: 'already_present' as const, detail: undefined };
-      present.add(resolution.norm.urn);
+      const identity = normIdentity(resolution.norm);
+      if (identity && present.has(identity)) return { ...base, outcome: 'already_present' as const, detail: undefined };
+      if (identity) present.add(identity);
       toCreate.push({ index, urn: resolution.norm.urn });
       return { ...base, outcome: 'added' as const };
     });
