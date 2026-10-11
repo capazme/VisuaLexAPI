@@ -134,7 +134,7 @@ describe('App routing — Studia', () => {
   it('opens «Da validare» at /studia/valida', async () => {
     renderAt('/studia/valida');
     expect(await screen.findByRole('heading', { name: 'Da validare' })).toBeInTheDocument();
-    expect(await screen.findByText('Nessuna scheda da validare in questa materia')).toBeInTheDocument();
+    expect(await screen.findByText('Nessuna scheda da validare')).toBeInTheDocument();
   });
 
   it('is the 404 page when VITE_FEATURE_STUDIA is off', async () => {

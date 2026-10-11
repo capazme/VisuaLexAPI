@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
   studiaService: { queue: vi.fn(), vote: vi.fn() },
@@ -286,14 +287,36 @@ describe('«Da validare», the queue', () => {
     render(<ValidationQueueView />);
     await screen.findByText('Domanda c1?');
     await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
-    expect(await screen.findByText('Nessuna scheda da validare in questa materia')).toBeInTheDocument();
+    expect(await screen.findByText('Nessuna scheda da validare')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approvata' })).toBeNull();
   });
 
   it('says so when the queue is empty from the start', async () => {
     queue.mockResolvedValue({ cards: [] });
     render(<ValidationQueueView />);
+    expect(await screen.findByText('Nessuna scheda da validare')).toBeInTheDocument();
+  });
+
+  it('names the subject when one is chosen and nothing is left in it', async () => {
+    localStorage.setItem(STORAGE_KEY, 'DIRITTO_PENALE');
+    queue.mockResolvedValue({ cards: [] });
+    render(<ValidationQueueView />);
     expect(await screen.findByText('Nessuna scheda da validare in questa materia')).toBeInTheDocument();
+  });
+
+  it('tells someone who never was a validator that the section is theirs only', async () => {
+    queue.mockRejectedValue(rejection(403));
+    render(
+      <MemoryRouter initialEntries={['/studia/valida']}>
+        <Routes>
+          <Route path="/studia" element={<Outlet context={{ validator: false }} />}>
+            <Route path="valida" element={<ValidationQueueView />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Questa sezione è riservata ai validatori di VisuaLex Studia')).toBeInTheDocument();
+    expect(screen.queryByText('Non sei più tra i validatori')).toBeNull();
   });
 
   it('says the user is no longer a validator, and stops, on a 403 from the queue', async () => {

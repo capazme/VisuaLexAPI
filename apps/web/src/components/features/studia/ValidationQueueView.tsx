@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -10,6 +11,7 @@ import { ArticleReadOnly } from './ArticleReadOnly';
 import { MATERIA_LABEL, anchorLabel, cardTitle, normaFromAnchor } from './studiaLabels';
 import { useValidationQueue, type VoteOutcome } from './useValidationQueue';
 import { VoteBar } from './VoteBar';
+import type { StudiaOutletContext } from './StudiaPage';
 
 const STORAGE_KEY = 'visualex.studia.valida.materia';
 const MEASURE = 'max-w-[60ch]';
@@ -107,6 +109,8 @@ export function ValidationQueueView() {
   const desktop = useIsDesktop();
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const { status, card, voting, vote, retry } = useValidationQueue(materia);
+  // A refusal reads «no longer» unless the account says the person never was a validator.
+  const neverValidator = useOutletContext<StudiaOutletContext | undefined>()?.validator === false;
   const [toast, setToast] = useState<ToastState>(null);
   // The collapsed section belongs to a card: the next one starts closed.
   const [openFor, setOpenFor] = useState<string | null>(null);
@@ -151,10 +155,10 @@ export function ValidationQueueView() {
       </div>
 
       {status === 'loading' && <p className="text-sm text-slate-500 dark:text-slate-400">Carico le schede…</p>}
-      {status === 'empty' && <p className="py-8 text-sm text-slate-600 dark:text-slate-300">Nessuna scheda da validare in questa materia</p>}
+      {status === 'empty' && <p className="py-8 text-sm text-slate-600 dark:text-slate-300">{materia ? 'Nessuna scheda da validare in questa materia' : 'Nessuna scheda da validare'}</p>}
       {status === 'forbidden' && (
         <div role="alert" className="space-y-1 py-8 text-sm text-slate-600 dark:text-slate-300">
-          <p className="font-medium text-slate-800 dark:text-slate-100">Non sei più tra i validatori</p>
+          <p className="font-medium text-slate-800 dark:text-slate-100">{neverValidator ? 'Questa sezione è riservata ai validatori di VisuaLex Studia' : 'Non sei più tra i validatori'}</p>
           <p>Se pensi sia un errore, chiedilo a un amministratore.</p>
         </div>
       )}

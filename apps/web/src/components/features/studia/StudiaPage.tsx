@@ -12,8 +12,13 @@ const TO_VALIDATE = { to: 'valida', label: 'Da validare' };
  * already pads the page; below `lg` its fixed menu button sits over the top-left corner, so the
  * heading starts to its right. «Da validare» is offered to validators only.
  */
+/** What the area tells its views; `validator` is undefined while the account is still loading. */
+export interface StudiaOutletContext {
+  validator: boolean | undefined;
+}
+
 export function StudiaPage() {
-  const { isValidator } = useAuth();
+  const { isValidator, loading } = useAuth();
   const views = isValidator ? [MY_CARDS, TO_VALIDATE] : [MY_CARDS];
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4">
@@ -38,7 +43,7 @@ export function StudiaPage() {
           ))}
         </nav>
       </header>
-      <Outlet />
+      <Outlet context={{ validator: loading ? undefined : isValidator } satisfies StudiaOutletContext} />
     </div>
   );
 }
