@@ -257,7 +257,23 @@ the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-cur
 moves and changes nothing in the DOM (gotcha 23), and where the API is missing it only fails to
 draw. The article renderer emits nothing for a search (no `search` mark kind, no amber `<mark>`).
 Matching ignores case, accents and marks, folded 1:1 per UTF-16 unit so offsets are the
-original's; a query needs two characters (digits count); past 1000 matches the rest are not drawn.
+original's; a query needs two letters or digits (punctuation does not count: «n.» is not searched); past 1000 matches the rest are not drawn.
+A dot or comma of an abbreviation is optional («cpa» finds «c.p.a.», «art 13» finds «art. 13»; «art.» never finds «articolo»), and a
+number is never cut out of a longer one («8980/2018» is not in «18980/2018»). A query that reads as a
+citation (`readQueryCitation`, spec §13.2) also finds the other forms of it: per target, the literal
+matches and `findCitationSpans` are one list (`matchesWithCitation`), ordered by start, overlapping matches joined into their union, on a drawn text
+over the same separator map and on a stored text over its projection (`utils/citationSearch.ts`).
+The literal matches of a citation query obey the spans' bounds: never right after a letter, digit
+or dot, never before a letter when the query ends with a dot («art. 1 c.p.» is not in «c.p.c.»).
+`useFindWindow` keeps one `CitationText` per target in scope (folded and parsed for citations once
+per text, replaced when the text changes, dropped when the target leaves the scope). Act types come from `sources/actTypes.ts` plus the
+palette's spellings (`NUMBERED_ACT_SPELLINGS`); a type is never found inside another's name («legge»
+in «decreto-legge» or «decreto- legge»), a decision's number never inside an act's citation (any
+type of the table, or «decreto», «direttiva», «regolamento»: regional laws and Union acts too), and
+an article links to its act only across the gap §13.2 whitelists. Its tests use synthetic texts (no run of 30
+characters shared with the real ones); the real ones live in
+the git-ignored `utils/__fixtures__/private/` (personal data: never copy them into a committed
+file) and `citationSearch.local.test.ts` is skipped where the folder is absent.
 Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
 `decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
 The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
@@ -595,7 +611,7 @@ Duplicating any of these is a defect, not a shortcut.
   `uniqueArticleIdFromNorma(norma)`. Both keys share their act-level segments so
   they cannot drift. `buildItemKey` is the annotation/highlight key contract and
   must stay byte-identical across dashboard and dossier.
-- `utils/findInText.ts`, `utils/findHighlights.ts`, `utils/findScope.ts`, `utils/findTargets.ts`,
+- `utils/findInText.ts`, `utils/citationSearch.ts`, `utils/findHighlights.ts`, `utils/findScope.ts`, `utils/findTargets.ts`,
   `utils/findWindowControl.ts`, `hooks/useFindWindow.ts`, `hooks/useRegisterFindRoot.ts`,
   `hooks/useFindWindowScopedTo.ts` — find in the text:
   `findMatches`/`collectSearchableText`/`rangesForMatches` (folded, 1:1 offsets; `isSearchableQuery`

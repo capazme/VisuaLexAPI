@@ -196,6 +196,14 @@ const NUMBERED_ACT_TYPES = new Set([
 ]);
 
 /**
+ * The spellings of numbered act types the palette accepts ("legge cost.", "l. costituzionale",
+ * "decreto-legge"), each with the type it resolves to: the find window's citation search
+ * (citationSearch.ts) adds them to the forms of the act-type table (sources/actTypes.ts).
+ */
+export const NUMBERED_ACT_SPELLINGS: ReadonlyArray<readonly [string, string]> = Object.entries(ABBREVIATION_MAP)
+  .filter(([, actType]) => NUMBERED_ACT_TYPES.has(actType));
+
+/**
  * Atti che un testo può nominare per esteso ("del codice civile", "della
  * Costituzione", "del codice del consumo"), con il tipo a cui la palette li
  * risolve: le voci della mappa senza punti, multi-parola o di almeno otto

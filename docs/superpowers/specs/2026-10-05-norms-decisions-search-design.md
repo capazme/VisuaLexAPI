@@ -920,7 +920,8 @@ text. A soft hyphen or a zero-width space inside a word, in the text or in the q
 finds «respon­sabilità»). Ligatures (ﬁ, ﬂ, ﬃ) are not matched: they cannot fold one unit to one.
 In the query, a run of spaces matches any run of whitespace in the text; the query is trimmed at
 its edges, and the two-character minimum counts folded base characters (code points after the
-marks are dropped), so one emoji or one accented letter is not enough.
+marks are dropped) that are letters or digits (§13.2), so one emoji, one accented letter or one
+letter with a dot is not enough.
 
 **Where one block ends.** The text nodes of two blocks touch without a space, so the search runs
 over the text nodes joined by one virtual space wherever a block ends and another begins (a
@@ -1030,6 +1031,89 @@ search at all, so a search never changes the text DOM on either surface (root ru
 
 **Not covered yet.** The dossier reader and Study Mode (Later). In both Cmd/Ctrl+F is the
 browser's own find (see «How it opens»).
+
+#### 13.2 A citation is searched as a citation (the owner, 11 October)
+
+The owner: «ma io intendevo la ricerca nel testo, poteri voler cercare una citazione nella
+sentenza»; then, on the proposal, «80 sì, subito». Measured on two real decisions with PR 4d's
+matcher: a citation is found only when typed exactly as the decision writes it. «art. 580 c.p.»
+finds nothing where the text says «art. 580 del codice penale» (4 times), «l. 219/2017» nothing
+where it says «legge n. 219 del 2017» (11 times), «art 110 cpa» nothing against «art. 110
+c.p.a.», «Cass. n. 8980/2018» nothing against «Cass., S.U. n 8980/2018». So, in the find window,
+a query that reads as a citation also finds the other forms of the same citation. §13's literal
+match stays, and both kinds of match are drawn the same way (one list, ordered by position,
+overlapping matches joined into one, their union, so the counter counts each place once); nothing
+is added to the page. When the query reads as a citation, its literal matches obey the bounds the
+citation's spans obey: a match never starts right after a letter, a digit or a dot, nor on a type
+that is the tail of another type's name (below); when the query ends with a dot, a match never
+ends right before a letter («art. 1 c.p.» is not in «art. 1 c.p.c.» or «art. 1 c.p.p.»); for a
+decision, a match inside an act's citation is dropped (below).
+
+**A norm.** When the query reads as a norm, the window also finds every span of the text that
+names the same norm:
+- a code's article («art. 580 c.p.», «art 110 cpa», «art. 2 Cost.»): every citation the
+  client's own `extractCitations` (`utils/citationMatcher.ts`, the reader of norm links in a
+  decision's text) resolves to the same code and article («art. 580 del codice penale», «art.
+  580 cod. pen.»);
+- a numbered act, with or without an article («l. 99/2015», «legge 99/2015», «d.P.R.
+  115/2002», «art. 1 l. 99/2015»): every span that names the same act type, number and year in
+  the forms decisions use — «legge n. 99 del 2015», «l. n. 99/2015», «legge 3 marzo 2015, n. 99»,
+  «L. 99/15», a date in figures («D.P.R. 30.5.2002 n. 115», «l. 3.3.2015, n. 99») —
+  with the type's forms read from the act-type table (`utils/sources/actTypes.ts`) and the
+  palette's other spellings of it («legge cost.», «l. cost.», «legge costituzionale»). A type is
+  never found inside another type's name: «l. 34/2020» does not find the «legge» of
+  «decreto-legge 19 maggio 2020, n. 34», «decreto legge n. 34 del 2020» or «decreto- legge n. 34
+  del 2020» (a hyphen may take spaces on either side), nor the «l.» of «d. l. 34/2020» or «d.l.
+  34/2020»;
+- when the query has an article, the act's span is found only with that article: before the act,
+  linked to it by nothing but commas and spaces, «comma N», «co. N», «lett. x», «n. N», «numero
+  N», «del», «della», «dell'», «di cui al», «di cui alla», and further articles of the same act
+  («art. 1 e l'art. 2 della legge …», «art. 2 e dell'art. 1 della legge …», «artt. 1, 2 e 3 della
+  legge …»: the span starts at the article the query names); or right after the act («legge n.
+  99/2015, art. 1, comma 3», «legge 99/2015, all'art. 1»), not followed by another act or a code
+  («legge 99/2015, art. 1 Cost.» is not it, nor «art. 1 della Carta», «CEDU», «della Convenzione»,
+  «del Trattato», «TFUE», «TUE»). Anything else between the article and the act breaks the link:
+  another act's name with or without a number, «Cost.», «c.c.», «cod.», «regolamento», «citato», a
+  full stop, a semicolon. «all'art.» and «dell'art.» are an article's prefix, in the text and in the
+  query;
+- a query that is only a code's abbreviation («c.p.») or an act without number is not a
+  citation: it is searched literally.
+
+**A decision.** When the query reads as a decision's number and year («Cass. n. 8980/2018»,
+«n. 8980/2018», «8980/2018», «sent. n. 8980 del 2018»), the window finds the number and year in
+every form: «n. 8980/2018», «n 8980/2018», «n. 8980 del 2018», «8980/2018». The court and
+section in the query are not required in the text (decisions cite «S.U.», «Sez. 3», or nothing).
+A query reads as a decision only with a court or a decision marker («Cass.», «Corte», «C.
+cost.», «sent.», «ord.», «S.U.», «n.»), or bare as «N/YYYY» with a four-digit year: «12/12»,
+«3/04» and «c. 99/2015» are searched literally. A number and year that are part of an act's
+citation are never a decision, neither as a span nor as a literal match: «Cass. n. 99/2015» and
+«n. 99/2015» do not find the number of «legge n. 99 del 2015» or «l. n. 99/2015». An act's
+citation, here, is any form of a type in the act-type table, or «decreto», «direttiva»,
+«regolamento» («dir.», «reg.»), followed by up to five words that are not a court or a decision's
+marker, then the number and year: «legge regionale n. 99 del 2015», «l.r. n. 99/2015», «legge
+della Regione Veneto n. 99 del 2015», «Reg. (UE) n. 99/2015», «decreto n. 99 del 2015».
+
+**Punctuation in abbreviations.** For every query, a dot or a comma inside or after an
+abbreviation is optional on both sides: «cpa» finds «c.p.a.», «art 13» finds «art. 13», «art.
+13, comma 1-quater» finds «art. 13 comma 1-quater». A dot that ends a sentence is never
+required. This rule widens the literal match only by punctuation; it never joins two words. A
+query word typed with a final dot ends where the text's word ends, with a dot or a word boundary:
+«art.» finds «art.» and «art 13», never «articolo»; a query without dots still finds an
+abbreviation, so «su» finds «S.U.». A dot may be followed by no space: «art. 13» finds «art.13»,
+«n. 2» finds «n.2», and a citation is read so too («art.13 c.c.», «Cass. n.8980/2018»). Only letters and digits count towards §13's two-character
+minimum: «n.», «l.», «c.» and «1.» are not searched, «c.p.» is.
+
+**Numbers.** For every query, a match never starts right after a digit when the query starts with
+a digit, nor ends right before a digit when it ends with one: «8980/2018» is not found in
+«18980/2018» nor in «8980/20181».
+
+**Not yet found.** A decision written date first («Cass. 12 aprile 2018, n. 8980»), and an
+article linked to its act through «primo comma», «commi», «e ss.» or «del c.c.».
+
+**Tests.** Synthetic texts in the repository, written for the cases above. Real decision texts
+stay out of the repository (they carry personal data): a local-only suite reads them from a
+git-ignored folder (`apps/web/src/utils/__fixtures__/private/`) and is skipped when the folder is
+absent, as the API's `_local` freeze test is.
 
 ## Security and data
 
