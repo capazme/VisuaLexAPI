@@ -380,6 +380,17 @@ describe('what the author and the reader see', () => {
     for (const leak of [carol.id, dave.id, 'see-carol', 'see-dave', 'utenteId']) expect(text).not.toContain(leak);
   });
 
+  it('gives a connected application the card without the votes or the reasons', async () => {
+    const card = await makeCard(alice.id, 'PROPOSTA_COMMUNITY');
+    await prisma.lingoValidazioneCard.create({ data: { cardId: card.id, utenteId: carol.id, giudizio: 'ERRATA', motivazione: 'Lo ha scritto Mario Rossi.' } });
+    const response = await request(app).get(`/api/lingo/cards/${card.id}`).set(await delegated(alice, 'lingo:cards:read'));
+    expect(response.status).toBe(200);
+    expect(response.body.id).toBe(card.id);
+    expect(response.body).not.toHaveProperty('rilievi');
+    expect(response.body).not.toHaveProperty('approvazioni');
+    expect(JSON.stringify(response.body)).not.toContain('Mario Rossi');
+  });
+
   it('shows a draft with no approvals and no remarks, and still only to its author', async () => {
     const card = await makeCard(alice.id);
     const response = await request(app).get(`/api/lingo/cards/${card.id}`).set(authHeader(alice));
@@ -431,17 +442,25 @@ describe('what the author and the reader see', () => {
 describe('who may reach these routes', () => {
   it('refuses an exchanged token on proponi, ritira, the queue and the vote', async () => {
     const alice = await createTestUser('tok-alice');
+    // The queue and the vote are tried with a validator's token, so a 403 can only be the delegated gate's.
+    const carol = await makeValidator('tok-carol');
     const card = await makeCard(alice.id, 'PROPOSTA_COMMUNITY');
     const v1 = await notice();
+    const refusedByGate = (res: { status: number; body: { error?: string } }) => {
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('forbidden');
+    };
     for (const scope of ['lingo:cards:read', 'lingo:cards:write']) {
-      const token = await delegated(alice, scope);
-      expect((await request(app).post(`/api/lingo/cards/${card.id}/proponi`).set(token).send({ accettoTestoId: v1.id })).status).toBe(403);
-      expect((await request(app).post(`/api/lingo/cards/${card.id}/ritira`).set(token)).status).toBe(403);
-      expect((await request(app).get('/api/lingo/validazione/coda').set(token)).status).toBe(403);
-      expect((await request(app).post(`/api/lingo/validazione/${card.id}`).set(token).send({ giudizio: 'APPROVATA' })).status).toBe(403);
+      const asAlice = await delegated(alice, scope);
+      const asCarol = await delegated(carol, scope);
+      refusedByGate(await request(app).post(`/api/lingo/cards/${card.id}/proponi`).set(asAlice).send({ accettoTestoId: v1.id }));
+      refusedByGate(await request(app).post(`/api/lingo/cards/${card.id}/ritira`).set(asAlice));
+      refusedByGate(await request(app).get('/api/lingo/validazione/coda').set(asCarol));
+      refusedByGate(await request(app).post(`/api/lingo/validazione/${card.id}`).set(asCarol).send({ giudizio: 'APPROVATA' }));
     }
     expect(await state(card.id)).toBe('PROPOSTA_COMMUNITY');
     expect(await prisma.lingoAccettazioneTesto.count()).toBe(0);
+    expect(await prisma.lingoValidazioneCard.count()).toBe(0);
   });
 
   it('shows the validator flag to the person themselves on /api/auth/me and on login', async () => {

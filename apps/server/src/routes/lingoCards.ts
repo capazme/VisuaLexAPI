@@ -123,6 +123,12 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const card = await prisma.lingoCard.findFirst({ where: { id: req.params.id, autoreId: req.user!.id }, include: { ancore: true } });
   if (!card) throw new AppError(404, 'Scheda non trovata.');
+  // A connected application reads the card as before: a validator's reason is their writing and may name
+  // someone (spec decision 19), so it is not handed to an application unless the owner decides it.
+  if (req.delegation) {
+    res.json(serialize(card));
+    return;
+  }
   // What the validators said about the current proposal: the count of approvals and each remark, never who made it.
   const [approvazioni, rilievi] = await Promise.all([
     prisma.lingoValidazioneCard.count({ where: { cardId: card.id, giudizio: 'APPROVATA' } }),
