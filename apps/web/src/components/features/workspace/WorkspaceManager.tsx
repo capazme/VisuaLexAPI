@@ -29,12 +29,11 @@ export function WorkspaceManager({
   onViewPdf,
   onCrossReference
 }: WorkspaceManagerProps) {
-  const { workspaceTabs, moveNormaBetweenTabs, moveLooseArticleBetweenTabs, mergeLooseArticleToNorma, moveLooseArticleToCollection } = useAppStore(useShallow(s => ({
+  const { workspaceTabs, moveNormaBetweenTabs, moveLooseArticleBetweenTabs, mergeLooseArticleToNorma } = useAppStore(useShallow(s => ({
     workspaceTabs: s.workspaceTabs,
     moveNormaBetweenTabs: s.moveNormaBetweenTabs,
     moveLooseArticleBetweenTabs: s.moveLooseArticleBetweenTabs,
     mergeLooseArticleToNorma: s.mergeLooseArticleToNorma,
-    moveLooseArticleToCollection: s.moveLooseArticleToCollection,
   })));
   const [activeItem, setActiveItem] = useState<DragData | null>(null);
 
@@ -79,14 +78,6 @@ export function WorkspaceManager({
         }
       }
 
-      setActiveItem(null);
-      return;
-    }
-
-    // Check if dropping on a Collection
-    if (overId.startsWith('collection-drop-') && dragData.type === 'loose-article') {
-      const dropData = over.data.current as { type: string; collectionId: string; tabId: string };
-      moveLooseArticleToCollection(dropData.tabId, dragData.itemId, dropData.collectionId);
       setActiveItem(null);
       return;
     }

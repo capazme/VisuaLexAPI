@@ -208,7 +208,7 @@ an earlier decision was put to him and answered (§13, D15); none of the others 
 | T7 | **Decisions sort newest first**: by date of deposit when known (`attributi.data_deposito`, learned when the decision is found), else by year; ties by number. | The interview fixed the key, not the direction; newest first is how the Cassazione's lists are ordered in the app (`/search_decisions`, `sort=pd desc`). A decision never read has no date and sorts by its year. |
 | T8 | **A topic search is a window, not an entry.** It is a question, not a source: it never enters «Giurisprudenza»; a decision opened from it does. On the desktop it is a light window (from P4; a band at the top of the table in P3); on a phone it opens in the full-screen reader with «‹ Pratica» (from P5; the same band at the top of the phone's table in P3 and P4). | One fewer kind of row; a search is not kept once its window is replaced, as it is not kept once its tab is closed today. |
 | T9 | **Built behind `VITE_FEATURE_PRACTICE_TABLE`**, read by `isPracticeTableEnabled()` in `apps/web/src/features/practice/featureFlag.ts`, the house's place for flags, but **off unless the variable is `true`**, unlike the house's flags. The practices are persisted beside the tabs and seeded from them once, marked by `practicesSeeded` (§9); the last PR removes the flag, migrates every browser and deletes the tab model (§12). | The house's flags are on by default because they hide a finished area in a deployment; this one hides unfinished work on `develop`, so a build that does not ask for it must get the old surface. Develop stays usable between PRs (root CLAUDE.md: experiments sit behind flags). While the flag is on, the tabs and the practices diverge: turning it off shows the tabs as they were. Vite reads the flag when it starts, so a browser pass runs the branch's own Vite on its own port, never the shared stack on :5173 (§12). |
-| T10 | **Migration placement**: a decision tab goes under «Giurisprudenza» of the practice whose norm tab had the highest z-index, or of a new practice «Sentenze» when there is no norm tab; the topic-search tab with the highest z-index becomes a window of that practice; any other is not reopened, and the user is told which (§9). | «Highest z-index» everywhere, never «newest»: a tab records no creation time and the array order is the dock's drag order, while the z-index is the one last brought to the front — the one last looked at, and PR 4d's front tab. The old tabs do not record which tab a decision was opened from; the front tab is the likeliest. A search is re-run from the palette in one line. |
+| T10 | **Migration placement**: a decision tab goes under «Giurisprudenza» of the practice whose norm tab was in front (the visible one with the highest z-index), or of a new practice «Sentenze» when there is no norm tab; the topic-search tab in front becomes a window of that practice; any other is not reopened, and the user is told which (§9). | «Highest z-index» everywhere, never «newest»: a tab records no creation time and the array order is the dock's drag order, while the z-index is the one last brought to the front — the one last looked at, and PR 4d's front tab. As in PR 4d's `frontTabId`, a minimised or hidden tab keeps its z-index but is not in front; with no visible norm tab, the highest z-index among them. The old tabs do not record which tab a decision was opened from; the front tab is the likeliest. A search is re-run from the palette in one line. |
 | T11 | **A search lands in the active practice**, creating one (named after its first act, `shortAct`) when there is none. R3's merge heuristics, the custom-label matching and the historical split retire; `targetTabId` keeps its role for the dossier's «Apri tutto» and names a practice (gotcha 15); a `targetTabId` that names no practice (closed meanwhile) lands in the active practice. | Simpler and predictable: what you search goes on the table you are looking at. A user who wants a new practice makes one from the bar. |
 | T12 | **The window's reading bar** is the toolbar in a compact form: notes, highlights, discussions, copy and the magnifier «Cerca nel testo», which opens the find window (PR 4d). The rest of the toolbar (dossier, quick norm, share, export, «Testo alla data», compare, Studio) stays on the row in the table. | D5's «pulito come la sentenza»; one more step for those actions from a window. |
 | T13 | **Acts move between practices from the act's «⋯»** («Sposta in un'altra pratica»), as round 2b planned; drag between containers goes. | Drag between floating windows has no target once there is one table on screen. |
@@ -241,7 +241,9 @@ not the table split in two columns.
 ### 2. The practice: data model
 
 The practice replaces `WorkspaceTab` (T1). New module `apps/web/src/utils/practice.ts` (pure, no
-store import) holds the types and every rule; the store holds the state and calls it.
+store import) holds the types and every rule; the migration from the saved tabs (§9) lives beside it
+in `apps/web/src/utils/practiceMigration.ts`, which imports it; the store holds the state and calls
+both.
 
 ```ts
 /** One practice: the table of a question. UI state, saved in the browser (D6). */
@@ -278,9 +280,12 @@ export interface PracticeDecision {
   identified: boolean;     // the reference is the decision's identity: set on a found answer, never guessed
   depositDate?: string;    // attributi.data_deposito, ISO, once found (T7)
   tipo?: string;           // attributi.tipo, kept for «Salva come dossier»
+  historyRecordedKey?: string; // the decisionKey its reading recorded in the Cronologia: once per opening (PR 5)
 }
 
-/** What a light window shows. `id` is stable for the subject, so opening it twice finds it. */
+/** What a light window shows. `id` is stable for the subject, so opening it twice finds it; a
+ *  topic-search window's id is derived from the store's `stableQueryKey(query)` (P4), and a window
+ *  the migration made, which carries its old tab's id, is re-id'd on read. */
 export type BesideRef =
   | { id: string; kind: 'article'; actId: string; articleKey: string }
   | { id: string; kind: 'decision'; decisionId: string }
@@ -317,7 +322,8 @@ once, §9).
 | `WorkspaceTab.view` `decision-search` | a `BesideRef` of kind `decision-search` |
 | `position`, `size`, `zIndex`, `isMinimized`, `isHidden`, `highestZIndex` | gone (the layout is computed, §4.3) |
 
-**The rules** (all in `utils/practice.ts`, tested without a DOM):
+**The rules** (in `utils/practice.ts`, the migration in `utils/practiceMigration.ts`; tested
+without a DOM):
 - `addArticles(acts, norma, articles)`: finds the act by `actKeyOf(norma)` or appends one;
   inserts each article whose `practiceArticleKey` is not already there, keeps the sort; a copy with
   the same key fills what the stored one lacks — `brocardi_info` (today's `addNormaToTab`
@@ -329,7 +335,7 @@ once, §9).
 - `sameDecision(entry, reference)`: today's rule, moved from the store: same court, number and year;
   a citation with an archive matches only that archive.
 - `besideAfterOpen(beside, ref, { askerId? })`: D10, T16 (§4.2).
-- `practicesFromTabs(tabs)`: the migration (§9).
+- `practicesFromTabs(tabs, newId)` (`practiceMigration.ts`): the migration (§9).
 - `sanitizePractices(raw)`: rehydration of untrusted saved state (§10).
 
 ### 3. The table on the desktop
@@ -655,25 +661,31 @@ One layout mounted (T4, `useIsDesktop`). From P3 the phone draws the practices t
 
 ### 9. Migration of the saved workspace (D13)
 
-`practicesFromTabs(tabs: unknown): { practices: Practice[]; activePracticeId: string | null;
-dropped: string[]; droppedSearches: string[] }`, pure, never throwing:
+`practicesFromTabs(tabs: unknown, newId: () => string): { practices: Practice[]; activePracticeId:
+string | null; dropped: string[]; droppedSearches: string[] }` (`utils/practiceMigration.ts`), pure,
+never throwing. «In front» is read as PR 4d's `frontTabId` reads it (T10): a visible tab (neither
+minimised nor hidden) before any other, then the highest z-index; with no visible norm tab, the
+highest z-index among them.
 1. Each tab without `view` becomes a practice with its `id`, `label` and `labelIsCustom`, in the
    tabs' array order (the dock's order). A tab with no content becomes an empty practice: its name
-   is the user's.
+   is the user's («Pratica» when it was empty). Every label is trimmed and capped at 120 characters.
 2. Its norm blocks become acts by `actKeyOf`; two blocks of one act merge (the first block's id is
    kept). Its loose articles join their act (`actKeyOf(sourceNorma)`), created if absent. A
    collection's articles join theirs. Articles merge only when their `practiceArticleKey`s are
    identical (T2) and are sorted.
-3. Decision tabs go under «Giurisprudenza» of the practice whose norm tab had the highest z-index,
+3. Decision tabs go under «Giurisprudenza» of the practice whose norm tab was in front,
    or of a new practice «Sentenze» when there was no norm tab (T10). Their reference is kept as
-   saved, with `identified: false`: the saved reference does not say whether it was found, so the
+   `sanitizePractices` keeps it (its known fields; a court VisuaLex does not read is dropped and
+   logged, never labelled as another court's), with the tab's `historyRecordedKey` and
+   `identified: false`: the saved reference does not say whether it was found, so the
    entry is identified the first time it is read (`setDecisionEntryIdentity`); until then «Salva come
    dossier» counts it as not identified (§7). Two tabs of one decision cannot exist; if they do, one
    entry is kept.
-4. The decision-search tab with the highest z-index becomes the only window of that practice; any
+4. The decision-search tab in front becomes the only window of that practice; any
    other is not reopened: its label goes into `droppedSearches`. The other decision tabs become
-   entries without windows.
-5. The active practice is the one whose tab had the highest z-index. Positions, sizes, z-indexes
+   entries without windows. The window keeps its old tab's id until P4 re-ids it from
+   `stableQueryKey` on read (§2).
+5. The active practice is the one whose tab was in front. Positions, sizes, z-indexes
    and flags are dropped.
 
 What fails to parse goes into `dropped` and is logged once with context (gotcha 18). The searches
@@ -715,10 +727,13 @@ empty tab, malformed entries (§10).
 
 - **Saved state is untrusted input.** `localStorage` can hold an old shape, a hand-edited value or
   garbage. `sanitizePractices` keeps a practice only with a string `id` and `label` and arrays where
-  arrays belong; an act only with a `norma.tipo_atto` string and articles with a `norma_data`; a
-  decision only with a reference that passes today's `isValidView` checks (court, positive integer
-  number and year); a `BesideRef` only when it points at something the practice holds;
-  `practicesSeeded` only as a boolean. What fails is dropped and logged, never thrown: a throw in
+  arrays belong; an act only with a `norma.tipo_atto` string and articles with a `norma_data` and
+  an `article_text` that is a string when present; a decision only with a reference that passes
+  today's `isValidView` checks (court, positive integer number and year) and names a court
+  VisuaLex reads, its `historyRecordedKey` only as a string; a `BesideRef` only when it points at
+  something the practice holds, a topic query's `normaLabel` only as a string;
+  `practicesSeeded` only as a boolean. Act and decision ids are unique across practices: a taken
+  one is re-id'd and the practice's windows follow it. What fails is dropped and logged, never thrown: a throw in
   `merge` would reset the whole store.
 - **User isolation.** `clearUserData` empties `practices`, `activePracticeId`, the open rows, the
   pending reveal, `phoneReader` and `practiceNotice` and sets `practicesSeeded` to
@@ -781,7 +796,7 @@ reloads it with the flag on restarts that same port's Vite without, then with, t
 
 | PR | Branch | What | Flag |
 |---|---|---|---|
-| P1 | `refactor/workspace-groundwork` | Collections removed (a saved one becomes loose articles at load); `workspaceTabActions.ts` deleted; `utils/practice.ts` with the model, the rules and the migration, tested. No visible change. | none |
+| P1 | `refactor/workspace-groundwork` | Collections removed (a saved one becomes loose articles at load); `workspaceTabActions.ts` deleted; `utils/practice.ts` with the model and the rules, `utils/practiceMigration.ts` with the migration, tested. No visible change. | none |
 | P2 | `feat/practice-store` | The flag; the practice slice, its actions, persistence, the seeding marker and the wrapped storage; decisions and windows in the store; the two-shape back-stack. Inert: no entry point calls it yet. | gates the seeding |
 | P3 | `feat/practice-table` | The table and the bar of practices on the desktop, and the plain table on the phone (T18); searches, the index, the dossier's «Apri tutto», decisions (opened in place until P4), topic searches (in a band of the table until P4), the find window's scope, compare and the `table` half of the way back routed to the practice; «Salva come dossier». | on = new desktop and phone |
 | P4 | `feat/reading-window` | The light window, «Apri accanto», the row of two and its layout, the find window's place; decisions and topic searches beside (on a phone topic searches stay in the table's band); the find root of a window under its practice (§6.6); citations from a window; the `beside` half of the way back. | on = windows |
@@ -808,8 +823,9 @@ alternative is dropped.
 - **Pure modules, no DOM**: `practice.ts` (`addArticles` with duplicates, past texts, annexes,
   Brocardi and URN backfill, the codice civile with and without its R.D., a code's article with
   `allegato: '2'` and without; `findPracticeArticle` with `1-bis` / `1 bis` and a code's annex;
-  `decisionOrder`; `sameDecision`; `besideAfterOpen` with and without the asker; `practicesFromTabs`
-  on every case of §9, the notice's labels included; `sanitizePractices` on garbage),
+  `decisionOrder`; `sameDecision`; `besideAfterOpen` with and without the asker; `sanitizePractices`
+  on garbage), `practiceMigration.ts` (`practicesFromTabs` on every case of §9, minimised and hidden
+  tabs included, the notice's labels included),
   `besideLayout`, `practiceDossierItems`.
 - **Store**: actions atomic under StrictMode (open beside twice, drain a pending decision once,
   consume a reveal once, take the notice once); persistence (`partialize`; seeding with the flag on

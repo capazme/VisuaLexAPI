@@ -8,7 +8,6 @@ import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { NormaBlockComponent } from './NormaBlockComponent';
 import { LooseArticleCard } from './LooseArticleCard';
-import { ArticleCollectionComponent } from './ArticleCollectionComponent';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
@@ -103,11 +102,6 @@ export function WorkspaceTabPanel({
         });
       } else if (item.type === 'loose-article') {
         addToDossier(dossierId, normaForDossier(item.sourceNorma, item.article), 'norma');
-      } else if (item.type === 'collection') {
-        // Add each article from the collection
-        item.articles.forEach(({ article, sourceNorma }) => {
-          addToDossier(dossierId, normaForDossier(sourceNorma, article), 'norma');
-        });
       }
     });
     setShowDossierMenu(false);
@@ -556,16 +550,6 @@ export function WorkspaceTabPanel({
                       onExtractArticle={(articleId) => extractArticleFromNorma(tab.id, item.id, articleId)}
                       onRemoveArticle={(articleId) => removeArticleFromNorma(tab.id, item.id, articleId)}
                       onRemoveNorma={() => removeContentFromTab(tab.id, item.id)}
-                    />
-                  );
-                } else if (item.type === 'collection') {
-                  return (
-                    <ArticleCollectionComponent
-                      key={item.id}
-                      tabId={tab.id}
-                      collection={item}
-                      onViewPdf={onViewPdf}
-                      onCrossReference={onCrossReference}
                     />
                   );
                 } else {

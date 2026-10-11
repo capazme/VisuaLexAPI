@@ -16,6 +16,7 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
+import { isStoredArticle, isValidView, sameDecision } from '../utils/practice';
 import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
@@ -140,21 +141,7 @@ interface LooseArticle {
     revealSignal?: number;
 }
 
-interface CollectionArticle {
-    article: ArticleData;
-    sourceNorma: Norma;
-}
-
-interface ArticleCollection {
-    type: 'collection';
-    id: string;
-    label: string;
-    articles: CollectionArticle[];
-    isCollapsed: boolean;
-    color?: 'purple' | 'indigo';
-}
-
-type TabContent = NormaBlock | LooseArticle | ArticleCollection;
+type TabContent = NormaBlock | LooseArticle;
 
 /** A tab that shows one thing rather than a list of norms (design 2026-10-05 §2.1): a decision,
  *  or a list of decisions. A field of the tab, not a TabContent: 27 places switch over
@@ -445,13 +432,6 @@ interface AppState {
     removeContentFromTab: (tabId: string, contentId: string) => void;
     mergeLooseArticleToNorma: (tabId: string, looseArticleId: string, targetNormaId: string) => boolean;
 
-    // Collection Actions
-    createCollection: (tabId: string, label?: string) => string;
-    renameCollection: (tabId: string, collectionId: string, newLabel: string) => void;
-    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: Norma) => void;
-    removeArticleFromCollection: (tabId: string, collectionId: string, articleKey: string) => void;
-    toggleCollectionCollapse: (tabId: string, collectionId: string) => void;
-    moveLooseArticleToCollection: (tabId: string, looseArticleId: string, collectionId: string) => void;
 
     addBookmark: (norma: NormaVisitata, tags?: string[]) => void;
     updateBookmarkTags: (normaKey: string, tags: string[]) => void;
@@ -777,7 +757,7 @@ const appStore = createStore<AppState>()(
                 state.searchPanelState.position = position;
             }),
 
-            // Decision tabs (design 2026-10-05 §2.1-§2.2). Live here, not in workspaceTabActions.ts (gotcha 25).
+            // Decision tabs (design 2026-10-05 §2.1-§2.2).
             openDecisionTab: (reference, options) => {
                 let tabId = '';
                 set((state) => {
@@ -1223,15 +1203,6 @@ const appStore = createStore<AppState>()(
                         tab.zIndex = ++state.highestZIndex;
                         return;
                     }
-                    // A collection holds loose copies: showing the article is opening the collection.
-                    const collection = tab.content.find(c => c.type === 'collection' && c.articles.some(
-                        a => normalizeArticleId(uniqueArticleIdFromNorma(a.article.norma_data)) === wanted
-                    )) as ArticleCollection | undefined;
-                    if (!collection) return;
-                    collection.isCollapsed = false;
-                    tab.isMinimized = false;
-                    tab.isHidden = false;
-                    tab.zIndex = ++state.highestZIndex;
                     return;
                 }
                 block.autoFocusArticleId = articleId;
@@ -1408,134 +1379,6 @@ const appStore = createStore<AppState>()(
                 });
                 return success;
             },
-
-            // Collection Actions
-            createCollection: (tabId, label) => {
-                let collectionId = '';
-                set((state) => {
-                    const tab = state.workspaceTabs.find(t => t.id === tabId);
-                    if (!tab) return;
-                    if (refuseViewTab(tab, 'createCollection')) return;
-
-                    const newCollection: ArticleCollection = {
-                        type: 'collection',
-                        id: uuidv4(),
-                        label: label || 'Nuova Raccolta',
-                        articles: [],
-                        isCollapsed: false,
-                        color: 'purple'
-                    };
-
-                    tab.content.push(newCollection);
-                    collectionId = newCollection.id;
-                });
-                return collectionId;
-            },
-
-            renameCollection: (tabId, collectionId, newLabel) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (collection) {
-                    collection.label = newLabel;
-                }
-            }),
-
-            addArticleToCollection: (tabId, collectionId, article, sourceNorma) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'addArticleToCollection')) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (!collection) return;
-
-                // Check for duplicates
-                const articleKey = `${sourceNorma.tipo_atto}-${sourceNorma.numero_atto}-${article.norma_data.numero_articolo}`;
-                const exists = collection.articles.some(
-                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` === articleKey
-                );
-
-                if (!exists) {
-                    collection.articles.push({ article, sourceNorma });
-                }
-            }),
-
-            removeArticleFromCollection: (tabId, collectionId, articleKey) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (!collection) return;
-
-                collection.articles = collection.articles.filter(
-                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` !== articleKey
-                );
-
-                // Remove empty collection
-                if (collection.articles.length === 0) {
-                    tab.content = tab.content.filter(c => c.id !== collectionId);
-                }
-            }),
-
-            toggleCollectionCollapse: (tabId, collectionId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (collection) {
-                    collection.isCollapsed = !collection.isCollapsed;
-                }
-            }),
-
-            moveLooseArticleToCollection: (tabId, looseArticleId, collectionId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'moveLooseArticleToCollection')) return;
-
-                // Find and remove loose article
-                const looseIndex = tab.content.findIndex(
-                    c => c.type === 'loose-article' && c.id === looseArticleId
-                );
-                if (looseIndex === -1) return;
-
-                const loose = tab.content[looseIndex] as LooseArticle;
-
-                // Find target collection
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (!collection) return;
-
-                // Check for duplicates
-                const articleKey = `${loose.sourceNorma.tipo_atto}-${loose.sourceNorma.numero_atto}-${loose.article.norma_data.numero_articolo}`;
-                const exists = collection.articles.some(
-                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` === articleKey
-                );
-
-                if (!exists) {
-                    collection.articles.push({
-                        article: loose.article,
-                        sourceNorma: loose.sourceNorma
-                    });
-                }
-
-                // Remove loose article
-                tab.content.splice(looseIndex, 1);
-            }),
 
             addBookmark: (norma, tags = []) => {
                 const key = generateKey(norma);
@@ -3189,7 +3032,7 @@ const appStore = createStore<AppState>()(
                 return {
                     ...current,
                     ...p,
-                    ...(p.workspaceTabs !== undefined ? { workspaceTabs: sanitizeViews(p.workspaceTabs) ?? current.workspaceTabs } : {}),
+                    ...(p.workspaceTabs !== undefined ? { workspaceTabs: foldCollections(sanitizeViews(p.workspaceTabs)) ?? current.workspaceTabs } : {}),
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
@@ -3218,34 +3061,6 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 export { appStore };
 
 // Export types
-/** Does the tab's reference (`tab`) show the decision a citation (`wanted`) names? Same court,
- *  number and year; a citation with an archive matches only a tab of that archive (civil and
- *  penal numbers run in separate series), one without matches a tab of either. */
-function sameDecision(tab: DecisionReference, wanted: DecisionReference): boolean {
-    return tab.corte === wanted.corte && tab.numero === wanted.numero && tab.anno === wanted.anno &&
-        (wanted.archivio === undefined || tab.archivio === wanted.archivio);
-}
-
-function isValidView(view: unknown): boolean {
-    if (!view || typeof view !== 'object') return false;
-    const v = view as { kind?: unknown; reference?: Record<string, unknown>; query?: unknown };
-    if (v.kind === 'decision') {
-        const r = v.reference;
-        return !!r && typeof r.corte === 'string' && r.corte !== '' &&
-            Number.isInteger(r.numero) && (r.numero as number) > 0 &&
-            Number.isInteger(r.anno) && (r.anno as number) > 0;
-    }
-    if (v.kind === 'decision-search') {
-        const q = v.query as { tema?: unknown; norma?: unknown } | null | undefined;
-        if (!q || typeof q !== 'object') return false;
-        if (q.tema !== undefined && typeof q.tema !== 'string') return false;
-        const n = q.norma as Record<string, unknown> | null | undefined;
-        if (n !== undefined && (!n || typeof n !== 'object' || typeof n.tipo_atto !== 'string' || typeof n.numero_articolo !== 'string')) return false;
-        return q.tema !== undefined || n !== undefined;
-    }
-    return false;
-}
-
 /** Drops a persisted tab's malformed `view`; a tab left without content goes with it. */
 function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
     if (!Array.isArray(tabs)) return undefined;
@@ -3254,6 +3069,39 @@ function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
         const { view: _view, ...rest } = tab;
         void _view;
         return Array.isArray(rest.content) && rest.content.length > 0 ? [rest as WorkspaceTab] : [];
+    });
+}
+
+/** Article collections were removed; a browser may still hold one. Each article of a saved collection
+ *  becomes a loose article of the same tab with its `norma_data` untouched (annotation keys read it).
+ *  A collection whose articles are not a list, an entry without an article that has a `norma_data`
+ *  (`isStoredArticle`), and any other unknown item type are dropped with a warning naming the tab
+ *  (gotcha 18). */
+function foldCollections(tabs: WorkspaceTab[] | undefined): WorkspaceTab[] | undefined {
+    if (!tabs) return tabs;
+    return tabs.map((tab) => {
+        if (!tab || !Array.isArray(tab.content)) return tab;
+        const content = (tab.content as unknown[]).flatMap((item): TabContent[] => {
+            const type = (item as { type?: unknown } | null)?.type;
+            if (type === 'norma' || type === 'loose-article') return [item as TabContent];
+            if (type === 'collection') {
+                const articles = (item as { articles?: unknown }).articles;
+                if (!Array.isArray(articles)) {
+                    console.warn(`workspace: dropped a saved collection whose articles are not a list from the tab "${tab.label}"`);
+                    return [];
+                }
+                return articles.flatMap((entry: { article?: ArticleData; sourceNorma?: Norma } | null): LooseArticle[] => {
+                    if (!entry || !isStoredArticle(entry.article)) {
+                        console.warn(`workspace: skipped an entry without an article and its norma_data from a saved collection in the tab "${tab.label}"`);
+                        return [];
+                    }
+                    return [{ type: 'loose-article', id: uuidv4(), article: entry.article, sourceNorma: entry.sourceNorma ?? entry.article.norma_data }];
+                });
+            }
+            console.warn(`workspace: dropped an item of unknown type "${String(type)}" from the tab "${tab.label}"`);
+            return [];
+        });
+        return { ...tab, content };
     });
 }
 
@@ -3337,5 +3185,5 @@ function fillFreeArea(state: AppState, tabId: string) {
     Object.assign(tab, { position: { x: x0 + m - origin.left, y }, size: { width, height }, isHidden: false, isMinimized: false });
 }
 
-export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };
+export type { WorkspaceTab, NormaBlock, LooseArticle, TabContent, SearchPanelState };
 

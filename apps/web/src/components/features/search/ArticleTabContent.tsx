@@ -90,7 +90,7 @@ interface ArticleTabContentProps {
      */
     readingOrigin?: { tabId: string; blockId: string };
     /**
-     * The workspace tab a loose article or a collection sits in, which has no norma block to come
+     * The workspace tab a loose article sits in, which has no norma block to come
      * back to: a decision cited in its massime opens beside that tab, with no way-back entry.
      * `readingOrigin` wins when both are given.
      */

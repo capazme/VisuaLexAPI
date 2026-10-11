@@ -3,8 +3,8 @@
  * targets in «Questa scheda» or «Tutte le schede», built from the store's workspace tabs alone —
  * no DOM, so it is tested without one, like `utils/versionDisplay.ts`.
  *
- * A target is an article (one per article actually loaded in a block, a loose article or a
- * collection — not only the one a block currently shows: an article open but not drawn still
+ * A target is an article (one per article actually loaded in a block or a loose
+ * article — not only the one a block currently shows: an article open but not drawn still
  * counts, searched in its stored text) or a decision tab (one text). `storedText` is always the
  * projection — `article_text` with every `\n` dropped, or a decision's `decisionProjection` — so a
  * caller can `findMatches` it directly; the DOM, when a root is registered and displayed for the
@@ -105,8 +105,7 @@ function targetsOfTab(tab: WorkspaceTab, phone: boolean): FindTarget[] {
     // The phone column draws norm blocks alone (`SearchPanel` filters on `type === 'norma'`).
     if (phone && item.type !== 'norma') continue;
     if (item.type === 'norma') targets.push(...articleTargets(tab.id, item.articles));
-    else if (item.type === 'loose-article') targets.push(...articleTargets(tab.id, [item.article]));
-    else targets.push(...articleTargets(tab.id, item.articles.map((a) => a.article)));
+    else targets.push(...articleTargets(tab.id, [item.article]));
   }
   return targets;
 }
@@ -115,9 +114,9 @@ function targetsOfTab(tab: WorkspaceTab, phone: boolean): FindTarget[] {
  * The ordered targets of the scope: «Questa scheda» is `frontTabId` alone, «Tutte le schede» is
  * every open tab in dock order (`workspaceTabs`'s own order — `WorkspaceNavigator` renders it
  * unsorted, minimised tabs included); inside a tab, block and article as the tab shows them, a
- * decision tab one text. The same article twice in one tab (in a block and in a collection) is one
+ * decision tab one text. The same article twice in one tab (in a block and loose) is one
  * target, where it first appears: its key names one root, so it is searched and counted once.
- * On a phone (`options.phone`) the loose articles and collections are left out: its column never
+ * On a phone (`options.phone`) the loose articles are left out: its column never
  * draws them, so counting them would only promise matches that cannot be shown.
  */
 export function findTargetsInScope(
