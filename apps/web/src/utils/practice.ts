@@ -197,3 +197,193 @@ export function practiceCountLine(counts: PracticeCounts): string {
     part(counts.decisions, 'sentenza', 'sentenze'),
   ].filter(Boolean).join(' · ');
 }
+
+// --- Saved state is untrusted input (spec §10): checked before use, never thrown on. ---
+
+/** A practice's name as stored and shown: trimmed, at most this long (spec §10). */
+export const MAX_PRACTICE_LABEL = 120;
+
+export function practiceLabel(label: string): string {
+  return label.trim().slice(0, MAX_PRACTICE_LABEL);
+}
+
+type Loose = Record<string, unknown>;
+const isObject = (value: unknown): value is Loose => !!value && typeof value === 'object' && !Array.isArray(value);
+const isText = (value: unknown): value is string => typeof value === 'string';
+const shapeOf = (value: unknown): string => {
+  if (value === null || value === undefined) return String(value);
+  if (Array.isArray(value)) return 'a list';
+  return typeof value === 'object' ? 'an object' : `${typeof value} ${JSON.stringify(value).slice(0, 40)}`;
+};
+
+/** A saved view of a tab (a decision or a topic search) that can be read: a court, a positive
+ *  integer number and year; a topic or a norm with its act type and article. */
+export function isValidView(view: unknown): boolean {
+  if (!view || typeof view !== 'object') return false;
+  const v = view as { kind?: unknown; reference?: Record<string, unknown>; query?: unknown };
+  if (v.kind === 'decision') {
+    const r = v.reference;
+    return !!r && typeof r.corte === 'string' && r.corte !== '' &&
+      Number.isInteger(r.numero) && (r.numero as number) > 0 &&
+      Number.isInteger(r.anno) && (r.anno as number) > 0;
+  }
+  if (v.kind === 'decision-search') {
+    const q = v.query as { tema?: unknown; norma?: unknown } | null | undefined;
+    if (!q || typeof q !== 'object') return false;
+    if (q.tema !== undefined && typeof q.tema !== 'string') return false;
+    const n = q.norma as Record<string, unknown> | null | undefined;
+    if (n !== undefined && (!n || typeof n !== 'object' || typeof n.tipo_atto !== 'string' || typeof n.numero_articolo !== 'string')) return false;
+    return q.tema !== undefined || n !== undefined;
+  }
+  return false;
+}
+
+/** An article that can be keyed: a `norma_data` with its act type and article number. */
+export function isStoredArticle(value: unknown): value is ArticleData {
+  if (!isObject(value) || !isObject(value.norma_data)) return false;
+  return isText(value.norma_data.tipo_atto) && isText(value.norma_data.numero_articolo);
+}
+
+/** An act as stored: its type required, the other fields kept only when they are text. */
+export function storedNorma(value: unknown): Norma | null {
+  if (!isObject(value) || !isText(value.tipo_atto) || value.tipo_atto.trim() === '') return null;
+  const norma: Norma = { tipo_atto: value.tipo_atto, data: isText(value.data) ? value.data : '' };
+  if (isText(value.numero_atto)) norma.numero_atto = value.numero_atto;
+  if (isText(value.tipo_atto_reale)) norma.tipo_atto_reale = value.tipo_atto_reale;
+  if (isText(value.urn)) norma.urn = value.urn;
+  return norma;
+}
+
+/** A decision's reference that passes `isValidView`, with its known fields only. */
+export function storedReference(value: unknown): DecisionReference | null {
+  if (!isObject(value) || !isValidView({ kind: 'decision', reference: value })) return null;
+  if (value.archivio !== undefined && value.archivio !== 'civile' && value.archivio !== 'penale') return null;
+  const reference = { corte: value.corte, numero: value.numero, anno: value.anno } as DecisionReference;
+  if (value.archivio !== undefined) reference.archivio = value.archivio as DecisionReference['archivio'];
+  if (isText(value.sezione)) reference.sezione = value.sezione;
+  return reference;
+}
+
+function sanitizeAct(raw: unknown, where: string, dropped: string[]): PracticeAct | null {
+  if (!isObject(raw) || !isText(raw.id) || raw.id === '') {
+    dropped.push(`${where}: an act without an id (${shapeOf(raw)})`);
+    return null;
+  }
+  const norma = storedNorma(raw.norma);
+  if (!norma || !Array.isArray(raw.articles)) {
+    dropped.push(`${where}, act ${raw.id}: no act type or no list of articles`);
+    return null;
+  }
+  const articles: ArticleData[] = [];
+  const keys = new Set<string>();
+  raw.articles.forEach((article: unknown, i: number) => {
+    if (!isStoredArticle(article)) {
+      dropped.push(`${where}, act ${raw.id}: article #${i} has no norma_data (${shapeOf(article)})`);
+      return;
+    }
+    const key = practiceArticleKey(article);
+    if (keys.has(key)) {
+      dropped.push(`${where}, act ${raw.id}: a second copy of ${key}`);
+      return;
+    }
+    keys.add(key);
+    articles.push(article);
+  });
+  return { id: raw.id, key: actKeyOf(norma), norma, articles, isCollapsed: raw.isCollapsed === true };
+}
+
+function sanitizeDecision(raw: unknown, where: string, dropped: string[]): PracticeDecision | null {
+  const reference = isObject(raw) ? storedReference(raw.reference) : null;
+  if (!isObject(raw) || !isText(raw.id) || raw.id === '' || !reference || !isText(raw.label)) {
+    dropped.push(`${where}: a decision without an id, a label or a valid reference (${shapeOf(isObject(raw) ? raw.reference : raw)})`);
+    return null;
+  }
+  const decision: PracticeDecision = { id: raw.id, reference, label: raw.label, identified: raw.identified === true };
+  if (isText(raw.depositDate)) decision.depositDate = raw.depositDate;
+  if (isText(raw.tipo)) decision.tipo = raw.tipo;
+  return decision;
+}
+
+function sanitizeBeside(raw: unknown, practice: Practice): BesideRef | null {
+  if (!isObject(raw) || !isText(raw.id) || raw.id === '') return null;
+  if (raw.kind === 'article' && isText(raw.actId) && isText(raw.articleKey)) {
+    const act = practice.acts.find((a) => a.id === raw.actId);
+    const held = act?.articles.some((a) => practiceArticleKey(a) === raw.articleKey);
+    return held ? { id: raw.id, kind: 'article', actId: raw.actId, articleKey: raw.articleKey } : null;
+  }
+  if (raw.kind === 'decision' && isText(raw.decisionId)) {
+    return practice.decisions.some((d) => d.id === raw.decisionId)
+      ? { id: raw.id, kind: 'decision', decisionId: raw.decisionId }
+      : null;
+  }
+  if (raw.kind === 'decision-search' && isText(raw.label) && isValidView({ kind: 'decision-search', query: raw.query })) {
+    return { id: raw.id, kind: 'decision-search', query: raw.query as DecisionSearchQuery, label: raw.label };
+  }
+  return null;
+}
+
+/**
+ * The saved practices, checked (spec §10): a practice is kept only with a string id and label and
+ * lists where lists belong; an act only with an act type, and its articles only with a
+ * `norma_data`; a decision only with a reference `isValidView` accepts; a window only when it
+ * points at something the practice holds, at most two. What fails goes into `dropped`, for the
+ * caller to log (gotcha 18); nothing is thrown, since a throw in the store's `merge` would reset it.
+ */
+export function sanitizePractices(raw: unknown): { practices: Practice[]; dropped: string[] } {
+  const dropped: string[] = [];
+  if (raw === undefined || raw === null) return { practices: [], dropped };
+  if (!Array.isArray(raw)) return { practices: [], dropped: [`practices: not a list (${shapeOf(raw)})`] };
+
+  const practices: Practice[] = [];
+  raw.forEach((entry: unknown, index: number) => {
+    if (!isObject(entry) || !isText(entry.id) || entry.id === '' || !isText(entry.label) ||
+      !Array.isArray(entry.acts) || !Array.isArray(entry.decisions) || !Array.isArray(entry.beside)) {
+      dropped.push(`practice #${index}: no id, no label, or not lists of acts, decisions and windows (${shapeOf(entry)})`);
+      return;
+    }
+    if (practices.some((p) => p.id === entry.id)) {
+      dropped.push(`practice #${index}: the id ${entry.id} is already taken`);
+      return;
+    }
+    const where = `practice ${entry.id}`;
+    const practice: Practice = {
+      id: entry.id, label: practiceLabel(entry.label), labelIsCustom: entry.labelIsCustom === true,
+      acts: [], decisions: [], beside: [],
+    };
+    for (const rawAct of entry.acts) {
+      const act = sanitizeAct(rawAct, where, dropped);
+      if (!act) continue;
+      const same = practice.acts.find((a) => a.key === act.key);
+      if (same) {
+        // Two acts of one identity: one act, the first one's id (no article is lost).
+        practice.acts = addArticles(practice.acts, act.norma, act.articles, () => same.id).acts;
+      } else if (practice.acts.some((a) => a.id === act.id)) {
+        dropped.push(`${where}: the act id ${act.id} is already taken`);
+      } else {
+        practice.acts.push(act);
+      }
+    }
+    for (const rawDecision of entry.decisions) {
+      const decision = sanitizeDecision(rawDecision, where, dropped);
+      if (!decision) continue;
+      if (practice.decisions.some((d) => d.id === decision.id)) {
+        dropped.push(`${where}: the decision id ${decision.id} is already taken`);
+        continue;
+      }
+      practice.decisions.push(decision);
+    }
+    const beside: BesideRef[] = [];
+    for (const rawRef of entry.beside) {
+      const ref = sanitizeBeside(rawRef, practice);
+      if (!ref || beside.some((b) => b.id === ref.id)) {
+        dropped.push(`${where}: a window that points at nothing the practice holds (${shapeOf(isObject(rawRef) ? rawRef.kind : rawRef)})`);
+        continue;
+      }
+      beside.push(ref);
+    }
+    if (beside.length > MAX_BESIDE) dropped.push(`${where}: ${beside.length - MAX_BESIDE} windows past the two allowed`);
+    practice.beside = beside.slice(-MAX_BESIDE);
+    practices.push(practice);
+  });
+  return { practices, dropped };
+}
