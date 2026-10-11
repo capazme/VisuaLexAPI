@@ -317,7 +317,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   filters by `materia`, `stato`, `tipo`, `normaKey` — any anchor on the act —
   `q` — 1–100 characters, in the institute or the question, case-insensitive —
   and `origine=applicazione`, ordered `ordine=recenti` (default) or `materia`,
-  then institute, newest, id),
+  then institute, newest, id; `GET /:id` adds, for the user's session only, `approvazioni` and
+  `rilievi` — the «migliorabile» and «errata» reasons, never who gave them: a connected application
+  gets the card without them, since a reason may name someone),
+  `POST /:id/proponi` and `POST /:id/ritira` (session only; see Studia validation below),
   `POST /trash` (personal states only, `PERSONAL_STATES`; the session and
   exchanged tokens alike), and `PATCH /:id` for the session only (not in the
   delegated table: a default-deny 403 for an exchanged token). The patch takes
@@ -334,11 +337,38 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `lingo:cards:read` / `lingo:cards:write`; two points per reference, one of
   the day's hundred per card. `lingo/serializeCard.ts` is the one answer shape.
 - **`GET /api/lingo/articolo?urn=`** (`routes/lingoArticolo.ts`, session only):
-  the user's non-archived cards anchored on the article, each with `comunita`
-  and `approvazioni` (in PR A always `false` and `null`; the community's come
-  later). The address is the reader's (`…urn:nir:…~art1453!vig=…`); the
+  the user's non-archived cards anchored on the article (`comunita: false`,
+  `approvazioni: null`), then other people's `VALIDATA` ones (`comunita: true`,
+  `approvazioni` = the count of approvals; a card whose author is gone included),
+  at most 50, never another person's draft, proposal or archived card. The address is the reader's (`…urn:nir:…~art1453!vig=…`); the
   identity is `anchorUrn`, the same cut that stores an anchor's `urn`, so
   storage and lookup agree. An address with no `urn:` is a 400.
+- **Studia validation** (spec `docs/superpowers/specs/2026-10-07-studia-cards-screens-design.md`
+  decisions 13–15, 19, 20, 22; every route session only, none in the delegated table).
+  `POST /api/lingo/cards/:id/proponi { accettoTestoId? }`: the author's draft → proposed, in one
+  transaction that locks the row and reads the current version of `PROPOSTA_SCHEDA`
+  (`lingo/texts.ts` `currentText`, `hasAccepted`). If the caller has not accepted it, the body
+  must name that version's id and the acceptance is stored with the proposal; otherwise 409
+  `{ detail, richiedeTesto }` with the current version, nothing written. The card records the
+  version in `propostaTestoId`. `POST /:id/ritira`: proposed → draft at any time, deleting the
+  card's votes and clearing `propostaTestoId`. `routes/lingoValidazione.ts`:
+  `GET /api/lingo/validazione/coda?materia=&limit=` (1–20) and `POST /api/lingo/validazione/:cardId
+  { giudizio, motivazione? }` (reason 1–2,000 characters, required unless `APPROVATA`), for
+  validators only: `User.lingoValidatore`, set by an administrator through `PUT /admin/users/:id`
+  and read from the database on every call (a validator demoted mid-queue is refused at the next
+  vote). The queue holds proposed cards not written by the caller (author-less ones included —
+  a null `autoreId` fails a bare `not`, hence the `OR`) and not yet voted on by them, oldest first.
+  The vote locks the card row, refuses one's own card (403), a second vote (409) and a card that
+  is no longer proposed (404), stores the vote and lets `lingo/validationRule.ts` decide the
+  state: **provisional** (to confirm with the other developer), 2 approvals and no «errata»
+  validate, one «errata» archives, in two named constants. `GET /api/lingo/testi/:chiave` gives
+  the current text to accept and whether the caller accepted it; `routes/adminStudiaTesti.ts`
+  (`GET`/`POST /api/admin/studia/testi[/:chiave]`, administrators only) lists every version and
+  saves a new one numbered above the highest (two at once: the unique index refuses the second,
+  409). A version is never updated or deleted: acceptances and cards point at it with
+  `RESTRICT`. Version 1 of each key is written by the migration that creates the key
+  (`20261017100000_lingo_validation` for `PROPOSTA_SCHEDA`). `GET /auth/me` and the login answer
+  carry `lingo_validatore`.
 - **LingoLex cards** (data layer): `LingoCard` and
   `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
   is the strict contract: one to ten anchors, a lower-case SHA-256 fingerprint,
@@ -347,13 +377,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   that decides which anchor is the primary one.
   `lingo/cards.ts` `createLingoCard(authorId, input, client?, origin?)` is one nested write that
   starts the card as `BOZZA_PERSONALE`; `lingo/cardStates.ts` holds the
-  lifecycle (`canTransition`). The author is optional: when an account goes
+  lifecycle (`canTransition`; proposed → draft is the withdrawal). The author is optional: when an account goes
   (`deleteUserAccount`, used by `DELETE /auth/account` and by the administrator's
   `DELETE /admin/users/:id`; never delete the user row by hand) the cards the
   community has taken up (proposed, validated, to review) stay without an author,
   and the person's drafts and archived cards are deleted with them, in one
-  transaction (plan, decision 14). `GET /auth/export` includes the user's cards
-  as `data.lingoCards`.
+  transaction (plan, decision 14). Their votes outlive them, anonymous
+  (`LingoValidazioneCard.utenteId` `SET NULL`), as do the text versions they wrote
+  (`autoreId` `SET NULL`); their acceptances go. A card's votes go with the card: one
+  restored from the trash comes back without them. `GET /auth/export` includes the user's cards
+  as `data.lingoCards`, their votes as `data.lingoValidazioni` (card id, verdict, reason, time)
+  and their acceptances as `data.lingoAccettazioni` (key, version, time).
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
@@ -363,7 +397,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades, except the community's study cards, which stay without an
-  author: see LingoLex cards). Reached from the Settings modal. The export's
+  author, and the validators' votes and the text versions an administrator wrote,
+  which stay anonymous: see LingoLex cards). Reached from the Settings modal. The export's
   history rows include `decisionKey` (raw Prisma fields, as the rest of the export); its
   discussion threads keep a release's time but not the releasing admin's id.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
@@ -385,7 +420,10 @@ schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 ## Tests
 
 Only through `npm test`: its setup runs `prisma migrate reset` and refuses a
-database whose name lacks "test". nock is replaced by a fetch shim (vitest
+database whose name lacks "test". The per-test `TRUNCATE … users CASCADE` also empties
+`lingo_testi_versioni` (it references `users`), so the setup reads the versions the migrations
+wrote once and puts them back after each truncation: every test starts with version 1 of each
+text to accept, as a fresh database has. nock is replaced by a fetch shim (vitest
 alias) because nock 14 corrupted supertest's sockets, and the suite shares one
 persistent server bound to `127.0.0.1` (a wildcard bind on macOS could share its
 port with another local process).

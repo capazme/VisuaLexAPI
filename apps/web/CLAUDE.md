@@ -20,7 +20,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
   validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di VisuaLex Studia»
   tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
-  names the validators; both follow `VITE_FEATURE_STUDIA`),
+  names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/studia/valida`
+  (`ValidationQueueView`), linked for validators only (`useAuth().isValidator`, from `lingo_validatore`
+  on `/auth/me`; the server checks the flag on every call): `useValidationQueue` shows the proposed cards
+  one at a time, oldest first, refilling when two are left; the primary anchor's article sits beside the
+  card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
+  dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata; the
+  subject is remembered in `localStorage`; a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an
