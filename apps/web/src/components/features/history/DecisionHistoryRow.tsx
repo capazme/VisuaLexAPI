@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Gavel, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -6,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { SearchHistoryItem } from '../../../services/historyService';
-import { formatDecisionShort, identityFromKey } from '../../../utils/decisionLinks';
+import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
 
 /**
  * A decision in the Cronologia: its short citation, a fixed slate stripe (no act type to colour it),
@@ -24,20 +23,19 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
   const key = item.decision_key ?? '';
   const identity = identityFromKey(key);
 
-  useEffect(() => {
-    if (!identity) console.error('history: unreadable decision key', { id: item.id, decision_key: item.decision_key });
-  }, [identity, item.id, item.decision_key]);
-
   const open = () => {
     if (!identity) return;
     openDecisionTab(identity);
     navigate('/');
   };
   const when = item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: it }) : null;
-  const label = identity ? formatDecisionShort(identity) : 'Sentenza';
+  const label = decisionHistoryLabel(item.decision_key);
 
   return (
-    <div id={id} data-history-decision className={cn('relative group', variant === 'desktop' && 'md:block')}>
+    <div id={id} data-history-decision className="relative group">
+      {variant === 'desktop' && (
+        <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800 group-hover:scale-125 transition-transform" />
+      )}
       <div className={cn(
         'relative flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700',
         variant === 'desktop' ? 'rounded-xl border-2 p-2 pl-5' : 'rounded-lg p-1 pl-4',

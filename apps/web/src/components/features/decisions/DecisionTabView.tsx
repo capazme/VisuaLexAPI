@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { DecisionNotice, DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
 import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
 import { addDecisionToHistory } from '../../../services/historyService';
@@ -30,6 +30,7 @@ function withoutCitationNotices(answer: FoundDecision): FoundDecision {
 export function DecisionTabView({ tabId, reference }: { tabId: string; reference: DecisionReference }) {
   const setIdentity = useAppStore((s) => s.setDecisionTabIdentity);
   const openPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
+  const markRecorded = useAppStore((s) => s.markDecisionRecorded);
   const takeFocusRequest = useAppStore((s) => s.takeDecisionFocusRequest);
   const focusRequested = useAppStore((s) => s.decisionFocusRequest === tabId);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -70,21 +71,23 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
     }
   }, [answer, setIdentity, tabId]);
 
-  // The Cronologia learns the decision once per opening of the tab. The desktop panel and the phone
-  // view are both mounted: only the copy on screen records, and each mount remembers the key it sent.
-  const recordedKey = useRef<string | null>(null);
+  // The Cronologia learns the decision once per opening of the tab: the key it was told is kept on
+  // the tab (persisted with it), so a remount, a minimise and restore or a reload never records
+  // again, while a new tab for the decision does. The desktop panel and the phone view are both
+  // mounted: only the copy on screen records.
   useEffect(() => {
     if (answer?.esito !== 'trovata') return;
     const panel = panelRef.current;
     if (!panel || panel.getClientRects().length === 0) return;
     const key = decisionKey(identityOf(answer.identita));
-    if (recordedKey.current === key) return;
-    recordedKey.current = key;
+    const tab = appStore.getState().workspaceTabs.find((t) => t.id === tabId);
+    if (!tab || tab.historyRecordedKey === key) return;
+    markRecorded(tabId, key);
     // the history is a convenience: the reading never fails for it
     addDecisionToHistory(key).catch((error: unknown) => {
       console.error('addDecisionToHistory failed', { decisionKey: key, error });
     });
-  }, [answer]);
+  }, [answer, tabId, markRecorded]);
 
   // The reader chose a candidate in another tab that turned out to be this one: the tab they were
   // in is gone, so keyboard focus comes here rather than falling to the page.

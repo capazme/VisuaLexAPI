@@ -248,20 +248,51 @@ describe('DecisionTabView — the store learns the identity of a tab opened by a
 });
 
 describe('DecisionTabView — the Cronologia', () => {
-  it('records a found decision once per opening, not on re-render, again after close and reopen', async () => {
+  it('records once per opening: a remount, a minimise and restore or a re-render never records again', async () => {
     fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
     const { id } = openTab(CIVILE);
     const first = render(<DecisionTabView tabId={id} reference={CIVILE} />);
     await screen.findByText(/Sez\. III civile/);
     expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
     expect(addDecisionToHistory).toHaveBeenCalledWith('cassazione:civile:99999:2024');
-    first.rerender(<DecisionTabView tabId={id} reference={CIVILE} />);
-    await act(async () => {});
-    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+    expect(appStore.getState().workspaceTabs.find((t) => t.id === id)?.historyRecordedKey).toBe('cassazione:civile:99999:2024');
+    // a remount of the same tab (a route change, a reload)
     first.unmount();
+    const second = render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    await screen.findByText(/Sez\. III civile/);
+    await act(async () => {});
+    // minimise and restore: the view unmounts and mounts again
+    second.unmount();
+    act(() => { appStore.getState().toggleTabMinimize(id); });
+    act(() => { appStore.getState().toggleTabMinimize(id); });
     render(<DecisionTabView tabId={id} reference={CIVILE} />);
     await screen.findByText(/Sez\. III civile/);
+    await act(async () => {});
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('records again for a new tab of the same decision, opened after the old one was closed', async () => {
+    fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
+    const { id } = openTab(CIVILE);
+    const first = render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    await screen.findByText(/Sez\. III civile/);
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+    first.unmount();
+    act(() => { appStore.getState().removeTab(id); });
+    const again = openTab(CIVILE);
+    expect(again.id).not.toBe(id);
+    render(<DecisionTabView tabId={again.id} reference={CIVILE} />);
     await waitFor(() => expect(addDecisionToHistory).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not record when the tab is brought to the front again', async () => {
+    fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
+    const { id } = openTab(CIVILE);
+    render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    await screen.findByText(/Sez\. III civile/);
+    act(() => { appStore.getState().openDecisionTab(CIVILE); });
+    await act(async () => {});
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
   });
 
   it('records nothing for an answer that is not a found decision', async () => {

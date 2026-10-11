@@ -14,7 +14,7 @@ import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } f
 import { NormaChangesSection } from './NormaChangesSection';
 import { labelFromParams } from '../../../utils/sources';
 import { DecisionHistoryRow } from './DecisionHistoryRow';
-import { formatDecisionShort, identityFromKey } from '../../../utils/decisionLinks';
+import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
 
 // Stripe color per act_type — keyed on lowercased exact match. Codes get
 // distinct colors so the user can scan the timeline visually; everything
@@ -289,6 +289,12 @@ export function HistoryView() {
     useEffect(() => {
         getHistory()
             .then(data => {
+                // once per row here, not in the row: the mobile and desktop lists both mount it
+                data.forEach((item) => {
+                    if (item.decision_key && !identityFromKey(item.decision_key)) {
+                        console.error('history: unreadable decision key', { id: item.id, decision_key: item.decision_key });
+                    }
+                });
                 setHistory(data);
                 setLoading(false);
             })
@@ -312,7 +318,7 @@ export function HistoryView() {
                 item.article?.toString() ?? '',
                 item.date ?? '',
                 item.version ?? '',
-                item.decision_key ? (() => { const id = identityFromKey(item.decision_key); return id ? formatDecisionShort(id) : 'Sentenza'; })() : generateQuickNormLabel(item),
+                item.decision_key ? decisionHistoryLabel(item.decision_key) : generateQuickNormLabel(item),
             ].join(' ').toLowerCase();
             return tokens.every(t => haystack.includes(t));
         });
