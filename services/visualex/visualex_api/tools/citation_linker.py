@@ -49,6 +49,7 @@ _NUMBERED_ACT_TYPES = frozenset({
     "legge", "decreto legge", "decreto legislativo",
     "decreto del presidente della repubblica", "regio decreto",
     "decreto ministeriale", "regolamento ue", "direttiva ue",
+    "legge costituzionale", "regio decreto legge", "decreto legislativo luogotenenziale",
 })
 
 # One article: a number, an optional bis/ter/.../terdecies suffix or a range

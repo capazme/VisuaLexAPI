@@ -244,6 +244,11 @@ class TestResolveNlQuery:
         assert result["act_type"] == "codice civile"
         assert result["article"] == "2043"
 
+    def test_the_annex_is_merged_too(self):
+        ctrl = self._make_controller()
+        result = ctrl._resolve_nl_query({"query": "art. 1 d.lgs. 81/2008 (All. A)"})
+        assert (result["act_number"], result["annex"]) == ("81", "A")
+
     def test_explicit_act_type_skips_nl_merge(self):
         ctrl = self._make_controller()
         result = ctrl._resolve_nl_query({
