@@ -263,7 +263,7 @@ above, question and answer in the reader's serif at a 60ch measure, the question
 shadow or gradient; the reveal is the area's one motion (a hairline, then the answer, `motion-safe:`
 only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
 but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
-menu's backdrop; `Layout` hides the feedback button there on a phone). An anchor opens its article
+menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
 (`DossierItemReader`) in a side panel on desktop and in `studia/Sheet` on a phone (the bottom sheet
 shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
 

@@ -32,7 +32,7 @@ export interface Scheda {
   /** The connected application that wrote the card; null for a card written here. */
   origine: { clientName: string | null } | null;
   /**
-   * The day of the next review, 'YYYY-MM-DD' in Rome; null when the user has never reviewed the card.
+   * The day of the next review, 'YYYY-MM-DD' in Rome; null when the user has never reviewed the card or it can no longer be reviewed.
    * Carried by the list (`/lingo/cards`); absent where the card is read some other way.
    */
   prossimoRipasso?: string | null;

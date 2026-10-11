@@ -348,7 +348,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   the due cards first (earliest `dueAt`, at most 500 fetched, `dovute` exact), then the
   new ones (oldest first) up to the daily goal minus the cards introduced today — state
   rows with `reps = 1` reviewed today, since only a day's first grade is recorded — so
-  the goal holds across devices; each card carries `nuova`, `comunita` and `anteprima`
+  the goal holds across devices, and across subjects: a session narrowed to one subject
+  still counts the day's new cards of every subject; each card carries `nuova`, `comunita` and `anteprima`
   (the days each grade would give, `previewIntervals`). `lingo/reviewQueue.ts`
   `reviewScope` is decision 8: the user's own drafts, proposals and validated cards, and
   the community's validated cards in the subjects switched on — never `autoreId != me`,
@@ -382,8 +383,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   as `data.lingoCards`. Review data is personal: `LingoStatoRipasso`
   (`lingo_stato_ripasso`, one row per user and card, indexed by `(utente_id, due_at)`),
   the append-only log `LingoRevisioneSRS` (`lingo_revisioni_srs`, kept to fit the weights
-  later) and `LingoPreferenzeStudio` (`lingo_preferenze_studio`) cascade from the user and
-  from the card; the export carries the log as `data.lingoRipassi` (not the derived state)
+  later) cascade from the user and from the card, `LingoPreferenzeStudio`
+  (`lingo_preferenze_studio`) from the user; the export carries the log as `data.lingoRipassi` (not the derived state)
   and the preferences as `data.lingoPreferenze` (null when never saved).
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
