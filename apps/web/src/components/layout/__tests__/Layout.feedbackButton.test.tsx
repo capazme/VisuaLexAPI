@@ -11,7 +11,9 @@ vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => 
 vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
 vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
-vi.mock('../../ui/ServiceHealthBanner', () => ({ ServiceHealthBanner: () => null }));
+vi.mock('../../ui/ServiceHealthBanner', () => ({
+  ServiceHealthBanner: ({ className }: { className?: string }) => <div data-testid="health" className={className}>Servizi operativi</div>,
+}));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
@@ -21,13 +23,15 @@ vi.mock('../../../hooks/useTour', () => ({
 
 import { Layout } from '../Layout';
 
-describe('Layout — the feedback button', () => {
-  it('is hidden on a phone during a review session, where the grade bar is pinned, and nowhere else', () => {
+describe('Layout — what sits where the review’s grade bar is pinned', () => {
+  it('hides the feedback button and the services pill on a phone during a review session, and nowhere else', () => {
     const { unmount } = render(<MemoryRouter initialEntries={['/studia/ripasso/sessione?materia=DIRITTO_CIVILE']}><Layout /></MemoryRouter>);
     expect(screen.getByTestId('feedback')).toHaveClass('max-md:hidden');
+    expect(screen.getByTestId('health')).toHaveClass('max-md:hidden');
     unmount();
 
     render(<MemoryRouter initialEntries={['/studia/ripasso']}><Layout /></MemoryRouter>);
     expect(screen.getByTestId('feedback')).not.toHaveClass('max-md:hidden');
+    expect(screen.getByTestId('health')).not.toHaveClass('max-md:hidden');
   });
 });

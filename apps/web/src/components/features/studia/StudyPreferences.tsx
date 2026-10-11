@@ -36,7 +36,9 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
   const [preferences, setPreferences] = useState<PreferenzeStudio | null>(null);
   const [goal, setGoal] = useState('');
   const [goalError, setGoalError] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [saving, setSaving] = useState(false);
+  // Only the goal reports «Salvato», beside its own button: a switch's feedback is the counts changing.
+  const [goalSaved, setGoalSaved] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,16 +58,21 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
 
   const save = async (changes: Partial<PreferenzeStudio>) => {
     setProblem(null);
-    setStatus('saving');
+    setSaving(true);
+    const isGoal = changes.nuoveAlGiorno !== undefined;
     try {
       const saved = await studiaService.savePreferences(changes);
       setPreferences(saved);
-      setGoal(String(saved.nuoveAlGiorno));
-      setStatus('saved');
+      // A switch must not overwrite a goal being typed.
+      if (isGoal) {
+        setGoal(String(saved.nuoveAlGiorno));
+        setGoalSaved(true);
+      }
       onChanged();
     } catch {
-      setStatus('idle');
       setProblem('Non sono riuscito a salvare. Riprova.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -123,7 +130,7 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
                   onChange={(e) => {
                     setGoal(e.target.value);
                     setGoalError(null);
-                    setStatus('idle');
+                    setGoalSaved(false);
                   }}
                   aria-invalid={goalError ? true : undefined}
                   aria-describedby={goalError ? errorId : undefined}
@@ -132,12 +139,12 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
                 <button
                   type="button"
                   onClick={saveGoal}
-                  disabled={status === 'saving'}
+                  disabled={saving}
                   className={cn(CONTROL, 'font-medium hover:bg-slate-100 disabled:opacity-60 dark:hover:bg-slate-700')}
                 >
                   Salva
                 </button>
-                {status === 'saved' && <span role="status" className="text-sm text-slate-500 dark:text-slate-400">Salvato</span>}
+                {goalSaved && <span role="status" className="text-sm text-slate-500 dark:text-slate-400">Salvato</span>}
               </div>
               {goalError && (
                 <p id={errorId} role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -158,7 +165,7 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
                         type="button"
                         role="switch"
                         aria-checked={on}
-                        disabled={status === 'saving'}
+                        disabled={saving}
                         onClick={() => toggle(materia)}
                         className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md px-1 text-left text-sm text-slate-800 md:min-h-0 md:py-1.5 disabled:opacity-60 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                       >

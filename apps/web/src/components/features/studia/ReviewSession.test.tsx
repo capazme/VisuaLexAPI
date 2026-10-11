@@ -88,6 +88,14 @@ describe('the review session', () => {
     expect(session).toHaveBeenCalledWith(undefined);
   });
 
+  it('counts what remains in words that cannot be read as an anchor', async () => {
+    renderSession([card('a'), card('b')]);
+    expect(await screen.findByText('Restano 2')).toBeInTheDocument();
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Resta 1')).toBeInTheDocument();
+  });
+
   it('sets the question, and then the answer, in a serif container', async () => {
     renderSession([card('a', { spiegazione: 'Perché sì.' })]);
     const question = await screen.findByRole('heading', { name: 'Domanda a?' });

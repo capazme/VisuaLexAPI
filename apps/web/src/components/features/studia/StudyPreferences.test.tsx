@@ -96,6 +96,18 @@ describe('StudyPreferences', () => {
       expect(screen.getByRole('switch', { name: 'Diritto penale' })).toHaveAttribute('aria-checked', 'false');
     });
 
+    it('does not report on the daily goal, nor overwrite a goal being typed', async () => {
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE'] });
+      const { user } = await opened();
+      const goal = screen.getByLabelText('Nuove schede al giorno');
+      await user.clear(goal);
+      await user.type(goal, '45');
+      await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
+      await waitFor(() => expect(screen.getByRole('switch', { name: 'Diritto civile' })).toHaveAttribute('aria-checked', 'true'));
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(goal).toHaveValue(45);
+    });
+
     it('switches one off, keeping the others', async () => {
       preferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
       savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_PENALE'] });

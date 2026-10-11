@@ -143,7 +143,7 @@ export function ReviewSession() {
       <div className={cn(openAnchor && desktop && 'md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] md:items-start md:gap-8')}>
         <div className="min-w-0">
           <div className="mb-6 flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Ancora {remaining}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{remaining === 1 ? 'Resta 1' : `Restano ${remaining}`}</p>
             <button
               type="button"
               onClick={() => setConfirmStop(true)}
