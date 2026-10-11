@@ -68,12 +68,15 @@ function wordPattern(word: string): string {
 const LETTER = /^\p{L}$/u;
 const LETTER_OR_DIGIT = /^[\p{L}\p{N}]$/u;
 
+/** Between two words of the text: spaces, or a dot followed by none («art.13», «n.2»). */
+const WORD_GAP = '(?:[.,]?\\s+|\\.)';
+
 /**
  * The query as a pattern in which punctuation of abbreviations is optional (spec §13.2): a «.» or
  * «,» of the query after a letter, or ending a word, may be absent from the text; the text may have
- * a «.» or «,» after any letter of a query word and at the end of any word but the last. Never a
- * space: it never joins two words. Matched only at the start of a word, so «art. 13» finds
- * «art 13» but not «part 13».
+ * a «.» or «,» after any letter of a query word and at the end of any word but the last, where a
+ * dot may stand for the space («art 13» finds «art.13»). Never a space inside a word: it never joins
+ * two words. Matched only at the start of a word, so «art. 13» finds «art 13» but not «part 13».
  */
 function punctuationFreePattern(words: string[]): string | null {
   const parts: string[] = [];
@@ -83,7 +86,6 @@ function punctuationFreePattern(words: string[]): string | null {
     // back as an optional `[.,]` where a letter or the word's end allows one.
     const kept = units.filter((u, i) => !((u === '.' || u === ',') && (LETTER.test(units[i - 1] ?? '') || i === units.length - 1)));
     if (kept.length === 0) return;
-    if (parts.length > 0) parts.push('\\s+');
     kept.forEach((u, i) => {
       parts.push(`${escapeRegExp(u)}\\p{M}*`);
       if (i < kept.length - 1) parts.push(LETTER.test(u) ? '[.,\\u00ad\\u200b]?' : INVISIBLE);
@@ -92,10 +94,12 @@ function punctuationFreePattern(words: string[]): string | null {
     // comma»); the query's last word takes none, so a match never swallows a sentence's end. A
     // last word typed with its final dot ends where the text's word ends: «art.» finds «art.» and
     // «art 13», never «articolo».
-    if (w < words.length - 1) parts.push('[.,]?');
+    if (w < words.length - 1) parts.push(WORD_GAP);
     else if (word.endsWith('.')) parts.push('(?:\\.|(?![\\p{L}\\p{N}]))');
   });
   if (parts.length === 0) return null;
+  // A query ending with a word of punctuation alone ends on the word before it, as a last word does.
+  if (parts[parts.length - 1] === WORD_GAP) parts[parts.length - 1] = '[.,]?';
   const body = parts.join('');
   const first = [...words[0]][0] ?? '';
   return LETTER_OR_DIGIT.test(first) ? `(?<![\\p{L}\\p{N}])${body}` : body;
@@ -154,7 +158,9 @@ export function findMatchesInFolded(
   const edges = [...folded];
   const before = /\p{N}/u.test(edges[0]) ? '(?<!\\p{N})' : '';
   const after = /\p{N}/u.test(edges[edges.length - 1]) ? '(?!\\p{N})' : '';
-  const literal = `${before}(?:${words.map(wordPattern).join('\\s+')})${after}`;
+  // A query word ending with a dot may be followed by no space in the text: «n. 2» finds «n.2».
+  const literalBody = words.map((word, i) => (i === 0 ? '' : words[i - 1].endsWith('.') ? '\\s*' : '\\s+') + wordPattern(word)).join('');
+  const literal = `${before}(?:${literalBody})${after}`;
   const relaxedBody = punctuationFreePattern(words);
   const relaxed = relaxedBody ? `${before}(?:${relaxedBody})${after}` : null;
   const re = new RegExp(relaxed ? `${literal}|${relaxed}` : literal, 'gu');

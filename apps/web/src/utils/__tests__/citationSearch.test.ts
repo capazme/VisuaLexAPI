@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { findCitationSpans, mergeMatches, readQueryCitation } from '../citationSearch';
+import { findCitationSpans, matchesWithCitation, mergeMatches, readQueryCitation } from '../citationSearch';
 import { findMatches } from '../findInText';
 import { CITATION_TEXTS } from '../__fixtures__/citationTexts';
 
-/** What the find window shows for `query`: the literal matches and the citation's spans, merged. */
+/** What the find window shows for `query` (`useFindWindow`): the literal matches and, for a
+ *  citation, the bounded literal matches and the citation's spans, merged. */
 function found(text: string, query: string): string[] {
-  const citation = readQueryCitation(query);
-  const spans = citation ? findCitationSpans(text, citation) : [];
-  return mergeMatches(findMatches(text, query).matches, spans).map(([s, e]) => text.slice(s, e));
+  const literal = findMatches(text, query).matches;
+  return (matchesWithCitation(text, query, literal) ?? literal).map(([s, e]) => text.slice(s, e));
 }
 
 /** The citation's spans alone. */
@@ -70,6 +70,15 @@ describe('readQueryCitation', () => {
       kind: 'act', actType: 'decreto del presidente della repubblica', number: '115', year: '2002',
     });
     expect(readQueryCitation('l. 22.12.2017, n. 219')).toEqual({ kind: 'act', actType: 'legge', number: '219', year: '2017' });
+  });
+
+  it("reads «all'art.» and «dell'art.» as an article's prefix, and an article with no space after the dot", () => {
+    const act = { kind: 'act', actType: 'legge', number: '99', year: '2015', article: '1' };
+    expect(readQueryCitation("dell'art. 1 della legge 99/2015")).toEqual(act);
+    expect(readQueryCitation("all'art. 1 l. 99/2015")).toEqual(act);
+    expect(readQueryCitation('art.1 l. 99/2015')).toEqual(act);
+    expect(readQueryCitation('art.13 c.c.')).toEqual({ kind: 'code', code: 'codice civile', article: '13' });
+    expect(readQueryCitation('Cass. n.8980/2018')).toEqual({ kind: 'decision', number: '8980', year: '2018' });
   });
 
   it('is not a citation: an abbreviation alone, an act without number, an article alone, words', () => {
@@ -141,6 +150,14 @@ describe('findCitationSpans', () => {
     expect(cited(text, 'legge cost. 34/2020')).toEqual(constitutional);
   });
 
+  it('never finds a law inside a decree-law whose hyphen takes a space', () => {
+    const text = 'Il decreto- legge n. 34 del 2020, il decreto -legge 34/2020 e il decreto - legge 19 maggio 2020, n. 34.';
+    for (const q of ['l. 34/2020', 'legge 34/2020', 'legge n. 34 del 2020']) expect(found(text, q), q).toEqual([]);
+    expect(cited(text, 'd.l. 34/2020')).toEqual([
+      'decreto- legge n. 34 del 2020', 'decreto -legge 34/2020', 'decreto - legge 19 maggio 2020, n. 34',
+    ]);
+  });
+
   it('finds an act whose date is written in figures', () => {
     const text = CITATION_TEXTS.numericDates;
     expect(cited(text, 'd.P.R. 115/2002')).toEqual(['D.P.R. 30.5.2002 n. 115']);
@@ -181,6 +198,29 @@ describe('findCitationSpans', () => {
     for (const text of broken) expect(cited(text, q), text).toEqual([]);
   });
 
+  it("links «all'art.» and «dell'art.», and never to a charter, a convention or a treaty", () => {
+    const q = 'art. 1 l. 99/2015';
+    expect(cited('La legge 99/2015, all\'art. 1, dispone.', q)).toEqual(["legge 99/2015, all'art. 1"]);
+    expect(cited('La legge 99/2015, dell\'art. 1, dispone.', q)).toEqual(["legge 99/2015, dell'art. 1"]);
+    expect(cited("Si veda l'art. 2 e dell'art. 1 della legge 99/2015.", q)).toEqual(['art. 1 della legge 99/2015']);
+    expect(cited("Si veda l'art. 2 e all'art. 1 della legge 99/2015.", q)).toEqual(['art. 1 della legge 99/2015']);
+    for (const other of ['della Carta', 'CEDU', 'della Convenzione', 'del Trattato', 'TFUE', 'TUE']) {
+      const text = `La legge 99/2015, art. 1 ${other}, dispone.`;
+      expect(cited(text, q), text).toEqual([]);
+    }
+    expect(cited('La legge 99/2015, art. 1 della cartella, dispone.', q)).toEqual(['legge 99/2015, art. 1']);
+  });
+
+  it('finds an article and a number written with no space after the dot', () => {
+    expect(found("Si veda l'art.13 c.c. e l'art. 13 c.c.", 'art. 13 c.c.')).toEqual(['art.13 c.c.', 'art. 13 c.c.']);
+    expect(found('Si veda art.1 della l. n.99/2015.', 'art. 1 l. 99/2015')).toEqual(['art.1 della l. n.99/2015']);
+    expect(found('Come Cass. n.8980/2018 afferma.', 'Cass. n. 8980/2018')).toEqual(['Cass. n.8980/2018']);
+    expect(found('Come Cass.n.8980/2018 afferma.', 'n. 8980/2018')).toEqual(['n.8980/2018']);
+    // The code's other forms too: «art.13» is read as an article.
+    expect(found("L'art.13 del codice civile e l'art.2043 cod. civ.", 'art. 13 c.c.')).toEqual(['art.13 del codice civile']);
+    expect(found("L'art.13 del codice civile e l'art.2043 cod. civ.", 'art.2043 c.c.')).toEqual(['art.2043 cod. civ.']);
+  });
+
   it('reads the act type from the tables: d.P.R. and d.lgs. are two acts', () => {
     const text = CITATION_TEXTS.dprForms;
     const forms = ['d.P.R. 30 maggio 2002, n. 115', 'd.P.R. n. 115 del 2002', 'D.P.R. 115/2002'];
@@ -205,12 +245,69 @@ describe('findCitationSpans', () => {
     expect(cited(CITATION_TEXTS.decisionAndAct, 'Cass. n. 219/2017')).toEqual(['n. 219/2017', 'n. 219 del 2017']);
   });
 
+  it("never finds a decision's number in a regional law, an act of the Union or a bare decree", () => {
+    const acts = [
+      'legge regionale n. 99 del 2015',
+      'l.r. n. 99/2015',
+      'legge reg. Puglia n. 99 del 2015',
+      'legge della Regione Veneto n. 99 del 2015',
+      'legge della Provincia autonoma di Trento n. 99/2015',
+      'legge della Regione Friuli-Venezia Giulia 3 marzo 2015, n. 99',
+      'direttiva n. 99/2015',
+      'dir. n. 99/2015',
+      'regolamento n. 99/2015',
+      'Reg. (UE) n. 99/2015',
+      'decreto n. 99 del 2015',
+      'decreto 3 marzo 2015, n. 99',
+    ];
+    const text = `${acts.join('; ')}; non Cass. n. 99/2015 né la legge, sentenza n. 99 del 2015.`;
+    for (const q of ['Cass. n. 99/2015', 'n. 99/2015', '99/2015']) {
+      expect(cited(text, q), q).toEqual(['n. 99/2015', 'n. 99 del 2015']);
+    }
+    expect(found(text, 'n. 99/2015')).toEqual(['n. 99/2015', 'n. 99 del 2015']);
+  });
+
   it('keeps the offsets of the original text with accents and capitals', () => {
     const text = 'È così: LEGGE N. 219 DEL 2017.';
     const citation = readQueryCitation('l. 219/2017');
     expect(citation).not.toBeNull();
     const spans = findCitationSpans(text, citation!);
     expect(spans.map(([s, e]) => text.slice(s, e))).toEqual(['LEGGE N. 219 DEL 2017']);
+  });
+});
+
+describe('the window: literal matches bounded as the citation spans are', () => {
+  it('never finds a law inside a decree-law, however the type is written', () => {
+    const text = CITATION_TEXTS.actTypeNames;
+    expect(found(text, 'l. 34/2020')).toEqual(['legge 17 luglio 2020, n. 34', 'l. 34/2020']);
+    expect(found(text, 'legge 34/2020')).toEqual(['legge 17 luglio 2020, n. 34', 'l. 34/2020']);
+    const numbered = 'Il d.l. n. 34/2020, il d. l. n. 34/2020, il r.d.l. n. 34/2020 e la l. n. 34/2020.';
+    expect(found(numbered, 'l. n. 34/2020')).toEqual(['l. n. 34/2020']);
+    expect(found(numbered, 'd.l. n. 34/2020')).toEqual(['d.l. n. 34/2020', 'd. l. n. 34/2020']);
+  });
+
+  it('never starts right after a letter, a digit or a dot', () => {
+    expect(found('la xl. 34/2020, la 1l. 34/2020, la .l. 34/2020', 'l. 34/2020')).toEqual([]);
+    expect(found("dell'art. 1 c.p. e (art. 1 c.p.)", 'art. 1 c.p.')).toEqual(['art. 1 c.p.', 'art. 1 c.p.']);
+  });
+
+  it('a query ending with a dot never ends right before a letter', () => {
+    const text = 'Gli art. 1 c.p.c., art. 1 c.p.p. e art. 1 c.p. vigente.';
+    expect(found(text, 'art. 1 c.p.')).toEqual(['art. 1 c.p.']);
+    expect(found('Si veda art. 360 c.p.c., n. 3.', 'art. 360 c.p.')).toEqual([]);
+    expect(found('Si veda art. 360 c.p.c., n. 3.', 'art. 360 c.p.c.')).toEqual(['art. 360 c.p.c.']);
+  });
+
+  it("a decision's number never inside an act's citation", () => {
+    const text = 'La l. n. 99/2015 e la legge n. 99 del 2015, non la sentenza n. 99/2015.';
+    expect(found(text, 'n. 99/2015')).toEqual(['n. 99/2015']);
+    expect(found(text, 'Cass. n. 99/2015')).toEqual(['n. 99/2015']);
+    expect(found(text, 'n. 99 del 2015')).toEqual(['n. 99/2015']);
+  });
+
+  it('a query that is not a citation keeps every literal match', () => {
+    expect(matchesWithCitation('il d.l. citato', 'l. citato', [[5, 14]])).toBeNull();
+    expect(found('il d.l. citato', 'l. citato')).toEqual(['l. citato']);
   });
 });
 

@@ -280,6 +280,14 @@ describe('punctuation in abbreviations is optional (spec §13.2)', () => {
     expect(words(text, 'art. 13 comma 1-quater')).toEqual(['art. 13, comma 1-quater', 'art. 13 comma 1-quater']);
   });
 
+  it('a dot may be followed by no space: «art. 13» finds «art.13», «n. 2» finds «n.2»', () => {
+    const text = "l'art.13 e l'art. 13, il n.2 e il n. 2";
+    expect(words(text, 'art. 13')).toEqual(['art.13', 'art. 13']);
+    expect(words(text, 'art 13')).toEqual(['art.13', 'art. 13']);
+    expect(words(text, 'n. 2')).toEqual(['n.2', 'n. 2']);
+    expect(words("l'art.130", 'art. 13')).toEqual([]);
+  });
+
   it('never requires a dot that ends a sentence', () => {
     expect(words('il danno ingiusto, e la colpa', 'danno ingiusto.')).toEqual(['danno ingiusto']);
   });

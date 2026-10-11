@@ -743,6 +743,54 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
     expect(parsed()).toBe(1);
   });
 
+  it('bounds the literal matches as the citation spans are (spec §13.2)', async () => {
+    addTab(
+      'Altrove',
+      NORMA_1,
+      'Il d.l. 34/2020, il d. l. 34/2020 e la l. 34/2020; art. 1 c.p.c., art. 1 c.p.p. e art. 1 c.p.; la l. n. 99/2015 e la n. 99/2015.',
+      { minimised: true },
+    );
+    const { rerender } = render(<Harness query="l. 34/2020" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(1);
+    rerender(<Harness query="art. 1 c.p." scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(1);
+    rerender(<Harness query="n. 99/2015" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(1);
+  });
+
+  it('folds a stored text once for an act query, and parses every text of the scope once', async () => {
+    const ACT = 'La legge n. 99 del 2015 e la l. 99/2015.';
+    addTab('Altrove', NORMA_1, ACT, { minimised: true });
+    const many = Array.from({ length: 40 }, (_, i) => norma(String(i + 10)));
+    const id = appStore.getState().addWorkspaceTab('Molti', many[0], many.map((n, i) => article(n, `Testo ${i}: l'art. 580 c.p.`)));
+    appStore.setState((st) => ({ workspaceTabs: st.workspaceTabs.map((t) => (t.id === id ? { ...t, isMinimized: true } : t)) }));
+    const folds = () => vi.mocked(foldForSearch).mock.calls.filter(([t]) => t === ACT).length;
+    const parses = () => vi.mocked(extractCitations).mock.calls.filter(([t]) => String(t).startsWith('Testo ')).length;
+
+    const { rerender } = render(<Harness query="l. 99/2015" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(2);
+    rerender(<Harness query="art. 580 c.p." scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(40);
+    expect(parses()).toBe(40);
+
+    for (const label of ['Uno', 'Due']) {
+      act(() => {
+        appStore.getState().addWorkspaceTab(label);
+      });
+      await settle(50);
+    }
+    rerender(<Harness query="l. 99/2015" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(2);
+    expect(folds()).toBe(1);
+    expect(parses()).toBe(40);
+  });
+
   it('never changes the text DOM, node identity included, with a citation searched', async () => {
     const tabId = addTab('Codice civile', NORMA_1, 'x');
     const element = mountRoot(tabId, NORMA_1, DRAWN);

@@ -10,7 +10,7 @@
  */
 
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
-import { extractCitations } from './citationMatcher';
+import { extractCitations, type CitationMatch } from './citationMatcher';
 import { NUMBERED_ACT_SPELLINGS, toApiArticleNumber } from './citationParser';
 import { expandTwoDigitYear } from './dateUtils';
 import { foldForSearch } from './findInText';
@@ -53,9 +53,9 @@ function abbreviationSource(abbreviation: string): string {
     .join('\\s*');
 }
 
-/** «decreto legislativo» → «decreto\s+legislativo». */
+/** «decreto legislativo» → «decreto\s+legislativo»; a hyphen may take spaces («decreto- legge», «decreto - legge»). */
 function nameSource(name: string): string {
-  return escapeRegExp(name).replace(/\s+/g, '\\s+');
+  return escapeRegExp(name).replace(/\s+/g, '\\s+').replace(/-/g, '\\s*-\\s*');
 }
 
 /**
@@ -142,14 +142,19 @@ const ARTICLE_REACH = 160;
 const ARTICLE_QUALIFIER =
   `\\s*,?\\s*(?:(?:comma|co\\.)\\s*${ARTICLE_ITEM}|(?:lett\\.?|lettera)\\s*\\p{L}\\)?|(?:n\\.?|numero)\\s*${ARTICLE_ITEM})`;
 const ARTICLE_WITH_QUALIFIERS = `${ARTICLE_WORD}\\s*${ARTICLE_LIST}(?:${ARTICLE_QUALIFIER})*`;
-const ARTICLE_JOIN = "\\s*(?:,\\s*(?:(?:e|ed)\\s+)?|(?:e|ed)\\s+)(?:l'\\s*|gli\\s+)?";
+/** «l'», «all'», «dell'» before an article («e dell'art. 2», «, all'art. 1»). */
+const ARTICLE_PREFIX = "(?:(?:l|all|dell)'\\s*)";
+const ARTICLE_JOIN = `\\s*(?:,\\s*(?:(?:e|ed)\\s+)?|(?:e|ed)\\s+)(?:${ARTICLE_PREFIX}|gli\\s+)?`;
 const ACT_LINK = "\\s*,?\\s*(?:(?:della|del|dell'|di\\s+cui\\s+(?:alla|al))\\s*)?";
 /** The articles right before an act, up to it: matched against the text that ends where the act starts. */
 const ARTICLES_BEFORE = new RegExp(`${ARTICLE_WITH_QUALIFIERS}(?:${ARTICLE_JOIN}${ARTICLE_WITH_QUALIFIERS})*${ACT_LINK}$`, 'u');
 
-/** A code named by its name or abbreviation («Cost.», «c.c.», «cod. pen.», «codice»), or an act of the Union. */
+/**
+ * A code named by its name or abbreviation («Cost.», «c.c.», «cod. pen.», «codice»), an act of the
+ * Union, a charter, a convention or a treaty («Carta», «CEDU», «Convenzione», «Trattato»).
+ */
 const CODE_NAME =
-  '(?<!\\p{L})(?:codice|cod\\.|costituzione|cost(?:\\.|(?!\\p{L}))|c\\.\\s*\\p{L}\\.|disp\\.|preleggi|regolamento|reg\\.|direttiva|dir\\.|tue|tfue|cdfue)';
+  '(?<!\\p{L})(?:codice|cod\\.|costituzione|cost(?:\\.|(?!\\p{L}))|c\\.\\s*\\p{L}\\.|disp\\.|preleggi|regolamento|reg\\.|direttiva|dir\\.|tue|tfue|cdfue|(?:carta|cedu|convenzione|trattato)(?!\\p{L}))';
 /** Another act or a code right after an article: the article is that one's. */
 const ANOTHER_ACT_NEXT = new RegExp(`^${ACT_LINK}(?:${TYPE_START}${ANY_ACT_TYPE}(?!\\p{L})|${CODE_NAME})`, 'u');
 
@@ -158,7 +163,7 @@ const ANOTHER_ACT_NEXT = new RegExp(`^${ACT_LINK}(?:${TYPE_START}${ANY_ACT_TYPE}
 // ---------------------------------------------------------------------------
 
 const QUERY_ACT = new RegExp(
-  `^(?:${ARTICLE_WORD}\\s*(?<artBefore>${ARTICLE_ITEM})${COMMA_CLAUSE}\\s*,?\\s*${PREPOSITION})?` +
+  `^(?:${ARTICLE_PREFIX}?${ARTICLE_WORD}\\s*(?<artBefore>${ARTICLE_ITEM})${COMMA_CLAUSE}\\s*,?\\s*${PREPOSITION})?` +
     `(?<type>${ANY_ACT_TYPE})\\s*,?\\s*` +
     numberYearSource({
       numberA: '(?<numberA>\\d+)',
@@ -210,10 +215,25 @@ function readAct(folded: string): QueryCitation | null {
   };
 }
 
+/** «art.13» → «art. 13»: `extractCitations` reads an article only with a space after the dot. */
+const ARTICLE_DOT_DIGIT = /(?<![\p{L}\p{N}])art(?:t|icol[oi])?\.(?=\d)/giu;
+
+/** `extractCitations` of `text` with «art.13» read as «art. 13», at the offsets of `text`. */
+function extractSpaced(text: string): CitationMatch[] {
+  const inserted: number[] = [];
+  const spaced = text.replace(ARTICLE_DOT_DIGIT, (m: string, offset: number) => {
+    inserted.push(offset + m.length + inserted.length);
+    return `${m} `;
+  });
+  if (inserted.length === 0) return extractCitations(text);
+  const back = (i: number) => i - inserted.filter((at) => at < i).length;
+  return extractCitations(spaced).map((c) => ({ ...c, startIndex: back(c.startIndex), endIndex: back(c.endIndex), text: text.slice(back(c.startIndex), back(c.endIndex)) }));
+}
+
 function readCode(query: string, folded: string): QueryCitation | null {
   // A list of articles is not one citation: it is searched literally.
   if (/(?<!\p{L})(?:artt|articoli)(?!\p{L})/u.test(folded)) return null;
-  const trimmed = query.trim();
+  const trimmed = query.trim().replace(ARTICLE_DOT_DIGIT, '$& ');
   const found = extractCitations(trimmed);
   if (found.length !== 1) return null;
   const [c] = found;
@@ -261,7 +281,7 @@ function listHas(list: string, article: string): boolean {
 }
 
 const ARTICLE_MENTION = new RegExp(`${ARTICLE_WORD}\\s*(${ARTICLE_LIST})`, 'gu');
-const ARTICLE_AFTER = new RegExp(`^\\s*,?\\s*${ARTICLE_WORD}\\s*(${ARTICLE_LIST})(?:${ARTICLE_QUALIFIER})*`, 'u');
+const ARTICLE_AFTER = new RegExp(`^\\s*,?\\s*${ARTICLE_PREFIX}?${ARTICLE_WORD}\\s*(${ARTICLE_LIST})(?:${ARTICLE_QUALIFIER})*`, 'u');
 
 /**
  * The act's article written before it, linked to it by nothing but `ARTICLES_BEFORE`'s gap, or
@@ -333,19 +353,47 @@ function actSpans(folded: string, c: Extract<QueryCitation, { kind: 'act' }>): S
 }
 
 /**
- * A decision's number and year in every form; never where they belong to an act (any type in the
- * table), as in «legge n. 219 del 2017» for «n. 219/2017».
+ * What names an act for a decision's number (spec §13.2): any form of a type in the tables, or
+ * «decreto», «direttiva», «regolamento» («dir.», «reg.»), whole or ending with a dot («l.r.»).
  */
-function decisionSpans(folded: string, c: Extract<QueryCitation, { kind: 'decision' }>): Span[] {
+const ACT_WORD = `${TYPE_START}(?:${ANY_ACT_TYPE}|decreto|direttiva|dir\\.|regolamento|reg\\.)(?:(?<=\\.)|(?!\\p{L}))`;
+/**
+ * A word between an act's name and its number: «regionale», «reg.», «r.», «della», «Regione»,
+ * «Friuli-Venezia», «(UE)». Never a court or a decision's marker: «la legge e Cass. n. …» is a decision.
+ */
+const ACT_NAME_WORD = `(?!${DECISION_HEAD})(?:\\p{L}+(?:-\\p{L}+)*(?!\\p{L})\\.?|\\(\\p{L}+\\))`;
+/** Spaces and at most one comma, in one way only (no backtracking over a long run of spaces). */
+const ACT_NAME_GAP = '\\s*(?:,\\s*)?';
+/** How many such words: «legge della Provincia autonoma di Trento». */
+const ACT_NAME_WORDS = 5;
+
+/**
+ * The citations of any act with this number and year: an act's name, up to `ACT_NAME_WORDS` words,
+ * and the number and year («legge regionale n. 99 del 2015», «Reg. (UE) n. 99/2015», «decreto n.
+ * 99 del 2015»). A decision's number is never found inside one.
+ */
+function anyActSpans(folded: string, number: string, year: string): Span[] {
+  const n = escapeRegExp(number);
+  const re = new RegExp(
+    `${ACT_WORD}(?:${ACT_NAME_GAP}${ACT_NAME_WORD}){0,${ACT_NAME_WORDS}}${ACT_NAME_GAP}` +
+      numberYearSource({ numberA: n, numberB: n, slashYear: slashYearSource(year), delYear: year, dateYear: year }),
+    'gu',
+  );
+  return [...folded.matchAll(re)].map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
+}
+
+const overlapsAny = (spans: readonly Span[], [s, e]: Span): boolean => spans.some(([a, b]) => s < b && a < e);
+
+/** A decision's number and year in every form; never where they belong to an act (`anyActSpans`). */
+function decisionSpans(folded: string, c: Extract<QueryCitation, { kind: 'decision' }>, acts: readonly Span[]): Span[] {
   const re = new RegExp(
     `(?:(?<![\\p{L}\\p{N}])${NUMBER_WORD})?(?<![\\d/])(?<!\\d[.,])${escapeRegExp(c.number)}(?!\\d)\\s*` +
       `(?:\\/\\s*${slashYearSource(c.year)}|,?\\s+del\\s+(?:${DAY_MONTH})?${c.year})(?!\\d)`,
     'gu',
   );
-  const acts = ACT_TYPE_FORMS.flatMap((forms) => actTypeSpans(folded, forms, c.number, c.year));
   return [...folded.matchAll(re)]
     .map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length])
-    .filter(([s, e]) => !acts.some(([a, b]) => s < b && a < e));
+    .filter((span) => !overlapsAny(acts, span));
 }
 
 /** «dell'», «all'»… that `extractCitations` reads with the article: the span starts at «art.». */
@@ -354,37 +402,80 @@ const LEADING_PREPOSITION = /^(?:dell?|dall?|all?|nell?|sull?)['’]/i;
 /** A list read whole («artt. 2, 13 e 32 Cost.»): `extractCitations` names it by its first article only. */
 const ARTICLE_LIST_HEAD = /^(?:\p{L}+['’])?(?:artt|articoli)(?!\p{L})/iu;
 
-/** `extractCitations` results of the last texts read: a window searching the same texts for every keystroke parses each once. */
-const CITATIONS_CACHE_SIZE = 32;
-const citationsCache = new Map<string, ReturnType<typeof extractCitations>>();
-
-function citationsIn(text: string): ReturnType<typeof extractCitations> {
-  const hit = citationsCache.get(text);
-  if (hit) {
-    citationsCache.delete(text);
-    citationsCache.set(text, hit);
-    return hit;
-  }
-  const found = extractCitations(text);
-  citationsCache.set(text, found);
-  if (citationsCache.size > CITATIONS_CACHE_SIZE) citationsCache.delete(citationsCache.keys().next().value as string);
-  return found;
+/**
+ * A text as the citation search reads it: folded once (`foldForSearch`), its citations read once
+ * (`extractCitations`, on first need). A caller searching the same text for every keystroke keeps
+ * one per text (`useFindWindow`, per target) and passes it back.
+ */
+export interface CitationText {
+  readonly text: string;
+  readonly folded: string;
+  citations?: CitationMatch[];
 }
 
-function codeSpans(text: string, c: Extract<QueryCitation, { kind: 'code' }>): Span[] {
+export function citationText(text: string, folded: string = foldForSearch(text)): CitationText {
+  return { text, folded };
+}
+
+function codeSpans(t: CitationText, c: Extract<QueryCitation, { kind: 'code' }>): Span[] {
   const code = c.code.toLowerCase();
-  return citationsIn(text)
+  t.citations ??= extractSpaced(t.text);
+  return t.citations
     .filter((m) => !m.parsed.act_number && m.parsed.act_type.toLowerCase() === code)
     .filter((m) => m.parsed.article === c.article || (ARTICLE_LIST_HEAD.test(m.text) && listHas(m.text, c.article)))
     .map((m) => [m.startIndex + (LEADING_PREPOSITION.exec(m.text)?.[0].length ?? 0), m.endIndex]);
 }
 
-/** Every span of `text` naming the same norm or decision as `citation`, sorted, as `[start, end)` of the original text. */
-export function findCitationSpans(text: string, citation: QueryCitation): Span[] {
-  if (citation.kind === 'code') return codeSpans(text, citation);
-  const folded = foldForSearch(text);
-  if (citation.kind === 'act') return actSpans(folded, citation);
-  return decisionSpans(folded, citation);
+/** Every span of the text naming the same norm or decision as `citation`, sorted, as `[start, end)` of the original text. */
+export function findCitationSpans(text: string | CitationText, citation: QueryCitation): Span[] {
+  const t = typeof text === 'string' ? citationText(text) : text;
+  if (citation.kind === 'code') return codeSpans(t, citation);
+  if (citation.kind === 'act') return actSpans(t.folded, citation);
+  return decisionSpans(t.folded, citation, anyActSpans(t.folded, citation.number, citation.year));
+}
+
+const LETTER_DIGIT_OR_DOT = /[\p{L}\p{N}.]/u;
+const LETTER = /\p{L}/u;
+
+/**
+ * Whether a literal match of a citation query stays: bounded as the citation's spans are (spec
+ * §13.2). It never starts right after a letter, a digit or a dot, nor on an act type that is the
+ * tail of another type's name («l. 34/2020» in «d. l. 34/2020»); with a final dot in the query it
+ * never ends right before a letter («art. 1 c.p.» in «art. 1 c.p.c.»); for a decision it never
+ * overlaps an act's citation («n. 219/2017» in «l. n. 219/2017»).
+ */
+function literalKept(folded: string, query: string, citation: QueryCitation, acts: readonly Span[]): (span: Span) => boolean {
+  const endsWithDot = query.trim().endsWith('.');
+  const forms = citation.kind === 'act' ? ACT_TYPE_FORMS.find((f) => f.actType === citation.actType) : undefined;
+  const typeAt = forms ? new RegExp(forms.source, 'uy') : null;
+  return ([start, end]) => {
+    if (start > 0 && LETTER_DIGIT_OR_DOT.test(folded[start - 1])) return false;
+    if (endsWithDot && end < folded.length && LETTER.test(folded[end])) return false;
+    if (typeAt && forms) {
+      typeAt.lastIndex = start;
+      const type = typeAt.exec(folded);
+      if (type && insideAnotherType(folded, start, start + type[0].length, forms.actType)) return false;
+    }
+    return !overlapsAny(acts, [start, end]);
+  };
+}
+
+/**
+ * What the find window shows for `query` on a text whose literal matches are `literal`
+ * (`findMatches`, sorted): `null` when the query is not a citation (the literal matches stand as
+ * they are); otherwise the literal matches bounded as the citation's spans are, and the spans,
+ * merged (`mergeMatches`).
+ */
+export function matchesWithCitation(text: string | CitationText, query: string, literal: readonly Span[]): Span[] | null {
+  const citation = readQueryCitation(query);
+  if (!citation) return null;
+  const t = typeof text === 'string' ? citationText(text) : text;
+  const acts = citation.kind === 'decision' ? anyActSpans(t.folded, citation.number, citation.year) : [];
+  const spans =
+    citation.kind === 'decision'
+      ? decisionSpans(t.folded, citation, acts)
+      : findCitationSpans(t, citation);
+  return mergeMatches(literal.filter(literalKept(t.folded, query, citation, acts)), spans);
 }
 
 /**

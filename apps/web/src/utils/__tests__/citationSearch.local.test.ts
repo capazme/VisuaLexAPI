@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { findCitationSpans, mergeMatches, readQueryCitation } from '../citationSearch';
+import { findCitationSpans, matchesWithCitation, readQueryCitation } from '../citationSearch';
 import { findMatches } from '../findInText';
 
 /**
@@ -16,9 +16,9 @@ const CASS = 'd_cass5625.json';
 const CORTE = 'd_cort242.json';
 
 function spansFor(text: string, query: string): [number, number][] {
-  const citation = readQueryCitation(query);
-  expect(citation, query).not.toBeNull();
-  return mergeMatches(findMatches(text, query).matches, findCitationSpans(text, citation!));
+  const spans = matchesWithCitation(text, query, findMatches(text, query).matches);
+  expect(spans, query).not.toBeNull();
+  return spans!;
 }
 
 /** Every place `form` occurs in `text`, each of which a span must cover. */

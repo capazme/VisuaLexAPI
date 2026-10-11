@@ -11,16 +11,14 @@ import {
 import { findRootsFor, subscribeFindRoots, type FindRoot } from '../utils/findTargets';
 import {
   collectSearchableText,
-  findMatches,
   findMatchesInFolded,
-  foldForSearch,
   isSearchableQuery,
   mapThroughEdit,
   rangesForMatches,
   type FindResult,
   type TextSegment,
 } from '../utils/findInText';
-import { findCitationSpans, mergeMatches, readQueryCitation } from '../utils/citationSearch';
+import { citationText, matchesWithCitation, type CitationText } from '../utils/citationSearch';
 import { clearFindRanges, setFindRanges } from '../utils/findHighlights';
 
 const DEBOUNCE_MS = 150;
@@ -113,12 +111,13 @@ function rootFor(roots: FindRoot[], tabId: string, targetKey: string): FindRoot 
 }
 
 /** A text's matches for the query: the literal ones and, when the query reads as a citation, the
- *  spans naming the same citation, ordered by start, an overlap kept once (spec §13.2). Over a
- *  drawn text the same separator map as the literal match; over a stored text its projection. */
-function withCitation(text: string, q: string, found: FindResult, limit: number): FindResult {
-  const citation = readQueryCitation(q);
-  if (!citation) return found;
-  const merged = mergeMatches(found.matches, findCitationSpans(text, citation));
+ *  literal ones bounded as the citation's spans are and the spans naming the same citation, ordered
+ *  by start, an overlap kept once (spec §13.2). Over a drawn text the same separator map as the
+ *  literal match; over a stored text its projection. */
+function matchText(t: CitationText, q: string, limit: number): FindResult {
+  const found = findMatchesInFolded(t.folded, q, { limit });
+  const merged = matchesWithCitation(t, q, found.matches);
+  if (!merged) return found;
   return merged.length > limit
     ? { matches: merged.slice(0, limit), truncated: true }
     : { matches: merged, truncated: found.truncated };
@@ -164,7 +163,8 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
  *
  * Recomputed on typing (debounced), and — coalesced to one per animation frame — on a displayed
  * root's own mutations, on a root registering or being removed anywhere, and on any workspace
- * change. A stored text is folded once per text. Draws under one registry owner for the whole
+ * change. Each target's text is folded, and read for citations, once per text: one entry per target
+ * in scope, replaced when its text changes, dropped when it leaves the scope. Draws under one registry owner for the whole
  * window; nothing here adds, moves or changes the text DOM.
  */
 export function useFindWindow({ query, scope, open, prefer = null }: UseFindWindowOptions): UseFindWindow {
@@ -188,8 +188,8 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const indexRef = useRef(-1);
   const currentRef = useRef<CurrentRef>(null);
   const textByTargetRef = useRef<Map<string, string>>(new Map());
-  /** Each stored text folded once: by target, valid while the target's stored text is the same. */
-  const foldedRef = useRef<Map<string, { text: string; folded: string }>>(new Map());
+  /** Each target's text folded and read for citations once: by target, valid while its text is the same. */
+  const foldedRef = useRef<Map<string, CitationText>>(new Map());
   const pendingRef = useRef<Pending | null>(null);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Targets given up for the applied query: a «go to» found no root in time (`PENDING_TIMEOUT_MS`). */
@@ -230,14 +230,14 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
     pendingRef.current = null;
   }, []);
 
-  /** A stored text's matches, folding it only when it is not the text folded last time. */
-  const matchStored = useCallback((id: string, text: string, q: string, limit: number) => {
+  /** A target's matches, folding its text only when it is not the text folded last time. */
+  const matchTarget = useCallback((id: string, text: string, q: string, limit: number) => {
     let entry = foldedRef.current.get(id);
     if (!entry || entry.text !== text) {
-      entry = { text, folded: foldForSearch(text) };
+      entry = citationText(text);
       foldedRef.current.set(id, entry);
     }
-    return withCitation(text, q, findMatchesInFolded(entry.folded, q, { limit }), limit);
+    return matchText(entry, q, limit);
   }, []);
 
   /** Builds this run's matches for every target, DOM-first, stored otherwise, under the
@@ -254,13 +254,13 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
         const limit = Math.max(0, budget);
         if (root) {
           const collected = collectSearchableText(root.element);
-          const { matches, truncated: tr } = withCitation(collected.text, q, findMatches(collected.text, q, { limit }), limit);
+          const { matches, truncated: tr } = matchTarget(id, collected.text, q, limit);
           if (tr) truncated = true;
           budget -= matches.length;
           built.push({ ...target, id, onScreen: true, text: collected.text, nodes: collected.nodes, matches });
         } else {
           const text = target.storedText ?? '';
-          const { matches, truncated: tr } = matchStored(id, text, q, limit);
+          const { matches, truncated: tr } = matchTarget(id, text, q, limit);
           if (tr) truncated = true;
           budget -= matches.length;
           built.push({ ...target, id, onScreen: false, text, matches });
@@ -268,7 +268,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
       }
       return { targets: built, truncated };
     },
-    [matchStored],
+    [matchTarget],
   );
 
   function flatten(built: TargetMatches[]): FlatMatch[] {
