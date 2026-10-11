@@ -25,8 +25,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   on `/auth/me`; the server checks the flag on every call): `useValidationQueue` shows the proposed cards
   one at a time, oldest first, refilling when two are left; the primary anchor's article sits beside the
   card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
-  dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata; the
-  subject is remembered in `localStorage`; a 403 stops the queue with «Non sei più tra i validatori»),
+  dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
+  `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
+  verdict after «Annulla»; `Layout` hides the floating feedback button below `md` on this route, where it
+  would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
+  change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an

@@ -35,7 +35,10 @@ export function Layout() {
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
-  const onSearchPage = useLocation().pathname === '/';
+  const { pathname } = useLocation();
+  const onSearchPage = pathname === '/';
+  // The validators' vote bar is pinned to the bottom edge, where the floating button would cover its verdicts.
+  const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
 
   // Leaving the search page closes the window: its matches are in tabs no longer on screen.
   useEffect(() => {
@@ -229,7 +232,7 @@ export function Layout() {
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
 
       {/* Feedback Button - only for authenticated users */}
-      {isAuthenticated && <FeedbackButton />}
+      {isAuthenticated && <FeedbackButton className={onValidationQueue ? 'hidden md:block' : undefined} />}
 
       {/* Version changelog notification */}
       <ChangelogNotification />

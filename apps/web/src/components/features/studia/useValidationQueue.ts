@@ -39,6 +39,8 @@ export function useValidationQueue(materia: Materia | undefined) {
   // A reading that began for another subject (or before a retry) must not write.
   const generation = useRef(0);
   const reading = useRef(false);
+  // The subject in use now, for a vote that outlives the render it was cast in.
+  const keyNow = useRef(key);
   // Cards voted or skipped in this visit: a reading that began before the vote may still list them.
   const handled = useRef(new Set<string>());
 
@@ -57,6 +59,8 @@ export function useValidationQueue(materia: Materia | undefined) {
         });
       } catch (error) {
         if (gen !== generation.current) return;
+        // Whether it shows (first reading, a retry) or not (a refill with cards in hand), it is said.
+        if (statusOf(error) !== 403) console.warn('[useValidationQueue] reading the queue failed', error);
         setState((before) => {
           if (statusOf(error) === 403) return { key, cards: [], dry: true, failure: 'forbidden' };
           // A failed background reading leaves the cards in hand to be judged.
@@ -72,9 +76,10 @@ export function useValidationQueue(materia: Materia | undefined) {
   useEffect(() => {
     generation.current += 1;
     reading.current = false;
+    keyNow.current = key;
     handled.current = new Set();
     void read(generation.current);
-  }, [read]);
+  }, [read, key]);
 
   const retry = useCallback(() => {
     generation.current += 1;
@@ -101,21 +106,30 @@ export function useValidationQueue(materia: Materia | undefined) {
   const vote = async (giudizio: Giudizio, motivazione?: string): Promise<VoteOutcome> => {
     if (!current || voting) return 'failed';
     const cardId = current.id;
+    // This render's `read` and `advance` answer the subject the vote was cast for. If the subject
+    // changes (or the queue starts over) while the vote is on its way, they must not write again.
+    const gen = generation.current;
     setVoting(true);
     try {
       await studiaService.vote(cardId, giudizio, motivazione);
       // The community's counts under the article have moved.
       invalidateArticleCards();
-      advance(cardId);
+      if (gen === generation.current) advance(cardId);
+      else handled.current.add(cardId);
       return 'voted';
     } catch (error) {
       const code = statusOf(error);
       if (code === 403) {
-        setState({ key, cards: [], dry: true, failure: 'forbidden' });
+        // Not a validator any more, for every subject: the queue now in use stops too, and a reading
+        // still on its way for it must not bring cards back.
+        generation.current += 1;
+        reading.current = false;
+        setState({ key: keyNow.current, cards: [], dry: true, failure: 'forbidden' });
         return 'forbidden';
       }
       if (code === 404 || code === 409) {
-        advance(cardId);
+        if (gen === generation.current) advance(cardId);
+        else handled.current.add(cardId);
         return code === 404 ? 'gone' : 'already';
       }
       return 'failed';

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '../../../lib/utils';
 import type { Giudizio } from '../../../types/studia';
 
@@ -35,6 +35,14 @@ export function VoteBar({ cardId, busy, onVote }: VoteBarProps) {
   const open = writing && writing.cardId === cardId ? writing : null;
   const fieldId = useId();
   const reason = open?.text.trim() ?? '';
+  // «Annulla» destroys the field with the key under the keyboard: the verdict chosen takes the focus back.
+  const buttons = useRef<Partial<Record<Giudizio, HTMLButtonElement | null>>>({});
+  const backTo = useRef<Giudizio | null>(null);
+  useEffect(() => {
+    if (open || !backTo.current) return;
+    buttons.current[backTo.current]?.focus();
+    backTo.current = null;
+  }, [open]);
 
   if (open) {
     const label = VERDICTS.find((verdict) => verdict.giudizio === open.giudizio)?.label;
@@ -54,7 +62,11 @@ export function VoteBar({ cardId, busy, onVote }: VoteBarProps) {
         />
         <div className="flex items-center gap-2">
           <span className="mr-auto text-xs text-slate-500 dark:text-slate-400">{open.text.length} / {REASON_MAX}</span>
-          <button type="button" onClick={() => setWriting(null)} disabled={busy} className={cn(BUTTON, QUIET)}>
+          <button type="button" onClick={() => {
+              backTo.current = open.giudizio;
+              setWriting(null);
+            }}
+            disabled={busy} className={cn(BUTTON, QUIET)}>
             Annulla
           </button>
           <button
@@ -75,6 +87,9 @@ export function VoteBar({ cardId, busy, onVote }: VoteBarProps) {
       {VERDICTS.map(({ giudizio, label }) => (
         <button
           key={giudizio}
+          ref={(node) => {
+            buttons.current[giudizio] = node;
+          }}
           type="button"
           disabled={busy}
           onClick={() => (giudizio === 'APPROVATA' ? onVote(giudizio) : setWriting({ cardId, giudizio, text: '' }))}

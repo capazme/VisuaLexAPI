@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -47,13 +47,14 @@ const OUTCOME_TOAST: Partial<Record<VoteOutcome, Exclude<ToastState, null>>> = {
  * The card under review, read like the law it rests on: the title as a source line, then the
  * question and the answer in the reader's serif, set apart by one rule. Everything is plain text.
  */
-function CardBody({ card }: { card: Scheda }) {
+function CardBody({ card, headingRef }: { card: Scheda; headingRef: RefObject<HTMLHeadingElement | null> }) {
   const anchors = [...card.ancore].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
   const others = anchors.slice(1);
   return (
     <article aria-label="Scheda da validare" className="space-y-5">
       <div>
-        <h3 className="mb-2 text-sm text-slate-500 dark:text-slate-400">{cardTitle(card)}</h3>
+        {/* Focusable by script only: after a vote the keyboard lands here, on the card that comes next. */}
+        <h3 ref={headingRef} tabIndex={-1} className="mb-2 text-sm text-slate-500 focus:outline-none dark:text-slate-400">{cardTitle(card)}</h3>
         <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-xl leading-[1.7] text-slate-900 dark:text-slate-50')}>{card.domanda}</p>
         <hr className={cn(MEASURE, 'my-4 border-slate-200 dark:border-slate-700')} />
         <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-lg leading-[1.7] text-slate-800 dark:text-slate-200')}>{card.risposta}</p>
@@ -110,15 +111,29 @@ export function ValidationQueueView() {
   // The collapsed section belongs to a card: the next one starts closed.
   const [openFor, setOpenFor] = useState<string | null>(null);
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => setToast({ message, type });
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // The card a vote was cast on, until the next card is on screen: only then does the keyboard move.
+  const votedOn = useRef<string | null>(null);
+
+  const cardId = card?.id;
+  useEffect(() => {
+    if (!cardId || !votedOn.current || votedOn.current === cardId) return;
+    votedOn.current = null;
+    headingRef.current?.focus();
+  }, [cardId]);
 
   const chooseMateria = (value: string) => {
+    votedOn.current = null;
     const next = MATERIE.find((m) => m === value);
     setMateria(next);
     rememberMateria(next);
   };
 
   const cast: Parameters<typeof VoteBar>[0]['onVote'] = async (giudizio, motivazione) => {
+    votedOn.current = card?.id ?? null;
     const outcome = await vote(giudizio, motivazione);
+    // The card stays (the vote failed, or the user was stopped): the keyboard stays where it is.
+    if (outcome === 'failed' || outcome === 'forbidden') votedOn.current = null;
     const message = OUTCOME_TOAST[outcome];
     if (message) setToast(message);
   };
@@ -146,7 +161,11 @@ export function ValidationQueueView() {
       {status === 'error' && (
         <div role="alert" className="flex flex-wrap items-center gap-3 py-4 text-sm text-red-600 dark:text-red-400">
           Non riesco a leggere le schede da validare.
-          <button type="button" onClick={retry} className="min-h-[44px] rounded px-2 font-medium underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+          <button type="button" onClick={() => {
+              votedOn.current = null;
+              retry();
+            }}
+            className="min-h-[44px] rounded px-2 font-medium underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             Riprova
           </button>
         </div>
@@ -156,7 +175,7 @@ export function ValidationQueueView() {
         <>
           <div className="md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-start md:gap-6">
             <div className="min-w-0">
-              <CardBody card={card} />
+              <CardBody card={card} headingRef={headingRef} />
               {!desktop && (
                 <section className="mt-5 border-t border-slate-200 pt-2 dark:border-slate-700">
                   <h4>
@@ -175,15 +194,16 @@ export function ValidationQueueView() {
               )}
             </div>
             {desktop && (
-              <div className="sticky top-0 max-h-screen min-w-0 overflow-y-auto pb-4">
+              // Scrolls on its own, and is cut to what is left under the page's heading, the filter and the vote bar (about 17rem).
+              <div className="sticky top-0 max-h-[calc(100vh-17rem)] min-w-0 overflow-y-auto pb-4">
                 <AnchoredArticle card={card} showToast={showToast} />
               </div>
             )}
           </div>
-          {/* Pinned to the bottom of the screen on a phone, where the thumb is; in the flow on a desktop. */}
+          {/* Pinned to the bottom of the screen at every width, so a long card or a tall article never pushes it out of reach. */}
           <div
             className={cn(
-              'sticky bottom-0 -mx-4 border-t border-slate-200 bg-slate-50 px-4 py-3 md:static md:mx-0 md:border-t-0 md:bg-transparent md:px-0 dark:border-slate-800 dark:bg-slate-950 md:dark:bg-transparent',
+              'sticky bottom-0 -mx-4 border-t border-slate-200 bg-slate-50 px-4 py-3 md:-mx-2 md:px-2 dark:border-slate-800 dark:bg-slate-950',
               Z_INDEX.sticky,
             )}
           >

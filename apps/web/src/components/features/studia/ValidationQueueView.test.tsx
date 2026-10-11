@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../services/studiaService', () => ({
@@ -217,6 +217,52 @@ describe('«Da validare», voting', () => {
   });
 });
 
+describe('«Da validare», the keyboard and the vote bar', () => {
+  it('keeps the vote bar pinned to the bottom at every width, with its own background', async () => {
+    for (const desktop of [true, false]) {
+      setDesktop(desktop);
+      const { unmount } = render(<ValidationQueueView />);
+      await screen.findByText('Domanda c1?');
+      const bar = screen.getByRole('group', { name: 'Il tuo giudizio' }).parentElement!;
+      expect(bar).toHaveClass('sticky', 'bottom-0', 'border-t', 'bg-slate-50');
+      expect(bar.className).not.toMatch(/\bmd:(static|bg-transparent|border-t-0)\b/);
+      unmount();
+    }
+  });
+
+  it('moves the keyboard to the next card’s heading after a vote', async () => {
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    const approve = screen.getByRole('button', { name: 'Approvata' });
+    approve.focus();
+    await userEvent.click(approve);
+    await screen.findByText('Domanda c2?');
+    const heading = screen.getByRole('heading', { level: 3 });
+    expect(heading).toHaveAttribute('tabindex', '-1');
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it('moves the keyboard after a vote with a reason as well', async () => {
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    await userEvent.click(screen.getByRole('button', { name: 'Errata' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Scrivi il motivo' }), 'No.');
+    await userEvent.click(screen.getByRole('button', { name: 'Invia' }));
+    await screen.findByText('Domanda c2?');
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3 })).toHaveFocus());
+  });
+
+  it('does not take the keyboard away when the card is not left (the vote failed) or on the first card', async () => {
+    vote.mockRejectedValueOnce(rejection(500));
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    expect(screen.getByRole('heading', { level: 3 })).not.toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
+    await screen.findByText('Non sono riuscito a registrare il voto. Riprova.');
+    expect(screen.getByRole('heading', { level: 3 })).not.toHaveFocus();
+  });
+});
+
 describe('«Da validare», the queue', () => {
   it('reads the queue again when it runs low, without showing the same card twice', async () => {
     queue.mockResolvedValueOnce({ cards: [card('c1'), card('c2')] });
@@ -258,12 +304,90 @@ describe('«Da validare», the queue', () => {
     expect(queue).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the cards in hand, and says in the console, when a background refill fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    queue.mockResolvedValueOnce({ cards: [card('c1'), card('c2')] });
+    queue.mockRejectedValueOnce(rejection(500));
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
+    expect(await screen.findByText('Domanda c2?')).toBeInTheDocument();
+    await waitFor(() => expect(warn).toHaveBeenCalledWith('[useValidationQueue] reading the queue failed', expect.any(Error)));
+    expect(screen.getByRole('button', { name: 'Approvata' })).toBeInTheDocument();
+    warn.mockRestore();
+  });
+
   it('offers to try again when the queue cannot be read', async () => {
     queue.mockRejectedValueOnce(rejection(500));
     render(<ValidationQueueView />);
     expect(await screen.findByText('Non riesco a leggere le schede da validare.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
     expect(await screen.findByText('Domanda c1?')).toBeInTheDocument();
+  });
+});
+
+describe('«Da validare», a subject change while a vote is on its way', () => {
+  const PENALE = card('p1', { materia: 'DIRITTO_PENALE' });
+  const answerByMateria = () =>
+    queue.mockImplementation(async (params) => ({ cards: params?.materia === 'DIRITTO_PENALE' ? [PENALE] : [card('c1'), card('c2')] }));
+  const deferred = () => {
+    let resolve!: (value: { stato: 'PROPOSTA_COMMUNITY' }) => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<{ stato: 'PROPOSTA_COMMUNITY' }>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+
+  it('keeps showing the new subject’s card, never stuck on «Carico le schede…», once the vote resolves', async () => {
+    answerByMateria();
+    const pending = deferred();
+    vote.mockReturnValueOnce(pending.promise);
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Materia' }), 'Diritto penale');
+    expect(await screen.findByText('Domanda p1?')).toBeInTheDocument();
+    const readings = queue.mock.calls.length;
+
+    await act(async () => pending.resolve({ stato: 'PROPOSTA_COMMUNITY' }));
+    expect(await screen.findByText('Voto registrato')).toBeInTheDocument();
+    expect(screen.getByText('Domanda p1?')).toBeInTheDocument();
+    expect(screen.queryByText('Carico le schede…')).toBeNull();
+    // The old subject is not read again for the vote that finished.
+    expect(queue).toHaveBeenCalledTimes(readings);
+  });
+
+  it('stops the new subject’s queue as well when that vote is refused because the user is no longer a validator', async () => {
+    answerByMateria();
+    const pending = deferred();
+    vote.mockReturnValueOnce(pending.promise);
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Materia' }), 'Diritto penale');
+    await screen.findByText('Domanda p1?');
+
+    await act(async () => pending.reject(rejection(403)));
+    expect(await screen.findByText('Non sei più tra i validatori')).toBeInTheDocument();
+    expect(screen.queryByText('Carico le schede…')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Approvata' })).toBeNull();
+  });
+
+  it('skips a card gone (404) in the same way', async () => {
+    answerByMateria();
+    const pending = deferred();
+    vote.mockReturnValueOnce(pending.promise);
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Materia' }), 'Diritto penale');
+    await screen.findByText('Domanda p1?');
+
+    await act(async () => pending.reject(rejection(404)));
+    expect(await screen.findByText('La scheda non è più in coda: passo alla prossima.')).toBeInTheDocument();
+    expect(screen.getByText('Domanda p1?')).toBeInTheDocument();
   });
 });
 
