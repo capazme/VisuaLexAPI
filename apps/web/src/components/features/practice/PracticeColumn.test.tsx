@@ -75,6 +75,17 @@ describe('PracticeColumn (spec §3)', () => {
     expect(scrolled).toHaveLength(0);
   });
 
+  it('draws «Giurisprudenza» after the acts, only when the practice holds a decision', () => {
+    const { practiceId } = setUp();
+    const { rerender } = render(column(practiceId));
+    expect(screen.queryByRole('region', { name: /Giurisprudenza/ })).toBeNull();
+    act(() => { s().openDecision({ corte: 'cassazione', archivio: 'civile', numero: 577, anno: 2008 }, { practiceId, open: false }); });
+    rerender(column(practiceId));
+    expect(actHeadings()).toEqual([
+      expect.stringContaining('Codice civile'), expect.stringContaining('l. 8 marzo 2017, n. 24'), 'Giurisprudenza (1)',
+    ]);
+  });
+
   it('reserves room at the bottom for the bar of practices (§3.4)', () => {
     const { practiceId } = setUp();
     render(column(practiceId));

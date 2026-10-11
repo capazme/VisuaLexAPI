@@ -203,6 +203,25 @@ describe('setDecisionEntryIdentity', () => {
   });
 });
 
+describe('markDecisionEntryRecorded (carry-over ruling 13)', () => {
+  it('keeps on the entry the key its reading recorded in the Cronologia; the same key again writes nothing', () => {
+    const { practiceId, decisionId } = s().openDecision(FOUND);
+    s().markDecisionEntryRecorded(practiceId, decisionId, 'cassazione:civile:28994:2019');
+    expect(practice(practiceId).decisions[0].historyRecordedKey).toBe('cassazione:civile:28994:2019');
+    const before = s().practices;
+    s().markDecisionEntryRecorded(practiceId, decisionId, 'cassazione:civile:28994:2019');
+    expect(s().practices).toBe(before);
+  });
+
+  it('ignores an unknown practice or entry', () => {
+    const { practiceId } = s().openDecision(FOUND);
+    const before = s().practices;
+    s().markDecisionEntryRecorded('gone', 'x', 'k');
+    s().markDecisionEntryRecorded(practiceId, 'gone', 'k');
+    expect(s().practices).toBe(before);
+  });
+});
+
 describe('removePracticeDecision, openBeside, closeBeside', () => {
   it('removes the entry with its window, its row and its reveal', () => {
     const { practiceId, decisionId } = s().openDecision(FOUND, { beside: false });

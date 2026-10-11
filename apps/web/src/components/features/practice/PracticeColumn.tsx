@@ -13,6 +13,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { actHeading } from '../../../utils/sources';
 import { PracticeActBlock } from './PracticeActBlock';
+import { PracticeDecisionsSection } from './PracticeDecisionsSection';
 
 export interface PracticeColumnProps {
   practiceId: string;
@@ -22,7 +23,7 @@ export interface PracticeColumnProps {
 
 /**
  * The practice's column (spec §3, D3): its acts one under the other, in their order and reordered
- * by drag (pointer and keyboard, as the dossier's acts); «Giurisprudenza» follows them (Task 9).
+ * by drag (pointer and keyboard, as the dossier's acts); «Giurisprudenza» follows them (§3.3).
  * It takes the practice's reveal (`takeReveal`, once, gotcha 14) and scrolls the revealed row into
  * view: the row is already open, the store opened it in the same step.
  */
@@ -100,6 +101,7 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference }: Prac
           </div>
         </SortableContext>
       </DndContext>
+      <PracticeDecisionsSection practiceId={practiceId} />
     </div>
   );
 }

@@ -430,6 +430,12 @@ interface AppState {
     /** Takes the decision off «Giurisprudenza» with its window, its row and its reveal. */
     removePracticeDecision: (practiceId: string, decisionId: string) => void;
     /**
+     * The entry's reading told the Cronologia `key` (PR 5's once per opening, carry-over ruling 13):
+     * kept on the entry and persisted with it, so a remount or a reload never records again, while a
+     * new entry of the decision does. The same key again writes nothing.
+     */
+    markDecisionEntryRecorded: (practiceId: string, decisionId: string, key: string) => void;
+    /**
      * «Apri accanto» (§4.2): a window on `ref` beside the practice's table, which is made active.
      * Nothing moves when a window already shows that subject; with two, the oldest that is not the
      * asker goes and its subject stays in the table (D10, T16). A ref to something the practice does
@@ -1060,11 +1066,20 @@ const appStore = createStore<AppState>()(
             removePracticeDecision: (practiceId, decisionId) => {
                 if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return;
                 set((state) => {
-                const practice = state.practices.find((p) => p.id === practiceId);
-                if (!practice || !practice.decisions.some((d) => d.id === decisionId)) return;
-                practice.decisions = practice.decisions.filter((d) => d.id !== decisionId);
-                practice.beside = practice.beside.filter((b) => !(b.kind === 'decision' && b.decisionId === decisionId));
-                dropRows(state, decisionRowKey(practiceId, decisionId), true);
+                    const practice = state.practices.find((p) => p.id === practiceId);
+                    if (!practice || !practice.decisions.some((d) => d.id === decisionId)) return;
+                    practice.decisions = practice.decisions.filter((d) => d.id !== decisionId);
+                    practice.beside = practice.beside.filter((b) => !(b.kind === 'decision' && b.decisionId === decisionId));
+                    dropRows(state, decisionRowKey(practiceId, decisionId), true);
+                });
+            },
+
+            markDecisionEntryRecorded: (practiceId, decisionId, key) => {
+                const entry = get().practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === decisionId);
+                if (!entry || entry.historyRecordedKey === key) return;
+                set((state) => {
+                    const held = state.practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === decisionId);
+                    if (held) held.historyRecordedKey = key;
                 });
             },
 

@@ -53,8 +53,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
   user drops in — parsed in the browser, never uploaded — each opening the
   reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
-  (`DecisionView`, the body of a decision wherever it is drawn; `DecisionTabView`,
-  its workspace tab and the phone view; `DecisionAddress`, the `/sentenze/…` route element;
+  (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
+  decision read in its row (and, from P4, its window), over `useDecisionAnswer` (the fetch, the
+  candidates, the notices) and `DecisionAnswerBody`; `DecisionTabView`, its workspace tab and the
+  phone view, a thin wrapper over the same body until P6; `DecisionAddress`, the `/sentenze/…` route element;
   `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
@@ -114,7 +116,8 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   decision (`decision_key`, never both): `DecisionTabView` records a found decision once per
   opening: the key it sent is kept on the tab (`historyRecordedKey`, persisted with it), so a
   remount, a minimise and restore or a reload never records again, while a new tab does (the
-  copy on screen only) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab is marked
+  copy on screen only); a practice's entry does the same through `DecisionEntryView`, the key kept
+  on the entry (`markDecisionEntryRecorded`) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab is marked
   before the request, so a failed request is not retried (not even after a reload) and the failure
   is logged: the history is a convenience.
 
