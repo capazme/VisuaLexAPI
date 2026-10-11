@@ -6,7 +6,13 @@ vi.mock('../../../services/studiaService', () => ({
   studiaService: { create: vi.fn(), update: vi.fn() },
 }));
 
+vi.mock('../../../utils/articleCardsCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/articleCardsCache')>()),
+  invalidateArticleCards: vi.fn(),
+}));
+
 import { studiaService } from '../../../services/studiaService';
+import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import type { NormaVisitata } from '../../../types';
 import type { Scheda } from '../../../types/studia';
 import { CardForm, type CardFormMode } from './CardForm';
@@ -52,6 +58,7 @@ beforeEach(() => {
   setDesktop(true);
   create.mockReset();
   update.mockReset();
+  vi.mocked(invalidateArticleCards).mockClear();
 });
 
 afterEach(() => setDesktop(false));
@@ -162,6 +169,8 @@ describe('CardForm, opened from an article', () => {
       ancore: [{ riferimento: 'art. 1453 c.c.', principale: true }],
     });
     expect(onSaved).toHaveBeenCalledWith('new-1');
+    // What the reader kept for the article is no longer true.
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
   });
 
   it('puts the server’s detail under the anchor that failed and keeps the form open', async () => {
@@ -353,6 +362,7 @@ describe('CardForm, editing a draft', () => {
     });
     expect(create).not.toHaveBeenCalled();
     expect(onSaved).toHaveBeenCalledWith('k1');
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
   });
 
   it('shows the question <img src=x onerror=alert(1)> of a stored card as literal text', () => {

@@ -7,6 +7,7 @@ import { SegmentedControl } from '../../ui/SegmentedControl';
 import { studiaService } from '../../../services/studiaService';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { cn } from '../../../lib/utils';
+import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import { citeNorm, normFromUrn } from '../../../utils/sources';
 import type { NormaVisitata } from '../../../types';
 import type { EsitoAncoraRifiutata, Materia, Scheda, SchedaInput, TipoScheda } from '../../../types/studia';
@@ -298,6 +299,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
         setBusy(false);
         return;
       }
+      invalidateArticleCards();
       onSaved(outcome.outcome === 'created' ? outcome.id : outcome.card.id);
     } catch (error) {
       setFormError(failureMessage(error, editing));

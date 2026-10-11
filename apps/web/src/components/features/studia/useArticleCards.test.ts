@@ -7,7 +7,8 @@ vi.mock('../../../services/studiaService', () => ({
 
 import { studiaService } from '../../../services/studiaService';
 import type { SchedaDellArticolo } from '../../../types/studia';
-import { clearArticleCardsCache, useArticleCards } from './useArticleCards';
+import { clearArticleCardsCache } from '../../../utils/articleCardsCache';
+import { useArticleCards } from './useArticleCards';
 
 const forArticle = vi.mocked(studiaService.forArticle);
 

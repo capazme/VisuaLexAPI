@@ -7,7 +7,13 @@ vi.mock('../../../services/studiaService', () => ({
   studiaService: { list: vi.fn(), get: vi.fn(), trash: vi.fn(), create: vi.fn(), update: vi.fn() },
 }));
 
+vi.mock('../../../utils/articleCardsCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/articleCardsCache')>()),
+  invalidateArticleCards: vi.fn(),
+}));
+
 import { studiaService } from '../../../services/studiaService';
+import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import { appStore } from '../../../store/useAppStore';
 import type { Scheda, StatoScheda } from '../../../types/studia';
 import { MyCardsView } from './MyCardsView';
@@ -67,6 +73,7 @@ beforeEach(() => {
   list.mockReset();
   get.mockReset();
   trash.mockReset();
+  vi.mocked(invalidateArticleCards).mockClear();
   list.mockResolvedValue(page(FIVE));
   appStore.setState({ searchTrigger: null });
 });
@@ -390,6 +397,8 @@ describe('«Le mie schede», delete', () => {
     await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
     expect(trash).toHaveBeenCalledWith(['r1']);
     expect(await screen.findByText('Scheda nel cestino')).toBeInTheDocument();
+    // The row under the article must not go on counting it.
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede');
     await waitFor(() => expect(screen.queryByRole('link', { name: /Domanda r1\?/ })).not.toBeInTheDocument());
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
@@ -400,6 +409,7 @@ describe('«Le mie schede», delete', () => {
     const dialog = await openConfirm();
     await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
     expect(await screen.findByText(/non si può eliminare nello stato in cui si trova/)).toBeInTheDocument();
+    expect(invalidateArticleCards).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
   });
 

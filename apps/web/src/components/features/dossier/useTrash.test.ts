@@ -8,7 +8,10 @@ vi.mock('../../../services/trashService', () => ({
   trashService: { list: () => list(), restore: (...a: unknown[]) => restoreCall(...a), purge: (...a: unknown[]) => purgeCall(...a) },
 }));
 
+vi.mock('../../../utils/articleCardsCache', () => ({ invalidateArticleCards: vi.fn(), clearArticleCardsCache: vi.fn() }));
+
 import { appStore } from '../../../store/useAppStore';
+import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import { useTrash } from './useTrash';
 import type { TrashEntry } from '../../../services/trashService';
 
@@ -33,6 +36,17 @@ describe('useTrash', () => {
     expect(outcome).toEqual({ kind: 'restored' });
     expect(refreshDossier).toHaveBeenCalledWith('d1');
     expect(result.current.entries).toEqual([]);
+  });
+
+  it('has the cards read again under their articles when a card entry comes back, and only then', async () => {
+    list.mockResolvedValue([]);
+    restoreCall.mockResolvedValue({ dossierId: null });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toEqual([]));
+    await act(async () => { await result.current.restore(entry({ id: 't2', kind: 'DOSSIER_ITEMS' })); });
+    expect(invalidateArticleCards).not.toHaveBeenCalled();
+    await act(async () => { await result.current.restore(entry({ id: 't3', kind: 'LINGO_CARDS', dossierId: null })); });
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
   });
 
   it('asks for a dossier when the entry’s own is gone', async () => {

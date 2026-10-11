@@ -14,6 +14,8 @@ afterEach(async () => {
   // lazily, so the module (and legalFetch behind it) is not loaded before a test mocks them
   const cache = await import('../utils/decisionSearchCache')
   cache.clearDecisionSearchCache()
+  const articleCards = await import('../utils/articleCardsCache')
+  articleCards.clearArticleCardsCache()
 })
 
 // Mock localStorage

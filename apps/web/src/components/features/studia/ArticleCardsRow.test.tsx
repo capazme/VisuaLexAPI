@@ -14,7 +14,7 @@ import type { SchedaDellArticolo } from '../../../types/studia';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
 import { parseArticleStructure } from '../../../utils/articleStructure';
 import { ArticleCardsRow, type ArticleCardsHandle } from './ArticleCardsRow';
-import { clearArticleCardsCache } from './useArticleCards';
+import { clearArticleCardsCache } from '../../../utils/articleCardsCache';
 
 const forArticle = vi.mocked(studiaService.forArticle);
 const create = vi.mocked(studiaService.create);

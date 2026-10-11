@@ -17,7 +17,7 @@ vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 import { ArticleTabContent } from '../ArticleTabContent';
 import { studiaService } from '../../../../services/studiaService';
 import { appStore } from '../../../../store/useAppStore';
-import { clearArticleCardsCache } from '../../studia/useArticleCards';
+import { clearArticleCardsCache } from '../../../../utils/articleCardsCache';
 
 const forArticle = vi.mocked(studiaService.forArticle);
 
@@ -108,7 +108,7 @@ describe('ArticleTabContent: the cards on this article', () => {
       norma_data: { ...data.norma_data, versione: 'vigente', data_versione: '2005-06-01' },
       versionInfo: { isHistorical: true, requestedDate: '2005-06-01' },
     });
-    expect(await screen.findByRole('button', { name: '+ Nuova scheda' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: '+ Nuova scheda' })).toHaveAttribute('aria-disabled', 'true');
     await selectNeedle(/^copia \(cmd/i);
     expect(screen.queryByRole('button', { name: 'Crea scheda' })).not.toBeInTheDocument();
   });

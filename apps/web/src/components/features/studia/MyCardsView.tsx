@@ -5,6 +5,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { studiaService } from '../../../services/studiaService';
 import { useAppStore } from '../../../store/useAppStore';
+import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import type { AncoraScheda, Scheda } from '../../../types/studia';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
@@ -146,6 +147,8 @@ export function MyCardsView() {
     try {
       const outcome = await studiaService.trash([card.id]);
       setRestartActs(true);
+      // The cards under an article are read again where they are shown next.
+      if (outcome.moved.length > 0) invalidateArticleCards();
       if (outcome.moved.includes(card.id)) {
         setToast({ message: 'Scheda nel cestino', type: 'success' });
       } else if (outcome.notDeletable.includes(card.id)) {
