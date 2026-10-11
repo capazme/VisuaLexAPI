@@ -11,6 +11,7 @@ import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType, AdminS
 import type { SharedEnvironmentReport, ReportStatus } from '../types';
 import { getErrorMessage } from '../utils/errors';
 import { isMerltEnabled } from '../features/merlt/featureFlag';
+import { isStudiaEnabled } from '../features/studia/featureFlag';
 import { IngestionAdminPanel } from '../features/merlt/ops/ingestion/IngestionAdminPanel';
 import { StudiaTextsAdmin } from '../components/features/admin/StudiaTextsAdmin';
 import {
@@ -55,6 +56,8 @@ export function AdminPage() {
   // (App.tsx wraps only <Layout> with it), so calling useMerltFeatures — which calls
   // useConsent — would throw "useConsent must be used within a ConsentProvider".
   const opsVisible = isMerltEnabled() && isAdmin;
+  // VisuaLex Studia's admin parts (the texts tab, the validator checkbox) follow its flag, as its pages do.
+  const studiaVisible = isStudiaEnabled();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -472,18 +475,20 @@ export function AdminPage() {
                   <Flag size={16} />
                   Segnalazioni
                 </button>
-                <button
-                  onClick={() => setActiveTab('studia')}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    activeTab === 'studia'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  )}
-                >
-                  <GraduationCap size={16} />
-                  Testi di VisuaLex Studia
-                </button>
+                {studiaVisible && (
+                  <button
+                    onClick={() => setActiveTab('studia')}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                      activeTab === 'studia'
+                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    )}
+                  >
+                    <GraduationCap size={16} />
+                    Testi di VisuaLex Studia
+                  </button>
+                )}
                 {opsVisible && (
                   <button
                     onClick={() => setActiveTab('ingestion')}
@@ -651,16 +656,19 @@ export function AdminPage() {
                               {u.is_admin ? <Shield size={12} /> : <ShieldOff size={12} />}
                               {u.is_admin ? 'Admin' : 'Utente'}
                             </button>
-                            <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                              <input
-                                type="checkbox"
-                                checked={u.lingo_validatore}
-                                onChange={() => handleToggleValidator(u.id, u.lingo_validatore)}
-                                disabled={actionLoading}
-                                className="h-4 w-4 rounded border-gray-300"
-                              />
-                              Validatore di VisuaLex Studia
-                            </label>
+                            {studiaVisible && (
+                              <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                <input
+                                  type="checkbox"
+                                  checked={u.lingo_validatore}
+                                  onChange={() => handleToggleValidator(u.id, u.lingo_validatore)}
+                                  disabled={actionLoading}
+                                  aria-label={`Validatore di VisuaLex Studia: ${u.username}`}
+                                  className="h-4 w-4 rounded border-gray-300"
+                                />
+                                Validatore di VisuaLex Studia
+                              </label>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
@@ -1196,7 +1204,7 @@ export function AdminPage() {
         )}
 
         {/* ==================== VISUALEX STUDIA TAB ==================== */}
-        {activeTab === 'studia' && <StudiaTextsAdmin />}
+        {studiaVisible && activeTab === 'studia' && <StudiaTextsAdmin />}
 
         {/* ==================== INGESTION TAB ==================== */}
         {activeTab === 'ingestion' && opsVisible && <IngestionAdminPanel />}

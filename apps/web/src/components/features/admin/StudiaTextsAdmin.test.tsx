@@ -87,14 +87,13 @@ describe('StudiaTextsAdmin, saving', () => {
     expect(saveStudiaText).not.toHaveBeenCalled();
   });
 
-  it('posts the four fields as edited, then reads the texts again and says which version was saved', async () => {
+  it('posts the four fields as edited, says which version was saved and shows it as current with no second read', async () => {
     const user = userEvent.setup();
     const section = await renderAdmin();
     await user.type(within(section).getByLabelText('Titolo'), '!');
     await user.type(within(section).getByLabelText('Etichetta del pulsante'), '?');
-    saveStudiaText.mockResolvedValue(version(4));
-    const after: StudiaTextGroup = { chiave: 'PROPOSTA_SCHEDA', versioni: [version(4), ...GROUP.versioni] };
-    studiaTexts.mockResolvedValue([after]);
+    const saved = version(4, { titolo: 'Titolo v3!', corpo: 'Primo paragrafo v3.\n\nSecondo paragrafo v3.', conferma: 'Casella v3', azione: 'Pulsante v3?' });
+    saveStudiaText.mockResolvedValue(saved);
 
     await user.click(within(section).getByRole('button', { name: 'Salva come nuova versione' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Salva' }));
@@ -103,24 +102,35 @@ describe('StudiaTextsAdmin, saving', () => {
       titolo: 'Titolo v3!', corpo: 'Primo paragrafo v3.\n\nSecondo paragrafo v3.', conferma: 'Casella v3', azione: 'Pulsante v3?',
     }));
     expect(await screen.findByText('Versione 4 salvata')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Versione attuale: 4')).toBeInTheDocument());
-    expect(studiaTexts).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Versione attuale: 4')).toBeInTheDocument();
+    // The form never went back to the old version: it holds what was saved, and it is not «changed».
+    expect(within(section).getByLabelText('Titolo')).toHaveValue('Titolo v3!');
+    expect(within(section).getByRole('button', { name: 'Salva come nuova versione' })).toBeDisabled();
+    // The old current version is now the first of the earlier ones.
+    expect(within(within(section).getByRole('list', { name: 'Versioni precedenti' })).getAllByRole('listitem')).toHaveLength(3);
+    expect(studiaTexts).toHaveBeenCalledTimes(1);
   });
 
-  it('says another version was saved meanwhile on a 409, and reads the texts again on «Ricarica»', async () => {
+  it('says another version was saved meanwhile on a 409, and on «Ricarica» shows the new version but keeps what was typed', async () => {
     const user = userEvent.setup();
     const section = await renderAdmin();
     await user.type(within(section).getByLabelText('Titolo'), '!');
+    await user.type(within(section).getByLabelText('Testo'), ' Aggiunta.');
     saveStudiaText.mockRejectedValue({ status: 409, data: {} });
     await user.click(within(section).getByRole('button', { name: 'Salva come nuova versione' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Salva' }));
 
-    expect(await screen.findByText('Un’altra versione è stata salvata nel frattempo: ricarica')).toBeInTheDocument();
+    expect(await screen.findByText(/Un’altra versione è stata salvata nel frattempo/)).toHaveTextContent('le tue modifiche restano nel modulo');
     const after: StudiaTextGroup = { chiave: 'PROPOSTA_SCHEDA', versioni: [version(4), ...GROUP.versioni] };
     studiaTexts.mockResolvedValue([after]);
     await user.click(screen.getByRole('button', { name: 'Ricarica' }));
     await waitFor(() => expect(screen.getByText('Versione attuale: 4')).toBeInTheDocument());
     expect(screen.queryByText(/Un’altra versione/)).not.toBeInTheDocument();
+    const reloaded = screen.getByRole('region', { name: 'Avviso per proporre una scheda' });
+    expect(within(reloaded).getByLabelText('Titolo')).toHaveValue('Titolo v3!');
+    expect(within(reloaded).getByLabelText('Testo')).toHaveValue('Primo paragrafo v3.\n\nSecondo paragrafo v3. Aggiunta.');
+    // Still unsaved against the new version, so it can be saved as version 5.
+    expect(within(reloaded).getByRole('button', { name: 'Salva come nuova versione' })).toBeEnabled();
   });
 
   it('says plainly when saving failed for another reason', async () => {

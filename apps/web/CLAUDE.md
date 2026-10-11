@@ -18,9 +18,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
-  validators' `rilievi`, which the list does not carry; the admin page's «Testi di VisuaLex Studia»
-  tab (`features/admin/StudiaTextsAdmin`) saves a text as a new version and its user list names the
-  validators),
+  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di VisuaLex Studia»
+  tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
+  names the validators; both follow `VITE_FEATURE_STUDIA`),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an
@@ -257,7 +257,9 @@ The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
 (find-in-text and the offsets never see it): «Schede su questo articolo (n) · + Nuova scheda». The count
 (`useArticleCards`: one read per address from `/api/lingo/articolo`, kept for the session in
-`utils/articleCardsCache.ts`, shared between copies, `refresh()` after a save) opens `ArticleCardsPeek`; the row owns the
+`utils/articleCardsCache.ts`, shared between copies, `refresh()` after a save) opens `ArticleCardsPeek` (the reader's own
+card is a link to `/studia/schede/:id`; a community card — `comunita: true` — is a 44 px `aria-expanded` button that opens in
+place with its answer and explanation as text, because `GET /lingo/cards/:id` answers only the author); the row owns the
 `CardFormDialog`, and the selection popup's «Crea scheda» (`SelectionPopup.onCreateCard`, passed through
 `ArticleBody.onPopupCreateCard`, offered only by the article tab) reaches it through the row's `ref`
 (`createFromPassage`). `articleCardsOffer.ts` is the one rule: a row needs a `urn:` in `norma_data.urn`

@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import type { TestoDaAccettare } from '../../../types/studia';
@@ -18,7 +18,8 @@ export interface AcceptTextDialogProps {
  * The one place a text to accept is drawn (the proposal notice now, the simulation's consent later).
  * Every word comes from the version it is given. The button stays disabled until the box is ticked; a
  * new version replacing the one shown comes with the box unticked, because the tick was for the old
- * words.
+ * words, takes the focus back to the box (the button it was on is now disabled) and says so in a
+ * polite live region.
  */
 export function AcceptTextDialog({ text, onAccept, onCancel, busy = false }: AcceptTextDialogProps) {
   // The tick belongs to a version: a different one shows it unticked, with no effect to reset it.
@@ -26,6 +27,16 @@ export function AcceptTextDialog({ text, onAccept, onCancel, busy = false }: Acc
   const ticked = tickedFor === text.id;
   const checkboxId = useId();
   const checkboxRef = useRef<HTMLInputElement>(null);
+  // A version that replaces the one first shown (never the first render): focus and a note, once.
+  const [shownId, setShownId] = useState(text.id);
+  const [replaced, setReplaced] = useState(false);
+  if (shownId !== text.id) {
+    setShownId(text.id);
+    setReplaced(true);
+  }
+  useEffect(() => {
+    if (replaced) checkboxRef.current?.focus();
+  }, [text.id, replaced]);
 
   return (
     <Modal
@@ -37,10 +48,10 @@ export function AcceptTextDialog({ text, onAccept, onCancel, busy = false }: Acc
       initialFocusRef={checkboxRef}
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
+          <Button variant="ghost" size="sm" className="min-h-[44px] md:min-h-0" onClick={onCancel}>
             Annulla
           </Button>
-          <Button size="sm" disabled={!ticked || busy} onClick={() => onAccept(text.id)}>
+          <Button size="sm" className="min-h-[44px] md:min-h-0" disabled={!ticked || busy} onClick={() => onAccept(text.id)}>
             {text.azione}
           </Button>
         </>
@@ -48,6 +59,10 @@ export function AcceptTextDialog({ text, onAccept, onCancel, busy = false }: Acc
     >
       <div className="space-y-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         <TextParagraphs body={text.corpo} />
+      </div>
+      {/* Always in the page, so the note is announced when it appears. */}
+      <div role="status" aria-live="polite" className={replaced ? 'mt-4 text-sm font-medium text-amber-700 dark:text-amber-300' : 'sr-only'}>
+        {replaced ? 'Il testo è cambiato nel frattempo: rileggilo e conferma.' : ''}
       </div>
       <div className="mt-5 flex items-start gap-3">
         <input

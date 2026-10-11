@@ -38,27 +38,44 @@ function useDebounced<T>(value: T, ms: number): [T, (next: T) => void] {
  * date moves, so a withdrawn or newly validated card shows the present. Until the answer comes, or
  * if it never does, the card is shown as the list gave it.
  */
-function useCardDetail(card: Scheda): Scheda {
+function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: () => void } {
   const needsDetail = card.stato !== 'BOZZA_PERSONALE' && card.rilievi === undefined;
   const [detail, setDetail] = useState<Scheda | null>(null);
+  // The card, state and date whose reading failed: a different one starts without the failure.
+  const asked = `${card.id}|${card.stato}|${card.updatedAt}`;
+  const [failedFor, setFailedFor] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!needsDetail) return;
     let live = true;
     studiaService.get(card.id).then(
-      (full) => live && setDetail(full),
-      () => {},
+      (full) => {
+        if (!live) return;
+        setDetail(full);
+        setFailedFor(null);
+      },
+      (error) => {
+        console.error(`Could not read the validators' remarks of study card ${card.id}`, error);
+        if (live) setFailedFor(asked);
+      },
     );
     return () => {
       live = false;
     };
-  }, [needsDetail, card.id, card.stato, card.updatedAt]);
+  }, [needsDetail, card.id, asked, attempt]);
+  const retry = () => {
+    setFailedFor(null);
+    setAttempt((n) => n + 1);
+  };
   // Only an answer for this very card and state: another one's, or a draft's, is not shown.
-  return needsDetail && detail && detail.id === card.id && detail.stato === card.stato ? detail : card;
+  const shown = needsDetail && detail && detail.id === card.id && detail.stato === card.stato ? detail : card;
+  return { card: shown, failed: needsDetail && failedFor === asked, retry };
 }
 
 /** The detail of a card, completed with what its own address carries (`useCardDetail`). */
 function DetailOf({ card, ...rest }: CardDetailProps) {
-  return <CardDetail {...rest} card={useCardDetail(card)} />;
+  const full = useCardDetail(card);
+  return <CardDetail {...rest} card={full.card} rilieviFailed={full.failed} onRetryRilievi={full.retry} />;
 }
 
 /**
@@ -261,6 +278,8 @@ export function MyCardsView() {
         <div className={cn('min-w-0 pt-2 md:pt-3', desktop && 'sticky top-0 max-h-screen overflow-y-auto pb-4')}>
           {selected ? (
             <DetailOf
+              // Its confirmations and pending request belong to this card: another one starts clean.
+              key={selected.id}
               card={selected}
               onBack={desktop ? undefined : () => navigate(LIST_PATH)}
               onEdit={() => setEdit({ card: selected, open: true })}

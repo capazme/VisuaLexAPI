@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { studiaService } from '../../../services/studiaService';
@@ -23,6 +23,9 @@ export interface CardDetailProps {
    * The caller reads its lists again; the card is the caller's to refresh.
    */
   onChanged: (message: string, type: 'success' | 'error') => void;
+  /** The validators' remarks could not be read: the section says so, with a way to try again. */
+  rilieviFailed?: boolean;
+  onRetryRilievi?: () => void;
 }
 
 const RILIEVO_LABEL: Record<RilievoValidatore['giudizio'], string> = {
@@ -59,7 +62,7 @@ const MEASURE = 'max-w-[60ch]';
  * proposed card may only be withdrawn (it goes back to a draft); a validated or «da rivedere» card
  * is kept (spec D5, D6). Proposing asks the user to accept the server's current notice first.
  */
-export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onChanged }: CardDetailProps) {
+export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onChanged, rilieviFailed = false, onRetryRilievi }: CardDetailProps) {
   const canEdit = card.stato === 'BOZZA_PERSONALE';
   const canDelete = canEdit || card.stato === 'ARCHIVIATA';
   const canPropose = card.stato === 'BOZZA_PERSONALE';
@@ -69,10 +72,15 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
   const notice = asked && asked.cardId === card.id ? asked.text : null;
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [pending, setPending] = useState(false);
+  // A second click before the first answer (the confirm button stays through the dialog's exit
+  // animation) must not send a second request: state would still read idle in the same tick.
+  const inFlight = useRef(false);
 
   // First without a notice accepted: the server answers the card, or the notice to accept (and again,
   // with a newer one, if an administrator saved a version meanwhile).
   const propose = async (acceptedTextId?: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     try {
       const outcome = acceptedTextId ? await studiaService.propose(card.id, acceptedTextId) : await studiaService.propose(card.id);
@@ -86,12 +94,15 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
       setAsked(null);
       onChanged(proposeFailure(error), 'error');
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   };
 
   const withdraw = async () => {
     setConfirmWithdraw(false);
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     try {
       await studiaService.withdraw(card.id);
@@ -99,6 +110,7 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
     } catch (error) {
       onChanged(withdrawFailure(error), 'error');
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   };
@@ -181,6 +193,15 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
             ))}
           </ul>
         </section>
+      )}
+
+      {rilieviFailed && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
+          <p>Non ho potuto leggere i rilievi dei validatori.</p>
+          <button type="button" onClick={onRetryRilievi} className={cn(BUTTON, 'border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800')}>
+            Riprova
+          </button>
+        </div>
       )}
 
       {card.rilievi && card.rilievi.length > 0 && (

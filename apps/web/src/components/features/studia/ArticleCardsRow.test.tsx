@@ -124,11 +124,69 @@ describe('ArticleCardsRow', () => {
     ]);
     renderRow();
     await user.click(await screen.findByRole('button', { name: 'Schede su questo articolo (3)' }));
-    const rows = within(await screen.findByRole('dialog')).getAllByRole('link');
-    expect(within(rows[0]).getByText('Validata da 2')).toBeInTheDocument();
-    expect(within(rows[0]).getByText('Validata')).toBeInTheDocument();
-    expect(within(rows[1]).queryByText(/Validata da/)).not.toBeInTheDocument();
-    expect(within(rows[2]).queryByText(/Validata da/)).not.toBeInTheDocument();
+    const peek = await screen.findByRole('dialog');
+    const community = within(peek).getByRole('button', { name: /Domanda a\?/ });
+    expect(within(community).getByText('Validata da 2')).toBeInTheDocument();
+    expect(within(community).getByText('Validata')).toBeInTheDocument();
+    const own = within(peek).getAllByRole('link');
+    expect(own).toHaveLength(2);
+    expect(within(own[0]).queryByText(/Validata da/)).not.toBeInTheDocument();
+    expect(within(own[1]).queryByText(/Validata da/)).not.toBeInTheDocument();
+  });
+
+  it('opens a community card in place, with its answer and explanation: its address answers only its author', async () => {
+    const user = userEvent.setup();
+    forArticle.mockResolvedValue([
+      card('a', { stato: 'VALIDATA', comunita: true, approvazioni: 2, risposta: 'Con la diffida ad adempiere.', spiegazione: 'Art. 1454 c.c.' }),
+      card('b'),
+    ]);
+    renderRow();
+    await user.click(await screen.findByRole('button', { name: 'Schede su questo articolo (2)' }));
+    const peek = await screen.findByRole('dialog');
+    // Not a link, to /studia/schede/a or anywhere: a button, closed.
+    const row = within(peek).getByRole('button', { name: /Domanda a\?/ });
+    expect(within(peek).queryByRole('link', { name: /Domanda a\?/ })).not.toBeInTheDocument();
+    expect(row).toHaveAttribute('type', 'button');
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    expect(row).toHaveClass('min-h-[44px]');
+    expect(within(peek).queryByText('Con la diffida ad adempiere.')).not.toBeInTheDocument();
+
+    await user.click(row);
+    expect(row).toHaveAttribute('aria-expanded', 'true');
+    expect(within(peek).getByText('Con la diffida ad adempiere.')).toBeInTheDocument();
+    expect(within(peek).getByText('Art. 1454 c.c.')).toBeInTheDocument();
+    // The Peek stays open, and the reader's own card stays a link.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(peek).getByRole('link', { name: /Domanda b\?/ })).toHaveAttribute('href', '/studia/schede/b');
+
+    await user.click(row);
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    expect(within(peek).queryByText('Con la diffida ad adempiere.')).not.toBeInTheDocument();
+  });
+
+  it('opens a community card from the keyboard', async () => {
+    const user = userEvent.setup();
+    forArticle.mockResolvedValue([card('a', { stato: 'VALIDATA', comunita: true, approvazioni: 1, risposta: 'Risposta da tastiera.' })]);
+    renderRow();
+    await user.click(await screen.findByRole('button', { name: 'Schede su questo articolo (1)' }));
+    const row = within(await screen.findByRole('dialog')).getByRole('button', { name: /Domanda a\?/ });
+    row.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByText('Risposta da tastiera.')).toBeInTheDocument();
+  });
+
+  it('shows the answer and explanation of a community card as plain text, never as markup', async () => {
+    const user = userEvent.setup();
+    forArticle.mockResolvedValue([
+      card('a', { stato: 'VALIDATA', comunita: true, approvazioni: 1, risposta: '<img src=x onerror=alert(1)>', spiegazione: '<b>x</b>' }),
+    ]);
+    renderRow();
+    await user.click(await screen.findByRole('button', { name: 'Schede su questo articolo (1)' }));
+    const peek = await screen.findByRole('dialog');
+    await user.click(within(peek).getByRole('button', { name: /Domanda a\?/ }));
+    expect(within(peek).getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
+    expect(within(peek).getByText('<b>x</b>')).toBeInTheDocument();
+    expect(peek.querySelector('img, b')).toBeNull();
   });
 
   it('closes the Peek with its button', async () => {

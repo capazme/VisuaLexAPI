@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../services/studiaService', () => ({
@@ -66,6 +66,18 @@ describe('CardDetail, the actions each state allows', () => {
 });
 
 describe('CardDetail, proposing', () => {
+  it('sends one request however many times «Proponi alla comunità» is clicked at once', async () => {
+    let finish: (value: Scheda) => void = () => {};
+    propose.mockReturnValue(new Promise<Scheda>((resolve) => { finish = resolve; }));
+    const { onChanged } = renderDetail(card('BOZZA_PERSONALE'));
+    const button = screen.getByRole('button', { name: 'Proponi alla comunità' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    finish(card('PROPOSTA_COMMUNITY'));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith('Scheda proposta alla comunità', 'success'));
+    expect(propose).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the notice the server asks for, drawn from that version alone', async () => {
     const user = userEvent.setup();
     propose.mockResolvedValue({ richiedeTesto: text('t1') });
@@ -172,6 +184,21 @@ describe('CardDetail, withdrawing', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith('Proposta ritirata: la scheda è di nuovo una bozza', 'success'));
     // The dialog leaves with its exit animation.
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  });
+
+  it('sends one request however many times the confirmation is clicked while it is in flight', async () => {
+    const user = userEvent.setup();
+    let finish: (value: Scheda) => void = () => {};
+    withdraw.mockReturnValue(new Promise<Scheda>((resolve) => { finish = resolve; }));
+    const { onChanged } = renderDetail(card('PROPOSTA_COMMUNITY'));
+    await user.click(screen.getByRole('button', { name: 'Ritira' }));
+    const confirm = within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Ritira' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    finish(card('BOZZA_PERSONALE'));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(withdraw).toHaveBeenCalledTimes(1);
+    expect(onChanged).toHaveBeenCalledWith('Proposta ritirata: la scheda è di nuovo una bozza', 'success');
   });
 
   it('says when the card cannot be withdrawn any more', async () => {

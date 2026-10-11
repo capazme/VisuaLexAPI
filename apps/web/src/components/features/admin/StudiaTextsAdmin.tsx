@@ -82,11 +82,16 @@ function EarlierVersion({ version }: { version: StudiaTextVersion }) {
 
 interface TextSectionProps {
   group: StudiaTextGroup;
-  onSaved: (version: number) => void;
+  /** The version the server just created, as it answered. */
+  onSaved: (chiave: string, version: StudiaTextVersion) => void;
   onReload: () => void;
 }
 
-/** One text: its current version in a form with a live preview, and the versions before it. */
+/**
+ * One text: its current version in a form with a live preview, and the versions before it. The
+ * section is keyed by the text, not by its version: the draft lives here and outlives a reload of
+ * the texts, so a newer version found after a conflict never costs the administrator what was typed.
+ */
 function TextSection({ group, onSaved, onReload }: TextSectionProps) {
   const [current, ...earlier] = group.versioni;
   const headingId = useId();
@@ -108,7 +113,7 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
     setProblem(null);
     try {
       const saved = await adminService.saveStudiaText(group.chiave, draft);
-      onSaved(saved.versione);
+      onSaved(group.chiave, saved);
     } catch (error) {
       setProblem((error as { status?: number } | null)?.status === 409 ? 'conflict' : 'failed');
     } finally {
@@ -149,9 +154,16 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
 
       {problem && (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
-          <p>{problem === 'conflict' ? 'Un’altra versione è stata salvata nel frattempo: ricarica' : 'Non sono riuscito a salvare la versione. Riprova.'}</p>
+          <p>{problem === 'conflict' ? 'Un’altra versione è stata salvata nel frattempo. Ricarica per vederla: le tue modifiche restano nel modulo.' : 'Non sono riuscito a salvare la versione. Riprova.'}</p>
           {problem === 'conflict' && (
-            <Button variant="outline" size="sm" onClick={onReload}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setProblem(null);
+                onReload();
+              }}
+            >
               Ricarica
             </Button>
           )}
@@ -196,7 +208,7 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
 export function StudiaTextsAdmin() {
   const [groups, setGroups] = useState<StudiaTextGroup[] | null>(null);
   const [failed, setFailed] = useState(false);
-  // Bumped to read again: after a save, and on «Ricarica». The forms start over with it.
+  // Bumped to read again, on «Riprova» and «Ricarica». The forms keep what was typed.
   const [round, setRound] = useState(0);
   const [saved, setSaved] = useState<number | null>(null);
 
@@ -232,11 +244,13 @@ export function StudiaTextsAdmin() {
 
       {groups?.filter((group) => group.versioni.length > 0).map((group) => (
         <TextSection
-          key={`${round}:${group.chiave}:${group.versioni[0].id}`}
+          key={group.chiave}
           group={group}
-          onSaved={(version) => {
-            setSaved(version);
-            readAgain();
+          onSaved={(chiave, version) => {
+            // The 201 carries the whole version: it becomes the current one with no second read, so
+            // the form never shows the old version beside the new number.
+            setGroups((before) => before && before.map((g) => (g.chiave === chiave ? { ...g, versioni: [version, ...g.versioni] } : g)));
+            setSaved(version.versione);
           }}
           onReload={readAgain}
         />

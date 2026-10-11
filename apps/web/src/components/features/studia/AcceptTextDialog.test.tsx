@@ -98,6 +98,35 @@ describe('AcceptTextDialog', () => {
     expect(screen.getByRole('button', { name: 'Vai nuovo' })).toBeDisabled();
   });
 
+  it('on a newer version moves the focus to the box and says the text changed, politely; not on first open', async () => {
+    const user = userEvent.setup();
+    const { rerender, onAccept, onCancel } = renderDialog();
+    const note = 'Il testo è cambiato nel frattempo: rileggilo e conferma.';
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    await user.click(screen.getByRole('checkbox', { name: 'Spunta di prova' }));
+    screen.getByRole('button', { name: 'Vai di prova' }).focus();
+
+    const second: TestoDaAccettare = { ...TEXT, id: 'v2', versione: 2, conferma: 'Spunta nuova', azione: 'Vai nuovo' };
+    rerender(<AcceptTextDialog text={second} onAccept={onAccept} onCancel={onCancel} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(note);
+    expect(screen.getByRole('checkbox', { name: 'Spunta nuova' })).toHaveFocus();
+  });
+
+  it('keeps the note when the same version is drawn again', () => {
+    const { rerender, onAccept, onCancel } = renderDialog();
+    rerender(<AcceptTextDialog text={{ ...TEXT }} onAccept={onAccept} onCancel={onCancel} />);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('gives its buttons a 44 px target on a phone', () => {
+    renderDialog();
+    for (const name of ['Annulla', 'Vai di prova']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    }
+  });
+
   it('disables the button while the acceptance is being sent', async () => {
     const user = userEvent.setup();
     const onAccept = vi.fn();

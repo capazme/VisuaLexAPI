@@ -519,6 +519,42 @@ describe('«Le mie schede», proposing and withdrawing', () => {
     expect(screen.getByText('Approvazioni: 1')).toBeInTheDocument();
   });
 
+  it('says when the validators\' remarks cannot be read, logs why, and reads them again on «Riprova»', async () => {
+    const user = userEvent.setup();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    list.mockResolvedValue(page([proposed]));
+    get.mockRejectedValueOnce(new Error('down'));
+    renderView('/studia/schede/d1');
+    expect(await screen.findByText('Non ho potuto leggere i rilievi dei validatori.')).toBeInTheDocument();
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining('d1'), expect.any(Error));
+    // The card itself is still there, as the list gave it.
+    expect(screen.getByRole('button', { name: 'Ritira' })).toBeInTheDocument();
+
+    get.mockResolvedValue({
+      ...proposed, approvazioni: 1,
+      rilievi: [{ giudizio: 'ERRATA', motivazione: 'Sbagliata.', createdAt: '2026-10-06T09:00:00Z' }],
+    });
+    await user.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByText('Sbagliata.')).toBeInTheDocument();
+    expect(screen.queryByText('Non ho potuto leggere i rilievi dei validatori.')).not.toBeInTheDocument();
+    expect(get).toHaveBeenCalledTimes(2);
+    logged.mockRestore();
+  });
+
+  it('starts another card\'s detail clean: a confirmation left open does not follow the route', async () => {
+    const user = userEvent.setup();
+    const other = card('d2', { stato: 'PROPOSTA_COMMUNITY' });
+    list.mockResolvedValue(page([proposed, other]));
+    get.mockImplementation(async (id) => ({ ...(id === 'd1' ? proposed : other), approvazioni: 0, rilievi: [] }));
+    renderView('/studia/schede/d1');
+    await user.click(await screen.findByRole('button', { name: 'Ritira' }));
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    // The route moves under the open dialog (the dialog hides the list from the accessibility tree).
+    fireEvent.click(screen.getByText('Domanda d2?'));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/d2'));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  });
+
   it('does not read a draft again: it has no votes', async () => {
     list.mockResolvedValue(page([draft]));
     renderView('/studia/schede/d1');
