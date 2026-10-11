@@ -162,7 +162,7 @@ describe('partialize', () => {
   it('saves the practices, the active one and the marker; never the open rows, the pending reveal or the notice', () => {
     appStore.setState({
       practices: [practice('p1', 'Uno')], activePracticeId: 'p1', practicesSeeded: true,
-      practiceRows: { 'p1/d1': true }, pendingReveal: 'p1/d1', practiceNotice: 'avviso',
+      practiceRows: { 'p1/d1': true }, pendingReveal: { practiceId: 'p1', rowKey: 'p1/d1' }, practiceNotice: 'avviso',
     });
     const saved = options().partialize(appStore.getState());
     expect(saved).toMatchObject({ practices: [practice('p1', 'Uno')], activePracticeId: 'p1', practicesSeeded: true });
@@ -211,7 +211,7 @@ describe('a full storage', () => {
 describe('clearUserData — logout on a shared browser', () => {
   const seeded = () => {
     appStore.setState(reload({ workspaceTabs: twoTabs }));
-    appStore.setState({ practiceRows: { 'tab-cc/x': true }, pendingReveal: 'tab-cc/x', practiceNotice: 'avviso' });
+    appStore.setState({ practiceRows: { 'tab-cc/x': true }, pendingReveal: { practiceId: 'tab-cc', rowKey: 'tab-cc/x' }, practiceNotice: 'avviso' });
   };
 
   it('with the flag on, empties the slice and leaves the marker set', () => {

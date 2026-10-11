@@ -16,7 +16,11 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
-import { isStoredArticle, isValidView, sameDecision, sanitizePractices, type Practice } from '../utils/practice';
+import {
+    addArticles, articleRowKey, DEFAULT_PRACTICE_LABEL, findPracticeArticle, isStoredArticle, isValidView, labelOr,
+    practiceArticleKey, practiceLabel, sameDecision, sanitizePractices, type Practice,
+} from '../utils/practice';
+import { shortAct } from '../utils/sources';
 import { practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isPracticeTableEnabled } from '../features/practice/featureFlag';
@@ -321,13 +325,71 @@ interface AppState {
     /** The open rows (T15), keyed `practiceId/actId/articleKey` or `practiceId/decisionId`.
      *  Session-only, absent from `partialize`: after a reload every row is closed. */
     practiceRows: Record<string, true>;
-    /** One row to open and scroll to, a `practiceRows` key; consumed once (gotcha 14). Session-only. */
-    pendingReveal: string | null;
+    /** One row to open and scroll to: its practice and its `practiceRows` key; taken once by
+     *  `takeReveal` (gotcha 14). Session-only. */
+    pendingReveal: { practiceId: string; rowKey: string } | null;
     /** The topic searches the seeding did not reopen, told once (`practiceNoticeText`); taken by
      *  `takePracticeNotice`. Session-only. */
     practiceNotice: string | null;
     /** The notice, once: returns it and clears it in one step; null after. */
     takePracticeNotice: () => string | null;
+
+    // Practice actions (spec §2-§5). Each is one `set`. Until P3 draws the practices behind the
+    // flag, nothing calls them: with the flag off they are unused.
+    /** A new practice at the end of the bar: its label trimmed and capped (`practiceLabel`,
+     *  «Pratica» when empty), `custom` marks a name the user gave (default false). It becomes the
+     *  active one unless `activate: false`, which still activates it when no practice is active. */
+    createPractice: (label: string, options?: { custom?: boolean; activate?: boolean }) => string;
+    /** Trimmed and capped at 120 characters; sets `labelIsCustom`. A name empty once trimmed is ignored. */
+    renamePractice: (id: string, label: string) => void;
+    /** Closes it with its open rows, its reveal and the structure window one of its acts owned; the
+     *  active one hands over to its neighbour, the next, else the previous. */
+    closePractice: (id: string) => void;
+    /** Empties the table; the seeding marker stays set, so a reload never brings the tabs back (§5). */
+    closeAllPractices: () => void;
+    /** Ignored for an id that names no practice. */
+    setActivePractice: (id: string) => void;
+    reorderPractices: (fromIndex: number, toIndex: number) => void;
+    /**
+     * A search's articles into a practice (T11, §5.1): `null` is the active practice, created when
+     * there is none (named `options.label ?? shortAct(norma)`) and made active; an id that names no
+     * practice (closed meanwhile) falls back to the same, with a `console.warn` naming it. The
+     * articles join their act (`addArticles`, T2). `reveal`, `'first'` (the first article given) or
+     * an article id (found through `findPracticeArticle`), opens that row and sets `pendingReveal`.
+     */
+    addArticlesToPractice: (
+        practiceId: string | null,
+        norma: Norma,
+        articles: ArticleData[],
+        options?: { reveal?: 'first' | string; label?: string },
+    ) => { practiceId: string; actId: string };
+    /** An article-less act, or the act already there (its URN backfilled), and the structure window
+     *  pointed at it, in one step («Apri l'indice e sfoglia», today's `addNormaIndexToTab`). The
+     *  practice is resolved as `addArticlesToPractice` does and made active, so the window's owner is
+     *  on screen. Returns the act's id. */
+    addActIndexToPractice: (practiceId: string | null, norma: Norma) => string;
+    /** The row of `act` holding `articleId` (`findPracticeArticle`): when found, opens and reveals it
+     *  and returns true. The index pick, the arrows and a citation jump call it before fetching. */
+    revealPracticeArticle: (practiceId: string, actId: string, articleId: string) => boolean;
+    /** Takes the row off the table (the act stays, even empty), with its open row, its reveal and a
+     *  window showing it. */
+    removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
+    /** Takes the act off the table with its rows, its reveal, its windows and the structure window it owned. */
+    removePracticeAct: (practiceId: string, actId: string) => void;
+    /**
+     * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
+     * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
+     * the open rows and the structure window follow. The windows of `from` that showed it close: their
+     * subject is now on the other table.
+     */
+    moveActToPractice: (actId: string, fromPracticeId: string, toPracticeId: string) => void;
+    reorderActs: (practiceId: string, fromIndex: number, toIndex: number) => void;
+    toggleActCollapse: (practiceId: string, actId: string) => void;
+    /** Opens or closes a row (`articleRowKey`, `decisionRowKey`). */
+    setRowOpen: (rowKey: string, open: boolean) => void;
+    /** The row to reveal in this practice, once: returns it and clears it in one step; null after,
+     *  and null when the reveal belongs to another practice (gotcha 14). */
+    takeReveal: (practiceId: string) => { rowKey: string } | null;
 
     /**
      * The tab the phone's carousel shows (`SearchPanel`, below `md`): the one tab on screen there,
@@ -631,6 +693,190 @@ const appStore = createStore<AppState>()(
                 const notice = get().practiceNotice;
                 if (notice !== null) set((state) => { state.practiceNotice = null; });
                 return notice;
+            },
+
+            // ── Practices (spec §2-§5) ───────────────────────────────────
+            // Each action computes from the plain state and writes it in one `set` (gotcha 14).
+            createPractice: (label, options = {}) => {
+                const created = newPractice(label, options.custom === true);
+                set((state) => {
+                    state.practices.push(created);
+                    if (options.activate !== false || !state.practices.some((p) => p.id === state.activePracticeId)) {
+                        state.activePracticeId = created.id;
+                    }
+                });
+                return created.id;
+            },
+
+            renamePractice: (id, label) => set((state) => {
+                const practice = state.practices.find((p) => p.id === id);
+                const kept = practiceLabel(label);
+                if (!practice || !kept) return;
+                practice.label = kept;
+                practice.labelIsCustom = true;
+            }),
+
+            closePractice: (id) => set((state) => {
+                const index = state.practices.findIndex((p) => p.id === id);
+                if (index < 0) return;
+                const closed = state.practices[index];
+                if (state.activePracticeId === id) {
+                    state.activePracticeId = (state.practices[index + 1] ?? state.practices[index - 1])?.id ?? null;
+                }
+                if (closed.acts.some((a) => a.id === state.structureWindow.blockId)) state.structureWindow.blockId = null;
+                state.practices.splice(index, 1);
+                dropRows(state, `${id}/`);
+            }),
+
+            closeAllPractices: () => set((state) => {
+                if (state.practices.some((p) => p.acts.some((a) => a.id === state.structureWindow.blockId))) {
+                    state.structureWindow.blockId = null;
+                }
+                state.practices = [];
+                state.activePracticeId = null;
+                state.practiceRows = {};
+                state.pendingReveal = null;
+            }),
+
+            setActivePractice: (id) => set((state) => {
+                if (state.practices.some((p) => p.id === id)) state.activePracticeId = id;
+            }),
+
+            reorderPractices: (fromIndex, toIndex) => set((state) => {
+                if (!movable(state.practices.length, fromIndex, toIndex)) return;
+                const [moved] = state.practices.splice(fromIndex, 1);
+                state.practices.splice(toIndex, 0, moved);
+            }),
+
+            addArticlesToPractice: (practiceId, norma, articles, options = {}) => {
+                const landing = landingPractice(get(), practiceId, () => labelOr(options.label, shortAct(norma)), 'addArticlesToPractice');
+                const id = landing.practice.id;
+                const { acts, actId } = addArticles(landing.practice.acts, norma, articles, uuidv4);
+                const act = acts.find((a) => a.id === actId);
+                let shown: ArticleData | undefined;
+                if (act && options.reveal === 'first') {
+                    const first = articles[0] && practiceArticleKey(articles[0]);
+                    shown = act.articles.find((a) => practiceArticleKey(a) === first);
+                } else if (act && options.reveal) {
+                    shown = findPracticeArticle(act, options.reveal);
+                }
+                set((state) => {
+                    state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
+                    state.activePracticeId = landing.activePracticeId;
+                    if (shown) revealRow(state, id, actId, practiceArticleKey(shown));
+                });
+                return { practiceId: id, actId };
+            },
+
+            addActIndexToPractice: (practiceId, norma) => {
+                const landing = landingPractice(get(), practiceId, () => shortAct(norma), 'addActIndexToPractice');
+                const id = landing.practice.id;
+                const { acts, actId } = addArticles(landing.practice.acts, norma, [], uuidv4);
+                set((state) => {
+                    state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
+                    state.activePracticeId = id;
+                    state.structureWindow.blockId = actId;
+                });
+                return actId;
+            },
+
+            revealPracticeArticle: (practiceId, actId, articleId) => {
+                const act = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                const hit = act ? findPracticeArticle(act, articleId) : undefined;
+                if (!hit) return false;
+                set((state) => { revealRow(state, practiceId, actId, practiceArticleKey(hit)); });
+                return true;
+            },
+
+            removePracticeArticle: (practiceId, actId, articleKey) => set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                const act = practice?.acts.find((a) => a.id === actId);
+                const at = act ? act.articles.findIndex((a) => practiceArticleKey(a) === articleKey) : -1;
+                if (!practice || !act || at < 0) return;
+                act.articles.splice(at, 1);
+                practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId && b.articleKey === articleKey));
+                dropRows(state, articleRowKey(practiceId, actId, articleKey), true);
+            }),
+
+            removePracticeAct: (practiceId, actId) => set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice || !practice.acts.some((a) => a.id === actId)) return;
+                practice.acts = practice.acts.filter((a) => a.id !== actId);
+                practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId));
+                if (state.structureWindow.blockId === actId) state.structureWindow.blockId = null;
+                dropRows(state, `${practiceId}/${actId}/`);
+            }),
+
+            moveActToPractice: (actId, fromPracticeId, toPracticeId) => {
+                if (fromPracticeId === toPracticeId) return;
+                const { practices } = get();
+                const source = practices.find((p) => p.id === fromPracticeId);
+                const target = practices.find((p) => p.id === toPracticeId);
+                const act = source?.acts.find((a) => a.id === actId);
+                if (!source || !target || !act) return;
+                // Into a practice holding the same act, it joins that act and takes its id.
+                const merged = addArticles(target.acts, act.norma, act.articles, () => act.id);
+                const nowId = merged.actId;
+                const targetActs = nowId === act.id
+                    ? merged.acts.map((a) => (a.id === act.id ? { ...a, isCollapsed: act.isCollapsed } : a))
+                    : merged.acts;
+                const oldPrefix = `${fromPracticeId}/${actId}/`;
+                const newPrefix = `${toPracticeId}/${nowId}/`;
+                set((state) => {
+                    state.practices = practices.map((p) => {
+                        if (p.id === fromPracticeId) {
+                            return {
+                                ...p,
+                                acts: p.acts.filter((a) => a.id !== actId),
+                                beside: p.beside.filter((b) => !(b.kind === 'article' && b.actId === actId)),
+                            };
+                        }
+                        return p.id === toPracticeId ? { ...p, acts: targetActs } : p;
+                    });
+                    for (const key of Object.keys(state.practiceRows)) {
+                        if (!key.startsWith(oldPrefix)) continue;
+                        delete state.practiceRows[key];
+                        state.practiceRows[newPrefix + key.slice(oldPrefix.length)] = true;
+                    }
+                    if (state.pendingReveal?.rowKey.startsWith(oldPrefix)) {
+                        state.pendingReveal = { practiceId: toPracticeId, rowKey: newPrefix + state.pendingReveal.rowKey.slice(oldPrefix.length) };
+                    }
+                    if (state.structureWindow.blockId === actId) state.structureWindow.blockId = nowId;
+                    // Carry-over ruling 4: the way back names the act where it now is.
+                    for (const entry of state.readingBackStack) {
+                        if (entry.tabId === fromPracticeId && entry.blockId === actId) {
+                            entry.tabId = toPracticeId;
+                            entry.blockId = nowId;
+                        }
+                    }
+                });
+            },
+
+            reorderActs: (practiceId, fromIndex, toIndex) => set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice || !movable(practice.acts.length, fromIndex, toIndex)) return;
+                const [moved] = practice.acts.splice(fromIndex, 1);
+                practice.acts.splice(toIndex, 0, moved);
+            }),
+
+            toggleActCollapse: (practiceId, actId) => set((state) => {
+                const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (act) act.isCollapsed = !act.isCollapsed;
+            }),
+
+            setRowOpen: (rowKey, open) => set((state) => {
+                if (open) state.practiceRows[rowKey] = true;
+                else delete state.practiceRows[rowKey];
+            }),
+
+            takeReveal: (practiceId) => {
+                let taken: { rowKey: string } | null = null;
+                set((state) => {
+                    if (state.pendingReveal?.practiceId !== practiceId) return;
+                    taken = { rowKey: state.pendingReveal.rowKey };
+                    state.pendingReveal = null;
+                });
+                return taken;
             },
             pendingDecision: null,
             decisionFocusRequest: null,
@@ -3119,6 +3365,55 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 export { appStore };
 
 // Export types
+/** A new, empty practice: the label trimmed and capped, «Pratica» when nothing is left of it. */
+function newPractice(label: string, custom: boolean): Practice {
+    return { id: uuidv4(), label: labelOr(label, DEFAULT_PRACTICE_LABEL), labelIsCustom: custom, acts: [], decisions: [], beside: [] };
+}
+
+/**
+ * Where a search or the index lands (T11, §5.1): the practice `wanted` names; `null`, or an id that
+ * names no practice (closed meanwhile, warned with its id), means the active practice, created when
+ * there is none (named `label()`) and then made active. Pure over the plain state.
+ */
+function landingPractice(
+    state: Pick<AppState, 'practices' | 'activePracticeId'>,
+    wanted: string | null,
+    label: () => string,
+    caller: string,
+): { practices: Practice[]; practice: Practice; activePracticeId: string | null } {
+    const { practices, activePracticeId } = state;
+    if (wanted !== null) {
+        const named = practices.find((p) => p.id === wanted);
+        if (named) return { practices, practice: named, activePracticeId };
+        console.warn(`${caller}: the practice ${JSON.stringify(wanted)} is not open (closed meanwhile?); landing in the active practice`);
+    }
+    const active = practices.find((p) => p.id === activePracticeId);
+    if (active) return { practices, practice: active, activePracticeId };
+    const created = newPractice(label(), false);
+    return { practices: [...practices, created], practice: created, activePracticeId: created.id };
+}
+
+/** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. */
+function revealRow(state: AppState, practiceId: string, actId: string, articleKey: string): void {
+    const rowKey = articleRowKey(practiceId, actId, articleKey);
+    const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+    if (act) act.isCollapsed = false;
+    state.practiceRows[rowKey] = true;
+    state.pendingReveal = { practiceId, rowKey };
+}
+
+/** Closes the open rows under `key` (a prefix, or exactly that key) and drops a reveal of one. */
+function dropRows(state: AppState, key: string, exact = false): void {
+    const hit = (rowKey: string) => (exact ? rowKey === key : rowKey.startsWith(key));
+    for (const rowKey of Object.keys(state.practiceRows)) {
+        if (hit(rowKey)) delete state.practiceRows[rowKey];
+    }
+    if (state.pendingReveal && hit(state.pendingReveal.rowKey)) state.pendingReveal = null;
+}
+
+const movable = (length: number, from: number, to: number): boolean =>
+    from !== to && from >= 0 && to >= 0 && from < length && to < length;
+
 /** The practices as a load finds them (spec §9, §10): the saved ones sanitized; with the flag on and
  *  no marker, seeded from the saved tabs, as they are, and marked, whatever the result. What could
  *  not be read is logged once (gotcha 18); nothing is thrown, since a throw in `merge` would reset

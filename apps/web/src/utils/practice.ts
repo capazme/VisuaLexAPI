@@ -75,6 +75,16 @@ export function practiceArticleKey(article: ArticleData): string {
   return `${buildItemKey(article.norma_data)}|${versionKey(article.norma_data)}`;
 }
 
+/** The key of an article's row in the store's open rows and reveal (T15): `practiceId/actId/articleKey`. */
+export function articleRowKey(practiceId: string, actId: string, articleKey: string): string {
+  return `${practiceId}/${actId}/${articleKey}`;
+}
+
+/** The key of a decision's row: `practiceId/decisionId`. */
+export function decisionRowKey(practiceId: string, decisionId: string): string {
+  return `${practiceId}/${decisionId}`;
+}
+
 const ANNEX_PREFIX = /^all([^:]+):(.+)$/;
 
 // An article as a row of its act shows it: a code's annex («2» of the R.D.) is dropped.
