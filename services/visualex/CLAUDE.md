@@ -465,7 +465,13 @@ Breaking one of these breaks the product. Read before editing.
     check in `create_norma_visitata_from_data` is what turns that into a 404
     ("Articolo N non presente in …", through `_error_response`); it fails open,
     so a Normattiva outage is never reported as "does not exist". A range where
-    *some* articles exist keeps those and drops the rest.
+    *some* articles exist keeps those and drops the rest. Normattiva numbers an
+    act's annexes by position, not as the act names them (the c.p.a. is «Allegato 1»
+    of d.lgs. 104/2010 and annex 2 on Normattiva), and that number stays the identity
+    (owner, 11 October 2026); so when an annex the caller named does not hold the
+    article, the refusal adds where it is («: su Normattiva l'art. 29 si trova
+    nell'allegato 2»), from the tree just read (`_where_else_in_tree`). Never for a
+    code's default annex: another annex of a code is another code.
 
 30. **A path built from the URN is untrusted.** The guard on `/export_pdf` checks the
     host (`normattiva.it`), so everything after it is the caller's: `;../../x` used to
