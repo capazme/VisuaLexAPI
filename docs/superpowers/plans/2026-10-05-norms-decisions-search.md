@@ -3043,6 +3043,33 @@ Added 2026-10-09 (the owner: «no però vorrei tutta la ricerca in cmd+f e vorre
 
 **PR 4d:** title «feat: one floating find window on Cmd/Ctrl+F»; body names spec §13.1 and what goes. Browser pass (one test account on the dev stack): Cmd/Ctrl+F from an article and from a decision; «perche» on «Questa scheda» and on «Tutte le schede» across an article tab, a decision tab and a second article of a block not on screen (it is shown when reached); the window dragged and reopened in place; Esc; a phone width (320 and 360 px). Merge: `merge: feat/find-window — one floating find window on Cmd/Ctrl+F, over the tab or every tab`.
 
+## PR 4e — `feat/find-citations` (apps/web)
+
+Added 2026-10-11 (the owner: «ma io intendevo la ricerca nel testo, poteri voler cercare una citazione nella sentenza»; «80 sì, subito»; spec §13.2). After PR 4d. No server change, no migration.
+
+### Task 36: A citation in the query, its forms in the text
+
+**Files:**
+- Create: `apps/web/src/utils/citationSearch.ts` (`readQueryCitation(query)`: `{ kind: 'code', code, article } | { kind: 'act', actType, number, year, article? } | { kind: 'decision', number, year } | null`; `findCitationSpans(text, citation)`: `[start, end)` spans of the original text naming the same norm or decision, spec §13.2 — codes through `extractCitations`, numbered acts and decisions through patterns over `foldForSearch(text)` so offsets stay the original's)
+- Modify: `apps/web/src/utils/findInText.ts` (the punctuation rule of §13.2 in the query pattern: a `.` or `,` after a letter is optional, and an optional `[.,]` may follow any letter of an abbreviation in the text; never between two words)
+- Create: `apps/web/src/utils/__fixtures__/citationTexts.ts` (synthetic decision passages, one per form)
+- Modify: `.gitignore` (`apps/web/src/utils/__fixtures__/private/`)
+- Test: `citationSearch.test.ts`; `findInText.test.ts` (punctuation cases); `citationSearch.local.test.ts` (real texts from the private folder, skipped without it)
+
+- [ ] **Step 1: Failing tests** — every example of spec §13.2 on synthetic passages, and the negatives: «art. 58 c.p.» does not find «art. 580 c.p.»; «l. 219/2017» does not find «l. 219/2016» or «n. 2190/2017»; «c.p.» alone stays literal; «8980/2018» does not find «18980/2018»; punctuation never joins two words («art. 13» does not find «part 13»).
+- [ ] **Steps 2–4**, web build and lint; commit — «feat(web): a citation in the find query finds its other forms in the text».
+
+### Task 37: The find window uses it
+
+**Files:**
+- Modify: `apps/web/src/hooks/useFindWindow.ts` (for a query that `readQueryCitation` reads, the matches of each target are the union of the literal matches and `findCitationSpans`, ordered by start, an overlap kept once — on drawn texts through the same separator map as §13, on stored texts over their projection; nothing else changes: counter, navigation, drawing)
+- Modify: `apps/web/CLAUDE.md` (the find window: citations), spec §13.2 if the code differs
+- Test: `useFindWindow.test.tsx` (a citation query counts the other forms on a drawn and a stored text; the text DOM unchanged)
+
+- [ ] **Steps 1–4**; commit — «feat(web): the find window finds a citation in every form a decision writes it».
+
+**PR 4e:** title «feat: find a citation in every form»; body names spec §13.2, the measured cases and the local-only real-text suite. Browser pass (one test account on the dev stack): on a Cassazione decision and on a Corte costituzionale decision, «art. 580 c.p.», «l. 219/2017», «art 110 cpa», «n. 8980/2018» each find the forms the text uses. Merge: `merge: feat/find-citations — a citation in the find window finds every form a decision writes it in`.
+
 ## PR 5 — `feat/decision-history` (apps/server, apps/web)
 
 Announce the migration to the orchestrator before Step 3 of Task 23, and ask its go before any `npm --prefix apps/server test`.
@@ -3546,3 +3573,7 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - The window has two lines: the field and its buttons, then the scope switch and, under «Tutte le schede», the place of the match as one label (a decision tab's own label, which carries the section; an article's `shortNorm`), also read in the live region. The window is clamped whole inside the viewport.
 - Cmd/Ctrl+F is intercepted on `/` only, where the workspace is drawn; elsewhere it is the browser's, and leaving `/` closes the window. It is also the browser's while an overlay covers the workspace (`isWorkspaceCovered`): an element with `aria-modal="true"` or `data-find-overlay`, the mark Study Mode, the command palette, CompareView and the PDF viewer carry. Study Mode is not a modal dialog in ARIA terms (its note popovers are portalled outside it, and it has no focus trap). The hand-rolled `z-50`/`z-[100]` modals lie under the window, which stays over them, visible and usable.
 - Task 35 left `store/workspaceTabActions.ts` as it is (the dead duplicate of gotcha 25; the workspace redesign deletes it). `getFindWindowScope` and `useArticleTextInteractions`' `openUpdates`, left without callers by the removals, went too.
+
+
+**Amendment, 2026-10-11 — PR 4e added (the owner: «80 sì, subito»).** A citation typed in the find window finds every form of the same norm or decision in the text (spec §13.2, Tasks 36–37): codes through `extractCitations`, numbered acts and decision numbers through patterns over the folded text, and punctuation in abbreviations optional for every query. Real decision texts stay out of the repository; a local-only suite reads them.
+
