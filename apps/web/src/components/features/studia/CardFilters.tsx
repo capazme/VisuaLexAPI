@@ -46,12 +46,12 @@ function FilterSelect<T extends string>({ label, all, value, options, disabled, 
 }
 
 /**
- * The sticky filter row of «Le mie schede»: search, subject, state, kind, act and «Scritte da
- * Claude, da rileggere». On a phone the selects fold behind «Filtri», so the row does not take the screen.
+ * The sticky filter row of «Le mie schede»: search, subject, state, kind, act, «Scritte da
+ * Claude, da rileggere» and «Da ripassare oggi». On a phone the selects fold behind «Filtri», so the row does not take the screen.
  */
 export function CardFilters({ value, onChange, search, onSearchChange, acts }: CardFiltersProps) {
   const [open, setOpen] = useState(false);
-  const active = [value.materia, value.stato, value.tipo, value.normaKey].filter(Boolean).length + (value.daRileggere ? 1 : 0);
+  const active = [value.materia, value.stato, value.tipo, value.normaKey].filter(Boolean).length + (value.daRileggere ? 1 : 0) + (value.dovuteOggi ? 1 : 0);
 
   return (
     <div
@@ -126,6 +126,18 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           )}
         >
           Scritte da Claude, da rileggere
+        </button>
+        <button
+          type="button"
+          aria-pressed={value.dovuteOggi}
+          onClick={() => onChange({ ...value, dovuteOggi: !value.dovuteOggi })}
+          className={cn(
+            CONTROL,
+            'col-span-2 text-left md:col-span-1 md:text-center',
+            value.dovuteOggi && 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/30 dark:text-primary-300',
+          )}
+        >
+          Da ripassare oggi
         </button>
       </div>
     </div>

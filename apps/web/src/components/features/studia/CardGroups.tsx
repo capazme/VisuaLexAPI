@@ -4,7 +4,7 @@ import { cn } from '../../../lib/utils';
 import { ClaudeMark } from '../../ui/ClaudeMark';
 import type { Scheda } from '../../../types/studia';
 import { StateChip } from './StateChip';
-import { MATERIA_LABEL, TIPO_LABEL, anchorCitation } from './studiaLabels';
+import { MATERIA_LABEL, TIPO_LABEL, anchorCitation, nextReviewLabel } from './studiaLabels';
 import type { SubjectGroup } from './useMyCards';
 
 export interface CardGroupsProps {
@@ -21,6 +21,7 @@ const count = (n: number) => (n === 1 ? '1 scheda' : `${n} schede`);
 
 function CardRow({ card, selected }: { card: Scheda; selected: boolean }) {
   const citation = anchorCitation(card);
+  const nextReview = nextReviewLabel(card.prossimoRipasso);
   return (
     <li>
       <Link
@@ -37,6 +38,7 @@ function CardRow({ card, selected }: { card: Scheda; selected: boolean }) {
           <span>{citation ? `${TIPO_LABEL[card.tipo]} · ${citation}` : TIPO_LABEL[card.tipo]}</span>
           <StateChip stato={card.stato} />
           <ClaudeMark createdBy={card.origine} compact />
+          {nextReview && <span>{nextReview}</span>}
         </span>
       </Link>
     </li>

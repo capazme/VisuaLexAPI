@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL, anchorActLabel, anchorLabel, cardTitle, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
+import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL, anchorActLabel, anchorLabel, cardTitle, nextReviewLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import type { Scheda } from '../../../types/studia';
 
 const card = (urn: string | null, istituto = 'Risoluzione per inadempimento'): Scheda => ({
@@ -68,5 +68,30 @@ describe('normaFromAnchor', () => {
       tipo_atto: 'legge', data: '1990-08-07', numero_articolo: '2', numero_atto: '241',
     });
     expect(normaFromAnchor({ urn: 'non è un indirizzo' })).toBeNull();
+  });
+});
+
+describe('nextReviewLabel', () => {
+  const today = '2026-10-11';
+
+  it('says «Da ripassare oggi» from today on, in the past too', () => {
+    expect(nextReviewLabel('2026-10-11', today)).toBe('Da ripassare oggi');
+    expect(nextReviewLabel('2026-09-30', today)).toBe('Da ripassare oggi');
+  });
+
+  it('names a later day from its parts, with no timezone to move it', () => {
+    expect(nextReviewLabel('2026-10-12', today)).toBe('Prossimo ripasso: 12 ottobre');
+    expect(nextReviewLabel('2026-11-01', today)).toBe('Prossimo ripasso: 1 novembre');
+    expect(nextReviewLabel('2026-12-31', today)).toBe('Prossimo ripasso: 31 dicembre');
+  });
+
+  it('adds the year when it is not this one', () => {
+    expect(nextReviewLabel('2027-01-05', today)).toBe('Prossimo ripasso: 5 gennaio 2027');
+  });
+
+  it('says nothing for a card never reviewed, or a day it cannot read', () => {
+    expect(nextReviewLabel(null, today)).toBeNull();
+    expect(nextReviewLabel(undefined, today)).toBeNull();
+    expect(nextReviewLabel('2027-13-40', today)).toBeNull();
   });
 });
