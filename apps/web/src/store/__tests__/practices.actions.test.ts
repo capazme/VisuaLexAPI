@@ -443,3 +443,63 @@ describe('the practices themselves', () => {
     expect(s().practices.map((p) => p.id)).toEqual([b, a]);
   });
 });
+
+describe('an action that would change nothing returns before set (review M1)', () => {
+  const quietly = (name: string, setup: () => () => void) => {
+    it(name, () => {
+      const setItem = vi.spyOn(localStorage, 'setItem');
+      const call = setup();
+      setItem.mockClear();
+      call();
+      expect(setItem).not.toHaveBeenCalled();
+    });
+  };
+  const seeded = () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    return { practiceId, actId };
+  };
+  const WIDE = { corte: 'cassazione' as const, numero: 28994, anno: 2019 };
+
+  quietly('closeBeside with an unknown window id', () => {
+    const { practiceId } = seeded();
+    return () => { s().closeBeside(practiceId, 'nope'); s().closeBeside('nope', 'nope'); };
+  });
+  quietly('removePracticeArticle, removePracticeAct and removePracticeDecision with an unknown id', () => {
+    const { practiceId, actId } = seeded();
+    return () => {
+      s().removePracticeArticle(practiceId, actId, 'nope');
+      s().removePracticeAct(practiceId, 'nope');
+      s().removePracticeDecision(practiceId, 'nope');
+    };
+  });
+  quietly('renamePractice with an empty name or an unknown id', () => {
+    const { practiceId } = seeded();
+    return () => { s().renamePractice(practiceId, '   '); s().renamePractice('nope', 'Nome'); };
+  });
+  quietly('closePractice with an unknown id', () => {
+    seeded();
+    return () => s().closePractice('nope');
+  });
+  quietly('reorderPractices and reorderActs with nothing to move', () => {
+    const { practiceId } = seeded();
+    return () => { s().reorderPractices(0, 0); s().reorderPractices(0, 5); s().reorderActs(practiceId, 0, 0); s().reorderActs('nope', 0, 1); };
+  });
+  quietly('openDecision on an entry whose window is already open', () => {
+    s().openDecision(WIDE);
+    return () => { s().openDecision(WIDE); };
+  });
+  it('setDecisionEntryIdentity with the same identity keeps the practices reference and writes nothing', () => {
+    const { practiceId, decisionId } = s().openDecision(WIDE);
+    const attrs = { sezione: '3', tipo: 'Ordinanza', data_deposito: '2019-11-11' };
+    s().setDecisionEntryIdentity(practiceId, decisionId, WIDE, attrs, 'Cass. 28994/2019');
+    const setItem = vi.spyOn(localStorage, 'setItem');
+    const before = s().practices;
+    let notified = 0;
+    const unsubscribe = appStore.subscribe(() => { notified += 1; });
+    s().setDecisionEntryIdentity(practiceId, decisionId, WIDE, attrs, 'Cass. 28994/2019');
+    unsubscribe();
+    expect(s().practices).toBe(before);
+    expect(notified).toBe(0);
+    expect(setItem).not.toHaveBeenCalled();
+  });
+});

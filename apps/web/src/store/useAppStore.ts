@@ -765,15 +765,20 @@ const appStore = createStore<AppState>()(
                 return created.id;
             },
 
-            renamePractice: (id, label) => set((state) => {
-                const practice = state.practices.find((p) => p.id === id);
+            renamePractice: (id, label) => {
+                // A write that changes nothing would still serialise the whole store.
                 const kept = practiceLabel(label);
-                if (!practice || !kept) return;
-                practice.label = kept;
-                practice.labelIsCustom = true;
-            }),
+                if (!kept || !get().practices.some((p) => p.id === id)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === id) as Practice;
+                    practice.label = kept;
+                    practice.labelIsCustom = true;
+                });
+            },
 
-            closePractice: (id) => set((state) => {
+            closePractice: (id) => {
+                if (!get().practices.some((p) => p.id === id)) return;
+                set((state) => {
                 const index = state.practices.findIndex((p) => p.id === id);
                 if (index < 0) return;
                 const closed = state.practices[index];
@@ -783,7 +788,8 @@ const appStore = createStore<AppState>()(
                 if (closed.acts.some((a) => a.id === state.structureWindow.blockId)) state.structureWindow.blockId = null;
                 state.practices.splice(index, 1);
                 dropRows(state, `${id}/`);
-            }),
+                });
+            },
 
             closeAllPractices: () => set((state) => {
                 if (state.practices.some((p) => p.acts.some((a) => a.id === state.structureWindow.blockId))) {
@@ -801,11 +807,13 @@ const appStore = createStore<AppState>()(
                 set((state) => { state.activePracticeId = id; });
             },
 
-            reorderPractices: (fromIndex, toIndex) => set((state) => {
-                if (!movable(state.practices.length, fromIndex, toIndex)) return;
-                const [moved] = state.practices.splice(fromIndex, 1);
-                state.practices.splice(toIndex, 0, moved);
-            }),
+            reorderPractices: (fromIndex, toIndex) => {
+                if (!movable(get().practices.length, fromIndex, toIndex)) return;
+                set((state) => {
+                    const [moved] = state.practices.splice(fromIndex, 1);
+                    state.practices.splice(toIndex, 0, moved);
+                });
+            },
 
             addArticlesToPractice: (practiceId, norma, articles, options = {}) => {
                 const landing = landingPractice(get(), practiceId, () => labelOr(options.label, shortAct(norma)), 'addArticlesToPractice');
@@ -855,7 +863,10 @@ const appStore = createStore<AppState>()(
                 return true;
             },
 
-            removePracticeArticle: (practiceId, actId, articleKey) => set((state) => {
+            removePracticeArticle: (practiceId, actId, articleKey) => {
+                const held = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (!held || !held.articles.some((a) => practiceArticleKey(a) === articleKey)) return;
+                set((state) => {
                 const practice = state.practices.find((p) => p.id === practiceId);
                 const act = practice?.acts.find((a) => a.id === actId);
                 const at = act ? act.articles.findIndex((a) => practiceArticleKey(a) === articleKey) : -1;
@@ -863,16 +874,20 @@ const appStore = createStore<AppState>()(
                 act.articles.splice(at, 1);
                 practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId && b.articleKey === articleKey));
                 dropRows(state, articleRowKey(practiceId, actId, articleKey), true);
-            }),
+                });
+            },
 
-            removePracticeAct: (practiceId, actId) => set((state) => {
+            removePracticeAct: (practiceId, actId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.acts.some((a) => a.id === actId)) return;
+                set((state) => {
                 const practice = state.practices.find((p) => p.id === practiceId);
                 if (!practice || !practice.acts.some((a) => a.id === actId)) return;
                 practice.acts = practice.acts.filter((a) => a.id !== actId);
                 practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId));
                 if (state.structureWindow.blockId === actId) state.structureWindow.blockId = null;
                 dropRows(state, `${practiceId}/${actId}/`);
-            }),
+                });
+            },
 
             moveActToPractice: (actId, fromPracticeId, toPracticeId) => {
                 if (fromPracticeId === toPracticeId) return;
@@ -927,12 +942,15 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            reorderActs: (practiceId, fromIndex, toIndex) => set((state) => {
-                const practice = state.practices.find((p) => p.id === practiceId);
-                if (!practice || !movable(practice.acts.length, fromIndex, toIndex)) return;
-                const [moved] = practice.acts.splice(fromIndex, 1);
-                practice.acts.splice(toIndex, 0, moved);
-            }),
+            reorderActs: (practiceId, fromIndex, toIndex) => {
+                const held = get().practices.find((p) => p.id === practiceId);
+                if (!held || !movable(held.acts.length, fromIndex, toIndex)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    const [moved] = practice.acts.splice(fromIndex, 1);
+                    practice.acts.splice(toIndex, 0, moved);
+                });
+            },
 
             toggleActCollapse: (practiceId, actId) => set((state) => {
                 const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
@@ -961,6 +979,14 @@ const appStore = createStore<AppState>()(
                 const practiceId = landing.practice.id;
                 const existing = landing.practice.decisions.find((d) => sameDecision(d.reference, reference));
                 const decisionId = existing?.id ?? uuidv4();
+                // Already there, its window already open, in the active practice: nothing to write.
+                if (existing && landing.practices === before.practices && options.open !== false && options.beside !== false &&
+                    before.activePracticeId === practiceId &&
+                    besideWith(landing.practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId) === landing.practice.beside &&
+                    (existing.identified || existing.reference.archivio || !reference.sezione ||
+                        decisionPath(existing.reference) === decisionPath(reference))) {
+                    return { practiceId, decisionId };
+                }
                 set((state) => {
                     // a practice landingPractice created is new and unfrozen: pushed, never one already stored
                     if (landing.practices !== before.practices) state.practices.push(landing.practice);
@@ -999,6 +1025,9 @@ const appStore = createStore<AppState>()(
                 if (attrs.sezione) found.sezione = attrs.sezione;
                 // One entry per decision: one already holding it (a candidate chosen here) absorbs this one.
                 const survivor = practice.decisions.find((d) => d.id !== decisionId && sameDecision(d.reference, identity));
+                // The same identity again (every found answer, cache hits included): keep the reference.
+                if (!survivor && entry.identified && entry.label === label && sameDecision(entry.reference, identity) &&
+                    JSON.stringify(found) === JSON.stringify(entry)) return;
                 set((state) => {
                     const target = state.practices.find((p) => p.id === practiceId) as Practice;
                     if (!survivor) {
@@ -1013,13 +1042,16 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            removePracticeDecision: (practiceId, decisionId) => set((state) => {
+            removePracticeDecision: (practiceId, decisionId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return;
+                set((state) => {
                 const practice = state.practices.find((p) => p.id === practiceId);
                 if (!practice || !practice.decisions.some((d) => d.id === decisionId)) return;
                 practice.decisions = practice.decisions.filter((d) => d.id !== decisionId);
                 practice.beside = practice.beside.filter((b) => !(b.kind === 'decision' && b.decisionId === decisionId));
                 dropRows(state, decisionRowKey(practiceId, decisionId), true);
-            }),
+                });
+            },
 
             openBeside: (practiceId, ref, askerId) => {
                 const practice = get().practices.find((p) => p.id === practiceId);
@@ -1036,11 +1068,13 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            closeBeside: (practiceId, refId) => set((state) => {
-                const practice = state.practices.find((p) => p.id === practiceId);
-                if (!practice || !practice.beside.some((b) => b.id === refId)) return;
-                practice.beside = practice.beside.filter((b) => b.id !== refId);
-            }),
+            closeBeside: (practiceId, refId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === refId)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    practice.beside = practice.beside.filter((b) => b.id !== refId);
+                });
+            },
             pendingDecision: null,
             decisionFocusRequest: null,
             highestZIndex: 100,
