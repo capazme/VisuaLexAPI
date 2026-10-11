@@ -8,6 +8,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useFindWindow, type FindScope } from '../../../hooks/useFindWindow';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { frontTabId as computeFrontTabId } from '../../../utils/findScope';
+import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 import {
   reportFindWindowScope,
   subscribeFindWindow,
@@ -153,7 +154,10 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
   const [restartTick, setRestartTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const revealTab = useAppStore((s) => s.revealTab);
+  const setActivePractice = useAppStore((s) => s.setActivePractice);
   const front = useAppStore((s) => computeFrontTabId(s, isDesktop));
+  // With the practices drawn (flag on) the scopes are a practice and every practice (spec §6.6).
+  const practices = isPracticeTableEnabled();
 
   const find = useFindWindow({ query, scope, open: true, prefer });
   const restartRef = useRef(find.restart);
@@ -173,7 +177,9 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
     if (scoped && request.tabId !== undefined) {
       setScope('tab');
       setPrefer({ tabId: request.tabId, targetKey: request.targetKey });
-      revealTab(request.tabId);
+      // The practices: the magnifier's practice becomes the one on screen (a row's is already).
+      if (practices) setActivePractice(request.tabId);
+      else revealTab(request.tabId);
       setRestartTick((n) => n + 1);
     }
     inputRef.current?.focus();
@@ -264,7 +270,8 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
   // text was read with), an article's `shortNorm`.
   const current = find.current;
   const decisionTabLabel = useAppStore((s) => {
-    const tab = current ? s.workspaceTabs.find((t) => t.id === current.tabId) : undefined;
+    // A practice's target already carries its label (the entry's, with the practice's name).
+    const tab = current && !practices ? s.workspaceTabs.find((t) => t.id === current.tabId) : undefined;
     return tab?.view?.kind === 'decision' ? tab.label : undefined;
   });
   const where = scope === 'all' && current ? decisionTabLabel || current.label : '';
@@ -334,7 +341,10 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1.5 pb-1.5 pt-1">
         <div role="group" aria-label="Dove cercare" className="inline-flex rounded-md bg-slate-100 p-0.5 dark:bg-slate-800">
-          {([['tab', 'Questa scheda'], ['all', 'Tutte le schede']] as const).map(([value, label]) => (
+          {(practices
+            ? ([['tab', 'Questa pratica'], ['all', 'Tutte le pratiche']] as const)
+            : ([['tab', 'Questa scheda'], ['all', 'Tutte le schede']] as const)
+          ).map(([value, label]) => (
             <button
               key={value}
               type="button"

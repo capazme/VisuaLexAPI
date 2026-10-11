@@ -249,7 +249,13 @@ popovers are portalled outside it, and VoiceOver hides what lies outside a modal
 `mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
 with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
 session-only) and «Tutte le schede». A phone leaves out loose articles: its column draws
-norm blocks only. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
+norm blocks only. Behind `VITE_FEATURE_PRACTICE_TABLE` the scopes are «Questa pratica» (the active
+practice, on both breakpoints: every article of every act, its row open or closed, then its decisions
+newest first) and «Tutte le pratiche» (the bar's order, each place named with its practice); a row's
+root registers under its practice's id with the same keys; a decision never read counts nothing (it
+is not in the session's cache); reaching an undrawn match opens its row with its practice made active
+(`revealPracticeRow`, `revealPracticeDecision`), and the window recomputes on a practice switched, a
+row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
 (it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
 26: use `useIsDesktop`). Esc closes it and returns focus. Text roots register through
