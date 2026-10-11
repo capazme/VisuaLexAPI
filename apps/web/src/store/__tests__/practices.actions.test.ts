@@ -130,6 +130,46 @@ describe('the reveal (pendingReveal, gotcha 14)', () => {
   });
 });
 
+describe('revealPracticeRow: the row a key names exactly (an index chip)', () => {
+  it('reveals a past-text row, never the text in force, and unfolds its act in one write', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '5', PAST)]);
+    s().toggleActCollapse(practiceId, actId);
+    const other = s().createPractice('Altra');
+    expect(s().activePracticeId).toBe(other);
+    const pastKey = practiceArticleKey(article(L24, '5', PAST));
+    const listener = vi.fn();
+    const unsubscribe = appStore.subscribe(listener);
+    expect(s().revealPracticeRow(practiceId, actId, pastKey)).toBe(true);
+    unsubscribe();
+    expect(listener).toHaveBeenCalledTimes(1);
+    const rowKey = articleRowKey(practiceId, actId, pastKey);
+    expect(s().practiceRows).toEqual({ [rowKey]: true });
+    expect(s().activePracticeId).toBe(practiceId);
+    expect(practice(practiceId).acts[0].isCollapsed).toBe(false);
+    expect(s().takeReveal(practiceId)).toEqual({ rowKey });
+  });
+
+  it('a row revealed again, already open, becomes the last one opened (the block reads from it)', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    const five = practiceArticleKey(article(L24, '5'));
+    const seven = practiceArticleKey(article(L24, '7'));
+    s().revealPracticeRow(practiceId, actId, five);
+    s().revealPracticeRow(practiceId, actId, seven);
+    s().revealPracticeRow(practiceId, actId, five);
+    expect(Object.keys(s().practiceRows)).toEqual([articleRowKey(practiceId, actId, seven), articleRowKey(practiceId, actId, five)]);
+  });
+
+  it('a key the act does not hold reveals nothing and writes nothing', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    const listener = vi.fn();
+    const unsubscribe = appStore.subscribe(listener);
+    expect(s().revealPracticeRow(practiceId, actId, practiceArticleKey(article(L24, '7')))).toBe(false);
+    expect(s().revealPracticeRow('nope', actId, practiceArticleKey(article(L24, '5')))).toBe(false);
+    unsubscribe();
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
 describe('revealPracticeArticle (T2, gotcha 9)', () => {
   it('finds «1 bis» as 1-bis and reveals its row', () => {
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '1-bis')]);

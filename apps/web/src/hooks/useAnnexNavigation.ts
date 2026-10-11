@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { extractArticleIdsFromTree, normalizeArticleId, type TreeNode } from '../utils/treeUtils';
 import { getUniqueArticleId } from '../utils/articleIds';
@@ -13,6 +13,12 @@ interface UseAnnexNavigationProps {
   articles: ArticleData[];
   /** Tab ID (only for workspace - enables direct article loading) */
   tabId?: string;
+  /**
+   * Where a loaded article lands, before `tabId`: the practice's act (`addArticlesToPractice`,
+   * spec §6.4). The caller first reveals a row already holding the article (`revealPracticeArticle`)
+   * and loads only when there is none. `tabId` stays for the old surface until P6.
+   */
+  addArticles?: (norma: Norma, articles: ArticleData[]) => void;
   /** Originally searched article (for preserving context on annex switch) */
   searchedArticle?: string;
   /** Currently active/selected article (for determining current annex context) */
@@ -54,7 +60,9 @@ interface UseAnnexNavigationReturn {
 
   // Actions
   fetchTree: () => Promise<void>;
-  handleAnnexSelect: (annexNumber: string | null) => Promise<string | null>;
+  /** Switches to `annexNumber`, loading `articleNumber` there (default: the searched article, else
+   *  the first loaded, else "1"). */
+  handleAnnexSelect: (annexNumber: string | null, articleNumber?: string) => Promise<string | null>;
   /** Load an article - targetAnnex allows specifying which annex to load from (null = dispositivo) */
   handleLoadArticle: (articleNumber: string, targetAnnex?: string | null) => void;
 
@@ -71,6 +79,7 @@ export function useAnnexNavigation({
   norma,
   articles,
   tabId,
+  addArticles,
   searchedArticle,
   activeArticle
 }: UseAnnexNavigationProps): UseAnnexNavigationReturn {
@@ -88,6 +97,12 @@ export function useAnnexNavigation({
 
   // Article loading state (for workspace direct loading)
   const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
+
+  // Where a loaded article lands: the practice's act, else the tab, else nowhere (a global search).
+  const land = useMemo(
+    () => addArticles ?? (tabId ? (n: Norma, loaded: ArticleData[]) => addNormaToTab(tabId, n, loaded) : null),
+    [addArticles, tabId, addNormaToTab],
+  );
 
   // Derive current annex from active article (if provided) or first loaded article
   const currentAnnex = activeArticle?.norma_data?.allegato
@@ -176,17 +191,22 @@ export function useAnnexNavigation({
     }
   }, [norma.urn, treeData]);
 
-  // Auto-fetch tree when norma has URN
+  // Auto-fetch tree when norma has URN: once per act. A failed load leaves `treeData` null, and
+  // re-asking on every settle hammered the sources (and the user's scraping quota) in a loop; the
+  // structure button (`fetchTree`) asks again.
+  const autoFetchedUrn = useRef<string | null>(null);
   useEffect(() => {
-    if (norma.urn && !treeData && !treeLoading) {
+    if (norma.urn && !treeData && !treeLoading && autoFetchedUrn.current !== norma.urn) {
+      autoFetchedUrn.current = norma.urn;
       fetchTree();
     }
   }, [norma.urn, treeData, treeLoading, fetchTree]);
 
   // Handle annex selection - load into same tab if tabId is present
-  const handleAnnexSelect = useCallback(async (annexNumber: string | null): Promise<string | null> => {
-    // Use searched article > current article > default "1"
-    const articleToSearch = searchedArticle
+  const handleAnnexSelect = useCallback(async (annexNumber: string | null, articleNumber?: string): Promise<string | null> => {
+    // Use the article asked for > searched article > current article > default "1"
+    const articleToSearch = articleNumber
+      || searchedArticle
       || articles[0]?.norma_data?.numero_articolo
       || '1';
 
@@ -205,9 +225,9 @@ export function useAnnexNavigation({
     // This prevents smart lookup from redirecting to an allegato
     const annexForApi = annexNumber === null ? '' : annexNumber;
 
-    // If we have a tabId, load directly into the same tab (workspace behavior)
+    // With a place to land (the practice's act, or a tab), load directly into it (workspace behavior)
     // This is now preferred for ALL contexts including search results (NormaCard will pass tabId)
-    if (tabId) {
+    if (land) {
       setLoadingArticle(annexNumber ? `annex-${annexNumber}` : 'main');
 
       try {
@@ -233,8 +253,8 @@ export function useAnnexNavigation({
         const validArticles = fetchedArticles.filter((a: ArticleData) => !a.error && a.norma_data);
 
         if (validArticles.length > 0) {
-          // Add to the same tab - addNormaToTab will handle deduplication
-          addNormaToTab(tabId, norma, validArticles);
+          // addArticlesToPractice / addNormaToTab handle deduplication
+          land(norma, validArticles);
           return articleToSearch;
         }
       } catch (e) {
@@ -257,7 +277,7 @@ export function useAnnexNavigation({
       return null;
     }
     return null;
-  }, [norma, articles, searchedArticle, tabId, triggerSearch, addNormaToTab]);
+  }, [norma, articles, searchedArticle, land, triggerSearch]);
 
   // Handle loading a new article
   // targetAnnex: if provided, use it (null = dispositivo); if undefined, use currentAnnex
@@ -284,8 +304,8 @@ export function useAnnexNavigation({
       return; // Already loaded - caller should handle navigation
     }
 
-    // If we have a tabId, load directly into the tab (workspace behavior)
-    if (tabId) {
+    // With a place to land, load directly into it (workspace behavior)
+    if (land) {
       if (loadingArticle) return; // Already loading something
 
       setLoadingArticle(articleNumber);
@@ -313,7 +333,7 @@ export function useAnnexNavigation({
         const validArticles = fetchedArticles.filter((a: ArticleData) => !a.error && a.norma_data);
 
         if (validArticles.length > 0) {
-          addNormaToTab(tabId, norma, validArticles);
+          land(norma, validArticles);
         }
       } catch (e) {
         console.error('Error loading article:', e);
@@ -333,7 +353,7 @@ export function useAnnexNavigation({
         annex: annexForApi
       });
     }
-  }, [norma, currentAnnex, tabId, loadingArticle, isArticleLoaded, triggerSearch, addNormaToTab]);
+  }, [norma, currentAnnex, land, loadingArticle, isArticleLoaded, triggerSearch]);
 
   return {
     // Tree state

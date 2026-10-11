@@ -484,6 +484,8 @@ destination, and it has no keyboard shortcut on purpose: every natural
 combination for "back" already belongs to the browser. Behind `VITE_FEATURE_PRACTICE_TABLE` the
 stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
 practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
+the row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
+so a past text comes back as itself), else found through `findPracticeArticle`,
 live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
 practice made active, the row revealed or the window reopened); any other entry is kept as given.
 Until P3 draws the practices, an entry still live in a tab stays a tab entry even with the flag on

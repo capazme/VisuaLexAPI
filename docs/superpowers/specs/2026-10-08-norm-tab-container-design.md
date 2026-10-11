@@ -544,8 +544,10 @@ decision links and lists, `DecisionReadingSurface`, `CaseLawSection`, `MassimeSe
 articleKey } | { kind: 'decision'; decisionId }, place: 'table' | 'beside', label }`. The reading
 surfaces keep pushing today's shape (`ArticleTabContent`'s `readingOrigin`, `useCitationLinks`);
 `pushReadingBack` converts an entry whose `tabId` names a practice into `place: 'table'` (the row:
-`blockId` is the act, `articleId` is found through `findPracticeArticle`) and one whose `tabId` names
-a window into `place: 'beside'`. `findLiveBackIndex` keeps an entry while its practice holds its
+`blockId` is the act; a row's surface adds the row's `articleKey`, its `practiceArticleKey` with the
+version, which names the row, so going back to a past text reveals that row and never the text in
+force; without it, or when no row holds that key, `articleId` is found through `findPracticeArticle`)
+and one whose `tabId` names a window into `place: 'beside'`. `findLiveBackIndex` keeps an entry while its practice holds its
 subject. Going back makes that practice active and either reveals the row (`table`) or opens the
 subject beside (`beside`; on a phone, in the reader). `ReadingBackControl` stays one, global,
 without a shortcut. While the flag exists the stack accepts both shapes; P6 drops the tab shape.

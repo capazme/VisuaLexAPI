@@ -362,6 +362,30 @@ describe('the way back over practices (§6.3)', () => {
     expect(s().activePracticeId).toBe(to);
   });
 
+  it('an entry with the row\'s key names that row: back to a past text reveals the past text (ruling 12)', () => {
+    flagOn();
+    const past = article(L24, '5', { data_versione: '2007-12-29' });
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), past]);
+    const pastKey = practiceArticleKey(past);
+    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', articleKey: pastKey, label: 'art. 5' });
+    expect(s().readingBackStack).toEqual([
+      { practiceId, subject: { kind: 'article', actId, articleKey: pastKey }, place: 'table', label: 'art. 5' },
+    ]);
+    s().popReadingBack();
+    const rowKey = articleRowKey(practiceId, actId, pastKey);
+    expect(s().practiceRows).toEqual({ [rowKey]: true });
+    expect(s().takeReveal(practiceId)).toEqual({ rowKey });
+  });
+
+  it('an entry whose key no row holds falls back to the article its id names', () => {
+    flagOn();
+    const { practiceId, actId, key5 } = withArticles();
+    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', articleKey: 'gone|key', label: 'art. 5' });
+    expect(s().readingBackStack).toEqual([
+      { practiceId, subject: { kind: 'article', actId, articleKey: key5 }, place: 'table', label: 'art. 5' },
+    ]);
+  });
+
   it('revealPracticeArticle makes its practice active in the same step (ruling 9)', () => {
     const { practiceId, actId } = withArticles();
     s().createPractice('Altra');

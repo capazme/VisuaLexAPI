@@ -376,6 +376,10 @@ interface AppState {
     /** The row of `act` holding `articleId` (`findPracticeArticle`): when found, opens and reveals it
      *  and returns true. The index pick, the arrows and a citation jump call it before fetching. */
     revealPracticeArticle: (practiceId: string, actId: string, articleId: string) => boolean;
+    /** The row `articleKey` names exactly (an index chip, a past text included): opens and reveals it,
+     *  its practice made active, in one step, and returns true; false, writing nothing, when the act
+     *  holds no such row. */
+    revealPracticeRow: (practiceId: string, actId: string, articleKey: string) => boolean;
     /** Takes the row off the table (the act stays, even empty), with its open row, its reveal and a
      *  window showing it. */
     removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
@@ -555,7 +559,8 @@ interface AppState {
     // Reading Back-Stack Actions
     /**
      * Records a jump. With the flag on, an entry whose `tabId` names a practice is kept as a `table`
-     * entry (its `blockId` an act, the row found through `findPracticeArticle`, or a decision) and
+     * entry (its `blockId` an act, the row its `articleKey` names, else the one `findPracticeArticle`
+     * finds, or a decision) and
      * one whose `tabId` names a window as a `beside` entry (spec §6.3); any other is kept as given.
      */
     pushReadingBack: (entry: ReadingBackEntry) => void;
@@ -859,6 +864,16 @@ const appStore = createStore<AppState>()(
                 set((state) => {
                     state.activePracticeId = practiceId;
                     revealRow(state, practiceId, actId, practiceArticleKey(hit));
+                });
+                return true;
+            },
+
+            revealPracticeRow: (practiceId, actId, articleKey) => {
+                const act = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (!act || !act.articles.some((a) => practiceArticleKey(a) === articleKey)) return false;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    revealRow(state, practiceId, actId, articleKey);
                 });
                 return true;
             },
@@ -3599,11 +3614,14 @@ function landingPractice(
     return { practices: [...practices, created], practice: created, activePracticeId: created.id };
 }
 
-/** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. */
+/** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. The row moves
+ *  to the end of `practiceRows`, open already or not: the act's last row there is the one its block
+ *  reads from (Studio, the arrows). */
 function revealRow(state: AppState, practiceId: string, actId: string, articleKey: string): void {
     const rowKey = articleRowKey(practiceId, actId, articleKey);
     const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
     if (act) act.isCollapsed = false;
+    delete state.practiceRows[rowKey];
     state.practiceRows[rowKey] = true;
     state.pendingReveal = { practiceId, rowKey };
 }
@@ -3661,7 +3679,9 @@ function practiceBackEntry(state: AppState, entry: ReadingBackEntry): PracticeBa
     const practice = state.practices.find((p) => p.id === entry.tabId);
     if (practice) {
         const act = practice.acts.find((a) => a.id === entry.blockId);
-        const hit = act && findPracticeArticle(act, entry.articleId);
+        // The row the entry names by its key (a past text, ruling 12), else the one its id names.
+        const hit = act && ((entry.articleKey && act.articles.find((a) => practiceArticleKey(a) === entry.articleKey)) ||
+            findPracticeArticle(act, entry.articleId));
         if (act && hit) {
             return { practiceId: practice.id, subject: { kind: 'article', actId: act.id, articleKey: practiceArticleKey(hit) }, place: 'table', label };
         }
