@@ -139,8 +139,15 @@ export function findMatchesInFolded(
   const words = folded.split(/\s+/);
   // The literal match first; where it fails, the same words with the punctuation of
   // abbreviations made optional (spec §13.2).
-  const literal = words.map(wordPattern).join('\\s+');
-  const relaxed = punctuationFreePattern(words);
+  // A number is never cut out of a longer one: a query starting with a digit does not begin right
+  // after a digit, one ending with a digit does not end right before one («8980/2018» is not in
+  // «18980/2018» nor in «8980/20181»).
+  const edges = [...folded];
+  const before = /\p{N}/u.test(edges[0]) ? '(?<!\\p{N})' : '';
+  const after = /\p{N}/u.test(edges[edges.length - 1]) ? '(?!\\p{N})' : '';
+  const literal = `${before}(?:${words.map(wordPattern).join('\\s+')})${after}`;
+  const relaxedBody = punctuationFreePattern(words);
+  const relaxed = relaxedBody ? `${before}(?:${relaxedBody})${after}` : null;
   const re = new RegExp(relaxed ? `${literal}|${relaxed}` : literal, 'gu');
 
   const matches: [number, number][] = [];

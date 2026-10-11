@@ -17,8 +17,10 @@ import {
   isSearchableQuery,
   mapThroughEdit,
   rangesForMatches,
+  type FindResult,
   type TextSegment,
 } from '../utils/findInText';
+import { findCitationSpans, mergeMatches, readQueryCitation } from '../utils/citationSearch';
 import { clearFindRanges, setFindRanges } from '../utils/findHighlights';
 
 const DEBOUNCE_MS = 150;
@@ -108,6 +110,18 @@ const targetId = (tabId: string, targetKey: string): string => `${tabId}\u0000${
 
 function rootFor(roots: FindRoot[], tabId: string, targetKey: string): FindRoot | undefined {
   return roots.find((r) => r.tabId === tabId && r.targetKey === targetKey);
+}
+
+/** A text's matches for the query: the literal ones and, when the query reads as a citation, the
+ *  spans naming the same citation, ordered by start, an overlap kept once (spec §13.2). Over a
+ *  drawn text the same separator map as the literal match; over a stored text its projection. */
+function withCitation(text: string, q: string, found: FindResult, limit: number): FindResult {
+  const citation = readQueryCitation(q);
+  if (!citation) return found;
+  const merged = mergeMatches(found.matches, findCitationSpans(text, citation));
+  return merged.length > limit
+    ? { matches: merged.slice(0, limit), truncated: true }
+    : { matches: merged, truncated: found.truncated };
 }
 
 type FindWindowState = Omit<UseFindWindow, 'next' | 'previous' | 'restart'>;
@@ -223,7 +237,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
       entry = { text, folded: foldForSearch(text) };
       foldedRef.current.set(id, entry);
     }
-    return findMatchesInFolded(entry.folded, q, { limit });
+    return withCitation(text, q, findMatchesInFolded(entry.folded, q, { limit }), limit);
   }, []);
 
   /** Builds this run's matches for every target, DOM-first, stored otherwise, under the
@@ -240,7 +254,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
         const limit = Math.max(0, budget);
         if (root) {
           const collected = collectSearchableText(root.element);
-          const { matches, truncated: tr } = findMatches(collected.text, q, { limit });
+          const { matches, truncated: tr } = withCitation(collected.text, q, findMatches(collected.text, q, { limit }), limit);
           if (tr) truncated = true;
           budget -= matches.length;
           built.push({ ...target, id, onScreen: true, text: collected.text, nodes: collected.nodes, matches });

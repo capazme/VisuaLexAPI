@@ -13,6 +13,11 @@ vi.mock('../utils/findInText', async (importOriginal) => {
   return { ...actual, foldForSearch: vi.fn(actual.foldForSearch) };
 });
 
+vi.mock('../utils/citationMatcher', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/citationMatcher')>();
+  return { ...actual, extractCitations: vi.fn(actual.extractCitations) };
+});
+
 import { appStore } from '../store/useAppStore';
 import type { ArticleData, NormaVisitata } from '../types';
 import { buildItemKey } from '../utils/normaKeys';
@@ -20,6 +25,7 @@ import { versionKey } from '../utils/versionDisplay';
 import { registerFindRoot } from '../utils/findTargets';
 import { findTargetsInScope } from '../utils/findScope';
 import { foldForSearch } from '../utils/findInText';
+import { extractCitations } from '../utils/citationMatcher';
 import { FakeHighlight } from '../utils/__fixtures__/openFind';
 import { useFindWindow, type UseFindWindow } from './useFindWindow';
 
@@ -142,6 +148,7 @@ beforeEach(() => {
   (HTMLElement.prototype as unknown as Record<string, unknown>).scrollIntoView = scrolled;
   vi.mocked(findTargetsInScope).mockClear();
   vi.mocked(foldForSearch).mockClear();
+  vi.mocked(extractCitations).mockClear();
 });
 
 afterEach(() => {
@@ -656,5 +663,111 @@ describe('useFindWindow — targets that cannot be reached', () => {
     await settle();
     expect(latest.count).toBe(1);
     expect(latest.current).toMatchObject({ tabId: x, onScreen: true });
+  });
+});
+
+describe('useFindWindow — a citation finds its other forms (spec §13.2)', () => {
+  const DRAWN =
+    '<div class="vlx-b">Il giudice dubita dell\'<span>art. 580</span> del codice penale e ritiene che l\'art. 580 c.p. </div>' +
+    '<div class="vlx-b">resti; l\'art. 580 cod. pen. punisce l\'aiuto, non l\'art. 581 c.p.</div>';
+  const STORED = "L'art. 580 del codice penale e l'art. 580 c.p. e la sentenza n. 18580.";
+
+  it('counts the other forms on a drawn text, once each, and draws them', async () => {
+    const tabId = addTab('Codice civile', NORMA_1, 'x');
+    mountRoot(tabId, NORMA_1, DRAWN);
+
+    render(<Harness query="art. 580 c.p." scope="all" open />);
+    await settle();
+
+    // «art. 580 del codice penale» (across two nodes), «art. 580 c.p.», «art. 580 cod. pen.»
+    expect(latest.count).toBe(3);
+    expect(currentText()).toBe('art. 580 del codice penale');
+    expect(registry.get('vlx-find')?.ranges.map((r) => r.toString())).toEqual(['art. 580 c.p.', 'art. 580 cod. pen.']);
+  });
+
+  it('counts the other forms on a stored text only, and an overlap with the literal match once', async () => {
+    addTab('Altrove', NORMA_1, STORED, { minimised: true });
+
+    render(<Harness query="art. 580 c.p." scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(2);
+    expect(registry.size).toBe(0);
+
+    // The literal match and the citation span of «art. 580 c.p.» are the same place: counted once.
+    act(() => {
+      appStore.getState().addWorkspaceTab('Altra');
+    });
+    await settle();
+    expect(latest.count).toBe(2);
+  });
+
+  it('finds a numbered act and a decision in the forms a decision writes them', async () => {
+    addTab('Altrove', NORMA_1, 'La legge n. 219 del 2017 e la L. 219/17; Cass. n 8980/2018 e n. 8980 del 2018.', { minimised: true });
+
+    const { rerender } = render(<Harness query="l. 219/2017" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(2);
+    rerender(<Harness query="n. 8980/2018" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(2);
+  });
+
+  it('a query that is not a citation is searched as before', async () => {
+    addTab('Altrove', NORMA_1, STORED, { minimised: true });
+    render(<Harness query="codice penale" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(1);
+  });
+
+  it('does not find a number inside a longer one', async () => {
+    addTab('Altrove', NORMA_1, 'n. 18980/2018, n. 8980/20181, n. 8980/2018', { minimised: true });
+    render(<Harness query="n. 8980/2018" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(1);
+  });
+
+  it('parses a text for citations once, however many times the window recomputes', async () => {
+    const UNIQUE = "Parsed once: l'art. 580 c.p. e l'art. 580 del codice penale.";
+    addTab('Altrove', NORMA_1, UNIQUE, { minimised: true });
+    render(<Harness query="art. 580 c.p." scope="all" open />);
+    await settle();
+    const parsed = () => vi.mocked(extractCitations).mock.calls.filter(([t]) => t === UNIQUE).length;
+    expect(parsed()).toBe(1);
+
+    for (const label of ['Uno', 'Due']) {
+      act(() => {
+        appStore.getState().addWorkspaceTab(label);
+      });
+      await settle(50);
+    }
+    expect(parsed()).toBe(1);
+  });
+
+  it('never changes the text DOM, node identity included, with a citation searched', async () => {
+    const tabId = addTab('Codice civile', NORMA_1, 'x');
+    const element = mountRoot(tabId, NORMA_1, DRAWN);
+    const nodesOf = () => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_ALL);
+      const nodes: Node[] = [];
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+      return nodes;
+    };
+    const html = element.innerHTML;
+    const nodes = nodesOf();
+    const values = nodes.map((n) => n.nodeValue);
+
+    const { rerender } = render(<Harness query="art. 580 c.p." scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(3);
+    act(() => latest.next());
+    expect(element.innerHTML).toBe(html);
+    rerender(<Harness query="art. 580 c.p." scope="all" open={false} />);
+    await settle();
+
+    expect(element.innerHTML).toBe(html);
+    nodesOf().forEach((n, i) => {
+      expect(n).toBe(nodes[i]);
+      expect(n.nodeValue).toBe(values[i]);
+    });
   });
 });

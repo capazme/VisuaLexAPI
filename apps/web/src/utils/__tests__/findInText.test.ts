@@ -285,3 +285,15 @@ describe('punctuation in abbreviations is optional (spec §13.2)', () => {
     expect(words('euro 1.000 e 1000', '1.000')).toEqual(['1.000']);
   });
 });
+
+describe('findMatches — a number is never cut out of a longer one', () => {
+  it('a query starting with a digit does not start right after a digit', () => {
+    expect(findMatches('n. 18980/2018 e n. 8980/2018', '8980/2018').matches).toEqual([[19, 28]]);
+  });
+  it('a query ending with a digit does not end right before a digit', () => {
+    expect(findMatches('n. 8980/20181 e n. 8980/2018.', 'n. 8980/2018').matches).toEqual([[16, 28]]);
+  });
+  it('a query edge that is not a digit is unchanged', () => {
+    expect(findMatches('il 12fatto', 'fatto').matches).toEqual([[5, 10]]);
+  });
+});

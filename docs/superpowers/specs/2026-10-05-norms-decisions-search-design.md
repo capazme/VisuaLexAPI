@@ -1067,6 +1067,10 @@ abbreviation is optional on both sides: «cpa» finds «c.p.a.», «art 13» fin
 13, comma 1-quater» finds «art. 13 comma 1-quater». A dot that ends a sentence is never
 required. This rule widens the literal match only by punctuation; it never joins two words.
 
+**Numbers.** For every query, a match never starts right after a digit when the query starts with
+a digit, nor ends right before a digit when it ends with one: «8980/2018» is not found in
+«18980/2018» nor in «8980/20181».
+
 **Tests.** Synthetic texts in the repository, written for the cases above. Real decision texts
 stay out of the repository (they carry personal data): a local-only suite reads them from a
 git-ignored folder (`apps/web/src/utils/__fixtures__/private/`) and is skipped when the folder is

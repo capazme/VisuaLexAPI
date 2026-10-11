@@ -277,9 +277,26 @@ const LEADING_PREPOSITION = /^(?:dell?|dall?|all?|nell?|sull?)['’]/i;
 /** A list read whole («artt. 2, 13 e 32 Cost.»): `extractCitations` names it by its first article only. */
 const ARTICLE_LIST_HEAD = /^(?:\p{L}+['’])?(?:artt|articoli)(?!\p{L})/iu;
 
+/** `extractCitations` results of the last texts read: a window searching the same texts for every keystroke parses each once. */
+const CITATIONS_CACHE_SIZE = 32;
+const citationsCache = new Map<string, ReturnType<typeof extractCitations>>();
+
+function citationsIn(text: string): ReturnType<typeof extractCitations> {
+  const hit = citationsCache.get(text);
+  if (hit) {
+    citationsCache.delete(text);
+    citationsCache.set(text, hit);
+    return hit;
+  }
+  const found = extractCitations(text);
+  citationsCache.set(text, found);
+  if (citationsCache.size > CITATIONS_CACHE_SIZE) citationsCache.delete(citationsCache.keys().next().value as string);
+  return found;
+}
+
 function codeSpans(text: string, c: Extract<QueryCitation, { kind: 'code' }>): Span[] {
   const code = c.code.toLowerCase();
-  return extractCitations(text)
+  return citationsIn(text)
     .filter((m) => !m.parsed.act_number && m.parsed.act_type.toLowerCase() === code)
     .filter((m) => m.parsed.article === c.article || (ARTICLE_LIST_HEAD.test(m.text) && listHas(m.text, c.article)))
     .map((m) => [m.startIndex + (LEADING_PREPOSITION.exec(m.text)?.[0].length ?? 0), m.endIndex]);
