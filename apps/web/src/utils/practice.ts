@@ -51,6 +51,9 @@ export interface PracticeDecision {
   depositDate?: string;
   /** `attributi.tipo`, kept for «Salva come dossier». */
   tipo?: string;
+  /** `attributi.sezione`, once found, kept for «Salva come dossier»: the identity carries no section,
+   *  and the reference stays the identity, so the decision's address does not change once found. */
+  sezione?: string;
   /** The `decisionKey` this entry's reading recorded in the Cronologia: once per opening (PR 5). */
   historyRecordedKey?: string;
 }
@@ -63,6 +66,51 @@ export type BesideRef =
 
 /** At most two windows beside the table (D10). */
 export const MAX_BESIDE = 2;
+
+/** What a practice holds that can be read: a row of an act, or a decision of «Giurisprudenza». It is
+ *  what a window shows (bar a topic search) and what the way back returns to (spec §6.3). */
+export type PracticeSubject =
+  | { kind: 'article'; actId: string; articleKey: string }
+  | { kind: 'decision'; decisionId: string };
+
+/** The id of the window on an article: stable for the subject, so opening it twice finds it. */
+export function articleWindowId(actId: string, articleKey: string): string {
+  return `article:${actId}:${articleKey}`;
+}
+
+/** The id of the window on a decision. */
+export function decisionWindowId(decisionId: string): string {
+  return `decision:${decisionId}`;
+}
+
+/** The window that shows `subject`, under its stable id. */
+export function besideRefFor(subject: PracticeSubject): BesideRef {
+  return subject.kind === 'article'
+    ? { id: articleWindowId(subject.actId, subject.articleKey), kind: 'article', actId: subject.actId, articleKey: subject.articleKey }
+    : { id: decisionWindowId(subject.decisionId), kind: 'decision', decisionId: subject.decisionId };
+}
+
+/** What a window shows; null for a topic search, which is a question, not a subject (T8). */
+export function subjectOfRef(ref: BesideRef): PracticeSubject | null {
+  if (ref.kind === 'article') return { kind: 'article', actId: ref.actId, articleKey: ref.articleKey };
+  if (ref.kind === 'decision') return { kind: 'decision', decisionId: ref.decisionId };
+  return null;
+}
+
+/** The practice still holds the subject: its act holds the row, or the decision is in «Giurisprudenza». */
+export function holdsSubject(practice: Practice, subject: PracticeSubject): boolean {
+  if (subject.kind === 'decision') return practice.decisions.some((d) => d.id === subject.decisionId);
+  const act = practice.acts.find((a) => a.id === subject.actId);
+  return !!act && act.articles.some((a) => practiceArticleKey(a) === subject.articleKey);
+}
+
+/** Two windows on one subject, whatever their ids. Topic searches are compared by the store, which
+ *  owns the query's key (`stableQueryKey`). */
+export function sameBesideSubject(a: BesideRef, b: BesideRef): boolean {
+  if (a.kind === 'article' && b.kind === 'article') return a.actId === b.actId && a.articleKey === b.articleKey;
+  if (a.kind === 'decision' && b.kind === 'decision') return a.decisionId === b.decisionId;
+  return false;
+}
 
 /**
  * An article's identity in a practice: its annotation key plus the text it asks for (T2).
@@ -348,6 +396,7 @@ function sanitizeDecision(raw: unknown, where: string, dropped: string[]): Pract
   };
   if (isText(raw.depositDate)) decision.depositDate = raw.depositDate;
   if (isText(raw.tipo)) decision.tipo = raw.tipo;
+  if (isText(raw.sezione)) decision.sezione = raw.sezione;
   if (isText(raw.historyRecordedKey)) decision.historyRecordedKey = raw.historyRecordedKey;
   return decision;
 }
@@ -357,13 +406,6 @@ function sanitizeDecision(raw: unknown, where: string, dropped: string[]): Pract
 interface SavedIds {
   acts: Map<string, string>;
   decisions: Map<string, string>;
-}
-
-/** Two windows on one subject: after the id maps, two decisions (or acts) that merged are one. */
-function sameBesideSubject(a: BesideRef, b: BesideRef): boolean {
-  if (a.kind === 'article' && b.kind === 'article') return a.actId === b.actId && a.articleKey === b.articleKey;
-  if (a.kind === 'decision' && b.kind === 'decision') return a.decisionId === b.decisionId;
-  return false;
 }
 
 function sanitizeBeside(raw: unknown, practice: Practice, ids: SavedIds): BesideRef | null {
@@ -395,16 +437,18 @@ export const sameEntry = (a: DecisionReference, b: DecisionReference): boolean =
  * One entry from two entries of one decision (`sameEntry`): the first one's id, and what either
  * holds. An identified entry leads over one that is not (its reference is the identity, its label
  * carries the section); otherwise the first leads. The fields the leader lacks — `depositDate`,
- * `tipo`, `historyRecordedKey` — are taken from the other, so nothing either learned is lost.
+ * `tipo`, `sezione`, `historyRecordedKey` — are taken from the other, so nothing either learned is lost.
  */
 export function mergeDecisionEntries(first: PracticeDecision, second: PracticeDecision): PracticeDecision {
   const [lead, other] = !first.identified && second.identified ? [second, first] : [first, second];
   const merged: PracticeDecision = { id: first.id, reference: lead.reference, label: lead.label, identified: lead.identified };
   const depositDate = lead.depositDate ?? other.depositDate;
   const tipo = lead.tipo ?? other.tipo;
+  const sezione = lead.sezione ?? other.sezione;
   const historyRecordedKey = lead.historyRecordedKey ?? other.historyRecordedKey;
   if (depositDate !== undefined) merged.depositDate = depositDate;
   if (tipo !== undefined) merged.tipo = tipo;
+  if (sezione !== undefined) merged.sezione = sezione;
   if (historyRecordedKey !== undefined) merged.historyRecordedKey = historyRecordedKey;
   return merged;
 }

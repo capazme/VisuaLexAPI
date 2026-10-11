@@ -4,8 +4,11 @@ import {
   findLiveBackIndex,
   peekReadingBack,
   READING_BACK_STACK_CAP,
+  type BackStackEntry,
+  type PracticeBackEntry,
   type ReadingBackEntry,
 } from './readingBackStack';
+import { practiceArticleKey, type Practice } from './practice';
 
 function entry(id: string, tabId = 'tab-1', blockId = 'block-1'): ReadingBackEntry {
   return { tabId, blockId, articleId: id, label: `Art. ${id}` };
@@ -93,10 +96,54 @@ describe('findLiveBackIndex with a decision tab', () => {
 describe('peekReadingBack', () => {
   it('returns the entry the control would take you to', () => {
     const stack = [entry('1'), entry('2')];
-    expect(peekReadingBack(stack, [tab('tab-1', ['block-1'])])?.articleId).toBe('2');
+    expect(peekReadingBack(stack, [tab('tab-1', ['block-1'])])).toEqual(entry('2'));
   });
 
   it('returns null when there is nowhere live to go back to', () => {
     expect(peekReadingBack([entry('1', 'tab-gone')], [tab('tab-1', ['block-1'])])).toBeNull();
+  });
+});
+
+describe('findLiveBackIndex over practices (spec §6.3)', () => {
+  const art5 = {
+    article_text: 'Art. 5',
+    norma_data: { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08', numero_articolo: '5', versione: 'vigente' },
+  };
+  const key5 = practiceArticleKey(art5);
+  const practice: Practice = {
+    id: 'p-1', label: 'Pratica', labelIsCustom: false, beside: [],
+    acts: [{ id: 'act-1', key: 'legge|24|2017-03-08', norma: { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08' }, articles: [art5], isCollapsed: false }],
+    decisions: [{ id: 'dec-1', reference: { corte: 'cassazione', numero: 1, anno: 2024 }, label: 'Cass. civ., n. 1/2024', identified: false }],
+  };
+  const onArticle = (place: 'table' | 'beside', practiceId = 'p-1', articleKey = key5): PracticeBackEntry => ({
+    practiceId, subject: { kind: 'article', actId: 'act-1', articleKey }, place, label: 'art. 5',
+  });
+  const onDecision: PracticeBackEntry = {
+    practiceId: 'p-1', subject: { kind: 'decision', decisionId: 'dec-1' }, place: 'beside', label: 'Cass.',
+  };
+
+  it('is live while its practice holds its subject, at the table or beside', () => {
+    expect(findLiveBackIndex([onArticle('table')], [], [practice])).toBe(0);
+    expect(findLiveBackIndex([onArticle('beside')], [], [practice])).toBe(0);
+    expect(findLiveBackIndex([onDecision], [], [practice])).toBe(0);
+  });
+
+  it('is dead once its practice is closed or its subject removed', () => {
+    expect(findLiveBackIndex([onArticle('table')], [], [])).toBe(-1);
+    expect(findLiveBackIndex([onArticle('table', 'p-gone')], [], [practice])).toBe(-1);
+    expect(findLiveBackIndex([onArticle('table', 'p-1', 'gone|vigente')], [], [practice])).toBe(-1);
+    expect(findLiveBackIndex([onDecision], [], [{ ...practice, decisions: [] }])).toBe(-1);
+  });
+
+  it('walks a stack holding both shapes', () => {
+    const stack: BackStackEntry[] = [entry('1'), onArticle('table'), onArticle('table', 'p-gone')];
+    expect(findLiveBackIndex(stack, [tab('tab-1', ['block-1'])], [practice])).toBe(1);
+    expect(findLiveBackIndex(stack, [tab('tab-1', ['block-1'])], [])).toBe(0);
+    expect(peekReadingBack(stack, [], [practice])?.label).toBe('art. 5');
+  });
+
+  it('a tab entry never reads a practice of the same id as its tab', () => {
+    const named: ReadingBackEntry = { tabId: 'p-1', blockId: 'act-1', articleId: '5', label: 'art. 5' };
+    expect(findLiveBackIndex([named], [], [practice])).toBe(-1);
   });
 });

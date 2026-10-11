@@ -280,6 +280,7 @@ export interface PracticeDecision {
   identified: boolean;     // the reference is the decision's identity: set on a found answer, never guessed
   depositDate?: string;    // attributi.data_deposito, ISO, once found (T7)
   tipo?: string;           // attributi.tipo, kept for «Salva come dossier»
+  sezione?: string;        // attributi.sezione, kept for «Salva come dossier»: the identity has no section
   historyRecordedKey?: string; // the decisionKey its reading recorded in the Cronologia: once per opening (PR 5)
 }
 
@@ -548,6 +549,12 @@ a window into `place: 'beside'`. `findLiveBackIndex` keeps an entry while its pr
 subject. Going back makes that practice active and either reveals the row (`table`) or opens the
 subject beside (`beside`; on a phone, in the reader). `ReadingBackControl` stays one, global,
 without a shortcut. While the flag exists the stack accepts both shapes; P6 drops the tab shape.
+Until P3 draws the practices, an entry still live in a tab stays a tab entry: a seeded practice keeps
+its tab's id and its acts their blocks' ids, so with the flag on in P2 the old surface's way back
+keeps working; P3 drops that preference. A window's id is stable for its subject
+(`articleWindowId`, `decisionWindowId`), and opening a subject already beside, under any id, moves
+nothing. When `setDecisionEntryIdentity` merges an entry into another, its window, open row, reveal
+and back-stack entries name the survivor.
 P3 rows push entries that name a practice, so P3 brings the `table` half of the way back with them;
 P4 adds the `beside` half (§12).
 

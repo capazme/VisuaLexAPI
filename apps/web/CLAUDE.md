@@ -464,7 +464,11 @@ opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
 per-tab copy would sit inside the very tab an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
-combination for "back" already belongs to the browser.
+combination for "back" already belongs to the browser. Behind `VITE_FEATURE_PRACTICE_TABLE` the
+stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
+practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
+live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
+practice made active, the row revealed or the window reopened); any other entry is kept as given.
 
 **Decisions in the workspace.** A court decision is a workspace tab of its own: `WorkspaceTab.view`
 (`{ kind: 'decision', reference }`, drawn by `workspace/renderTabView.tsx` on the desktop panel and the
@@ -648,7 +652,7 @@ Duplicating any of these is a defect, not a shortcut.
   sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
   URL parameter; a logout forgets it.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
-  `findLiveBackIndex` for citation-jump undo.
+  `findLiveBackIndex` (over tabs and practices), `isPracticeBackEntry` for citation-jump undo.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
   *structurally* different markup per breakpoint (portal vs. inline). It existed
   as two private copies before round 2a; do not make a third. For anything a CSS

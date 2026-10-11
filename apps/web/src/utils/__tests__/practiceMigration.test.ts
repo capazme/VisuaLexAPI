@@ -325,7 +325,7 @@ describe('sanitizePractices', () => {
   });
 
   it('drops a decision whose reference fails the checks, and keeps only known fields', () => {
-    const ok = { id: 'd1', reference: { ...FOUND, extra: 'x' }, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza', html: '<b>' };
+    const ok = { id: 'd1', reference: { ...FOUND, extra: 'x' }, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza', sezione: '3', html: '<b>' };
     const r = sanitizePractices([{
       id: 'p', label: 'P', labelIsCustom: false, acts: [], beside: [],
       decisions: [
@@ -338,7 +338,7 @@ describe('sanitizePractices', () => {
       ],
     }]);
     expect(r.practices[0].decisions).toEqual([
-      { id: 'd1', reference: FOUND, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza' },
+      { id: 'd1', reference: FOUND, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza', sezione: '3' },
     ]);
     expect(r.dropped).toHaveLength(5);
   });
