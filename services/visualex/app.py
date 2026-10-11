@@ -512,6 +512,10 @@ class NormaController:
             elif isinstance(annex_value, (int, float)):
                 annex_value = str(int(annex_value))
 
+        # The annex the caller named, before a code's default one is filled in: only
+        # that one can be pointed elsewhere when the article is not in it.
+        asked_annex = annex_value
+
         # If no annex specified (and not explicit dispositivo), check if this is a codice with a default annex
         # e.g., "codice civile" maps to "regio.decreto:1942-03-16;262:2" where :2 is the annex
         if annex_value is None and not explicit_dispositivo:
@@ -620,8 +624,14 @@ class NormaController:
         # A range like "1-50" on a 32-article act still returns the 32; only a
         # request where NOTHING exists is an error.
         if missing_articles and not norma_visitata_list:
+            hint = ''
+            if asked_annex is not None and len(missing_articles) == 1:
+                hint = await self._where_else_in_tree(norma, missing_articles[0], asked_annex)
+            # Named the annex: the article may be elsewhere in the act, so the refusal
+            # says which part it looked in, never "not in the act".
+            where = f"nell'allegato {asked_annex} di" if asked_annex is not None else "in"
             raise ResourceNotFoundError(
-                f"Articolo {', '.join(missing_articles)} non presente in {norma}"
+                f"Articolo {', '.join(missing_articles)} non presente {where} {norma}{hint}"
             )
 
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
@@ -688,6 +698,42 @@ class NormaController:
             if normalize_article_key(entry.get('numero', '')) == wanted:
                 return True
         return False
+
+    async def _where_else_in_tree(self, norma, article, annex):
+        """Where else in the act the article is, as a sentence to append to the refusal,
+        or '' when it is nowhere else or the tree cannot be read.
+
+        Normattiva numbers an act's annexes by position, not by the act's own wording
+        (the c.p.a. is «Allegato 1» of d.lgs. 104/2010 and annex 2 on Normattiva; the
+        owner kept Normattiva's number as the identity, 11 October 2026), so a lawyer
+        can name the annex the text names and miss. The tree is the one the existence
+        check has just read (get_tree is cached): no new request.
+        """
+        try:
+            tree_result = await get_tree(getattr(norma, 'url', None) or str(norma), link=False,
+                                         details=False, return_metadata=True)
+        except Exception:  # noqa: BLE001 - a hint never fails the refusal
+            return ''
+        articles = tree_result[0] if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3 else tree_result
+        if isinstance(articles, str) or not articles:
+            return ''
+        wanted = normalize_article_key(article)
+        parts = []
+        for entry in articles:
+            if not isinstance(entry, dict) or normalize_article_key(entry.get('numero', '')) != wanted:
+                continue
+            part = str(entry.get('allegato') or '')
+            if part != str(annex) and part not in parts:
+                parts.append(part)
+        if not parts:
+            return ''
+        annexes = [p for p in parts if p]
+        places = []
+        if '' in parts:
+            places.append("nel testo dell'atto")
+        if annexes:
+            places.append(("nell'allegato " if len(annexes) == 1 else "negli allegati ") + ", ".join(annexes))
+        return f": su Normattiva l'art. {article} si trova {' e '.join(places)}"
 
     def get_scraper_for_norma(self, normavisitata):
         act_type_normalized = normavisitata.norma.tipo_atto.lower()

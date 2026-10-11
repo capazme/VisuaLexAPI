@@ -159,6 +159,9 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
       if (params.date) {
         requestBody.date = parseItalianDate(params.date);
       }
+      if (params.annex) {
+        requestBody.annex = params.annex;
+      }
 
       // Add version_date for temporal comparison
       if (version === 'data' && versionDate) {
