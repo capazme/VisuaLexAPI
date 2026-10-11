@@ -252,3 +252,36 @@ describe('the query folds as the text does', () => {
   });
 });
 
+
+describe('punctuation in abbreviations is optional (spec §13.2)', () => {
+  const words = (text: string, query: string) => findMatches(text, query).matches.map(([s, e]) => text.slice(s, e));
+
+  it('finds an abbreviation with or without its dots, on either side', () => {
+    expect(words("l'art. 110 c.p.a. dispone", 'cpa')).toEqual(['c.p.a']);
+    expect(words("l'art. 110 cpa dispone", 'c.p.a.')).toEqual(['cpa']);
+    expect(words('secondo il D.Lgs. citato', 'dlgs')).toEqual(['D.Lgs']);
+  });
+
+  it('finds «art 13» in «art. 13» and a comma after a number made optional', () => {
+    expect(words("l'art. 13 dispone", 'art 13')).toEqual(['art. 13']);
+    const text = "L'art. 13, comma 1-quater, e poi l'art. 13 comma 1-quater ancora.";
+    expect(words(text, 'art. 13, comma 1-quater')).toEqual(['art. 13, comma 1-quater', 'art. 13 comma 1-quater']);
+    expect(words(text, 'art. 13 comma 1-quater')).toEqual(['art. 13, comma 1-quater', 'art. 13 comma 1-quater']);
+  });
+
+  it('never requires a dot that ends a sentence', () => {
+    expect(words('il danno ingiusto, e la colpa', 'danno ingiusto.')).toEqual(['danno ingiusto']);
+  });
+
+  it('never joins two words', () => {
+    expect(words('la part 13 del modulo', 'art. 13')).toEqual([]);
+    expect(words('la part 13 del modulo', 'art 13')).toEqual(['art 13']);
+    expect(words('secondo il c. p. a. vigente', 'cpa')).toEqual([]);
+    expect(words("l'art. 13 dispone", 'art13')).toEqual([]);
+  });
+
+  it('keeps the literal match first, and a dot between digits literal', () => {
+    expect(words('c.p. vigente', 'c.p.')).toEqual(['c.p.']);
+    expect(words('euro 1.000 e 1000', '1.000')).toEqual(['1.000']);
+  });
+});

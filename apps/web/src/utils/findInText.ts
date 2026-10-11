@@ -65,6 +65,39 @@ function wordPattern(word: string): string {
   return units.join(INVISIBLE);
 }
 
+const LETTER = /^\p{L}$/u;
+const LETTER_OR_DIGIT = /^[\p{L}\p{N}]$/u;
+
+/**
+ * The query as a pattern in which punctuation of abbreviations is optional (spec §13.2): a «.» or
+ * «,» of the query after a letter, or ending a word, may be absent from the text; the text may have
+ * a «.» or «,» after any letter of a query word and at the end of any word but the last. Never a
+ * space: it never joins two words. Matched only at the start of a word, so «art. 13» finds
+ * «art 13» but not «part 13».
+ */
+function punctuationFreePattern(words: string[]): string | null {
+  const parts: string[] = [];
+  words.forEach((word, w) => {
+    const units = [...word];
+    // A «.» or «,» after a letter, or at the end of the word, is optional: dropped here, and put
+    // back as an optional `[.,]` where a letter or the word's end allows one.
+    const kept = units.filter((u, i) => !((u === '.' || u === ',') && (LETTER.test(units[i - 1] ?? '') || i === units.length - 1)));
+    if (kept.length === 0) return;
+    if (parts.length > 0) parts.push('\\s+');
+    kept.forEach((u, i) => {
+      parts.push(`${escapeRegExp(u)}\\p{M}*`);
+      if (i < kept.length - 1) parts.push(LETTER.test(u) ? '[.,\\u00ad\\u200b]?' : INVISIBLE);
+    });
+    // Between two words a «.» or «,» may end the first on either side («art 13» and «art. 13,
+    // comma»); the query's last word takes none, so a match never swallows a sentence's end.
+    if (w < words.length - 1) parts.push('[.,]?');
+  });
+  if (parts.length === 0) return null;
+  const body = parts.join('');
+  const first = [...words[0]][0] ?? '';
+  return LETTER_OR_DIGIT.test(first) ? `(?<![\\p{L}\\p{N}])${body}` : body;
+}
+
 /** Whether `query` is long enough to search: the rule `findMatches` applies (folded, trimmed, in base characters). */
 export function isSearchableQuery(query: string): boolean {
   return [...foldQuery(query).trim()].length >= MIN_QUERY_LENGTH;
@@ -76,8 +109,10 @@ export function isSearchableQuery(query: string): boolean {
  * characters, that is code points) nothing matches; a run of whitespace in the
  * query matches any run in the text; a combining mark after a matched letter
  * is part of the match, and a soft hyphen or zero-width space between letters
- * is ignored. Ligatures (ﬁ, ﬂ) are not matched. Past `limit` matches the rest
- * are not collected and `truncated` is set.
+ * is ignored. Ligatures (ﬁ, ﬂ) are not matched. Where the literal match fails,
+ * the punctuation of abbreviations is optional (`punctuationFreePattern`: «cpa»
+ * finds «c.p.a.», «art 13» finds «art. 13»), from the start of a word only. Past
+ * `limit` matches the rest are not collected and `truncated` is set.
  */
 export function findMatches(
   text: string,
@@ -101,8 +136,12 @@ export function findMatchesInFolded(
   if (!isSearchableQuery(query)) return { matches: [], truncated: false };
   const folded = foldQuery(query).trim();
 
-  const pattern = folded.split(/\s+/).map(wordPattern).join('\\s+');
-  const re = new RegExp(pattern, 'gu');
+  const words = folded.split(/\s+/);
+  // The literal match first; where it fails, the same words with the punctuation of
+  // abbreviations made optional (spec §13.2).
+  const literal = words.map(wordPattern).join('\\s+');
+  const relaxed = punctuationFreePattern(words);
+  const re = new RegExp(relaxed ? `${literal}|${relaxed}` : literal, 'gu');
 
   const matches: [number, number][] = [];
   let truncated = false;
