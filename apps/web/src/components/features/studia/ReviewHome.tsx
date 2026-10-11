@@ -60,7 +60,7 @@ export function ReviewHome() {
         </p>
         {failed && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            Non riesco a leggere le schede di oggi. Riprova.{' '}
+            Non riesco a leggere le schede di oggi.{' '}
             <button type="button" onClick={() => setReads((n) => n + 1)} className="min-h-[44px] rounded px-1 font-medium underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               Riprova
             </button>

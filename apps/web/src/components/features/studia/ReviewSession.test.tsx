@@ -19,6 +19,7 @@ vi.mock('../dossier/DossierItemReader', () => ({
 
 import { studiaService } from '../../../services/studiaService';
 import { appStore } from '../../../store/useAppStore';
+import { Z_INDEX } from '../../../constants/zIndex';
 import type { SchedaDiRipasso } from '../../../types/studia';
 import { ReviewSession } from './ReviewSession';
 
@@ -126,7 +127,7 @@ describe('the review session', () => {
   it('pins the bar to the bottom on a phone and puts it in the flow from md up', async () => {
     renderSession([card('a')]);
     const reveal = await screen.findByRole('button', { name: /Mostra risposta/ });
-    expect(reveal.parentElement).toHaveClass('fixed', 'inset-x-0', 'bottom-0', 'md:static');
+    expect(reveal.parentElement).toHaveClass('fixed', 'inset-x-0', 'bottom-0', 'md:static', Z_INDEX.pinnedBar);
     expect(reveal).toHaveClass('min-h-[44px]');
     expect(within(reveal).getByText('Spazio')).toBeInTheDocument();
   });
@@ -230,16 +231,53 @@ describe('the review session', () => {
       expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     });
 
-    it('opens over the card on a phone, in a dialog', async () => {
+    it('opens in a bottom sheet on a phone, which the find shortcut leaves to the browser', async () => {
       setDesktop(false);
       renderSession([card('a')]);
       await show();
       const user = userEvent.setup();
       await user.click(screen.getByRole('button', { name: 'art. 1453 c.c.' }));
-      const dialog = await screen.findByRole('dialog', { name: 'art. 1453 c.c.' });
-      expect(within(dialog).getByTestId('article-reader')).toBeInTheDocument();
+      const sheet = await screen.findByRole('dialog', { name: 'art. 1453 c.c.' });
+      expect(within(sheet).getByTestId('article-reader')).toBeInTheDocument();
+      expect(sheet).toHaveClass('fixed', 'inset-x-0', 'bottom-0');
+      expect(sheet).toHaveAttribute('data-find-overlay');
       expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
       expect(screen.getByText('Domanda a?')).toBeInTheDocument();
+
+      // The sheet owns the keyboard: space behind it does nothing, Esc closes it and not the session.
+      fireEvent.keyDown(document.body, { key: '3' });
+      expect(review).not.toHaveBeenCalled();
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(screen.getByText('Risposta a.')).toBeInTheDocument();
+    });
+
+    it('closes with the first Esc and asks to stop on the second, on desktop', async () => {
+      renderSession([card('a')]);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'art. 1453 c.c.' }));
+      expect(screen.getByRole('complementary', { name: 'Articolo' })).toBeInTheDocument();
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('complementary')).not.toBeInTheDocument());
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' })).toBeInTheDocument();
+    });
+
+    it('does not come back by itself when a «Di nuovo» card returns', async () => {
+      renderSession([card('a')]);
+      await show();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'art. 1453 c.c.' }));
+      expect(screen.getByRole('complementary')).toBeInTheDocument();
+      // The only card goes back to the queue and is the next one: same card, new pass.
+      await user.click(screen.getByRole('button', { name: /Di nuovo/ }));
+      await screen.findByRole('button', { name: /Mostra risposta/ });
+      expect(screen.getByText('Domanda a?')).toBeInTheDocument();
+      expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+      await show();
+      expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     });
 
     it('can be left for the reader, which takes the session’s place', async () => {
@@ -257,6 +295,71 @@ describe('the review session', () => {
       await show();
       expect(screen.queryByRole('region', { name: 'Articoli' })).not.toBeInTheDocument();
     });
+  });
+
+  describe('a pass for practice', () => {
+    it('shows the grade names alone, with a line saying nothing is recorded', async () => {
+      renderSession([card('a'), card('b')]);
+      const user = userEvent.setup();
+      await show();
+      expect(screen.queryByText('Ripasso di pratica: non registrato')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Di nuovo/ }));
+      await show();
+      await user.click(screen.getByRole('button', { name: /Bene/ }));
+      // «a» is back for its second pass.
+      await screen.findByText('Domanda a?');
+      await show();
+      expect(screen.getByText('Ripasso di pratica: non registrato')).toBeInTheDocument();
+      const buttons = within(screen.getByRole('group', { name: 'Come è andata?' })).getAllByRole('button');
+      expect(buttons.map((b) => b.textContent)).toEqual(['Di nuovo', 'Difficile', 'Bene', 'Facile']);
+    });
+  });
+
+  describe('focus', () => {
+    it('goes to the question when a card is shown, to the answer when it is revealed, to the next question after a grade', async () => {
+      renderSession([card('a'), card('b')]);
+      const question = await screen.findByRole('heading', { name: 'Domanda a?' });
+      await waitFor(() => expect(question).toHaveFocus());
+      await show();
+      const answer = screen.getByRole('group', { name: 'Risposta' });
+      await waitFor(() => expect(answer).toHaveFocus());
+      expect(answer).toHaveTextContent('Risposta a.');
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      const next = await screen.findByRole('heading', { name: 'Domanda b?' });
+      await waitFor(() => expect(next).toHaveFocus());
+    });
+
+    it('goes back to the question when the same card comes straight back', async () => {
+      renderSession([card('a')]);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Di nuovo/ }));
+      const question = await screen.findByRole('heading', { name: 'Domanda a?' });
+      await waitFor(() => expect(question).toHaveFocus());
+    });
+  });
+
+  it('lets a long answer scroll: space is the page’s once the answer is shown', async () => {
+    renderSession([card('a')]);
+    await screen.findByText('Domanda a?');
+    expect(fireEvent.keyDown(document.body, { key: ' ' })).toBe(false);
+    await screen.findByText('Risposta a.');
+    expect(fireEvent.keyDown(document.body, { key: ' ' })).toBe(true);
+  });
+
+  it('does not grade the next card with a key pressed after the previous grade went through', async () => {
+    let finish: (value: Awaited<ReturnType<typeof studiaService.review>>) => void = () => {};
+    review.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    renderSession([card('a'), card('b')]);
+    await screen.findByText('Domanda a?');
+    fireEvent.keyDown(document.body, { key: ' ' });
+    await screen.findByText('Risposta a.');
+    fireEvent.keyDown(document.body, { key: '3' });
+    finish({ registrata: true, prossimoRipasso: '2026-10-15', scheduledDays: 3 });
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    fireEvent.keyDown(document.body, { key: '3' });
+    expect(await screen.findByText('Domanda b?')).toBeInTheDocument();
+    expect(review).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Risposta b.')).not.toBeInTheDocument();
   });
 
   describe('the end', () => {

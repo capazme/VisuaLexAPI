@@ -1,4 +1,5 @@
 import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../../constants/zIndex';
 import type { Voto } from '../../../types/studia';
 import { formatInterval } from './formatInterval';
 
@@ -15,6 +16,8 @@ export interface GradeBarProps {
   anteprima: Record<`${Voto}`, number>;
   onReveal: () => void;
   onGrade: (rating: Voto) => void;
+  /** A pass for practice: the card was graded once already, and this grade is not sent. */
+  practice?: boolean;
   /** A grade is on its way. */
   disabled?: boolean;
   /** The last grade did not reach the server. */
@@ -32,16 +35,21 @@ const WARNING = 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 
  * large text, because it is what the user decides on, and the grade the small one; only «Di nuovo»
  * has a tone of its own.
  */
-export function GradeBar({ revealed, anteprima, onReveal, onGrade, disabled, saveError }: GradeBarProps) {
+export function GradeBar({ revealed, anteprima, onReveal, onGrade, practice, disabled, saveError }: GradeBarProps) {
   return (
     <div
-      // Over the feedback button (z-40) and under the menu drawer (z-50): no band in `Z_INDEX` sits between.
-      className="fixed inset-x-0 bottom-0 z-[45] border-t border-slate-200 bg-white px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:static md:z-auto md:mt-8 md:max-w-[60ch] md:border-0 md:bg-transparent md:p-0 dark:border-slate-800 dark:bg-slate-900 md:dark:bg-transparent"
+      className={cn(
+        Z_INDEX.pinnedBar,
+        'fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:static md:z-auto md:mt-8 md:max-w-[60ch] md:border-0 md:bg-transparent md:p-0 dark:border-slate-800 dark:bg-slate-900 md:dark:bg-transparent',
+      )}
     >
       {saveError && (
         <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">
           Non registrato: riprova
         </p>
+      )}
+      {revealed && practice && (
+        <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">Ripasso di pratica: non registrato</p>
       )}
       {revealed ? (
         <div role="group" aria-label="Come è andata?" className="flex gap-2">
@@ -54,8 +62,14 @@ export function GradeBar({ revealed, anteprima, onReveal, onGrade, disabled, sav
               onClick={() => onGrade(rating)}
               className={cn(BUTTON, rating === 1 ? WARNING : NEUTRAL)}
             >
-              <span className="text-base font-semibold">{formatInterval(anteprima[`${rating}`])}</span>
-              <span className="text-xs">{label}</span>
+              {practice ? (
+                <span className="text-base font-semibold">{label}</span>
+              ) : (
+                <>
+                  <span className="text-base font-semibold">{formatInterval(anteprima[`${rating}`])}</span>
+                  <span className="text-xs">{label}</span>
+                </>
+              )}
             </button>
           ))}
         </div>

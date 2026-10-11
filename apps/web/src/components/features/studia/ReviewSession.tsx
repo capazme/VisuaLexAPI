@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -7,12 +7,12 @@ import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
 import type { AncoraScheda, Materia } from '../../../types/studia';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { Modal } from '../../ui/Modal';
 import { Toast } from '../../ui/Toast';
 import { DossierItemReader } from '../dossier/DossierItemReader';
 import { formatInterval } from './formatInterval';
 import { GradeBar } from './GradeBar';
 import { ReviewCard } from './ReviewCard';
+import { Sheet } from './Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import { useReviewSession, type ReviewSummary } from './useReviewSession';
 
@@ -41,7 +41,7 @@ interface ArticlePanelProps {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-/** The article an anchor rests on, read as the dossier embeds it: beside the card on desktop, over it on a phone. */
+/** The article an anchor rests on, read as the dossier embeds it: beside the card on desktop, in a sheet on a phone. */
 function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: ArticlePanelProps) {
   const norma = useMemo(() => normaFromAnchor(anchor), [anchor]);
   const label = anchorLabel(anchor) ?? 'Articolo';
@@ -50,9 +50,9 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
 
   if (!desktop) {
     return (
-      <Modal isOpen onClose={onClose} title={label} size="lg" contentClassName="overflow-y-auto">
-        {reader}
-      </Modal>
+      <Sheet title={label} onClose={onClose} closeOnEscape>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{reader}</div>
+      </Sheet>
     );
   }
   return (
@@ -91,14 +91,24 @@ export function ReviewSession() {
   const materia = requested && Object.keys(MATERIA_LABEL).includes(requested) ? (requested as Materia) : undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
-  const [panel, setPanel] = useState<{ cardId: string; anchor: AncoraScheda } | null>(null);
+  const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
-  const { current, revealed, reveal, grade, remaining, done, summary, loading, loadError, saveError, saving, reload } =
-    useReviewSession(materia, { paused: confirmStop, onEscape: () => setConfirmStop(true) });
+  // Esc closes the article beside the card first (on a phone the sheet closes itself); a second one asks to stop.
+  const panelOpen = useRef(false);
+  const handleEscape = useCallback(() => {
+    if (panelOpen.current) setPanel(null);
+    else setConfirmStop(true);
+  }, []);
 
-  // An article belongs to the card it was opened from.
-  const openAnchor = panel && current && panel.cardId === current.id ? panel.anchor : null;
+  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, saving, reload } =
+    useReviewSession(materia, { paused: confirmStop, onEscape: handleEscape });
+
+  // An article belongs to the step it was opened at: a card that comes back is a new step.
+  const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
+  useEffect(() => {
+    panelOpen.current = openAnchor !== null && desktop;
+  }, [openAnchor, desktop]);
 
   const openInReader = (anchor: AncoraScheda) => {
     const searchParams = searchParamsFromAnchor(anchor);
@@ -142,8 +152,8 @@ export function ReviewSession() {
               Interrompi
             </button>
           </div>
-          <ReviewCard card={current} revealed={revealed} onOpenAnchor={(anchor) => setPanel({ cardId: current.id, anchor })} />
-          <GradeBar revealed={revealed} anteprima={current.anteprima} onReveal={reveal} onGrade={(rating) => void grade(rating)} disabled={saving} saveError={saveError} />
+          <ReviewCard card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
+          <GradeBar revealed={revealed} anteprima={current.anteprima} practice={practice} onReveal={reveal} onGrade={(rating) => void grade(rating)} disabled={saving} saveError={saveError} />
         </div>
         {openAnchor && (
           <ArticlePanel

@@ -79,6 +79,7 @@ const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'l
  * When a card is next reviewed, as a row says it: «Da ripassare oggi» from today on, else
  * «Prossimo ripasso: 12 ottobre» (with the year when it is not this one). Read from the parts of
  * the 'YYYY-MM-DD' day, never through `Date`, which would read it as UTC; null when the card has no date.
+ * `todayInRome()` only words the label: whether a card is due is the server's decision (spec D18).
  */
 export function nextReviewLabel(day: string | null | undefined, today: string = todayInRome()): string | null {
   if (!day) return null;

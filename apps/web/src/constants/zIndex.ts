@@ -34,6 +34,13 @@ export const Z_INDEX = {
   /** Floating action buttons, FABs */
   floating: 'z-40',
 
+  /**
+   * A bar pinned to the bottom of a phone's screen (the review's grades). Under the mobile menu's
+   * backdrop (`z-40`), so the open menu covers it; the feedback button, which would sit on it, is
+   * hidden on that route (`Layout`).
+   */
+  pinnedBar: 'z-[35]',
+
   /** App sidebar navigation */
   sidebar: 'z-50',
 
@@ -100,6 +107,7 @@ export const Z_INDEX_VALUES = {
   sticky: 20,
   dropdown: 30,
   floating: 40,
+  pinnedBar: 35,
   sidebar: 50,
   dock: 80,
   structure: 90,

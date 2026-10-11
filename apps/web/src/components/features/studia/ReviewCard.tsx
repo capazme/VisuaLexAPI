@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { cn } from '../../../lib/utils';
 import type { AncoraScheda, SchedaDiRipasso } from '../../../types/studia';
 import { anchorCitation, anchorLabel } from './studiaLabels';
@@ -5,6 +6,8 @@ import { anchorCitation, anchorLabel } from './studiaLabels';
 export interface ReviewCardProps {
   card: SchedaDiRipasso;
   revealed: boolean;
+  /** Changes whenever the screen moves on to a card (or back to the same one): focus goes to the question. */
+  focusKey: number;
   /** Opens the anchor's article beside the card (or over it on a phone). */
   onOpenAnchor: (anchor: AncoraScheda) => void;
 }
@@ -18,8 +21,19 @@ const TEXT = 'whitespace-pre-line break-words text-left font-serif leading-[1.7]
  * gradient. Showing the answer is the one motion: a hairline draws across, then the answer
  * unfolds beneath it (`motion-safe:` only, so none with reduced motion). Question, answer and
  * explanation are plain text, left to React as text nodes.
+ *
+ * Focus follows the screen: to the question when a card is shown, to the answer when it is
+ * revealed, which is how a screen reader hears it.
  */
-export function ReviewCard({ card, revealed, onOpenAnchor }: ReviewCardProps) {
+export function ReviewCard({ card, revealed, focusKey, onOpenAnchor }: ReviewCardProps) {
+  const question = useRef<HTMLHeadingElement>(null);
+  const answer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    question.current?.focus({ preventScroll: true });
+  }, [focusKey]);
+  useEffect(() => {
+    if (revealed) answer.current?.focus({ preventScroll: true });
+  }, [revealed]);
   const citation = anchorCitation(card);
   // The primary anchor first; one whose address names no article cannot be opened.
   const anchors = [...card.ancore].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)).filter((a) => anchorLabel(a));
@@ -27,11 +41,11 @@ export function ReviewCard({ card, revealed, onOpenAnchor }: ReviewCardProps) {
   return (
     <article aria-label="Scheda in ripasso">
       {citation && <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">{citation}</p>}
-      <h2 className={cn(MEASURE, TEXT, 'text-xl text-slate-900 md:text-2xl dark:text-slate-50')}>{card.domanda}</h2>
+      <h2 ref={question} tabIndex={-1} className={cn(MEASURE, TEXT, 'text-xl text-slate-900 focus:outline-none md:text-2xl dark:text-slate-50')}>{card.domanda}</h2>
       {revealed && (
         <>
           <hr className={cn(MEASURE, 'my-4 origin-left border-slate-200 motion-safe:animate-vlx-rule dark:border-slate-700')} />
-          <div className="motion-safe:animate-vlx-unfold">
+          <div ref={answer} tabIndex={-1} aria-label="Risposta" role="group" className="focus:outline-none motion-safe:animate-vlx-unfold">
             <p className={cn(MEASURE, TEXT, 'text-lg text-slate-800 md:text-xl dark:text-slate-200')}>{card.risposta}</p>
             {card.spiegazione && (
               <section className="mt-5">

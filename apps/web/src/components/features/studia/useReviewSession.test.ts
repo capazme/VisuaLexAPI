@@ -162,6 +162,50 @@ describe('useReviewSession', () => {
     expect(result.current.current?.id).toBe('b');
   });
 
+  it('ignores a key pressed after the grade went through and before the screen caught up', async () => {
+    let finish: (value: Awaited<ReturnType<typeof studiaService.review>>) => void = () => {};
+    review.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { result } = await started([card('a'), card('b')]);
+    act(() => result.current.reveal());
+    key('3');
+    expect(review).toHaveBeenCalledTimes(1);
+    // The post resolves; React has not rendered yet, so the listener in place is still the old one.
+    finish({ registrata: true, prossimoRipasso: '2026-10-15', scheduledDays: 3 });
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    key('3');
+    key('1');
+    await waitFor(() => expect(result.current.current?.id).toBe('b'));
+    expect(review).toHaveBeenCalledTimes(1);
+    expect(result.current.remaining).toBe(1);
+    expect(result.current.revealed).toBe(false);
+  });
+
+  it('does not stop the page from scrolling on a space once the answer is shown', async () => {
+    await started([card('a')]);
+    expect(fireEvent.keyDown(document.body, { key: ' ' })).toBe(false);
+    expect(fireEvent.keyDown(document.body, { key: ' ' })).toBe(true);
+  });
+
+  it('marks a requeued card as practice', async () => {
+    const { result } = await started([card('a'), card('b')]);
+    expect(result.current.practice).toBe(false);
+    act(() => result.current.reveal());
+    await act(async () => result.current.grade(1));
+    act(() => result.current.reveal());
+    await act(async () => result.current.grade(3));
+    expect(result.current.current?.id).toBe('a');
+    expect(result.current.practice).toBe(true);
+  });
+
+  it('counts a step each time the queue moves on, even to the same card', async () => {
+    const { result } = await started([card('a')]);
+    const before = result.current.step;
+    act(() => result.current.reveal());
+    await act(async () => result.current.grade(1));
+    expect(result.current.current?.id).toBe('a');
+    expect(result.current.step).toBe(before + 1);
+  });
+
   it('asks to stop on Esc', async () => {
     const onEscape = vi.fn();
     await started([card('a')], { onEscape });

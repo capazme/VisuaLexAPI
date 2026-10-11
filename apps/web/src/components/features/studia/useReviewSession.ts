@@ -39,25 +39,42 @@ function isForOtherControl(target: EventTarget | null, key: string): boolean {
 /**
  * The review queue of a session. It is read once; the head is `current`. Space shows the answer,
  * 1–4 grade it (only once shown). The first grade of a card is sent to the server, with the time
- * spent; «Di nuovo» (1) puts the card back at the end, and its later passes are not sent — 1 sends
- * it back again, 2–4 take it out. A grade that fails to reach the server leaves the card in place,
- * shown, with `saveError` set; grading again sends it again.
+ * spent; «Di nuovo» (1) puts the card back at the end, and its later passes (`practice`) are not
+ * sent — 1 sends it back again, 2–4 take it out. A grade that fails to reach the server leaves the
+ * card in place, shown, with `saveError` set; grading again sends it again.
+ *
+ * The queue and the shown flag live in refs as well as in state: the key listener in place between
+ * a post resolving and the screen rendering would otherwise act on the card already graded. Every
+ * move of the queue is made from the ref, and checks that the head is still the card it was made for.
  */
 export function useReviewSession(materia?: Materia, { paused = false, onEscape }: ReviewSessionOptions = {}) {
-  const [queue, setQueue] = useState<Entry[]>([]);
+  const [queue, setQueueState] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealedState] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reviewedIds, setReviewedIds] = useState<ReadonlySet<string>>(new Set());
   const [againIds, setAgainIds] = useState<ReadonlySet<string>>(new Set());
   const [nextDue, setNextDue] = useState<number | null>(null);
+  // How many times the queue has moved on: a card that comes straight back is a new step.
+  const [step, setStep] = useState(0);
 
+  const queueRef = useRef<Entry[]>([]);
+  const revealedRef = useRef(false);
   // When the question was shown: the grade's duration runs from here.
   const shownAt = useRef(Date.now());
   const busy = useRef(false);
   const latest = useRef(0);
+
+  const setQueue = useCallback((next: Entry[]) => {
+    queueRef.current = next;
+    setQueueState(next);
+  }, []);
+  const setRevealed = useCallback((next: boolean) => {
+    revealedRef.current = next;
+    setRevealedState(next);
+  }, []);
 
   const load = useCallback(async () => {
     const request = ++latest.current;
@@ -72,6 +89,7 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
       setReviewedIds(new Set());
       setAgainIds(new Set());
       setNextDue(null);
+      setStep((n) => n + 1);
       shownAt.current = Date.now();
     } catch {
       if (request !== latest.current) return;
@@ -80,7 +98,7 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     } finally {
       if (request === latest.current) setLoading(false);
     }
-  }, [materia]);
+  }, [materia, setQueue, setRevealed]);
 
   useEffect(() => {
     // Leaving (or asking again) makes the answer in flight stale.
@@ -94,13 +112,13 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
   const current = queue[0]?.card ?? null;
 
   const reveal = useCallback(() => {
-    if (current) setRevealed(true);
-  }, [current]);
+    if (queueRef.current.length > 0) setRevealed(true);
+  }, [setRevealed]);
 
   const grade = useCallback(
     async (rating: Voto) => {
-      const entry = queue[0];
-      if (!entry || !revealed || busy.current) return;
+      const entry = queueRef.current[0];
+      if (!entry || !revealedRef.current || busy.current) return;
       busy.current = true;
       setSaving(true);
       const { card } = entry;
@@ -112,13 +130,15 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
           if (rating === 1) setAgainIds((before) => new Set(before).add(card.id));
           setNextDue((before) => (before === null ? outcome.scheduledDays : Math.min(before, outcome.scheduledDays)));
         }
-        setQueue((before) => {
-          const [, ...rest] = before;
-          return rating === 1 ? [...rest, { card, posted: true }] : rest;
-        });
-        setRevealed(false);
+        // The session may have been read again while the post was on its way.
+        if (queueRef.current[0]?.card.id === card.id) {
+          const [, ...rest] = queueRef.current;
+          setQueue(rating === 1 ? [...rest, { card, posted: true }] : rest);
+          setRevealed(false);
+          setStep((n) => n + 1);
+          shownAt.current = Date.now();
+        }
         setSaveError(false);
-        shownAt.current = Date.now();
       } catch {
         setSaveError(true);
       } finally {
@@ -126,19 +146,21 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
         setSaving(false);
       }
     },
-    [queue, revealed],
+    [setQueue, setRevealed],
   );
 
   useEffect(() => {
     if (paused) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-      // A dialog that is not this screen's own (shortcuts, feedback) owns the keyboard.
-      if (document.querySelector('[aria-modal="true"]') !== null) return;
+      // A dialog or sheet that is not this screen's own (shortcuts, feedback, an article) owns the keyboard.
+      if (document.querySelector('[aria-modal="true"]') !== null || document.querySelector('[data-find-overlay]') !== null) return;
       if (isForOtherControl(event.target, event.key)) return;
       if (event.key === 'Escape') {
         onEscape?.();
       } else if (event.key === ' ') {
+        // Once the answer is shown, space is the page's again: a long answer scrolls.
+        if (revealedRef.current || queueRef.current.length === 0) return;
         event.preventDefault();
         reveal();
       } else if (event.key in GRADE_KEYS) {
@@ -159,6 +181,9 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     remaining: queue.length,
     done: !loading && !loadError && queue.length === 0,
     summary,
+    /** The head has already been graded once today in this session: a pass for practice, not sent. */
+    practice: queue[0]?.posted ?? false,
+    step,
     loading,
     loadError,
     saveError,

@@ -12,6 +12,7 @@ import { ReviewHome } from './ReviewHome';
 
 const session = vi.mocked(studiaService.session);
 const preferences = vi.mocked(studiaService.preferences);
+const savePreferences = vi.mocked(studiaService.savePreferences);
 
 const counts = (dovute: number, nuove: number) => ({ conteggi: { dovute, nuove }, cards: [] });
 
@@ -34,6 +35,7 @@ function renderHome() {
 beforeEach(() => {
   session.mockReset();
   preferences.mockReset();
+  savePreferences.mockReset();
   preferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: [] });
 });
 
@@ -85,12 +87,48 @@ describe('ReviewHome', () => {
   it('says so, and reads again on request, when the counts cannot be read', async () => {
     session.mockRejectedValueOnce(new Error('down'));
     renderHome();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere le schede di oggi.');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Non riesco a leggere le schede di oggi.');
+    expect(alert.textContent).not.toMatch(/Riprova\.\s*Riprova/);
     expect(screen.getByRole('button', { name: 'Inizia il ripasso' })).toBeDisabled();
     session.mockResolvedValue(counts(1, 0));
     await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova' }));
     expect(await screen.findByText('Oggi: 1 da ripassare · 0 nuove')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('counts again, and shows the new counts, after a community subject is switched on', async () => {
+    session.mockResolvedValue(counts(3, 0));
+    renderHome();
+    await screen.findByText('Oggi: 3 da ripassare · 0 nuove');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
+    session.mockResolvedValue(counts(3, 12));
+    savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE'] });
+    await user.click(await screen.findByRole('switch', { name: 'Diritto civile' }));
+    expect(savePreferences).toHaveBeenCalledWith({ materieComunita: ['DIRITTO_CIVILE'] });
+    expect(await screen.findByText('Oggi: 3 da ripassare · 12 nuove')).toBeInTheDocument();
+    expect(session).toHaveBeenCalledTimes(2);
+  });
+
+  it('never lets a slow answer for a subject chosen before overwrite the one that came after', async () => {
+    const pending: Array<(value: ReturnType<typeof counts>) => void> = [];
+    session.mockResolvedValueOnce(counts(1, 1));
+    renderHome();
+    await screen.findByText('Oggi: 1 da ripassare · 1 nuove');
+    session.mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
+    const user = userEvent.setup();
+    const select = screen.getByRole('combobox', { name: 'Materia' });
+    await user.selectOptions(select, 'Diritto penale');
+    await user.selectOptions(select, 'Diritto civile');
+    expect(pending).toHaveLength(2);
+    // The newer request answers first, the older one after.
+    pending[1](counts(7, 7));
+    expect(await screen.findByText('Oggi: 7 da ripassare · 7 nuove')).toBeInTheDocument();
+    pending[0](counts(9, 9));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByText('Oggi: 7 da ripassare · 7 nuove')).toBeInTheDocument();
+    expect(screen.queryByText('Oggi: 9 da ripassare · 9 nuove')).not.toBeInTheDocument();
   });
 
   it('holds the study settings under it', async () => {
