@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronDown, FolderInput, GitBranch, GripVertical, Loader2, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -53,7 +53,7 @@ function chipLabel(article: ArticleData): string {
 export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference }: PracticeActBlockProps) {
   const {
     toggleActCollapse, revealPracticeArticle, revealPracticeRow, addArticlesToPractice, removePracticeAct,
-    moveActToPractice, createPractice, openStructureWindow, closeStructureWindow,
+    moveActToPractice, openStructureWindow, closeStructureWindow,
   } = useAppStore(useShallow((s) => ({
     toggleActCollapse: s.toggleActCollapse,
     revealPracticeArticle: s.revealPracticeArticle,
@@ -61,11 +61,15 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
     addArticlesToPractice: s.addArticlesToPractice,
     removePracticeAct: s.removePracticeAct,
     moveActToPractice: s.moveActToPractice,
-    createPractice: s.createPractice,
     openStructureWindow: s.openStructureWindow,
     closeStructureWindow: s.closeStructureWindow,
   })));
-  const practices = useAppStore((s) => s.practices);
+  // Only what the move dialog lists, and only while it is open: a stream into another practice does
+  // not re-render every act's rows. `useShallow` compares the pairs' fields.
+  const [moveOpen, setMoveOpen] = useState(false);
+  const moveTargets = useAppStore(useShallow((s) => (moveOpen
+    ? s.practices.filter((p) => p.id !== practiceId).map((p) => `${p.id}\u0000${p.label}`)
+    : [])));
   const isStructureWindowOpen = useAppStore((s) => s.structureWindow.blockId === act.id);
   // The act's open rows, oldest first: a reveal moves its row to the end (`revealRow`).
   const prefix = `${practiceId}/${act.id}/`;
@@ -77,7 +81,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
   // The row Study Mode shows while it is open; null, closed.
   const [studyKey, setStudyKey] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: act.id });
@@ -97,6 +100,25 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
   const isLocked = (article: ArticleData | undefined) =>
     !article || describeVersion(article.validity, article.norma_data).readOnly;
   const studyLocked = isLocked(current);
+  // Study Mode steps over, and resolves a number against, the rows it may write on: a past text
+  // sorts next to its text in force and would shadow it (gotcha 32).
+  const studyRows = useMemo(
+    () => act.articles.filter((a) => !describeVersion(a.validity, a.norma_data).readOnly),
+    [act.articles],
+  );
+  // The heading's height, for the open rows' reading toolbars to pin under it (a phone wraps it).
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useEffect(() => {
+    const node = headerRef.current;
+    if (!node) return undefined;
+    const measure = () => setHeaderHeight(node.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   // A loaded article lands in this act and its row opens (spec §6.4).
   const landInAct = useCallback((norma: Norma, loaded: ArticleData[]) => {
@@ -129,8 +151,11 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
     if (!isLocked(article)) setStudyKey(practiceArticleKey(article as ArticleData));
   };
 
-  const others = practices.filter((p) => p.id !== practiceId);
-  const moveTo = (target: string) => {
+  const others = moveTargets.map((pair) => {
+    const [id, label] = pair.split('\u0000');
+    return { id, label };
+  });
+  const moveTo = (target: string | { newLabel: string }) => {
     setMoveOpen(false);
     moveActToPractice(act.id, practiceId, target);
   };
@@ -140,12 +165,19 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
   return (
     <section
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+        // Read by an open row's reading toolbar (`--reading-toolbar-top`) and by the rows' scroll margin.
+        ['--practice-head' as string]: `${headerHeight}px`,
+      }}
       aria-label={heading}
       className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
       {/* The sticky-row convention: opaque, edge to edge, over the rows it heads. */}
       <header
+        ref={headerRef}
         className={cn(
           'sticky top-0 flex items-start gap-1 rounded-t-xl border-b border-slate-100 bg-white px-2 py-2 md:gap-2 md:px-3 dark:border-slate-700 dark:bg-slate-800',
           Z_INDEX.sticky,
@@ -251,6 +283,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                       <button
                         type="button"
                         onClick={() => revealPracticeRow(practiceId, act.id, key)}
+                        aria-current={openKeys.includes(key) ? 'true' : undefined}
                         className={cn(
                           'min-h-[44px] rounded-md px-2 text-xs font-medium transition-colors md:min-h-0 md:py-0.5',
                           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
@@ -319,6 +352,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                     currentAnnex={allegato || null}
                     annexes={annexes}
                     onSwitchAnnex={async (annexNumber): Promise<string | null> => {
+                      // Already on the table: reveal it, no request (T2).
+                      const wanted = annexNumber ? `all${annexNumber}:${numero}` : numero;
+                      if (revealPracticeArticle(practiceId, act.id, wanted)) return numero;
                       const found = await handleAnnexSelect(annexNumber, numero);
                       if (found) revealPracticeArticle(practiceId, act.id, annexNumber ? `all${annexNumber}:${found}` : found);
                       return found;
@@ -383,8 +419,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
           <li>
             <button
               type="button"
-              // A new practice named after the act, as a search names one (T11); this table stays on screen.
-              onClick={() => moveTo(createPractice(shortAct(act.norma), { activate: false }))}
+              // A new practice named after the act, as a search names one (T11), made and moved into in one write; this table stays on screen.
+              onClick={() => moveTo({ newLabel: shortAct(act.norma) })}
               className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-primary-700 hover:bg-primary-50 md:min-h-0 md:py-2 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               <Plus size={14} aria-hidden />
@@ -401,9 +437,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
           isOpen={studyKey !== null}
           onClose={() => setStudyKey(null)}
           article={studyArticle}
-          articles={act.articles}
+          articles={studyRows}
           onNavigate={(articleId) => {
-            const hit = findPracticeArticle(act, articleId);
+            const hit = findPracticeArticle({ ...act, articles: studyRows }, articleId);
             if (hit) setStudyKey(practiceArticleKey(hit));
           }}
           onCrossReferenceNavigate={onCrossReference}

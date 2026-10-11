@@ -10,12 +10,13 @@ const h = vi.hoisted(() => ({
   navs: [] as Array<Record<string, unknown>>,
   studies: [] as Array<Record<string, unknown>>,
   legalFetch: vi.fn(),
+  annexes: [{ number: null, label: 'Dispositivo', article_numbers: ['1', '5', '7', '9'] }] as Array<Record<string, unknown>>,
   onViewPdf: vi.fn(),
 }));
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => h.desktop }));
 vi.mock('../../../services/legalFetch', () => ({ legalFetch: h.legalFetch }));
 vi.mock('../../../utils/actStructureCache', () => ({
-  fetchActTree: () => Promise.resolve({ articles: [], metadata: { annexes: [{ number: null, label: 'Dispositivo', article_numbers: ['1', '5', '7', '9'] }] } }),
+  fetchActTree: () => Promise.resolve({ articles: [], metadata: { annexes: h.annexes } }),
   fetchActRubriche: () => Promise.resolve({ rubriche: {}, abrogati: [], parts: [] }),
 }));
 vi.mock('../search/ArticleTabContent', () => ({ ArticleTabContent: () => <div data-testid="reader" /> }));
@@ -92,6 +93,13 @@ describe('PracticeActBlock: the heading (spec §3.2)', () => {
     expect(h.onViewPdf).toHaveBeenCalledWith(CC_RD.urn);
   });
 
+  it('the heading is sticky and tells its height to the rows, so a reading toolbar pins under it', () => {
+    const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
+    const { container } = render(<Block practiceId={practiceId} actId={actId} />);
+    expect(container.querySelector('header')).toHaveClass('sticky', 'top-0');
+    expect(container.querySelector('section')?.style.getPropertyValue('--practice-head')).toBe('0px');
+  });
+
   it('the chevron folds the block: no index, no rows', () => {
     const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
     render(<Block practiceId={practiceId} actId={actId} />);
@@ -104,6 +112,14 @@ describe('PracticeActBlock: the heading (spec §3.2)', () => {
 });
 
 describe('PracticeActBlock: the index on top (D3)', () => {
+  it('a chip says which row is open to a screen reader', () => {
+    const { practiceId, actId } = setUp(L24, [article(L24, '5'), article(L24, '7')]);
+    render(<Block practiceId={practiceId} actId={actId} />);
+    act(() => s().setRowOpen(articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '7'))), true));
+    const chips = within(indexLine()).getAllByRole('button');
+    expect(chips.map((c) => c.getAttribute('aria-current'))).toEqual([null, 'true']);
+  });
+
   it('lists every row once, with the annex and the past text marked', () => {
     const { practiceId, actId } = setUp(L24, [
       article(L24, '1'), article(L24, '1', { allegato: 'A' }), article(L24, '5'), article(L24, '5', PAST),
@@ -152,7 +168,24 @@ describe('PracticeActBlock: rows and Studio', () => {
     const study = h.studies.at(-1) as { isOpen: boolean; article: ArticleData; articles: ArticleData[] };
     expect(study.isOpen).toBe(true);
     expect(study.article).toEqual(article(L24, '5'));
-    expect(study.articles).toHaveLength(2);
+    // Never a past text: Study Mode writes notes keyed by the article, not the version (gotcha 32).
+    expect(study.articles).toEqual([article(L24, '5')]);
+  });
+
+  it('Study Mode steps over the texts in force only: a past text neither blocks the arrow nor is reached', () => {
+    const { practiceId, actId } = setUp(L24, [article(L24, '5'), article(L24, '5', PAST), article(L24, '7'), article(L24, '9', PAST)]);
+    const now = articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '5')));
+    render(<Block practiceId={practiceId} actId={actId} />);
+    act(() => s().setRowOpen(now, true));
+    fireEvent.click(screen.getByRole('button', { name: 'Modalità studio' }));
+    const study = () => h.studies.at(-1) as { article: ArticleData; articles: ArticleData[]; onNavigate: (id: string) => void };
+    expect(study().articles.map((a) => a.norma_data.numero_articolo)).toEqual(['5', '7']);
+    act(() => study().onNavigate('7'));
+    expect(study().article).toEqual(article(L24, '7'));
+    act(() => study().onNavigate('9'));
+    expect(study().article).toEqual(article(L24, '7'));
+    act(() => study().onNavigate('5'));
+    expect(study().article).toEqual(article(L24, '5'));
   });
 
   it('Study Mode is not mounted for an act with no article', () => {
@@ -211,6 +244,32 @@ describe('PracticeActBlock: «⋯»', () => {
     expect(s().practices[1].label).toBe('l. 24/2017');
     expect(s().practices[1].acts.map((a) => a.id)).toEqual([actId]);
     expect(s().activePracticeId).toBe(practiceId);
+  });
+
+  it('«Nuova pratica» is one store write', () => {
+    const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
+    render(<Block practiceId={practiceId} actId={actId} />);
+    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: "Sposta in un'altra pratica" }));
+    const writes = vi.fn();
+    const stop = appStore.subscribe(writes);
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Nuova pratica' }));
+    stop();
+    expect(writes).toHaveBeenCalledTimes(1);
+  });
+
+  it('the annex suggestion reveals an article the act already holds and fetches nothing', async () => {
+    h.annexes = [
+      { number: null, label: 'Dispositivo', article_count: 1, article_numbers: ['5'] },
+      { number: '2', label: 'Allegato 2', article_count: 3, article_numbers: ['5'] },
+    ];
+    const { practiceId, actId } = setUp(L24_URN, [article(L24, '5'), article(L24, '5', { allegato: '2' })]);
+    render(<Block practiceId={practiceId} actId={actId} />);
+    act(() => s().setRowOpen(articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '5'))), true));
+    fireEvent.click(await screen.findByRole('button', { name: /Vai/ }));
+    await waitFor(() => expect(s().pendingReveal).not.toBeNull());
+    expect(h.legalFetch).not.toHaveBeenCalled();
+    h.annexes = [{ number: null, label: 'Dispositivo', article_numbers: ['1', '5', '7', '9'] }];
   });
 });
 

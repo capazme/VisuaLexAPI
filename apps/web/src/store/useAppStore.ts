@@ -389,9 +389,10 @@ interface AppState {
      * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
      * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
      * the open rows and the structure window follow. The windows of `from` that showed it close: their
-     * subject is now on the other table.
+     * subject is now on the other table. `to` as `{ newLabel }` creates that practice (not activated)
+     * and moves the act into it in the same write (gotcha 14): nothing is created if the move no-ops.
      */
-    moveActToPractice: (actId: string, fromPracticeId: string, toPracticeId: string) => void;
+    moveActToPractice: (actId: string, fromPracticeId: string, to: string | { newLabel: string }) => void;
     reorderActs: (practiceId: string, fromIndex: number, toIndex: number) => void;
     toggleActCollapse: (practiceId: string, actId: string) => void;
     /** Opens or closes a row (`articleRowKey`, `decisionRowKey`). */
@@ -910,9 +911,11 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            moveActToPractice: (actId, fromPracticeId, toPracticeId) => {
+            moveActToPractice: (actId, fromPracticeId, to) => {
+                const created = typeof to === 'string' ? null : newPractice(to.newLabel, false);
+                const toPracticeId = typeof to === 'string' ? to : (created as Practice).id;
                 if (fromPracticeId === toPracticeId) return;
-                const { practices } = get();
+                const practices = created ? [...get().practices, created] : get().practices;
                 const source = practices.find((p) => p.id === fromPracticeId);
                 const target = practices.find((p) => p.id === toPracticeId);
                 const act = source?.acts.find((a) => a.id === actId);

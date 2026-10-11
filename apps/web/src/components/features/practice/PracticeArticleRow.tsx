@@ -61,10 +61,11 @@ export function PracticeArticleRow({
   return (
     <div
       data-practice-row={rowKey}
-      // Clear of the act's sticky heading when scrolled into view.
-      className="group scroll-mt-20 rounded-lg py-1 pl-2 pr-1 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+      // Clear of the act's sticky heading (`--practice-head`, set by the act block) when scrolled into view.
+      className="group scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-lg py-1 pl-2 pr-1"
     >
-      <div className="flex items-center gap-1 md:gap-2">
+      {/* The tint is the header's: hovering the open article does not wash its text. */}
+      <div className="flex items-center gap-1 rounded-lg transition-colors hover:bg-slate-50 md:gap-2 dark:hover:bg-slate-800/60">
         {/* The toggle wraps only text: the remove button stays outside it (gotcha 22). */}
         <div
           role="button"
@@ -114,7 +115,12 @@ export function PracticeArticleRow({
         </button>
       </div>
       {isOpen && (
-        <div id={regionId} className="pb-3 pl-2 pr-1 pt-1 md:pl-6 md:pr-2">
+        <div
+          id={regionId}
+          className="pb-3 pl-2 pr-1 pt-1 md:pl-6 md:pr-2"
+          // The reading toolbar pins under the act's heading, not over it (both are sticky).
+          style={{ ['--reading-toolbar-top' as string]: 'var(--practice-head, 0px)' }}
+        >
           {annexSuggestion}
           <ArticleTabContent
             data={article}
