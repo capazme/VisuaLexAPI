@@ -342,17 +342,23 @@ function sanitizeDecision(raw: unknown, where: string, dropped: string[]): Pract
   return decision;
 }
 
-// `ids` names, for this practice, the act or decision a saved id meant after any re-id.
-function sanitizeBeside(raw: unknown, practice: Practice, ids: Map<string, string>): BesideRef | null {
+/** What a practice's windows name, after any re-id: a saved act id and a saved decision id → the
+ *  id each has now. Two maps, since an act and a decision that share a saved id are two things. */
+interface SavedIds {
+  acts: Map<string, string>;
+  decisions: Map<string, string>;
+}
+
+function sanitizeBeside(raw: unknown, practice: Practice, ids: SavedIds): BesideRef | null {
   if (!isObject(raw) || !isText(raw.id) || raw.id === '') return null;
   if (raw.kind === 'article' && isText(raw.actId) && isText(raw.articleKey)) {
-    const actId = ids.get(raw.actId);
+    const actId = ids.acts.get(raw.actId);
     const act = practice.acts.find((a) => a.id === actId);
     const held = act?.articles.some((a) => practiceArticleKey(a) === raw.articleKey);
     return act && held ? { id: raw.id, kind: 'article', actId: act.id, articleKey: raw.articleKey } : null;
   }
   if (raw.kind === 'decision' && isText(raw.decisionId)) {
-    const decisionId = ids.get(raw.decisionId);
+    const decisionId = ids.decisions.get(raw.decisionId);
     return decisionId && practice.decisions.some((d) => d.id === decisionId)
       ? { id: raw.id, kind: 'decision', decisionId }
       : null;
@@ -363,19 +369,39 @@ function sanitizeBeside(raw: unknown, practice: Practice, ids: Map<string, strin
   return null;
 }
 
-// Two entries show one decision when every field of their identity is equal (as the migration reads two tabs).
-const sameEntry = (a: DecisionReference, b: DecisionReference): boolean =>
+/** Two entries show one decision when every field of their identity is equal (as the migration
+ *  reads two tabs). */
+export const sameEntry = (a: DecisionReference, b: DecisionReference): boolean =>
   a.corte === b.corte && a.numero === b.numero && a.anno === b.anno && a.archivio === b.archivio;
+
+/**
+ * One entry from two entries of one decision (`sameEntry`): the first one's id, and what either
+ * holds. An identified entry leads over one that is not (its reference is the identity, its label
+ * carries the section); otherwise the first leads. The fields the leader lacks — `depositDate`,
+ * `tipo`, `historyRecordedKey` — are taken from the other, so nothing either learned is lost.
+ */
+export function mergeDecisionEntries(first: PracticeDecision, second: PracticeDecision): PracticeDecision {
+  const [lead, other] = !first.identified && second.identified ? [second, first] : [first, second];
+  const merged: PracticeDecision = { id: first.id, reference: lead.reference, label: lead.label, identified: lead.identified };
+  const depositDate = lead.depositDate ?? other.depositDate;
+  const tipo = lead.tipo ?? other.tipo;
+  const historyRecordedKey = lead.historyRecordedKey ?? other.historyRecordedKey;
+  if (depositDate !== undefined) merged.depositDate = depositDate;
+  if (tipo !== undefined) merged.tipo = tipo;
+  if (historyRecordedKey !== undefined) merged.historyRecordedKey = historyRecordedKey;
+  return merged;
+}
 
 /**
  * The saved practices, checked (spec §10): a practice is kept only with a string id and label and
  * lists where lists belong; an act only with an act type, and its articles only with a
  * `norma_data` and a text that is text; a decision only with a reference `storedReference`
- * accepts; a window only when it points at something the practice holds, at most two. Act and
- * decision ids are unique across practices: a taken one is re-id'd (`<id>-2`, …), and the
- * practice's windows follow it. Labels are trimmed and capped. What fails goes into `dropped`, for
- * the caller to log (gotcha 18); nothing is thrown, since a throw in the store's `merge` would
- * reset it.
+ * accepts; a window only when it points at something the practice holds, at most two. A second
+ * entry of one decision is merged into the first (`mergeDecisionEntries`). Act and decision ids are
+ * unique across practices: a taken one is re-id'd (`<id>-2`, …), and the practice's windows follow
+ * it, acts and decisions through separate maps. Labels are trimmed and capped. What fails, and
+ * every merge and re-id, goes into `dropped`, for the caller to log (gotcha 18); nothing is
+ * thrown, since a throw in the store's `merge` would reset it.
  */
 export function sanitizePractices(raw: unknown): { practices: Practice[]; dropped: string[] } {
   const dropped: string[] = [];
@@ -408,8 +434,8 @@ export function sanitizePractices(raw: unknown): { practices: Practice[]; droppe
       acts: [], decisions: [], beside: [],
     };
     // A saved act or decision id → the id it has now; the first of a practice's equal ids wins.
-    const ids = new Map<string, string>();
-    const keep = (saved: string, now: string) => { if (!ids.has(saved)) ids.set(saved, now); };
+    const ids: SavedIds = { acts: new Map(), decisions: new Map() };
+    const keep = (map: Map<string, string>, saved: string, now: string) => { if (!map.has(saved)) map.set(saved, now); };
     for (const rawAct of entry.acts) {
       const act = sanitizeAct(rawAct, where, dropped);
       if (!act) continue;
@@ -417,26 +443,28 @@ export function sanitizePractices(raw: unknown): { practices: Practice[]; droppe
       if (same) {
         // Two acts of one identity: one act, the first one's id (no article is lost).
         practice.acts = addArticles(practice.acts, act.norma, act.articles, () => same.id).acts;
-        keep(act.id, same.id);
+        keep(ids.acts, act.id, same.id);
         continue;
       }
       const id = claim(act.id);
       if (id !== act.id) dropped.push(`${where}: the act id ${act.id} is already taken, re-id'd ${id}`);
-      keep(act.id, id);
+      keep(ids.acts, act.id, id);
       practice.acts.push({ ...act, id });
     }
     for (const rawDecision of entry.decisions) {
       const decision = sanitizeDecision(rawDecision, where, dropped);
       if (!decision) continue;
-      const twin = practice.decisions.find((d) => sameEntry(d.reference, decision.reference));
-      if (twin) {
-        dropped.push(`${where}: a second entry of the decision ${twin.label}`);
-        keep(decision.id, twin.id);
+      const at = practice.decisions.findIndex((d) => sameEntry(d.reference, decision.reference));
+      if (at >= 0) {
+        const twin = practice.decisions[at];
+        dropped.push(`${where}: a second entry of the decision ${twin.label} (${decision.id}), merged into ${twin.id}`);
+        practice.decisions[at] = mergeDecisionEntries(twin, decision);
+        keep(ids.decisions, decision.id, twin.id);
         continue;
       }
       const id = claim(decision.id);
       if (id !== decision.id) dropped.push(`${where}: the decision id ${decision.id} is already taken, re-id'd ${id}`);
-      keep(decision.id, id);
+      keep(ids.decisions, decision.id, id);
       practice.decisions.push({ ...decision, id });
     }
     const beside: BesideRef[] = [];

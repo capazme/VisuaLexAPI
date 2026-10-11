@@ -3,7 +3,8 @@ import type { DecisionSearchQuery } from '../types/decisions';
 import { formatDecisionShort } from './decisionLinks';
 import {
   addArticles, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, isStoredArticle, isStoredQuery, isValidView, labelOr,
-  storedNorma, storedReference, type BesideRef, type Practice, type PracticeAct, type PracticeDecision,
+  mergeDecisionEntries, sameEntry, storedNorma, storedReference, type BesideRef, type Practice, type PracticeAct,
+  type PracticeDecision,
 } from './practice';
 
 /**
@@ -180,11 +181,17 @@ export function practicesFromTabs(tabs: unknown, newId: () => string): MigratedW
 
   for (const { tab, reference, label } of decisionTabs) {
     const target = host as Practice;
-    const twin = target.decisions.find((d) => d.reference.corte === reference.corte && d.reference.numero === reference.numero &&
-      d.reference.anno === reference.anno && d.reference.archivio === reference.archivio);
-    if (twin) continue; // two tabs of one decision cannot exist; if they do, one entry
+    const historyRecordedKey = typeof tab.historyRecordedKey === 'string' ? tab.historyRecordedKey : undefined;
+    // Two tabs of one decision cannot exist; if they do, one entry, holding what either held.
+    const at = target.decisions.findIndex((d) => sameEntry(d.reference, reference));
+    if (at >= 0) {
+      const twin = target.decisions[at];
+      dropped.push(`tab "${label}" (${String(tab.id)}): a second tab of the decision, merged into ${twin.id}`);
+      target.decisions[at] = mergeDecisionEntries(twin, { id: twin.id, reference, label, identified: false, historyRecordedKey });
+      continue;
+    }
     const entry: PracticeDecision = { id: claim(tab.id), reference, label, identified: false };
-    if (typeof tab.historyRecordedKey === 'string') entry.historyRecordedKey = tab.historyRecordedKey;
+    if (historyRecordedKey !== undefined) entry.historyRecordedKey = historyRecordedKey;
     target.decisions.push(entry);
   }
 
