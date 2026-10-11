@@ -58,10 +58,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
     portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
     down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
-  - `act_dates.py` — internal (MERL-T only): acts cited by year only → the full URN
-    through Normattiva's resolver, verified by the page's title (type, year and
-    number; State acts of nine kinds only, because the resolver answers a regional
-    URN with the State's act of the same number), cached a year.
+  - `act_dates.py` — acts cited by year only → their full date, through Normattiva's
+    resolver, verified by the page's title (type, year and number; State acts of nine
+    kinds only, because the resolver answers a regional URN with the State's act of the
+    same number), found dates cached a year. `complete_year` serves a search
+    (see Date System); `resolve_many` serves MERL-T (`/resolve_act_dates`).
   - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
     `model.py` (identity and reference), `italgiure.py` (Cassazione, Italgiure's Solr),
     `pdf_text.py` (the Cassazione's text from the court's PDF), `corte_cost.py` (Corte
@@ -82,7 +83,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `apps/web/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
     `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
     exists, which is why nothing looked broken
-  - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
+  - `sys_op.py` — `PlaywrightManager` singleton (browser pooling), reached through
+    `get_playwright_manager()`
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
   - `map.py` — act-type mappings, plus the act tables the resolver reads
     (`ATTI_NOTI` 64 aliases, `ATTI_DENOMINATI` 202 aliases over 81 acts, built
@@ -274,14 +276,27 @@ Request fields are `act_type/act_number/date`; the `norma_data` in responses use
 
 Two complementary paths, chosen by whether you need speed or truth.
 
-**Backend** (`services/visualex/visualex_api/tools/text_op.py`):
-- `complete_date_or_parse(date_str)` — **sync, fast, approximate**. Year-only
-  dates become `YYYY-01-01`. Used by `urngenerator.py` so URN generation never
-  blocks on a lookup.
-- `complete_date_or_parse_async(date_str)` — **async, slow, accurate**. Drives
-  Playwright to read the real publication date from Normattiva, memoised in
-  `_date_cache`. Used where the date is displayed or compared.
-- `complete_date()` — the low-level Playwright call behind the async wrapper.
+**Backend** (`services/visualex/visualex_api/tools/urngenerator.py`):
+- `complete_date_or_parse(date, act_type, act_number)` — **sync, approximate**.
+  Year-only dates become `YYYY-01-01`. Used by `generate_urn` so URN generation
+  never blocks on a lookup (the source convention's PR 3b is to stop writing it).
+- `complete_request_date(act_type, date, act_number)` — **async**, the date a
+  request names, as `create_norma_visitata_from_data` (both servers) builds the
+  `Norma` with it. A year with a number goes to `act_dates.complete_year`: one
+  request to Normattiva's resolver, the date read from the act's own title only
+  when its type, year and number are the ones asked (cached a year). When the act
+  cannot be told for certain (a kind outside `act_dates._TITLES`, a number that is
+  not digits, another act's page, a failure, past `LOOKUP_BUDGET` = 15 s) the year
+  stands: never another act's date. A full date is read into ISO for `legge`,
+  `decreto legge`, `decreto legislativo`, `d.p.r.` and `regio decreto` (a malformed
+  one is a 400) and passed on as given for the others.
+- Until 9 October 2026 the year was completed by `complete_date`, which typed the
+  act into the portal's search with Playwright and took the first hit without
+  reading it: d.lgs. 231/2001 came back dated 2025-12-31, another act's day, and a
+  failed lookup was a 500. A norm saved from that answer (a tab, a dossier item, a
+  quick norm, a watched norm, an environment, a share link) keeps the wrong full
+  date and sends it back, which skips the lookup; the date is also part of
+  `buildItemKey`, so correcting it would orphan the notes made on it.
 
 **Frontend** (`apps/web/src/utils/dateUtils.ts`):
 - `parseItalianDate(dateStr)` — parses while preserving the original precision.
@@ -292,9 +307,8 @@ Two complementary paths, chosen by whether you need speed or truth.
 precision the backend actually has — a year-only entry displays as a year, and
 that is correct, not a bug to normalise away.
 
-If date completion feels slow, you are probably calling the async variant in a
-loop; if a browser timeout appears, the async wrapper catches it and falls back
-to the cached or synthetic value.
+If date completion feels slow, you are probably calling `complete_request_date`
+in a loop: each act it cannot find costs a request (a miss is not cached).
 
 ## Scraping Architecture
 
@@ -346,9 +360,9 @@ Duplicating any of these is a defect, not a shortcut.
 **Playwright work** —
 
 ```python
-from visualex_api.tools.browser_manager import PlaywrightManager
+from visualex_api.tools.sys_op import get_playwright_manager
 
-manager = PlaywrightManager()
+manager = get_playwright_manager()
 browser = await manager.get_browser()
 page = await browser.new_page()
 # ... work
@@ -411,7 +425,7 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
 Breaking one of these breaks the product. Read before editing.
 
 **Python** — `services/visualex/visualex_api/app.py` (controller) · `tools/norma.py` (models) ·
-`tools/text_op.py` (parsing + dates) · `tools/browser_manager.py` (browser pool) ·
+`tools/text_op.py` (parsing + dates) · `tools/sys_op.py` (browser pool) ·
 `services/*_scraper.py` (fragile HTML parsers).
 
 ## Gotchas
@@ -421,10 +435,11 @@ Breaking one of these breaks the product. Read before editing.
 2. **Async context** — never block the Python event loop; wrap blocking calls in
    `asyncio.to_thread()`.
 3. **Rate limiting** — per-IP, configured in `config.py`; 429 when exceeded.
-4. **Playwright** — needed for PDF export and date completion
-   (`playwright install chromium`); always via `PlaywrightManager`.
-5. **Dates** — sync for URNs (approximate), async for display (accurate); never
-   render a synthetic `YYYY-01-01`. See Date System.
+4. **Playwright** — needed for PDF export (`playwright install chromium`);
+   always via `PlaywrightManager`. Date completion no longer uses it.
+5. **Dates** — sync for URNs (approximate), `complete_request_date` for the
+   norm a request names (the act's own date, or its year); never render a
+   synthetic `YYYY-01-01`. See Date System.
 6. **CORS/proxy** — the Vite dev server proxies to the Python API; check
    `vite.config.ts`. `ALLOWED_ORIGINS` unset means localhost only.
 7. **Annex handling** — codici carry a default annex in the URN; see

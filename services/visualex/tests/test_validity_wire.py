@@ -192,7 +192,7 @@ class TestAFutureDateIsRefusedBeforeAnyRequest:
         scraper = normattiva_serving()
         with patch("app.normattiva_scraper", scraper), \
                 patch("app.get_tree", AsyncMock(side_effect=AssertionError("no request may be made"))), \
-                patch("app.complete_date_or_parse_async", AsyncMock(side_effect=AssertionError("no request may be made"))):
+                patch("app.complete_request_date", AsyncMock(side_effect=AssertionError("no request may be made"))):
             response = await controller.app.test_client().post(endpoint, json=self.BODY)
         assert response.status_code == 400
         assert "futura" in (await response.get_json())["error"]
