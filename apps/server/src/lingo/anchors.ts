@@ -41,7 +41,9 @@ const isNamedAct = (norm: NormaVisitata): boolean =>
 export function anchorUrn(raw: string): string | null {
   const at = raw.indexOf('urn:');
   if (at < 0) return null;
-  return raw.slice(at).replace(/(?:!vig=[^~@]*|@[^~!]*)+$/, '');
+  // Each suffix's body excludes both delimiters, so the tail splits one way only: the cut is linear
+  // (the address is up to 600 characters from any signed-in user).
+  return raw.slice(at).replace(/(?:!vig=[^~@!]*|@[^~!@]*)+$/, '');
 }
 
 /** The labels and identity of an anchor, or null when the norm has no official URN. */

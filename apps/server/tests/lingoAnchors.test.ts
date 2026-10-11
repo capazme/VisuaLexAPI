@@ -66,6 +66,23 @@ describe('anchorUrn', () => {
     expect(anchorUrn('')).toBeNull();
   });
 
+  // `GET /api/lingo/articolo?urn=` takes 600 characters from any signed-in user: the cut must not backtrack.
+  it.each([
+    ['repeated version suffixes before a tilde', 'urn:x' + '!vig='.repeat(100) + '~'],
+    ['a run of original-text marks before a tilde', 'urn:x' + '@'.repeat(500) + '~'],
+    ['both suffixes mixed, 600 characters, before a tilde', 'urn:x' + '!vig=@'.repeat(99) + '~'],
+  ])('is linear on %s', (_label, raw) => {
+    const started = performance.now();
+    expect(anchorUrn(raw)).toBe(raw);
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+
+  it('cuts any number of suffixes at the end, in either order, in linear time', () => {
+    const started = performance.now();
+    expect(anchorUrn(`${LAW}~art2${'@originale!vig=2026-10-07'.repeat(20)}`)).toBe('urn:nir:stato:legge:1990-08-07;241~art2');
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+
   it('agrees with the cut anchorKeys stores', () => {
     const stored = anchorKeys(norm({ urn: `${CC}:2~art1453!vig=2026-10-07` }));
     expect(stored!.urn).toBe(anchorUrn(`${CC}:2~art1453`));
