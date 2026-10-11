@@ -553,6 +553,79 @@ describe('the review routes', () => {
     });
   });
 
+  describe('a card in the trash', () => {
+    const trash = (who: Record<string, string>, cardId: string) => request(app).post('/api/lingo/cards/trash').set(who).send({ cardIds: [cardId] });
+    const restore = async (who: Record<string, string>) => {
+      const [entry] = (await request(app).get('/api/trash').set(who)).body;
+      return request(app).post(`/api/trash/${entry.id}/restore`).set(who).send({});
+    };
+    const reviewsOf = (cardId: string) => ({
+      state: prisma.lingoStatoRipasso.findMany({ where: { cardId } }),
+      log: prisma.lingoRevisioneSRS.findMany({ where: { cardId }, orderBy: [{ dataRevisione: 'asc' }, { id: 'asc' }] }),
+    });
+    /** A draft studied on two days (the second a lapse): one state row, two log rows. */
+    async function studiedDraft() {
+      setClock(MONDAY_MORNING);
+      const c = await card(alice);
+      await grade(a, { cardId: c.id, rating: 3, durataMs: 4200 });
+      setClock('2026-10-22T08:00:00Z');
+      await grade(a, { cardId: c.id, rating: 1 });
+      return c;
+    }
+
+    it('keeps its review state and log, and brings them back identical when restored', async () => {
+      const c = await studiedDraft();
+      const before = { state: await reviewsOf(c.id).state, log: await reviewsOf(c.id).log };
+      expect(before.state).toHaveLength(1);
+      expect(before.log).toHaveLength(2);
+
+      expect((await trash(a, c.id)).status).toBe(200);
+      expect(await prisma.lingoStatoRipasso.count()).toBe(0);
+      expect(await prisma.lingoRevisioneSRS.count()).toBe(0);
+
+      expect((await restore(a)).status).toBe(200);
+      expect(await reviewsOf(c.id).state).toEqual(before.state);
+      expect(await reviewsOf(c.id).log).toEqual(before.log);
+      // The card is not «nuova» again: it is not offered as new, and its date is where it was.
+      expect((await request(app).get(`/api/lingo/cards/${c.id}`).set(a)).body.prossimoRipasso).toBe(romeDay(before.state[0].dueAt));
+      expect((await session(a)).body.cards.some((x: { id: string; nuova: boolean }) => x.id === c.id && x.nuova)).toBe(false);
+    });
+
+    it('takes along only the author’s reviews, not another user’s', async () => {
+      const c = await studiedDraft();
+      await prisma.lingoRevisioneSRS.create({ data: { utenteId: bob.id, cardId: c.id, rating: 3, scheduledDays: 2, stability: 2.4, difficulty: 4.93 } });
+      await stateDueOn(bob, c.id, '2026-10-30', new Date('2026-10-28T08:00:00Z'));
+
+      await trash(a, c.id);
+      await restore(a);
+
+      expect(await prisma.lingoStatoRipasso.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: alice.id }]);
+      expect((await prisma.lingoRevisioneSRS.findMany({ select: { utenteId: true } })).map((r) => r.utenteId)).toEqual([alice.id, alice.id]);
+    });
+
+    it('restores an entry trashed before reviews were kept, a payload with the cards alone', async () => {
+      const c = await card(alice);
+      await trash(a, c.id);
+      const entry = await prisma.trashEntry.findFirstOrThrow();
+      const { cards } = entry.payload as { cards: unknown[] };
+      await prisma.trashEntry.update({ where: { id: entry.id }, data: { payload: { cards } } });
+
+      expect((await restore(a)).status).toBe(200);
+      expect(await prisma.lingoCard.count({ where: { id: c.id } })).toBe(1);
+      expect(await prisma.lingoStatoRipasso.count()).toBe(0);
+      expect(await prisma.lingoRevisioneSRS.count()).toBe(0);
+    });
+
+    it('leaves the reviews gone when the entry is emptied', async () => {
+      const c = await studiedDraft();
+      await trash(a, c.id);
+      const [entry] = (await request(app).get('/api/trash').set(a)).body;
+      expect((await request(app).delete(`/api/trash/${entry.id}`).set(a)).status).toBe(204);
+      expect(await prisma.lingoCard.count()).toBe(0);
+      expect(await prisma.lingoRevisioneSRS.count()).toBe(0);
+    });
+  });
+
   describe('who may reach them', () => {
     it('refuses an exchanged token on every path', async () => {
       const token = await delegated(alice, 'lingo:cards:read');
