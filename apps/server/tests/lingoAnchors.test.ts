@@ -54,6 +54,8 @@ describe('anchorUrn', () => {
     ['the c.c. address with an article', `${CC}:2~art1453`, 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453'],
     ['the same address with the version the reader adds', `${CC}:2~art1453!vig=2026-10-07`, 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453'],
     ['an original-text suffix', `${LAW}~art2bis@originale`, 'urn:nir:stato:legge:1990-08-07;241~art2bis'],
+    ['both suffixes, original text then version', `${LAW}~art2@originale!vig=2026-10-07`, 'urn:nir:stato:legge:1990-08-07;241~art2'],
+    ['both suffixes, version then original text', `${LAW}~art2!vig=2026-10-07@originale`, 'urn:nir:stato:legge:1990-08-07;241~art2'],
     ['an address that is already the URN', 'urn:nir:stato:legge:1990-08-07;241~art2bis', 'urn:nir:stato:legge:1990-08-07;241~art2bis'],
   ])('%s', (_label, raw, expected) => {
     expect(anchorUrn(raw)).toBe(expected);

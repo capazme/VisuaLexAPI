@@ -37,11 +37,11 @@ const snake = (text: string): string =>
 const isNamedAct = (norm: NormaVisitata): boolean =>
   !norm.numero_atto || Boolean(norm.tipo_atto_reale && norm.tipo_atto_reale !== norm.tipo_atto);
 
-/** The anchor's identity from a Normattiva address: cut at `urn:`, without a version suffix (S6). */
+/** The anchor's identity from a Normattiva address: cut at `urn:`, without its version suffixes, both when the reader adds both (S6). */
 export function anchorUrn(raw: string): string | null {
   const at = raw.indexOf('urn:');
   if (at < 0) return null;
-  return raw.slice(at).replace(/(!vig=[^~@]*|@[^~!]*)$/, '');
+  return raw.slice(at).replace(/(?:!vig=[^~@]*|@[^~!]*)+$/, '');
 }
 
 /** The labels and identity of an anchor, or null when the norm has no official URN. */
