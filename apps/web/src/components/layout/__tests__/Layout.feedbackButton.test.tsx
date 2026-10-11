@@ -8,7 +8,9 @@ vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => 
 vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
 vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
-vi.mock('../../ui/ServiceHealthBanner', () => ({ ServiceHealthBanner: () => null }));
+vi.mock('../../ui/ServiceHealthBanner', () => ({
+  ServiceHealthBanner: ({ className }: { className?: string }) => <div data-testid="health" className={className} />,
+}));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
@@ -30,8 +32,14 @@ describe('Layout — the feedback button on the validators’ queue', () => {
     expect(screen.getByTestId('feedback')).toHaveClass('hidden', 'md:block');
   });
 
+  it('hides the services pill there too: on a phone it sat over «Approvata» and «Migliorabile»', () => {
+    at('/studia/valida');
+    expect(screen.getByTestId('health')).toHaveClass('hidden', 'md:block');
+  });
+
   it.each(['/', '/studia', '/studia/schede', '/dossier'])('leaves it as it is on %s', (path) => {
     at(path);
     expect(screen.getByTestId('feedback')).not.toHaveClass('hidden');
+    expect(screen.getByTestId('health')).not.toHaveClass('hidden');
   });
 });

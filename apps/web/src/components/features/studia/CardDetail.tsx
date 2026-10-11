@@ -50,7 +50,7 @@ function withdrawFailure(error: unknown): string {
 }
 
 const BUTTON =
-  'inline-flex min-h-[44px] items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+  'inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg border px-3 text-sm font-medium transition-colors md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const MEASURE = 'max-w-[60ch]';
 
 /**
@@ -121,14 +121,14 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
 
   return (
     <article aria-label="Scheda" className="space-y-5">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {onBack && (
           <button type="button" onClick={onBack} className={cn(BUTTON, 'border-transparent text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800')}>
             <ArrowLeft size={16} aria-hidden className="mr-1.5" />
             Indietro
           </button>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {canEdit && (
             <button type="button" onClick={onEdit} className={cn(BUTTON, 'border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800')}>
               Modifica

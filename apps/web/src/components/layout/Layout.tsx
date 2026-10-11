@@ -248,7 +248,7 @@ export function Layout() {
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
 
-      <ServiceHealthBanner />
+      <ServiceHealthBanner className={onValidationQueue ? 'hidden md:block' : undefined} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />
