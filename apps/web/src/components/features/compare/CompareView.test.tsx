@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CompareView } from './CompareView';
 import { appStore } from '../../../store/useAppStore';
 import { closeCompare, setCompareState } from '../../../hooks/useCompare';
+import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import type { ArticleData, Norma, NormaVisitata } from '../../../types';
 
 const NORMA: Norma = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2' };
@@ -72,5 +73,16 @@ describe('CompareView — the articles it lists from the open tabs', () => {
       'art. 1284 c.c. — testo al 29/12/2007',
       'art. 1285 c.c.',
     ]);
+  });
+});
+
+describe('CompareView — over the workspace', () => {
+  it('leaves Cmd/Ctrl+F to the browser while it is open', () => {
+    render(<CompareView />);
+    expect(isWorkspaceCovered()).toBe(true);
+    cleanup();
+    closeCompare();
+    render(<CompareView />);
+    expect(isWorkspaceCovered()).toBe(false);
   });
 });

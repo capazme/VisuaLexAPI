@@ -184,8 +184,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { canContribute, qaAskable, consentLevel, merltEnabled } = useMerltFeatures();
 
     const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
-    // The find window's target for this article (spec §13.1, Task 33 ruling 1): the tab this
-    // surface reads in, `readingOrigin` winning like everywhere else it is given. No tab (a
+    // The find window's target for this article (spec §13.1): the tab this surface reads in,
+    // `readingOrigin` winning like everywhere else it is given, so the root lands under the tab and
+    // key the scope computes from the store. No tab (a
     // preview outside the workspace, such as the palette's result card) registers nothing.
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
     useRegisterFindRoot(originTabId ?? tabId, findTargetKey, shortNorm(norma_data), textRootRef);

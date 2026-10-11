@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -13,7 +13,7 @@ import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
 import { FindWindow } from '../features/search/FindWindow';
-import { openFindWindow } from '../../utils/findWindowControl';
+import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
@@ -34,6 +34,13 @@ export function Layout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const navigate = useNavigate();
+  // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
+  const onSearchPage = useLocation().pathname === '/';
+
+  // Leaving the search page closes the window: its matches are in tabs no longer on screen.
+  useEffect(() => {
+    if (!onSearchPage) closeFindWindow();
+  }, [onSearchPage]);
 
   // Onboarding Tour
   const { startTour, hasSeenTour, resetAndStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
@@ -102,9 +109,10 @@ export function Layout() {
         toggleSearchPanel();
       }
       // Cmd/Ctrl+F opens the floating find window (spec §13.1), or focuses its field when it is open.
-      // Under a modal overlay (a dialog, the discussion panel, Study Mode) the browser's own find is left alone.
+      // Off the search page, and under an overlay that covers the workspace (a modal dialog, the
+      // discussion panel, Study Mode, the palette, CompareView, the PDF viewer), the browser's own find is left alone.
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f'
-        && !document.querySelector('[aria-modal="true"]')) {
+        && onSearchPage && !isWorkspaceCovered()) {
         e.preventDefault();
         openFindWindow();
       }
@@ -116,7 +124,7 @@ export function Layout() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette]);
+  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage]);
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -238,8 +246,6 @@ export function Layout() {
       <SyncErrorToast />
 
       <ServiceHealthBanner />
-
-      {/* The old modal search over stored article texts: nothing opens it any more; it goes with Task 35. */}
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />

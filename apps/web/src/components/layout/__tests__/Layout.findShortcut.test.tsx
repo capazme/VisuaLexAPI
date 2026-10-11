@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
@@ -55,6 +55,48 @@ describe('Layout — Cmd/Ctrl+F', () => {
     press({ metaKey: true });
     expect(field).toHaveFocus();
     expect([field.selectionStart, field.selectionEnd]).toEqual([0, 5]);
+  });
+
+  it('leaves the browser\'s own find alone under an overlay marked data-find-overlay', () => {
+    render(<MemoryRouter><Layout /></MemoryRouter>);
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-find-overlay', '');
+    document.body.appendChild(overlay);
+    const event = new KeyboardEvent('keydown', { key: 'f', metaKey: true, cancelable: true, bubbles: true });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    overlay.remove();
+  });
+
+  it.each(['/dossier', '/forum', '/history', '/grafo'])('leaves the browser\'s own find alone on %s', (path) => {
+    render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
+    const event = new KeyboardEvent('keydown', { key: 'f', metaKey: true, cancelable: true, bubbles: true });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+  });
+
+  it('closes the window when the reader leaves the search page', () => {
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Link to="/dossier">Dossier</Link>} />
+            <Route path="dossier" element={<p>I miei dossier</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    press({ metaKey: true });
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Dossier' }));
+    expect(screen.getByText('I miei dossier')).toBeInTheDocument();
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
   });
 
   it('leaves the browser\'s own find alone under a modal overlay', () => {

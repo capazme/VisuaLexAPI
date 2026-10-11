@@ -24,6 +24,9 @@ import { registerFindRoot } from '../../../utils/findTargets';
 import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
 import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { FakeHighlight } from '../../../utils/__fixtures__/openFind';
+import { shortNorm } from '../../../utils/sources';
+import { decisionKey } from '../../../utils/decisionLinks';
+import type { DecisionIdentity } from '../../../types/decisions';
 
 const g = globalThis as unknown as Record<string, unknown>;
 let registry: Map<string, FakeHighlight>;
@@ -55,7 +58,7 @@ function addDrawnTab(label: string, n: NormaVisitata, text: string): string {
   const element = document.createElement('div');
   element.textContent = text;
   document.body.appendChild(element);
-  cleanups.push(registerFindRoot({ tabId: id, targetKey: keyOf(n), label: 'art.', element }));
+  cleanups.push(registerFindRoot({ tabId: id, targetKey: keyOf(n), label: shortNorm(n), element }));
   return id;
 }
 
@@ -185,12 +188,33 @@ describe('FindWindow — opening', () => {
     expect(screen.getByRole('button', { name: 'Tutte le schede' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'false');
     expect(counter()).toHaveTextContent(/^\d di 3/);
-    expect(screen.getByTestId('find-where')).toHaveTextContent('Tab A');
+    // One label for an article, its `shortNorm`: never the tab's label joined to it.
+    expect(screen.getByTestId('find-where')).toHaveTextContent(new RegExp(`^${shortNorm(N1)}$`));
     // The place is in the polite live region with the counter.
-    expect(counter()).toHaveTextContent('Tab A');
+    expect(counter()).toHaveTextContent(shortNorm(N1));
     act(() => screen.getByRole('button', { name: 'Risultato successivo' }).click());
-    expect(screen.getByTestId('find-where')).toHaveTextContent('Tab B');
-    expect(counter()).toHaveTextContent('Tab B');
+    expect(screen.getByTestId('find-where')).toHaveTextContent(new RegExp(`^${shortNorm(N2)}$`));
+    expect(counter()).toHaveTextContent(shortNorm(N2));
+    expect(counter()).not.toHaveTextContent('Tab B');
+  });
+
+  it('names a decision by its tab\'s label, the one with the section, alone', async () => {
+    addDrawnTab('Tab A', N1, 'nessuna corrispondenza');
+    const identity: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 1234, anno: 2020 };
+    const id = appStore.getState().openDecisionTab(identity);
+    act(() => appStore.getState().setDecisionTabIdentity(id, identity, 'Cass. civ., sez. III, n. 1234/2020'));
+    const element = document.createElement('div');
+    element.textContent = 'il fatto non sussiste';
+    document.body.appendChild(element);
+    // The surface registers the shorter label when it has no section of its own.
+    cleanups.push(registerFindRoot({ tabId: id, targetKey: decisionKey(identity), label: 'Cass. civ., n. 1234/2020', element }));
+    render(<FindWindow />);
+    act(() => openFindWindow());
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    typeQuery('fatto');
+    await settle();
+    expect(counter()).toHaveTextContent('1 di 1');
+    expect(screen.getByTestId('find-where')).toHaveTextContent(/^Cass\. civ\., sez\. III, n\. 1234\/2020$/);
   });
 
   it('spends the magnifier\'s preference on the first query: later ones start in the front tab', async () => {
@@ -209,7 +233,7 @@ describe('FindWindow — opening', () => {
     typeQuery('fatt');
     await settle();
     expect(counter()).toHaveTextContent('2 di 3');
-    expect(screen.getByTestId('find-where')).toHaveTextContent('B');
+    expect(screen.getByTestId('find-where')).toHaveTextContent(shortNorm(N2));
   });
 
   it('a magnifier on another text of the same tab is not pressed while the window is pointed elsewhere', async () => {

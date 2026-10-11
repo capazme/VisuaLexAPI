@@ -4,8 +4,9 @@
  * `FindWindow` mounted in the layout subscribes. With no window mounted (a preview, a test of a
  * toolbar alone) a call is a no-op.
  *
- * Also the window's report of what it is scoped to, which the magnifiers read for `aria-pressed`
- * («the window is open and scoped to this tab», Task 34 ruling 3).
+ * Also the window's report of what it is scoped to, which the magnifiers read for `aria-pressed`:
+ * pressed means «the window is open on this tab and this text», so a magnifier on a background tab
+ * or on another text of the same tab opens the window there instead of closing it.
  */
 
 export interface FindWindowRequest {
@@ -37,6 +38,18 @@ export function subscribeFindWindow(listener: (command: FindWindowCommand) => vo
   };
 }
 
+/**
+ * Whether an overlay covers the workspace, so Cmd/Ctrl+F is left to the browser (`Layout`): a modal
+ * dialog (`aria-modal="true"`), or an overlay that is not one in ARIA terms but still covers the
+ * reader — Study Mode, the command palette, CompareView, the PDF viewer — marked `data-find-overlay`.
+ * An overlay carries the mark only while it is open (each renders nothing when closed).
+ */
+export function isWorkspaceCovered(): boolean {
+  // Two queries, not one selector list: jsdom's `querySelector` misses the second selector of a list
+  // when the first matches nothing, and the tests run there.
+  return document.querySelector('[aria-modal="true"]') !== null || document.querySelector('[data-find-overlay]') !== null;
+}
+
 let scopedTabId: string | null = null;
 let pointedKey: string | null = null;
 const scopeListeners = new Set<() => void>();
@@ -49,10 +62,6 @@ export function reportFindWindowScope(tabId: string | null, targetKey: string | 
   scopedTabId = tabId;
   pointedKey = targetKey;
   for (const listener of scopeListeners) listener();
-}
-
-export function getFindWindowScope(): string | null {
-  return scopedTabId;
 }
 
 /** Whether the window is open on `tabId` and, when it was pointed at one text, on `targetKey`. */

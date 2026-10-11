@@ -141,8 +141,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const textRootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
 
-  // The find window's target for this decision (spec §13.1, Task 33 ruling 1): one text, keyed by
-  // its own `decisionKey`. No `hostTabId` (a host with no tab) registers nothing.
+  // The find window's target for this decision (spec §13.1): one text, keyed by its own
+  // `decisionKey`, the key the scope computes for a decision tab. No `hostTabId` (a host with no
+  // tab) registers nothing.
   useRegisterFindRoot(hostTabId, key, label, textRootRef);
   const isFindOpen = useFindWindowScopedTo(hostTabId, key);
 

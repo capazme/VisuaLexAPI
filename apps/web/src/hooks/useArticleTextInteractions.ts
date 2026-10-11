@@ -59,8 +59,6 @@ export function useArticleTextInteractions(
   updatesOpen: boolean;
   openNote: OpenUpdateNote | null;
   closeNote: () => void;
-  /** Unfolds the AGGIORNAMENTO notes — e.g. before scrolling to a search hit inside them. */
-  openUpdates: () => void;
   /**
    * The block whose annotation sign was activated. Unlike a note it survives
    * a redraw of the text — an edit or a removal made inside it redraws the
@@ -89,10 +87,6 @@ export function useArticleTextInteractions(
 
   const closeBlock = useCallback(() => {
     setState((s) => (s.key === scope ? { ...s, openBlock: null } : fresh(scope, updatesOpenByDefault)));
-  }, [scope, updatesOpenByDefault]);
-
-  const openUpdates = useCallback(() => {
-    setState((s) => ({ ...(s.key === scope ? s : fresh(scope, updatesOpenByDefault)), updatesOpen: true }));
   }, [scope, updatesOpenByDefault]);
 
   // A layout effect, not a passive one: the signs and chips are focusable
@@ -165,5 +159,5 @@ export function useArticleTextInteractions(
       ?.setAttribute('aria-expanded', current.updatesOpen ? 'true' : 'false');
   }, [current.updatesOpen, containerRef, contentKey]);
 
-  return { updatesOpen: current.updatesOpen, openNote, closeNote, openUpdates, openBlock: current.openBlock, closeBlock };
+  return { updatesOpen: current.updatesOpen, openNote, closeNote, openBlock: current.openBlock, closeBlock };
 }

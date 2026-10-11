@@ -1,5 +1,5 @@
 /**
- * The registry of text roots actually on screen (spec §13.1, Task 33): `ArticleTabContent` and
+ * The registry of text roots actually on screen (spec §13.1): `ArticleTabContent` and
  * `DecisionReadingSurface` each register the element that holds their text root for as long as
  * they are mounted. The desktop and phone copies of a tab are both mounted at once, one hidden by
  * a CSS breakpoint (gotcha 26) — so the same (tabId, targetKey) can be registered twice, and only

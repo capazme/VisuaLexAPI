@@ -1,5 +1,5 @@
 /**
- * The texts a search over the workspace can reach (spec §13.1, Task 33): the ordered list of
+ * The texts a search over the workspace can reach (spec §13.1): the ordered list of
  * targets in «Questa scheda» or «Tutte le schede», built from the store's workspace tabs alone —
  * no DOM, so it is tested without one, like `utils/versionDisplay.ts`.
  *
@@ -8,7 +8,7 @@
  * counts, searched in its stored text) or a decision tab (one text). `storedText` is always the
  * projection — `article_text` with every `\n` dropped, or a decision's `decisionProjection` — so a
  * caller can `findMatches` it directly; the DOM, when a root is registered and displayed for the
- * same target, takes precedence (`findRootsFor`, never both — Task 33 ruling 2).
+ * same target, takes precedence (`findRootsFor`; never both, or a text would count twice).
  */
 import type { ArticleData } from '../types';
 import type { DecisionIdentity, DecisionText } from '../types/decisions';

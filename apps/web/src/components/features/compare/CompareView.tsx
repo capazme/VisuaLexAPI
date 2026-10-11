@@ -626,6 +626,8 @@ export function CompareView() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+        data-find-overlay=""
         className={cn(
           "fixed inset-0 bg-black/50 backdrop-blur-sm",
           Z_INDEX.compare,

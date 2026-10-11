@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 import type { ArticleData, ArticleValidity, Highlight, NormaVisitata } from '../../../../types';
 
 const { listPassages, listDiscussions, checkNorma } = vi.hoisted(() => ({
@@ -322,5 +323,34 @@ describe('ArticleTabContent — a magnifier that was not pressed opens the windo
     fireEvent.pointerDown(mag('b'));
     fireEvent.click(mag('b'));
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['released off the button', (el: HTMLElement) => { void el; fireEvent.pointerUp(document.body); }],
+    ['cancelled', (el: HTMLElement) => fireEvent.pointerCancel(el)],
+  ])('Enter after a press %s, with the window closed since, opens it', async (_how, abort) => {
+    const user = userEvent.setup();
+    const a = article({ article_text: ACCENTED.text });
+    const tab = appStore.getState().addWorkspaceTab('A', NORMA, [a]);
+    render(
+      <MemoryRouter>
+        <ArticleTabContent data={a} readingOrigin={{ tabId: tab, blockId: 'b' }} />
+        <FindWindow />
+      </MemoryRouter>,
+    );
+    const mag = () => screen.getAllByRole('button', { name: 'Cerca nel testo' })[0];
+
+    fireEvent.click(mag());
+    expect(mag()).toHaveAttribute('aria-pressed', 'true');
+    // A press on the open magnifier that never becomes a click.
+    fireEvent.pointerDown(mag());
+    abort(mag());
+    act(() => closeFindWindow());
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+
+    mag().focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(mag()).toHaveAttribute('aria-pressed', 'true');
   });
 });

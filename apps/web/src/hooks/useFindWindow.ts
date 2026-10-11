@@ -23,7 +23,8 @@ import { clearFindRanges, setFindRanges } from '../utils/findHighlights';
 
 const DEBOUNCE_MS = 150;
 /** How long a «go to» an undrawn match waits for the root to register before the target is given
- *  up for the query (Task 33 ruling 3) — long enough for a block to mount and fetch, short enough
+ *  up for the query, so a target that never draws (an article that fails to load) leaves the counter
+ *  instead of holding «next» on it — long enough for a block to mount and fetch, short enough
  *  that the window never looks stuck. */
 const PENDING_TIMEOUT_MS = 3000;
 const MATCH_LIMIT = 1000;
@@ -87,14 +88,14 @@ interface FlatMatch {
   articleId?: string;
   onScreen: boolean;
   /** Its position among its own target's matches alone — the ordinal a pending «go to» resolves
-   *  by, since the drawn and the stored count of the same text can differ (ruling 3). */
+   *  by, since the drawn and the stored count of the same text can differ (spec §13.1). */
   ordinal: number;
   /** Offset in the text that was actually searched for this target this run. */
   start: number;
   range?: Range;
 }
 
-/** A «go to» an undrawn match, waiting for its root (ruling 3). */
+/** A «go to» an undrawn match, waiting for its root to be drawn (spec §13.1). */
 interface Pending {
   id: string;
   ordinal: number;
@@ -129,10 +130,10 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
 }
 
 /**
- * The matches across every text the current scope reaches (spec §13.1, Task 33): a target with a
+ * The matches across every text the current scope reaches (spec §13.1): a target with a
  * displayed registered root (`findRootsFor`) is searched in its text root, as PR 4c's
- * the single-root find of PR 4c did for one root; a target without one is searched in its stored projection and
- * only counted (ruling 2 — never both for the same target).
+ * single-root find did; a target without one is searched in its stored projection and only
+ * counted (never both for the same target: a text would count twice).
  *
  * Where the current match is:
  * - typing (a new query) takes the front tab's first match, a drawn one first; with none in the
@@ -177,7 +178,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const foldedRef = useRef<Map<string, { text: string; folded: string }>>(new Map());
   const pendingRef = useRef<Pending | null>(null);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Targets given up for the applied query: a «go to» found no root in time (ruling 3). */
+  /** Targets given up for the applied query: a «go to» found no root in time (`PENDING_TIMEOUT_MS`). */
   const unreachableRef = useRef<Set<string>>(new Set());
 
   const appliedRef = useRef('');
@@ -357,7 +358,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
 
   const commitState = useCallback(
     (current: FindWindowLocation | null, patch?: Partial<FindWindowState>) => {
-      // The counter counts what can be reached: a target given up (ruling 4) leaves it, and the
+      // The counter counts what can be reached: a target given up (no root in time) leaves it, and the
       // index is the current match's place among the rest.
       const all = allRef.current;
       let count = 0;
@@ -399,7 +400,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   }, [commitState, stepFrom]);
 
   /** An explicit move to `index`: drawn, it is shown; not drawn, its tab is revealed and its article
-   *  shown, and the match waits for its root (ruling 3). */
+   *  shown, and the match waits for its root, found there by its ordinal (spec §13.1). */
   const goTo = useCallback(
     (all: FlatMatch[], index: number, direction: Direction): FindWindowLocation | null => {
       clearPending();

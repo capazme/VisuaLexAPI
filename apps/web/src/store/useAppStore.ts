@@ -1235,7 +1235,8 @@ const appStore = createStore<AppState>()(
                     return;
                 }
                 block.autoFocusArticleId = articleId;
-                // A collapsed block draws no article: showing one is opening its block (find, Task 34).
+                // A collapsed block draws no article: showing one is opening its block (the find
+                // window's «go to» a match in it, spec §13.1).
                 block.isCollapsed = false;
                 // Surface the tab if it was minimized/hidden so the focus signal
                 // is actually visible (R3 + R2 edge case).

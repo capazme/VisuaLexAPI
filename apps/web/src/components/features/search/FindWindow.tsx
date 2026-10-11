@@ -260,10 +260,14 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
     savePlace(next);
   };
 
-  const tabLabel = useAppStore((s) => s.workspaceTabs.find((t) => t.id === find.current?.tabId)?.label);
-  const where = scope === 'all' && find.current
-    ? [tabLabel && tabLabel !== find.current.label ? tabLabel : null, find.current.label].filter(Boolean).join(' · ')
-    : '';
+  // Where the current match is, as one label: a decision's tab label (it carries the section the
+  // text was read with), an article's `shortNorm`.
+  const current = find.current;
+  const decisionTabLabel = useAppStore((s) => {
+    const tab = current ? s.workspaceTabs.find((t) => t.id === current.tabId) : undefined;
+    return tab?.view?.kind === 'decision' ? tab.label : undefined;
+  });
+  const where = scope === 'all' && current ? decisionTabLabel || current.label : '';
 
   const button = isDesktop ? ICON_BUTTON : cn(ICON_BUTTON, 'min-h-[44px] min-w-[44px]');
 

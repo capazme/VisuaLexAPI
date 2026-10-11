@@ -1,4 +1,4 @@
-import { useRef, type Ref } from 'react';
+import { useEffect, useRef, type Ref } from 'react';
 import { Search } from 'lucide-react';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
@@ -21,16 +21,41 @@ export interface FindInTextButtonProps {
  */
 export function FindInTextButton({ isOpen, onToggle, ref, size = 16 }: FindInTextButtonProps) {
     const pressedAtDown = useRef<boolean | null>(null);
+    const stopWatching = useRef<(() => void) | null>(null);
+    const forget = () => {
+        pressedAtDown.current = null;
+        stopWatching.current?.();
+    };
+    useEffect(() => () => stopWatching.current?.(), []);
+    // A press that ends without a click (released off the button, cancelled) leaves no state behind:
+    // a later Enter or Space reads the state on screen. A release on the button is followed by the
+    // click, which reads the state and clears it.
+    const watchRelease = (button: HTMLButtonElement) => {
+        stopWatching.current?.();
+        const onUp = (e: PointerEvent) => {
+            if (!(e.target instanceof Node && button.contains(e.target))) forget();
+        };
+        document.addEventListener('pointerup', onUp, true);
+        document.addEventListener('pointercancel', forget, true);
+        stopWatching.current = () => {
+            document.removeEventListener('pointerup', onUp, true);
+            document.removeEventListener('pointercancel', forget, true);
+            stopWatching.current = null;
+        };
+    };
     return (
         <button
             ref={ref}
             type="button"
-            onPointerDown={() => { pressedAtDown.current = isOpen; }}
-            onBlur={() => { pressedAtDown.current = null; }}
+            onPointerDown={(e) => {
+                pressedAtDown.current = isOpen;
+                watchRelease(e.currentTarget);
+            }}
+            onBlur={forget}
             onClick={() => {
                 // A keyboard click has no pointerdown: the state now is the state seen.
                 const wasPressed = pressedAtDown.current ?? isOpen;
-                pressedAtDown.current = null;
+                forget();
                 onToggle(wasPressed);
             }}
             aria-pressed={isOpen}
