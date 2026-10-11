@@ -5,9 +5,11 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createLingoCard } from '../lingo/cards';
+import { canTransition } from '../lingo/cardStates';
 import { hasNoNul } from '../lingo/noNul';
 import { cardInputSchema, planCards } from '../lingo/planCards';
 import { serialize } from '../lingo/serializeCard';
+import { currentText, hasAccepted, serializeText } from '../lingo/texts';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
 import { trashLingoCards } from '../trash/trash';
 
@@ -22,7 +24,9 @@ import { trashLingoCards } from '../trash/trash';
  * the trash are open to the user's session and to exchanged tokens
  * (`lingo:cards:read` / `lingo:cards:write`, `content:delete`); editing a
  * draft is for the session only. Only the user's personal cards go to the
- * trash (drafts, archived: what account deletion removes too).
+ * trash (drafts, archived: what account deletion removes too). Proposing a
+ * draft to the community, under the notice the author accepted, and
+ * withdrawing a proposal are for the session only too.
  */
 const router = Router();
 router.use(authenticate);
@@ -50,6 +54,9 @@ const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).max(100000).default(0),
 });
+const proposeSchema = z
+  .object({ accettoTestoId: z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' }).optional() })
+  .strict();
 const trashSchema = z.object({ cardIds: z.array(z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' })).min(1).max(MAX_CARDS_PER_CALL) }).strict();
 
 router.post('/', async (req, res) => {
@@ -116,6 +123,64 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const card = await prisma.lingoCard.findFirst({ where: { id: req.params.id, autoreId: req.user!.id }, include: { ancore: true } });
   if (!card) throw new AppError(404, 'Scheda non trovata.');
+  // What the validators said about the current proposal: the count of approvals and each remark, never who made it.
+  const [approvazioni, rilievi] = await Promise.all([
+    prisma.lingoValidazioneCard.count({ where: { cardId: card.id, giudizio: 'APPROVATA' } }),
+    prisma.lingoValidazioneCard.findMany({
+      where: { cardId: card.id, giudizio: { in: ['MIGLIORABILE', 'ERRATA'] } },
+      select: { giudizio: true, motivazione: true, createdAt: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    }),
+  ]);
+  res.json({ ...serialize(card), approvazioni, rilievi: rilievi.map((r) => ({ ...r, motivazione: r.motivazione ?? '' })) });
+});
+
+router.post('/:id/proponi', async (req, res) => {
+  const { accettoTestoId } = proposeSchema.parse(req.body);
+  const outcome = await prisma.$transaction(async (tx) => {
+    // The row is locked (the author's own, as in the edit): a second click or an edit waits its turn.
+    const locked = await tx.$queryRaw<{ stato: LingoCardStato }[]>`SELECT stato FROM lingo_cards WHERE id = ${req.params.id} AND autore_id = ${req.user!.id} FOR UPDATE`;
+    if (locked.length !== 1) throw new AppError(404, 'Scheda non trovata.');
+    if (!canTransition(locked[0].stato, 'PROPOSTA_COMMUNITY')) {
+      throw new AppError(409, 'Solo una bozza si può proporre alla comunità.');
+    }
+    const current = await currentText(tx, 'PROPOSTA_SCHEDA');
+    if (!(await hasAccepted(tx, req.user!.id, current.id))) {
+      // Only the current version counts: a stale or unknown id writes nothing and the person is shown the current text.
+      if (accettoTestoId !== current.id) return { richiedeTesto: serializeText(current, false) };
+      // A concurrent duplicate (a double click) is harmless: the pair (person, version) is unique.
+      await tx.lingoAccettazioneTesto.createMany({ data: [{ utenteId: req.user!.id, testoId: current.id }], skipDuplicates: true });
+    }
+    const card = await tx.lingoCard.update({
+      where: { id: req.params.id },
+      data: { stato: 'PROPOSTA_COMMUNITY', propostaTestoId: current.id },
+      include: { ancore: true },
+    });
+    return { card };
+  });
+  if ('richiedeTesto' in outcome) {
+    res.status(409).json({ detail: 'Prima di proporre la scheda devi accettare il testo.', richiedeTesto: outcome.richiedeTesto });
+    return;
+  }
+  res.json(serialize(outcome.card));
+});
+
+router.post('/:id/ritira', async (req, res) => {
+  const card = await prisma.$transaction(async (tx) => {
+    // Locked like a vote's: a vote that comes in at this moment either lands before (and is deleted here) or finds a draft.
+    const locked = await tx.$queryRaw<{ stato: LingoCardStato }[]>`SELECT stato FROM lingo_cards WHERE id = ${req.params.id} AND autore_id = ${req.user!.id} FOR UPDATE`;
+    if (locked.length !== 1) throw new AppError(404, 'Scheda non trovata.');
+    if (!canTransition(locked[0].stato, 'BOZZA_PERSONALE')) {
+      throw new AppError(409, 'Solo una scheda in attesa di validazione si può ritirare.');
+    }
+    // The votes belong to the proposal being withdrawn: a new proposal starts from none.
+    await tx.lingoValidazioneCard.deleteMany({ where: { cardId: req.params.id } });
+    return tx.lingoCard.update({
+      where: { id: req.params.id },
+      data: { stato: 'BOZZA_PERSONALE', propostaTestoId: null },
+      include: { ancore: true },
+    });
+  });
   res.json(serialize(card));
 });
 
