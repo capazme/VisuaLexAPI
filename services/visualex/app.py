@@ -627,8 +627,11 @@ class NormaController:
             hint = ''
             if asked_annex is not None and len(missing_articles) == 1:
                 hint = await self._where_else_in_tree(norma, missing_articles[0], asked_annex)
+            # Named the annex: the article may be elsewhere in the act, so the refusal
+            # says which part it looked in, never "not in the act".
+            where = f"nell'allegato {asked_annex} di" if asked_annex is not None else "in"
             raise ResourceNotFoundError(
-                f"Articolo {', '.join(missing_articles)} non presente in {norma}{hint}"
+                f"Articolo {', '.join(missing_articles)} non presente {where} {norma}{hint}"
             )
 
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])

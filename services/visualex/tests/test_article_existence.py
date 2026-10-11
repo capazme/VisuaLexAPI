@@ -333,6 +333,14 @@ class TestWhereElseInTheAct:
             assert await _controller()._where_else_in_tree("https://x", article, annex) == hint
 
     @pytest.mark.asyncio
+    async def test_the_cached_shape_and_string_annexes_read_alike(self):
+        """The tree's annexes are strings (treextractor), and a cache hit gives a list."""
+        cached = [[{"numero": "1", "allegato": None}, {"numero": "29", "allegato": "2"}], 2, {}]
+        with patch("app.get_tree", new=AsyncMock(return_value=cached)):
+            assert await _controller()._where_else_in_tree("https://x", "29", 1) == \
+                ": su Normattiva l'art. 29 si trova nell'allegato 2"
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("tree", ["Errore di rete", [], RuntimeError("down")])
     async def test_an_unreadable_tree_gives_no_hint(self, tree):
         mock = AsyncMock(side_effect=tree) if isinstance(tree, Exception) else AsyncMock(return_value=tree)
@@ -348,7 +356,7 @@ class TestWhereElseInTheAct:
             await _controller().create_norma_visitata_from_data({
                 "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
                 "article": "29", "annex": "1"})
-        assert str(refused.value).startswith("Articolo 29 non presente in")
+        assert str(refused.value).startswith("Articolo 29 non presente nell'allegato 1 di decreto legislativo")
         assert str(refused.value).endswith(": su Normattiva l'art. 29 si trova nell'allegato 2")
 
     @pytest.mark.asyncio

@@ -469,7 +469,8 @@ Breaking one of these breaks the product. Read before editing.
     act's annexes by position, not as the act names them (the c.p.a. is «Allegato 1»
     of d.lgs. 104/2010 and annex 2 on Normattiva), and that number stays the identity
     (owner, 11 October 2026); so when an annex the caller named does not hold the
-    article, the refusal adds where it is («: su Normattiva l'art. 29 si trova
+    article, the refusal names the annex it looked in and adds where the article is
+    («Articolo 29 non presente nell'allegato 1 di …: su Normattiva l'art. 29 si trova
     nell'allegato 2»), from the tree just read (`_where_else_in_tree`). Never for a
     code's default annex: another annex of a code is another code.
 
