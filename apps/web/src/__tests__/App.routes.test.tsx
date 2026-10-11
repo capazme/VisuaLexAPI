@@ -42,6 +42,14 @@ vi.mock('../features/merlt/graph/page/GraphExplorerPage', () => ({
 }));
 vi.mock('../features/merlt/contrib/ContribPage', () => ({ ContribPage: () => <div /> }));
 vi.mock('../features/merlt/validate/ValidationPage', () => ({ ValidationPage: () => <div /> }));
+// The Studia views are real (their headings are under test), so their requests are answered here:
+// unmocked, jsdom's XHR reaches for a server that isn't there.
+vi.mock('../services/studiaService', () => ({
+  studiaService: {
+    list: vi.fn().mockResolvedValue({ cards: [], nextOffset: null }),
+    get: vi.fn().mockRejectedValue({ status: 404 }),
+  },
+}));
 
 import App from '../App';
 
