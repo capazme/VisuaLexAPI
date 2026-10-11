@@ -246,12 +246,16 @@ original's; a query needs two letters or digits (punctuation does not count: «n
 A dot or comma of an abbreviation is optional («cpa» finds «c.p.a.», «art 13» finds «art. 13»; «art.» never finds «articolo»), and a
 number is never cut out of a longer one («8980/2018» is not in «18980/2018»). A query that reads as a
 citation (`readQueryCitation`, spec §13.2) also finds the other forms of it: per target, the literal
-matches and `findCitationSpans` are one list, ordered by start, overlapping matches joined into their union, on a drawn text
-over the same separator map and on a stored text over its projection (`utils/citationSearch.ts`,
-which parses each text for citations once). Act types come from `sources/actTypes.ts` plus the
+matches and `findCitationSpans` are one list (`matchesWithCitation`), ordered by start, overlapping matches joined into their union, on a drawn text
+over the same separator map and on a stored text over its projection (`utils/citationSearch.ts`).
+The literal matches of a citation query obey the spans' bounds: never right after a letter, digit
+or dot, never before a letter when the query ends with a dot («art. 1 c.p.» is not in «c.p.c.»).
+`useFindWindow` keeps one `CitationText` per target in scope (folded and parsed for citations once
+per text, replaced when the text changes, dropped when the target leaves the scope). Act types come from `sources/actTypes.ts` plus the
 palette's spellings (`NUMBERED_ACT_SPELLINGS`); a type is never found inside another's name («legge»
-in «decreto-legge»), a decision's number never inside an act's citation, and an article links to
-its act only across the gap §13.2 whitelists. Its tests use synthetic texts (no run of 30
+in «decreto-legge» or «decreto- legge»), a decision's number never inside an act's citation (any
+type of the table, or «decreto», «direttiva», «regolamento»: regional laws and Union acts too), and
+an article links to its act only across the gap §13.2 whitelists. Its tests use synthetic texts (no run of 30
 characters shared with the real ones); the real ones live in
 the git-ignored `utils/__fixtures__/private/` (personal data: never copy them into a committed
 file) and `citationSearch.local.test.ts` is skipped where the folder is absent.
