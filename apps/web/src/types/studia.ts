@@ -31,6 +31,11 @@ export interface Scheda {
   ancore: AncoraScheda[];
   /** The connected application that wrote the card; null for a card written here. */
   origine: { clientName: string | null } | null;
+  /**
+   * The day of the next review, 'YYYY-MM-DD' in Rome; null when the user has never reviewed the card.
+   * Carried by the list (`/lingo/cards`); absent where the card is read some other way.
+   */
+  prossimoRipasso?: string | null;
 }
 
 /** A card in the reader's panel: the community's come with the validation (PR B). */
@@ -58,6 +63,8 @@ export interface FiltriSchede {
   normaKey?: string;
   q?: string;
   origine?: 'applicazione';
+  /** Only the cards whose next review is today or earlier. */
+  dovuteOggi?: 'true';
   ordine?: 'recenti' | 'materia';
   limit?: number;
   offset?: number;
@@ -85,4 +92,39 @@ export interface EsitoCestino {
   moved: string[];
   notFound: string[];
   notDeletable: string[];
+}
+
+export type Voto = 1 | 2 | 3 | 4;
+
+/** A card of the review session: `nuova` when never reviewed, `anteprima` the days FSRS would schedule for each grade. */
+export interface SchedaDiRipasso extends Scheda {
+  nuova: boolean;
+  comunita: boolean;
+  anteprima: Record<`${Voto}`, number>;
+}
+
+export interface SessioneRipasso {
+  conteggi: { dovute: number; nuove: number };
+  /** Due cards first, then new ones. */
+  cards: SchedaDiRipasso[];
+}
+
+export interface RevisioneInput {
+  cardId: string;
+  rating: Voto;
+  /** Milliseconds from the question shown to the grade. */
+  durataMs?: number;
+}
+
+/** `registrata: false`: the card had already been graded today (another device), so nothing was written. */
+export interface EsitoRevisione {
+  registrata: boolean;
+  prossimoRipasso: string;
+  scheduledDays: number;
+}
+
+export interface PreferenzeStudio {
+  nuoveAlGiorno: number;
+  /** The subjects whose validated community cards enter the review. */
+  materieComunita: Materia[];
 }

@@ -3,10 +3,15 @@ import type {
   EsitoCestino,
   EsitoCreazione,
   EsitoModifica,
+  EsitoRevisione,
   FiltriSchede,
+  Materia,
+  PreferenzeStudio,
+  RevisioneInput,
   Scheda,
   SchedaDellArticolo,
   SchedaInput,
+  SessioneRipasso,
 } from '../types/studia';
 
 /**
@@ -68,5 +73,28 @@ export const studiaService = {
   async forArticle(urn: string): Promise<SchedaDellArticolo[]> {
     const response = await apiClient.get('/lingo/articolo', { params: { urn } });
     return response.data.cards;
+  },
+
+  /** Today's review: the counts and the cards, due ones first (`GET /lingo/srs/sessione`). */
+  async session(materia?: Materia): Promise<SessioneRipasso> {
+    const response = await apiClient.get('/lingo/srs/sessione', { params: materia ? { materia } : {} });
+    return response.data;
+  },
+
+  /** Records a grade; `registrata: false` means the card was already graded today. */
+  async review(input: RevisioneInput): Promise<EsitoRevisione> {
+    const response = await apiClient.post('/lingo/srs/revisioni', input);
+    return response.data;
+  },
+
+  async preferences(): Promise<PreferenzeStudio> {
+    const response = await apiClient.get('/lingo/srs/preferenze');
+    return response.data;
+  },
+
+  /** Either field alone; the answer is the whole preferences. */
+  async savePreferences(changes: Partial<PreferenzeStudio>): Promise<PreferenzeStudio> {
+    const response = await apiClient.put('/lingo/srs/preferenze', changes);
+    return response.data;
   },
 };
