@@ -6,6 +6,7 @@ import { sanitizeHTML } from '../sanitizeHtml';
 import {
   foldForSearch,
   findMatches,
+  isSearchableQuery,
   collectSearchableText,
   rangesForMatches,
 } from '../findInText';
@@ -67,10 +68,20 @@ describe('findMatches', () => {
     expect(findMatches('e\ufb03cace', 'efficace').matches).toEqual([]);
   });
 
-  it('counts the two-character minimum in folded base characters', () => {
+  it('counts the two-character minimum in letters and digits (folded base characters)', () => {
     expect(findMatches('x😀y é', '😀').matches).toEqual([]);
     expect(findMatches('e\u0301 e', 'e\u0301').matches).toEqual([]);
-    expect(findMatches('x😀y', '😀y').matches).toEqual([[1, 4]]);
+    expect(findMatches('x😀y', '😀y').matches).toEqual([]);
+    expect(findMatches('x😀yz', '😀yz').matches).toEqual([[1, 5]]);
+  });
+
+  it('does not count punctuation: «n.», «l.», «c.», «1.» are not searchable, «c.p.» is', () => {
+    for (const q of ['n.', 'l.', 'c.', '1.', ' n. ', '..', '«»']) {
+      expect(isSearchableQuery(q), q).toBe(false);
+      expect(findMatches('n. 5, l. 3, c. 2, 1. nulla', q).matches, q).toEqual([]);
+    }
+    for (const q of ['c.p.', 'n. 5', '12', 'ab']) expect(isSearchableQuery(q), q).toBe(true);
+    expect(findMatches('il c.p. vigente', 'c.p.').matches).toEqual([[3, 7]]);
   });
 
   it('finds accented forms with an unaccented query, at the original offsets', () => {
@@ -100,7 +111,7 @@ describe('findMatches', () => {
 
   it('treats regex characters as plain text', () => {
     expect(findMatches('a.b axb', 'a.b').matches).toEqual([[0, 3]]);
-    expect(findMatches('(x)', '(x)').matches).toEqual([[0, 3]]);
+    expect(findMatches('(xy)', '(xy)').matches).toEqual([[0, 4]]);
   });
 
   it('caps at the limit and says so', () => {
@@ -278,6 +289,17 @@ describe('punctuation in abbreviations is optional (spec §13.2)', () => {
     expect(words('la part 13 del modulo', 'art 13')).toEqual(['art 13']);
     expect(words('secondo il c. p. a. vigente', 'cpa')).toEqual([]);
     expect(words("l'art. 13 dispone", 'art13')).toEqual([]);
+  });
+
+  it('a query word ending with a dot ends where the text word ends', () => {
+    const text = "l'art. 13, l'articolo 2, l'art 5 e l'arte";
+    expect(words(text, 'art.')).toEqual(['art.', 'art']);
+    expect(words('secondo il cp e il cpp', 'c.p.')).toEqual(['cp']);
+    expect(words('secondo il cpp', 'c.p.')).toEqual([]);
+  });
+
+  it('a query without dots still finds an abbreviation: «su» finds «S.U.»', () => {
+    expect(words('Cass., S.U. n. 1 su ricorso', 'su')).toEqual(['S.U', 'su']);
   });
 
   it('keeps the literal match first, and a dot between digits literal', () => {

@@ -48,6 +48,16 @@ describe.skipIf(!present)('a citation in the query, on real decisions (local onl
     }
   });
 
+  it('«Cass. n. 219/2017» finds none of the 11 «legge n. 219 del 2017»: a law is not a decision', () => {
+    const text = texts[CORTE];
+    const places = occurrences(text, /legge\s+n\.\s+219\s+del\s+2017/);
+    expect(places).toHaveLength(11);
+    const citation = readQueryCitation('Cass. n. 219/2017');
+    expect(citation).toEqual({ kind: 'decision', number: '219', year: '2017' });
+    const spans = findCitationSpans(text, citation!);
+    expect(places.filter(([s, e]) => spans.some(([a, b]) => a < e && s < b))).toHaveLength(0);
+  });
+
   it('«art 110 cpa» finds «art. 110 c.p.a.»', () => {
     const text = texts[CASS];
     const places = occurrences(text, /art\.\s+110\s+c\.p\.a\./);

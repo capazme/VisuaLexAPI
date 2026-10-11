@@ -89,8 +89,11 @@ function punctuationFreePattern(words: string[]): string | null {
       if (i < kept.length - 1) parts.push(LETTER.test(u) ? '[.,\\u00ad\\u200b]?' : INVISIBLE);
     });
     // Between two words a «.» or «,» may end the first on either side («art 13» and «art. 13,
-    // comma»); the query's last word takes none, so a match never swallows a sentence's end.
+    // comma»); the query's last word takes none, so a match never swallows a sentence's end. A
+    // last word typed with its final dot ends where the text's word ends: «art.» finds «art.» and
+    // «art 13», never «articolo».
     if (w < words.length - 1) parts.push('[.,]?');
+    else if (word.endsWith('.')) parts.push('(?:\\.|(?![\\p{L}\\p{N}]))');
   });
   if (parts.length === 0) return null;
   const body = parts.join('');
@@ -98,15 +101,21 @@ function punctuationFreePattern(words: string[]): string | null {
   return LETTER_OR_DIGIT.test(first) ? `(?<![\\p{L}\\p{N}])${body}` : body;
 }
 
-/** Whether `query` is long enough to search: the rule `findMatches` applies (folded, trimmed, in base characters). */
+const SEARCHABLE_UNIT = /[\p{L}\p{N}]/gu;
+
+/**
+ * Whether `query` is long enough to search: the rule `findMatches` applies. Only letters and digits
+ * count (folded base characters), so punctuation the match may drop never makes a one-letter query
+ * searchable: «n.», «l.», «1.» are not, «c.p.» is.
+ */
 export function isSearchableQuery(query: string): boolean {
-  return [...foldQuery(query).trim()].length >= MIN_QUERY_LENGTH;
+  return (foldQuery(query).match(SEARCHABLE_UNIT)?.length ?? 0) >= MIN_QUERY_LENGTH;
 }
 
 /**
  * Every match of `query` in `text`, as `[start, end)` offsets of the original
- * text. The query is folded and trimmed; under two characters (folded base
- * characters, that is code points) nothing matches; a run of whitespace in the
+ * text. The query is folded and trimmed; under two letters or digits (folded
+ * base characters; punctuation does not count) nothing matches; a run of whitespace in the
  * query matches any run in the text; a combining mark after a matched letter
  * is part of the match, and a soft hyphen or zero-width space between letters
  * is ignored. Ligatures (ﬁ, ﬂ) are not matched. Where the literal match fails,
