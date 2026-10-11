@@ -13,7 +13,7 @@ import { useSavePracticeAsDossier } from './useSavePracticeAsDossier';
 import { searchesIntoOnePractice } from '../dossier/openInPractice';
 import { computeNormaGroups } from '../dossier/dossierUtils';
 import type { Dossier, DossierSentenzaData } from '../../../types';
-import { L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
+import { CC_BARE, CC_RD, L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
 const svc = vi.mocked(dossierService);
 const s = () => appStore.getState();
@@ -34,7 +34,10 @@ beforeEach(() => {
   svc.reorderItems.mockResolvedValue(undefined as never);
   svc.delete.mockResolvedValue(undefined as never);
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 function practiceWithWork() {
   const id = s().createPractice('Responsabilità medica');
@@ -153,6 +156,54 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     expect(result.current.notice?.message).toBe('Salvato nel dossier «Esistente»: 3 articoli, 1 sentenza. 2 già presenti');
   });
 
+  it('an existing dossier refusing every add: the message says nothing was saved, not «in parte»', async () => {
+    const id = s().createPractice('P');
+    s().addArticlesToPractice(id, L24, [article(L24, '5'), article(L24, '7')]);
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: 'x', items: [] }] as never });
+    svc.addItem.mockRejectedValue(new Error('down'));
+    const { result } = renderHook(() => useSavePracticeAsDossier());
+    await act(async () => { await result.current.addToExisting(id, 'd1'); });
+    expect(svc.delete).not.toHaveBeenCalled();
+    expect(result.current.notice).toEqual({ message: 'Nessun elemento è stato salvato nel dossier «Esistente»', type: 'error' });
+    expect(s().lastSyncError?.message).toContain('2 elementi non sono stati salvati');
+  });
+
+  it('a code article saved from a search is found again from its index copy, and a practice holding both saves one item', async () => {
+    const id = s().createPractice('Codice');
+    s().addArticlesToPractice(id, CC_BARE, [article(CC_BARE, '2043')]);
+    s().addArticlesToPractice(id, CC_RD, [article(CC_RD, '2043', { allegato: '2' })]);
+    expect(s().practices[0].acts).toHaveLength(1);
+    expect(s().practices[0].acts[0].articles).toHaveLength(2);
+    appStore.setState({
+      dossiers: [{
+        id: 'd1', title: 'Esistente', createdAt: 'x',
+        items: [{ id: 'i1', type: 'norma', addedAt: 'x', data: { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043', allegato: '2', versione: 'vigente' } }],
+      }] as never,
+    });
+    const { result } = renderHook(() => useSavePracticeAsDossier());
+    await act(async () => { await result.current.addToExisting(id, 'd1'); });
+    expect(svc.addItem).not.toHaveBeenCalled();
+    expect(result.current.notice?.message).toBe('Il dossier «Esistente» ha già tutto: 1 già presente');
+
+    await act(async () => { await result.current.saveAsNew(id); });
+    expect(svc.addItem).toHaveBeenCalledTimes(1);
+    expect(s().dossiers.find((d) => d.id !== 'd1')?.items.map((i) => i.data)).toEqual([
+      expect.objectContaining({ numero_atto: '262', data: '1942-03-16', allegato: '2', numero_articolo: '2043' }),
+    ]);
+  });
+
+  it('one save at a time per practice: a second start while the first runs does nothing', async () => {
+    const id = practiceWithWork();
+    const first = renderHook(() => useSavePracticeAsDossier());
+    const second = renderHook(() => useSavePracticeAsDossier());
+    await act(async () => {
+      await Promise.all([first.result.current.saveAsNew(id), second.result.current.saveAsNew(id)]);
+    });
+    expect(svc.create).toHaveBeenCalledTimes(1);
+    expect(s().dossiers).toHaveLength(1);
+    expect(second.result.current.notice).toBeNull();
+  });
+
   it('an existing dossier that holds everything says so and adds nothing', async () => {
     const id = s().createPractice('P');
     s().addArticlesToPractice(id, L24, [article(L24, '5')]);
@@ -202,6 +253,5 @@ describe('«Apri tutto» of a dossier, then «Salva come dossier» (spec §5.1, 
       expect.objectContaining({ corte: 'corte_costituzionale', numero: 1, anno: 2020 }),
     ]));
     expect(result.current.notice?.message).toBe('Salvato nel dossier «Ricorso Rossi»: 2 sentenze');
-    vi.unstubAllEnvs();
   });
 });

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
@@ -174,6 +174,57 @@ describe('PracticeTable: «Salva come dossier» (spec §7)', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).getByRole('button', { name: /Esistente/ }));
     expect(await screen.findByText('Salvato nel dossier «Esistente»: 1 articolo')).toBeInTheDocument();
     expect(dossierService.create).not.toHaveBeenCalled();
+  });
+
+  it('the header\'s own button saves; the outcome sits in the toast band, outside the table', async () => {
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().renamePractice(practiceId, 'Appalti');
+    render(table());
+    const header = screen.getByRole('heading', { name: 'Appalti' }).closest('header') as HTMLElement;
+    fireEvent.click(within(header).getByRole('button', { name: 'Salva come dossier' }));
+    const message = await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo');
+    const toast = message.closest('[role="alert"]') as HTMLElement;
+    expect(toast.closest('[data-testid="practice-table"]')).toBeNull();
+    expect(toast.className).toContain(Z_INDEX.toast);
+    expect(dossierService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('one save at a time: the button and the menu entries are disabled while it runs, a second click makes no second dossier', async () => {
+    let finish: (value: unknown) => void = () => {};
+    vi.mocked(dossierService.create).mockReturnValue(new Promise((resolve) => { finish = resolve; }) as never);
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().renamePractice(practiceId, 'Appalti');
+    render(table());
+    const button = screen.getByRole('button', { name: 'Salva come dossier' });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Appalti' }));
+    expect(screen.getByRole('menuitem', { name: 'Salva come dossier' })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' })).toBeDisabled();
+    await act(async () => { finish({ id: 'srv-d', name: 'x', created_at: '2026-10-12T00:00:00Z' }); });
+    expect(await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo')).toBeInTheDocument();
+    expect(dossierService.create).toHaveBeenCalledTimes(1);
+    expect(button).not.toBeDisabled();
+  });
+
+  it('«Aggiungi a un dossier…» is a modal dialog: the focus moves in, Tab stays in, Esc gives it back to «⋯»', async () => {
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().renamePractice(practiceId, 'Pratica');
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
+    render(table());
+    const trigger = screen.getByRole('button', { name: 'Altre azioni per la pratica Pratica' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Aggiungi a un dossier' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    const first = within(dialog).getByRole('button', { name: /Esistente/ });
+    await waitFor(() => expect(first).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Aggiungi a un dossier' })).toBeNull());
+    expect(trigger).toHaveFocus();
   });
 });
 

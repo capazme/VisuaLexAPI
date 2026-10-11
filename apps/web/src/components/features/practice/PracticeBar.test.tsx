@@ -7,6 +7,7 @@ vi.mock('../../../services/dossierService', () => ({
 import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
 import { PracticeBar } from './PracticeBar';
+import { Z_INDEX } from '../../../constants/zIndex';
 import { L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
 type AppState = ReturnType<typeof appStore.getState>;
@@ -167,6 +168,12 @@ describe('PracticeBar: the chip’s «⋯» saves the practice (spec §7)', () =
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Appalti' }));
     expect(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Salva come dossier' }));
-    expect(await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo')).toBeInTheDocument();
+    const message = await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo');
+    // Portalled to the document, in the toast band: inside the bar (fixed, transformed, blurred) it
+    // would be placed against the bar and stacked in it (gotchas 22, 26).
+    const toast = message.closest('[role="alert"]') as HTMLElement;
+    expect(toast.closest('#tour-workspace-dock')).toBeNull();
+    expect(toast.parentElement).toBe(document.body);
+    expect(toast.className).toContain(Z_INDEX.toast);
   });
 });

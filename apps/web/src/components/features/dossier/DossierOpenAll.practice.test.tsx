@@ -128,12 +128,25 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
 });
 
 describe('DossierListView\'s quick-open with the practices', () => {
-  it('one group creates one practice named after the dossier, and adds no decision', () => {
+  it('a dossier of one group opens whole: one practice named after the dossier, with its decisions, as from its page', () => {
     renderList(dossierOf([norm('a', PAST), decision('s1', 28994)]));
     expect(s().practices).toHaveLength(1);
-    expect(s().practices[0]).toEqual(expect.objectContaining({ label: 'Ricorso Rossi', labelIsCustom: true, decisions: [] }));
-    expect(s().searchTrigger).toMatchObject({ version_date: '2007-12-29', targetTabId: s().practices[0].id });
+    const [practice] = s().practices;
+    expect(practice).toEqual(expect.objectContaining({ label: 'Ricorso Rossi', labelIsCustom: true }));
+    expect(practice.decisions.map((d) => d.reference.numero)).toEqual([28994]);
+    expect(practice.decisions[0].identified).toBe(true);
+    expect(searches()).toEqual([expect.objectContaining({ version_date: '2007-12-29', targetTabId: practice.id })]);
+    expect(s().practiceRows).toEqual({});
+    expect(fetchDecision).not.toHaveBeenCalled();
     expect(s().workspaceTabs).toEqual([]);
+  });
+
+  it('one group picked from the list\'s picker brings no decision', () => {
+    renderList(TWO_PAST);
+    fireEvent.click(screen.getAllByText('Testo al 29/12/2007').at(-1) as HTMLElement);
+    expect(s().practices).toHaveLength(1);
+    expect(s().practices[0].decisions).toEqual([]);
+    expect(searches().map((q) => q.targetTabId)).toEqual([s().practices[0].id]);
   });
 
   it('the picker\'s «Apri tutto» creates one practice with the decisions, closed', () => {

@@ -114,7 +114,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       return;
     }
     if (groups.length === 1) {
-      openGroupOnDashboard(dossier, groups[0]);
+      // With the practices a dossier of one group is opened whole, its decisions too, as from its
+      // page (spec §5.1, T17); the picker's single group below brings none.
+      if (isPracticeTableEnabled()) openAllGroupsOnDashboard(dossier, groups);
+      else openGroupOnDashboard(dossier, groups[0]);
       return;
     }
     setOpenPickerGroups({ dossier, groups });
@@ -125,7 +128,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     // (workspaceTabs is persisted in localStorage — stale tabs can linger).
     // A group asking for a past text has a tab of its own (see tabLabelForGroup).
     const tabLabel = tabLabelForGroup(dossier.title, group);
-    // With the practices: one practice named after the dossier, active; one group brings no decision.
+    // With the practices: one practice named after the dossier, active; one group picked brings no decision.
     const tabId = isPracticeTableEnabled()
       ? appStore.getState().createPractice(dossier.title, { custom: true, activate: true })
       : addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });

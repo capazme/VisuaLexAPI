@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { practiceDossierItems } from './practiceDossierItems';
+import { dossierHoldsArticle, practiceDossierItems } from './practiceDossierItems';
 import type { Practice, PracticeDecision } from '../../../utils/practice';
-import { L24, L241, CC_RD, article } from '../../../utils/__fixtures__/savedWorkspaces';
+import { L24, L241, CC_BARE, CC_RD, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
 const act = (id: string, norma: typeof L24, articles: ReturnType<typeof article>[]) =>
   ({ id, key: id, norma, articles, isCollapsed: false });
@@ -38,12 +38,43 @@ describe('practiceDossierItems (spec §7)', () => {
     expect(norms[0].data_versione).toBeUndefined();
   });
 
-  it('saves the two rows of one code article (search and index copies) as two items', () => {
+  it('saves two versions of one code article as two items', () => {
     const a = article(CC_RD, '2043', { versione: 'vigente' });
     const b = article(CC_RD, '2043', { versione: 'vigente', data_versione: '2020-01-01' });
     const { norms } = practiceDossierItems(practice({ acts: [act('a', CC_RD, [a, b])] }));
     expect(norms).toHaveLength(2);
     expect(norms.every((n) => n.urn === CC_RD.urn)).toBe(true);
+  });
+
+  it.each([
+    ['the index copy first', true],
+    ['the search copy first', false],
+  ])('a code article from a search (annex 2, the R.D.) and from the index (none) is one item, the search copy (%s)', (_, indexFirst) => {
+    const search = article(CC_RD, '2043', { allegato: '2' });
+    const index = article(CC_BARE, '2043');
+    const rows = indexFirst ? [index, search] : [search, index];
+    const { norms } = practiceDossierItems(practice({ acts: [act('a', indexFirst ? CC_BARE : CC_RD, rows)] }));
+    expect(norms).toHaveLength(1);
+    expect(norms[0]).toMatchObject({ tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043', allegato: '2' });
+  });
+
+  it('each row is saved as its own norma_data names it, not as the copy that opened the act', () => {
+    // The act was opened from the index (bare); a later search brought art. 1218 with the R.D.
+    const { norms } = practiceDossierItems(practice({
+      acts: [act('a', CC_BARE, [article(CC_BARE, '2043'), article(CC_RD, '1218', { allegato: '2' })])],
+    }));
+    expect(norms.map((n) => [n.numero_articolo, n.numero_atto ?? '', n.data, n.allegato ?? ''])).toEqual([
+      ['2043', '', '', ''],
+      ['1218', '262', '1942-03-16', '2'],
+    ]);
+  });
+
+  it('outside a code, annex 2 and no annex are two articles (gotcha 9)', () => {
+    const { norms } = practiceDossierItems(practice({
+      acts: [act('a', L24, [article(L24, '1'), article(L24, '1', { allegato: '2' })])],
+    }));
+    expect(norms).toHaveLength(2);
+    expect(norms.map((n) => n.allegato ?? '')).toEqual(['', '2']);
   });
 
   it('puts decisions in decisionOrder with sezione, tipo and data_deposito', () => {
@@ -65,5 +96,23 @@ describe('practiceDossierItems (spec §7)', () => {
     }));
     expect(decisions).toHaveLength(1);
     expect(unidentified).toBe(1);
+  });
+});
+
+describe('dossierHoldsArticle', () => {
+  const dossierWith = (data: Record<string, unknown>) =>
+    ({ id: 'd', title: 'D', createdAt: 'x', items: [{ id: 'i', type: 'norma', addedAt: 'x', data }] }) as never;
+
+  it('finds a code article saved from a search when the practice holds the index copy', () => {
+    const saved = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043', allegato: '2', versione: 'vigente' };
+    const { norms } = practiceDossierItems(practice({ acts: [act('a', CC_BARE, [article(CC_BARE, '2043')])] }));
+    expect(dossierHoldsArticle(dossierWith(saved), norms[0])).toBe(true);
+  });
+
+  it('keeps an annex apart outside a code, and a past text apart from the text in force', () => {
+    const saved = { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08', numero_articolo: '1', versione: 'vigente' };
+    expect(dossierHoldsArticle(dossierWith(saved), { ...saved, allegato: '2' })).toBe(false);
+    expect(dossierHoldsArticle(dossierWith(saved), { ...saved, data_versione: '2018-01-01' })).toBe(false);
+    expect(dossierHoldsArticle(dossierWith(saved), { ...saved, numero_articolo: '1 ' })).toBe(true);
   });
 });
