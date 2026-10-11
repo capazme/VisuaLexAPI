@@ -97,7 +97,12 @@ def test_what_is_not_a_norm_comes_back_as_it_is():
         assert normalize_norm_urn(value) == value
 
 
-@pytest.mark.parametrize("case", DECISIONS, ids=_ids(DECISIONS))
+# A key still open (the courts of the Union, design 2026-10-12 §8) waits for the owner, and for this
+# model to learn those courts.
+_KEYED = [c for c in DECISIONS if not c["identity"].get("key", {}).get("status", "").startswith("open:")]
+
+
+@pytest.mark.parametrize("case", _KEYED, ids=_ids(_KEYED))
 def test_a_decision_key_is_the_massimarios(case):
     ref = case["input"]["reference"]
     key = case["identity"].get("key", {}).get("value")
@@ -166,7 +171,8 @@ def test_an_ingested_article_stores_the_short_label(case):
 
 # --- labels of decisions ------------------------------------------------------------------
 
-_DECISION_SHORT = [c for c in DECISIONS if "short" in c["labels"]]
+_ASSERTED = ("decided", "current", "proposed")
+_DECISION_SHORT = [c for c in DECISIONS if c["labels"].get("short", {}).get("status") in _ASSERTED]
 
 
 def _decision(case, with_rv: bool):
@@ -180,8 +186,10 @@ def test_decision_short_label(case):
     assert _decision(case, with_rv=False) == case["labels"]["short"]["value"]
 
 
-@pytest.mark.parametrize("case", [c for c in DECISIONS if "short_with_rv" in c["labels"]],
-                         ids=_ids([c for c in DECISIONS if "short_with_rv" in c["labels"]]))
+_DECISION_SHORT_RV = [c for c in DECISIONS if c["labels"].get("short_with_rv", {}).get("status") in _ASSERTED]
+
+
+@pytest.mark.parametrize("case", _DECISION_SHORT_RV, ids=_ids(_DECISION_SHORT_RV))
 def test_decision_short_label_with_its_massime(case):
     assert _decision(case, with_rv=True) == case["labels"]["short_with_rv"]["value"]
 

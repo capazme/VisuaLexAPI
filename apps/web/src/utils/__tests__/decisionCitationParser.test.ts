@@ -1,51 +1,39 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { parseDecisionCitation } from '../decisionCitationParser';
 
-const NOW = new Date('2026-10-05T12:00:00Z');
-const CASES: Array<[string, Record<string, unknown> | null]> = [
-  ['Cass. 99999/2024', { corte: 'cassazione', numero: 99999, anno: 2024 }],
-  ['Cassazione n. 99999 del 2024', { corte: 'cassazione', numero: 99999, anno: 2024 }],
-  ['Cass. civ. 99999/2024', { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }],
-  ['Cass. civ., sez. III, n. 99999/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'III', numero: 99999, anno: 2024 }],
-  ['Cass. pen., sez. VII, 99999/2024', { corte: 'cassazione', archivio: 'penale', sezione: 'VII', numero: 99999, anno: 2024 }],
-  ['Cass. SU 31310/2024', { corte: 'cassazione', sezione: 'U', numero: 31310, anno: 2024 }],
-  ['Cass. civ., sez. un., n. 31310/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'U', numero: 31310, anno: 2024 }],
-  ['S.U. 31310/2024', { corte: 'cassazione', sezione: 'U', numero: 31310, anno: 2024 }],
-  ['Cass. civ., sez. lav., 21 aprile 2022, n. 12789', { corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: 12789, anno: 2022 }],
-  ['Cass. pen., sez. VII, 10 gennaio 2024 (dep. 14 marzo 2024), n. 99999', { corte: 'cassazione', archivio: 'penale', sezione: 'VII', numero: 99999, anno: 2024 }],
-  ['Cass. civ. 1234/99', { corte: 'cassazione', archivio: 'civile', numero: 1234, anno: 1999 }],
-  ['Corte cost. 71/2020', { corte: 'corte_costituzionale', numero: 71, anno: 2020 }],
-  ['C. cost. n. 71 del 2020', { corte: 'corte_costituzionale', numero: 71, anno: 2020 }],
-  ['Corte costituzionale, sentenza n. 71/2020', { corte: 'corte_costituzionale', numero: 71, anno: 2020 }],
-  ['Cass. pen. n. 1399 del 1999, dep. 2000', { corte: 'cassazione', archivio: 'penale', numero: 1399, anno: 2000 }],
-  ['Cass. pen., sez. II, n. 1399/1999 (dep. 2000)', { corte: 'cassazione', archivio: 'penale', sezione: 'II', numero: 1399, anno: 2000 }],
-  ['Cass. pen., sez. II, n. 1399/1999 (dep. 3 gennaio 2000)', { corte: 'cassazione', archivio: 'penale', sezione: 'II', numero: 1399, anno: 2000 }],
-  ['Cass. pen. n. 1399 del 15/12/1999, dep. 2000', { corte: 'cassazione', archivio: 'penale', numero: 1399, anno: 2000 }],
-  ['Cass. pen. n. 1399/1999, depositata il 14/03/2000', { corte: 'cassazione', archivio: 'penale', numero: 1399, anno: 2000 }],
-  ['Cass. civ., sez. III, n. 12789 del 21 aprile 2022', { corte: 'cassazione', archivio: 'civile', sezione: 'III', numero: 12789, anno: 2022 }],
-  ['Cass. pen. n. 1399 del 15/12/1999', { corte: 'cassazione', archivio: 'penale', numero: 1399, anno: 1999 }],
-  ['Cass. civ. n. 99999 del 14/03/2024', { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }],
-  ['Cass. civ., sez. 6-1, n. 99999/2024', { corte: 'cassazione', archivio: 'civile', sezione: '6', numero: 99999, anno: 2024 }],
-  ['Cass. civ., sez. VI-1, n. 99999/2024', { corte: 'cassazione', archivio: 'civile', sezione: 'VI', numero: 99999, anno: 2024 }],
-  ['Cass. civ., Sez. L, n. 12789/2022', { corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: 12789, anno: 2022 }],
-  ['su questo punto 12/2020', null],
-  ['SU n. 31310/2024', { corte: 'cassazione', sezione: 'U', numero: 31310, anno: 2024 }],
-  ['Corte cost. n. 71 del 2020 della Corte', { corte: 'corte_costituzionale', numero: 71, anno: 2020 }],
-  ['Cass. civ. n. 5 del 2020 ha affermato', { corte: 'cassazione', archivio: 'civile', numero: 5, anno: 2020 }],
-  ['Corte cost. n. 71/2020 in tema', { corte: 'corte_costituzionale', numero: 71, anno: 2020 }],
-  ['art 2043 cc', null],
-  ['art. 2043 c.c.', null],
-  ['Cass. civ.', null],
-  ['Cass. 99999', null],
-  ['Cass. 0/2024', null],
-  ['Cass. 99999/2030', null],
-  ['Corte cost. 1/1950', null],
-];
+// The words and what they read as live in the convention's golden file (decision_citations), which
+// the Python API's /parse_decision will assert too (design 2026-10-12, Part A): the two parsers
+// cannot drift apart.
+function findGolden(from: string): string {
+  for (let dir = from; ; dir = dirname(dir)) {
+    const candidate = join(dir, 'conventions', 'sources', 'golden.json');
+    if (existsSync(candidate)) return candidate;
+    if (dirname(dir) === dir) throw new Error('conventions/sources/golden.json not found above ' + from);
+  }
+}
+
+interface Expected { value: unknown; status: string }
+interface CitationCase { input: string; reference: Expected; unsupported_court?: Expected }
+const { today, cases } = (JSON.parse(readFileSync(findGolden(__dirname), 'utf8')) as {
+  decision_citations: { today: string; cases: CitationCase[] };
+}).decision_citations;
+const NOW = new Date(`${today}T12:00:00Z`);
+const ASSERTED = new Set(['decided', 'current', 'proposed']);
+const asserted = cases.filter((c) => ASSERTED.has(c.reference.status));
+const open = cases.filter((c) => !ASSERTED.has(c.reference.status));
 
 describe('parseDecisionCitation', () => {
-  for (const [input, expected] of CASES) {
-    it(input, () => expect(parseDecisionCitation(input, { now: NOW })).toEqual(expected));
+  it('reads the cases of the golden file', () => expect(asserted.length).toBeGreaterThan(30));
+
+  for (const c of asserted) {
+    // a court without a reader is the API's to name: the palette leaves those words to the norm parser
+    it(c.input, () => expect(parseDecisionCitation(c.input, { now: NOW })).toEqual(c.reference.value));
   }
+
+  // Waiting for the owner (the courts of the Union, design 2026-10-12 §8): listed, not asserted.
+  it.skip.each(open.map((c) => [c.reference.status, c.input]))('%s: %s', () => {});
 
   it("leaves the input to the user's alias that starts it", () => {
     expect(parseDecisionCitation('cass 99999/2024', { aliasTriggers: ['cass'], now: NOW })).toBeNull();

@@ -38,7 +38,8 @@ interface DecisionCase {
 const golden = JSON.parse(readFileSync(findGolden(__dirname), 'utf8')) as {
   version: number; norms: NormCase[]; decisions: DecisionCase[];
 };
-const QUESTIONS = new Set(['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8']); // the spec's §9
+// Q1–Q8: the convention spec's §9; Q10–Q13: the courts of the Union (design 2026-10-12, §8)
+const QUESTIONS = new Set(['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q10', 'Q11', 'Q12', 'Q13']);
 const cases = [...golden.norms, ...golden.decisions];
 const expectations = cases.flatMap((c) => [...Object.entries(c.identity), ...Object.entries(c.labels)]
   .map(([field, expected]) => ({ id: c.id, field, expected })));
@@ -65,7 +66,7 @@ describe('the golden file of legal sources', () => {
       expect(c.note.length, c.id).toBeGreaterThan(0);
     }
     for (const c of golden.decisions) {
-      expect(['cassazione', 'corte_costituzionale'], c.id).toContain(c.input.reference.corte);
+      expect(['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue'], c.id).toContain(c.input.reference.corte);
       expect(Number.isInteger(c.input.reference.numero), c.id).toBe(true);
     }
   });
