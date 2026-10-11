@@ -180,6 +180,8 @@ interface WorkspaceTab {
     labelIsCustom: boolean;
     /** Set on a decision or decision-search tab, which draws its view and ignores `content`. */
     view?: TabView;
+    /** The decision key the Cronologia was told about for this tab (an opening is recorded once). */
+    historyRecordedKey?: string;
 }
 
 interface SearchPanelState {
@@ -375,6 +377,7 @@ interface AppState {
     openDecisionTab: (reference: DecisionReference, options?: { besideTabId?: string }) => string;
     openDecisionSearchTab: (query: DecisionSearchQuery, label: string, options?: { besideTabId?: string }) => string;
     setDecisionTabIdentity: (tabId: string, identity: DecisionIdentity, label: string) => void;
+    markDecisionRecorded: (tabId: string, key: string) => void;
     placeTabsSideBySide: (leftTabId: string, rightTabId: string) => void;
     requestOpenDecision: (reference: DecisionReference) => void;
     drainPendingDecision: () => string | null;
@@ -824,6 +827,11 @@ const appStore = createStore<AppState>()(
                 }
                 tab.view = { kind: 'decision', reference: identityOf(identity) };
                 tab.label = label;
+            }),
+
+            markDecisionRecorded: (tabId, key) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (tab?.view?.kind === 'decision') tab.historyRecordedKey = key;
             }),
 
             placeTabsSideBySide: (leftTabId, rightTabId) => set((state) => {

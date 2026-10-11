@@ -633,11 +633,14 @@ model Feedback {
 
 model SearchHistory {
   id        String   @id @default(uuid())
-  actType   String   @map("act_type")
+  actType   String?  @map("act_type")
   actNumber String?  @map("act_number")
   article   String?
   date      String?
   version   String?  @default("vigente")
+  // A row is a norm (actType) or a court decision (decisionKey), never both: a CHECK in the
+  // migration (not in Prisma's model) holds it.
+  decisionKey String? @map("decision_key")
   userId    String   @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
 
