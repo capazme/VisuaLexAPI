@@ -44,8 +44,8 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Giurisprudenza (3)');
     expect(rowNames()).toEqual([
       'Espandi Cass. civ., n. 10787/2024',
-      'Espandi Cass. civ., sez. III, n. 28994/2019',
-      'Espandi Cass. civ., sez. un., n. 577/2008',
+      "Espandi Cass. civ., sez. III, n. 28994/2019, Sentenza depositata l'11 novembre 2019",
+      "Espandi Cass. civ., sez. un., n. 577/2008, Sentenza depositata l'11 gennaio 2008",
     ]);
   });
 
@@ -80,7 +80,7 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
     act(() => {
       s().setDecisionEntryIdentity(practiceId, decisionId, NEW, { tipo: 'sentenza', data_deposito: '2019-11-11', sezione: '3' }, 'Cass. civ., sez. III, n. 28994/2019');
     });
-    expect(screen.getByRole('button', { name: 'Espandi Cass. civ., sez. III, n. 28994/2019' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Espandi Cass. civ., sez. III, n. 28994/2019, Sentenza depositata l'11 novembre 2019" })).toBeInTheDocument();
     expect(screen.getByText('Sentenza depositata l\'11 novembre 2019')).toBeInTheDocument();
     expect(s().practices[0].decisions[0].identified).toBe(true);
   });
@@ -93,5 +93,14 @@ describe('PracticeDecisionsSection (spec §3.3)', () => {
     fireEvent.click(within(section).getByRole('button', { name: 'Togli dal tavolo Cass. civ., n. 28994/2019' }));
     expect(s().practices[0].decisions.map((d) => d.reference.numero)).toEqual([577]);
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Giurisprudenza (1)');
+  });
+
+  it('names the toggle with the visible text, deposit included', () => {
+    const { practiceId, decisionId } = s().openDecision(NEW, { open: false });
+    act(() => { s().setDecisionEntryIdentity(practiceId, decisionId, NEW, { data_deposito: '2019-11-05', tipo: 'sentenza' }, 'Cass. civ., n. 28994/2019'); });
+    render(<PracticeDecisionsSection practiceId={practiceId} />);
+    const name = screen.getByRole('button', { name: /^Espandi / }).getAttribute('aria-label');
+    expect(name).toContain('Cass. civ., n. 28994/2019');
+    expect(name).toMatch(/Sentenza depositata/);
   });
 });

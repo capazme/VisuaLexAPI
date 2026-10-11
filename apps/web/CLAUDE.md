@@ -117,7 +117,7 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   opening: the key it sent is kept on the tab (`historyRecordedKey`, persisted with it), so a
   remount, a minimise and restore or a reload never records again, while a new tab does (the
   copy on screen only); a practice's entry does the same through `DecisionEntryView`, the key kept
-  on the entry (`markDecisionEntryRecorded`) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab is marked
+  on the entry (`markDecisionEntryRecorded`) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab or the entry is marked
   before the request, so a failed request is not retried (not even after a reload) and the failure
   is logged: the history is a convenience.
 

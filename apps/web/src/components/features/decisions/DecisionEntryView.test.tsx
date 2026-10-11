@@ -211,6 +211,46 @@ describe('DecisionEntryView — a candidate that is already an entry', () => {
   });
 });
 
+describe('DecisionEntryView — an unread entry absorbs an open one', () => {
+  it('records the survivor exactly once, and never persists the focus request', async () => {
+    fetchDecision.mockImplementation(async (ref: DecisionReference) => (ref.archivio ? foundOf(ref, '7') : AMBIGUOUS));
+    const loose = openEntry(AMBIGUA_REF);
+    // «Apri tutto»: the penal entry is there but unread (its row closed, so nothing is mounted)
+    const penal = openEntry(PENALE);
+    expect(s().practiceRows[decisionRowKey(penal.practiceId, penal.decisionId)]).toBeFalsy();
+    s().setRowOpen(decisionRowKey(loose.practiceId, loose.decisionId), true);
+    // the table mounts a view only for an open row
+    function OpenRows() {
+      const decisions = useAppStore((st) => st.practices.find((p) => p.id === penal.practiceId)?.decisions);
+      const rows = useAppStore((st) => st.practiceRows);
+      return (
+        <>
+          {(decisions ?? []).filter((d) => rows[decisionRowKey(penal.practiceId, d.id)] === true).map((d) => (
+            <div key={d.id} data-entry={d.id}>
+              <DecisionEntryView practiceId={penal.practiceId} decisionId={d.id} reference={d.reference} hostId={penal.practiceId} />
+            </div>
+          ))}
+        </>
+      );
+    }
+    render(<OpenRows />);
+    fireEvent.click(await screen.findByRole('link', { name: /Sez\. VII penale/ }));
+
+    await waitFor(() => expect(practiceOf(penal.practiceId)?.decisions.map((d) => d.id)).toEqual([penal.decisionId]));
+    expect(s().practiceRows[decisionRowKey(penal.practiceId, penal.decisionId)]).toBe(true);
+    await waitFor(() => expect(addDecisionToHistory).toHaveBeenCalledTimes(1));
+    expect(addDecisionToHistory).toHaveBeenCalledWith('cassazione:penale:99999:2024');
+    await waitFor(() => expect(practiceOf(penal.practiceId)?.decisions[0]?.historyRecordedKey).toBe('cassazione:penale:99999:2024'));
+    await act(async () => {});
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+
+    // the focus request is session-only
+    act(() => { appStore.setState({ decisionFocusRequest: 'some-entry' }); });
+    const persisted = appStore.persist.getOptions().partialize?.(s()) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('decisionFocusRequest');
+  });
+});
+
 describe('DecisionEntryView — the row and the window of one decision, both mounted', () => {
   function renderTwoCopies(e: { practiceId: string; decisionId: string }, ref: DecisionReference) {
     return render(
