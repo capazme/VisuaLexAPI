@@ -57,14 +57,14 @@ describe('CompareView — the articles it lists from the open tabs', () => {
     ]);
   });
 
-  it('names the version of a past loose article and of a past article in a collection', () => {
+  it('names the version of a past loose article', () => {
     appStore.setState({
       workspaceTabs: [
         tab('t1', 'Sparsi', [{ type: 'loose-article', id: 'l1', article: article(PAST), sourceNorma: NORMA }]),
-        tab('t2', 'Raccolta', [{
-          type: 'collection', id: 'c1', label: 'Raccolta', isCollapsed: false,
-          articles: [{ article: article(PAST), sourceNorma: NORMA }, { article: article({ ...IN_FORCE, numero_articolo: '1285' }), sourceNorma: NORMA }],
-        }]),
+        tab('t2', 'Altri sparsi', [
+          { type: 'loose-article', id: 'l2', article: article(PAST), sourceNorma: NORMA },
+          { type: 'loose-article', id: 'l3', article: article({ ...IN_FORCE, numero_articolo: '1285' }), sourceNorma: NORMA },
+        ]),
       ] as never,
     });
     render(<CompareView />);

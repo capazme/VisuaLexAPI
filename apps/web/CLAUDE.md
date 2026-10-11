@@ -222,7 +222,7 @@ popovers are portalled outside it, and VoiceOver hides what lies outside a modal
 (pressed: open on this tab and this text; the state is read at `pointerdown`, before the tab panel's
 `mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
 with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
-session-only) and «Tutte le schede». A phone leaves out loose articles and collections: its column draws
+session-only) and «Tutte le schede». A phone leaves out loose articles: its column draws
 norm blocks only. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
 (it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
@@ -232,8 +232,7 @@ searched in its DOM, any other in its stored projection and only counted), moves
 next or previous, and shows an undrawn match through `revealTab` (raises the tab, restores it when
 minimised or hidden, makes it the phone's tab on screen) and `focusArticleInTab` (opens a collapsed
 block and sets its `autoFocusArticleId`, which `NormaBlockComponent` consumes on a desktop and `NormaCard`
-on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`;
-expands a collection). `revealTab` is a separate action, never
+on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`). `revealTab` is a separate action, never
 `bringTabToFront` made to reveal: the restore button and the dock chip use `bringTabToFront`, and a
 minimised tab must stay minimised until its own button restores it. A target whose root does not
 appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
@@ -962,13 +961,6 @@ meant to stay split; add new features as new files, not inside the shells:
     raising the child's value does nothing.
 
 
-25. **`store/workspaceTabActions.ts` is a dead duplicate — edit `useAppStore.ts`.**
-    The live workspace-tab actions are inlined in the store (`addNormaToTab` and
-    friends); nothing imports the factory in that file. Its only live export is
-    the `NormaBlock` / `LooseArticle` *types*, which nothing imports any more
-    (`useGlobalSearch.ts` is gone).
-    Editing an action there changes nothing at runtime. The file carries a header
-    saying so; relocating the types and deleting the rest is queued for round 2b.
 26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**
     `display: none` hides descendants, but a portal re-parents to `document.body`
     and leaves the hidden subtree behind — the desktop renderer would surface its

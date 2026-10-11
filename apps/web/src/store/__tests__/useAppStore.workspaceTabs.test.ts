@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { appStore, type WorkspaceTab } from '../useAppStore';
+import type { ArticleData, Norma } from '../../types';
 
 function makeTab(id: string): WorkspaceTab {
     return {
@@ -137,17 +138,6 @@ describe('useAppStore focusArticleInTab — showing an article opens what hides 
         expect(tab.isMinimized).toBe(false);
     });
 
-    it('expands a collapsed collection that holds the article', () => {
-        appStore.setState({
-            workspaceTabs: [tabWith([{ type: 'collection', id: 'col', label: 'raccolta', isCollapsed: true, articles: [{ article, sourceNorma: norma }] }])],
-        });
-        appStore.getState().focusArticleInTab('t', '2043');
-        const tab = appStore.getState().workspaceTabs[0];
-        const collection = tab.content[0];
-        expect(collection.type === 'collection' && collection.isCollapsed).toBe(false);
-        expect(tab.isMinimized).toBe(false);
-    });
-
     it('signals a loose article, so its collapsed card opens, and raises and restores its tab', () => {
         appStore.setState({
             workspaceTabs: [tabWith([{ type: 'loose-article', id: 'loose', article, sourceNorma: norma }])],
@@ -168,5 +158,59 @@ describe('useAppStore focusArticleInTab — showing an article opens what hides 
         const block = appStore.getState().workspaceTabs[0].content[0];
         expect(block.type === 'norma' && block.isCollapsed).toBe(true);
         expect(appStore.getState().workspaceTabs[0].isMinimized).toBe(true);
+    });
+});
+
+describe('useAppStore persisted workspace — a saved article collection', () => {
+    const CC: Norma = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16' };
+    const ARTICLE_2043: ArticleData = {
+        article_text: 'Qualunque fatto doloso o colposo…',
+        norma_data: { ...CC, numero_articolo: '2043', allegato: '2' },
+    };
+    type Merge = (persisted: unknown, current: unknown) => { workspaceTabs: WorkspaceTab[] };
+    const merge = (appStore as unknown as { persist: { getOptions: () => { merge: Merge } } }).persist.getOptions().merge;
+
+    it('turns a saved collection into loose articles of its tab, norma_data unchanged', () => {
+        const saved = { workspaceTabs: [{ ...makeTab('t'),
+            content: [{ type: 'collection', id: 'c', label: 'Raccolta', isCollapsed: false,
+                articles: [{ article: ARTICLE_2043, sourceNorma: CC }] }] }] };
+        const tabs = merge(saved, appStore.getState()).workspaceTabs;
+        expect(tabs[0].content).toEqual([{ type: 'loose-article', id: expect.any(String), article: ARTICLE_2043, sourceNorma: CC }]);
+    });
+
+    it('keeps the other items in order, gives each folded article its own id and drops unknown types with a warning', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const norma = { type: 'norma', id: 'n', norma: CC, articles: [ARTICLE_2043], isCollapsed: false };
+        const loose = { type: 'loose-article', id: 'l', article: ARTICLE_2043, sourceNorma: CC };
+        const saved = { workspaceTabs: [{ ...makeTab('t'), content: [
+            norma,
+            { type: 'collection', id: 'c', label: 'R', isCollapsed: true, articles: [
+                { article: ARTICLE_2043, sourceNorma: CC }, { article: ARTICLE_2043, sourceNorma: CC }, null] },
+            { type: 'mystery', id: 'x' },
+            loose,
+        ] }] };
+        const content = merge(saved, appStore.getState()).workspaceTabs[0].content;
+        expect(content.map((c) => c.type)).toEqual(['norma', 'loose-article', 'loose-article', 'loose-article']);
+        expect(content[1].id).not.toBe(content[2].id);
+        expect(content[3]).toEqual(loose);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('Tab t'));
+        warn.mockRestore();
+    });
+
+    it('drops, with a warning naming the tab, a collection whose articles are not a list and an entry without norma_data', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const saved = { workspaceTabs: [{ ...makeTab('t'), content: [
+            { type: 'collection', id: 'c1', label: 'R', isCollapsed: false, articles: 'none' },
+            { type: 'collection', id: 'c2', label: 'R', isCollapsed: false, articles: [
+                { article: { article_text: 'senza norma' }, sourceNorma: CC },
+                { article: ARTICLE_2043, sourceNorma: CC },
+            ] },
+        ] }] };
+        const content = merge(saved, appStore.getState()).workspaceTabs[0].content;
+        expect(content).toEqual([{ type: 'loose-article', id: expect.any(String), article: ARTICLE_2043, sourceNorma: CC }]);
+        expect(warn).toHaveBeenCalledTimes(2);
+        expect(warn).toHaveBeenNthCalledWith(1, expect.stringMatching(/articles are not a list.*"Tab t"/));
+        expect(warn).toHaveBeenNthCalledWith(2, expect.stringMatching(/without an article and its norma_data.*"Tab t"/));
+        warn.mockRestore();
     });
 });
