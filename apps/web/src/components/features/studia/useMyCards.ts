@@ -2,16 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { studiaService } from '../../../services/studiaService';
 import type { FiltriSchede, Materia, Scheda, StatoScheda, TipoScheda } from '../../../types/studia';
 
-/** What the filter row holds; «da rileggere» stands for `origine=applicazione` with `stato=BOZZA_PERSONALE`. */
+/**
+ * What the filter row holds; «da rileggere» stands for `origine=applicazione` with `stato=BOZZA_PERSONALE`,
+ * «da ripassare oggi» for `dovuteOggi=true`.
+ */
 export interface FilterState {
   materia?: Materia;
   stato?: StatoScheda;
   tipo?: TipoScheda;
   normaKey?: string;
   daRileggere: boolean;
+  dovuteOggi: boolean;
 }
 
-export const NO_FILTERS: FilterState = { daRileggere: false };
+export const NO_FILTERS: FilterState = { daRileggere: false, dovuteOggi: false };
 
 export interface ActOption {
   normaKey: string;

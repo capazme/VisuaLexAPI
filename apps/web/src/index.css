@@ -80,6 +80,19 @@
   --color-primary-900: #1e3a8a;
   --color-primary-950: #172554;
 
+  /* The review card's reveal (VisuaLex Studia): the hairline draws, then the answer unfolds.
+     Used only as `motion-safe:animate-vlx-rule` / `motion-safe:animate-vlx-unfold`. */
+  --animate-vlx-rule: vlx-rule 90ms ease-out both;
+  --animate-vlx-unfold: vlx-unfold 90ms ease-out 90ms both;
+  @keyframes vlx-rule {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  @keyframes vlx-unfold {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+  }
+
   /* Radius */
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);

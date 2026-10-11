@@ -10,11 +10,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
-  in `infra/compose.app.yml`), which also hides the Sidebar's «Studia»; `/studia` redirects to `schede`; «Le mie schede» is
+  in `infra/compose.app.yml`), which also hides the Sidebar's «Studia»; `/studia` redirects to `ripasso` (see «Card review» below); «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
-  keeping what a narrowed list hid until a deletion starts it over),
+  keeping what a narrowed list hid until a deletion starts it over; each row shows the next review,
+  `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an
@@ -65,7 +66,7 @@ annotations and highlights (these two hydrate per-article via
 not a store slice: `HistoryView` keeps it in local state and reloads it on mount.
 
 **Not in the store:** study cards are server state fetched per view (`studiaService`, `useMyCards`,
-`useArticleCards` over `utils/articleCardsCache.ts`), never in `useAppStore`.
+`useArticleCards` over `utils/articleCardsCache.ts`, `useReviewSession`), never in `useAppStore`.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
 workspace tabs and z-index, settings, `searchPanelState`.
@@ -222,7 +223,7 @@ popovers are portalled outside it, and VoiceOver hides what lies outside a modal
 (pressed: open on this tab and this text; the state is read at `pointerdown`, before the tab panel's
 `mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
 with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
-session-only) and «Tutte le schede». A phone leaves out loose articles and collections: its column draws
+session-only) and «Tutte le schede». A phone leaves out loose articles: its column draws
 norm blocks only. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
 (it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
@@ -232,8 +233,7 @@ searched in its DOM, any other in its stored projection and only counted), moves
 next or previous, and shows an undrawn match through `revealTab` (raises the tab, restores it when
 minimised or hidden, makes it the phone's tab on screen) and `focusArticleInTab` (opens a collapsed
 block and sets its `autoFocusArticleId`, which `NormaBlockComponent` consumes on a desktop and `NormaCard`
-on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`;
-expands a collection). `revealTab` is a separate action, never
+on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`). `revealTab` is a separate action, never
 `bringTabToFront` made to reveal: the restore button and the dock chip use `bringTabToFront`, and a
 minimised tab must stay minimised until its own button restores it. A target whose root does not
 appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
@@ -262,6 +262,26 @@ file) and `citationSearch.local.test.ts` is skipped where the folder is absent.
 Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
 `decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
 The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
+
+**Card review** (`/studia/ripasso`, `ReviewHome` with `StudyPreferences`; the session is
+`/studia/ripasso/sessione?materia=`, `ReviewSession`): the server builds the day's queue and decides
+what «today» is (Studia spec decision 18), so the web app never computes a due date; the one exception,
+`nextReviewLabel`'s «Da ripassare oggi», is a display label. `useReviewSession` holds the queue: a card's
+first grade is posted, «Di nuovo» puts it back at the end, and its later passes that day are practice,
+never posted (the bar then shows the grades without intervals and «Ripasso di pratica: non registrato»).
+Its key handler reads the queue from refs and every queue update checks the head is still the graded
+card: a second key pressed between a post resolving and the re-render must not drop the next card.
+Keys: space reveals (ignored on a focused button or link, in a field, under an `aria-modal` dialog or a
+`data-find-overlay` layer), 1–4 grade after the reveal, Esc closes the article first, then asks
+«Interrompere il ripasso?»; listed in the «?» dialog's «Ripasso» group. The visual rule of the review
+card (`ReviewCard`) is the spec's §6 and is not to be restyled: the anchor's citation small in slate sans
+above, question and answer in the reader's serif at a 60ch measure, the question a step larger, no
+shadow or gradient; the reveal is the area's one motion (a hairline, then the answer, `motion-safe:`
+only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
+but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
+menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
+(`DossierItemReader`) in a side panel on desktop and in `studia/Sheet` on a phone (the bottom sheet
+shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
@@ -814,7 +834,7 @@ the row an opaque background matching the panel, bleed it edge-to-edge with
 negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
-**Stacking** — use the bands in `constants/zIndex.ts` (`sidebar` 50, `dock` 80,
+**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80,
 overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
@@ -978,13 +998,6 @@ meant to stay split; add new features as new files, not inside the shells:
     raising the child's value does nothing.
 
 
-25. **`store/workspaceTabActions.ts` is a dead duplicate — edit `useAppStore.ts`.**
-    The live workspace-tab actions are inlined in the store (`addNormaToTab` and
-    friends); nothing imports the factory in that file. Its only live export is
-    the `NormaBlock` / `LooseArticle` *types*, which nothing imports any more
-    (`useGlobalSearch.ts` is gone).
-    Editing an action there changes nothing at runtime. The file carries a header
-    saying so; relocating the types and deleting the rest is queued for round 2b.
 26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**
     `display: none` hides descendants, but a portal re-parents to `document.body`
     and leaves the hidden subtree behind — the desktop renderer would surface its

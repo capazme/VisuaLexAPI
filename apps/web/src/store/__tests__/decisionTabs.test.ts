@@ -281,7 +281,6 @@ describe('decision tabs', () => {
       ['addNormaToTab', () => get().addNormaToTab(id, NORMA, [ARTICLE])],
       ['addLooseArticleToTab', () => get().addLooseArticleToTab(id, ARTICLE, NORMA)],
       ['addNormaIndexToTab', () => expect(get().addNormaIndexToTab(id, NORMA)).toBeNull()],
-      ['createCollection', () => get().createCollection(id)],
     ])('%s refuses it, and says so', (name, act) => {
       act();
       expect(content()).toEqual([]);

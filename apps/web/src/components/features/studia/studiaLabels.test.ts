@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL, anchorActLabel, anchorLabel, cardTitle, searchParamsFromAnchor } from './studiaLabels';
+import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL, anchorActLabel, anchorLabel, cardTitle, nextReviewLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import type { Scheda } from '../../../types/studia';
 
 const card = (urn: string | null, istituto = 'Risoluzione per inadempimento'): Scheda => ({
@@ -59,5 +59,39 @@ describe('the anchors', () => {
   it('give the reader what it needs to open the article', () => {
     expect(searchParamsFromAnchor(civile)).toMatchObject({ act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1453', version: 'vigente' });
     expect(searchParamsFromAnchor(legge)).toMatchObject({ act_type: 'legge', act_number: '241', date: '1990-08-07', article: '2' });
+  });
+});
+
+describe('normaFromAnchor', () => {
+  it('reads the norm of an anchor as the dossier holds it, null when the address names no article', () => {
+    expect(normaFromAnchor({ urn: 'urn:nir:stato:legge:1990-08-07;241~art2' })).toEqual({
+      tipo_atto: 'legge', data: '1990-08-07', numero_articolo: '2', numero_atto: '241',
+    });
+    expect(normaFromAnchor({ urn: 'non è un indirizzo' })).toBeNull();
+  });
+});
+
+describe('nextReviewLabel', () => {
+  const today = '2026-10-11';
+
+  it('says «Da ripassare oggi» from today on, in the past too', () => {
+    expect(nextReviewLabel('2026-10-11', today)).toBe('Da ripassare oggi');
+    expect(nextReviewLabel('2026-09-30', today)).toBe('Da ripassare oggi');
+  });
+
+  it('names a later day from its parts, with no timezone to move it', () => {
+    expect(nextReviewLabel('2026-10-12', today)).toBe('Prossimo ripasso: 12 ottobre');
+    expect(nextReviewLabel('2026-11-01', today)).toBe('Prossimo ripasso: 1 novembre');
+    expect(nextReviewLabel('2026-12-31', today)).toBe('Prossimo ripasso: 31 dicembre');
+  });
+
+  it('adds the year when it is not this one', () => {
+    expect(nextReviewLabel('2027-01-05', today)).toBe('Prossimo ripasso: 5 gennaio 2027');
+  });
+
+  it('says nothing for a card never reviewed, or a day it cannot read', () => {
+    expect(nextReviewLabel(null, today)).toBeNull();
+    expect(nextReviewLabel(undefined, today)).toBeNull();
+    expect(nextReviewLabel('2027-13-40', today)).toBeNull();
   });
 });

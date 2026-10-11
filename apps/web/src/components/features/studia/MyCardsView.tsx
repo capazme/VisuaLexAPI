@@ -79,6 +79,7 @@ export function MyCardsView() {
       tipo: filterState.tipo,
       normaKey: filterState.normaKey,
       origine: filterState.daRileggere ? 'applicazione' : undefined,
+      dovuteOggi: filterState.dovuteOggi ? 'true' : undefined,
       q: q || undefined,
     }),
     [filterState, q],

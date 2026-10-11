@@ -45,7 +45,7 @@ describe('WorkspaceTabPanel with a decision tab', () => {
     expect(screen.getByTitle('Minimizza')).toBeInTheDocument();
   });
 
-  it('keeps the collection button and the rename on an article tab', () => {
+  it('keeps the dossier button and the rename on an article tab', () => {
     const id = appStore.getState().addWorkspaceTab('Codice civile');
     const tab = appStore.getState().workspaceTabs.find((t) => t.id === id)!;
     render(<WorkspaceTabPanel tab={tab} onViewPdf={noop} onCrossReference={noop} />);

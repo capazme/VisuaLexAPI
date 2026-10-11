@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { FloatingFocusManager, FloatingPortal, useFloating, useInteractions, useRole } from '@floating-ui/react';
-import { X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { Modal } from '../../ui/Modal';
 import { Toast } from '../../ui/Toast';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { cn } from '../../../lib/utils';
 import { CardForm, type CardFormMode } from './CardForm';
+import { Sheet } from './Sheet';
 
 export interface CardFormDialogProps {
   open: boolean;
@@ -14,63 +13,6 @@ export interface CardFormDialogProps {
   mode: CardFormMode;
   /** Called with the card's id once it is saved; the dialog then closes itself. */
   onSaved: (id: string) => void;
-}
-
-interface SheetProps {
-  title: string;
-  onClose: () => void;
-  initialFocusRef: RefObject<HTMLElement | null>;
-  children: ReactNode;
-}
-
-/** A phone's bottom sheet, after `AddToDossierPopover`'s: a backdrop, the sheet, the focus kept inside. */
-function Sheet({ title, onClose, initialFocusRef, children }: SheetProps) {
-  // Neither Esc nor a press outside dismisses it: closing is «Annulla», the X, or a save.
-  const { refs, context } = useFloating({ open: true });
-  const role = useRole(context, { role: 'dialog' });
-  const { getFloatingProps } = useInteractions([role]);
-
-  // The page behind does not scroll under the sheet, as under `Modal`.
-  useEffect(() => {
-    const before = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = before;
-    };
-  }, []);
-
-  return (
-    <FloatingPortal>
-      <div className={cn('fixed inset-0 bg-slate-900/40 motion-safe:animate-in motion-safe:fade-in duration-150', Z_INDEX.modal)} aria-hidden />
-      <FloatingFocusManager context={context} modal initialFocus={initialFocusRef}>
-        <div
-          // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
-          ref={refs.setFloating}
-          {...getFloatingProps()}
-          aria-label={title}
-          className={cn(
-            'fixed inset-x-0 bottom-0 flex max-h-[92vh] flex-col rounded-t-2xl border border-b-0',
-            'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900',
-            'motion-safe:animate-in motion-safe:slide-in-from-bottom duration-200',
-            Z_INDEX.modal,
-          )}
-        >
-          <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-2 dark:border-slate-800">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Chiudi"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-            >
-              <X size={20} aria-hidden="true" />
-            </button>
-          </header>
-          {children}
-        </div>
-      </FloatingFocusManager>
-    </FloatingPortal>
-  );
 }
 
 /**

@@ -1236,3 +1236,17 @@ senso che l'admin può rimetterlo in chiaro)»; 7 «sì».
   The same holds for a decision discussion's withdrawn quotation (§8.7, the limit): the API returns
   it to every signed-in caller and the panel's withholding is presentation, not access control, so
   the server must withhold it itself before the opening.
+- **Decisions in every search surface (proposals of 11 October, parked).** The owner asked «la
+  ricerca mi sembra ancora solo per le norme, estendiamola alle sentenze», then clarified he meant
+  searching inside a decision's text (PR 4d does it), and parked the rest: «ok, la 79 lasciamola
+  stare per ora». The proposals, kept for later: (1) the palette offers «Sentenze che citano …»
+  when the box reads as a norm, and reads incomplete decision citations («Cass. 10787/2024»
+  without section, «SU …», «sentenza n. …/2024»); (2) the empty search page shows a decision
+  example and «Sentenze aperte di recente»; (3) the Cronologia records topic and cited-norm
+  searches too (a migration) and filters Norme / Sentenze / Temi; (4) the dossier's «Aggiungi»
+  offers «Sentenza…»; (5) a decision cited as a MERL-T source opens its tab; (6) the documents
+  page finds decision citations, and decision citations inside a decision's text become links;
+  (7) a decision node in the graph opens its tab; (8) decision filters in the palette (archive,
+  years); (9) quick decisions and aliases for decisions; (10) searching the Corte costituzionale
+  (its open data, indexed locally); (11) a search over one's own notes and highlights, norms and
+  decisions together; (12) not planned: the find window inside result lists.
