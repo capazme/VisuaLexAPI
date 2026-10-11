@@ -9,7 +9,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
   `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
-  (`features/studia/featureFlag.ts`), which also hides the Sidebar's «Studia»; `/studia` redirects to `schede`; «Le mie schede» is
+  (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
+  in `infra/compose.app.yml`), which also hides the Sidebar's «Studia»; `/studia` redirects to `schede`; «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
