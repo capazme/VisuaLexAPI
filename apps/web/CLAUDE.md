@@ -69,7 +69,9 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   sidebar badges their unread count (`useForumNotifications().count.normaChanges`,
   deliberately kept out of the Forum's `total`, which nothing on that page
   could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
-  on `window` so the badge drops before the next 30s poll.
+  on `window` so the badge drops before the next 30s poll. A row is a norm (`act_type`) or a
+  decision (`decision_key`, never both): `DecisionTabView` records a found decision once per
+  opening (the copy on screen only) and `DecisionHistoryRow` reopens it with `openDecisionTab`.
 
 All of them reopen a norm through `triggerSearch()`.
 

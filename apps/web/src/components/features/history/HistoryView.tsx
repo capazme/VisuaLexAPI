@@ -13,6 +13,8 @@ import { useTour } from '../../../hooks/useTour';
 import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } from '../../../services/historyService';
 import { NormaChangesSection } from './NormaChangesSection';
 import { labelFromParams } from '../../../utils/sources';
+import { DecisionHistoryRow } from './DecisionHistoryRow';
+import { formatDecisionShort, identityFromKey } from '../../../utils/decisionLinks';
 
 // Stripe color per act_type — keyed on lowercased exact match. Codes get
 // distinct colors so the user can scan the timeline visually; everything
@@ -72,7 +74,7 @@ function historyToSearchParams(item: SearchHistoryItem): SearchParams {
 
 // A quick norm is suggested with the norm's short label, the act's with no article (source convention).
 function generateQuickNormLabel(item: SearchHistoryItem): string {
-    return labelFromParams({ act_type: item.act_type, act_number: item.act_number, date: item.date, article: item.article?.toString() });
+    return labelFromParams({ act_type: item.act_type ?? '', act_number: item.act_number, date: item.date, article: item.article?.toString() });
 }
 
 export function HistoryView() {
@@ -274,7 +276,7 @@ export function HistoryView() {
         // Navigate to search page and trigger search
         navigate('/');
         triggerSearch({
-            act_type: item.act_type,
+            act_type: item.act_type ?? '',
             act_number: item.act_number || '',
             date: item.date || '',
             article: item.article?.toString() || '',
@@ -310,7 +312,7 @@ export function HistoryView() {
                 item.article?.toString() ?? '',
                 item.date ?? '',
                 item.version ?? '',
-                generateQuickNormLabel(item),
+                item.decision_key ? (() => { const id = identityFromKey(item.decision_key); return id ? formatDecisionShort(id) : 'Sentenza'; })() : generateQuickNormLabel(item),
             ].join(' ').toLowerCase();
             return tokens.every(t => haystack.includes(t));
         });
@@ -469,7 +471,9 @@ export function HistoryView() {
                                     {/* Timeline items */}
                                     {/* Mobile: simpler timeline */}
                                     <div className="md:hidden space-y-2">
-                                        {items.map((item, idx) => (
+                                        {items.map((item, idx) => item.decision_key ? (
+                                            <DecisionHistoryRow key={item.id} item={item} variant="mobile" onDelete={handleDeleteItem} />
+                                        ) : (
                                             <div key={idx} className="relative">
                                                 {/* Mobile Item card - compact, tap-friendly */}
                                                 <div
@@ -519,7 +523,10 @@ export function HistoryView() {
 
                                     {/* Desktop: full timeline with dots */}
                                     <div className="hidden md:block space-y-3 pl-6 border-l-2 border-blue-100 dark:border-blue-900 relative">
-                                        {items.map((item, idx) => (
+                                        {items.map((item, idx) => item.decision_key ? (
+                                            <DecisionHistoryRow key={item.id} item={item} variant="desktop" onDelete={handleDeleteItem}
+                                                id={idx === 0 ? 'tour-history-item' : undefined} />
+                                        ) : (
                                             <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
                                                 {/* Timeline dot */}
                                                 <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800 group-hover:scale-125 transition-transform" />

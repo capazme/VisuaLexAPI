@@ -4,6 +4,8 @@ import type { DecisionReference, FetchDecisionAnswer } from '../../../types/deci
 
 const fetchDecision = vi.fn();
 vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
+const addDecisionToHistory = vi.fn();
+vi.mock('../../../services/historyService', () => ({ addDecisionToHistory: (...a: unknown[]) => addDecisionToHistory(...a) }));
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 
 import { appStore, useAppStore } from '../../../store/useAppStore';
@@ -39,6 +41,8 @@ function openTab(reference: DecisionReference) {
 
 beforeEach(() => {
   fetchDecision.mockReset();
+  addDecisionToHistory.mockReset();
+  addDecisionToHistory.mockResolvedValue({});
   for (const ref of [CIVILE, PENALE, AMBIGUA_REF, { ...AMBIGUA_REF, sezione: 'VII' }]) forgetDecision(ref);
   appStore.setState({ workspaceTabs: [], commandPaletteOpen: false });
 });
@@ -240,5 +244,56 @@ describe('DecisionTabView — the store learns the identity of a tab opened by a
     expect(fetchDecision).toHaveBeenCalledTimes(1);
     expect(seeded).toMatchObject({ esito: 'trovata', avvisi: [] });
     expect(screen.getByText(/la Sez\. VII indicata è quella penale/)).toBeInTheDocument();
+  });
+});
+
+describe('DecisionTabView — the Cronologia', () => {
+  it('records a found decision once per opening, not on re-render, again after close and reopen', async () => {
+    fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
+    const { id } = openTab(CIVILE);
+    const first = render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    await screen.findByText(/Sez\. III civile/);
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+    expect(addDecisionToHistory).toHaveBeenCalledWith('cassazione:civile:99999:2024');
+    first.rerender(<DecisionTabView tabId={id} reference={CIVILE} />);
+    await act(async () => {});
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+    first.unmount();
+    render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    await screen.findByText(/Sez\. III civile/);
+    await waitFor(() => expect(addDecisionToHistory).toHaveBeenCalledTimes(2));
+  });
+
+  it('records nothing for an answer that is not a found decision', async () => {
+    fetchDecision.mockResolvedValue(AMBIGUOUS);
+    const { id } = openTab(AMBIGUA_REF);
+    render(<DecisionTabView tabId={id} reference={AMBIGUA_REF} />);
+    await screen.findByRole('link', { name: /Sez\. VII penale/ });
+    expect(addDecisionToHistory).not.toHaveBeenCalled();
+  });
+
+  it('records from the copy on screen only', async () => {
+    fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
+    const { id } = openTab(CIVILE);
+    render(
+      <>
+        <div data-copy="hidden"><DecisionTabView tabId={id} reference={CIVILE} /></div>
+        <div data-copy="shown"><DecisionTabView tabId={id} reference={CIVILE} /></div>
+      </>,
+    );
+    await waitFor(() => expect(addDecisionToHistory).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a history failure and still shows the decision', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    addDecisionToHistory.mockRejectedValue(new Error('down'));
+    fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
+    const { id } = openTab(CIVILE);
+    render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    expect(await screen.findByText(/Sez\. III civile/)).toBeInTheDocument();
+    await waitFor(() => expect(error).toHaveBeenCalledWith('addDecisionToHistory failed', expect.objectContaining({ decisionKey: 'cassazione:civile:99999:2024' })));
+    error.mockRestore();
   });
 });

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { DecisionNotice, DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
 import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
-import { decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
+import { addDecisionToHistory } from '../../../services/historyService';
+import { decisionKey, decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionDiscussionsWithoutText } from './DecisionDiscussionsWithoutText';
 import { DecisionView } from './DecisionView';
@@ -68,6 +69,22 @@ export function DecisionTabView({ tabId, reference }: { tabId: string; reference
       setIdentity(tabId, answer.identita, formatDecisionShort({ ...answer.identita, sezione: answer.attributi.sezione }));
     }
   }, [answer, setIdentity, tabId]);
+
+  // The Cronologia learns the decision once per opening of the tab. The desktop panel and the phone
+  // view are both mounted: only the copy on screen records, and each mount remembers the key it sent.
+  const recordedKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (answer?.esito !== 'trovata') return;
+    const panel = panelRef.current;
+    if (!panel || panel.getClientRects().length === 0) return;
+    const key = decisionKey(identityOf(answer.identita));
+    if (recordedKey.current === key) return;
+    recordedKey.current = key;
+    // the history is a convenience: the reading never fails for it
+    addDecisionToHistory(key).catch((error: unknown) => {
+      console.error('addDecisionToHistory failed', { decisionKey: key, error });
+    });
+  }, [answer]);
 
   // The reader chose a candidate in another tab that turned out to be this one: the tab they were
   // in is gone, so keyboard focus comes here rather than falling to the page.
