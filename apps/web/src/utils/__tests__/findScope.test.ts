@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { findTargetsInScope, frontTabId, type FindScopeState } from '../findScope';
 import { clearDecisionCache, rememberDecision } from '../decisionFetchCache';
-import type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection } from '../../store/useAppStore';
+import type { WorkspaceTab, NormaBlock, LooseArticle } from '../../store/useAppStore';
 import type { ArticleData, NormaVisitata } from '../../types';
 import type { FoundDecision } from '../../types/decisions';
 
@@ -39,18 +39,15 @@ function looseArticle(id: string, data: ArticleData): LooseArticle {
   return { type: 'loose-article', id, article: data, sourceNorma: data.norma_data };
 }
 
-function collection(id: string, articles: ArticleData[]): ArticleCollection {
-  return { type: 'collection', id, label: 'raccolta', isCollapsed: false, articles: articles.map((a) => ({ article: a, sourceNorma: a.norma_data })) };
-}
-
 describe('findTargetsInScope', () => {
-  it('on a phone leaves out the loose articles and collections its column never draws', () => {
+  it('on a phone leaves out the loose articles its column never draws', () => {
     const front = tab({
       id: 'tab-front',
       content: [
         normaBlock('block-1', [article('1'), article('2')]),
         looseArticle('loose-1', article('5')),
-        collection('coll-1', [article('7'), article('8')]),
+        looseArticle('loose-2', article('7')),
+        looseArticle('loose-3', article('8')),
       ],
     });
     const state: FindScopeState = { workspaceTabs: [front] };
@@ -62,13 +59,14 @@ describe('findTargetsInScope', () => {
     expect(findTargetsInScope(state, 'tab', 'tab-front')).toHaveLength(5);
   });
 
-  it('lists the front tab\'s articles in display order, loose articles and collections included', () => {
+  it('lists the front tab\'s articles in display order, loose articles included', () => {
     const front = tab({
       id: 'tab-front',
       content: [
         normaBlock('block-1', [article('1'), article('2')]),
         looseArticle('loose-1', article('5')),
-        collection('coll-1', [article('7'), article('8')]),
+        looseArticle('loose-2', article('7')),
+        looseArticle('loose-3', article('8')),
       ],
     });
     const other = tab({ id: 'tab-other', content: [normaBlock('block-2', [article('9')])] });
@@ -92,8 +90,8 @@ describe('findTargetsInScope', () => {
     expect(targets.map((t) => t.tabId)).toEqual(['b', 'a']);
   });
 
-  it('counts the same article once in a tab that holds it twice (a block and a collection)', () => {
-    const t = tab({ id: 'a', content: [normaBlock('b', [article('1'), article('2')]), collection('c', [article('1')])] });
+  it('counts the same article once in a tab that holds it twice (a block and a loose article)', () => {
+    const t = tab({ id: 'a', content: [normaBlock('b', [article('1'), article('2')]), looseArticle('c', article('1'))] });
     const targets = findTargetsInScope({ workspaceTabs: [t] }, 'all', null);
     expect(targets.map((x) => x.label)).toEqual(['art. 1 c.c.', 'art. 2 c.c.']);
   });

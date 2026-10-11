@@ -4,7 +4,6 @@ import {
   Maximize2,
   Minimize2,
   FileText,
-  Folder,
   File,
   Eye,
   EyeOff,
@@ -30,12 +29,10 @@ function getTabSummary(tab: WorkspaceTab) {
   if (tab.view) return tab.view.kind === 'decision' ? 'Sentenza' : 'Ricerca di sentenze';
   const normaCount = tab.content.filter(c => c.type === 'norma').length;
   const looseCount = tab.content.filter(c => c.type === 'loose-article').length;
-  const collectionCount = tab.content.filter(c => c.type === 'collection').length;
 
   const parts: string[] = [];
   if (normaCount > 0) parts.push(`${normaCount} norma${normaCount > 1 ? 'e' : ''}`);
   if (looseCount > 0) parts.push(`${looseCount} articol${looseCount > 1 ? 'i' : 'o'}`);
-  if (collectionCount > 0) parts.push(`${collectionCount} raccolt${collectionCount > 1 ? 'e' : 'a'}`);
 
   return parts.length > 0 ? parts.join(', ') : 'Vuota';
 }
@@ -47,7 +44,6 @@ function getContentIcons(tab: WorkspaceTab) {
       {tab.view && <Gavel size={10} className="text-primary-500" />}
       {types.has('norma') && <FileText size={10} className="text-primary-500" />}
       {types.has('loose-article') && <File size={10} className="text-amber-500" />}
-      {types.has('collection') && <Folder size={10} className="text-purple-500" />}
     </div>
   );
 }
@@ -60,8 +56,6 @@ function getArticleCount(tab: WorkspaceTab) {
       count += item.articles.length;
     } else if (item.type === 'loose-article') {
       count += 1;
-    } else if (item.type === 'collection') {
-      count += item.articles.length;
     }
   });
   return count;

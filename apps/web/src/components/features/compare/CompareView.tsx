@@ -103,17 +103,6 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
           source: 'tab',
           tabName: tab.label,
         });
-      } else if (item.type === 'collection') {
-        item.articles.forEach(({ article, sourceNorma }) => {
-          availableArticles.push({
-            id: `${tab.id}-${item.id}-${article.norma_data.numero_articolo}`,
-            article,
-            sourceNorma,
-            label: `${shortNorm(article.norma_data)}${versionSuffixOf(article)}`,
-            source: 'tab',
-            tabName: tab.label,
-          });
-        });
       }
     });
   });
