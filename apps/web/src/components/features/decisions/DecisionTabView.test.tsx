@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { DecisionReference, FetchDecisionAnswer } from '../../../types/decisions';
 
 const fetchDecision = vi.fn();
@@ -248,7 +248,7 @@ describe('DecisionTabView — the store learns the identity of a tab opened by a
 });
 
 describe('DecisionTabView — the Cronologia', () => {
-  it('records once per opening: a remount, a minimise and restore or a re-render never records again', async () => {
+  it('records once per opening: a remount or a minimise and restore never records again', async () => {
     fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
     const { id } = openTab(CIVILE);
     const first = render(<DecisionTabView tabId={id} reference={CIVILE} />);
@@ -293,6 +293,36 @@ describe('DecisionTabView — the Cronologia', () => {
     act(() => { appStore.getState().openDecisionTab(CIVILE); });
     await act(async () => {});
     expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+    // the window is drawn again at its new place: the key kept on the tab still stops the record
+    cleanup();
+    render(<DecisionTabView tabId={id} reference={CIVILE} />);
+    await screen.findByText(/Sez\. III civile/);
+    await act(async () => {});
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the new key when the tab\'s decision is identified (a candidate chosen)', async () => {
+    fetchDecision.mockImplementation(async (ref: DecisionReference) => (ref.archivio ? foundOf(ref, '7') : AMBIGUOUS));
+    const { id, tab } = openTab(AMBIGUA_REF);
+    // a key left on the tab by an earlier identity: the new one is still recorded
+    act(() => { appStore.getState().markDecisionRecorded(id, 'cassazione:civile:99999:2024'); });
+    render(<DecisionTabView tabId={id} reference={AMBIGUA_REF} />);
+    fireEvent.click(await screen.findByRole('link', { name: /Sez\. VII penale/ }));
+    await waitFor(() => expect(addDecisionToHistory).toHaveBeenCalledTimes(1));
+    expect(addDecisionToHistory).toHaveBeenCalledWith('cassazione:penale:99999:2024');
+    await waitFor(() => expect(tab().historyRecordedKey).toBe('cassazione:penale:99999:2024'));
+    await act(async () => {});
+    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('a copy that is not on screen records nothing and marks nothing', async () => {
+    fetchDecision.mockResolvedValue(foundOf(CIVILE, '3'));
+    const { id, tab } = openTab(CIVILE);
+    render(<div data-copy="hidden"><DecisionTabView tabId={id} reference={CIVILE} /></div>);
+    await screen.findByText(/Sez\. III civile/);
+    await act(async () => {});
+    expect(addDecisionToHistory).not.toHaveBeenCalled();
+    expect(tab().historyRecordedKey).toBeUndefined();
   });
 
   it('records nothing for an answer that is not a found decision', async () => {
