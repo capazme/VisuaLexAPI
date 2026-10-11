@@ -143,7 +143,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `byApplication: false`, while one through a connected application is
   `byApplication: true` even when its name is unknown. `GET /api/trash`,
   `POST /api/trash/:id/restore {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
-  Restore brings every column back with the original ids; entries 30 days,
+  Restore brings every column back with the original ids — for a card, also the author's
+  review state and log (`LingoStatoRipasso`, `LingoRevisioneSRS`), which the card's deletion
+  would otherwise cascade away; an entry from before carries none and restores as it was; entries 30 days,
   then swept (awaited, at most every ten minutes). No route reachable by an
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
