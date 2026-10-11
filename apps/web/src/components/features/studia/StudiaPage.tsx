@@ -1,8 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 
-// The views of the area; «Da validare» and «Ripasso» join this list with their PRs.
-const VIEWS = [{ to: 'schede', label: 'Le mie schede' }];
+// The views of the area; «Da validare» joins this list with its PR.
+const VIEWS = [
+  { to: 'ripasso', label: 'Ripasso' },
+  { to: 'schede', label: 'Le mie schede' },
+];
 
 /**
  * VisuaLex Studia: the area's heading, the links to its views, and the view itself. The layout

@@ -26,6 +26,7 @@ import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
 import lingoCardsRoutes from './routes/lingoCards';
 import lingoArticoloRoutes from './routes/lingoArticolo';
+import lingoSrsRoutes from './routes/lingoSrs';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -73,7 +74,7 @@ app.use(createOAuthRouter(oauthConfig));
 // it is counted per user rather than per address.
 app.use('/api', delegatedAuth);
 
-// Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
+// Rate limiting: anonymous 100/min, authenticated 300/min, writes 200/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory
 app.use(globalRateLimiter);
 
@@ -128,6 +129,7 @@ app.use('/api/merlt', merltKillSwitch, merltRoutes);
 app.use('/api/lingo/simulazioni', lingoSimulazioniRoutes);
 app.use('/api/lingo/cards', lingoCardsRoutes);
 app.use('/api/lingo/articolo', lingoArticoloRoutes);
+app.use('/api/lingo/srs', lingoSrsRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 app.use('/api', authRoutes);

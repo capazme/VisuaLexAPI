@@ -51,6 +51,27 @@ interface ItemSummary {
 /** A row as JSON: dates become ISO strings, which is how the payload keeps them. */
 const asJson = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 
+/** A card's review state and a line of its log as the payload keeps them (dates as ISO strings). */
+interface StoredReviewState {
+  cardId: string;
+  stability: number;
+  difficulty: number;
+  dueAt: string;
+  lastReviewAt: string;
+  reps: number;
+  lapses: number;
+}
+interface StoredReview {
+  id: string;
+  cardId: string;
+  dataRevisione: string;
+  rating: number;
+  scheduledDays: number;
+  stability: number;
+  difficulty: number;
+  durataMs: number | null;
+}
+
 const itemSummary = (item: { itemType: string; content: unknown }): ItemSummary => ({
   itemType: item.itemType,
   citation: citeStoredItem(item.itemType, item.content),
@@ -202,6 +223,15 @@ export async function trashLingoCards(
     const notFound = wanted.filter((id) => !cards.some((card) => card.id === id));
     const notDeletable = cards.filter((card) => !PERSONAL_STATES.includes(card.stato)).map((card) => card.id);
     if (movable.length === 0) return { moved, notFound, notDeletable };
+    // The author's review state and log cascade with the card: they travel in the payload, so that restoring a
+    // studied draft does not make it «nuova» again and the log (kept to fit the weights, spec decision 17) is not lost.
+    // Only the author's rows: a personal card is nobody else's to review, and another person's history does not
+    // belong in this person's trash.
+    const states = await tx.lingoStatoRipasso.findMany({ where: { cardId: { in: moved }, utenteId: userId } });
+    const reviews = await tx.lingoRevisioneSRS.findMany({
+      where: { cardId: { in: moved }, utenteId: userId },
+      orderBy: [{ dataRevisione: 'asc' }, { id: 'asc' }],
+    });
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -213,7 +243,7 @@ export async function trashLingoCards(
           itemCount: movable.length,
           cards: movable.map((card) => ({ istituto: card.istituto, domanda: card.domanda.length > 120 ? `${card.domanda.slice(0, 119)}…` : card.domanda })),
         }),
-        payload: asJson({ cards: movable }),
+        payload: asJson({ cards: movable, states, reviews }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -368,8 +398,11 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       }
 
       if (entry.kind === 'LINGO_CARDS') {
-        const { cards } = entry.payload as unknown as {
+        // `states` and `reviews` are absent from an entry trashed before reviews were kept.
+        const { cards, states = [], reviews = [] } = entry.payload as unknown as {
           cards: (Record<string, unknown> & { id: string; createdAt: string; ancore: (Record<string, unknown> & { id: string; ultimaVerifica: string })[] })[];
+          states?: StoredReviewState[];
+          reviews?: StoredReview[];
         };
         for (const card of cards) {
           const { ancore, createdAt, updatedAt: _updatedAt, autoreId: _autoreId, ...fields } = card;
@@ -387,6 +420,31 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             },
           });
         }
+        await tx.lingoStatoRipasso.createMany({
+          data: states.map((state) => ({
+            utenteId: userId,
+            cardId: state.cardId,
+            stability: state.stability,
+            difficulty: state.difficulty,
+            dueAt: new Date(state.dueAt),
+            lastReviewAt: new Date(state.lastReviewAt),
+            reps: state.reps,
+            lapses: state.lapses,
+          })),
+        });
+        await tx.lingoRevisioneSRS.createMany({
+          data: reviews.map((log) => ({
+            id: log.id,
+            utenteId: userId,
+            cardId: log.cardId,
+            dataRevisione: new Date(log.dataRevisione),
+            rating: log.rating,
+            scheduledDays: log.scheduledDays,
+            stability: log.stability,
+            difficulty: log.difficulty,
+            durataMs: log.durataMs,
+          })),
+        });
         await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: null };
       }

@@ -1,6 +1,7 @@
 import { actHeading, citeNorm, normFromUrn } from '../../../utils/sources';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import type { AncoraScheda, Materia, Scheda, StatoScheda, TipoScheda } from '../../../types/studia';
+import { todayInRome } from '../../../utils/dateUtils';
 import { searchParamsFromNorma } from '../dossier/dossierUtils';
 
 export const MATERIA_LABEL: Record<Materia, string> = {
@@ -53,16 +54,39 @@ export function anchorActLabel(anchor: Pick<AncoraScheda, 'urn'>): string | null
   return norm?.tipo_atto ? actHeading(norm) : null;
 }
 
-/** What the workspace's search needs to open an anchor's article in the reader; null when its address names no article. */
-export function searchParamsFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): SearchParams | null {
+/** The norm an anchor's article is read as (the dossier's `NormaVisitata`); null when its address names no article. */
+export function normaFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): NormaVisitata | null {
   const norm = normFromUrn(anchor.urn);
   if (!norm?.tipo_atto || !norm.numero_articolo) return null;
-  const norma: NormaVisitata = {
+  return {
     tipo_atto: norm.tipo_atto,
     data: norm.data ?? '',
     numero_articolo: norm.numero_articolo,
     ...(norm.numero_atto ? { numero_atto: norm.numero_atto } : {}),
     ...(norm.allegato ? { allegato: norm.allegato } : {}),
   };
-  return searchParamsFromNorma(norma);
+}
+
+/** What the workspace's search needs to open an anchor's article in the reader; null when its address names no article. */
+export function searchParamsFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): SearchParams | null {
+  const norma = normaFromAnchor(anchor);
+  return norma ? searchParamsFromNorma(norma) : null;
+}
+
+const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+
+/**
+ * When a card is next reviewed, as a row says it: «Da ripassare oggi» from today on, else
+ * «Prossimo ripasso: 12 ottobre» (with the year when it is not this one). Read from the parts of
+ * the 'YYYY-MM-DD' day, never through `Date`, which would read it as UTC; null when the card has no date.
+ * `todayInRome()` only words the label: whether a card is due is the server's decision (spec D18).
+ */
+export function nextReviewLabel(day: string | null | undefined, today: string = todayInRome()): string | null {
+  if (!day) return null;
+  if (day <= today) return 'Da ripassare oggi';
+  const [year, month, date] = day.split('-').map(Number);
+  const monthName = MONTHS[month - 1];
+  if (!year || !monthName || !date) return null;
+  const sameYear = day.slice(0, 4) === today.slice(0, 4);
+  return `Prossimo ripasso: ${date} ${monthName}${sameYear ? '' : ` ${year}`}`;
 }

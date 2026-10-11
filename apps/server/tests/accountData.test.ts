@@ -12,6 +12,8 @@ describe('account data controls', () => {
     expect(response.body.user).not.toHaveProperty('password');
     expect(response.body.data).toHaveProperty('dossiers');
     expect(response.body.data).toHaveProperty('threads');
+    expect(response.body.data.lingoRipassi).toEqual([]);
+    expect(response.body.data.lingoPreferenze).toBeNull();
   });
 
   it('requires the current password and exact confirmation before deletion', async () => {
