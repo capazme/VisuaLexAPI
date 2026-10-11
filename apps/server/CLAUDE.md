@@ -23,7 +23,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (~6 s, measured), past what a process manager waits before its SIGKILL (pm2,
   on the old server, waited 1.6 s).
 - `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
-  authenticated 300/min (by userId), writes 20/min. `RateLimiterRedis` when
+  authenticated 300/min (by userId), writes 200/min. `RateLimiterRedis` when
   `REDIS_ENABLED=true`, else in-memory with a startup warning.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
   connection errors fail open.
@@ -317,7 +317,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   filters by `materia`, `stato`, `tipo`, `normaKey` — any anchor on the act —
   `q` — 1–100 characters, in the institute or the question, case-insensitive —
   and `origine=applicazione`, ordered `ordine=recenti` (default) or `materia`,
-  then institute, newest, id),
+  then institute, newest, id; for the session, `dovuteOggi=true` keeps the cards due by
+  today's Rome day, and each card carries the caller's `prossimoRipasso` — `YYYY-MM-DD`,
+  or null when never reviewed or no longer reviewable — while under an exchanged token the
+  field is absent and `dovuteOggi` answers 403: study state is not delegated surface),
   `POST /trash` (personal states only, `PERSONAL_STATES`; the session and
   exchanged tokens alike), and `PATCH /:id` for the session only (not in the
   delegated table: a default-deny 403 for an exchanged token). The patch takes
@@ -339,6 +342,29 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   later). The address is the reader's (`…urn:nir:…~art1453!vig=…`); the
   identity is `anchorUrn`, the same cut that stores an anchor's `urn`, so
   storage and lookup agree. An address with no `urn:` is a 400.
+- **Card review** (`routes/lingoSrs.ts`, `/api/lingo/srs`, session only — not in the
+  delegated table, so every path is a 403 for an exchanged token; Studia spec decisions
+  7–9, 17, 18): `GET /sessione?materia=` answers `{ conteggi: { dovute, nuove }, cards }`,
+  the due cards first (earliest `dueAt`, at most 500 fetched, `dovute` exact), then the
+  new ones (oldest first) up to the daily goal minus the cards introduced today — state
+  rows with `reps = 1` reviewed today, since only a day's first grade is recorded — so
+  the goal holds across devices; each card carries `nuova`, `comunita` and `anteprima`
+  (the days each grade would give, `previewIntervals`). `lingo/reviewQueue.ts`
+  `reviewScope` is decision 8: the user's own drafts, proposals and validated cards, and
+  the community's validated cards in the subjects switched on — never `autoreId != me`,
+  which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
+  rating, durataMs? }`: one transaction serialised on the pair by
+  `pg_advisory_xact_lock` (a first review has no state row to lock), the scope checked
+  again inside it (404, nothing written), a second grade the same Rome day answered
+  `registrata: false` with nothing written; otherwise FSRS's `review` with the elapsed
+  Rome days, the state row upserted (`dueAt` = 00:00 Rome of the due day, `reps`,
+  `lapses`) and a log row appended. `GET`/`PUT /preferenze`: the daily goal (1–200,
+  default 20) and the community subjects; `GET` never creates the row.
+- **`lingo/studyDay.ts`** — what «a day» is (spec decision 18): `romeDay`, `daysBetween`
+  and `startOfRomeDay`, on `Intl` alone, the same under any `TZ`. `startOfRomeDay` takes
+  Rome's offset at the UTC-midnight guess and subtracts it: exact, because Rome changes
+  its clocks at 01:00 UTC, never near its midnight. Never compute a study day from the
+  server's local date or the browser's.
 - **LingoLex cards** (data layer): `LingoCard` and
   `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
   is the strict contract: one to ten anchors, a lower-case SHA-256 fingerprint,
@@ -353,7 +379,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   community has taken up (proposed, validated, to review) stay without an author,
   and the person's drafts and archived cards are deleted with them, in one
   transaction (plan, decision 14). `GET /auth/export` includes the user's cards
-  as `data.lingoCards`.
+  as `data.lingoCards`. Review data is personal: `LingoStatoRipasso`
+  (`lingo_stato_ripasso`, one row per user and card, indexed by `(utente_id, due_at)`),
+  the append-only log `LingoRevisioneSRS` (`lingo_revisioni_srs`, kept to fit the weights
+  later) and `LingoPreferenzeStudio` (`lingo_preferenze_studio`) cascade from the user and
+  from the card; the export carries the log as `data.lingoRipassi` (not the derived state)
+  and the preferences as `data.lingoPreferenze` (null when never saved).
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
