@@ -1031,6 +1031,47 @@ search at all, so a search never changes the text DOM on either surface (root ru
 **Not covered yet.** The dossier reader and Study Mode (Later). In both Cmd/Ctrl+F is the
 browser's own find (see «How it opens»).
 
+#### 13.2 A citation is searched as a citation (the owner, 11 October)
+
+The owner: «ma io intendevo la ricerca nel testo, poteri voler cercare una citazione nella
+sentenza»; then, on the proposal, «80 sì, subito». Measured on two real decisions with PR 4d's
+matcher: a citation is found only when typed exactly as the decision writes it. «art. 580 c.p.»
+finds nothing where the text says «art. 580 del codice penale» (4 times), «l. 219/2017» nothing
+where it says «legge n. 219 del 2017» (11 times), «art 110 cpa» nothing against «art. 110
+c.p.a.», «Cass. n. 8980/2018» nothing against «Cass., S.U. n 8980/2018». So, in the find window,
+a query that reads as a citation also finds the other forms of the same citation. §13's literal
+match stays, and both kinds of match are drawn the same way (one list, ordered by position, an
+overlap kept once); nothing is added to the page.
+
+**A norm.** When the query reads as a norm, the window also finds every span of the text that
+names the same norm:
+- a code's article («art. 580 c.p.», «art 110 cpa», «art. 2 Cost.»): every citation the
+  client's own `extractCitations` (`utils/citationMatcher.ts`, the reader of norm links in a
+  decision's text) resolves to the same code and article («art. 580 del codice penale», «art.
+  580 cod. pen.»);
+- a numbered act, with or without an article («l. 219/2017», «legge 219/2017», «d.P.R.
+  115/2002», «art. 1 l. 219/2017»): every span that names the same act type, number and year in
+  the forms decisions use — «legge n. 219 del 2017», «l. n. 219/2017», «legge 22 dicembre 2017, n.
+  219», «L. 219/17» — and, when the query has an article, preceded by that article within the
+  same sentence («art. 1 della legge n. 219 del 2017», «art. 1, comma 2, legge …»);
+- a query that is only a code's abbreviation («c.p.») or an act without number is not a
+  citation: it is searched literally.
+
+**A decision.** When the query reads as a decision's number and year («Cass. n. 8980/2018»,
+«n. 8980/2018», «8980/2018», «sent. n. 8980 del 2018»), the window finds the number and year in
+every form: «n. 8980/2018», «n 8980/2018», «n. 8980 del 2018», «8980/2018». The court and
+section in the query are not required in the text (decisions cite «S.U.», «Sez. 3», or nothing).
+
+**Punctuation in abbreviations.** For every query, a dot or a comma inside or after an
+abbreviation is optional on both sides: «cpa» finds «c.p.a.», «art 13» finds «art. 13», «art.
+13, comma 1-quater» finds «art. 13 comma 1-quater». A dot that ends a sentence is never
+required. This rule widens the literal match only by punctuation; it never joins two words.
+
+**Tests.** Synthetic texts in the repository, written for the cases above. Real decision texts
+stay out of the repository (they carry personal data): a local-only suite reads them from a
+git-ignored folder (`apps/web/src/utils/__fixtures__/private/`) and is skipped when the folder is
+absent, as the API's `_local` freeze test is.
+
 ## Security and data
 
 - **Query injection (OWASP A03).** Topic words go into a Solr query: §5.4's
