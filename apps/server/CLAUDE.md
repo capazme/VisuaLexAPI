@@ -367,7 +367,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   saves a new one numbered above the highest (two at once: the unique index refuses the second,
   409). A version is never updated or deleted: acceptances and cards point at it with
   `RESTRICT`. Version 1 of each key is written by the migration that creates the key
-  (`20261017100000_lingo_validation` for `PROPOSTA_SCHEDA`). `GET /auth/me` and the login answer
+  (`20261019100000_lingo_validation` for `PROPOSTA_SCHEDA`). `GET /auth/me` and the login answer
   carry `lingo_validatore`.
 - **LingoLex cards** (data layer): `LingoCard` and
   `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
