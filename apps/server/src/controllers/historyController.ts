@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import type { SearchHistory } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { readDecisionKey } from '../norms/decisionKey';
 
@@ -35,10 +36,7 @@ function parseHistory(body: unknown): HistoryInput {
   return result.data;
 }
 
-type HistoryRow = {
-  id: string; actType: string | null; actNumber: string | null; article: string | null;
-  date: string | null; version: string | null; decisionKey: string | null; createdAt: Date;
-};
+type HistoryRow = Pick<SearchHistory, 'id' | 'actType' | 'actNumber' | 'article' | 'date' | 'version' | 'decisionKey' | 'createdAt'>;
 
 const toJson = (item: HistoryRow) => ({
   id: item.id,

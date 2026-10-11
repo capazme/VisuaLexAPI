@@ -26,7 +26,7 @@ describe('decisions in the search history', () => {
     expect(both.body.detail).toBe('Una voce della cronologia è una norma o una sentenza, non entrambe');
     const neither = await post({}).expect(400);
     expect(neither.body.detail).toBe('Manca la norma o la sentenza');
-    for (const key of ['cassazione:tributario:1:2024', 'cassazione:civile:99999:2999', 'legge:241', 42]) {
+    for (const key of ['cassazione:tributario:99999:2024', 'cassazione:civile:99999:2999', 'legge:241', 42]) {
       const bad = await post({ decision_key: key }).expect(400);
       expect(bad.body.detail).toBe('La chiave della sentenza non è valida');
     }
@@ -42,9 +42,17 @@ describe('decisions in the search history', () => {
     expect(other.body.id).not.toBe(a.body.id);
   });
 
+  it('keeps the norm path: de-duplicates a norm within five minutes and refuses a malformed one in Italian', async () => {
+    const a = await post({ act_type: 'legge', act_number: '241', date: '1990' }).expect(201);
+    const b = await post({ act_type: 'legge', act_number: '241', date: '1990' }).expect(200);
+    expect(b.body.id).toBe(a.body.id);
+    const bad = await post({ act_type: '' }).expect(400);
+    expect(bad.body.detail).toBe('La norma della cronologia non è valida');
+  });
+
   it('the database refuses a row with neither kind or with both', async () => {
-    await expect(prisma.searchHistory.create({ data: { userId: alice.id } })).rejects.toThrow();
-    await expect(prisma.searchHistory.create({ data: { userId: alice.id, actType: 'legge', decisionKey: CASS } })).rejects.toThrow();
+    await expect(prisma.searchHistory.create({ data: { userId: alice.id } })).rejects.toThrow(/search_history_one_kind/);
+    await expect(prisma.searchHistory.create({ data: { userId: alice.id, actType: 'legge', decisionKey: CASS } })).rejects.toThrow(/search_history_one_kind/);
   });
 
   it('exports the decision key with the history and erases the rows with the account', async () => {
