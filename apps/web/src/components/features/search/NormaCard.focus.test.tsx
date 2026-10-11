@@ -95,6 +95,16 @@ describe('NormaCard — «show this article» on a phone', () => {
     expect(isOpen(2)).toBe(true);
   });
 
+  it('opens a card the reader closed, to show the article asked for', () => {
+    viewport(false);
+    const { rerender } = render(card());
+    const toggle = screen.getAllByRole('button', { name: /comprimi/ })[0];
+    fireEvent.click(toggle);
+    expect(screen.queryAllByText('Dispositivo Articolo')).toHaveLength(0);
+    rerender(card('2'));
+    expect(shown('2')).toBeGreaterThan(0);
+  });
+
   it('leaves the signal to the workspace block on a desktop', () => {
     viewport(true);
     render(card('3'));

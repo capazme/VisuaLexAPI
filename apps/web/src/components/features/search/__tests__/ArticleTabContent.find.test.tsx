@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArticleData, ArticleValidity, Highlight, NormaVisitata } from '../../../../types';
@@ -173,10 +173,25 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
     fireEvent.click(magnifier());
     typeQuery('puo');
     await waitFor(() => expect(drawn('vlx-find-current')).toBe(1));
-    fireEvent.click(magnifier());
+    // As in a browser: the pointer goes down on the button, which takes the focus from the field.
+    const button = magnifier();
+    fireEvent.pointerDown(button);
+    button.focus();
+    fireEvent.click(button);
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
     expect(registry.has('vlx-find-current')).toBe(false);
     expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('keeps focus on the magnifier when it closes the window with the field still holding focus', async () => {
+    showInTab(article({ article_text: ACCENTED.text }));
+    const button = magnifier();
+    fireEvent.click(button);
+    expect(screen.getByRole('searchbox')).toHaveFocus();
+    fireEvent.click(button);
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(button);
   });
 
   it('Esc closes it and gives the focus back to the magnifier that opened it', async () => {
@@ -238,5 +253,72 @@ describe('ArticleTabContent — the find window\'s text root', () => {
     const { unmount } = show(article());
     expect(findRootsFor()).toHaveLength(0);
     unmount();
+  });
+});
+
+
+describe('ArticleTabContent — a magnifier that was not pressed opens the window on its text', () => {
+  const NORMA_B: NormaVisitata = { ...NORMA, numero_articolo: '1285', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1285' };
+
+  afterEach(() => {
+    act(() => closeFindWindow());
+    appStore.setState({ workspaceTabs: [] });
+  });
+
+  it('on a background tab: the mousedown that raises the tab does not turn the click into a close', () => {
+    const a = article({ article_text: ACCENTED.text });
+    const b = article({ article_text: ACCENTED.text, norma_data: NORMA_B });
+    const tabA = appStore.getState().addWorkspaceTab('A', NORMA, [a]);
+    const tabB = appStore.getState().addWorkspaceTab('B', NORMA_B, [b]);
+    render(
+      <MemoryRouter>
+        <div data-testid="a"><ArticleTabContent data={a} readingOrigin={{ tabId: tabA, blockId: 'b' }} /></div>
+        <div data-testid="b"><ArticleTabContent data={b} readingOrigin={{ tabId: tabB, blockId: 'b' }} /></div>
+        <FindWindow />
+      </MemoryRouter>,
+    );
+    const mag = (id: string) => within(screen.getByTestId(id)).getAllByRole('button', { name: 'Cerca nel testo' })[0];
+
+    // B is in front; open on it, then go to A's magnifier.
+    fireEvent.click(mag('b'));
+    expect(mag('b')).toHaveAttribute('aria-pressed', 'true');
+    expect(mag('a')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.pointerDown(mag('a'));
+    act(() => appStore.getState().bringTabToFront(tabA)); // the tab panel's mousedown
+    fireEvent.click(mag('a'));
+
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(mag('a')).toHaveAttribute('aria-pressed', 'true');
+    expect(mag('b')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('on another article of the front tab: opens on that text instead of closing', () => {
+    const a = article({ article_text: ACCENTED.text });
+    const b = article({ article_text: ACCENTED.text, norma_data: NORMA_B });
+    const tab = appStore.getState().addWorkspaceTab('A', NORMA, [a, b]);
+    render(
+      <MemoryRouter>
+        <div data-testid="a"><ArticleTabContent data={a} readingOrigin={{ tabId: tab, blockId: 'b' }} /></div>
+        <div data-testid="b"><ArticleTabContent data={b} readingOrigin={{ tabId: tab, blockId: 'b' }} /></div>
+        <FindWindow />
+      </MemoryRouter>,
+    );
+    const mag = (id: string) => within(screen.getByTestId(id)).getAllByRole('button', { name: 'Cerca nel testo' })[0];
+
+    fireEvent.click(mag('a'));
+    expect(mag('a')).toHaveAttribute('aria-pressed', 'true');
+    expect(mag('b')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.pointerDown(mag('b'));
+    fireEvent.click(mag('b'));
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(mag('b')).toHaveAttribute('aria-pressed', 'true');
+    expect(mag('a')).toHaveAttribute('aria-pressed', 'false');
+
+    // Pressed on its own text, the same magnifier closes.
+    fireEvent.pointerDown(mag('b'));
+    fireEvent.click(mag('b'));
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
   });
 });

@@ -13,7 +13,7 @@ import {
   subscribeFindWindow,
   type FindWindowRequest,
 } from '../../../utils/findWindowControl';
-import { dragLimits, workspaceOrigin } from '../../../utils/workspaceOrigin';
+import { workspaceOrigin } from '../../../utils/workspaceOrigin';
 import { counterText, ICON_BUTTON } from './findBarParts';
 
 const PLACE_KEY = 'visualex:find-window-place';
@@ -21,8 +21,8 @@ const SCOPE_KEY = 'visualex:find-window-scope';
 /** About 420 px wide on a desktop (spec §13.1). */
 const WIDTH = 420;
 const MARGIN = 16;
-/** Pixels of the window that stay inside the viewport on every side it can be dragged past. */
-const MIN_VISIBLE = 96;
+/** Two lines: the field row and the scope row (used until the element is measured). */
+const ESTIMATED_HEIGHT = 80;
 const KEY_STEP = 16;
 
 interface Place {
@@ -30,12 +30,17 @@ interface Place {
   y: number;
 }
 
-/** Viewport coordinates (the window is `position: fixed`), clamped so a handle is always reachable. */
-function clampPlace(place: Place): Place {
-  const limits = dragLimits({ left: 0, top: 0 }, { width: window.innerWidth, height: window.innerHeight }, WIDTH, MIN_VISIBLE);
+/**
+ * Viewport coordinates (the window is `position: fixed`), clamped so the whole window stays inside
+ * the viewport: its handle, at the left edge, is then always reachable by pointer and keyboard.
+ * Its height is read from the element when there is one (it is a line or two tall).
+ */
+function clampPlace(place: Place, height = ESTIMATED_HEIGHT): Place {
+  const maxX = Math.max(0, window.innerWidth - WIDTH);
+  const maxY = Math.max(0, window.innerHeight - height);
   return {
-    x: Math.min(Math.max(place.x, limits.left), limits.right),
-    y: Math.min(Math.max(place.y, limits.top), limits.bottom),
+    x: Math.min(Math.max(place.x, 0), maxX),
+    y: Math.min(Math.max(place.y, 0), maxY),
   };
 }
 
@@ -98,12 +103,22 @@ interface Session {
  */
 export function FindWindow() {
   const [session, setSession] = useState<Session | null>(null);
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  });
 
   useEffect(
     () =>
       subscribeFindWindow((command) => {
         if (command.type === 'close') {
+          // Closed from outside (the magnifier pressed again): focus goes back to the magnifier when it
+          // was inside the window, or nowhere.
+          const target = sessionRef.current?.request.returnFocus;
+          const active = document.activeElement;
+          const lost = !active || active === document.body || !!active.closest('[data-testid="find-window"]');
           setSession(null);
+          if (lost && target?.isConnected) target.focus();
           return;
         }
         const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -174,8 +189,9 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
 
   // What the magnifiers read for `aria-pressed`.
   useEffect(() => {
-    reportFindWindowScope(scope === 'tab' ? front : null);
-  }, [scope, front]);
+    const pointedKey = prefer && prefer.tabId === front ? (prefer.targetKey ?? null) : null;
+    reportFindWindowScope(scope === 'tab' ? front : null, pointedKey);
+  }, [scope, front, prefer]);
   useEffect(() => () => reportFindWindowScope(null), []);
 
   const close = () => {
@@ -200,6 +216,8 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
   };
 
   // The place: stored for the session, clamped on open and on resize.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const clamp = useCallback((p: Place) => clampPlace(p, rootRef.current?.offsetHeight || ESTIMATED_HEIGHT), []);
   const [place, setPlace] = useState<Place>(() => clampPlace(readPlace() ?? defaultPlace()));
   const placeRef = useRef(place);
   const moveTo = useCallback((next: Place) => {
@@ -207,10 +225,10 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
     setPlace(next);
   }, []);
   useEffect(() => {
-    const onResize = () => moveTo(clampPlace(placeRef.current));
+    const onResize = () => moveTo(clamp(placeRef.current));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [moveTo]);
+  }, [moveTo, clamp]);
 
   const dragOffset = useRef<Place | null>(null);
   const onHandleDown = (e: PointerEvent<HTMLButtonElement>) => {
@@ -219,7 +237,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
   };
   const onHandleMove = (e: PointerEvent<HTMLButtonElement>) => {
     const offset = dragOffset.current;
-    if (offset) moveTo(clampPlace({ x: e.clientX - offset.x, y: e.clientY - offset.y }));
+    if (offset) moveTo(clamp({ x: e.clientX - offset.x, y: e.clientY - offset.y }));
   };
   const onHandleUp = () => {
     if (!dragOffset.current) return;
@@ -237,7 +255,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
     const move = delta[e.key];
     if (!move) return;
     e.preventDefault();
-    const next = clampPlace({ x: placeRef.current.x + move.x, y: placeRef.current.y + move.y });
+    const next = clamp({ x: placeRef.current.x + move.x, y: placeRef.current.y + move.y });
     moveTo(next);
     savePlace(next);
   };
@@ -251,6 +269,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
 
   return (
     <div
+      ref={rootRef}
       role="search"
       aria-label="Cerca nel testo"
       data-testid="find-window"
@@ -297,6 +316,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
         />
         <span role="status" aria-live="polite" className={cn('whitespace-nowrap px-1 text-xs text-slate-500 dark:text-slate-400', !isDesktop && 'flex-1')}>
           {counterText(find)}
+          {where && <span className="sr-only">{`, ${where}`}</span>}
         </span>
         <button type="button" onClick={find.previous} aria-label="Risultato precedente" title="Risultato precedente" className={button}>
           <ChevronUp size={16} aria-hidden />
@@ -328,7 +348,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
           ))}
         </div>
         {where && (
-          <span data-testid="find-where" className="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-400" title={where}>
+          <span data-testid="find-where" aria-hidden className="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-400" title={where}>
             {where}
           </span>
         )}

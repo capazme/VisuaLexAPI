@@ -57,7 +57,7 @@ export interface ReadingToolbarProps {
         /** The window is open and scoped to this tab. */
         isOpen: boolean;
         /** Told which of the two buttons was on screen, for the window to give focus back to. */
-        onToggle: (button: HTMLElement | null) => void;
+        onToggle: (button: HTMLElement | null, wasPressed: boolean) => void;
     };
 }
 
@@ -95,10 +95,10 @@ export function ReadingToolbar({
     // Both rows are mounted and one is hidden by CSS: the window returns focus to the one on screen.
     const desktopFindRef = useRef<HTMLButtonElement>(null);
     const phoneFindRef = useRef<HTMLButtonElement>(null);
-    const toggleFind = () => {
+    const toggleFind = (wasPressed: boolean) => {
         if (!find) return;
         const desktop = desktopFindRef.current;
-        find.onToggle(desktop && desktop.getClientRects().length > 0 ? desktop : phoneFindRef.current);
+        find.onToggle(desktop && desktop.getClientRects().length > 0 ? desktop : phoneFindRef.current, wasPressed);
     };
     // A switched-off tool keeps its name and gains the reason in its tooltip.
     const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);

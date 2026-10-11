@@ -148,6 +148,18 @@ describe('useAppStore focusArticleInTab — showing an article opens what hides 
         expect(tab.isMinimized).toBe(false);
     });
 
+    it('signals a loose article, so its collapsed card opens, and raises and restores its tab', () => {
+        appStore.setState({
+            workspaceTabs: [tabWith([{ type: 'loose-article', id: 'loose', article, sourceNorma: norma }])],
+        });
+        appStore.getState().focusArticleInTab('t', '2043');
+        appStore.getState().focusArticleInTab('t', '2043');
+        const tab = appStore.getState().workspaceTabs[0];
+        const loose = tab.content[0];
+        expect(loose.type === 'loose-article' && loose.revealSignal).toBe(2);
+        expect(tab.isMinimized).toBe(false);
+    });
+
     it('leaves an article that is not in the tab alone', () => {
         appStore.setState({
             workspaceTabs: [tabWith([{ type: 'norma', id: 'blk', norma: { tipo_atto: 'codice civile', data: '' }, articles: [article], isCollapsed: true }])],

@@ -1,6 +1,21 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
+vi.mock('../../../services/articleDiscussionService', () => ({
+  articleDiscussionService: {
+    list: vi.fn().mockResolvedValue({ data: [], pagination: { page: 1, limit: 20, total: 0, pages: 1 } }),
+    listPassages: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    comment: vi.fn(),
+    report: vi.fn(),
+    voteThread: vi.fn(),
+    voteComment: vi.fn(),
+    setPassageReleased: vi.fn(),
+  },
+}));
+
 import { FindWindow } from './FindWindow';
+import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { appStore } from '../../../store/useAppStore';
 import type { ArticleData, NormaVisitata } from '../../../types';
 import { buildItemKey } from '../../../utils/normaKeys';
@@ -55,6 +70,12 @@ const typeQuery = (value: string) => fireEvent.change(field(), { target: { value
 const counter = () => screen.getByRole('status');
 const win = () => screen.getByTestId('find-window');
 const handle = () => screen.getByRole('button', { name: 'Sposta la finestra di ricerca' });
+
+/** jsdom's pointer events carry no coordinates: a mouse event under the pointer event's name does. */
+const pointer = (type: string, clientX: number, clientY: number) =>
+  act(() => {
+    handle().dispatchEvent(new MouseEvent(type, { clientX, clientY, bubbles: true }));
+  });
 
 function ScopedProbe({ tabId }: { tabId: string }) {
   return <span data-testid="probe">{String(useFindWindowScopedTo(tabId))}</span>;
@@ -163,10 +184,60 @@ describe('FindWindow — opening', () => {
     await settle();
     expect(screen.getByRole('button', { name: 'Tutte le schede' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'false');
-    expect(counter()).toHaveTextContent(/^\d di 3$/);
+    expect(counter()).toHaveTextContent(/^\d di 3/);
     expect(screen.getByTestId('find-where')).toHaveTextContent('Tab A');
+    // The place is in the polite live region with the counter.
+    expect(counter()).toHaveTextContent('Tab A');
     act(() => screen.getByRole('button', { name: 'Risultato successivo' }).click());
     expect(screen.getByTestId('find-where')).toHaveTextContent('Tab B');
+    expect(counter()).toHaveTextContent('Tab B');
+  });
+
+  it('spends the magnifier\'s preference on the first query: later ones start in the front tab', async () => {
+    const a = addDrawnTab('A', N1, 'un fatto in A');
+    const b = addDrawnTab('B', N2, 'fatto uno, fatto due');
+    render(<FindWindow />);
+    act(() => openFindWindow({ tabId: a, targetKey: keyOf(N1) }));
+    typeQuery('fatto');
+    await settle();
+    expect(counter()).toHaveTextContent('1 di 1');
+
+    // The reader moves on to B and widens the search; a new query starts where the reader is.
+    act(() => appStore.getState().bringTabToFront(b));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    await settle();
+    typeQuery('fatt');
+    await settle();
+    expect(counter()).toHaveTextContent('2 di 3');
+    expect(screen.getByTestId('find-where')).toHaveTextContent('B');
+  });
+
+  it('a magnifier on another text of the same tab is not pressed while the window is pointed elsewhere', async () => {
+    const a = addDrawnTab('A', N1, 'un fatto');
+    function Probe({ k }: { k: string }) {
+      return <span data-testid={`probe-${k}`}>{String(useFindWindowScopedTo(a, k))}</span>;
+    }
+    render(<><FindWindow /><Probe k={keyOf(N1)} /><Probe k="altro" /></>);
+    act(() => openFindWindow({ tabId: a, targetKey: keyOf(N1) }));
+    await settle();
+    expect(screen.getByTestId(`probe-${keyOf(N1)}`)).toHaveTextContent('true');
+    expect(screen.getByTestId('probe-altro')).toHaveTextContent('false');
+  });
+
+  it('with two texts in one tab, the magnifier\'s targetKey picks the first match, not just the tab', async () => {
+    const a = appStore.getState().addWorkspaceTab('A', N1, [article(N1, 'un fatto uno'), article(N2, 'un fatto due')]);
+    for (const [n, text] of [[N1, 'un fatto uno'], [N2, 'un fatto due']] as const) {
+      const element = document.createElement('div');
+      element.textContent = text;
+      document.body.appendChild(element);
+      cleanups.push(registerFindRoot({ tabId: a, targetKey: keyOf(n), label: 'art.', element }));
+    }
+    render(<FindWindow />);
+    act(() => openFindWindow({ tabId: a, targetKey: keyOf(N2) }));
+    typeQuery('fatto');
+    await settle();
+    expect(counter()).toHaveTextContent('2 di 2');
+    expect(registry.get('vlx-find-current')?.ranges[0].startContainer.parentElement?.textContent).toBe('un fatto due');
   });
 
   it('remembers the scope for the session', () => {
@@ -220,6 +291,25 @@ describe('FindWindow — Esc', () => {
     expect(registry.has('vlx-find-current')).toBe(false);
     expect(registry.has('vlx-find')).toBe(false);
     expect(opener).toHaveFocus();
+  });
+
+  it('with a real discussion panel open, Esc closes the window and leaves the panel open', async () => {
+    const onPanelClose = vi.fn();
+    const { unmount } = render(
+      <>
+        <FindWindow />
+        <ArticleDiscussionPanel anchor={{ normaKey: 'k1', articleId: '1', articleLabel: '1' }} isOpen onClose={onPanelClose} />
+      </>,
+    );
+    await settle();
+    act(() => openFindWindow());
+    fireEvent.keyDown(field(), { key: 'Escape' });
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(onPanelClose).not.toHaveBeenCalled();
+    // The panel still answers its own Esc.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(onPanelClose).toHaveBeenCalledTimes(1);
+    unmount();
   });
 
   it('returns the focus to what held it when it was opened from the keyboard', () => {
@@ -289,14 +379,47 @@ describe('FindWindow — its place', () => {
     sessionStorage.setItem('visualex:find-window-place', JSON.stringify({ x: 99999, y: -500 }));
     render(<FindWindow />);
     act(() => openFindWindow());
-    expect(parseFloat(win().style.left)).toBeLessThanOrEqual(window.innerWidth - 96);
+    expect(parseFloat(win().style.left)).toBe(window.innerWidth - 420);
     expect(parseFloat(win().style.top)).toBe(0);
 
     act(() => {
       window.innerWidth = 500;
       window.dispatchEvent(new Event('resize'));
     });
-    expect(parseFloat(win().style.left)).toBeLessThanOrEqual(500 - 96);
+    expect(parseFloat(win().style.left)).toBe(500 - 420);
+  });
+
+  it('keeps the whole window inside the viewport: the handle stays reachable on every side', () => {
+    sessionStorage.setItem('visualex:find-window-place', JSON.stringify({ x: -300, y: 99999 }));
+    render(<FindWindow />);
+    act(() => openFindWindow());
+    expect(parseFloat(win().style.left)).toBe(0);
+    expect(parseFloat(win().style.top)).toBeLessThan(window.innerHeight);
+    expect(parseFloat(win().style.top)).toBeGreaterThan(window.innerHeight - 200);
+    for (let i = 0; i < 80; i += 1) fireEvent.keyDown(handle(), { key: 'ArrowLeft', shiftKey: true });
+    expect(parseFloat(win().style.left)).toBe(0);
+    for (let i = 0; i < 80; i += 1) fireEvent.keyDown(handle(), { key: 'ArrowRight', shiftKey: true });
+    expect(parseFloat(win().style.left)).toBe(window.innerWidth - 420);
+  });
+
+  it('is dragged by the pointer, kept inside the viewport, and the place is saved on release', () => {
+    render(<FindWindow />);
+    act(() => openFindWindow());
+    const startLeft = parseFloat(win().style.left);
+    const startTop = parseFloat(win().style.top);
+    pointer('pointerdown', 500, 100);
+    pointer('pointermove', 450, 130);
+    expect(parseFloat(win().style.left)).toBe(startLeft - 50);
+    expect(parseFloat(win().style.top)).toBe(startTop + 30);
+    expect(sessionStorage.getItem('visualex:find-window-place')).toBeNull();
+    pointer('pointermove', -5000, -5000);
+    expect(parseFloat(win().style.left)).toBe(0);
+    expect(parseFloat(win().style.top)).toBe(0);
+    pointer('pointerup', 0, 0);
+    expect(JSON.parse(sessionStorage.getItem('visualex:find-window-place')!)).toEqual({ x: 0, y: 0 });
+    // Released: further movement does not drag.
+    pointer('pointermove', 300, 300);
+    expect(parseFloat(win().style.left)).toBe(0);
   });
 
   it('ignores a stored place that is not two numbers', () => {

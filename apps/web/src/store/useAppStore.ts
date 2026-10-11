@@ -136,6 +136,8 @@ interface LooseArticle {
     id: string;
     article: ArticleData;
     sourceNorma: Norma;
+    /** Bumped by `focusArticleInTab`: the card opens when it changes (the find window showing a collapsed loose article). */
+    revealSignal?: number;
 }
 
 interface CollectionArticle {
@@ -1203,6 +1205,16 @@ const appStore = createStore<AppState>()(
                     );
                 }) as NormaBlock | undefined;
                 if (!block) {
+                    const loose = tab.content.find(c => c.type === 'loose-article' &&
+                        normalizeArticleId(uniqueArticleIdFromNorma(c.article.norma_data)) === wanted
+                    ) as LooseArticle | undefined;
+                    if (loose) {
+                        loose.revealSignal = (loose.revealSignal ?? 0) + 1;
+                        tab.isMinimized = false;
+                        tab.isHidden = false;
+                        tab.zIndex = ++state.highestZIndex;
+                        return;
+                    }
                     // A collection holds loose copies: showing the article is opening the collection.
                     const collection = tab.content.find(c => c.type === 'collection' && c.articles.some(
                         a => normalizeArticleId(uniqueArticleIdFromNorma(a.article.norma_data)) === wanted

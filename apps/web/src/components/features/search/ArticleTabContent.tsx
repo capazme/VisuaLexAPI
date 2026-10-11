@@ -185,7 +185,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // preview outside the workspace, such as the palette's result card) registers nothing.
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
     useRegisterFindRoot(originTabId ?? tabId, findTargetKey, shortNorm(norma_data), textRootRef);
-    const isFindOpen = useFindWindowScopedTo(originTabId ?? tabId);
+    const isFindOpen = useFindWindowScopedTo(originTabId ?? tabId, findTargetKey);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],
@@ -774,7 +774,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onCompare={handleCompare}
                 find={display.textVisible ? {
                     isOpen: isFindOpen,
-                    onToggle: (button) => (isFindOpen
+                    onToggle: (button, wasPressed) => (wasPressed
                         ? closeFindWindow()
                         : openFindWindow({ tabId: originTabId ?? tabId, targetKey: findTargetKey, returnFocus: button })),
                 } : undefined}

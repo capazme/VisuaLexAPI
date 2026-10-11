@@ -102,7 +102,9 @@ export function Layout() {
         toggleSearchPanel();
       }
       // Cmd/Ctrl+F opens the floating find window (spec §13.1), or focuses its field when it is open.
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+      // Under a modal overlay (a dialog, the discussion panel, Study Mode) the browser's own find is left alone.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f'
+        && !document.querySelector('[aria-modal="true"]')) {
         e.preventDefault();
         openFindWindow();
       }

@@ -144,7 +144,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   // The find window's target for this decision (spec §13.1, Task 33 ruling 1): one text, keyed by
   // its own `decisionKey`. No `hostTabId` (a host with no tab) registers nothing.
   useRegisterFindRoot(hostTabId, key, label, textRootRef);
-  const isFindOpen = useFindWindowScopedTo(hostTabId);
+  const isFindOpen = useFindWindowScopedTo(hostTabId, key);
 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
@@ -219,7 +219,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
-        onToggleFind={() => (isFindOpen ? closeFindWindow() : openFindWindow({ tabId: hostTabId, targetKey: key, returnFocus: findButtonRef.current }))}
+        onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: hostTabId, targetKey: key, returnFocus: findButtonRef.current }))}
         findButtonRef={findButtonRef}
       />
       <NotesPeekPanel

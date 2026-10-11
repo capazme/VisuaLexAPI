@@ -29,6 +29,13 @@ export function LooseArticleCard({
 }: LooseArticleCardProps) {
   const { article, sourceNorma } = looseArticle;
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // «Show this article» from the store (the find window's «go to»): a collapsed card opens, adjusted
+  // during render when the signal changes.
+  const [seenReveal, setSeenReveal] = useState(looseArticle.revealSignal);
+  if (looseArticle.revealSignal !== seenReveal) {
+    setSeenReveal(looseArticle.revealSignal);
+    setIsCollapsed(false);
+  }
   const [studyModeOpen, setStudyModeOpen] = useState(false);
   const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
   const [dossierBtnEl, setDossierBtnEl] = useState<HTMLButtonElement | null>(null);

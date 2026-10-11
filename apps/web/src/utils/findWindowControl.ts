@@ -38,18 +38,27 @@ export function subscribeFindWindow(listener: (command: FindWindowCommand) => vo
 }
 
 let scopedTabId: string | null = null;
+let pointedKey: string | null = null;
 const scopeListeners = new Set<() => void>();
 
 /** What the window reports: the tab it is open on in «Questa scheda», `null` when it is closed or
- *  searching every tab. */
-export function reportFindWindowScope(tabId: string | null): void {
-  if (scopedTabId === tabId) return;
+ *  searching every tab; and the text in that tab it was pointed at by a magnifier (`null`: the
+ *  whole tab, as a bare Cmd/Ctrl+F leaves it). */
+export function reportFindWindowScope(tabId: string | null, targetKey: string | null = null): void {
+  if (scopedTabId === tabId && pointedKey === targetKey) return;
   scopedTabId = tabId;
+  pointedKey = targetKey;
   for (const listener of scopeListeners) listener();
 }
 
 export function getFindWindowScope(): string | null {
   return scopedTabId;
+}
+
+/** Whether the window is open on `tabId` and, when it was pointed at one text, on `targetKey`. */
+export function isFindWindowScopedTo(tabId: string | undefined, targetKey?: string): boolean {
+  if (tabId === undefined || scopedTabId !== tabId) return false;
+  return targetKey === undefined || pointedKey === null || pointedKey === targetKey;
 }
 
 export function subscribeFindWindowScope(listener: () => void): () => void {

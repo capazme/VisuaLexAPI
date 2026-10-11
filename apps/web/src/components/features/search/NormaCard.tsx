@@ -134,7 +134,11 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
   if (autoFocusArticleId !== seenFocusSignal) {
     setSeenFocusSignal(autoFocusArticleId);
     const wanted = !isDesktop && autoFocusArticleId ? findArticleByNormalizedId(articles, autoFocusArticleId) : undefined;
-    if (wanted) focusTab(getUniqueArticleId(wanted));
+    if (wanted) {
+      focusTab(getUniqueArticleId(wanted));
+      // A card the reader closed opens to show it.
+      setIsOpen(true);
+    }
   }
   const consumeAutoFocusArticle = useAppStore((s) => s.consumeAutoFocusArticle);
   useEffect(() => {

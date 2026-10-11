@@ -42,8 +42,9 @@ export interface UseFindWindowOptions {
   scope: FindScope;
   /** Nothing is searched, drawn or recomputed while false — the window is closed. */
   open: boolean;
-  /** Where a fresh query starts: the first match in this tab (and target, when given) wins over the
-   *  front tab's — the magnifier of a reading toolbar opens the window on its own text. */
+  /** Where the first fresh query starts: the first match in this tab (and target, when given) wins
+   *  over the front tab's — the magnifier of a reading toolbar opens the window on its own text.
+   *  Spent by that first computation; a new object re-arms it. */
   prefer?: { tabId: string; targetKey?: string } | null;
 }
 
@@ -187,9 +188,15 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const isDesktopRef = useRef(isDesktop);
   const revealTabRef = useRef(revealTab);
   const focusArticleInTabRef = useRef(focusArticleInTab);
+  // `prefer` applies to the first fresh computation after it is given, then it is spent: later
+  // queries start from the front tab, as Cmd/Ctrl+F does.
   const preferRef = useRef(prefer);
+  const givenPreferRef = useRef(prefer);
   useEffect(() => {
-    preferRef.current = prefer;
+    if (givenPreferRef.current !== prefer) {
+      givenPreferRef.current = prefer;
+      preferRef.current = prefer;
+    }
     queryRef.current = query;
     scopeRef.current = scope;
     workspaceTabsRef.current = workspaceTabs;
@@ -483,6 +490,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
           newIndex = pickInitial(all, front);
           const chosen = newIndex >= 0 ? all[newIndex] : undefined;
           scroll = fresh && !!chosen && chosen.onScreen && (chosen.tabId === front || chosen.tabId === preferRef.current?.tabId);
+          if (fresh) preferRef.current = null;
         } else {
           const sameTarget = all.filter((m) => m.id === cur.id);
           let kept: FlatMatch | undefined;

@@ -56,4 +56,20 @@ describe('Layout — Cmd/Ctrl+F', () => {
     expect(field).toHaveFocus();
     expect([field.selectionStart, field.selectionEnd]).toEqual([0, 5]);
   });
+
+  it('leaves the browser\'s own find alone under a modal overlay', () => {
+    render(<MemoryRouter><Layout /></MemoryRouter>);
+    const overlay = document.createElement('div');
+    overlay.setAttribute('aria-modal', 'true');
+    document.body.appendChild(overlay);
+    const event = new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, cancelable: true, bubbles: true });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    overlay.remove();
+    press({ ctrlKey: true });
+    expect(screen.getByRole('search')).toBeInTheDocument();
+  });
 });

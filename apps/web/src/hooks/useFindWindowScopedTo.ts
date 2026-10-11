@@ -1,9 +1,13 @@
 import { useSyncExternalStore } from 'react';
-import { getFindWindowScope, subscribeFindWindowScope } from '../utils/findWindowControl';
+import { isFindWindowScopedTo, subscribeFindWindowScope } from '../utils/findWindowControl';
 
-/** Whether the find window is open and scoped to `tabId` («Questa scheda» on that tab): the
- *  magnifier's `aria-pressed`. False for a surface with no tab. */
-export function useFindWindowScopedTo(tabId: string | undefined): boolean {
-  const scoped = useSyncExternalStore(subscribeFindWindowScope, getFindWindowScope, () => null);
-  return tabId !== undefined && scoped === tabId;
+/** Whether the find window is open and scoped to `tabId` («Questa scheda» on that tab) and, when
+ *  `targetKey` is given, to that text: the magnifier's `aria-pressed`. A window pointed at another
+ *  text of the same tab is not pressed here. False for a surface with no tab. */
+export function useFindWindowScopedTo(tabId: string | undefined, targetKey?: string): boolean {
+  return useSyncExternalStore(
+    subscribeFindWindowScope,
+    () => isFindWindowScopedTo(tabId, targetKey),
+    () => false,
+  );
 }

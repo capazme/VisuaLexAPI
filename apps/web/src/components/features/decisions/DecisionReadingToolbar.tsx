@@ -20,7 +20,7 @@ export interface DecisionReadingToolbarProps {
   /** «Cerca nel testo»: the toolbar is drawn over a decision with text, so the button is always there. `isFindOpen`: the
    *  floating find window is open and scoped to this tab. */
   isFindOpen: boolean;
-  onToggleFind: () => void;
+  onToggleFind: (wasPressed: boolean) => void;
   findButtonRef?: Ref<HTMLButtonElement>;
 }
 

@@ -954,7 +954,7 @@ and what goes.
 
 **The window.** One window for the whole app, mounted once in the signed-in layout and portalled
 to the document: a field «Cerca nel testo», the counter, «Risultato precedente» / «Risultato
-successivo» (↑ ↓), a scope switch and «Chiudi la ricerca» (×). It is small (one row, about 420 px
+successivo» (↑ ↓), a scope switch and «Chiudi la ricerca» (×). It is small (a row for the field and its buttons, and a second line for the scope switch, about 420 px
 wide on a desktop), it is not modal (the reader keeps reading, selecting and scrolling while it is
 open), it can be dragged by its handle, and its place is remembered for the session
 (`sessionStorage`, clamped to the viewport, never stored with the workspace); it opens at the top
@@ -968,6 +968,9 @@ that tab, with the first match taken in that text; there is no box under the too
 Esc in the window closes it, clears the highlights and returns the focus to where it was (the
 magnifier, when it was opened from one); it does not reach an open discussion panel or citation
 preview. Enter and Shift+Enter move as in §13 and wrap.
+While a modal overlay is open (any element with `aria-modal="true"`: a dialog, the discussion
+panel, Study Mode) Cmd/Ctrl+F is not intercepted: the browser's own find works and the window does
+not open. A window already open when an overlay opens stays under it.
 
 **What it searches: the tab, or every tab.** A two-state switch, «Questa scheda» / «Tutte le
 schede» (`aria-pressed`), remembered for the session. «Questa scheda» is the tab in front: on a
@@ -1005,7 +1008,7 @@ and the navigation request), the article renderer's `search` mark kind (`searchQ
 in the two toolbars). With the `search` marks gone the article renderer adds no element for a
 search at all, so a search never changes the text DOM on either surface (root rule 23).
 
-**Not covered yet.** The dossier reader and Study Mode (Later). Cmd/Ctrl+F there still opens the
+**Not covered yet.** The dossier reader and Study Mode (Later). Cmd/Ctrl+F in Study Mode is left to the browser (see «How it opens»); on the dossier it opens the
 window over the workspace's tabs, not over the dossier's text.
 
 ## Security and data

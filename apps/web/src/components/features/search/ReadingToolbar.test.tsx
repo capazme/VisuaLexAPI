@@ -211,10 +211,10 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
         // jsdom has no layout: say that the desktop row is the one on screen
         desktop.getClientRects = () => [{}] as unknown as DOMRectList;
         fireEvent.click(phone);
-        expect(f.onToggle).toHaveBeenLastCalledWith(desktop);
+        expect(f.onToggle).toHaveBeenLastCalledWith(desktop, false);
         desktop.getClientRects = () => [] as unknown as DOMRectList;
         fireEvent.click(desktop);
-        expect(f.onToggle).toHaveBeenLastCalledWith(phone);
+        expect(f.onToggle).toHaveBeenLastCalledWith(phone, false);
     });
 
     it('draws no box under the buttons, shows the window open on the buttons and keeps the phone buttons at 44 px', () => {
