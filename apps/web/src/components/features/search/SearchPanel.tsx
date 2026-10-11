@@ -30,6 +30,22 @@ import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
 import { shortAct } from '../../../utils/sources';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
+import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { practiceArticleKey } from '../../../utils/practice';
+import { actKeyOf } from '../dossier/dossierLayout';
+import type { PracticeStreaming } from '../practice/PracticeParts';
+
+// The practice's table (spec 2026-10-08-norm-tab-container-design.md, behind
+// VITE_FEATURE_PRACTICE_TABLE): loaded only when the flag draws it, so the old
+// workspace's bundle carries none of it.
+const PracticeTable = lazy(() => import('../practice/PracticeTable').then(m => ({ default: m.PracticeTable })));
+const PracticeBar = lazy(() => import('../practice/PracticeBar').then(m => ({ default: m.PracticeBar })));
+const PracticePhoneView = lazy(() => import('../practice/PracticePhoneView').then(m => ({ default: m.PracticePhoneView })));
+
+/** A row a search added to a practice (it was not there before): the annex auto-switch removes
+ *  the stray rows of the first search, and only those (spec §5.2). */
+interface CreatedRow { practiceId: string; actId: string; articleKey: string; norma: Norma }
 
 // Estimate the number of articles a search will return based on the `article`
 // field. Used both for the streaming progress bar and the loading skeleton.
@@ -103,6 +119,15 @@ export function SearchPanel() {
 
   // Track active streaming tab to avoid creating duplicates
   const streamingTabRef = useRef<{ normaKey: string; tabId: string } | null>(null);
+
+  // The practices (flag on): one layout per breakpoint (T4, gotcha 26); the practice the current
+  // search lands in (its first result decides, the rest follow it); the rows it created.
+  const practiceTable = isPracticeTableEnabled();
+  const isDesktop = useIsDesktop();
+  const practiceCount = useAppStore((s) => s.practices.length);
+  const streamingPracticeRef = useRef<string | null>(null);
+  const [streamingPracticeId, setStreamingPracticeId] = useState<string | null>(null);
+  const createdRowsRef = useRef<CreatedRow[]>([]);
 
   // R2 (streaming-ux): how many articles the current search is expected to
   // produce. When it's exactly 1, processResult auto-focuses the single
@@ -214,6 +239,33 @@ export function SearchPanel() {
       const allegato = result.norma_data.allegato;
       const articleUniqueId = allegato ? `all${allegato}:${numero}` : numero;
 
+      // The practices (spec §5.1, T11): the dossier's practice (`targetTabId`, gotcha 15), else the
+      // one this search already landed in, else the active one, created when there is none. Which
+      // rows open (§3.2): the one article a one-article search asked for (R2), the first article of
+      // an act new to the practice in a range (R1), the article a deep link names; never on the
+      // dossier's queue, which would jump to every article as it lands.
+      if (isPracticeTableEnabled()) {
+        const store = appStore.getState();
+        const wanted = targetTabId ?? streamingPracticeRef.current;
+        const landingId = wanted && store.practices.some((p) => p.id === wanted) ? wanted : store.activePracticeId;
+        const heldAct = store.practices.find((p) => p.id === landingId)?.acts.find((a) => a.key === actKeyOf(norma));
+        const articleKey = practiceArticleKey(result);
+        const isNewRow = !heldAct?.articles.some((a) => practiceArticleKey(a) === articleKey);
+        const isDeepLinkTarget = deepLinkFocusRef.current === articleUniqueId;
+        const reveal = isDeepLinkTarget || (!targetTabId && (expectedTotalRef.current === 1 || !heldAct));
+        const landed = store.addArticlesToPractice(wanted, norma, [result], {
+          ...(reveal ? { reveal: 'first' as const } : {}),
+          ...(tabLabel ? { label: tabLabel } : {}),
+        });
+        if (streamingPracticeRef.current !== landed.practiceId) {
+          streamingPracticeRef.current = landed.practiceId;
+          setStreamingPracticeId(landed.practiceId);
+        }
+        if (isNewRow) createdRowsRef.current.push({ practiceId: landed.practiceId, actId: landed.actId, articleKey, norma });
+        if (isDeepLinkTarget) deepLinkFocusRef.current = null;
+        return;
+      }
+
       // Direct-merge path: when the caller pre-created a tab (dossier "apri
       // tutto") and passed its id, we bypass all label-matching logic and
       // always merge into that tab. Also binds streamingTabRef so subsequent
@@ -324,6 +376,9 @@ export function SearchPanel() {
     acceptedRef.current = 0;
     setResultsBuffer({}); // Clear buffer before new search
     streamingTabRef.current = null; // Reset streaming tab tracker
+    streamingPracticeRef.current = null;
+    setStreamingPracticeId(null);
+    createdRowsRef.current = [];
 
     const expectedTotal = calculateExpectedArticles(params.article || '');
     expectedTotalRef.current = expectedTotal;
@@ -339,7 +394,8 @@ export function SearchPanel() {
 
     // A search started from another tab (a norm cited in a decision): once its first result has
     // landed, the tab that holds it goes beside that one, the asking tab on the left. Once per search.
-    let placed = !params.besideTabId;
+    // (The practices place no tab: in P3 everything reads in the table.)
+    let placed = !params.besideTabId || isPracticeTableEnabled();
     const placeBeside = () => {
       const destination = streamingTabRef.current?.tabId;
       if (placed || !destination || !params.besideTabId) return;
@@ -443,6 +499,7 @@ export function SearchPanel() {
       if (streamAbortRef.current === controller) {
         setIsLoading(false);
         setLoadingProgress(null);
+        setStreamingPracticeId(null);
         streamAbortRef.current = null;
       }
     }
@@ -462,6 +519,19 @@ export function SearchPanel() {
 
   // Process results buffer and create workspace tabs
   useEffect(() => {
+    if (Object.keys(resultsBuffer).length > 0 && !isLoading && isPracticeTableEnabled()) {
+      // The practices: every group joins the active practice (created when there is none, named
+      // after the dossier's label when one was given); the first group's first row opens (R1/R2).
+      Object.values(resultsBuffer).forEach((group, index) => {
+        appStore.getState().addArticlesToPractice(null, group.norma, group.articles, {
+          ...(index === 0 ? { reveal: 'first' as const } : {}),
+          ...(customTabLabel ? { label: customTabLabel } : {}),
+        });
+      });
+      setResultsBuffer({});
+      setCustomTabLabel(null);
+      return;
+    }
     if (Object.keys(resultsBuffer).length > 0 && !isLoading) {
 
       // Use custom label if provided (e.g., from dossier), otherwise generate default
@@ -604,6 +674,18 @@ export function SearchPanel() {
     onSearch: handleSearch,
     isLoading,
     onRemoveDuplicateTabs: (params) => {
+      // The practices close nothing: the annex's articles are rows of their own (`allegato` is in
+      // the row's key). Only the stray rows the first search created are taken off (spec §5.2).
+      if (isPracticeTableEnabled()) {
+        const sameAct = (n: Norma) =>
+          n.tipo_atto.toLowerCase() === params.act_type.toLowerCase() && n.numero_atto === params.act_number && n.data === params.date;
+        const { removePracticeArticle } = appStore.getState();
+        for (const row of createdRowsRef.current) {
+          if (sameAct(row.norma)) removePracticeArticle(row.practiceId, row.actId, row.articleKey);
+        }
+        createdRowsRef.current = createdRowsRef.current.filter((row) => !sameAct(row.norma));
+        return;
+      }
       // Remove any existing tabs with the same norma (from the initial search without annex)
       const duplicateTabs = workspaceTabs.filter(tab =>
         tab.content.some(item =>
@@ -638,6 +720,15 @@ export function SearchPanel() {
       show_brocardi_info: !requestIsHistorical(normaData),
       annex: normaData.allegato || undefined  // Preserve annex when navigating via cross-reference
     };
+    // The practices: an article of the same act already on the table is revealed, not searched again
+    // (T2); a past text's jump asks for its own version, so it searches.
+    if (isPracticeTableEnabled() && !requestIsHistorical(normaData)) {
+      const { practices, activePracticeId, revealPracticeArticle } = appStore.getState();
+      const practice = practices.find((p) => p.id === activePracticeId);
+      const act = practice?.acts.find((a) => a.key === actKeyOf(normaData));
+      const articleId = normaData.allegato ? `all${normaData.allegato}:${articleNumber}` : articleNumber;
+      if (practice && act && revealPracticeArticle(practice.id, act.id, articleId)) return;
+    }
     handleSearch(params);
   }, [handleSearch]);
 
@@ -661,6 +752,13 @@ export function SearchPanel() {
         act_number: params.act_number || undefined,
         date: params.date || undefined,
       });
+
+      // The practices: the act lands on the active practice (created when there is none) and the
+      // structure window points at it, in one step (spec §5.1).
+      if (isPracticeTableEnabled()) {
+        appStore.getState().addActIndexToPractice(null, norma);
+        return;
+      }
 
       // Land on the tab the user is already working in; only open a new one
       // when the workspace is empty.
@@ -703,8 +801,11 @@ export function SearchPanel() {
     }
   };
 
-  const hasTabs = workspaceTabs.length > 0;
+  const hasTabs = practiceTable ? practiceCount > 0 : workspaceTabs.length > 0;
   const activeMobileTab = workspaceTabs[mobileActiveTabIndex];
+  const practiceStreaming: PracticeStreaming | null = loadingProgress && streamingPracticeId
+    ? { practiceId: streamingPracticeId, ...loadingProgress }
+    : null;
 
   return (
     <>
@@ -723,8 +824,26 @@ export function SearchPanel() {
         }}
       />
 
+      {/* The practices (flag on): the table and the bar on the desktop, the phone's table below md;
+          one layout mounted (T4, gotcha 26), loaded only here. */}
+      {practiceTable && (
+        <Suspense fallback={null}>
+          {isDesktop ? (
+            <>
+              <div id={WORKSPACE_AREA_ID} className="w-full">
+                <PracticeTable onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
+              </div>
+              <PracticeBar />
+            </>
+          ) : (
+            <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
+          )}
+        </Suspense>
+      )}
+
       {/* Workspace Manager - renders all tabs */}
       {/* Desktop: Workspace floating panels - hidden on mobile */}
+      {!practiceTable && (<>
       <div id={WORKSPACE_AREA_ID} className="hidden md:block">
         <WorkspaceManager
           onViewPdf={handleViewPdf}
@@ -853,6 +972,7 @@ export function SearchPanel() {
           </div>
         </div>
       )}
+      </>)}
 
       {/* QuickNorms Manager Modal */}
       <QuickNormsManager

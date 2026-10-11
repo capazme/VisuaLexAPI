@@ -951,6 +951,16 @@ meant to stay split; add new features as new files, not inside the shells:
   lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
   "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
   workspace is persisted).
+- `features/practice/` — the norm-tab redesign, behind `VITE_FEATURE_PRACTICE_TABLE` (spec
+  `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
+  header, count line, «⋯», the streaming bar, the topic searches' band `PracticeTopicSearches`, then
+  `PracticeColumn`), `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place),
+  `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column),
+  `PracticeParts` (the migration's notice, taken once; the empty practice; the name editor).
+  `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with
+  the flag off none of it is loaded; with it on, searches, the index, decisions, topic searches and
+  the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread) land in
+  the practices.
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
   `NormaChangesSection.tsx` (see History above).
 - `features/documents/` — `DocumentReviewPage.tsx` only.
