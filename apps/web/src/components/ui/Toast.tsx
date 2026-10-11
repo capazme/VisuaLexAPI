@@ -21,6 +21,8 @@ export interface ToastProps {
    * with 'assertive' so screen readers interrupt.
    */
   ariaLive?: 'polite' | 'assertive' | 'off';
+  /** Extra classes, last: a band of `constants/zIndex.ts` (`Z_INDEX.toast`) replaces the default. */
+  className?: string;
 }
 
 export function Toast({
@@ -32,6 +34,7 @@ export function Toast({
   position = 'bottom',
   action,
   ariaLive,
+  className,
 }: ToastProps) {
   useEffect(() => {
     if (isVisible && duration > 0) {
@@ -71,7 +74,8 @@ export function Toast({
           className={cn(
             'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-md',
             positionStyles,
-            styles[type]
+            styles[type],
+            className
           )}
           role="alert"
           aria-live={ariaLive ?? (type === 'error' ? 'assertive' : 'polite')}

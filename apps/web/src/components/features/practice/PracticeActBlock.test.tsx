@@ -293,6 +293,20 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     expect(s().structureWindow.blockId).toBeNull();
   });
 
+  it('on a phone width «Apri l\'indice e sfoglia» opens the act\'s drawer, and closing it hands the window back', async () => {
+    h.desktop = false;
+    const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
+    render(<Block practiceId={practiceId} actId={actId} />);
+    expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: false }));
+    // the palette's «Apri l'indice e sfoglia» lands on this act (`addActIndexToPractice`)
+    act(() => { s().addActIndexToPractice(practiceId, L24); });
+    await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
+    expect(screen.getByRole('button', { name: 'Struttura della norma' })).toHaveAttribute('aria-pressed', 'true');
+    act(() => { (lastTree() as unknown as { onClose: () => void }).onClose(); });
+    expect(s().structureWindow.blockId).toBeNull();
+    expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: false }));
+  });
+
   it('a pick from the index of an article not on the table loads it into this act and reveals it', async () => {
     h.legalFetch.mockResolvedValue(answer([article(L24, '9')]));
     const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);

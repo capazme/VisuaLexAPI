@@ -418,6 +418,18 @@ interface AppState {
         options?: { practiceId?: string; beside?: boolean; open?: boolean; askerId?: string },
     ) => { practiceId: string; decisionId: string };
     /**
+     * Decisions whose identity is already known (a dossier's, opened with «Apri tutto», T17) into
+     * the practice `practiceId` names, in one write: identified, with the section, type and date of
+     * deposit the dossier kept, so «Salva come dossier» saves them back; closed and unread, as
+     * `open: false` adds them (nothing is fetched until one is opened). One entry per decision: one
+     * already there takes what the new one knows (`mergeDecisionEntries`). Nothing for a practice
+     * that is not open.
+     */
+    addKnownDecisions: (
+        practiceId: string,
+        decisions: Array<DecisionIdentity & { sezione?: string; tipo?: string; data_deposito?: string }>,
+    ) => void;
+    /**
      * The entry's decision was found: its identity, label, date of deposit, type and section, and
      * `identified`. When another entry of the practice already holds that decision (a candidate chosen
      * here), this one merges into it (`mergeDecisionEntries`): its window, its row, its reveal and the
@@ -1048,6 +1060,25 @@ const appStore = createStore<AppState>()(
                 return { practiceId, decisionId };
             },
 
+            addKnownDecisions: (practiceId, decisions) => {
+                if (decisions.length === 0 || !get().practices.some((p) => p.id === practiceId)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    for (const known of decisions) {
+                        const reference = identityOf(known);
+                        const entry: PracticeDecision = {
+                            id: uuidv4(), reference, label: formatDecisionShort({ ...reference, sezione: known.sezione }), identified: true,
+                        };
+                        if (known.data_deposito) entry.depositDate = known.data_deposito;
+                        if (known.tipo) entry.tipo = known.tipo;
+                        if (known.sezione) entry.sezione = known.sezione;
+                        const at = practice.decisions.findIndex((d) => sameDecision(d.reference, reference));
+                        if (at < 0) practice.decisions.push(entry);
+                        else practice.decisions[at] = mergeDecisionEntries(practice.decisions[at], entry);
+                    }
+                });
+            },
+
             setDecisionEntryIdentity: (practiceId, decisionId, identity, attrs, label) => {
                 const practice = get().practices.find((p) => p.id === practiceId);
                 const entry = practice?.decisions.find((d) => d.id === decisionId);
@@ -1337,7 +1368,7 @@ const appStore = createStore<AppState>()(
                 if (isPracticeTableEnabled()) {
                     const before = get();
                     const landing = landingPractice(before, practiceOfPlace(before, options?.besideTabId), () => DECISIONS_PRACTICE_LABEL, 'openDecisionSearchTab');
-                    const ref: BesideRef = { id: topicWindowId(query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
+                    const ref: BesideRef = { id: topicWindowId(landing.practice.id, query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
                     const beside = besideWith(landing.practice.beside, ref);
                     const shownId = beside.find((b) => b.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(query))?.id ?? ref.id;
                     if (beside === landing.practice.beside && landing.practices === before.practices && before.activePracticeId === landing.practice.id) {
@@ -3793,9 +3824,11 @@ function practiceOfPlace(state: Pick<AppState, 'practices'>, placeId: string | u
     return holder ? holder.id : null;
 }
 
-/** A topic-search window's id: stable for its query, so asking again finds it (spec §2). */
-function topicWindowId(query: DecisionSearchQuery): string {
-    return `search:${stableQueryKey(query)}`;
+/** A topic-search window's id: stable for its practice and query, so asking again finds it (spec §2);
+ *  the practice is part of it, so the same topic in two practices is two windows and a decision opened
+ *  from one lands in that one (`practiceOfPlace`). */
+function topicWindowId(practiceId: string, query: DecisionSearchQuery): string {
+    return `search:${practiceId}:${stableQueryKey(query)}`;
 }
 
 const movable = (length: number, from: number, to: number): boolean =>

@@ -5,6 +5,15 @@ import { MemoryRouter } from 'react-router-dom';
 const env = vi.hoisted(() => ({
   desktop: true,
   lines: [] as unknown[],
+  /** The stream's lines for a request, or 'fail' for a refused one; else `lines`. */
+  stream: null as null | ((params: Record<string, unknown>) => unknown[] | 'fail'),
+  /** Every request's params, in order. */
+  requests: [] as Array<Record<string, unknown>>,
+  /** `/fetch_tree`'s answer (the annex auto-switch reads it); null answers 500. */
+  tree: null as unknown,
+  /** The article a reader's citation link names. */
+  jumpTo: '',
+  annex: { MAX_MAIN_ARTICLES: 50, MIN_ANNEX_ARTICLES: 10, TOAST_DURATION: 3000, ENABLED: false, AUTO_CONFIRM: true },
 }));
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop }));
@@ -14,9 +23,21 @@ vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./QuickNormsManager', () => ({ QuickNormsManager: () => null }));
 vi.mock('../settings/AliasManager', () => ({ AliasManager: () => null }));
 vi.mock('./NormaCard', () => ({ NormaCard: () => null }));
+vi.mock('../../../config/annexConfig', () => ({ ANNEX_AUTO_SWITCH_CONFIG: env.annex }));
 vi.mock('./ArticleTabContent', () => ({
-  ArticleTabContent: ({ data }: { data: { norma_data: { numero_articolo: string } } }) =>
-    <div data-testid="reader">art. {data.norma_data.numero_articolo}</div>,
+  ArticleTabContent: ({ data, onCrossReferenceNavigate }: {
+    data: { norma_data: { numero_articolo: string; allegato?: string; data_versione?: string } };
+    onCrossReferenceNavigate?: (article: string, normaData: unknown) => void;
+  }) => {
+    const n = data.norma_data;
+    const name = `art. ${n.allegato ? `All. ${n.allegato} ` : ''}${n.numero_articolo}${n.data_versione ? ` al ${n.data_versione}` : ''}`;
+    return (
+      <>
+        <div data-testid="reader">{name}</div>
+        <button type="button" onClick={() => onCrossReferenceNavigate?.(env.jumpTo, n)}>Citazione in {name}</button>
+      </>
+    );
+  },
 }));
 vi.mock('./TreeViewPanel', () => ({ TreeViewPanel: () => null }));
 vi.mock('../workspace/ArticleNavigation', () => ({ ArticleNavigation: () => null }));
@@ -41,12 +62,23 @@ vi.mock('../decisions/DecisionSearchTabView', async () => {
 });
 vi.mock('../../../services/historyService', () => ({ addToHistory: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../../services/legalFetch', () => ({
-  legalFetch: async () => new Response(env.lines.map((l) => JSON.stringify(l)).join('\n') + '\n'),
+  legalFetch: async (path: string, init?: RequestInit) => {
+    if (path === '/fetch_tree') return env.tree ? new Response(JSON.stringify(env.tree)) : new Response('', { status: 500 });
+    const params = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+    env.requests.push(params);
+    const lines = env.stream ? env.stream(params) : env.lines;
+    if (lines === 'fail') return new Response('', { status: 500 });
+    return new Response(lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  },
 }));
 
 import { appStore } from '../../../store/useAppStore';
 import { SearchPanel } from './SearchPanel';
 import { actKeyOf } from '../dossier/dossierLayout';
+import { searchesIntoOnePractice } from '../dossier/openInPractice';
+import { computeNormaGroups } from '../dossier/dossierUtils';
+import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
+import type { Dossier } from '../../../types';
 
 const s = () => appStore.getState();
 const CC = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', url: 'urn:nir:stato:regio.decreto:1942-03-16;262' };
@@ -57,15 +89,22 @@ const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero:
 const panel = () => render(<MemoryRouter><SearchPanel /></MemoryRouter>);
 const readers = () => screen.queryAllByTestId('reader').map((el) => el.textContent);
 
+let scrolled: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
-  vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+  scrolled = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   env.desktop = true;
   env.lines = [];
+  env.stream = null;
+  env.requests = [];
+  env.tree = null;
+  env.jumpTo = '';
+  env.annex.ENABLED = false;
   appStore.setState({
     practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDecision: null,
     readingBackStack: [], commandPaletteOpen: false, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
+    mobileActiveTabId: null,
   });
 });
 afterEach(() => {
@@ -165,5 +204,185 @@ describe('SearchPanel with the practices: where a search lands (spec §5.1)', ()
     expect(readers()).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }));
     await waitFor(() => expect(readers()).toEqual(['art. 2043']));
+  });
+});
+
+// A decree asked for as the palette asks (the year only), answered with its full date.
+const DLGS = { tipo_atto: 'decreto legislativo', data: '2008-04-09', numero_atto: '81', url: 'urn:nir:stato:decreto.legislativo:2008-04-09;81' };
+const dlgsArticle = (n: string, allegato?: string) => ({
+  article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...DLGS, numero_articolo: n, ...(allegato ? { allegato } : {}) }, brocardi_info: null,
+});
+const dlgsParams = (article: string) => ({ act_type: 'decreto legislativo', act_number: '81', date: '2008', article, version: 'vigente' as const, show_brocardi_info: false });
+const rowNames = () => s().practices[0].acts.flatMap((a) => a.articles.map((x) =>
+  `${x.norma_data.allegato ? `All. ${x.norma_data.allegato} ` : ''}${x.norma_data.numero_articolo}${x.norma_data.data_versione ? ` al ${x.norma_data.data_versione}` : ''}`));
+
+describe('SearchPanel with the practices: the annex auto-switch (spec §5.2)', () => {
+  beforeEach(() => {
+    env.annex.ENABLED = true;
+    // the body holds three articles; Allegato 2 holds the one asked for
+    env.tree = { metadata: { annexes: [
+      { number: null, label: 'Testo', article_count: 3, article_numbers: ['1', '2', '3'] },
+      { number: '2', label: 'Allegato 2', article_count: 20, article_numbers: ['5', '6'] },
+    ] } };
+  });
+
+  it('removes the stray row the first search created, once the annex\'s article has landed; a row it did not create stays', async () => {
+    const p = s().createPractice('P');
+    s().addArticlesToPractice(p, DLGS, [dlgsArticle('1')]);
+    env.stream = (params) => (params.annex === '2' ? [dlgsArticle('5', '2')] : [dlgsArticle('5')]);
+    panel();
+    act(() => { s().triggerSearch(dlgsParams('5')); });
+    await waitFor(() => expect(env.requests.some((r) => r.annex === '2')).toBe(true));
+    await waitFor(() => expect(rowNames()).toEqual(['1', 'All. 2 5']));
+    expect(s().practices).toHaveLength(1);
+  });
+
+  it('a failed annex search leaves the act as it was before, not empty', async () => {
+    s().createPractice('P');
+    env.stream = (params) => (params.annex === '2' ? 'fail' : [dlgsArticle('5')]);
+    panel();
+    act(() => { s().triggerSearch(dlgsParams('5')); });
+    await waitFor(() => expect(env.requests.some((r) => r.annex === '2')).toBe(true));
+    expect(await screen.findByText('Errore nella richiesta')).toBeInTheDocument();
+    expect(rowNames()).toEqual(['5']);
+  });
+});
+
+describe('SearchPanel with the practices: a citation jump (spec §3.2, T2)', () => {
+  const pastArticle = (n: string) => ({ ...ccArticle(n), norma_data: { ...CC, numero_articolo: n, versione: 'vigente', data_versione: '2007-12-29' } });
+
+  it('to an article of the act already on the table: its row is revealed in place, nothing is searched', async () => {
+    const p = s().createPractice('P');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043'), ccArticle('1218')], { reveal: 'first' });
+    expect(actId).toBeTruthy();
+    env.jumpTo = '1218';
+    panel();
+    await waitFor(() => expect(readers()).toEqual(['art. 2043']));
+    fireEvent.click(screen.getByRole('button', { name: 'Citazione in art. 2043' }));
+    // the column draws rows in article order
+    await waitFor(() => expect(readers()).toEqual(['art. 1218', 'art. 2043']));
+    expect(env.requests).toEqual([]);
+  });
+
+  it('from a text in force to an article the act holds only as a past text: the text in force is loaded as a new row', async () => {
+    const p = s().createPractice('P');
+    s().addArticlesToPractice(p, CC, [ccArticle('2043'), pastArticle('1218')], { reveal: 'first' });
+    env.jumpTo = '1218';
+    env.lines = [ccArticle('1218')];
+    panel();
+    await waitFor(() => expect(readers()).toEqual(['art. 2043']));
+    fireEvent.click(screen.getByRole('button', { name: 'Citazione in art. 2043' }));
+    // the column draws rows in article order
+    await waitFor(() => expect(readers()).toEqual(['art. 1218', 'art. 2043']));
+    expect(env.requests).toEqual([expect.objectContaining({ article: '1218', version: 'vigente' })]);
+    expect(rowNames().sort()).toEqual(['1218', '1218 al 2007-12-29', '2043']);
+  });
+});
+
+describe('SearchPanel with the practices: «Apri tutto» streamed through (spec §5.1, D15)', () => {
+  it('the texts in force and a past text of one act land as rows of that act in the dossier\'s practice, none opened', async () => {
+    const dossier: Dossier = {
+      id: 'd1', title: 'Ricorso Rossi', createdAt: '2026-10-04T08:00:00Z', tags: [],
+      items: [
+        { id: 'a', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043' } },
+        { id: 'b', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1284', versione: 'vigente', data_versione: '2007-12-29' } },
+      ],
+    };
+    s().createPractice('Altra');
+    env.stream = (params) => (params.version_date
+      ? [{ ...ccArticle(String(params.article)), norma_data: { ...CC, numero_articolo: String(params.article), versione: 'vigente', data_versione: params.version_date } }]
+      : [ccArticle(String(params.article))]);
+    panel();
+    act(() => { s().triggerMultiSearch(searchesIntoOnePractice(dossier, computeNormaGroups(dossier.items), true)); });
+    const practiceId = s().activePracticeId as string;
+    await waitFor(() => expect(env.requests).toHaveLength(2));
+    await waitFor(() => expect(s().practices.find((p) => p.id === practiceId)?.acts[0]?.articles).toHaveLength(2));
+    const held = s().practices.find((p) => p.id === practiceId)!;
+    expect(held.acts).toHaveLength(1);
+    expect(held.acts[0].articles.map((a) => `${a.norma_data.numero_articolo}|${a.norma_data.data_versione ?? ''}`).sort())
+      .toEqual(['1284|2007-12-29', '2043|']);
+    expect(s().practiceRows).toEqual({});
+    expect(s().practices.find((p) => p.label === 'Altra')?.acts).toEqual([]);
+  });
+});
+
+describe('SearchPanel with the practices: the rest of the review (round 1)', () => {
+  it('a closed target is warned once per search, not once per article', async () => {
+    const gone = s().createPractice('Chiusa');
+    s().createPractice('Attiva');
+    s().closePractice(gone);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    env.lines = [ccArticle('1'), ccArticle('2'), ccArticle('3')];
+    panel();
+    act(() => { s().triggerSearch({ ...params('1-3'), targetTabId: gone }); });
+    await waitFor(() => expect(s().practices[0].acts[0]?.articles).toHaveLength(3));
+    expect(warn.mock.calls.filter(([message]) => String(message).includes('is not open'))).toHaveLength(1);
+  });
+
+  it('a new topic search scrolls its band into view', async () => {
+    const p = s().createPractice('P');
+    s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
+    panel();
+    await screen.findByTestId('practice-column');
+    act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
+    const band = await screen.findByRole('region', { name: 'Ricerca per tema: danno' });
+    expect(scrolled.mock.contexts).toContain(band);
+  });
+
+  it('a decision opened from practice B\'s band enters B, while A holds the same topic', async () => {
+    const a = s().createPractice('A');
+    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    const b = s().createPractice('B');
+    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    panel();
+    const band = await screen.findByRole('region', { name: 'Ricerca per tema: danno' });
+    fireEvent.click(within(band).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
+    expect(s().practices.find((p) => p.id === b)?.decisions).toHaveLength(1);
+    expect(s().practices.find((p) => p.id === a)?.decisions).toEqual([]);
+    expect(s().activePracticeId).toBe(b);
+  });
+
+  it('the column\'s bottom padding follows the bar\'s measured height (§3.4)', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.id === 'tour-workspace-dock' ? 138 : 0;
+    });
+    const p = s().createPractice('P');
+    s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
+    panel();
+    const column = await screen.findByTestId('practice-column');
+    await waitFor(() => expect(document.getElementById(WORKSPACE_AREA_ID)?.style.getPropertyValue('--practice-bar-height')).toBe('138px'));
+    expect(document.getElementById(WORKSPACE_AREA_ID)?.contains(column)).toBe(true);
+    expect(column.className).toContain('var(--practice-bar-height');
+  });
+
+  it('the migration\'s notice survives a change of breakpoint until it is closed', async () => {
+    s().createPractice('P');
+    appStore.setState({ practiceNotice: 'Una ricerca per tema non è stata riaperta: «Tema: danno». Puoi rifarla dalla barra di ricerca.' });
+    const { rerender } = panel();
+    expect(await screen.findByText(/Una ricerca per tema non è stata riaperta/)).toBeInTheDocument();
+    env.desktop = false;
+    rerender(<MemoryRouter><SearchPanel /></MemoryRouter>);
+    await screen.findByTestId('practice-phone-view');
+    expect(screen.getByText(/Una ricerca per tema non è stata riaperta/)).toBeInTheDocument();
+    expect(s().practiceNotice).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Chiudi notifica' }));
+    await waitFor(() => expect(screen.queryByText(/Una ricerca per tema non è stata riaperta/)).toBeNull());
+  });
+
+  it('going back with the practices writes nothing of the old tabs\' state', async () => {
+    env.lines = [ccArticle('2043')];
+    panel();
+    act(() => { s().triggerSearch(params('2043')); });
+    await waitFor(() => expect(readers()).toEqual(['art. 2043']));
+    const { id: practiceId, acts } = s().practices[0];
+    // a seeded practice keeps its tab's id: a stored tab of that id is still there
+    appStore.setState({ workspaceTabs: [{
+      id: practiceId, label: 'c.c.', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1,
+      isMinimized: false, isHidden: false, content: [], labelIsCustom: false,
+    }] });
+    act(() => { s().pushReadingBack({ tabId: practiceId, blockId: acts[0].id, articleId: '2043', label: 'art. 2043 c.c.' }); });
+    fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }));
+    await waitFor(() => expect(s().readingBackStack).toEqual([]));
+    expect(s().mobileActiveTabId).toBeNull();
   });
 });

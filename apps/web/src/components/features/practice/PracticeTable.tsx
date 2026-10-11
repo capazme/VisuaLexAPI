@@ -9,9 +9,7 @@ import { CLOSE_PRACTICE_MESSAGE, isEmptyPractice } from './practiceView';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
 import { PracticeTopicSearches } from './PracticeTopicSearches';
-import {
-  PracticeEmpty, PracticeNameInput, PracticeNotice, PracticeStreamingBar, type PracticeStreaming,
-} from './PracticeParts';
+import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
 
 export interface PracticeTableProps {
   onViewPdf: (urn: string) => void;
@@ -22,28 +20,24 @@ export interface PracticeTableProps {
 /**
  * The active practice's table on the desktop (spec §3): its header (name, count line, «⋯»), the
  * streaming bar of a search landing in it, the topic searches' band (P3, T8), then its column.
- * An empty practice says so. The migration's notice is taken here once (§9).
+ * An empty practice says so. (The migration's notice is `SearchPanel`'s, over both layouts.)
  */
 export function PracticeTable({ onViewPdf, onCrossReference, streaming }: PracticeTableProps) {
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
+  if (!practice) return null;
   return (
-    <>
-      <PracticeNotice />
-      {practice && (
-        <div data-testid="practice-table" className="mx-auto w-full max-w-4xl space-y-3">
-          <PracticeHeader practice={practice} />
-          <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
-          {isEmptyPractice(practice) ? (
-            <PracticeEmpty />
-          ) : (
-            <>
-              <PracticeTopicSearches practiceId={practice.id} />
-              <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
-            </>
-          )}
-        </div>
+    <div data-testid="practice-table" className="mx-auto w-full max-w-4xl space-y-3">
+      <PracticeHeader practice={practice} />
+      <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
+      {isEmptyPractice(practice) ? (
+        <PracticeEmpty />
+      ) : (
+        <>
+          <PracticeTopicSearches practiceId={practice.id} />
+          <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
+        </>
       )}
-    </>
+    </div>
   );
 }
 

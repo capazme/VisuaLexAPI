@@ -81,12 +81,25 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     expect(screen.getByTestId('topic-list')).toBeInTheDocument();
   });
 
-  it('an empty practice says so; the notice of the migration shows once', () => {
+  it('an empty practice says so; the migration\'s notice is not the view\'s (SearchPanel shows it over both layouts)', () => {
     s().createPractice('Vuota');
-    appStore.setState({ practiceNotice: '2 ricerche per tema non sono state riaperte: «a», «b». Puoi rifarle dalla barra di ricerca.' });
+    const notice = '2 ricerche per tema non sono state riaperte: «a», «b». Puoi rifarle dalla barra di ricerca.';
+    appStore.setState({ practiceNotice: notice });
     render(view());
     expect(screen.getByText('Pratica vuota')).toBeInTheDocument();
-    expect(screen.getByText(/2 ricerche per tema non sono state riaperte/)).toBeInTheDocument();
-    expect(s().practiceNotice).toBeNull();
+    expect(s().practiceNotice).toBe(notice);
+  });
+
+  it('the header\'s controls are 44 px targets: the chevrons, and each dot a button around a small dot naming its practice', () => {
+    s().createPractice('Prima');
+    s().createPractice('Seconda');
+    render(view());
+    for (const name of ['Pratica precedente', 'Pratica successiva', 'Pratica 1: Prima', 'Pratica 2: Seconda']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    }
+    const dot = screen.getByRole('button', { name: 'Pratica 2: Seconda' });
+    expect(dot).toHaveAttribute('aria-current', 'true');
+    expect(dot.querySelector('span')).toHaveClass('h-1.5', 'w-6');
+    expect(screen.getByRole('button', { name: 'Pratica 1: Prima' }).querySelector('span')).toHaveClass('h-1.5', 'w-1.5');
   });
 });

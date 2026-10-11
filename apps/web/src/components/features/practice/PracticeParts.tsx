@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { Toast } from '../../ui/Toast';
 import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../../constants/zIndex';
 import { practiceLabel } from '../../../utils/practice';
 
 /** What a search streaming into a practice has brought so far (`SearchPanel`'s progress). */
@@ -15,8 +16,8 @@ export interface PracticeStreaming {
 
 /**
  * The migration's notice (spec §9): taken once from the store (`takePracticeNotice`, gotcha 14) and
- * shown as an info toast that stays until closed. The desktop table and the phone view each mount
- * one; only one of them is mounted at a time (T4).
+ * shown as an info toast that stays until closed, in the toast band over the bar of practices.
+ * `SearchPanel` mounts it once over both layouts, so a change of breakpoint does not lose it.
  */
 export function PracticeNotice() {
   const takePracticeNotice = useAppStore((s) => s.takePracticeNotice);
@@ -36,6 +37,7 @@ export function PracticeNotice() {
       isVisible={notice !== null}
       onClose={() => setNotice(null)}
       duration={0}
+      className={Z_INDEX.toast}
     />
   );
 }

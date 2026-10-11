@@ -16,6 +16,7 @@ import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { LazyStudyMode as StudyMode } from '../workspace/LazyStudyMode';
 import { shownAnnex } from '../dossier/dossierLayout';
 import { PracticeArticleRow } from './PracticeArticleRow';
+import { fromPracticePair, practicePair } from './practiceView';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { formatNormaMeta } from '../../../utils/normaMeta';
@@ -68,7 +69,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
   // not re-render every act's rows. `useShallow` compares the pairs' fields.
   const [moveOpen, setMoveOpen] = useState(false);
   const moveTargets = useAppStore(useShallow((s) => (moveOpen
-    ? s.practices.filter((p) => p.id !== practiceId).map((p) => `${p.id}\u0000${p.label}`)
+    ? s.practices.filter((p) => p.id !== practiceId).map(practicePair)
     : [])));
   const isStructureWindowOpen = useAppStore((s) => s.structureWindow.blockId === act.id);
   // The act's open rows, oldest first: a reveal moves its row to the end (`revealRow`).
@@ -77,7 +78,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
     .filter((key) => key.startsWith(prefix))
     .map((key) => key.slice(prefix.length))));
   const isDesktop = useIsDesktop();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerToggled, setDrawerToggled] = useState(false);
+  // On a phone the index is the drawer (§8). «Apri l'indice e sfoglia» points the structure window at
+  // the act it drops (§5.1): on a phone that request opens this act's drawer too.
+  const drawerOpen = drawerToggled || (!isDesktop && isStructureWindowOpen);
+  const closeDrawer = () => {
+    setDrawerToggled(false);
+    if (isStructureWindowOpen) closeStructureWindow();
+  };
   // The row Study Mode shows while it is open; null, closed.
   const [studyKey, setStudyKey] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -141,8 +149,10 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
     if (isDesktop) {
       if (isStructureWindowOpen) closeStructureWindow();
       else openStructureWindow(act.id);
+    } else if (drawerOpen) {
+      closeDrawer();
     } else {
-      setDrawerOpen((open) => !open);
+      setDrawerToggled(true);
     }
     if (!treeData) fetchTree();
   };
@@ -151,10 +161,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
     if (!isLocked(article)) setStudyKey(practiceArticleKey(article as ArticleData));
   };
 
-  const others = moveTargets.map((pair) => {
-    const [id, label] = pair.split('\u0000');
-    return { id, label };
-  });
+  const others = moveTargets.map(fromPracticePair);
   const moveTo = (target: string | { newLabel: string }) => {
     setMoveOpen(false);
     moveActToPractice(act.id, practiceId, target);
@@ -371,7 +378,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
       <TreeViewPanel
         variant={isDesktop ? 'window' : 'drawer'}
         isOpen={isDesktop ? isStructureWindowOpen : drawerOpen}
-        onClose={isDesktop ? closeStructureWindow : () => setDrawerOpen(false)}
+        onClose={isDesktop ? closeStructureWindow : closeDrawer}
         treeData={treeData || []}
         urn={act.norma.urn || ''}
         title="Struttura dell'atto"

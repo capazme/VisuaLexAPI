@@ -10,6 +10,9 @@ vi.mock('../../../services/dossierService', () => ({
 import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
 import { useSavePracticeAsDossier } from './useSavePracticeAsDossier';
+import { searchesIntoOnePractice } from '../dossier/openInPractice';
+import { computeNormaGroups } from '../dossier/dossierUtils';
+import type { Dossier, DossierSentenzaData } from '../../../types';
 import { L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
 const svc = vi.mocked(dossierService);
@@ -163,5 +166,42 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     await act(async () => { await result.current.addToExisting(id, 'd1'); });
     expect(svc.addItem).not.toHaveBeenCalled();
     expect(result.current.notice?.message).toBe('Il dossier «Esistente» ha già tutto: 1 già presente');
+  });
+});
+
+describe('«Apri tutto» of a dossier, then «Salva come dossier» (spec §5.1, §7, T17)', () => {
+  it('the dossier\'s decisions, entered closed and unread, are saved back with what the dossier kept', async () => {
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
+    const kept: DossierSentenzaData = {
+      corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019, sezione: '3', tipo: 'sentenza', data_deposito: '2019-11-11',
+      etichetta: 'Cass. civ., sez. III, 11 novembre 2019, n. 28994',
+    };
+    const dossier: Dossier = {
+      id: 'd0', title: 'Ricorso Rossi', createdAt: '2026-10-04T08:00:00Z', tags: [],
+      items: [
+        { id: 'a', type: 'norma', addedAt: '', data: { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08', numero_articolo: '5' } },
+        { id: 's1', type: 'sentenza', addedAt: '', data: kept },
+        { id: 's2', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2020, etichetta: 'Corte cost., n. 1/2020' } },
+      ],
+    };
+    const writes: number[] = [];
+    const unsubscribe = appStore.subscribe((state) => writes.push(state.practices.length));
+    searchesIntoOnePractice(dossier, computeNormaGroups(dossier.items), true);
+    unsubscribe();
+    // the practice, then every decision in one more write
+    expect(writes).toEqual([1, 1]);
+    const [practice] = s().practices;
+    expect(practice.decisions.every((d) => d.identified)).toBe(true);
+
+    const { result } = renderHook(() => useSavePracticeAsDossier());
+    await act(async () => { await result.current.saveAsNew(practice.id); });
+    const saved = s().dossiers[0].items.filter((i) => i.type === 'sentenza').map((i) => i.data);
+    expect(saved).toHaveLength(2);
+    expect(saved).toEqual(expect.arrayContaining([
+      expect.objectContaining({ corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019, sezione: '3', tipo: 'sentenza', data_deposito: '2019-11-11' }),
+      expect.objectContaining({ corte: 'corte_costituzionale', numero: 1, anno: 2020 }),
+    ]));
+    expect(result.current.notice?.message).toBe('Salvato nel dossier «Ricorso Rossi»: 2 sentenze');
+    vi.unstubAllEnvs();
   });
 });

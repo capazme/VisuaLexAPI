@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const fetchDecision = vi.hoisted(() => vi.fn());
@@ -7,10 +7,12 @@ vi.mock('./useActDetails', () => ({ useActDetails: () => ({ title: null, rubrica
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: { getSnapshots: vi.fn(async () => []) } }));
 vi.mock('../../../services/decisionService', () => ({ fetchDecision }));
+vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
 import { appStore } from '../../../store/useAppStore';
 import { DossierDetailView } from './DossierDetailView';
 import { DossierListView } from './DossierListView';
+import { PracticeTable } from '../practice/PracticeTable';
 import type { Dossier, DossierItem, NormaVisitata } from '../../../types';
 
 const s = () => appStore.getState();
@@ -72,8 +74,24 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
     expect(practice.decisions.map((d) => d.reference.numero).sort((a, b) => a - b)).toEqual([577, 28994]);
     expect(s().practiceRows).toEqual({});
     expect(practice.beside).toEqual([]);
-    expect(fetchDecision).not.toHaveBeenCalled();
     expect(s().workspaceTabs).toEqual([]);
+  });
+
+  it('the table draws the dossier\'s decisions closed and asks for none of them until one is opened (T17)', async () => {
+    fetchDecision.mockReturnValue(new Promise(() => {}));
+    renderDetail(TWO_PAST);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Apri tutto\s*\d+ gruppi/ }));
+    const { container } = render(<MemoryRouter><PracticeTable onViewPdf={() => {}} onCrossReference={() => {}} streaming={null} /></MemoryRouter>);
+    const section = await within(container).findByRole('region', { name: /Giurisprudenza/ });
+    const toggles = within(section).getAllByRole('button', { name: /^Espandi Cass\. civ\./ });
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((t) => t.getAttribute('aria-expanded') === 'false')).toBe(true);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(fetchDecision).not.toHaveBeenCalled();
+    // the control: a row opened asks for its decision
+    fireEvent.click(toggles[0]);
+    await waitFor(() => expect(fetchDecision).toHaveBeenCalledTimes(1));
   });
 
   it('a dossier with one group: «Apri tutto» opens it with its decisions', () => {

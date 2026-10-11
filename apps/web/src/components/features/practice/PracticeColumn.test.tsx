@@ -86,10 +86,10 @@ describe('PracticeColumn (spec §3)', () => {
     ]);
   });
 
-  it('reserves room at the bottom for the bar of practices (§3.4)', () => {
+  it('reserves room at the bottom for the bar of practices: its measured height plus its offset (§3.4)', () => {
     const { practiceId } = setUp();
     render(column(practiceId));
-    expect(screen.getByTestId('practice-column')).toHaveClass('pb-24');
+    expect(screen.getByTestId('practice-column')).toHaveClass('pb-[calc(var(--practice-bar-height,3.75rem)+2.25rem)]');
   });
 
   it('acts reorder from the keyboard (dnd-kit keyboard sensor)', async () => {

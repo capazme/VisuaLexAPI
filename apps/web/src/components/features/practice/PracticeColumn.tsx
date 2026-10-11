@@ -75,9 +75,11 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference }: Prac
   };
 
   return (
-    // The bar of practices floats over the results area (`fixed bottom-6`, about 48 px high, §5):
-    // the column keeps its last row clear of it, bar plus offset plus a margin (§3.4).
-    <div ref={columnRef} data-testid="practice-column" className="space-y-3 pb-24">
+    // The bar of practices floats over the results area (`fixed bottom-6`, §5): the column keeps its
+    // last row clear of it (§3.4), the bar's measured height (`--practice-bar-height`, set by
+    // `SearchPanel` from `PracticeBar`; it grows when the chips wrap) plus its 24 px offset and a
+    // 12 px margin. Without the bar (the phone, the bar hidden) the fallback keeps today's 96 px.
+    <div ref={columnRef} data-testid="practice-column" className="space-y-3 pb-[calc(var(--practice-bar-height,3.75rem)+2.25rem)]">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

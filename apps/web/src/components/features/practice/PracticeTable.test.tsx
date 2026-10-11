@@ -23,6 +23,8 @@ vi.mock('../../../services/dossierService', () => ({
 import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
 import { PracticeTable } from './PracticeTable';
+import { PracticeNotice } from './PracticeParts';
+import { Z_INDEX } from '../../../constants/zIndex';
 import { FOUND, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
 const s = () => appStore.getState();
@@ -117,15 +119,25 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(screen.queryByRole('region', { name: /Ricerca per tema/ })).toBeNull();
   });
 
-  it('shows the migration\'s notice once, as an info toast that stays until closed', () => {
+  it('the migration\'s notice: shown once, as an info toast that stays until closed, in the toast band over the bar', () => {
     s().createPractice('P');
     appStore.setState({ practiceNotice: 'Una ricerca per tema non è stata riaperta: «Tema: danno». Puoi rifarla dalla barra di ricerca.' });
-    const { unmount } = render(table());
-    expect(screen.getByText(/Una ricerca per tema non è stata riaperta/)).toBeInTheDocument();
+    const { unmount } = render(<PracticeNotice />);
+    const toast = screen.getByRole('alert');
+    expect(toast).toHaveTextContent(/Una ricerca per tema non è stata riaperta/);
+    expect(toast).toHaveClass(Z_INDEX.toast);
+    expect(toast).not.toHaveClass('z-[60]');
     expect(s().practiceNotice).toBeNull();
     unmount();
-    render(table());
+    render(<PracticeNotice />);
     expect(screen.queryByText(/Una ricerca per tema non è stata riaperta/)).toBeNull();
+  });
+
+  it('the table does not take the notice (SearchPanel shows it over both layouts)', () => {
+    s().createPractice('P');
+    appStore.setState({ practiceNotice: 'avviso' });
+    render(table());
+    expect(s().practiceNotice).toBe('avviso');
   });
 });
 

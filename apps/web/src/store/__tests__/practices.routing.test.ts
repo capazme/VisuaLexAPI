@@ -59,6 +59,23 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
     expect(s().activePracticeId).toBe(first);
   });
 
+  it('the same topic in two practices is two windows; a decision opened from B\'s band enters B, and B stays active', () => {
+    flagOn();
+    const a = s().createPractice('A');
+    const topicA = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    const b = s().createPractice('B');
+    const topicB = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    expect(topicB).not.toBe(topicA);
+    expect(practice(a).beside.map((w) => w.id)).toEqual([topicA]);
+    expect(practice(b).beside.map((w) => w.id)).toEqual([topicB]);
+    s().openDecisionTab(REF, { besideTabId: topicB });
+    expect(practice(b).decisions.map((d) => d.reference.numero)).toEqual([99999]);
+    expect(practice(a).decisions).toEqual([]);
+    expect(s().activePracticeId).toBe(b);
+    // asking B for the same topic again finds B's window
+    expect(s().openDecisionSearchTab({ tema: ' Danno ' }, 'Tema: danno')).toBe(topicB);
+  });
+
   it('a decision asked for by its address is drained once into the active practice', () => {
     flagOn();
     const p = s().createPractice('P');
@@ -119,6 +136,47 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
     expect(writes).toEqual([practiceId]);
     expect(s().takeReveal(practiceId)).toEqual({ rowKey: decisionRowKey(practiceId, decisionId) });
     expect(s().revealPracticeDecision(practiceId, 'gone')).toBe(false);
+  });
+});
+
+describe('decisions whose identity is known (the dossier\'s «Apri tutto», T17)', () => {
+  const DOSSIER_DECISIONS = [
+    { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 28994, anno: 2019, sezione: '3', tipo: 'sentenza', data_deposito: '2019-11-11' },
+    { corte: 'corte_costituzionale' as const, numero: 1, anno: 2020 },
+  ];
+
+  it('enter the practice in one write, identified with what the dossier kept, closed and unread', () => {
+    flagOn();
+    const p = s().createPractice('Ricorso Rossi', { custom: true });
+    const writes: number[] = [];
+    const unsubscribe = appStore.subscribe((state) => writes.push(state.practices.length));
+    s().addKnownDecisions(p, DOSSIER_DECISIONS);
+    unsubscribe();
+    expect(writes).toHaveLength(1);
+    expect(practice(p).decisions).toEqual([
+      expect.objectContaining({
+        reference: { corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019 },
+        label: 'Cass. civ., sez. III, n. 28994/2019', identified: true, sezione: '3', tipo: 'sentenza', depositDate: '2019-11-11',
+      }),
+      expect.objectContaining({ reference: { corte: 'corte_costituzionale', numero: 1, anno: 2020 }, identified: true }),
+    ]);
+    expect(s().practiceRows).toEqual({});
+    expect(s().pendingReveal).toBeNull();
+    expect(practice(p).beside).toEqual([]);
+  });
+
+  it('one entry per decision: an entry already there takes what the dossier knows', () => {
+    flagOn();
+    const p = s().createPractice('P');
+    const { decisionId } = s().openDecision({ corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019 }, { practiceId: p, open: false });
+    s().addKnownDecisions(p, [DOSSIER_DECISIONS[0]]);
+    expect(practice(p).decisions).toEqual([expect.objectContaining({ id: decisionId, identified: true, depositDate: '2019-11-11' })]);
+  });
+
+  it('a practice that is not open takes nothing', () => {
+    flagOn();
+    s().addKnownDecisions('gone', DOSSIER_DECISIONS);
+    expect(s().practices).toEqual([]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../services/dossierService', () => ({
   dossierService: { create: vi.fn(), addItem: vi.fn(), reorderItems: vi.fn(), delete: vi.fn() },
@@ -117,6 +117,39 @@ describe('PracticeBar (spec §5)', () => {
     appStore.setState({ commandPaletteOpen: true });
     render(<PracticeBar />);
     expect(screen.queryByRole('navigation', { name: 'Pratiche' })).toBeNull();
+  });
+});
+
+describe('PracticeBar: its height keeps the column clear of it (spec §3.4)', () => {
+  // jsdom lays nothing out: the bar's height is given, and its ResizeObserver fired by hand.
+  let height = 0;
+  const observers: Array<() => void> = [];
+  beforeEach(() => {
+    height = 113;
+    observers.length = 0;
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.id === 'tour-workspace-dock' ? height : 0;
+    });
+    vi.stubGlobal('ResizeObserver', class {
+      callback: () => void;
+      constructor(callback: () => void) { this.callback = callback; }
+      observe() { observers.push(() => this.callback()); }
+      unobserve() {}
+      disconnect() {}
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reports its height, again when its chips wrap onto a new line, and null once it is not drawn', () => {
+    s().createPractice('Una');
+    const onHeightChange = vi.fn();
+    render(<PracticeBar onHeightChange={onHeightChange} />);
+    expect(onHeightChange).toHaveBeenLastCalledWith(113);
+    height = 171; // a second line of chips
+    act(() => { observers.forEach((fire) => fire()); });
+    expect(onHeightChange).toHaveBeenLastCalledWith(171);
+    act(() => { appStore.setState({ commandPaletteOpen: true }); });
+    expect(onHeightChange).toHaveBeenLastCalledWith(null);
   });
 });
 
