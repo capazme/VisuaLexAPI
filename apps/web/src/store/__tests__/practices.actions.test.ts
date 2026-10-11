@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
-import { articleRowKey, practiceArticleKey, MAX_PRACTICE_LABEL, type Practice } from '../../utils/practice';
+import { articleRowKey, decisionRowKey, practiceArticleKey, MAX_PRACTICE_LABEL, type Practice } from '../../utils/practice';
 import { shortAct } from '../../utils/sources';
 import { CC_BARE, CC_RD, L24, L241, article } from '../../utils/__fixtures__/savedWorkspaces';
 
 type AppState = ReturnType<typeof appStore.getState>;
 const s = (): AppState => appStore.getState();
+const PAST = { data_versione: '2007-12-29' };
 const practice = (id: string): Practice => {
   const found = s().practices.find((p) => p.id === id);
   if (!found) throw new Error(`no practice ${id}`);
@@ -96,6 +97,32 @@ describe('the reveal (pendingReveal, gotcha 14)', () => {
     expect(s().takeReveal(practiceId)).not.toBeNull();
   });
 
+  it('a past text search into an act holding the text in force reveals the past-text row (D15)', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().addArticlesToPractice(practiceId, L24, [article(L24, '5', PAST)], { reveal: '5' });
+    const act = practice(practiceId).acts[0];
+    expect(act.articles).toHaveLength(2);
+    const pastKey = articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '5', PAST)));
+    expect(s().takeReveal(practiceId)).toEqual({ rowKey: pastKey });
+    expect(s().practiceRows).toEqual({ [pastKey]: true });
+  });
+
+  it('a reveal that matches nothing this call brought in falls back to the act\'s row', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().addArticlesToPractice(practiceId, L24, [article(L24, '7')], { reveal: '5' });
+    expect(s().takeReveal(practiceId)).toEqual({ rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '5'))) });
+  });
+
+  it('adds raise one notification, a new practice included', () => {
+    const listener = vi.fn();
+    const unsubscribe = appStore.subscribe(listener);
+    s().addArticlesToPractice(null, L24, [article(L24, '5')], { reveal: 'first' });
+    expect(listener).toHaveBeenCalledTimes(1);
+    s().addArticlesToPractice(null, L24, [article(L24, '7')]);
+    unsubscribe();
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
   it('without reveal, nothing opens', () => {
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     expect(s().practiceRows).toEqual({});
@@ -122,7 +149,11 @@ describe('revealPracticeArticle (T2, gotcha 9)', () => {
   it('finds a code article with or without all2:', () => {
     const { practiceId, actId } = s().addArticlesToPractice(null, CC_RD, [article(CC_RD, '2043', { allegato: '2' })]);
     expect(s().revealPracticeArticle(practiceId, actId, '2043')).toBe(true);
+    s().takeReveal(practiceId);
     expect(s().revealPracticeArticle(practiceId, actId, 'all2:2043')).toBe(true);
+    expect(s().takeReveal(practiceId)).toEqual({
+      rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(CC_RD, '2043', { allegato: '2' }))),
+    });
   });
 
   it('returns false, and opens nothing, for an article not on the table or an unknown act', () => {
@@ -157,6 +188,24 @@ describe('addActIndexToPractice («Apri l\'indice e sfoglia»)', () => {
     expect(practice(practiceId).acts[0].articles).toHaveLength(1);
     expect(s().structureWindow.blockId).toBe(actId);
   });
+
+  it('activates a named practice that is not active', () => {
+    const active = s().createPractice('Attiva');
+    const named = s().createPractice('Nominata', { activate: false });
+    expect(s().activePracticeId).toBe(active);
+    const actId = s().addActIndexToPractice(named, L241);
+    expect(s().activePracticeId).toBe(named);
+    expect(practice(named).acts.map((a) => a.id)).toEqual([actId]);
+  });
+
+  it('an unknown practice id warns naming it and lands in the active practice', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const active = s().createPractice('Attiva');
+    s().addActIndexToPractice('gone', L241);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('gone');
+    expect(practice(active).acts).toHaveLength(1);
+  });
 });
 
 describe('acts and articles', () => {
@@ -189,7 +238,6 @@ describe('acts and articles', () => {
     const to = s().createPractice('A', { activate: false });
     const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5'), article(L24, '7')], { reveal: '5' });
     s().addArticlesToPractice(from, CC_RD, [article(CC_RD, '2043', { allegato: '2' })]);
-    s().takeReveal(from);
     s().moveActToPractice(actId, from, to);
     expect(practice(from).acts.map((a) => a.key)).not.toContain(practice(to).acts[0].key);
     expect(practice(from).acts).toHaveLength(1);
@@ -199,9 +247,69 @@ describe('acts and articles', () => {
     expect(s().activePracticeId).toBe(from);
   });
 
-  it('moves an act into a practice that holds the same act: one act, the target\'s id, the structure window following', () => {
+  it('a pending reveal follows the act it points at', () => {
     const from = s().createPractice('Da');
     const to = s().createPractice('A', { activate: false });
+    const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')], { reveal: 'first' });
+    s().moveActToPractice(actId, from, to);
+    const rowKey = articleRowKey(to, actId, practiceArticleKey(article(L24, '5')));
+    expect(s().takeReveal(from)).toBeNull();
+    expect(s().takeReveal(to)).toEqual({ rowKey });
+  });
+
+  it('a past-text row moves with its act, beside the text in force', () => {
+    const from = s().createPractice('Da');
+    const to = s().createPractice('A', { activate: false });
+    const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5'), article(L24, '5', PAST)], { reveal: '5' });
+    s().addArticlesToPractice(to, L24, [article(L24, '5', PAST)]);
+    s().moveActToPractice(actId, from, to);
+    expect(practice(to).acts).toHaveLength(1);
+    expect(practice(to).acts[0].articles.map(practiceArticleKey).sort()).toEqual(
+      [practiceArticleKey(article(L24, '5')), practiceArticleKey(article(L24, '5', PAST))].sort(),
+    );
+  });
+
+  it('the way back follows an act moved to a practice with no same act', () => {
+    const from = s().createPractice('Da');
+    const to = s().createPractice('A', { activate: false });
+    const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
+    s().pushReadingBack({ tabId: from, blockId: actId, articleId: '5', label: 'art. 5' });
+    s().moveActToPractice(actId, from, to);
+    expect(s().readingBackStack.at(-1)).toMatchObject({ tabId: to, blockId: actId });
+  });
+
+  it('a move raises one notification', () => {
+    const from = s().createPractice('Da');
+    const to = s().createPractice('A', { activate: false });
+    const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
+    const listener = vi.fn();
+    const unsubscribe = appStore.subscribe(listener);
+    s().moveActToPractice(actId, from, to);
+    unsubscribe();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('the structure window is cleared when its act moves to a practice that is not active', () => {
+    const from = s().createPractice('Da');
+    const to = s().createPractice('A', { activate: false });
+    const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
+    s().openStructureWindow(actId);
+    s().moveActToPractice(actId, from, to);
+    expect(s().structureWindow.blockId).toBeNull();
+  });
+
+  it('the structure window follows its act into the active practice', () => {
+    const from = s().createPractice('Da', { activate: false });
+    const to = s().createPractice('A');
+    const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
+    s().openStructureWindow(actId);
+    s().moveActToPractice(actId, from, to);
+    expect(s().structureWindow.blockId).toBe(actId);
+  });
+
+  it('moves an act into a practice that holds the same act: one act, the target\'s id, the structure window following', () => {
+    const from = s().createPractice('Da', { activate: false });
+    const to = s().createPractice('A');
     const moved = s().addArticlesToPractice(from, L24, [article(L24, '5')]).actId;
     const kept = s().addArticlesToPractice(to, L24, [article(L24, '7')]).actId;
     s().openStructureWindow(moved);
@@ -231,6 +339,34 @@ describe('acts and articles', () => {
     expect(s().practiceRows).toEqual({ 'p/a/k': true });
     s().setRowOpen('p/a/k', false);
     expect(s().practiceRows).toEqual({});
+  });
+});
+
+describe('a call that changes nothing writes nothing', () => {
+  it('takeReveal with nothing pending, an unknown or active practice id, and a row already in its state never touch the storage', () => {
+    const setItem = vi.spyOn(localStorage, 'setItem');
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().setRowOpen('p/a/k', true);
+    setItem.mockClear();
+    s().takeReveal(practiceId);
+    s().takeReveal('another');
+    s().setActivePractice('nope');
+    s().setActivePractice(practiceId);
+    s().setRowOpen('p/a/k', true);
+    s().setRowOpen('p/other', false);
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('a call that does change something does write', () => {
+    const setItem = vi.spyOn(localStorage, 'setItem');
+    s().setRowOpen('p/a/k', true);
+    expect(setItem).toHaveBeenCalled();
+  });
+});
+
+describe('row keys', () => {
+  it('a decision row key is practice id then decision id', () => {
+    expect(decisionRowKey('p1', 'd1')).toBe('p1/d1');
   });
 });
 

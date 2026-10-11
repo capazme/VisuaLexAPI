@@ -743,9 +743,11 @@ const appStore = createStore<AppState>()(
                 state.pendingReveal = null;
             }),
 
-            setActivePractice: (id) => set((state) => {
-                if (state.practices.some((p) => p.id === id)) state.activePracticeId = id;
-            }),
+            setActivePractice: (id) => {
+                const { practices, activePracticeId } = get();
+                if (activePracticeId === id || !practices.some((p) => p.id === id)) return;
+                set((state) => { state.activePracticeId = id; });
+            },
 
             reorderPractices: (fromIndex, toIndex) => set((state) => {
                 if (!movable(state.practices.length, fromIndex, toIndex)) return;
@@ -763,7 +765,11 @@ const appStore = createStore<AppState>()(
                     const first = articles[0] && practiceArticleKey(articles[0]);
                     shown = act.articles.find((a) => practiceArticleKey(a) === first);
                 } else if (act && options.reveal) {
-                    shown = findPracticeArticle(act, options.reveal);
+                    // The asked article is first one of those this call brought in (a past text
+                    // search keeps its own row, D15), else any row of the act.
+                    const brought = findPracticeArticle({ ...act, articles }, options.reveal);
+                    const key = brought && practiceArticleKey(brought);
+                    shown = act.articles.find((a) => practiceArticleKey(a) === key) ?? findPracticeArticle(act, options.reveal);
                 }
                 set((state) => {
                     state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
@@ -846,7 +852,10 @@ const appStore = createStore<AppState>()(
                     if (state.pendingReveal?.rowKey.startsWith(oldPrefix)) {
                         state.pendingReveal = { practiceId: toPracticeId, rowKey: newPrefix + state.pendingReveal.rowKey.slice(oldPrefix.length) };
                     }
-                    if (state.structureWindow.blockId === actId) state.structureWindow.blockId = nowId;
+                    if (state.structureWindow.blockId === actId) {
+                        // Its owner is off screen when the target is not the active practice (as closePractice).
+                        state.structureWindow.blockId = state.activePracticeId === toPracticeId ? nowId : null;
+                    }
                     // Carry-over ruling 4: the way back names the act where it now is.
                     for (const entry of state.readingBackStack) {
                         if (entry.tabId === fromPracticeId && entry.blockId === actId) {
@@ -869,19 +878,20 @@ const appStore = createStore<AppState>()(
                 if (act) act.isCollapsed = !act.isCollapsed;
             }),
 
-            setRowOpen: (rowKey, open) => set((state) => {
-                if (open) state.practiceRows[rowKey] = true;
-                else delete state.practiceRows[rowKey];
-            }),
+            setRowOpen: (rowKey, open) => {
+                // A write that changes nothing would still serialise the whole store.
+                if ((get().practiceRows[rowKey] === true) === open) return;
+                set((state) => {
+                    if (open) state.practiceRows[rowKey] = true;
+                    else delete state.practiceRows[rowKey];
+                });
+            },
 
             takeReveal: (practiceId) => {
-                let taken: { rowKey: string } | null = null;
-                set((state) => {
-                    if (state.pendingReveal?.practiceId !== practiceId) return;
-                    taken = { rowKey: state.pendingReveal.rowKey };
-                    state.pendingReveal = null;
-                });
-                return taken;
+                const pending = get().pendingReveal;
+                if (pending?.practiceId !== practiceId) return null;
+                set((state) => { state.pendingReveal = null; });
+                return { rowKey: pending.rowKey };
             },
             pendingDecision: null,
             decisionFocusRequest: null,
