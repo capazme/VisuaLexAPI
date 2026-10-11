@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "How VisuaLex identifies and writes legal sources. Specification: docs/superpowers/specs/2026-10-04-source-convention-design.md. Each expected value carries a status: decided (the owner's words exist), current (what the code does today, kept), proposed (Claude's low-impact call, stated in the spec), open:Qn (waits for question n of the spec, section 9). Act headings follow the dossier spec the owner approved on 4 October 2026 (2026-10-04-dossier-per-atto-design.md §2, interview Q6): the name for the acts cited by their own name, the act citation for every other act; the names are the dossier's own table (dossierLayout.ts CODE_NAMES), verbatim. The owner took every recommendation on 4 October 2026 («per il 31 procedi con le raccomandazione»): no case is open.",
+  "about": "How VisuaLex identifies and writes legal sources. Specification: docs/superpowers/specs/2026-10-04-source-convention-design.md. Each expected value carries a status: decided (the owner's words exist), current (what the code does today, kept), proposed (Claude's low-impact call, stated in the spec), open:Qn (waits for question n of the spec, section 9). Act headings follow the dossier spec the owner approved on 4 October 2026 (2026-10-04-dossier-per-atto-design.md §2, interview Q6): the name for the acts cited by their own name, the act citation for every other act; the names are the dossier's own table (dossierLayout.ts CODE_NAMES), verbatim. The owner took every recommendation on 4 October 2026 («per il 31 procedi con le raccomandazione»): no case of that spec is open. The courts of the Union (the Court of Justice and the General Court) wait for questions Q10–Q13 of docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §8: their cases are open until the owner answers.",
   "norms": [
     {
       "id": "cc-2043",
@@ -261,6 +261,103 @@
       "input": {"reference": {"corte": "cassazione", "numero": 10787, "anno": 2024, "sezione": "7"}, "attributes": {}},
       "identity": {"key": {"value": null, "status": "current"}, "reference_path": {"value": "/sentenze/cassazione/10787/2024?sezione=7", "status": "current"}},
       "labels": {}
+    },
+    {
+      "id": "cgue-c-634-21",
+      "note": "Read live on 12 October 2026 from the Publications Office's repository (CELLAR): judgment of the First Chamber, 7 December 2023, ECLI:EU:C:2023:957 (an attribute, never the key). Named by its case, as #112 proposed and the owner accepted («95–100 come raccomandi»); Q10 and Q11 of the 12 October design ask him to confirm the key and the citation.",
+      "input": {"reference": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "attributes": {"tipo": "sentenza", "sezione": "I", "data_decisione": "2023-12-07", "ecli": "ECLI:EU:C:2023:957"}},
+      "identity": {"fields": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q10"}, "key": {"value": "corte_giustizia_ue:634:2021", "status": "open:Q10"}, "path": {"value": "/sentenze/corte-giustizia-ue/634/2021", "status": "open:Q10"}},
+      "labels": {"citation": {"value": "Corte giust. UE, sez. I, sent. 7 dicembre 2023, causa C-634/21", "status": "open:Q11"}, "short": {"value": "Corte giust. UE, C-634/21", "status": "open:Q11"}}
+    },
+    {
+      "id": "cgue-joined-c-293-12",
+      "note": "Read live on 12 October 2026: one judgment of the Grand Chamber on joined cases C-293/12 and C-594/12, 8 April 2014, ECLI:EU:C:2014:238, filed under the first case (CELEX 62012CJ0293). One judgment, one key: a reference to C-594/12 resolves to this identity (Q12).",
+      "input": {"reference": {"corte": "corte_giustizia_ue", "numero": 293, "anno": 2012}, "attributes": {"tipo": "sentenza", "sezione": "grande", "data_decisione": "2014-04-08", "ecli": "ECLI:EU:C:2014:238", "cause_riunite": ["C-293/12", "C-594/12"]}},
+      "identity": {"key": {"value": "corte_giustizia_ue:293:2012", "status": "open:Q12"}, "path": {"value": "/sentenze/corte-giustizia-ue/293/2012", "status": "open:Q12"}},
+      "labels": {"citation": {"value": "Corte giust. UE, grande sez., sent. 8 aprile 2014, cause riunite C-293/12 e C-594/12", "status": "open:Q12"}, "short": {"value": "Corte giust. UE, C-293/12", "status": "open:Q12"}}
+    },
+    {
+      "id": "tribunale-ue-t-612-17",
+      "note": "Read live on 12 October 2026: judgment of the General Court, Ninth Chamber in extended composition, 10 November 2021, ECLI:EU:T:2021:763. The source names the formation in the title only.",
+      "input": {"reference": {"corte": "tribunale_ue", "numero": 612, "anno": 2017}, "attributes": {"tipo": "sentenza", "sezione": "IX ampliata", "data_decisione": "2021-11-10", "ecli": "ECLI:EU:T:2021:763"}},
+      "identity": {"fields": {"value": {"corte": "tribunale_ue", "numero": 612, "anno": 2017}, "status": "open:Q10"}, "key": {"value": "tribunale_ue:612:2017", "status": "open:Q10"}, "path": {"value": "/sentenze/tribunale-ue/612/2017", "status": "open:Q10"}},
+      "labels": {"citation": {"value": "Trib. UE, sez. IX ampliata, sent. 10 novembre 2021, causa T-612/17", "status": "open:Q11"}, "short": {"value": "Trib. UE, T-612/17", "status": "open:Q11"}}
+    },
+    {
+      "id": "cgue-26-62",
+      "note": "Read live on 12 October 2026: a case of 1962, before the letters (the source writes «Causa 26-62.»), judged by the full Court on 5 February 1963, ECLI:EU:C:1963:1. The source's title names no formation, so the citation names none.",
+      "input": {"reference": {"corte": "corte_giustizia_ue", "numero": 26, "anno": 1962}, "attributes": {"tipo": "sentenza", "data_decisione": "1963-02-05", "ecli": "ECLI:EU:C:1963:1"}},
+      "identity": {"key": {"value": "corte_giustizia_ue:26:1962", "status": "open:Q10"}, "path": {"value": "/sentenze/corte-giustizia-ue/26/1962", "status": "open:Q10"}},
+      "labels": {"citation": {"value": "Corte giust. UE, sent. 5 febbraio 1963, causa 26/62", "status": "open:Q11"}, "short": {"value": "Corte giust. UE, 26/62", "status": "open:Q11"}}
     }
-  ]
+  ],
+  "decision_citations": {
+    "note": "Words a lawyer writes, read into the reference /fetch_decision takes (null: not a decision VisuaLex can read). The web palette (decisionCitationParser.ts) and the Python API (/parse_decision) both assert every case; unsupported_court is the API's alone: the court it names when it recognises a court VisuaLex has no reader for (the palette answers null and leaves the words to the norm parser). today is the reader's clock. Design: docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1 and §3.4.",
+    "today": "2026-10-05",
+    "cases": [
+      {"input": "Cass. 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024}, "status": "current"}},
+      {"input": "Cassazione n. 99999 del 2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024}, "status": "current"}},
+      {"input": "Cass. civ. 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024, "archivio": "civile"}, "status": "current"}},
+      {"input": "Cass. civ., sez. III, n. 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024, "archivio": "civile", "sezione": "III"}, "status": "current"}},
+      {"input": "Cass. pen., sez. VII, 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024, "archivio": "penale", "sezione": "VII"}, "status": "current"}},
+      {"input": "Cass. SU 31310/2024", "reference": {"value": {"corte": "cassazione", "numero": 31310, "anno": 2024, "sezione": "U"}, "status": "current"}},
+      {"input": "Cass. civ., sez. un., n. 31310/2024", "reference": {"value": {"corte": "cassazione", "numero": 31310, "anno": 2024, "archivio": "civile", "sezione": "U"}, "status": "current"}},
+      {"input": "S.U. 31310/2024", "reference": {"value": {"corte": "cassazione", "numero": 31310, "anno": 2024, "sezione": "U"}, "status": "current"}},
+      {"input": "Cass. civ., sez. lav., 21 aprile 2022, n. 12789", "reference": {"value": {"corte": "cassazione", "numero": 12789, "anno": 2022, "archivio": "civile", "sezione": "L"}, "status": "current"}},
+      {"input": "Cass. pen., sez. VII, 10 gennaio 2024 (dep. 14 marzo 2024), n. 99999", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024, "archivio": "penale", "sezione": "VII"}, "status": "current"}},
+      {"input": "Cass. civ. 1234/99", "reference": {"value": {"corte": "cassazione", "numero": 1234, "anno": 1999, "archivio": "civile"}, "status": "current"}},
+      {"input": "Corte cost. 71/2020", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
+      {"input": "C. cost. n. 71 del 2020", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
+      {"input": "Corte costituzionale, sentenza n. 71/2020", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
+      {"input": "Cass. pen. n. 1399 del 1999, dep. 2000", "reference": {"value": {"corte": "cassazione", "numero": 1399, "anno": 2000, "archivio": "penale"}, "status": "current"}},
+      {"input": "Cass. pen., sez. II, n. 1399/1999 (dep. 2000)", "reference": {"value": {"corte": "cassazione", "numero": 1399, "anno": 2000, "archivio": "penale", "sezione": "II"}, "status": "current"}},
+      {"input": "Cass. pen., sez. II, n. 1399/1999 (dep. 3 gennaio 2000)", "reference": {"value": {"corte": "cassazione", "numero": 1399, "anno": 2000, "archivio": "penale", "sezione": "II"}, "status": "current"}},
+      {"input": "Cass. pen. n. 1399 del 15/12/1999, dep. 2000", "reference": {"value": {"corte": "cassazione", "numero": 1399, "anno": 2000, "archivio": "penale"}, "status": "current"}},
+      {"input": "Cass. pen. n. 1399/1999, depositata il 14/03/2000", "reference": {"value": {"corte": "cassazione", "numero": 1399, "anno": 2000, "archivio": "penale"}, "status": "current"}},
+      {"input": "Cass. civ., sez. III, n. 12789 del 21 aprile 2022", "reference": {"value": {"corte": "cassazione", "numero": 12789, "anno": 2022, "archivio": "civile", "sezione": "III"}, "status": "current"}},
+      {"input": "Cass. pen. n. 1399 del 15/12/1999", "reference": {"value": {"corte": "cassazione", "numero": 1399, "anno": 1999, "archivio": "penale"}, "status": "current"}},
+      {"input": "Cass. civ. n. 99999 del 14/03/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024, "archivio": "civile"}, "status": "current"}},
+      {"input": "Cass. civ., sez. 6-1, n. 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024, "archivio": "civile", "sezione": "6"}, "status": "current"}},
+      {"input": "Cass. civ., sez. VI-1, n. 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024, "archivio": "civile", "sezione": "VI"}, "status": "current"}},
+      {"input": "Cass. civ., Sez. L, n. 12789/2022", "reference": {"value": {"corte": "cassazione", "numero": 12789, "anno": 2022, "archivio": "civile", "sezione": "L"}, "status": "current"}},
+      {"input": "su questo punto 12/2020", "reference": {"value": null, "status": "current"}},
+      {"input": "SU n. 31310/2024", "reference": {"value": {"corte": "cassazione", "numero": 31310, "anno": 2024, "sezione": "U"}, "status": "current"}},
+      {"input": "Corte cost. n. 71 del 2020 della Corte", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
+      {"input": "Cass. civ. n. 5 del 2020 ha affermato", "reference": {"value": {"corte": "cassazione", "numero": 5, "anno": 2020, "archivio": "civile"}, "status": "current"}},
+      {"input": "Corte cost. n. 71/2020 in tema", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
+      {"input": "art 2043 cc", "reference": {"value": null, "status": "current"}},
+      {"input": "art. 2043 c.c.", "reference": {"value": null, "status": "current"}},
+      {"input": "Cass. civ.", "reference": {"value": null, "status": "current"}},
+      {"input": "Cass. 99999", "reference": {"value": null, "status": "current"}},
+      {"input": "Cass. 0/2024", "reference": {"value": null, "status": "current"}},
+      {"input": "Cass. 99999/2030", "reference": {"value": null, "status": "current"}},
+      {"input": "Corte cost. 1/1950", "reference": {"value": null, "status": "current"}},
+      {"input": "Cons. Stato, sez. VI, n. 2270/2019", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
+      {"input": "Consiglio di Stato, Ad. plen., 9 novembre 2021, n. 18", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
+      {"input": "TAR Lazio, Roma, sez. I, n. 1234/2020", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Tribunale amministrativo regionale", "status": "proposed"}},
+      {"input": "T.A.R. Lombardia, Milano, sez. II, 15 marzo 2021, n. 678", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Tribunale amministrativo regionale", "status": "proposed"}},
+      {"input": "Garante privacy, provv. 10 giugno 2021, n. 234", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Garante per la protezione dei dati personali", "status": "proposed"}},
+      {"input": "Corte EDU, 4 dicembre 2008, S. e Marper c. Regno Unito", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Corte europea dei diritti dell'uomo", "status": "proposed"}},
+      {"input": "CGUE, C-634/21", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q13"}},
+      {"input": "C-634/21", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q13"}},
+      {"input": "C‑634/21", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q13"}},
+      {"input": "causa C-634/21", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q13"}},
+      {"input": "CGUE C-634/2021", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q13"}},
+      {"input": "Corte giust. UE, sez. I, 7 dicembre 2023, causa C-634/21", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q13"}},
+      {"input": "Corte di giustizia dell'Unione europea, sentenza 7 dicembre 2023, C-634/21", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "open:Q13"}},
+      {"input": "Corte giust., cause riunite C-293/12 e C-594/12", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 293, "anno": 2012}, "status": "open:Q13"}},
+      {"input": "C. giust. UE 8 aprile 2014, C-594/12", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 594, "anno": 2012}, "status": "open:Q13"}},
+      {"input": "Corte giust., causa 26/62", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 26, "anno": 1962}, "status": "open:Q13"}},
+      {"input": "Trib. UE, T-612/17", "reference": {"value": {"corte": "tribunale_ue", "numero": 612, "anno": 2017}, "status": "open:Q13"}},
+      {"input": "Tribunale UE, sez. IX ampliata, 10 novembre 2021, causa T-612/17", "reference": {"value": {"corte": "tribunale_ue", "numero": 612, "anno": 2017}, "status": "open:Q13"}},
+      {"input": "CGUE, T-612/17", "reference": {"value": {"corte": "tribunale_ue", "numero": 612, "anno": 2017}, "status": "open:Q13"}},
+      {"input": "T-612/17", "reference": {"value": {"corte": "tribunale_ue", "numero": 612, "anno": 2017}, "status": "open:Q13"}},
+      {"input": "CGUE", "reference": {"value": null, "status": "open:Q13"}},
+      {"input": "C-634", "reference": {"value": null, "status": "open:Q13"}},
+      {"input": "C-0/21", "reference": {"value": null, "status": "open:Q13"}},
+      {"input": "C-634/31", "reference": {"value": null, "status": "open:Q13"}},
+      {"input": "T-1/88", "reference": {"value": null, "status": "open:Q13"}},
+      {"input": "art. 267 TFUE", "reference": {"value": null, "status": "open:Q13"}}
+    ]
+  }
 }

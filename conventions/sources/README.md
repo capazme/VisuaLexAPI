@@ -38,7 +38,7 @@ Every expected value `E` is `{ "value": …, "status": … }`:
 | `decided` | the owner's words exist (quoted in `note` or in the spec) | every adopting suite: the web app, the server and the MCP server, the API, MERL-T |
 | `current` | what the code does today, and the convention keeps it | by the suites that hold that code (today: the API for norm identities and decision keys, the web for decision paths) |
 | `proposed` | a low-impact call stated in the spec; the owner can overturn it | once the area adopts the convention |
-| `open:Qn` | waits for question n of the spec (§9); the value is the recommendation | once the owner answers and the status flips (none today: the owner answered Q1–Q9 on 4 October 2026) |
+| `open:Qn` | waits for question n: Q1–Q9 of the convention spec (§9), Q10–Q13 of `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` (§8); the value is the recommendation | once the owner answers and the status flips (the owner answered Q1–Q9 on 4 October 2026; Q10–Q13, the courts of the Union, are open) |
 
 `aliases` are other spellings of the same identity (a bare URN, Normattiva's
 alias form, a version marker, a malformed type token): the normaliser maps each
@@ -51,7 +51,7 @@ holding `conventions/`, and fails when it is not there.
 
 | Suite | Test |
 |---|---|
-| web | `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (today: shape, decided citations, current decision paths and reference paths) |
+| web | `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (today: shape, decided citations, current decision paths and reference paths); `apps/web/src/utils/__tests__/decisionCitationParser.test.ts` (`decision_citations`) |
 | Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys); `services/visualex/tests/test_nl_parser_convention.py` (every citation and short label reads back through the parser to its norm) |
 | server, MCP, MERL-T | added by each area's adoption PR (plan `docs/superpowers/plans/2026-10-04-source-convention.md`) |
 
@@ -60,6 +60,29 @@ holding `conventions/`, and fails when it is not there.
 A new case or a changed value is a change of the convention: it goes with the
 code that makes the suites green again, in the same pull request. Flipping an
 `open` status to `decided` quotes the owner's answer in the `note`.
+
+## `decision_citations`
+
+A decision as a lawyer writes it, read into the reference `/fetch_decision` takes, or `null`:
+
+```jsonc
+"decision_citations": {
+  "note": "…", "today": "2026-10-05",          // the reader's clock: a year after it is refused
+  "cases": [
+    { "input": "Cass. civ., sez. un., n. 31310/2024",
+      "reference": { "value": { "corte": "cassazione", "archivio": "civile", "sezione": "U", "numero": 31310, "anno": 2024 }, "status": "current" } },
+    { "input": "Cons. Stato, sez. VI, n. 2270/2019",
+      "reference": { "value": null, "status": "current" },
+      "unsupported_court": { "value": "Consiglio di Stato", "status": "proposed" } }
+  ]
+}
+```
+
+Two parsers read the same words: the web palette's `decisionCitationParser.ts`, on every
+keystroke in the browser, and the Python API's `/parse_decision`, which the server's
+`POST /dossiers/:id/decisions` calls. Both assert every case whose status their suite asserts;
+`unsupported_court` (the court the API names when it recognises one VisuaLex has no reader for)
+is the API's alone. The section is kept as written (`III`, `U`), as the palette keeps it.
 
 ## `norm-entries.json`
 
