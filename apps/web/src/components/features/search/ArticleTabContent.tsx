@@ -27,7 +27,8 @@ import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
-import { FindInTextBox } from './FindInTextBox';
+import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
+import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
@@ -156,10 +157,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // not persisted across sessions.
     const [highlightsHidden, setHighlightsHidden] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
-    // «Cerca nel testo» searches ArticleBody's text root only: not Brocardi, not the case law below it.
+    // The find window searches ArticleBody's text root only: not Brocardi, not the case law below it.
     const textRootRef = useRef<HTMLDivElement>(null);
-    const findButtonRef = useRef<HTMLElement | null>(null);
-    const [isFindOpen, setIsFindOpen] = useState(false);
     // Loop β #2 "missed" surface: a selection the user flagged as a legal
     // reference the citation detector did not link. Offset is in the same
     // marker projection as highlights; the rect was captured before the
@@ -187,6 +186,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // preview outside the workspace, such as the palette's result card) registers nothing.
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
     useRegisterFindRoot(originTabId ?? tabId, findTargetKey, shortNorm(norma_data), textRootRef);
+    const isFindOpen = useFindWindowScopedTo(originTabId ?? tabId);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],
@@ -199,8 +199,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // by article, not by version, so they would attach to the wrong words, and
     // Brocardi's commentary carries no date.
     const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
-    // No text on screen, no find box: it must not come back open (and take focus) when the text does.
-    if (!display.textVisible && isFindOpen) setIsFindOpen(false);
     const readOnly = display.readOnly;
     // Where a decision opened from the article's case law walks back to
     const decisionBackEntry = useMemo(() => originTabId && originBlockId ? {
@@ -812,8 +810,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onCompare={handleCompare}
                 find={display.textVisible ? {
                     isOpen: isFindOpen,
-                    onToggle: (button) => { findButtonRef.current = button; setIsFindOpen(v => !v); },
-                    bar: <FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} label="dell’articolo" onClose={() => setIsFindOpen(false)} />,
+                    onToggle: (button) => (isFindOpen
+                        ? closeFindWindow()
+                        : openFindWindow({ tabId: originTabId ?? tabId, targetKey: findTargetKey, returnFocus: button })),
                 } : undefined}
             />
 

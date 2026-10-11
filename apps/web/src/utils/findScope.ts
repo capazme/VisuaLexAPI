@@ -93,7 +93,7 @@ function decisionTarget(tab: WorkspaceTab): FindTarget | null {
   };
 }
 
-function targetsOfTab(tab: WorkspaceTab): FindTarget[] {
+function targetsOfTab(tab: WorkspaceTab, phone: boolean): FindTarget[] {
   if (tab.view?.kind === 'decision') {
     const target = decisionTarget(tab);
     return target ? [target] : [];
@@ -102,6 +102,8 @@ function targetsOfTab(tab: WorkspaceTab): FindTarget[] {
   if (tab.view) return [];
   const targets: FindTarget[] = [];
   for (const item of tab.content) {
+    // The phone column draws norm blocks alone (`SearchPanel` filters on `type === 'norma'`).
+    if (phone && item.type !== 'norma') continue;
     if (item.type === 'norma') targets.push(...articleTargets(tab.id, item.articles));
     else if (item.type === 'loose-article') targets.push(...articleTargets(tab.id, [item.article]));
     else targets.push(...articleTargets(tab.id, item.articles.map((a) => a.article)));
@@ -115,17 +117,20 @@ function targetsOfTab(tab: WorkspaceTab): FindTarget[] {
  * unsorted, minimised tabs included); inside a tab, block and article as the tab shows them, a
  * decision tab one text. The same article twice in one tab (in a block and in a collection) is one
  * target, where it first appears: its key names one root, so it is searched and counted once.
+ * On a phone (`options.phone`) the loose articles and collections are left out: its column never
+ * draws them, so counting them would only promise matches that cannot be shown.
  */
 export function findTargetsInScope(
   state: FindScopeState,
   scope: FindScope,
   frontTabId: string | null,
+  options: { phone?: boolean } = {},
 ): FindTarget[] {
   const tabs = scope === 'tab' ? state.workspaceTabs.filter((t) => t.id === frontTabId) : state.workspaceTabs;
   const targets: FindTarget[] = [];
   const seen = new Set<string>();
   for (const tab of tabs) {
-    for (const target of targetsOfTab(tab)) {
+    for (const target of targetsOfTab(tab, options.phone === true)) {
       const id = `${target.tabId}|${target.targetKey}`;
       if (seen.has(id)) continue;
       seen.add(id);

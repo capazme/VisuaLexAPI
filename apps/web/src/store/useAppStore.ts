@@ -1202,8 +1202,21 @@ const appStore = createStore<AppState>()(
                         a => normalizeArticleId(uniqueArticleIdFromNorma(a.norma_data)) === wanted
                     );
                 }) as NormaBlock | undefined;
-                if (!block) return;
+                if (!block) {
+                    // A collection holds loose copies: showing the article is opening the collection.
+                    const collection = tab.content.find(c => c.type === 'collection' && c.articles.some(
+                        a => normalizeArticleId(uniqueArticleIdFromNorma(a.article.norma_data)) === wanted
+                    )) as ArticleCollection | undefined;
+                    if (!collection) return;
+                    collection.isCollapsed = false;
+                    tab.isMinimized = false;
+                    tab.isHidden = false;
+                    tab.zIndex = ++state.highestZIndex;
+                    return;
+                }
                 block.autoFocusArticleId = articleId;
+                // A collapsed block draws no article: showing one is opening its block (find, Task 34).
+                block.isCollapsed = false;
                 // Surface the tab if it was minimized/hidden so the focus signal
                 // is actually visible (R3 + R2 edge case).
                 tab.isMinimized = false;

@@ -116,3 +116,45 @@ describe('useAppStore mobileActiveTabId', () => {
         expect(options.partialize(appStore.getState())).not.toHaveProperty('mobileActiveTabId');
     });
 });
+
+describe('useAppStore focusArticleInTab — showing an article opens what hides it', () => {
+    const norma = { tipo_atto: 'codice civile', data: '', numero_articolo: '2043' };
+    const article = { article_text: 'testo', norma_data: norma };
+
+    function tabWith(content: WorkspaceTab['content']): WorkspaceTab {
+        return { ...makeTab('t'), isMinimized: true, content };
+    }
+
+    it('expands a collapsed block, raises and restores its tab, and signals the article', () => {
+        appStore.setState({
+            workspaceTabs: [tabWith([{ type: 'norma', id: 'blk', norma: { tipo_atto: 'codice civile', data: '' }, articles: [article], isCollapsed: true }])],
+        });
+        appStore.getState().focusArticleInTab('t', '2043');
+        const tab = appStore.getState().workspaceTabs[0];
+        const block = tab.content[0];
+        expect(block.type === 'norma' && block.isCollapsed).toBe(false);
+        expect(block.type === 'norma' && block.autoFocusArticleId).toBe('2043');
+        expect(tab.isMinimized).toBe(false);
+    });
+
+    it('expands a collapsed collection that holds the article', () => {
+        appStore.setState({
+            workspaceTabs: [tabWith([{ type: 'collection', id: 'col', label: 'raccolta', isCollapsed: true, articles: [{ article, sourceNorma: norma }] }])],
+        });
+        appStore.getState().focusArticleInTab('t', '2043');
+        const tab = appStore.getState().workspaceTabs[0];
+        const collection = tab.content[0];
+        expect(collection.type === 'collection' && collection.isCollapsed).toBe(false);
+        expect(tab.isMinimized).toBe(false);
+    });
+
+    it('leaves an article that is not in the tab alone', () => {
+        appStore.setState({
+            workspaceTabs: [tabWith([{ type: 'norma', id: 'blk', norma: { tipo_atto: 'codice civile', data: '' }, articles: [article], isCollapsed: true }])],
+        });
+        appStore.getState().focusArticleInTab('t', '9999');
+        const block = appStore.getState().workspaceTabs[0].content[0];
+        expect(block.type === 'norma' && block.isCollapsed).toBe(true);
+        expect(appStore.getState().workspaceTabs[0].isMinimized).toBe(true);
+    });
+});

@@ -46,6 +46,9 @@ export const Z_INDEX = {
   /** Floating search panel — above dock, below overlay band */
   searchPanel: 'z-[100]',
 
+  /** Floating find window — a tool held over the workspace, above the search panel */
+  findWindow: 'z-[110]',
+
   // ── OVERLAY BAND (1000+) ─────────────────────────────────────────
   /** Side drawers (Brocardi drawer, etc.) */
   drawer: 'z-[1000]',

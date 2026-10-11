@@ -29,8 +29,18 @@ let saved: { css: unknown; highlight: unknown; matchMedia: typeof window.matchMe
 let latest: UseFindWindow;
 let scrolled: ReturnType<typeof vi.fn>;
 
-function Harness({ query, scope, open }: { query: string; scope: 'tab' | 'all'; open: boolean }) {
-  const result = useFindWindow({ query, scope, open });
+function Harness({
+  query,
+  scope,
+  open,
+  prefer,
+}: {
+  query: string;
+  scope: 'tab' | 'all';
+  open: boolean;
+  prefer?: { tabId: string; targetKey?: string } | null;
+}) {
+  const result = useFindWindow({ query, scope, open, prefer });
   useEffect(() => {
     latest = result;
   });
@@ -303,8 +313,21 @@ describe('useFindWindow — going to an undrawn match', () => {
     expect(latest.current?.tabId).toBe(front);
     expect(moves.revealTab).toHaveBeenCalledTimes(1);
     expect(moves.bringTabToFront).not.toHaveBeenCalled();
-    // Still counted.
-    expect(latest.count).toBe(2);
+    // Given up, so no longer counted: the counter counts what can be reached.
+    expect(latest.count).toBe(1);
+    expect(latest.index).toBe(0);
+  });
+
+  it('a given-up target leaves the counter even when there is nowhere else to go', async () => {
+    const away = addTab('Altrove', NORMA_1, 'il fatto mai disegnato', { minimised: true });
+    render(<Harness query="fatto" scope="all" open />);
+    await settle();
+    expect(latest.count).toBe(1);
+    act(() => latest.next());
+    await settle(3100);
+    expect(latest.count).toBe(0);
+    expect(latest.index).toBe(-1);
+    expect(away).toBeTruthy();
   });
 
   it('a new query tries a given-up target again', async () => {
@@ -550,5 +573,88 @@ describe('useFindWindow — «Questa scheda»', () => {
     await settle(50);
     expect(latest.count).toBe(1);
     expect(latest.current?.tabId).toBe(raised);
+  });
+});
+
+describe('useFindWindow — starting in a given tab', () => {
+  it('a fresh query starts at the preferred target\'s first match, drawn first, not at the front tab\'s', async () => {
+    const a = addTab('A', NORMA_1, 'un fatto in A');
+    mountRoot(a, NORMA_1, 'un fatto in A');
+    const b = addTab('B', NORMA_2, 'fatto uno, fatto due');
+    mountRoot(b, NORMA_2, 'fatto uno, fatto due');
+    appStore.getState().bringTabToFront(b);
+    const moves = spyMoves();
+
+    render(<Harness query="fatto" scope="all" open prefer={{ tabId: a, targetKey: targetKeyOf(NORMA_1) }} />);
+    await settle();
+
+    expect(latest.current).toMatchObject({ tabId: a, onScreen: true });
+    expect(latest.index).toBe(0);
+    expect(moves.revealTab).not.toHaveBeenCalled();
+  });
+
+  it('restart() applies the held query again as a fresh one, now', async () => {
+    const a = addTab('A', NORMA_1, 'un fatto in A');
+    mountRoot(a, NORMA_1, 'un fatto in A');
+    const b = addTab('B', NORMA_2, 'fatto uno, fatto due');
+    mountRoot(b, NORMA_2, 'fatto uno, fatto due');
+    appStore.getState().bringTabToFront(b);
+
+    const { rerender } = render(<Harness query="fatto" scope="all" open />);
+    await settle();
+    expect(latest.current?.tabId).toBe(b);
+
+    rerender(<Harness query="fatto" scope="all" open prefer={{ tabId: a }} />);
+    act(() => latest.restart());
+    expect(latest.current?.tabId).toBe(a);
+    expect(latest.index).toBe(0);
+  });
+});
+
+describe('useFindWindow — targets that cannot be reached', () => {
+  it('does not bounce between two targets whose drawn text lacks the stored match', async () => {
+    const front = addTab('Davanti', NORMA_3, 'niente qui');
+    mountRoot(front, NORMA_3, 'niente qui');
+    const x = addTab('X', NORMA_1, 'fatto', { minimised: true });
+    addTab('Y', NORMA_2, 'fatto', { minimised: true });
+    appStore.getState().bringTabToFront(front);
+    // The carousel / the active article: revealing one target draws it and unmounts the other, and what is
+    // drawn is split in two blocks, so the stored match is not there.
+    const drawnRoots = new Map<string, () => void>();
+    const reveal = vi.fn((id: string) => {
+      for (const [other, off] of drawnRoots) {
+        off();
+        drawnRoots.delete(other);
+      }
+      const n = id === x ? NORMA_1 : NORMA_2;
+      const element = document.createElement('div');
+      element.innerHTML = '<p>fat</p><p>to</p>';
+      document.body.appendChild(element);
+      drawnRoots.set(id, registerFindRoot({ tabId: id, targetKey: targetKeyOf(n), label: 'art.', element }));
+    });
+    appStore.setState({ revealTab: reveal });
+
+    render(<Harness query="fatto" scope="all" open />);
+    await settle();
+    act(() => latest.next());
+    await settle(20_000);
+
+    expect(reveal.mock.calls.length).toBeLessThanOrEqual(3);
+    for (const off of drawnRoots.values()) off();
+  });
+
+  it('a given-up target is reachable again when its root registers with drawn matches', async () => {
+    addTab('Davanti', NORMA_3, 'niente qui');
+    const x = addTab('X', NORMA_1, 'fatto', { minimised: true });
+    render(<Harness query="fatto" scope="all" open />);
+    await settle();
+    act(() => latest.next());
+    await settle(3100);
+    expect(latest.count).toBe(0);
+
+    mountRoot(x, NORMA_1, 'un fatto');
+    await settle();
+    expect(latest.count).toBe(1);
+    expect(latest.current).toMatchObject({ tabId: x, onScreen: true });
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArticleData, ArticleValidity, Highlight, NormaVisitata } from '../../../../types';
@@ -30,6 +30,8 @@ vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi">Nemo iudex sine actore</div> }));
 
 import { ArticleTabContent } from '../ArticleTabContent';
+import { FindWindow } from '../FindWindow';
+import { closeFindWindow } from '../../../../utils/findWindowControl';
 import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 import { fixtureText, ARTICLE_FIXTURES } from '../../../../utils/__fixtures__/articleTexts';
@@ -97,34 +99,54 @@ beforeEach(() => {
 const ACCENTED = ARTICLE_FIXTURES.find((f) => f.text.includes('può'))!;
 
 const typeQuery = (value: string) => fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value } });
-const openFind = () => fireEvent.click(screen.getAllByRole('button', { name: 'Cerca nel testo' })[0]);
+const magnifier = () => screen.getAllByRole('button', { name: 'Cerca nel testo' })[0];
 const drawn = (name = 'vlx-find') => registry.get(name)?.ranges.length ?? 0;
 
-describe('ArticleTabContent — «Cerca nel testo»', () => {
-  it('opens a box under the toolbar and finds a word typed without its accent', async () => {
-    show(article({ article_text: ACCENTED.text }));
+/** The article in a workspace tab, with the one find window mounted beside it. */
+function showInTab(data: ArticleData) {
+  const tabId = appStore.getState().addWorkspaceTab('Codice civile', NORMA, [data]);
+  const view = render(
+    <MemoryRouter>
+      <ArticleTabContent data={data} readingOrigin={{ tabId, blockId: 'b' }} />
+      <FindWindow />
+    </MemoryRouter>,
+  );
+  return { tabId, ...view };
+}
+
+describe('ArticleTabContent — the magnifier opens the find window', () => {
+  afterEach(() => {
+    act(() => closeFindWindow());
+    appStore.setState({ workspaceTabs: [] });
+  });
+
+  it('opens the window, not a box under the toolbar, and finds a word typed without its accent', async () => {
+    showInTab(article({ article_text: ACCENTED.text }));
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
-    openFind();
-    expect(screen.getByRole('search')).toBeInTheDocument();
+    fireEvent.click(magnifier());
+    const window_ = screen.getByRole('search');
+    expect(window_.closest('.glass-toolbar')).toBeNull();
+    expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'true');
     typeQuery('puo');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
     expect(drawn('vlx-find-current')).toBe(1);
   });
 
   it('finds the accented word typed with its accent too', async () => {
-    show(article({ article_text: ACCENTED.text }));
-    openFind();
+    showInTab(article({ article_text: ACCENTED.text }));
+    fireEvent.click(magnifier());
     typeQuery('può');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
   });
 
   it('searches the article text only: not Brocardi, not «Giurisprudenza», not the toolbar', async () => {
-    show(article({ article_text: ACCENTED.text }));
+    showInTab(article({ article_text: ACCENTED.text }));
     // each of the three words is on the page, outside the text root
     expect(screen.getByTestId('brocardi')).toHaveTextContent('Nemo iudex');
     expect(screen.getByText('Giurisprudenza')).toBeInTheDocument();
     expect(document.body.textContent).toContain('Allegato');
-    openFind();
+    fireEvent.click(magnifier());
     for (const word of ['Nemo iudex', 'Giurisprudenza', 'Allegato']) {
       typeQuery(word);
       await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
@@ -133,53 +155,40 @@ describe('ArticleTabContent — «Cerca nel testo»', () => {
   });
 
   it('does not find the loading placeholder', async () => {
-    show(article({ article_text: '' }));
+    showInTab(article({ article_text: '' }));
     expect(screen.getByText('Caricamento testo...')).toBeInTheDocument();
-    openFind();
+    fireEvent.click(magnifier());
     typeQuery('caricamento');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
   });
 
-  it('closes the box when the text goes away, and does not bring it back open', () => {
+  it('draws no magnifier while the text is not shown', () => {
     const notYet: ArticleValidity = { state: 'not_yet', valid_from: null, valid_to: null, version_number: null, act_updated: null, request_in_window: true };
-    const ui = (data: ArticleData) => <MemoryRouter><ArticleTabContent data={data} /></MemoryRouter>;
-    const { rerender } = render(ui(article({ article_text: ACCENTED.text })));
-    openFind();
-    expect(screen.getByRole('search')).toBeInTheDocument();
-    rerender(ui(article({ article_text: ACCENTED.text, validity: notYet })));
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
-    rerender(ui(article({ article_text: ACCENTED.text })));
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Cerca nel testo' })[0]).toHaveAttribute('aria-pressed', 'false');
+    showInTab(article({ article_text: ACCENTED.text, validity: notYet }));
+    expect(screen.queryByRole('button', { name: 'Cerca nel testo' })).not.toBeInTheDocument();
   });
 
-  it('closing clears the highlights and returns focus to the button', async () => {
-    show(article({ article_text: ACCENTED.text }));
-    openFind();
+  it('the magnifier again closes it, clearing the highlights and returning focus to the button', async () => {
+    showInTab(article({ article_text: ACCENTED.text }));
+    fireEvent.click(magnifier());
+    typeQuery('puo');
+    await waitFor(() => expect(drawn('vlx-find-current')).toBe(1));
+    fireEvent.click(magnifier());
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(registry.has('vlx-find-current')).toBe(false);
+    expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('Esc closes it and gives the focus back to the magnifier that opened it', async () => {
+    showInTab(article({ article_text: ACCENTED.text }));
+    const button = magnifier();
+    fireEvent.click(button);
     typeQuery('puo');
     await waitFor(() => expect(drawn('vlx-find-current')).toBe(1));
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
     expect(registry.has('vlx-find-current')).toBe(false);
-    expect(registry.has('vlx-find')).toBe(false);
-    expect(screen.getAllByRole('button', { name: 'Cerca nel testo' }).some((b) => b === document.activeElement)).toBe(true);
-  });
-
-  it('two tabs searching at once keep both sets of ranges', async () => {
-    render(
-      <MemoryRouter>
-        <div data-testid="one"><ArticleTabContent data={article({ article_text: ACCENTED.text })} /></div>
-        <div data-testid="two"><ArticleTabContent data={article({ article_text: ACCENTED.text })} /></div>
-      </MemoryRouter>,
-    );
-    for (const id of ['one', 'two']) {
-      fireEvent.click(within(screen.getByTestId(id)).getAllByRole('button', { name: 'Cerca nel testo' })[0]);
-      fireEvent.change(within(screen.getByTestId(id)).getByRole('searchbox'), { target: { value: 'puo' } });
-    }
-    await waitFor(() => expect(drawn('vlx-find-current')).toBe(2));
-    // closing one leaves the other's
-    fireEvent.keyDown(within(screen.getByTestId('one')).getByRole('searchbox'), { key: 'Escape' });
-    expect(drawn('vlx-find-current')).toBe(1);
+    expect(button).toHaveFocus();
   });
 
   it('leaves the other toolbar buttons where they were', () => {

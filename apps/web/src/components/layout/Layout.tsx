@@ -13,6 +13,8 @@ import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
 import { GlobalSearch } from '../features/search/GlobalSearch';
+import { FindWindow } from '../features/search/FindWindow';
+import { openFindWindow } from '../../utils/findWindowControl';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
@@ -32,7 +34,6 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const navigate = useNavigate();
 
   // Onboarding Tour
@@ -101,10 +102,10 @@ export function Layout() {
         e.preventDefault();
         toggleSearchPanel();
       }
-      // Cmd/Ctrl+F for global search
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+      // Cmd/Ctrl+F opens the floating find window (spec §13.1), or focuses its field when it is open.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
-        setGlobalSearchOpen(true);
+        openFindWindow();
       }
       // Open keyboard shortcuts with '?' (Shift + /)
       if (e.key === '?' && !isTyping) {
@@ -237,8 +238,11 @@ export function Layout() {
 
       <ServiceHealthBanner />
 
-      {/* Global Search (Cmd+F) */}
-      <GlobalSearch isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
+      {/* The old modal search over stored article texts: nothing opens it any more; it goes with Task 35. */}
+      <GlobalSearch isOpen={false} onClose={() => {}} />
+
+      {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
+      <FindWindow />
 
       {/* Heavy reader overlays are loaded only when their route/state needs them. */}
       <Suspense fallback={null}>

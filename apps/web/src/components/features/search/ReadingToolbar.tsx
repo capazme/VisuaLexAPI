@@ -1,4 +1,4 @@
-import { useRef, type ReactNode, type Ref } from 'react';
+import { useRef, type Ref } from 'react';
 import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -50,14 +50,14 @@ export interface ReadingToolbarProps {
     onOpenVersionInput: () => void;
     onCompare: () => void;
     /**
-     * «Cerca nel testo»: the button (desktop row and phone row) and, while open, the box in a row of its own under the
-     * buttons, sticky with the toolbar. Absent when there is no text to search.
+     * «Cerca nel testo»: the magnifier (desktop row and phone row), which opens the floating find window on this tab.
+     * Absent when there is no text to search.
      */
     find?: {
+        /** The window is open and scoped to this tab. */
         isOpen: boolean;
-        /** Told which of the two buttons was on screen, for the box to give focus back to. */
+        /** Told which of the two buttons was on screen, for the window to give focus back to. */
         onToggle: (button: HTMLElement | null) => void;
-        bar: ReactNode;
     };
 }
 
@@ -92,7 +92,7 @@ export function ReadingToolbar({
     onCompare,
     find,
 }: ReadingToolbarProps) {
-    // Both rows are mounted and one is hidden by CSS: the box returns focus to the one on screen.
+    // Both rows are mounted and one is hidden by CSS: the window returns focus to the one on screen.
     const desktopFindRef = useRef<HTMLButtonElement>(null);
     const phoneFindRef = useRef<HTMLButtonElement>(null);
     const toggleFind = () => {
@@ -312,7 +312,6 @@ export function ReadingToolbar({
                     )}
                 </div>
             </div>
-            {find?.isOpen && find.bar}
         </div>
     );
 }

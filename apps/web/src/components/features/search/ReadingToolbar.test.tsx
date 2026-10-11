@@ -191,7 +191,7 @@ describe('ReadingToolbar — the menu', () => {
 
 describe('ReadingToolbar — «Cerca nel testo»', () => {
     const find = (over: Partial<NonNullable<ReadingToolbarProps['find']>> = {}) => ({
-        isOpen: false, onToggle: vi.fn(), bar: <div role="search" />, ...over,
+        isOpen: false, onToggle: vi.fn(), ...over,
     });
 
     it('has the button in the desktop row and in the phone row', () => {
@@ -204,7 +204,7 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
         expect(screen.queryByRole('button', { name: 'Cerca nel testo' })).not.toBeInTheDocument();
     });
 
-    it('toggles from either row, and hands the box the button of the row on screen', () => {
+    it('toggles from either row, and hands the window the button of the row on screen', () => {
         const f = find();
         setup({ find: f });
         const [phone, desktop] = screen.getAllByRole('button', { name: 'Cerca nel testo' });
@@ -217,10 +217,13 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
         expect(f.onToggle).toHaveBeenLastCalledWith(phone);
     });
 
-    it('draws the box only while the search is open, and keeps the phone buttons at 44 px', () => {
+    it('draws no box under the buttons, shows the window open on the buttons and keeps the phone buttons at 44 px', () => {
         setup({ find: find({ isOpen: true }) });
-        expect(screen.getByRole('search')).toBeInTheDocument();
-        const phone = screen.getAllByRole('button', { name: 'Cerca nel testo' })[0];
+        expect(screen.queryByRole('search')).not.toBeInTheDocument();
+        expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+        const [phone, desktop] = screen.getAllByRole('button', { name: 'Cerca nel testo' });
+        expect(phone).toHaveAttribute('aria-pressed', 'true');
+        expect(desktop).toHaveAttribute('aria-pressed', 'true');
         expect(phone).toHaveClass('min-h-[44px]', 'min-w-[44px]');
     });
 });

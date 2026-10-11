@@ -44,6 +44,24 @@ function collection(id: string, articles: ArticleData[]): ArticleCollection {
 }
 
 describe('findTargetsInScope', () => {
+  it('on a phone leaves out the loose articles and collections its column never draws', () => {
+    const front = tab({
+      id: 'tab-front',
+      content: [
+        normaBlock('block-1', [article('1'), article('2')]),
+        looseArticle('loose-1', article('5')),
+        collection('coll-1', [article('7'), article('8')]),
+      ],
+    });
+    const state: FindScopeState = { workspaceTabs: [front] };
+
+    const phone = findTargetsInScope(state, 'tab', 'tab-front', { phone: true });
+    expect(phone.map((t) => t.label)).toEqual(findTargetsInScope(state, 'tab', 'tab-front').slice(0, 2).map((t) => t.label));
+    expect(phone).toHaveLength(2);
+    expect(findTargetsInScope(state, 'all', null, { phone: true })).toHaveLength(2);
+    expect(findTargetsInScope(state, 'tab', 'tab-front')).toHaveLength(5);
+  });
+
   it('lists the front tab\'s articles in display order, loose articles and collections included', () => {
     const front = tab({
       id: 'tab-front',

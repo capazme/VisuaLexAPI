@@ -42,6 +42,9 @@ export interface UseFindWindowOptions {
   scope: FindScope;
   /** Nothing is searched, drawn or recomputed while false — the window is closed. */
   open: boolean;
+  /** Where a fresh query starts: the first match in this tab (and target, when given) wins over the
+   *  front tab's — the magnifier of a reading toolbar opens the window on its own text. */
+  prefer?: { tabId: string; targetKey?: string } | null;
 }
 
 export interface UseFindWindow {
@@ -57,6 +60,9 @@ export interface UseFindWindow {
   current: FindWindowLocation | null;
   next: () => void;
   previous: () => void;
+  /** Applies the query again as a fresh one (typing's choice, `prefer` first), now: the window
+   *  was asked to open on a tab while it already held a query. */
+  restart: () => void;
 }
 
 type Direction = 1 | -1;
@@ -102,7 +108,7 @@ function rootFor(roots: FindRoot[], tabId: string, targetKey: string): FindRoot 
   return roots.find((r) => r.tabId === tabId && r.targetKey === targetKey);
 }
 
-type FindWindowState = Omit<UseFindWindow, 'next' | 'previous'>;
+type FindWindowState = Omit<UseFindWindow, 'next' | 'previous' | 'restart'>;
 
 const EMPTY: FindWindowState = { count: 0, index: -1, truncated: false, searched: false, current: null };
 
@@ -145,7 +151,7 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
  * change. A stored text is folded once per text. Draws under one registry owner for the whole
  * window; nothing here adds, moves or changes the text DOM.
  */
-export function useFindWindow({ query, scope, open }: UseFindWindowOptions): UseFindWindow {
+export function useFindWindow({ query, scope, open, prefer = null }: UseFindWindowOptions): UseFindWindow {
   const ownerId = `find-window-${useId()}`;
   const workspaceTabs = useAppStore(useShallow((s) => s.workspaceTabs));
   const mobileActiveTabId = useAppStore((s) => s.mobileActiveTabId);
@@ -181,7 +187,9 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
   const isDesktopRef = useRef(isDesktop);
   const revealTabRef = useRef(revealTab);
   const focusArticleInTabRef = useRef(focusArticleInTab);
+  const preferRef = useRef(prefer);
   useEffect(() => {
+    preferRef.current = prefer;
     queryRef.current = query;
     scopeRef.current = scope;
     workspaceTabsRef.current = workspaceTabs;
@@ -303,6 +311,15 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
   /** Typing's choice: the front tab's first match, a drawn one first; else the first overall. */
   const pickInitial = useCallback(
     (all: FlatMatch[], front: string | null): number => {
+      const wanted = preferRef.current;
+      if (wanted) {
+        const inWanted = (m: FlatMatch) =>
+          reachable(m) && m.tabId === wanted.tabId && (wanted.targetKey === undefined || m.targetKey === wanted.targetKey);
+        const preferred = all.findIndex((m) => inWanted(m) && m.onScreen);
+        if (preferred >= 0) return preferred;
+        const stored = all.findIndex(inWanted);
+        if (stored >= 0) return stored;
+      }
       let i = all.findIndex((m) => reachable(m) && m.tabId === front && m.onScreen);
       if (i < 0) i = all.findIndex((m) => reachable(m) && m.tabId === front);
       if (i < 0) i = all.findIndex(reachable);
@@ -333,10 +350,20 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
 
   const commitState = useCallback(
     (current: FindWindowLocation | null, patch?: Partial<FindWindowState>) => {
-      const next = { ...stateRef.current, ...patch, index: indexRef.current, current };
+      // The counter counts what can be reached: a target given up (ruling 4) leaves it, and the
+      // index is the current match's place among the rest.
+      const all = allRef.current;
+      let count = 0;
+      let index = -1;
+      all.forEach((m, i) => {
+        if (!reachable(m)) return;
+        if (i === indexRef.current) index = count;
+        count += 1;
+      });
+      const next = { ...stateRef.current, ...patch, count, index, current };
       if (!sameState(stateRef.current, next)) setLatest(next);
     },
-    [setLatest],
+    [reachable, setLatest],
   );
 
   // The pending timeout and `goTo` call each other through the run below: a ref to the latest
@@ -356,7 +383,11 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
     const of = all.filter((m) => m.id === pending.id);
     const from = of.length ? all.indexOf(of[Math.min(pending.ordinal, of.length - 1)]) : indexRef.current;
     const next = stepFrom(all, from, pending.direction);
-    if (next < 0 || next === from) return;
+    if (next < 0 || next === from) {
+      // Nothing else to go to: the target still leaves the counter.
+      commitState(stateRef.current.current);
+      return;
+    }
     commitState(goToRef.current(all, next, pending.direction));
   }, [commitState, stepFrom]);
 
@@ -394,8 +425,12 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
       }
       const scopeState = { workspaceTabs: workspaceTabsRef.current, mobileActiveTabId: mobileActiveTabIdRef.current };
       const front = computeFrontTabId(scopeState, isDesktopRef.current);
-      const targets = findTargetsInScope(scopeState, scopeRef.current, front);
+      // The phone's column draws norm blocks only: what it does not draw is not in the scope.
+      const targets = findTargetsInScope(scopeState, scopeRef.current, front, { phone: !isDesktopRef.current });
       const { targets: built, truncated } = buildTargets(targets, q);
+      // A given-up target whose root now draws matches (a slow mount, a block the reader expanded) is
+      // reachable again.
+      for (const t of built) if (t.onScreen && t.matches.length) unreachableRef.current.delete(t.id);
       const all = flatten(built);
       const order = built.map((t) => t.id);
       const previousOrder = orderRef.current;
@@ -409,7 +444,7 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
       // Folded texts of targets no longer in scope are dropped.
       for (const id of foldedRef.current.keys()) if (!textByTarget.has(id)) foldedRef.current.delete(id);
 
-      const patch = { count: all.length, truncated, searched: isSearchableQuery(q) };
+      const patch = { truncated, searched: isSearchableQuery(q) };
       let newIndex = -1;
       let decided = false;
       let scroll = false;
@@ -428,7 +463,9 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
             scroll = true;
             decided = true;
           } else {
-            // Drawn, and nothing matches there after all: go on in the direction of travel.
+            // Drawn, and nothing matches there after all: give it up for this query (going on may unmount
+            // it, and its stored text would send the window straight back), then go on.
+            unreachableRef.current.add(pending.id);
             const next = neighbourOf(all, order, pending.id, pending.direction);
             commitState(goTo(all, next, pending.direction), patch);
             return;
@@ -445,7 +482,7 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
         if (fresh || !cur) {
           newIndex = pickInitial(all, front);
           const chosen = newIndex >= 0 ? all[newIndex] : undefined;
-          scroll = fresh && !!chosen && chosen.onScreen && chosen.tabId === front;
+          scroll = fresh && !!chosen && chosen.onScreen && (chosen.tabId === front || chosen.tabId === preferRef.current?.tabId);
         } else {
           const sameTarget = all.filter((m) => m.id === cur.id);
           let kept: FlatMatch | undefined;
@@ -485,6 +522,12 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
     timerRef.current = null;
     run(queryRef.current, true);
     return true;
+  }, [run]);
+
+  const restart = useCallback(() => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    if (isSearchableQuery(queryRef.current)) run(queryRef.current, true);
   }, [run]);
 
   // Typing: apply the query after a pause, like PR 4c's box.
@@ -577,5 +620,5 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
   const next = useCallback(() => step(1), [step]);
   const previous = useCallback(() => step(-1), [step]);
 
-  return { ...state, next, previous };
+  return { ...state, next, previous, restart };
 }

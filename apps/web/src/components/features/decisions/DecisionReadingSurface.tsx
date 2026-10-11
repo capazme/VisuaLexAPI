@@ -6,7 +6,8 @@ import { useCitationLinks } from '../../../hooks/useCitationLinks';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { Toast, type ToastProps } from '../../ui/Toast';
 import { ArticleBody } from '../search/ArticleBody';
-import { FindInTextBox } from '../search/FindInTextBox';
+import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
+import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { NotesPeekPanel } from '../search/NotesPeekPanel';
 import { HighlightsActionsPicker } from '../search/HighlightsActionsPicker';
 import { InlineNotePopover } from '../search/InlineNotePopover';
@@ -136,7 +137,6 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
   const [highlightsHidden, setHighlightsHidden] = useState(false);
-  const [isFindOpen, setIsFindOpen] = useState(false);
   const findButtonRef = useRef<HTMLButtonElement>(null);
   const textRootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
@@ -144,6 +144,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   // The find window's target for this decision (spec §13.1, Task 33 ruling 1): one text, keyed by
   // its own `decisionKey`. No `hostTabId` (a host with no tab) registers nothing.
   useRegisterFindRoot(hostTabId, key, label, textRootRef);
+  const isFindOpen = useFindWindowScopedTo(hostTabId);
 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
@@ -218,9 +219,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
-        onToggleFind={() => setIsFindOpen((v) => !v)}
+        onToggleFind={() => (isFindOpen ? closeFindWindow() : openFindWindow({ tabId: hostTabId, targetKey: key, returnFocus: findButtonRef.current }))}
         findButtonRef={findButtonRef}
-        findBar={<FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} label="della decisione" onClose={() => setIsFindOpen(false)} />}
       />
       <NotesPeekPanel
         isOpen={isNotesOpen}
