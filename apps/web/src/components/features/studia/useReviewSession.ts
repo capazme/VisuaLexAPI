@@ -157,9 +157,10 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
             setRevealed(false);
             setStep((n) => n + 1);
             shownAt.current = Date.now();
+            // Only when this queue still held the card: a session reloaded meanwhile skipped nothing.
+            setSkipped(true);
           }
           setSaveError(false);
-          setSkipped(true);
         } else {
           setSaveError(true);
         }

@@ -357,7 +357,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   the community's validated cards in the subjects switched on — never `autoreId != me`,
   which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
   rating, durataMs? }`: one transaction serialised on the pair by
-  `pg_advisory_xact_lock` (a first review has no state row to lock), the scope checked
+  `pg_advisory_xact_lock` (a first review has no state row to lock), the card row held
+  `FOR KEY SHARE` (a grade racing the trash waits, then answers 404; a P2003 is a 404 too), the scope checked
   again inside it (404, nothing written), a second grade the same Rome day answered
   `registrata: false` with nothing written; otherwise FSRS's `review` with the elapsed
   Rome days, the state row upserted (`dueAt` = 00:00 Rome of the due day, `reps`,
