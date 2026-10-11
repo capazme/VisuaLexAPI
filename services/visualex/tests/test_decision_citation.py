@@ -63,8 +63,36 @@ def test_until_its_reader_ships_the_court_of_justice_is_named_not_read():
     for words in ("CGUE, C-634/21", "C-634/21", "Corte giust. UE, sez. I, causa C-634/21"):
         assert read_decision_citation(words, TODAY).to_dict() == {
             "corte_non_supportata": "Corte di giustizia dell'Unione europea"}
-    assert read_decision_citation("Trib. UE, T-612/17", TODAY).corte_non_supportata == (
-        "Tribunale dell'Unione europea")
+    for words in ("Trib. UE, T-612/17", "T-612/17", "CGUE, T-612/17", "causa T-612/17"):
+        assert read_decision_citation(words, TODAY).corte_non_supportata == "Tribunale dell'Unione europea"
+    assert read_decision_citation("causa C-634/21", TODAY).corte_non_supportata == (
+        "Corte di giustizia dell'Unione europea")
+
+
+@pytest.mark.parametrize("words,court", [
+    # the Italian tax courts, so named since l. 130/2022: never the Court of Justice
+    ("Corte di giustizia tributaria di primo grado di Milano, n. 5/2023", "Corte di giustizia tributaria"),
+    ("C. giust. trib. 5/2023", "Corte di giustizia tributaria"),
+    ("Corte giust. trib. Lombardia, n. 5/2023", "Corte di giustizia tributaria"),
+    ("Garante della privacy, provv. n. 5/2021", "Garante per la protezione dei dati personali"),
+    ("Corte EDU, ric. n. 30562/04", "Corte europea dei diritti dell'uomo"),
+    ("CEDU, 4 dicembre 2008", "Corte europea dei diritti dell'uomo"),
+])
+def test_a_court_without_a_reader_is_named(words, court):
+    assert read_decision_citation(words, TODAY).corte_non_supportata == court
+
+
+@pytest.mark.parametrize("words", ["Garante del contribuente, n. 5/2021", "Garante della concorrenza, provv. 5/2021",
+                                   "CEDU, art. 8", "CEDU art. 6"])
+def test_what_names_no_court_is_not_named_as_one(words):
+    assert read_decision_citation(words, TODAY).corte_non_supportata is None
+
+
+def test_a_no_break_space_reads_as_a_space():
+    assert read_decision_citation("Corte cost.\u00a0n.\u00a071/2020", TODAY).riferimento == {
+        "corte": "corte_costituzionale", "numero": 71, "anno": 2020}
+    assert read_decision_citation("Cass. civ., sez.\u00a0III, n.\u202f12/2020", TODAY).riferimento == {
+        "corte": "cassazione", "archivio": "civile", "sezione": "III", "numero": 12, "anno": 2020}
 
 
 @pytest.mark.parametrize("words", ["", "   ", "Cass.", "art. 8 CEDU", "tarda giurisprudenza 12/2020",

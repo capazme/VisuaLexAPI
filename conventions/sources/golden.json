@@ -332,6 +332,8 @@
       {"input": "Cass. 0/2024", "reference": {"value": null, "status": "current"}},
       {"input": "Cass. 99999/2030", "reference": {"value": null, "status": "current"}},
       {"input": "Corte cost. 1/1950", "reference": {"value": null, "status": "current"}},
+      {"input": "Corte cost.\u00a0n.\u00a071/2020", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
+      {"input": "Cass. civ., sez.\u00a0III, n. 99999/2024", "reference": {"value": {"corte": "cassazione", "archivio": "civile", "sezione": "III", "numero": 99999, "anno": 2024}, "status": "current"}},
       {"input": "Cons. Stato, sez. VI, n. 2270/2019", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
       {"input": "Consiglio di Stato, Ad. plen., 9 novembre 2021, n. 18", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
       {"input": "TAR Lazio, Roma, sez. I, n. 1234/2020", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Tribunale amministrativo regionale", "status": "proposed"}},

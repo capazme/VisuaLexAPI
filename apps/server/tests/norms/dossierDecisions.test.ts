@@ -22,6 +22,8 @@ const READINGS: Record<string, unknown> = {
   'Cass. civ. 77/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 77, anno: 2024 } },
   'Cass. civ. 88/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 88, anno: 2024 } },
   'Cons. Stato, sez. VI, n. 2270/2019': { corte_non_supportata: 'Consiglio di Stato' },
+  'Cass. civ. 66/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 66, anno: 2024 } },
+  'Cass. civ. 55/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 55, anno: 2024 } },
 };
 
 const SU_31310 = {
@@ -69,6 +71,9 @@ function stubPythonApi(fetchDelayMs = 0) {
     if (numero === 5) return [404, { esito: 'non_trovata', motivo: 'fuori_archivio', archivio_dal: '1999-01-04' }];
     if (numero === 77) return [503, { esito: 'fonte_non_raggiungibile', fonte: 'italgiure' }];
     if (numero === 88) return [500, { esito: 'errore_interno' }];
+    if (numero === 66) return [404, { esito: 'non_trovata', motivo: 'motivo_nuovo' }];
+    // An identity the item schema refuses (a year before 1900): never stored, and never a 400 for the call.
+    if (numero === 55) return found({ identita: { corte: 'cassazione', archivio: 'civile', numero: 55, anno: 1800 }, attributi: {} });
     return [404, { esito: 'non_trovata', motivo: 'inesistente' }];
   });
 }
@@ -158,6 +163,13 @@ describe('POST /api/dossiers/:id/decisions', () => {
     expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(1);
     // The court without a reader and the words not read never reach /fetch_decision.
     expect(calls['/fetch_decision']).toBe(7);
+  });
+
+  it('keeps "does not exist" for the reason inesistente, and refuses an identity the item schema refuses', async () => {
+    const response = await addDecisions(alice, dossierId, ['Cass. civ. 66/2024', 'Cass. civ. 55/2024', 'Corte cost. n. 71/2020']);
+    expect(response.status).toBe(200);
+    expect(outcomes(response)).toEqual(['unavailable', 'unavailable', 'added']);
+    expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(1);
   });
 
   it('stores nothing and says so when the words cannot be read', async () => {

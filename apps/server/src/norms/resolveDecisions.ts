@@ -7,7 +7,7 @@
  */
 import { mapLimited, postLegalApi, SourceUnavailable } from './resolveReference';
 import { citeDecision, shortDecision, type CitableDecision } from './decisionCitation';
-import { withDecisionLabel, type DecisionItemContent } from '../schemas/decisionItem';
+import { decisionItemContentSchema, withDecisionLabel, type DecisionItemContent } from '../schemas/decisionItem';
 
 export type DecisionOutcome =
   | 'resolved'
@@ -75,7 +75,9 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
   if (!identity) return null;
   const attrs = isObject(attributesRaw) ? attributesRaw : {};
   const { sezione, tipo, data_deposito: deposit } = attrs;
-  return withDecisionLabel({
+  // Through the item schema here, not only in the transaction: an identity out of range is this
+  // reference's `unavailable`, never a 400 that drops every decision of the call.
+  const parsed = decisionItemContentSchema.safeParse({
     corte: identity.corte as DecisionItemContent['corte'],
     numero: identity.numero,
     anno: identity.anno,
@@ -86,6 +88,7 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
     ...(typeof deposit === 'string' && ISO_DAY.test(deposit) ? { data_deposito: deposit } : {}),
     etichetta: '-',
   });
+  return parsed.success ? withDecisionLabel(parsed.data) : null;
 }
 
 /** «7 dicembre 2023» → the year an archive starts, for the reader. */
@@ -101,7 +104,9 @@ function notFound(data: Json): DecisionResolution {
       : `L'archivio pubblico della fonte copre solo in parte quell'anno${archiveStart(data.archivio_dal)}`;
     return { outcome: 'unavailable', detail: `${what}: non verificabile, quindi non aggiunta.${hint}` };
   }
-  return { outcome: 'does_not_exist', detail: `La fonte non conosce questa decisione.${hint}` };
+  if (data.motivo === 'inesistente') return { outcome: 'does_not_exist', detail: `La fonte non conosce questa decisione.${hint}` };
+  // A reason this route does not know: the source did not say the decision is missing.
+  return { outcome: 'unavailable', detail: UNAVAILABLE };
 }
 
 async function lookUp(reference: Json, signal: AbortSignal): Promise<DecisionResolution> {

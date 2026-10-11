@@ -46,23 +46,31 @@ _DATE_YEAR = re.compile(
     r"|\b\d{1,2}[/.-]\d{1,2}[/.-](\d{4})\b",
     _F)
 
-# Courts recognised by name for which VisuaLex has no reader yet: the answer names them.
+# Courts recognised by name for which VisuaLex has no reader yet: the answer names them. Checked in
+# order: the Italian tax courts are «Corte di giustizia tributaria» since l. 130/2022, so they come
+# before the Court of Justice; a case number's letter names the EU court (T: the General Court).
+_DASH = "[-\u2010\u2011\u2012\u2013\u2014]"
+_EU_CASE = r"(?:causa\s+)?{letter}\s*" + _DASH + r"?\s*\d{{1,4}}\s*/\s*\d{{2,4}}"
 _UNSUPPORTED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(r"^\s*(?:" + pattern + r")(?=[\s,.;:(]|$)", _F), name) for pattern, name in (
         (r"cons(?:iglio)?\.?\s*(?:di\s+)?st(?:ato)?\.?|c\.\s*d\.\s*s\.?|cds",
          "Consiglio di Stato"),
         (r"t\.\s*a\.\s*r\.?|tar|tribunale\s+amministrativo(?:\s+regionale)?",
          "Tribunale amministrativo regionale"),
-        (r"garante(?:\s+(?:privacy|per\s+la\s+protezione\s+dei\s+dati(?:\s+personali)?))?",
+        (r"garante\s+(?:della\s+)?privacy|garante\s+per\s+la\s+protezione\s+dei\s+dati(?:\s+personali)?",
          "Garante per la protezione dei dati personali"),
-        (r"corte\s+edu|c\.\s*edu|corte\s+europea\s+dei\s+diritti\s+dell['’]\s*uomo|cedu",
+        (r"corte\s+edu|c\.\s*edu|corte\s+europea\s+dei\s+diritti\s+dell['’]\s*uomo|cedu(?!\s*,?\s*art)",
          "Corte europea dei diritti dell'uomo"),
-        (r"cgue|c\.\s*g\.\s*u\.\s*e\.?|cgce|corte\s+giust(?:izia)?\.?|c\.\s*giust\.?|corte\s+di\s+giustizia"
-         r"|[CT]\s*[-‐‑‒–—]?\s*\d{1,4}\s*/\s*\d{2,4}|causa\s+[CT]\b",
-         "Corte di giustizia dell'Unione europea"),
-        (r"trib(?:unale)?\.?\s+(?:ue|dell['’]\s*unione\s+europea|i\s+grado|di\s+primo\s+grado)",
+        (r"(?:corte|c\.)\s*(?:di\s+)?giust(?:izia)?\.?\s*trib\w*\.?",
+         "Corte di giustizia tributaria"),
+        (r"trib(?:unale)?\.?\s+(?:ue|dell['’]\s*unione\s+europea|i\s+grado|di\s+primo\s+grado)|" + _EU_CASE.format(letter="T"),
          "Tribunale dell'Unione europea"),
+        (r"cgue|c\.\s*g\.\s*u\.\s*e\.?|cgce|corte\s+giust(?:izia)?\.?|c\.\s*giust\.?|corte\s+di\s+giustizia|"
+         + _EU_CASE.format(letter="C"),
+         "Corte di giustizia dell'Unione europea"),
     ))
+# «CGUE, T-612/17» is the General Court: the case number's letter wins over the court's name.
+_GENERAL_COURT_CASE = re.compile(r"\bT\s*" + _DASH + r"?\s*\d{1,4}\s*/\s*\d{2,4}\b", _F)
 
 
 def expand_two_digit_year(raw: str) -> int:
@@ -102,11 +110,15 @@ def read_decision_citation(text: object, today: date | None = None) -> Reading:
     if not isinstance(text, str):
         return Reading()
     today = today or date.today()
-    scanned = text.strip()[:MAX_SCANNED]
+    # Every Unicode space as a plain one: Word and PDFs put a no-break space after «n.» and «sez.»,
+    # which the palette's \s reads (JavaScript) and re.ASCII's would not.
+    scanned = re.sub(r"\s", " ", text.strip()[:MAX_SCANNED])
     court = _COURT.search(scanned)
     if not court:
         for pattern, name in _UNSUPPORTED:
             if pattern.search(scanned):
+                if name.startswith("Corte di giustizia dell") and _GENERAL_COURT_CASE.search(scanned):
+                    name = "Tribunale dell'Unione europea"
                 return Reading(corte_non_supportata=name)
         return Reading()
     corte = "corte_costituzionale" if court.group(1) else "cassazione"

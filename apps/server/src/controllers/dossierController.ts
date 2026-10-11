@@ -690,10 +690,25 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
 
   if (toCreate.length > 0) {
     const created = await prisma.$transaction(async (tx) => {
+      // The lookups took up to the budget: read again, in the transaction, what the dossier holds
+      // now (another call may have added the same decision, or the dossier may be gone).
+      const current = await tx.dossier.findFirst({
+        where: { id: dossier.id, userId: req.user!.id },
+        include: { items: { where: { itemType: 'sentenza' }, select: { content: true } } },
+      });
+      if (!current) throw new AppError(404, 'Dossier not found');
+      const kept = new Set(current.items.flatMap((item) => {
+        const parsed = decisionItemContentSchema.safeParse(item.content);
+        return parsed.success ? [decisionKeyOf(parsed.data)] : [];
+      }));
       const last = await tx.dossierItem.aggregate({ where: { dossierId: dossier.id }, _max: { position: true } });
       let position = (last._max.position ?? -1) + 1;
-      const rows = [];
+      const rows: { index: number; id: string }[] = [];
       for (const index of toCreate) {
+        if (kept.has(resolutions[index].key!)) {
+          results[index].outcome = 'already_present';
+          continue;
+        }
         // Checked by the item schema like any other write, the label recomputed (D9).
         const decision = parseDecisionItemContent(resolutions[index].decision);
         rows.push(
@@ -706,15 +721,13 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
               position: position++,
               ...provenanceFromRequest(req),
             },
-          }),
+          }).then((row) => ({ index, id: row.id })),
         );
       }
-      await tx.dossier.update({ where: { id: dossier.id }, data: { updatedAt: new Date() } });
+      if (rows.length > 0) await tx.dossier.update({ where: { id: dossier.id }, data: { updatedAt: new Date() } });
       return rows;
     });
-    toCreate.forEach((index, i) => {
-      results[index].itemId = created[i].id;
-    });
+    for (const { index, id } of created) results[index].itemId = id;
   }
 
   // Under an exchanged token each reference is charged two points; one the sources could not

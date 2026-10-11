@@ -234,7 +234,8 @@ POST unless noted, JSON bodies.
   not routed by the ingress, not proxied by Vite): 1–10 decisions cited in words (at most 300
   characters each) → one reading each, in order: `{riferimento}` (what `/fetch_decision` takes),
   `{corte_non_supportata: "<court>"}` (a court recognised that VisuaLex cannot read: Consiglio di
-  Stato, TAR, Garante, Corte EDU, and the CGUE until its reader ships) or `{non_riconosciuta: true}`.
+  Stato, TAR, Garante, Corte EDU, the Corte di giustizia tributaria, and the CGUE and the General Court
+  until their reader ships; a case number's letter names the EU court) or `{non_riconosciuta: true}`.
   No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
