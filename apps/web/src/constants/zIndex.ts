@@ -2,12 +2,16 @@
  * Standardized z-index values for consistent layering.
  *
  * TWO BANDS design:
- * - BASE BAND (0-99): in-document stacking, sidebar, dock, floating panels
+ * - BASE BAND (0-119): in-document stacking, sidebar, dock, floating windows
+ *   (structure 90, search panel 100, find window 110)
  * - OVERLAY BAND (1000+): modals, drawers, tooltips, toasts, settings
  *
- * The gap (100-999) is intentionally unused: it isolates the base band from
+ * The gap (120-999) is intentionally unused: it isolates the base band from
  * the overlay band so modals cannot be hidden by dynamic counters used for
- * floating windows (workspace tabs, search panel).
+ * floating windows (workspace tabs, search panel). Study Mode's own layers
+ * (backdrop 120, window 130) sit in that gap, over the find window; while an
+ * overlay covers the workspace (`aria-modal="true"` or `data-find-overlay`,
+ * `isWorkspaceCovered`) Cmd/Ctrl+F does not open the find window at all.
  *
  * The workspace tab dynamic counter is clamped in WorkspaceTabPanel.tsx to
  * stay below Z_INDEX_VALUES.dock, so stack ordering among tabs works but
@@ -45,6 +49,9 @@ export const Z_INDEX = {
 
   /** Floating search panel — above dock, below overlay band */
   searchPanel: 'z-[100]',
+
+  /** Floating find window — a tool held over the workspace, above the search panel */
+  findWindow: 'z-[110]',
 
   // ── OVERLAY BAND (1000+) ─────────────────────────────────────────
   /** Side drawers (Brocardi drawer, etc.) */
@@ -95,7 +102,9 @@ export const Z_INDEX_VALUES = {
   floating: 40,
   sidebar: 50,
   dock: 80,
+  structure: 90,
   searchPanel: 100,
+  findWindow: 110,
   drawer: 1000,
   modal: 1100,
   heavyModal: 1100,

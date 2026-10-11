@@ -281,31 +281,6 @@
            focus:rounded-lg focus:shadow-lg focus:font-medium;
   }
 
-  /* Cmd+F search result highlight — subtler than user highlights so it
-     doesn't fight their colour picks, but distinctive enough (amber
-     underline, light fill) that matches pop on first scan. */
-  .search-match {
-    background-color: color-mix(in srgb, hsl(43 96% 56%) 25%, transparent);
-    color: inherit;
-    border-radius: 2px;
-    padding: 0 1px;
-    box-decoration-break: clone;
-    -webkit-box-decoration-break: clone;
-  }
-  .dark .search-match {
-    background-color: color-mix(in srgb, hsl(43 96% 56%) 18%, transparent);
-  }
-  .search-match.search-match-active {
-    background-color: hsl(43 96% 56%);
-    color: hsl(24 80% 14%);
-    box-shadow: 0 0 0 2px hsl(43 96% 56% / 0.4);
-  }
-  .dark .search-match.search-match-active {
-    background-color: hsl(43 96% 56%);
-    color: hsl(24 80% 14%);
-    box-shadow: 0 0 0 2px hsl(43 96% 56% / 0.5);
-  }
-
   /* Toggle from the Highlights actions picker. The highlight markup
      uses inline `style="background-color:hsl(var(--hl-*-bg)); color:
      hsl(var(--hl-*-fg))"`, so a class-level rule on .highlight-mark

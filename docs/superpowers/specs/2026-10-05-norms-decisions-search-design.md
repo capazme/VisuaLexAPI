@@ -894,7 +894,7 @@ goes to the next, Shift+Enter to the previous (both wrap), Esc closes the box, c
 highlights and returns the focus to the button. The current match is scrolled into the middle of
 the tab's view. A query shorter than two characters highlights nothing. Past 1,000 matches the
 first 1,000 are highlighted and the counter says «oltre 1000: affina la ricerca». On a phone the
-box takes the toolbar's full width, the field on a row of its own. «Cerca nel testo» has no keyboard shortcut of its own. The app's Cmd/Ctrl+F is a different tool, the existing «Cerca negli articoli aperti» (`Layout.tsx`, unchanged by this PR): it searches the open articles, not decisions, and marks them in amber in the text.
+box takes the toolbar's full width, the field on a row of its own. (Superseded on 9 October by §13.1: one floating window, opened with Cmd/Ctrl+F or the magnifier, replaces this box and «Cerca negli articoli aperti».)
 A past text (gotcha 32) can be searched: searching stores nothing. A decision shown without its
 text has no button.
 
@@ -941,6 +941,95 @@ open search, so two tabs searching at once do not clear each other. When the tex
 (a note added, highlights hidden), the matches are computed again and the current one is kept
 where it still exists. A browser without the API (Chrome and Edge before 105, Safari before
 17.2, Firefox before 140) still counts, moves and scrolls; it draws no highlight.
+
+#### 13.1 One floating window, on Cmd/Ctrl+F (the owner, 9 October)
+
+The owner, after PR 4c: «no però vorrei tutta la ricerca in cmd+f e vorrei tutta la barra di
+ricerca meno ingombrante, magari in una sua finestra fluttuante». So the two searches become one:
+the box under the toolbar (above) and the old «Cerca negli articoli aperti» (a modal over the
+stored article texts, marking matches in amber with elements in the text) are replaced by a
+single small floating window. What §13 says about matching, folding, block separators and drawing
+with the Highlight API still holds; this section says where the search is opened, what it covers
+and what goes.
+
+**The window.** One window for the whole app, mounted once in the signed-in layout and portalled
+to the document: a field «Cerca nel testo», the counter, «Risultato precedente» / «Risultato
+successivo» (↑ ↓), a scope switch and «Chiudi la ricerca» (×). It is small (a row for the field and its buttons, and a second line for the scope switch, about 420 px
+wide on a desktop), it is not modal (the reader keeps reading, selecting and scrolling while it is
+open), it can be dragged by its handle, and its place is remembered for the session
+(`sessionStorage`, clamped to the viewport, never stored with the workspace); it opens at the top
+right of the results area. On a phone it takes the full width at the top of the screen, the field
+on a row of its own, 44 px targets, and it is not dragged.
+
+**How it opens.** Cmd/Ctrl+F on the search page (`/`, where the workspace is drawn) opens it with
+its field focused; pressed again while it is open, it focuses the field and selects the query (as a
+browser does). On every other page (the dossier, the forum, the history, the graph…) Cmd/Ctrl+F is
+the browser's own find, and leaving the search page closes the window: its matches are in tabs no
+longer on screen, and a «go to» would restore tabs the reader cannot see.
+The magnifier in a reading toolbar (an article's, a decision's) opens the same window, scoped to
+that tab, with the first match taken in that text; there is no box under the toolbar any more.
+Esc in the window closes it, clears the highlights and returns the focus to where it was (the
+magnifier, when it was opened from one); it does not reach an open discussion panel or citation
+preview. Enter and Shift+Enter move as in §13 and wrap.
+While an overlay covers the workspace Cmd/Ctrl+F is not intercepted: the browser's own find works
+and the window does not open. An overlay is any element with `aria-modal="true"` (a modal dialog,
+the discussion panel) or marked `data-find-overlay` (Study Mode, the command palette, CompareView,
+the PDF viewer: they cover the reader but are not modal dialogs in ARIA terms, and Study Mode must
+not become one, since its note popovers are portalled outside it and a screen reader would hide
+them). A window already open when an overlay opens keeps its place in the stacking order: under the
+overlays above it (Study Mode and the overlay band, from z 1000), over the hand-rolled modals drawn
+at `z-50` and `z-[100]` (on the search page, the tree view and the quick norms manager), where it
+stays visible and usable. That is accepted: the window is small, not modal, and
+closes with Esc or ×; what the overlay rule prevents — a focused field the reader cannot see — cannot
+happen over a modal it sits above.
+
+**What it searches: the tab, or every tab.** A two-state switch, «Questa scheda» / «Tutte le
+schede» (`aria-pressed`), remembered for the session. «Questa scheda» is the tab in front: on a
+desktop the visible tab with the highest stacking order (the one `bringTabToFront` last raised),
+on a phone the tab on screen (the store's `mobileActiveTabId`, which the carousel writes; session
+only); it covers every article and decision in that tab. On a phone both scopes leave out loose
+articles and collections: the phone column draws norm blocks only, so their matches could be
+counted but never shown. «Tutte le schede»
+covers every open tab, minimised ones included; it replaces «Cerca negli articoli aperti» and,
+unlike it, finds decisions too. The matches are ordered by tab as the dock orders them, inside a
+tab by block and article as the tab shows them; a decision tab is one text.
+
+**A text on screen and a text that is not.** A text drawn on screen (its reading surface is
+mounted and displayed) is searched in its text root as §13 says, and its matches are drawn. An
+article that is open but not drawn (another article of the same block, a loose article in a
+minimised tab) is searched in its stored text (`article_text`, the projection: every `\n`
+dropped, folded the same way), so its matches are counted but not drawn. Going to one of them
+reveals its tab — raises it, restores it when minimised or hidden, and makes it the phone's tab on
+screen (`revealTab`) — and shows the article (`focusArticleInTab`: it opens a collapsed block or
+collection, and signals a loose article to open); once its text root is on screen the match is
+found there by its ordinal within that text and becomes current. `revealTab` is an action of its
+own rather than `bringTabToFront` made to reveal, because the restore button and the dock chip use
+`bringTabToFront`, and there a minimised tab stays minimised until its own button restores it. A
+text whose root does not appear within 3 seconds is given up for that query and its matches leave
+the counter. Typing never moves the reader; only «next» and «previous» do. The two counts can differ by a match at a block boundary or in folded update notes; the
+drawn count replaces the stored one as soon as the text is on screen. A decision tab always draws
+its text when it is shown; a decision whose tab is minimised is searched in the session cache of
+decisions, or, if absent, counted as nothing until it is shown.
+
+**The counter and the place.** «3 di 12», «Nessun risultato», «oltre 1000: affina la ricerca» as
+in §13; under «Tutte le schede» the window also names where the current match is, as one label, never
+two joined: for an article its `shortNorm`, for a decision its tab's own label (the richer one: it
+carries the section the text was read with). The counter and the place are in a polite live
+region.
+
+**Kept current.** The window recomputes when a text on screen is drawn again (§13's observer),
+when tabs are opened, closed, raised or minimised, and when an article is shown in a block; the
+current match is kept where it still exists (§13).
+
+**What goes.** `GlobalSearch.tsx`, `useGlobalSearch.ts` (its result list, the highlight broadcast
+and the navigation request), the article renderer's `search` mark kind (`searchQuery`, the
+`<mark class="search-match">` elements and their ordinal), the scroll-to-match code in
+`ArticleTabContent`, the `.search-match` styles, and the box under the toolbar (`FindInTextBox`
+in the two toolbars). With the `search` marks gone the article renderer adds no element for a
+search at all, so a search never changes the text DOM on either surface (root rule 23).
+
+**Not covered yet.** The dossier reader and Study Mode (Later). In both Cmd/Ctrl+F is the
+browser's own find (see «How it opens»).
 
 ## Security and data
 

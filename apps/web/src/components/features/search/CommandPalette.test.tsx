@@ -12,6 +12,7 @@ vi.mock('../../../hooks/useTour', () => ({
 
 import { CommandPalette } from './CommandPalette';
 import { appStore } from '../../../store/useAppStore';
+import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 
 /**
  * The palette parses the query on the client, against the ~40 acts in
@@ -490,5 +491,16 @@ describe('CommandPalette — a topic for the Cassazione', () => {
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
     await act(async () => { answer({ ok: true, status: 200, json: async () => ({ recognized: false }) }); });
     expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette — over the workspace', () => {
+  it('leaves Cmd/Ctrl+F to the browser while it is open', () => {
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(isWorkspaceCovered()).toBe(true);
+    // Not a dialog in ARIA terms: the mark is all it gains.
+    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(isWorkspaceCovered()).toBe(false);
   });
 });

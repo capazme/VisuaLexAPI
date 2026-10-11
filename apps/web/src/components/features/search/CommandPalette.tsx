@@ -465,7 +465,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   if (!isOpen) return null;
 
   return (
-    <div className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
+    // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+    <div data-find-overlay="" className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
       {/* Premium Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}

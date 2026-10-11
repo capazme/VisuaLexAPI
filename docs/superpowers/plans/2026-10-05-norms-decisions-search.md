@@ -3002,6 +3002,47 @@ Added 2026-10-08 (the owner: «mettiamo anche una funzione di ricerca all'intern
 
 **PR 4c:** title «feat: find in the text of decisions and articles»; body names spec §13 and the Highlight API's browser floor. Browser pass (one test account on the dev stack: no migration): a Cassazione decision and an article, an accented word typed without its accent, Enter / Shift+Enter / Esc, two tabs searching at once, highlights and signs still drawn, a phone width (320 and 360 px). Merge: `merge: feat/find-in-text — «Cerca nel testo» on decisions and articles`.
 
+## PR 4d — `feat/find-window` (apps/web)
+
+Added 2026-10-09 (the owner: «no però vorrei tutta la ricerca in cmd+f e vorrei tutta la barra di ricerca meno ingombrante, magari in una sua finestra fluttuante»; spec §13.1). After PR 4c. No server change, no migration. It keeps PR 4c's matcher, registry and observer (`utils/findInText.ts`, `utils/findHighlights.ts`, the logic of `hooks/useFindInText.ts`) and replaces where the search is opened and what it covers.
+
+### Task 33: The texts a search can reach, on screen or stored
+
+**Files:**
+- Create: `apps/web/src/utils/findTargets.ts` (a module registry of the text roots on screen: `registerFindRoot({ tabId, targetKey, label, element })` returning an unregister function; `findRootsFor(tabId?)`; a root counts only while it is displayed (computed `display` up to the document), so the hidden copy of a decision tab and an undrawn article never answer)
+- Create: `apps/web/src/utils/findScope.ts` (`findTargetsInScope(state, scope, frontTabId)`: the ordered list of texts in «Questa scheda» or «Tutte le schede» from the store's workspace tabs — tab order as the dock shows it, then block and article as the tab shows them, a decision tab one text — each `{ tabId, targetKey, label, storedText? }`, the stored text being `article_text` or a cached decision's projection; `frontTabId(state, isDesktop)`: the visible tab with the highest stacking order on a desktop, the tab on screen on a phone)
+- Create: `apps/web/src/hooks/useFindWindow.ts` (the matches across the targets: a target with a registered root is searched in the DOM as PR 4c does and drawn under one registry owner; one without is searched in its stored text with `findMatches` over `foldForSearch` of the projection and only counted; `next`/`previous` across targets, wrapping; going to an undrawn match reveals its tab (`revealTab`, a new action: it raises the tab, restores it when minimised or hidden and makes it the phone's tab on screen; `bringTabToFront` stays as it was, because the restore button and the dock chip use it) and shows the article (`focusArticleInTab`), then takes the match by its ordinal once the root registers; recomputed on a root's mutations, on registrations, and on workspace changes; the current match kept by target and position as PR 4c does)
+- Modify: the article and decision reading surfaces (`ArticleTabContent`, `DecisionReadingSurface`) register their text roots (`useRegisterFindRoot`)
+- Test: `findTargets.test.ts`, `findScope.test.ts`, `useFindWindow.test.tsx`
+
+- [ ] **Step 1: Failing tests.** Registry: a displayed root answers, a `display: none` one does not, unregister removes it. Scope: «Questa scheda» lists the front tab's articles and decisions in display order; «Tutte le schede» lists every tab in dock order, minimised tabs included; the front tab on a desktop is the highest `zIndex` among visible tabs. Hook: counts matches on screen and in stored texts together; draws only the ones on screen; going to a stored match calls `revealTab` and `focusArticleInTab` and, once a root registers for that target, makes its match current; Enter past the last match wraps to the first; a root redrawn keeps the current match; the text DOM is identical before, during and after.
+- [ ] **Steps 2–4**, web build and lint, then commit — «feat(web): find over every open text, drawn where it is on screen and counted where it is stored».
+
+### Task 34: The floating window
+
+**Files:**
+- Create: `apps/web/src/components/features/search/FindWindow.tsx` (spec §13.1: a row for the field «Cerca nel testo», the counter in a polite live region, ↑ ↓ and ×; a second line for the scope switch «Questa scheda» / «Tutte le schede» with `aria-pressed` and, under «Tutte le schede», the current match's place; dragged by its handle with the drag limits of `utils/workspaceOrigin.ts`, its place in `sessionStorage` and clamped; full width at the top on a phone, not dragged, 44 px targets; Esc closes, stops propagation, clears and returns the focus; a z-index from `constants/zIndex.ts`)
+- Create: `apps/web/src/utils/findWindowControl.ts` (`openFindWindow({ tabId?, targetKey?, returnFocus? })`, `subscribeFindWindow`: the one way to open it, from the shortcut or a magnifier)
+- Modify: `apps/web/src/components/layout/Layout.tsx` (Cmd/Ctrl+F opens the window, or focuses and selects its field when open; mounts `FindWindow`)
+- Modify: `ReadingToolbar.tsx`, `DecisionReadingToolbar.tsx`, `ArticleTabContent.tsx`, `DecisionReadingSurface.tsx` (the magnifier opens the window scoped to its tab with the first match in its text; the box under the toolbar and its state go)
+- Test: `FindWindow.test.tsx`, `Layout` shortcut test, the toolbars' tests
+
+- [ ] **Step 1: Failing tests**: Cmd/Ctrl+F opens and focuses; a second press selects the query; the magnifier opens it scoped to its tab, the first match in its text; the scope switch changes the counter; Esc closes, clears the registry, returns the focus and does not reach a `document` listener; the window's place survives a reopen; on a phone width it has the full-width classes; the toolbars no longer draw a box.
+- [ ] **Steps 2–4**, then commit — «feat(web): one floating find window, on Cmd/Ctrl+F and the magnifier».
+
+### Task 35: Retire «Cerca negli articoli aperti» and the amber marks
+
+**Files:**
+- Delete: `apps/web/src/components/features/search/GlobalSearch.tsx`, `apps/web/src/hooks/useGlobalSearch.ts` and their tests; `FindInTextBox.tsx` if nothing else uses it
+- Modify: `apps/web/src/utils/articleRender.ts` and `hooks/useArticleMarkers.ts` (the `search` mark kind and `searchQuery` go), `ArticleTabContent.tsx` (the search-navigation scroll code goes), `index.css` (`.search-match` and `.search-match-active` go), `store/workspaceTabActions.ts` only if it imports the removed types (gotcha 25)
+- Modify: `apps/web/CLAUDE.md` (Reading surface: find in the text is the window; the shared utilities; the shortcut), spec §13.1 and this plan's amendment if the code differs
+- Test: `articleRender.test.ts` (no `search` kind), the contract tests with a search open
+
+- [ ] **Step 1**: delete and run: every reference fails the build; fix each by removal, never by a stub.
+- [ ] **Steps 2–4**, then commit — «refactor(web): the floating window replaces «Cerca negli articoli aperti»; the renderer adds nothing for a search».
+
+**PR 4d:** title «feat: one floating find window on Cmd/Ctrl+F»; body names spec §13.1 and what goes. Browser pass (one test account on the dev stack): Cmd/Ctrl+F from an article and from a decision; «perche» on «Questa scheda» and on «Tutte le schede» across an article tab, a decision tab and a second article of a block not on screen (it is shown when reached); the window dragged and reopened in place; Esc; a phone width (320 and 360 px). Merge: `merge: feat/find-window — one floating find window on Cmd/Ctrl+F, over the tab or every tab`.
+
 ## PR 5 — `feat/decision-history` (apps/server, apps/web)
 
 Announce the migration to the orchestrator before Step 3 of Task 23, and ask its go before any `npm --prefix apps/server test`.
@@ -3485,6 +3526,8 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - Phone layout: the field takes a row of its own, the counter and the three buttons share the next; targets are 44 px below `md`. Esc in the field stops there (an open discussion panel or citation preview stays open). The search landmark is named «Cerca nel testo» plus the surface.
 - Cmd/Ctrl+F is the app's «Cerca negli articoli aperti» (`Layout.tsx`), unchanged; «Cerca nel testo» has no shortcut.
 
+**Amendment, 2026-10-09 — PR 4d added (the owner: «no però vorrei tutta la ricerca in cmd+f e vorrei tutta la barra di ricerca meno ingombrante, magari in una sua finestra fluttuante»).** One floating window on Cmd/Ctrl+F and the magnifier replaces PR 4c's box under the toolbar and the old «Cerca negli articoli aperti» (spec §13.1, Tasks 33–35). It searches the tab in front or every open tab, decisions included; texts not on screen are searched in their stored text and shown when reached. The renderer's `search` marks go, so no search adds an element to the text on either surface.
+
 **Amendment, 2026-10-11 — PR 5 as built (`feat/decision-history`), after the final review.** Tasks 23 and 24 above are corrected where the code differs; what the rounds decided:
 - A row is a norm or a decision, never both, never neither: the CHECK `search_history_one_kind` (tested by name), and `parseHistory` refuses the other shapes in Italian. Migration `20261015100000_search_history_decisions`, written by hand; existing rows have `act_type NOT NULL`, so the CHECK holds when it is added.
 - The server reads the key with `readDecisionKey` (`norms/decisionKey.ts`), the one reader; tests use fictional keys only (99999) and expect 201 on create, 200 on a repeat within five minutes.
@@ -3493,3 +3536,13 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - `DecisionHistoryRow` draws a decision's row; `decisionHistoryLabel` (`utils/decisionLinks.ts`) is the one label helper; an unreadable key shows «Sentenza», is not clickable and is logged once on load.
 - Release note, for the PR body: there is no rollback path. After `migrate deploy`, rows with a null `act_type` exist, and a build whose Prisma client types `actType` as `String` makes `GET /api/history` throw for every user holding a decision row. A downgrade needs `DELETE FROM search_history WHERE decision_key IS NOT NULL` before restoring `NOT NULL`. Commit 522cc39d's body says «decision_key» for the export; the field is `decisionKey`.
 - Left as is: an explicit `decision_key: null` beside `act_type` is refused («…non entrambe»); no client sends it.
+
+**Amendment, 2026-10-11 — PR 4d as built (`feat/find-window`), after the final review.** Tasks 33–35 above are corrected where the code differs; what the rounds decided:
+- «Go to» an undrawn match calls `revealTab`, a separate action: it raises the tab, restores it when minimised or hidden, and sets `mobileActiveTabId`. Making `bringTabToFront` reveal broke the restore button and the dock chip (a press on a minimised bar must raise it and leave it minimised), so `bringTabToFront` is unchanged and only the find window calls `revealTab`.
+- The phone's tab on screen moved from `SearchPanel`'s own state into the store: `mobileActiveTabId`, session-only (absent from `partialize`); null or a closed id reads as the first tab, `removeTab` moves it to the neighbour. «Questa scheda» on a phone is that tab. On a phone the scope leaves out loose articles and collections, which the phone column does not draw, instead of counting matches it could never show.
+- `focusArticleInTab` opens a collapsed block (and a collapsed collection) and bumps a loose article's `revealSignal`, which `LooseArticleCard` turns into an open card. The block's `autoFocusArticleId` is consumed by `NormaBlockComponent` on a desktop and by `NormaCard` on a phone, which opens the card and the article: on a phone the hidden desktop copy used to swallow the signal.
+- Typing never moves the reader: only «next» and «previous» reveal a tab. A target whose root does not register within 3 s is given up for the query and its matches leave the counter (the counter counts what can be reached).
+- The magnifier's pressed state means «open on this tab and this text», read at `pointerdown` (before the tab panel's `mousedown` raises the tab); a press that ends without a click (released off the button, cancelled) or a blur forgets it, so a later Enter reads the state on screen.
+- The window has two lines: the field and its buttons, then the scope switch and, under «Tutte le schede», the place of the match as one label (a decision tab's own label, which carries the section; an article's `shortNorm`), also read in the live region. The window is clamped whole inside the viewport.
+- Cmd/Ctrl+F is intercepted on `/` only, where the workspace is drawn; elsewhere it is the browser's, and leaving `/` closes the window. It is also the browser's while an overlay covers the workspace (`isWorkspaceCovered`): an element with `aria-modal="true"` or `data-find-overlay`, the mark Study Mode, the command palette, CompareView and the PDF viewer carry. Study Mode is not a modal dialog in ARIA terms (its note popovers are portalled outside it, and it has no focus trap). The hand-rolled `z-50`/`z-[100]` modals lie under the window, which stays over them, visible and usable.
+- Task 35 left `store/workspaceTabActions.ts` as it is (the dead duplicate of gotcha 25; the workspace redesign deletes it). `getFindWindowScope` and `useArticleTextInteractions`' `openUpdates`, left without callers by the removals, went too.

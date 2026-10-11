@@ -206,20 +206,46 @@ the article now lists only what no sign can reach (`LooseHighlightsList`,
 desktop): highlights made in the Brocardi sections and highlights whose text
 changed — without it they could no longer be removed.
 
-**Find in the text** («Cerca nel testo», spec §13): one `FindInTextButton` in the toolbar
-(`ReadingToolbar`, both its desktop row and its phone row, and `DecisionReadingToolbar`) opens
-`FindInTextBox` (`useFindInText` + `FindInTextBar`) in a row of its own inside the sticky toolbar;
-it is mounted only while open, so closing clears the highlights and forgets the query. The
-article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
+**Find in the text** («Cerca nel testo», spec §13): one floating `FindWindow` (`features/search/`,
+mounted once in `Layout`, portalled, z-index `findWindow`) opened by Cmd/Ctrl+F (`Layout.tsx`: opens,
+or focuses and selects the query when already open) and by the magnifier (`FindInTextButton`) of
+`ReadingToolbar` (desktop and phone rows) and `DecisionReadingToolbar`. Cmd/Ctrl+F is intercepted on `/`
+only, where the workspace is drawn; on every other route it is the browser's, and leaving `/` closes the
+window. It is also the browser's while an overlay covers the workspace (`isWorkspaceCovered`): an element
+with `aria-modal="true"`, or one marked `data-find-overlay` — Study Mode, `CommandPalette`, `CompareView`,
+`PDFViewer`. A new full-screen overlay that is not a modal dialog in ARIA terms takes the mark on its
+root, rendered only while open; do not add `aria-modal` for this alone (Study Mode lost it: its note
+popovers are portalled outside it, and VoiceOver hides what lies outside a modal dialog). The hand-rolled
+`z-50`/`z-[100]` modals sit under the window, which stays over them, visible and usable.
+`utils/findWindowControl.ts` (`openFindWindow`, `closeFindWindow`, `subscribeFindWindow`,
+`isWorkspaceCovered`) is its control; `useFindWindowScopedTo` gives the magnifier its pressed state
+(pressed: open on this tab and this text; the state is read at `pointerdown`, before the tab panel's
+`mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
+with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
+session-only) and «Tutte le schede». A phone leaves out loose articles and collections: its column draws
+norm blocks only. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
+(it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
+place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
+26: use `useIsDesktop`). Esc closes it and returns focus. Text roots register through
+`useRegisterFindRoot`; `useFindWindow` finds across `utils/findTargets.ts` targets (a displayed root is
+searched in its DOM, any other in its stored projection and only counted), moves the reader only on
+next or previous, and shows an undrawn match through `revealTab` (raises the tab, restores it when
+minimised or hidden, makes it the phone's tab on screen) and `focusArticleInTab` (opens a collapsed
+block and sets its `autoFocusArticleId`, which `NormaBlockComponent` consumes on a desktop and `NormaCard`
+on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`;
+expands a collection). `revealTab` is a separate action, never
+`bringTabToFront` made to reveal: the restore button and the dock chip use `bringTabToFront`, and a
+minimised tab must stay minimised until its own button restores it. A target whose root does not
+appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
 a decision only when it has text (`hasDecisionText`). The search reads the text nodes, joined by one virtual space at every block boundary, `<br>` and skipped hidden subtree, and paints with
 the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-current)`); it adds,
 moves and changes nothing in the DOM (gotcha 23), and where the API is missing it only fails to
-draw. Matching ignores case, accents and marks, folded 1:1 per UTF-16 unit so offsets are the
-original's; a query needs two characters (digits count); past 1000 matches the rest are not drawn. Two surfaces
-searching at once keep both sets of ranges (the registry is keyed by owner). Browser floor: the
-Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
+draw. The article renderer emits nothing for a search (no `search` mark kind, no amber `<mark>`).
+Matching ignores case, accents and marks, folded 1:1 per UTF-16 unit so offsets are the
+original's; a query needs two characters (digits count); past 1000 matches the rest are not drawn.
+Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
 `decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
-«Cerca nel testo» has no shortcut: Cmd/Ctrl+F is the app's existing «Cerca negli articoli aperti» (`Layout.tsx`), a different tool that searches the open articles, not decisions.
+The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
@@ -532,11 +558,13 @@ Duplicating any of these is a defect, not a shortcut.
   `uniqueArticleIdFromNorma(norma)`. Both keys share their act-level segments so
   they cannot drift. `buildItemKey` is the annotation/highlight key contract and
   must stay byte-identical across dashboard and dossier.
-- `utils/findInText.ts`, `utils/findHighlights.ts`, `hooks/useFindInText.ts` — find in the text:
+- `utils/findInText.ts`, `utils/findHighlights.ts`, `utils/findScope.ts`, `utils/findTargets.ts`,
+  `utils/findWindowControl.ts`, `hooks/useFindWindow.ts`, `hooks/useRegisterFindRoot.ts`,
+  `hooks/useFindWindowScopedTo.ts` — find in the text:
   `findMatches`/`collectSearchableText`/`rangesForMatches` (folded, 1:1 offsets; `isSearchableQuery`
   is the one rule for «long enough»), the owner-keyed highlight registry (`setFindRanges`,
-  `clearFindRanges`) and the hook that debounces typing, keeps the current match across a redraw and
-  re-searches when the text changes. Read-only over the DOM. `features/search/toolbarToggle.ts`
+  `clearFindRanges`), and the window's scope, targets and hook (debounced typing, the current match
+  kept across a redraw, re-search when the text changes). Read-only over the DOM. `features/search/findBarParts.ts` (`counterText`, `ICON_BUTTON`) is the counter and icon button of the window; `features/search/toolbarToggle.ts`
   (`toolbarToggleClass`) is the look shared by the toolbar toggles (`DiscussionButton`,
   `FindInTextButton`): add a toggle with it, not with a copy of the classes.
 - `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
@@ -772,7 +800,9 @@ and raise it to `z-20`.
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`sidebar` 50, `dock` 80,
 overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
-z-index will be honoured.
+z-index will be honoured. An overlay above `findWindow` (110) that covers the
+workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
+or Cmd/Ctrl+F opens the find window hidden under it.
 
 **Beating inline `style="..."` without `!important`** — when markup you don't
 control ships inline styles (e.g. `useArticleMarkers` emits
@@ -935,7 +965,8 @@ meant to stay split; add new features as new files, not inside the shells:
 25. **`store/workspaceTabActions.ts` is a dead duplicate — edit `useAppStore.ts`.**
     The live workspace-tab actions are inlined in the store (`addNormaToTab` and
     friends); nothing imports the factory in that file. Its only live export is
-    the `NormaBlock` / `LooseArticle` *types*, imported by `useGlobalSearch.ts`.
+    the `NormaBlock` / `LooseArticle` *types*, which nothing imports any more
+    (`useGlobalSearch.ts` is gone).
     Editing an action there changes nothing at runtime. The file carries a header
     saying so; relocating the types and deleting the rest is queued for round 2b.
 26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**

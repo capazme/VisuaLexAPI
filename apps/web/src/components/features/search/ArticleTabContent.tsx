@@ -22,14 +22,14 @@ import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompa
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
-import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
 import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
-import { FindInTextBox } from './FindInTextBox';
+import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
+import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
@@ -54,6 +54,7 @@ import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
+import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
 import { plainText } from '../../../utils/threadPassages';
 import { PassageThreadsStatus } from './PassageThreadsStatus';
 import { VersionBanner } from './VersionBanner';
@@ -66,6 +67,7 @@ import {
     describeVersion,
     isEuropeanAct,
     requestIsHistorical,
+    versionKey,
     versionTabSuffix,
     type BannerAction,
     type TextAtDateChoice,
@@ -156,12 +158,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // not persisted across sessions.
     const [highlightsHidden, setHighlightsHidden] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
-    // «Cerca nel testo» searches ArticleBody's text root only: not Brocardi, not the case law below it.
+    // The find window searches ArticleBody's text root only: not Brocardi, not the case law below it.
     const textRootRef = useRef<HTMLDivElement>(null);
-    const findButtonRef = useRef<HTMLElement | null>(null);
     // The cards row owns the card form; the selection popup opens it through this.
     const cardsRowRef = useRef<ArticleCardsHandle>(null);
-    const [isFindOpen, setIsFindOpen] = useState(false);
     // Loop β #2 "missed" surface: a selection the user flagged as a legal
     // reference the citation detector did not link. Offset is in the same
     // marker projection as highlights; the rect was captured before the
@@ -184,6 +184,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { canContribute, qaAskable, consentLevel, merltEnabled } = useMerltFeatures();
 
     const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
+    // The find window's target for this article (spec §13.1): the tab this surface reads in,
+    // `readingOrigin` winning like everywhere else it is given, so the root lands under the tab and
+    // key the scope computes from the store. No tab (a
+    // preview outside the workspace, such as the palette's result card) registers nothing.
+    const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
+    useRegisterFindRoot(originTabId ?? tabId, findTargetKey, shortNorm(norma_data), textRootRef);
+    const isFindOpen = useFindWindowScopedTo(originTabId ?? tabId, findTargetKey);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],
@@ -196,8 +203,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // by article, not by version, so they would attach to the wrong words, and
     // Brocardi's commentary carries no date.
     const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
-    // No text on screen, no find box: it must not come back open (and take focus) when the text does.
-    if (!display.textVisible && isFindOpen) setIsFindOpen(false);
     const readOnly = display.readOnly;
     // The study cards anchor to the text in force only.
     const cardsHistorical = readOnly || !!versionInfo?.isHistorical;
@@ -707,46 +712,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom
     // fold; an annotation sign opens its block's notes and highlights.
-    const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
+    const { updatesOpen, openNote, closeNote, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
         updatesOpenByDefault: display.updateNotesOpen,
     });
     const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
-
-    // Cmd+F click → scroll this article body to the requested occurrence.
-    // useArticleMarkers tags each search hit with `data-search-idx`; we
-    // wait one frame (so the re-render from the setGlobalHighlight typing
-    // AND the article switch has settled) before querying the DOM.
-    useEffect(() => {
-        const reveal = (target: HTMLElement) => {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.classList.add('search-match-active');
-            setTimeout(() => target.classList.remove('search-match-active'), 1600);
-        };
-        return subscribeSearchNavigation((req) => {
-            if (!req) return;
-            if (req.articleId !== uniqueArticleId) return;
-            const container = contentRef.current;
-            if (!container) return;
-            // rAF twice: first frame lets React commit, second lets the
-            // browser lay out the scrollIntoView target.
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                const target = container.querySelector<HTMLElement>(
-                    `.search-match[data-search-idx="${req.occurrenceIdx}"]`,
-                );
-                if (!target) return;
-                // A hit in the folded AGGIORNAMENTO notes is display:none, and
-                // scrolling to it would do nothing: unfold them first. Folding
-                // is a class, so the target element survives the re-render.
-                if (target.closest('.vlx-updates-body') && !target.closest('.vlx-updates-open')) {
-                    openUpdates();
-                    requestAnimationFrame(() => requestAnimationFrame(() => reveal(target)));
-                    return;
-                }
-                reveal(target);
-            }));
-        });
-    }, [uniqueArticleId, openUpdates]);
 
     // Citation hover and click: a click jumps within the same act or opens a search, recording the
     // way back from this block first.
@@ -811,8 +781,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onCompare={handleCompare}
                 find={display.textVisible ? {
                     isOpen: isFindOpen,
-                    onToggle: (button) => { findButtonRef.current = button; setIsFindOpen(v => !v); },
-                    bar: <FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} label="dell’articolo" onClose={() => setIsFindOpen(false)} />,
+                    onToggle: (button, wasPressed) => (wasPressed
+                        ? closeFindWindow()
+                        : openFindWindow({ tabId: originTabId ?? tabId, targetKey: findTargetKey, returnFocus: button })),
                 } : undefined}
             />
 

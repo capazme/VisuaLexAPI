@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { Annotation, Highlight } from '../types';
 import type { ArticleStructure } from '../utils/articleStructure';
 import type { LocatedThread } from '../utils/articleAnnotations';
 import { renderArticleHtml } from '../utils/articleRender';
-import { getGlobalHighlight, subscribeToHighlight } from './useGlobalSearch';
 
 interface UseArticleMarkersInput {
   rawText: string;
@@ -25,10 +24,9 @@ interface UseArticleMarkersInput {
 
 /**
  * The HTML of an article's text with the reader's highlights, anchored notes
- * and the global Cmd+F hits applied, ready for `SafeHTML`. The rendering
- * itself lives in `utils/articleRender.ts`; this hook adds the subscription
- * to the global search query, so every mounted body re-marks its hits as the
- * user types and the search panel can scroll to one by ordinal.
+ * and annotation signs applied, ready for `SafeHTML`. The rendering itself
+ * lives in `utils/articleRender.ts`. Finding in the text draws nothing here:
+ * it uses the CSS Custom Highlight API (`utils/findHighlights.ts`).
  *
  * All offsets are plain-text offsets (`article_text` without newlines).
  * Citation wrapping is not applied here — it is article-specific and belongs
@@ -43,9 +41,6 @@ export function useArticleMarkers({
   threads,
   focusedThreadId,
 }: UseArticleMarkersInput): string {
-  const [searchQuery, setSearchQuery] = useState<string | null>(() => getGlobalHighlight());
-  useEffect(() => subscribeToHighlight(setSearchQuery), []);
-
   return useMemo(
     () =>
       renderArticleHtml({
@@ -53,11 +48,10 @@ export function useArticleMarkers({
         structure,
         highlights,
         annotations,
-        searchQuery,
         signs,
         threads,
         focusedThreadId,
       }),
-    [rawText, structure, highlights, annotations, searchQuery, signs, threads, focusedThreadId],
+    [rawText, structure, highlights, annotations, signs, threads, focusedThreadId],
   );
 }

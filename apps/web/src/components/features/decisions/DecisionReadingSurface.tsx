@@ -6,7 +6,8 @@ import { useCitationLinks } from '../../../hooks/useCitationLinks';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { Toast, type ToastProps } from '../../ui/Toast';
 import { ArticleBody } from '../search/ArticleBody';
-import { FindInTextBox } from '../search/FindInTextBox';
+import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
+import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { NotesPeekPanel } from '../search/NotesPeekPanel';
 import { HighlightsActionsPicker } from '../search/HighlightsActionsPicker';
 import { InlineNotePopover } from '../search/InlineNotePopover';
@@ -19,6 +20,7 @@ import { UnmatchedAnchors } from './UnmatchedAnchors';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
@@ -135,10 +137,15 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
   const [highlightsHidden, setHighlightsHidden] = useState(false);
-  const [isFindOpen, setIsFindOpen] = useState(false);
   const findButtonRef = useRef<HTMLButtonElement>(null);
   const textRootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
+
+  // The find window's target for this decision (spec §13.1): one text, keyed by its own
+  // `decisionKey`, the key the scope computes for a decision tab. No `hostTabId` (a host with no
+  // tab) registers nothing.
+  useRegisterFindRoot(hostTabId, key, label, textRootRef);
+  const isFindOpen = useFindWindowScopedTo(hostTabId, key);
 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
@@ -213,9 +220,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
-        onToggleFind={() => setIsFindOpen((v) => !v)}
+        onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: hostTabId, targetKey: key, returnFocus: findButtonRef.current }))}
         findButtonRef={findButtonRef}
-        findBar={<FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} label="della decisione" onClose={() => setIsFindOpen(false)} />}
       />
       <NotesPeekPanel
         isOpen={isNotesOpen}

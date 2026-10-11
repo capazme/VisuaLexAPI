@@ -7,7 +7,19 @@ import { decisionPath } from './decisionLinks';
 /** Answers kept, least recently used out: a trovata holds the whole text. */
 const MAX_KEPT_ANSWERS = 50;
 const answers = new Map<string, Promise<FetchDecisionAnswer>>();
+/** The same answers, already settled: `peekDecision` reads this, never the promise, so a caller
+ *  (the find window, over a minimised tab) can look without awaiting and without starting a
+ *  request of its own. Kept in step with `answers` by every place that mutates it. */
+const settled = new Map<string, FetchDecisionAnswer>();
 const KEPT: ReadonlySet<FetchDecisionAnswer['esito']> = new Set(['trovata', 'ambigua', 'non_trovata']);
+
+function evictOverflow(): void {
+  while (answers.size > MAX_KEPT_ANSWERS) {
+    const oldest = answers.keys().next().value as string;
+    answers.delete(oldest);
+    settled.delete(oldest);
+  }
+}
 
 export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisionAnswer> {
   const key = decisionPath(ref);
@@ -19,7 +31,10 @@ export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisi
   }
   const pending = fetchDecision(ref).then(
     (answer) => {
-      if (!KEPT.has(answer.esito) && answers.get(key) === pending) answers.delete(key);
+      if (answers.get(key) === pending) {
+        if (KEPT.has(answer.esito)) settled.set(key, answer);
+        else answers.delete(key);
+      }
       return answer;
     },
     (error: unknown) => {
@@ -28,7 +43,7 @@ export function fetchDecisionCached(ref: DecisionReference): Promise<FetchDecisi
     },
   );
   answers.set(key, pending);
-  while (answers.size > MAX_KEPT_ANSWERS) answers.delete(answers.keys().next().value as string);
+  evictOverflow();
   return pending;
 }
 
@@ -39,14 +54,27 @@ export function rememberDecision(ref: DecisionReference, answer: FetchDecisionAn
   const key = decisionPath(ref);
   if (answers.has(key) || !KEPT.has(answer.esito)) return;
   answers.set(key, Promise.resolve(answer));
-  while (answers.size > MAX_KEPT_ANSWERS) answers.delete(answers.keys().next().value as string);
+  settled.set(key, answer);
+  evictOverflow();
 }
 
 /** Everything kept, at logout: the next reader of this browser starts with nothing of the last one's. */
 export function clearDecisionCache(): void {
   answers.clear();
+  settled.clear();
 }
 
 export function forgetDecision(ref: DecisionReference): void {
-  answers.delete(decisionPath(ref));
+  const key = decisionPath(ref);
+  answers.delete(key);
+  settled.delete(key);
+}
+
+/** The decision's answer already fetched this session, read synchronously and without starting a
+ *  request: a minimised decision tab's text for the find window («Tutte le schede»), which must
+ *  not wake every closed tab's fetch just because the window opened. Absent when nothing was kept
+ *  for it yet, or when the last answer was not a `trovata`/`ambigua`/`non_trovata` (a transient
+ *  network failure is never kept, by `fetchDecisionCached` itself). */
+export function peekDecision(ref: DecisionReference): FetchDecisionAnswer | undefined {
+  return settled.get(decisionPath(ref));
 }

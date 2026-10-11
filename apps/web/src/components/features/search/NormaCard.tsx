@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
@@ -12,6 +12,7 @@ import { ArticleMinimap } from '../workspace/ArticleMinimap';
 import { LazyStudyMode as StudyMode } from '../workspace/LazyStudyMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';
 
 interface NormaCardProps {
@@ -29,6 +30,12 @@ interface NormaCardProps {
    */
   normaBlockId?: string;
   /**
+   * The block's one-shot «show this article» signal (`focusArticleInTab`): on a phone this card is
+   * the block on screen, so it opens the article and consumes the signal; on a desktop
+   * `NormaBlockComponent` does.
+   */
+  autoFocusArticleId?: string;
+  /**
    * When true, an inline progress bar is rendered at the top edge of the card
    * to signal that articles are still arriving for this tab.
    */
@@ -39,7 +46,7 @@ interface NormaCardProps {
   streamProgress?: { loaded: number; total?: number } | null;
 }
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId, normaBlockId, isStreaming, streamProgress }: NormaCardProps) {
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId, normaBlockId, autoFocusArticleId, isStreaming, streamProgress }: NormaCardProps) {
   // Where these articles sit in the workspace, so a citation jump out of them
   // can record the way back. Undefined when the card is rendered outside a
   // workspace tab — then no jump is recorded, which is correct.
@@ -117,6 +124,26 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     setActiveTabId(uniqueId);
     setExpandedArticles(prev => prev.has(uniqueId) ? prev : new Set(prev).add(uniqueId));
   };
+
+  // «Show this article» from the store (the find window's «go to», a single-article search): on a
+  // phone the article opens here, adjusted during render when the signal changes (no effect needed
+  // for local state); the store's signal is consumed after the commit. A desktop leaves both to
+  // `NormaBlockComponent`.
+  const isDesktop = useIsDesktop();
+  const [seenFocusSignal, setSeenFocusSignal] = useState<string | undefined>(undefined);
+  if (autoFocusArticleId !== seenFocusSignal) {
+    setSeenFocusSignal(autoFocusArticleId);
+    const wanted = !isDesktop && autoFocusArticleId ? findArticleByNormalizedId(articles, autoFocusArticleId) : undefined;
+    if (wanted) {
+      focusTab(getUniqueArticleId(wanted));
+      // A card the reader closed opens to show it.
+      setIsOpen(true);
+    }
+  }
+  const consumeAutoFocusArticle = useAppStore((s) => s.consumeAutoFocusArticle);
+  useEffect(() => {
+    if (autoFocusArticleId && !isDesktop && tabId && normaBlockId) consumeAutoFocusArticle(tabId, normaBlockId);
+  }, [autoFocusArticleId, isDesktop, tabId, normaBlockId, consumeAutoFocusArticle]);
 
   const toggleArticleExpanded = (uniqueId: string) => {
     if (expandedArticles.has(uniqueId)) {

@@ -136,6 +136,8 @@ interface LooseArticle {
     id: string;
     article: ArticleData;
     sourceNorma: Norma;
+    /** Bumped by `focusArticleInTab`: the card opens when it changes (the find window showing a collapsed loose article). */
+    revealSignal?: number;
 }
 
 interface CollectionArticle {
@@ -310,6 +312,13 @@ interface AppState {
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
+    /**
+     * The tab the phone's carousel shows (`SearchPanel`, below `md`): the one tab on screen there,
+     * which «Questa scheda» of the find window means on a phone (`utils/findScope.ts`). Null, or an
+     * id no longer open, reads as the first tab. Session-only, absent from `partialize`: before it
+     * lived here it was `SearchPanel`'s own state, and a reload started at the first tab.
+     */
+    mobileActiveTabId: string | null;
 
     /**
      * The floating structure (index) window. A single `blockId` — rather than
@@ -390,6 +399,14 @@ interface AppState {
     updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
     removeTab: (id: string) => void;
     bringTabToFront: (id: string) => void;
+    /**
+     * The find window's «go to» alone (spec §13.1): raises the tab like `bringTabToFront`, also
+     * restores it when minimised or hidden, and makes it the phone's tab on screen — so its text
+     * actually mounts and its root registers. Not for the panel's or the dock's own clicks: there a
+     * minimised tab stays minimised until its own button restores it.
+     */
+    revealTab: (id: string) => void;
+    setMobileActiveTabId: (id: string | null) => void;
     toggleTabMinimize: (id: string) => void;
     toggleTabVisibility: (id: string) => void;
     toggleNormaCollapse: (tabId: string, normaId: string) => void;
@@ -597,6 +614,7 @@ const appStore = createStore<AppState>()(
             pendingDecision: null,
             decisionFocusRequest: null,
             highestZIndex: 100,
+            mobileActiveTabId: null,
             structureWindow: {
                 blockId: null,
                 position: { x: Math.max(16, window.innerWidth - 400), y: 96 },
@@ -1003,7 +1021,14 @@ const appStore = createStore<AppState>()(
             }),
 
             removeTab: (id) => set((state) => {
+                const index = state.workspaceTabs.findIndex(t => t.id === id);
                 state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== id);
+                // The phone keeps its place: closing the tab on screen shows the one that took its
+                // index, or the one before it when it was the last (what the carousel's own index did).
+                if (index >= 0 && state.mobileActiveTabId === id) {
+                    const neighbour = state.workspaceTabs[Math.min(index, state.workspaceTabs.length - 1)];
+                    state.mobileActiveTabId = neighbour ? neighbour.id : null;
+                }
             }),
 
             bringTabToFront: (id) => set((state) => {
@@ -1011,6 +1036,19 @@ const appStore = createStore<AppState>()(
                 if (tab) {
                     tab.zIndex = ++state.highestZIndex;
                 }
+            }),
+
+            revealTab: (id) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === id);
+                if (!tab) return;
+                tab.zIndex = ++state.highestZIndex;
+                tab.isMinimized = false;
+                tab.isHidden = false;
+                state.mobileActiveTabId = id;
+            }),
+
+            setMobileActiveTabId: (id) => set((state) => {
+                state.mobileActiveTabId = id;
             }),
 
             toggleTabMinimize: (id) => set((state) => {
@@ -1074,6 +1112,7 @@ const appStore = createStore<AppState>()(
 
             closeAllWorkspaceTabs: () => set((state) => {
                 state.workspaceTabs = [];
+                state.mobileActiveTabId = null;
             }),
 
             // ── Structure window ─────────────────────────────────────────
@@ -1173,8 +1212,32 @@ const appStore = createStore<AppState>()(
                         a => normalizeArticleId(uniqueArticleIdFromNorma(a.norma_data)) === wanted
                     );
                 }) as NormaBlock | undefined;
-                if (!block) return;
+                if (!block) {
+                    const loose = tab.content.find(c => c.type === 'loose-article' &&
+                        normalizeArticleId(uniqueArticleIdFromNorma(c.article.norma_data)) === wanted
+                    ) as LooseArticle | undefined;
+                    if (loose) {
+                        loose.revealSignal = (loose.revealSignal ?? 0) + 1;
+                        tab.isMinimized = false;
+                        tab.isHidden = false;
+                        tab.zIndex = ++state.highestZIndex;
+                        return;
+                    }
+                    // A collection holds loose copies: showing the article is opening the collection.
+                    const collection = tab.content.find(c => c.type === 'collection' && c.articles.some(
+                        a => normalizeArticleId(uniqueArticleIdFromNorma(a.article.norma_data)) === wanted
+                    )) as ArticleCollection | undefined;
+                    if (!collection) return;
+                    collection.isCollapsed = false;
+                    tab.isMinimized = false;
+                    tab.isHidden = false;
+                    tab.zIndex = ++state.highestZIndex;
+                    return;
+                }
                 block.autoFocusArticleId = articleId;
+                // A collapsed block draws no article: showing one is opening its block (the find
+                // window's «go to» a match in it, spec §13.1).
+                block.isCollapsed = false;
                 // Surface the tab if it was minimized/hidden so the focus signal
                 // is actually visible (R3 + R2 edge case).
                 tab.isMinimized = false;

@@ -85,11 +85,24 @@ export function findMatches(
   { limit = 1000 }: { limit?: number } = {},
 ): FindResult {
   if (!isSearchableQuery(query)) return { matches: [], truncated: false };
+  return findMatchesInFolded(foldForSearch(text), query, { limit });
+}
+
+/**
+ * `findMatches` over a text already folded with `foldForSearch` (same length, so the offsets are
+ * the original text's): a caller searching the same stored text for every keystroke folds it once
+ * (`useFindWindow`).
+ */
+export function findMatchesInFolded(
+  haystack: string,
+  query: string,
+  { limit = 1000 }: { limit?: number } = {},
+): FindResult {
+  if (!isSearchableQuery(query)) return { matches: [], truncated: false };
   const folded = foldQuery(query).trim();
 
   const pattern = folded.split(/\s+/).map(wordPattern).join('\\s+');
   const re = new RegExp(pattern, 'gu');
-  const haystack = foldForSearch(text);
 
   const matches: [number, number][] = [];
   let truncated = false;
@@ -102,6 +115,23 @@ export function findMatches(
     matches.push([start, start + m[0].length]);
   }
   return { matches, truncated };
+}
+
+/**
+ * Where `pos` of `oldText` sits in `newText`: unchanged before the common prefix, shifted by the
+ * length difference after the common suffix, and at the start of the change when it falls inside
+ * what changed. How a caller keeping a current match carries its position through a redraw
+ * (`useFindWindow`) without re-finding it by content.
+ */
+export function mapThroughEdit(oldText: string, newText: string, pos: number): number {
+  const max = Math.min(oldText.length, newText.length);
+  let prefix = 0;
+  while (prefix < max && oldText[prefix] === newText[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < max - prefix && oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix += 1;
+  if (pos < prefix) return pos;
+  if (pos >= oldText.length - suffix) return pos + newText.length - oldText.length;
+  return prefix;
 }
 
 export interface TextSegment {

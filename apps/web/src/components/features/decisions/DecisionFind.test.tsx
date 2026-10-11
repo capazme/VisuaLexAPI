@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { appStore } from '../../../store/useAppStore';
 import type { DecisionIdentity, DecisionText, FoundDecision } from '../../../types/decisions';
 import { FakeHighlight } from '../../../utils/__fixtures__/openFind';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
+import { FindWindow } from '../search/FindWindow';
+import { closeFindWindow } from '../../../utils/findWindowControl';
 import { decisionKey } from '../../../utils/decisionLinks';
 import type { Highlight } from '../../../types';
 import { DecisionView } from './DecisionView';
@@ -41,16 +44,22 @@ afterEach(() => {
   delete g.Highlight;
 });
 
-const surface = () => <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} />;
-const openIn = (scope: ReturnType<typeof within>) => fireEvent.click(scope.getByRole('button', { name: 'Cerca nel testo' }));
-const typeIn = (scope: ReturnType<typeof within>, value: string) =>
-  fireEvent.change(scope.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value } });
+const surface = (hostTabId?: string) => <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} hostTabId={hostTabId} />;
+/** The decision in its own workspace tab, as the workspace draws it. */
+const inTab = () => surface(appStore.getState().openDecisionTab(IDENTITY));
+const withWindow = (ui: ReactNode) => <>{ui}<FindWindow /></>;
+const magnifier = () => screen.getByRole('button', { name: 'Cerca nel testo' });
+const typeQuery = (value: string) => fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value } });
 const drawn = (name: string) => registry.get(name)?.ranges.length ?? 0;
 
+afterEach(() => {
+  act(() => closeFindWindow());
+});
+
 describe('«Cerca nel testo» on a decision', () => {
-  it('has the button on a decision with text, and no box until it is pressed', () => {
-    render(surface());
-    expect(screen.getByRole('button', { name: 'Cerca nel testo' })).toHaveAttribute('aria-pressed', 'false');
+  it('has the magnifier on a decision with text, and no window until it is pressed', () => {
+    render(withWindow(surface()));
+    expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
   });
 
@@ -68,14 +77,22 @@ describe('«Cerca nel testo» on a decision', () => {
     expect(screen.queryByRole('button', { name: 'Cerca nel testo' })).not.toBeInTheDocument();
   });
 
+  it('opens the window scoped to its tab, not a box under the toolbar', () => {
+    render(withWindow(inTab()));
+    fireEvent.click(magnifier());
+    expect(screen.getByRole('search').closest('.glass-toolbar')).toBeNull();
+    expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('finds a word typed without its accent, and the same word with it', async () => {
-    render(surface());
-    openIn(screen);
-    typeIn(screen, 'societa');
+    render(withWindow(inTab()));
+    fireEvent.click(magnifier());
+    typeQuery('societa');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 di 1'));
-    typeIn(screen, 'società');
+    typeQuery('società');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 di 1'));
-    typeIn(screen, 'perche');
+    typeQuery('perche');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 di 1'));
     expect(drawn('vlx-find-current')).toBe(1);
   });
@@ -84,28 +101,28 @@ describe('«Cerca nel testo» on a decision', () => {
     // A highlight whose words are not in the text is listed by UnmatchedAnchors, outside the text root
     const lost = { id: 'h1', normaKey: decisionKey(IDENTITY), articleId: '', rangeSerialized: '', text: 'parole sparite', color: 'red', startOffset: 3 } as Highlight;
     appStore.setState({ highlights: [lost] });
-    render(surface());
+    render(withWindow(inTab()));
     expect(document.body.textContent).toContain('parole sparite');
     expect(document.body.textContent).toContain('Il testo della fonte è cambiato');
-    openIn(screen);
-    typeIn(screen, 'parole sparite');
+    fireEvent.click(magnifier());
+    typeQuery('parole sparite');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
-    typeIn(screen, 'fonte è cambiato');
+    typeQuery('fonte è cambiato');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
     expect(drawn('vlx-find')).toBe(0);
   });
 
   it('orders the buttons as the article does: discussion, then find', () => {
-    render(surface());
-    const find = screen.getByRole('button', { name: 'Cerca nel testo' });
+    render(withWindow(surface()));
     const discussion = screen.getByRole('button', { name: /Discussioni/ });
-    expect(discussion.compareDocumentPosition(find) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(discussion.compareDocumentPosition(magnifier()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('steps with Enter and Shift+Enter, and closes on Esc giving focus back to the button', async () => {
-    render(surface());
-    openIn(screen);
-    typeIn(screen, 'ricorso');
+  it('steps with Enter and Shift+Enter, and closes on Esc giving focus back to the magnifier', async () => {
+    render(withWindow(inTab()));
+    const button = magnifier();
+    fireEvent.click(button);
+    typeQuery('ricorso');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 di 2'));
     const field = screen.getByRole('searchbox');
     fireEvent.keyDown(field, { key: 'Enter' });
@@ -115,30 +132,16 @@ describe('«Cerca nel testo» on a decision', () => {
     fireEvent.keyDown(field, { key: 'Escape' });
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
     expect(registry.size).toBe(0);
-    expect(screen.getByRole('button', { name: 'Cerca nel testo' })).toHaveFocus();
+    expect(button).toHaveFocus();
   });
 
-  it('Esc in the field does not reach the document, so an open panel stays open', () => {
+  it('Esc in the window does not reach the document, so an open panel stays open', () => {
     const onDocKey = vi.fn();
     document.addEventListener('keydown', onDocKey);
-    render(surface());
-    openIn(screen);
+    render(withWindow(surface()));
+    fireEvent.click(magnifier());
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
     document.removeEventListener('keydown', onDocKey);
     expect(onDocKey).not.toHaveBeenCalled();
-  });
-
-  it('two decisions searching at once keep both sets of ranges', async () => {
-    render(<><div data-testid="a">{surface()}</div><div data-testid="b">{surface()}</div></>);
-    for (const id of ['a', 'b']) {
-      const scope = within(screen.getByTestId(id));
-      openIn(scope);
-      typeIn(scope, 'ricorso');
-    }
-    await waitFor(() => expect(drawn('vlx-find-current')).toBe(2));
-    expect(drawn('vlx-find')).toBe(2);
-    fireEvent.keyDown(within(screen.getByTestId('a')).getByRole('searchbox'), { key: 'Escape' });
-    expect(drawn('vlx-find-current')).toBe(1);
-    expect(drawn('vlx-find')).toBe(1);
   });
 });
