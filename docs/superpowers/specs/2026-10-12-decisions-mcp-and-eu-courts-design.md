@@ -48,6 +48,7 @@ di Stato, TAR, Garante, Corte EDU), so that the answer can say which court it re
 - **Internal.** The server calls it directly (`LEGAL_API_URL`), as it calls `/parse_query`; no
   browser does, so it joins neither the Vite proxy nor the ingress's `@legal` list, and from
   outside the ingress does not route it.
+
 ### 2.2 The route
 
 `POST /api/dossiers/:id/decisions` `{ references: string[] }` (`apps/server`), the twin of
@@ -205,8 +206,9 @@ date and title; the code then keeps only exact tokens of the right letter («C-5
 «T-594/12» nor «C-1594/12»). (2) The XHTML of the judgment found. None found: a second chance by
 CELEX alone (`6<anno><CJ|TJ><numero:04d>`), since the query needs an Italian expression; still
 none: `non_trovata`. Two judgments for one case (a rare second judgment, on costs or a
-revision): `ambigua`, with both. The 2026-08-29 case-law design had chosen the same endpoint
-(its `CellarAdapter`, never built).
+revision): `ambigua`, with both. The 2026-08-29 case-law design and its plan
+(`docs/superpowers/plans/2026-08-29-giurisprudenza-backend.md`, a `CellarAdapter` never built)
+had chosen the same endpoint.
 
 **The text.** `epigrafe`: from the title to «ha pronunciato la seguente / Sentenza» (the parties,
 the formation, the representatives); `motivazione`: the numbered points, with their headings, up

@@ -36,7 +36,7 @@ Every expected value `E` is `{ "value": …, "status": … }`:
 | status | meaning | asserted |
 |---|---|---|
 | `decided` | the owner's words exist (quoted in `note` or in the spec) | every adopting suite: the web app, the server and the MCP server, the API, MERL-T |
-| `current` | what the code does today, and the convention keeps it | by the suites that hold that code (today: the API for norm identities and decision keys, the web for decision paths) |
+| `current` | what the code does today, and the convention keeps it | by the suites that hold that code (today: the API for norm identities and decision keys, the web for decision paths and `decision_citations`) |
 | `proposed` | a low-impact call stated in the spec; the owner can overturn it | once the area adopts the convention |
 | `open:Qn` | waits for question n: Q1–Q9 of the convention spec (§9), Q10–Q13 of `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` (§8); the value is the recommendation | once the owner answers and the status flips (the owner answered Q1–Q9 on 4 October 2026; Q10–Q13, the courts of the Union, are open) |
 
@@ -79,10 +79,11 @@ A decision as a lawyer writes it, read into the reference `/fetch_decision` take
 ```
 
 Two parsers read the same words: the web palette's `decisionCitationParser.ts`, on every
-keystroke in the browser, and the Python API's `/parse_decision`, which the server's
-`POST /dossiers/:id/decisions` calls. Both assert every case whose status their suite asserts;
-`unsupported_court` (the court the API names when it recognises one VisuaLex has no reader for)
-is the API's alone. The section is kept as written (`III`, `U`), as the palette keeps it.
+keystroke in the browser, asserts the cases today; the Python API's `/parse_decision`, which the
+server's `POST /dossiers/:id/decisions` will call (Part A of the 12 October design), will assert
+them too. Each asserts the cases whose status is `decided`, `current` or `proposed` and lists the
+open ones as skipped. `unsupported_court` (the court the API names when it recognises one
+VisuaLex has no reader for) is the API's alone. The section is kept as written (`III`, `U`), as the palette keeps it.
 
 ## `norm-entries.json`
 

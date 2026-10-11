@@ -194,17 +194,18 @@ penal; the Massimario's paragraphs sometimes give a hearing date
 
 A new court adds a `corte` value and its key shape `<corte>:<numero>:<anno>`,
 with the court's own qualifiers in place of `archivio` when its numbering
-needs them (a TAR's seat and section, the Consiglio di Stato's section). ~~Where
-the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.~~
+needs them (a TAR's seat and section, the Consiglio di Stato's section). Where
+the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.
 
-**Amended 12 October 2026** (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
+**Proposed to replace the last sentence for the CGUE, 12 October 2026** (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
 §3, waiting for the owner's Q10–Q13 there): the Court of Justice and the General
 Court are named by their case, as lawyers cite them and as the proposal of #112
 put it, which the owner accepted («95–100 come raccomandi»). Two courts,
 `corte_giustizia_ue` and `tribunale_ue`; the key `corte_giustizia_ue:634:2021`
 for C-634/21, the path `/sentenze/corte-giustizia-ue/634/2021`; the ECLI an
 attribute, as for the Corte costituzionale, since it names one document of a case
-(the judgment, an order, the Advocate General's opinion), not the case. The ECtHR
+(the judgment, an order, the Advocate General's opinion), not the case. Once the
+owner answers Q10, this paragraph replaces that sentence for the CGUE; the ECtHR
 is left to its own design.
 
 ## 3. Norms: labels
