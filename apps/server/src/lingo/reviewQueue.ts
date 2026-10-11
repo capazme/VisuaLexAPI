@@ -1,10 +1,16 @@
-import type { LingoMateria, Prisma } from '@prisma/client';
+import type { LingoCardStato, LingoMateria, Prisma } from '@prisma/client';
 import { review, type Rating, type SrsState } from '../srs/fsrsEngine';
 
 /** The daily goal of new cards until the user changes it (spec decision 9). */
 export const DEFAULT_NUOVE_AL_GIORNO = 20;
 
 const RATINGS: readonly Rating[] = [1, 2, 3, 4];
+
+/**
+ * The states in which one's own card is reviewed. A card that leaves them (archived, «da rivedere») keeps
+ * its review state row but is not offered, graded or listed as due.
+ */
+export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'];
 
 /**
  * The cards a user may review (spec decision 8): their own that are drafts,
@@ -20,7 +26,7 @@ const RATINGS: readonly Rating[] = [1, 2, 3, 4];
 export function reviewScope(userId: string, materieComunita: LingoMateria[], materia?: LingoMateria): Prisma.LingoCardWhereInput {
   const scope: Prisma.LingoCardWhereInput = {
     OR: [
-      { autoreId: userId, stato: { in: ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'] } },
+      { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES } },
       { stato: 'VALIDATA', materia: { in: materieComunita } },
     ],
   };

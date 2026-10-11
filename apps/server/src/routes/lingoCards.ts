@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { createLingoCard } from '../lingo/cards';
 import { hasNoNul } from '../lingo/noNul';
 import { cardInputSchema, planCards } from '../lingo/planCards';
+import { REVIEWABLE_OWN_STATES } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
 import { romeDay, startOfRomeDay } from '../lingo/studyDay';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
@@ -57,14 +58,18 @@ const trashSchema = z.object({ cardIds: z.array(z.string().min(1).max(64).refine
 
 /**
  * What the caller's own review state adds to a card: the Rome day it is next due, null before its first
- * review. The study state is the user's session's: a connected application gets the card as before.
+ * review, and null for a card that can no longer be reviewed (its state row stays but nothing is due). The
+ * study state is the user's session's: a connected application gets the card as before.
  */
 const reviewedBy = (userId: string) => ({ ancore: true, statiRipasso: { where: { utenteId: userId } } }) satisfies Prisma.LingoCardInclude;
 type CardWithReview = Prisma.LingoCardGetPayload<{ include: ReturnType<typeof reviewedBy> }>;
 const serializeForCaller = (req: Request) => (card: CardWithReview) =>
   req.delegation
     ? serialize(card)
-    : { ...serialize(card), prossimoRipasso: card.statiRipasso[0] ? romeDay(card.statiRipasso[0].dueAt) : null };
+    : {
+        ...serialize(card),
+        prossimoRipasso: card.statiRipasso[0] && REVIEWABLE_OWN_STATES.includes(card.stato) ? romeDay(card.statiRipasso[0].dueAt) : null,
+      };
 
 router.post('/', async (req, res) => {
   const { cards } = createSchema.parse(req.body);
@@ -114,7 +119,17 @@ router.get('/', async (req, res) => {
     ...(q ? { OR: [{ istituto: { contains: q, mode: 'insensitive' } }, { domanda: { contains: q, mode: 'insensitive' } }] } : {}),
     ...(origine ? { createdByClientId: { not: null } } : {}),
     // A review state due before tomorrow's first instant in Rome: today's, or overdue.
-    ...(dovuteOggi ? { statiRipasso: { some: { utenteId: userId, dueAt: { lt: startOfRomeDay(romeDay(new Date()), 1) } } } } : {}),
+    // An AND, so that it does not collide with the `stato` filter; the states are the ones a session offers.
+    ...(dovuteOggi
+      ? {
+          AND: [
+            {
+              stato: { in: REVIEWABLE_OWN_STATES },
+              statiRipasso: { some: { utenteId: userId, dueAt: { lt: startOfRomeDay(romeDay(new Date()), 1) } } },
+            },
+          ],
+        }
+      : {}),
   };
   const orderBy: Prisma.LingoCardOrderByWithRelationInput[] =
     ordine === 'materia'

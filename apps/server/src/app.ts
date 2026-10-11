@@ -74,7 +74,7 @@ app.use(createOAuthRouter(oauthConfig));
 // it is counted per user rather than per address.
 app.use('/api', delegatedAuth);
 
-// Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
+// Rate limiting: anonymous 100/min, authenticated 300/min, writes 200/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory
 app.use(globalRateLimiter);
 

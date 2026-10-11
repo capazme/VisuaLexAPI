@@ -529,6 +529,28 @@ describe('the review routes', () => {
       expect(response.body.cards.some((c: { id: string }) => c.id === fresh.id)).toBe(false);
       expect((await list(a, { dovuteOggi: 'false' })).status).toBe(400);
     });
+
+    it('leaves out a card that can no longer be reviewed, though its review state stays: no date either', async () => {
+      setClock(MONDAY_MORNING);
+      const reviewable = await card(alice, 'PROPOSTA_COMMUNITY');
+      const archived = await card(alice, 'ARCHIVIATA');
+      const toReview = await card(alice, 'DA_RIVEDERE');
+      for (const c of [reviewable, archived, toReview]) await stateDueOn(alice, c.id, '2026-10-15', new Date('2026-10-10T08:00:00Z'));
+
+      const due = await list(a, { dovuteOggi: 'true' });
+      expect(due.body.cards.map((c: { id: string }) => c.id)).toEqual([reviewable.id]);
+      expect(due.body.cards[0].prossimoRipasso).toBe('2026-10-15');
+      // The session agrees with the list.
+      expect(idsOf(await session(a))).toEqual([reviewable.id]);
+
+      const all = await list(a);
+      const dates = Object.fromEntries(all.body.cards.map((c: { id: string; prossimoRipasso: string | null }) => [c.id, c.prossimoRipasso]));
+      expect(dates).toEqual({ [reviewable.id]: '2026-10-15', [archived.id]: null, [toReview.id]: null });
+      expect((await request(app).get(`/api/lingo/cards/${archived.id}`).set(a)).body.prossimoRipasso).toBeNull();
+      // The state filter still works alongside.
+      expect((await list(a, { dovuteOggi: 'true', stato: 'ARCHIVIATA' })).body.cards).toEqual([]);
+      expect((await list(a, { dovuteOggi: 'true', stato: 'PROPOSTA_COMMUNITY' })).body.cards).toHaveLength(1);
+    });
   });
 
   describe('who may reach them', () => {
