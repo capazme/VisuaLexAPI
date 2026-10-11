@@ -7,6 +7,8 @@ import { decisionProjection } from '../../../utils/decisionRender';
 import { DECISION_TEXTS } from '../../../utils/__fixtures__/decisionTexts';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionView } from './DecisionView';
+import { findRootsFor } from '../../../utils/findTargets';
+import { findTargetsInScope } from '../../../utils/findScope';
 
 const IDENTITY: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
 const TESTO: DecisionText = {
@@ -261,5 +263,26 @@ describe('DecisionView — what has no text or no identity', () => {
     view({ esito: 'ambigua', candidati: [{ identita: IDENTITY, attributi: {} }] });
     expect(screen.queryByRole('button', { name: /note|evidenziazioni/i })).toBeNull();
     expect(loadHighlights).not.toHaveBeenCalled();
+  });
+});
+
+describe('DecisionReadingSurface — the find window\'s text root', () => {
+  it('registers its text root under the key the scope computes for the decision tab', () => {
+    const tabId = appStore.getState().openDecisionTab(IDENTITY);
+    const { container, unmount } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} hostTabId={tabId} />);
+
+    const roots = findRootsFor(tabId);
+    const [target] = findTargetsInScope(appStore.getState(), 'all', null);
+    expect(roots).toHaveLength(1);
+    expect(roots[0].targetKey).toBe(target.targetKey);
+    expect(roots[0].element).toBe(container.querySelector('.vlx-art.vlx-decision'));
+    unmount();
+    expect(findRootsFor(tabId)).toHaveLength(0);
+  });
+
+  it('registers nothing without a host tab', () => {
+    const { unmount } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
+    expect(findRootsFor()).toHaveLength(0);
+    unmount();
   });
 });

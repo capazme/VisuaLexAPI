@@ -74,6 +74,27 @@ describe('findTargetsInScope', () => {
     expect(targets.map((t) => t.tabId)).toEqual(['b', 'a']);
   });
 
+  it('counts the same article once in a tab that holds it twice (a block and a collection)', () => {
+    const t = tab({ id: 'a', content: [normaBlock('b', [article('1'), article('2')]), collection('c', [article('1')])] });
+    const targets = findTargetsInScope({ workspaceTabs: [t] }, 'all', null);
+    expect(targets.map((x) => x.label)).toEqual(['art. 1 c.c.', 'art. 2 c.c.']);
+  });
+
+  it('keeps the same article in two tabs as two targets', () => {
+    const a = tab({ id: 'a', content: [normaBlock('b', [article('1')])] });
+    const b = tab({ id: 'b', content: [normaBlock('c', [article('1')])] });
+    expect(findTargetsInScope({ workspaceTabs: [a, b] }, 'all', null)).toHaveLength(2);
+  });
+
+  it('gives no stored text for an article whose text is not shown (not yet in force)', () => {
+    const notYet = article('1');
+    notYet.validity = { state: 'not_yet', valid_from: null, valid_to: null, version_number: null, act_updated: null, request_in_window: true };
+    const t = tab({ id: 'a', content: [normaBlock('b', [notYet, article('2')])] });
+    const targets = findTargetsInScope({ workspaceTabs: [t] }, 'all', null);
+    expect(targets[0].storedText).toBeUndefined();
+    expect(targets[1].storedText).toBe('testo art. 2');
+  });
+
   it('returns nothing for «Questa scheda» when there is no front tab', () => {
     const state: FindScopeState = { workspaceTabs: [tab({ id: 'a' })] };
     expect(findTargetsInScope(state, 'tab', null)).toEqual([]);
@@ -135,5 +156,20 @@ describe('frontTabId', () => {
 
   it('is null with no open tab', () => {
     expect(frontTabId({ workspaceTabs: [] }, true)).toBeNull();
+    expect(frontTabId({ workspaceTabs: [], mobileActiveTabId: 'gone' }, false)).toBeNull();
+  });
+
+  it('is the tab the carousel shows on a phone, whatever its zIndex or flags', () => {
+    const state: FindScopeState = {
+      workspaceTabs: [tab({ id: 'first', zIndex: 1 }), tab({ id: 'shown', zIndex: 2, isMinimized: true }), tab({ id: 'top', zIndex: 30 })],
+      mobileActiveTabId: 'shown',
+    };
+    expect(frontTabId(state, false)).toBe('shown');
+  });
+
+  it('is the first tab on a phone when the carousel names none that is open, as the carousel reads it', () => {
+    const tabs = [tab({ id: 'first', zIndex: 1 }), tab({ id: 'top', zIndex: 30 })];
+    expect(frontTabId({ workspaceTabs: tabs }, false)).toBe('first');
+    expect(frontTabId({ workspaceTabs: tabs, mobileActiveTabId: 'closed' }, false)).toBe('first');
   });
 });

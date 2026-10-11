@@ -85,11 +85,24 @@ export function findMatches(
   { limit = 1000 }: { limit?: number } = {},
 ): FindResult {
   if (!isSearchableQuery(query)) return { matches: [], truncated: false };
+  return findMatchesInFolded(foldForSearch(text), query, { limit });
+}
+
+/**
+ * `findMatches` over a text already folded with `foldForSearch` (same length, so the offsets are
+ * the original text's): a caller searching the same stored text for every keystroke folds it once
+ * (`useFindWindow`).
+ */
+export function findMatchesInFolded(
+  haystack: string,
+  query: string,
+  { limit = 1000 }: { limit?: number } = {},
+): FindResult {
+  if (!isSearchableQuery(query)) return { matches: [], truncated: false };
   const folded = foldQuery(query).trim();
 
   const pattern = folded.split(/\s+/).map(wordPattern).join('\\s+');
   const re = new RegExp(pattern, 'gu');
-  const haystack = foldForSearch(text);
 
   const matches: [number, number][] = [];
   let truncated = false;

@@ -12,6 +12,8 @@ import { findRootsFor, subscribeFindRoots, type FindRoot } from '../utils/findTa
 import {
   collectSearchableText,
   findMatches,
+  findMatchesInFolded,
+  foldForSearch,
   isSearchableQuery,
   mapThroughEdit,
   rangesForMatches,
@@ -20,9 +22,9 @@ import {
 import { clearFindRanges, setFindRanges } from '../utils/findHighlights';
 
 const DEBOUNCE_MS = 150;
-/** How long a "go to an undrawn match" request waits for the root to register before giving up
- *  (Task 33 ruling 3) — long enough for a block to mount and fetch, short enough that the window
- *  never looks stuck. */
+/** How long a «go to» an undrawn match waits for the root to register before the target is given
+ *  up for the query (Task 33 ruling 3) — long enough for a block to mount and fetch, short enough
+ *  that the window never looks stuck. */
 const PENDING_TIMEOUT_MS = 3000;
 const MATCH_LIMIT = 1000;
 
@@ -57,37 +59,42 @@ export interface UseFindWindow {
   previous: () => void;
 }
 
+type Direction = 1 | -1;
+
 /** One target's matches this run, over whichever text was actually searched. */
 interface TargetMatches extends FindTarget {
+  id: string;
   onScreen: boolean;
   text: string;
   nodes?: TextSegment[];
-  element?: HTMLElement;
   matches: [number, number][];
 }
 
 /** One match, flattened across every target in scope order. */
 interface FlatMatch {
+  /** The target's full identity (`targetId`). */
+  id: string;
   tabId: string;
   targetKey: string;
   label: string;
   articleId?: string;
   onScreen: boolean;
-  /** Its position among its own target's matches alone — the ordinal Task 33 ruling 3 resolves a
-   *  pending jump by, since the drawn and the stored count of the same text can differ. */
+  /** Its position among its own target's matches alone — the ordinal a pending «go to» resolves
+   *  by, since the drawn and the stored count of the same text can differ (ruling 3). */
   ordinal: number;
   /** Offset in the text that was actually searched for this target this run. */
   start: number;
   range?: Range;
 }
 
+/** A «go to» an undrawn match, waiting for its root (ruling 3). */
 interface Pending {
-  tabId: string;
-  targetKey: string;
+  id: string;
   ordinal: number;
+  direction: Direction;
 }
 
-type CurrentRef = { tabId: string; targetKey: string; start: number } | null;
+type CurrentRef = { id: string; start: number } | null;
 
 const targetId = (tabId: string, targetKey: string): string => `${tabId}\u0000${targetKey}`;
 
@@ -118,53 +125,74 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
  * The matches across every text the current scope reaches (spec §13.1, Task 33): a target with a
  * displayed registered root (`findRootsFor`) is searched in its text root, as PR 4c's
  * `useFindInText` does for one root; a target without one is searched in its stored projection and
- * only counted (ruling 2 — never both for the same target). `next`/`previous` step across every
- * match in scope order, wrapping; landing on a match that is not drawn raises its tab
- * (`bringTabToFront`) and shows its article (`focusArticleInTab`), then takes the match there by
- * its ordinal once a root registers for it (ruling 3) — dropped after three seconds with no root.
- * Recomputed on typing (debounced), on a displayed root's own mutations, on a root registering or
- * being removed anywhere, and on a workspace change; the current match is kept by target and
- * position, the way PR 4c's hook keeps it within one root (`mapThroughEdit`). Draws under one
- * registry owner for the whole window — nothing here adds, moves or changes the text DOM.
+ * only counted (ruling 2 — never both for the same target).
+ *
+ * Where the current match is:
+ * - typing (a new query) takes the front tab's first match, a drawn one first; with none in the
+ *   front tab, the first match overall — counted, never shown: typing raises no tab and switches no
+ *   article, it only scrolls to a drawn match in the front tab;
+ * - a recompute keeps the same match (same target, its position carried through the edit by
+ *   `mapThroughEdit`), else the next one in scope order — never back to the first;
+ * - only `next`/`previous` (Enter, Shift+Enter, the arrows) go to an undrawn match: its tab is
+ *   revealed (`revealTab`) and its article shown (`focusArticleInTab`), and once a root registers for
+ *   it the match at the same ordinal there becomes current (the last drawn one when fewer are drawn;
+ *   with none drawn, the next match in the direction of travel). With no root after three seconds
+ *   the target is given up for this query: navigation skips it, and the window moves once to the
+ *   next match in the direction of travel.
+ *
+ * Recomputed on typing (debounced), and — coalesced to one per animation frame — on a displayed
+ * root's own mutations, on a root registering or being removed anywhere, and on any workspace
+ * change. A stored text is folded once per text. Draws under one registry owner for the whole
+ * window; nothing here adds, moves or changes the text DOM.
  */
 export function useFindWindow({ query, scope, open }: UseFindWindowOptions): UseFindWindow {
   const ownerId = `find-window-${useId()}`;
   const workspaceTabs = useAppStore(useShallow((s) => s.workspaceTabs));
-  const bringTabToFront = useAppStore((s) => s.bringTabToFront);
+  const mobileActiveTabId = useAppStore((s) => s.mobileActiveTabId);
+  const revealTab = useAppStore((s) => s.revealTab);
   const focusArticleInTab = useAppStore((s) => s.focusArticleInTab);
   const isDesktop = useIsDesktop();
 
   const [state, setState] = useState(EMPTY);
   const stateRef = useRef(EMPTY);
-  const setLatest = useCallback((next: typeof EMPTY) => {
+  const setLatest = useCallback((next: FindWindowState) => {
     stateRef.current = next;
     setState(next);
   }, []);
 
   const allRef = useRef<FlatMatch[]>([]);
+  /** The targets of the last run, in scope order (their `targetId`s). */
+  const orderRef = useRef<string[]>([]);
   const indexRef = useRef(-1);
   const currentRef = useRef<CurrentRef>(null);
   const textByTargetRef = useRef<Map<string, string>>(new Map());
+  /** Each stored text folded once: by target, valid while the target's stored text is the same. */
+  const foldedRef = useRef<Map<string, { text: string; folded: string }>>(new Map());
   const pendingRef = useRef<Pending | null>(null);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Targets given up for the applied query: a «go to» found no root in time (ruling 3). */
+  const unreachableRef = useRef<Set<string>>(new Set());
 
   const appliedRef = useRef('');
   const queryRef = useRef(query);
   const scopeRef = useRef(scope);
   const workspaceTabsRef = useRef(workspaceTabs);
+  const mobileActiveTabIdRef = useRef(mobileActiveTabId);
   const isDesktopRef = useRef(isDesktop);
-  const bringTabToFrontRef = useRef(bringTabToFront);
+  const revealTabRef = useRef(revealTab);
   const focusArticleInTabRef = useRef(focusArticleInTab);
   useEffect(() => {
     queryRef.current = query;
     scopeRef.current = scope;
     workspaceTabsRef.current = workspaceTabs;
+    mobileActiveTabIdRef.current = mobileActiveTabId;
     isDesktopRef.current = isDesktop;
-    bringTabToFrontRef.current = bringTabToFront;
+    revealTabRef.current = revealTab;
     focusArticleInTabRef.current = focusArticleInTab;
   });
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   const clearPending = useCallback(() => {
     if (pendingTimerRef.current !== null) clearTimeout(pendingTimerRef.current);
@@ -172,35 +200,46 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
     pendingRef.current = null;
   }, []);
 
-  // `applyCurrent`'s pending timeout calls back into `run`, declared below it: a ref sidesteps the
-  // circularity (both close over it; only its latest value, read when the timer fires, matters).
-  const runRef = useRef<(q: string, keep: boolean) => void>(() => {});
-
-  /** Builds this run's matches for every target, DOM-first, stored otherwise; `limit` is the
-   *  1000-match budget shared across the whole scope. */
-  const buildTargets = useCallback((targets: FindTarget[], q: string): { targets: TargetMatches[]; truncated: boolean } => {
-    const roots = findRootsFor();
-    let budget = MATCH_LIMIT;
-    let truncated = false;
-    const built: TargetMatches[] = [];
-    for (const target of targets) {
-      const root = rootFor(roots, target.tabId, target.targetKey);
-      if (root) {
-        const collected = collectSearchableText(root.element);
-        const { matches, truncated: tr } = findMatches(collected.text, q, { limit: Math.max(0, budget) });
-        if (tr) truncated = true;
-        budget -= matches.length;
-        built.push({ ...target, onScreen: true, text: collected.text, nodes: collected.nodes, element: root.element, matches });
-      } else {
-        const text = target.storedText ?? '';
-        const { matches, truncated: tr } = findMatches(text, q, { limit: Math.max(0, budget) });
-        if (tr) truncated = true;
-        budget -= matches.length;
-        built.push({ ...target, onScreen: false, text, matches });
-      }
+  /** A stored text's matches, folding it only when it is not the text folded last time. */
+  const matchStored = useCallback((id: string, text: string, q: string, limit: number) => {
+    let entry = foldedRef.current.get(id);
+    if (!entry || entry.text !== text) {
+      entry = { text, folded: foldForSearch(text) };
+      foldedRef.current.set(id, entry);
     }
-    return { targets: built, truncated };
+    return findMatchesInFolded(entry.folded, q, { limit });
   }, []);
+
+  /** Builds this run's matches for every target, DOM-first, stored otherwise, under the
+   *  1000-match budget shared across the whole scope. */
+  const buildTargets = useCallback(
+    (targets: FindTarget[], q: string): { targets: TargetMatches[]; truncated: boolean } => {
+      const roots = findRootsFor();
+      let budget = MATCH_LIMIT;
+      let truncated = false;
+      const built: TargetMatches[] = [];
+      for (const target of targets) {
+        const id = targetId(target.tabId, target.targetKey);
+        const root = rootFor(roots, target.tabId, target.targetKey);
+        const limit = Math.max(0, budget);
+        if (root) {
+          const collected = collectSearchableText(root.element);
+          const { matches, truncated: tr } = findMatches(collected.text, q, { limit });
+          if (tr) truncated = true;
+          budget -= matches.length;
+          built.push({ ...target, id, onScreen: true, text: collected.text, nodes: collected.nodes, matches });
+        } else {
+          const text = target.storedText ?? '';
+          const { matches, truncated: tr } = matchStored(id, text, q, limit);
+          if (tr) truncated = true;
+          budget -= matches.length;
+          built.push({ ...target, id, onScreen: false, text, matches });
+        }
+      }
+      return { targets: built, truncated };
+    },
+    [matchStored],
+  );
 
   function flatten(built: TargetMatches[]): FlatMatch[] {
     const all: FlatMatch[] = [];
@@ -208,6 +247,7 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
       const ranges = target.onScreen && target.nodes ? rangesForMatches(target.nodes, target.matches) : undefined;
       target.matches.forEach(([start], ordinal) => {
         all.push({
+          id: target.id,
           tabId: target.tabId,
           targetKey: target.targetKey,
           label: target.label,
@@ -222,142 +262,228 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
     return all;
   }
 
+  const reachable = useCallback((m: FlatMatch) => !unreachableRef.current.has(m.id), []);
+
+  /** The match `delta` steps from `from`, wrapping and skipping given-up targets; -1 when none. */
+  const stepFrom = useCallback(
+    (all: FlatMatch[], from: number, delta: Direction): number => {
+      const n = all.length;
+      const origin = from >= 0 ? from : delta > 0 ? -1 : 0;
+      for (let k = 1; k <= n; k += 1) {
+        const i = (((origin + delta * k) % n) + n) % n;
+        if (reachable(all[i])) return i;
+      }
+      return -1;
+    },
+    [reachable],
+  );
+
+  /** The first match of the target nearest to `fromId` in `order`, going `direction` and wrapping —
+   *  the last of that target going back; -1 when no other target has a reachable match. */
+  const neighbourOf = useCallback(
+    (all: FlatMatch[], order: string[], fromId: string, direction: Direction): number => {
+      const position = order.indexOf(fromId);
+      if (position < 0) return -1;
+      const n = order.length;
+      for (let k = 1; k < n; k += 1) {
+        const id = order[(((position + direction * k) % n) + n) % n];
+        if (unreachableRef.current.has(id)) continue;
+        const first = all.findIndex((m) => m.id === id);
+        if (first < 0) continue;
+        if (direction > 0) return first;
+        let last = first;
+        while (last + 1 < all.length && all[last + 1].id === id) last += 1;
+        return last;
+      }
+      return -1;
+    },
+    [],
+  );
+
+  /** Typing's choice: the front tab's first match, a drawn one first; else the first overall. */
+  const pickInitial = useCallback(
+    (all: FlatMatch[], front: string | null): number => {
+      let i = all.findIndex((m) => reachable(m) && m.tabId === front && m.onScreen);
+      if (i < 0) i = all.findIndex((m) => reachable(m) && m.tabId === front);
+      if (i < 0) i = all.findIndex(reachable);
+      return i;
+    },
+    [reachable],
+  );
+
   const scrollToRange = useCallback((range: Range | undefined) => {
     range?.startContainer.parentElement?.scrollIntoView?.({ block: 'center', inline: 'nearest' });
   }, []);
 
-  /** Draws every on-screen match under one owner, `current` the stronger colour (or none, when
-   *  the current match is not drawn — it is still counted, just not painted). */
-  const draw = useCallback(
-    (all: FlatMatch[], currentIndex: number) => {
-      const ranges = all.filter((m) => m.range).map((m) => m.range as Range);
-      const current = currentIndex >= 0 ? all[currentIndex] : undefined;
-      setFindRanges(ownerId, ranges, current?.range ?? null);
-    },
-    [ownerId],
-  );
-
-  /** Applies `newIndex` as the current match: identifies it for the next recompute to keep
-   *  (`currentRef`), starts or clears the pending jump, and draws; returns it for the caller to
-   *  commit to state (its `onScreen` can flip between two runs with the very same index — a root
-   *  registering for a pending target — so the caller must not skip the update on index alone).
-   *  `scroll` is true only when the reader actually moved (a step, or a pending jump that just
-   *  resolved) — a passive recompute that keeps the same logical match never yanks the view. */
+  /** Makes `newIndex` current and draws every on-screen match, the current one the stronger colour
+   *  (none, when the current match is not drawn — it is still counted). Raises nothing. */
   const applyCurrent = useCallback(
     (all: FlatMatch[], newIndex: number, scroll: boolean): FindWindowLocation | null => {
       indexRef.current = newIndex;
       const match = newIndex >= 0 ? all[newIndex] : undefined;
-      currentRef.current = match ? { tabId: match.tabId, targetKey: match.targetKey, start: match.start } : null;
-      if (!match) {
-        clearPending();
-        draw(all, -1);
-        return null;
-      }
-      const location: FindWindowLocation = { tabId: match.tabId, targetKey: match.targetKey, label: match.label, onScreen: match.onScreen };
-      if (match.onScreen) {
-        clearPending();
-        draw(all, newIndex);
-        if (scroll) scrollToRange(match.range);
-        return location;
-      }
-      // Not drawn: show it, and wait for its root to register (ruling 3). A repeat recompute
-      // landing on the very same target does not raise it again.
-      const already = pendingRef.current;
-      if (!already || already.tabId !== match.tabId || already.targetKey !== match.targetKey) {
-        clearPending();
-        pendingRef.current = { tabId: match.tabId, targetKey: match.targetKey, ordinal: match.ordinal };
-        bringTabToFrontRef.current(match.tabId);
-        if (match.articleId) focusArticleInTabRef.current(match.tabId, match.articleId);
-        pendingTimerRef.current = setTimeout(() => {
-          // No root came: move on as if the target had no matches, rather than stay stuck on a
-          // match that can never be shown.
-          pendingTimerRef.current = null;
-          pendingRef.current = null;
-          currentRef.current = null;
-          runRef.current(appliedRef.current, false);
-        }, PENDING_TIMEOUT_MS);
-      }
-      draw(all, -1);
-      return location;
+      currentRef.current = match ? { id: match.id, start: match.start } : null;
+      const ranges = all.filter((m) => m.range).map((m) => m.range as Range);
+      setFindRanges(ownerId, ranges, match?.range ?? null);
+      if (!match) return null;
+      if (scroll && match.onScreen) scrollToRange(match.range);
+      return { tabId: match.tabId, targetKey: match.targetKey, label: match.label, onScreen: match.onScreen };
     },
-    [clearPending, draw, scrollToRange],
+    [ownerId, scrollToRange],
   );
 
+  const commitState = useCallback(
+    (current: FindWindowLocation | null, patch?: Partial<FindWindowState>) => {
+      const next = { ...stateRef.current, ...patch, index: indexRef.current, current };
+      if (!sameState(stateRef.current, next)) setLatest(next);
+    },
+    [setLatest],
+  );
+
+  // The pending timeout and `goTo` call each other through the run below: a ref to the latest
+  // `goTo` sidesteps the circularity (only its value when the timer fires matters).
+  const goToRef = useRef<(all: FlatMatch[], index: number, direction: Direction) => FindWindowLocation | null>(() => null);
+
+  /** A pending «go to» found no root in time: give the target up for this query and move once to
+   *  the next match in the direction of travel (which may itself be a «go to»; each target is given
+   *  up at most once, so this never loops). */
+  const onPendingTimeout = useCallback(() => {
+    pendingTimerRef.current = null;
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (!pending) return;
+    unreachableRef.current.add(pending.id);
+    const all = allRef.current;
+    const of = all.filter((m) => m.id === pending.id);
+    const from = of.length ? all.indexOf(of[Math.min(pending.ordinal, of.length - 1)]) : indexRef.current;
+    const next = stepFrom(all, from, pending.direction);
+    if (next < 0 || next === from) return;
+    commitState(goToRef.current(all, next, pending.direction));
+  }, [commitState, stepFrom]);
+
+  /** An explicit move to `index`: drawn, it is shown; not drawn, its tab is revealed and its article
+   *  shown, and the match waits for its root (ruling 3). */
+  const goTo = useCallback(
+    (all: FlatMatch[], index: number, direction: Direction): FindWindowLocation | null => {
+      clearPending();
+      const location = applyCurrent(all, index, true);
+      const match = index >= 0 ? all[index] : undefined;
+      if (!match || match.onScreen) return location;
+      pendingRef.current = { id: match.id, ordinal: match.ordinal, direction };
+      revealTabRef.current(match.tabId);
+      if (match.articleId) focusArticleInTabRef.current(match.tabId, match.articleId);
+      pendingTimerRef.current = setTimeout(onPendingTimeout, PENDING_TIMEOUT_MS);
+      return location;
+    },
+    [applyCurrent, clearPending, onPendingTimeout],
+  );
+  useEffect(() => {
+    goToRef.current = goTo;
+  });
+
   /**
-   * Recomputes every target's matches and decides the new current index.
-   * - A pending jump (ruling 3) resolves first: once its target has a displayed root, the match at
-   *   its ordinal within that target's own list becomes current, wherever it now sits overall.
-   * - Otherwise, `keep` tries to keep the same logical match: the same target, carried through
-   *   whatever changed in its own text (`mapThroughEdit`, as PR 4c's hook does within one root).
-   * - A fresh query (`keep` false) always lands on the first match.
+   * Recomputes every target's matches and decides the current one: `fresh` for a new query (typing's
+   * choice, nothing given up any more), otherwise a recompute that keeps the current match — after
+   * resolving a pending «go to» whose root is now on screen.
    */
   const run = useCallback(
-    (q: string, keep: boolean) => {
+    (q: string, fresh: boolean) => {
       appliedRef.current = q;
-      const front = computeFrontTabId({ workspaceTabs: workspaceTabsRef.current }, isDesktopRef.current);
-      const targets = findTargetsInScope({ workspaceTabs: workspaceTabsRef.current }, scopeRef.current, front);
+      if (fresh) {
+        clearPending();
+        unreachableRef.current = new Set();
+      }
+      const scopeState = { workspaceTabs: workspaceTabsRef.current, mobileActiveTabId: mobileActiveTabIdRef.current };
+      const front = computeFrontTabId(scopeState, isDesktopRef.current);
+      const targets = findTargetsInScope(scopeState, scopeRef.current, front);
       const { targets: built, truncated } = buildTargets(targets, q);
       const all = flatten(built);
+      const order = built.map((t) => t.id);
+      const previousOrder = orderRef.current;
       allRef.current = all;
+      orderRef.current = order;
 
       const textByTarget = new Map<string, string>();
-      for (const t of built) textByTarget.set(targetId(t.tabId, t.targetKey), t.text);
+      for (const t of built) textByTarget.set(t.id, t.text);
       const previousText = textByTargetRef.current;
       textByTargetRef.current = textByTarget;
+      // Folded texts of targets no longer in scope are dropped.
+      for (const id of foldedRef.current.keys()) if (!textByTarget.has(id)) foldedRef.current.delete(id);
 
+      const patch = { count: all.length, truncated, searched: isSearchableQuery(q) };
       let newIndex = -1;
+      let decided = false;
       let scroll = false;
 
       const pending = pendingRef.current;
       if (pending) {
-        const resolved = all.findIndex((m) => m.onScreen && m.tabId === pending.tabId && m.targetKey === pending.targetKey);
-        if (resolved >= 0) {
-          // Several matches may have arrived in the newly-drawn text: take the one at the same
-          // ordinal among them, clamped (the drawn and the stored count can differ, spec §13.1).
-          const ofTarget = all.filter((m) => m.onScreen && m.tabId === pending.tabId && m.targetKey === pending.targetKey);
-          const chosen = ofTarget[Math.min(pending.ordinal, ofTarget.length - 1)];
-          newIndex = all.indexOf(chosen);
-          scroll = true;
-        }
-      }
-
-      if (newIndex < 0) {
-        if (!keep) {
-          newIndex = all.length ? 0 : -1;
-        } else if (currentRef.current) {
-          const cur = currentRef.current;
-          const sameTarget = all.filter((m) => m.tabId === cur.tabId && m.targetKey === cur.targetKey);
-          if (sameTarget.length) {
-            const oldText = previousText.get(targetId(cur.tabId, cur.targetKey)) ?? '';
-            const newText = textByTarget.get(targetId(cur.tabId, cur.targetKey)) ?? '';
-            const mapped = mapThroughEdit(oldText, newText, cur.start);
-            const after = sameTarget.find((m) => m.start >= mapped);
-            const chosen = after ?? sameTarget[0];
-            newIndex = all.indexOf(chosen);
+        const target = built.find((t) => t.id === pending.id);
+        const of = all.filter((m) => m.id === pending.id);
+        if (!target) {
+          clearPending();
+        } else if (target.onScreen) {
+          clearPending();
+          if (of.length) {
+            // The same ordinal in the drawn text, or its last match when fewer are drawn.
+            newIndex = all.indexOf(of[Math.min(pending.ordinal, of.length - 1)]);
+            scroll = true;
+            decided = true;
           } else {
-            newIndex = all.length ? 0 : -1;
+            // Drawn, and nothing matches there after all: go on in the direction of travel.
+            const next = neighbourOf(all, order, pending.id, pending.direction);
+            commitState(goTo(all, next, pending.direction), patch);
+            return;
           }
-        } else {
-          newIndex = all.length ? 0 : -1;
+        } else if (of.length) {
+          // Still waiting: the current match stays on the stored one.
+          newIndex = all.indexOf(of[Math.min(pending.ordinal, of.length - 1)]);
+          decided = true;
         }
       }
 
-      const current = applyCurrent(all, newIndex, scroll);
-      const next = { count: all.length, index: indexRef.current, truncated, searched: isSearchableQuery(q), current };
-      if (!sameState(stateRef.current, next)) setLatest(next);
+      if (!decided) {
+        const cur = currentRef.current;
+        if (fresh || !cur) {
+          newIndex = pickInitial(all, front);
+          const chosen = newIndex >= 0 ? all[newIndex] : undefined;
+          scroll = fresh && !!chosen && chosen.onScreen && chosen.tabId === front;
+        } else {
+          const sameTarget = all.filter((m) => m.id === cur.id);
+          let kept: FlatMatch | undefined;
+          if (sameTarget.length) {
+            const mapped = mapThroughEdit(previousText.get(cur.id) ?? '', textByTarget.get(cur.id) ?? '', cur.start);
+            kept = sameTarget.find((m) => m.start >= mapped);
+          }
+          if (kept) {
+            newIndex = all.indexOf(kept);
+          } else {
+            // The match is gone: the next one in scope order, never back to the first.
+            const known = previousOrder.includes(cur.id) ? previousOrder : order;
+            const following = neighbourOf(all, known, cur.id, 1);
+            newIndex = following >= 0 ? following : sameTarget.length ? all.indexOf(sameTarget[0]) : pickInitial(all, front);
+          }
+        }
+      }
+
+      commitState(applyCurrent(all, newIndex, scroll), patch);
     },
-    [applyCurrent, buildTargets, setLatest],
+    [applyCurrent, buildTargets, clearPending, commitState, goTo, neighbourOf, pickInitial],
   );
-  useEffect(() => {
-    runRef.current = run;
-  });
+
+  /** One recompute at the next frame however many changes arrive before it. */
+  const schedule = useCallback(() => {
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      if (isSearchableQuery(appliedRef.current)) run(appliedRef.current, false);
+    });
+  }, [run]);
 
   /** Applies a query still waiting; true when there was one (next/previous land on its first match). */
   const flush = useCallback((): boolean => {
     if (timerRef.current === null) return false;
     clearTimeout(timerRef.current);
     timerRef.current = null;
-    run(queryRef.current, false);
+    run(queryRef.current, true);
     return true;
   }, [run]);
 
@@ -366,7 +492,7 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
     if (!open || query === appliedRef.current) return;
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      run(query, false);
+      run(query, true);
     }, DEBOUNCE_MS);
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -374,35 +500,17 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
     };
   }, [open, query, run]);
 
-  // The scope switches, or the workspace changes (a tab opened, closed, raised, minimised; an
-  // article shown in a block): recompute, keeping the current match where it still is.
+  // The scope switches, or the workspace changes (a tab opened, closed, raised, minimised, swiped to
+  // on a phone; an article shown in a block): recompute, keeping the current match where it is.
   useEffect(() => {
-    if (!open) return;
-    if (isSearchableQuery(appliedRef.current)) run(appliedRef.current, true);
-  }, [open, scope, workspaceTabs, isDesktop, run]);
+    if (open) schedule();
+  }, [open, scope, workspaceTabs, mobileActiveTabId, isDesktop, schedule]);
 
-  // A root registers or is removed anywhere (a pending jump's article mounts, a tab's copy swaps
-  // at a breakpoint): recompute.
-  useEffect(() => {
-    if (!open) return;
-    return subscribeFindRoots(() => {
-      if (isSearchableQuery(appliedRef.current)) run(appliedRef.current, true);
-    });
-  }, [open, run]);
-
-  // Every displayed root's own mutations (a note added, highlights toggled): recompute, coalesced
-  // to a frame, the way PR 4c's hook does for its one root.
+  // A root registers or is removed anywhere (a pending «go to»'s article mounts, a tab's copy swaps
+  // at a breakpoint), or a displayed root's own text changes (a note added, highlights toggled).
   useEffect(() => {
     if (!open) return;
     const observers = new Map<HTMLElement, MutationObserver>();
-    let frame: number | null = null;
-    const schedule = () => {
-      if (frame !== null) return;
-      frame = requestAnimationFrame(() => {
-        frame = null;
-        if (isSearchableQuery(appliedRef.current)) run(appliedRef.current, true);
-      });
-    };
     const sync = () => {
       const elements = new Set(findRootsFor().map((r) => r.element));
       for (const [el, observer] of observers) {
@@ -425,41 +533,45 @@ export function useFindWindow({ query, scope, open }: UseFindWindowOptions): Use
       }
     };
     sync();
-    const unsubscribe = subscribeFindRoots(sync);
+    const unsubscribe = subscribeFindRoots(() => {
+      sync();
+      schedule();
+    });
     return () => {
       unsubscribe();
       for (const observer of observers.values()) observer.disconnect();
-      if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [open, run]);
+  }, [open, schedule]);
 
-  // Closed or unmounted: nothing stays drawn or pending.
+  // Closed or unmounted: nothing stays drawn, pending or scheduled.
   useEffect(() => {
     if (!open) return;
     return () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
       clearFindRanges(ownerId);
       clearPending();
       allRef.current = [];
+      orderRef.current = [];
       indexRef.current = -1;
       currentRef.current = null;
       textByTargetRef.current = new Map();
+      foldedRef.current = new Map();
+      unreachableRef.current = new Set();
       appliedRef.current = '';
       setLatest(EMPTY);
     };
   }, [open, ownerId, clearPending, setLatest]);
 
   const step = useCallback(
-    (delta: 1 | -1) => {
+    (delta: Direction) => {
       if (flush()) return;
       const all = allRef.current;
-      const n = all.length;
-      if (n === 0) return;
-      const newIndex = (indexRef.current + delta + n) % n;
-      const current = applyCurrent(all, newIndex, true);
-      const next = { ...stateRef.current, index: indexRef.current, current };
-      if (!sameState(stateRef.current, next)) setLatest(next);
+      const newIndex = stepFrom(all, indexRef.current, delta);
+      if (newIndex < 0) return;
+      commitState(goTo(all, newIndex, delta));
     },
-    [applyCurrent, flush, setLatest],
+    [commitState, flush, goTo, stepFrom],
   );
 
   const next = useCallback(() => step(1), [step]);

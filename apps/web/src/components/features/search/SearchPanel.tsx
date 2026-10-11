@@ -67,6 +67,7 @@ export function SearchPanel() {
     quickNorms, selectQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
     pendingDecision, drainPendingDecision,
+    mobileActiveTabId, setMobileActiveTabId,
     quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
   } = useAppStore(useShallow(s => ({
     addWorkspaceTab: s.addWorkspaceTab,
@@ -88,6 +89,8 @@ export function SearchPanel() {
     closeCommandPalette: s.closeCommandPalette,
     pendingDecision: s.pendingDecision,
     drainPendingDecision: s.drainPendingDecision,
+    mobileActiveTabId: s.mobileActiveTabId,
+    setMobileActiveTabId: s.setMobileActiveTabId,
     quickNormsManagerOpen: s.quickNormsManagerOpen,
     openQuickNormsManager: s.openQuickNormsManager,
     closeQuickNormsManager: s.closeQuickNormsManager,
@@ -116,21 +119,20 @@ export function SearchPanel() {
   // Abort in-flight streaming fetch when a new search starts or component unmounts
   const streamAbortRef = useRef<AbortController | null>(null);
 
-  // Mobile: active tab index for swipe navigation
-  const [mobileActiveTabIndex, setMobileActiveTabIndex] = useState(0);
-
-  // Keep mobile tab index in bounds when tabs change
-  useEffect(() => {
-    if (mobileActiveTabIndex >= workspaceTabs.length && workspaceTabs.length > 0) {
-      setMobileActiveTabIndex(workspaceTabs.length - 1);
-    }
-  }, [workspaceTabs.length, mobileActiveTabIndex]);
+  // Mobile: the tab on screen, kept in the store (the find window's «Questa scheda» reads it, and its
+  // «go to» sets it through `revealTab`). An id no longer open reads as the first tab; `removeTab`
+  // moves it to the neighbour when the tab on screen is the one closed.
+  const mobileActiveTabIndex = Math.max(0, workspaceTabs.findIndex((t) => t.id === mobileActiveTabId));
+  const setMobileActiveTabIndex = (index: number) => {
+    const tab = workspaceTabs[index];
+    if (tab) setMobileActiveTabId(tab.id);
+  };
 
   // Mobile shows one tab at a time. Opening a decision (a new frontmost tab with a `view`, or an
   // open one brought to the front again, which raises its zIndex) makes it the visible one. The
   // reader's own swipes, chevrons and dots never touch a zIndex, so a later render never undoes them.
-  // (gotcha 11: this syncs the local phone index with the store, an external change, and there is
-  // nothing to derive it from during render. The lint rule does not flag it, so there is no disable.)
+  // (gotcha 11: this follows an external change of the store, and there is nothing to derive the
+  // phone's tab from during render.)
   const frontTabRef = useRef<string | null>(null);
   const frontTabSeenRef = useRef(false);
   useEffect(() => {
@@ -140,11 +142,8 @@ export function SearchPanel() {
     frontTabRef.current = front ? `${front.id}:${front.zIndex}` : null;
     // the first run only records what is in front at mount
     if (!frontTabSeenRef.current) { frontTabSeenRef.current = true; return; }
-    if (front?.view && frontTabRef.current !== previous) {
-      const index = workspaceTabs.findIndex((t) => t.id === front.id);
-      if (index >= 0) setMobileActiveTabIndex(index);
-    }
-  }, [workspaceTabs]);
+    if (front?.view && frontTabRef.current !== previous) setMobileActiveTabId(front.id);
+  }, [workspaceTabs, setMobileActiveTabId]);
 
   // A decision asked for from outside the search space (the `/sentenze/…` address) is opened here, on
   // every change of the request: the address may queue it after this panel has mounted.
@@ -720,8 +719,7 @@ export function SearchPanel() {
           sit inside the very tab an entry points at. */}
       <ReadingBackControl
         onNavigated={(tabId) => {
-          const index = workspaceTabs.findIndex(t => t.id === tabId);
-          if (index >= 0) setMobileActiveTabIndex(index);
+          if (workspaceTabs.some(t => t.id === tabId)) setMobileActiveTabId(tabId);
         }}
       />
 
@@ -838,6 +836,7 @@ export function SearchPanel() {
                           articles={normaBlock.articles || []}
                           tabId={workspaceTabs[mobileActiveTabIndex].id}
                           normaBlockId={normaBlock.id}
+                          autoFocusArticleId={normaBlock.autoFocusArticleId}
                           onCloseArticle={(articleId) => {
                             removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
                           }}

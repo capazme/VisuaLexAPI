@@ -98,9 +98,11 @@ export function NormaBlockComponent({
   // DO jump focus because that's what the user just asked for.
   // Effect is required here because consumeAutoFocusArticle mutates external
   // store state, which cannot happen during render.
+  // On a phone this block is the hidden desktop copy: the signal is left for the phone's
+  // `NormaCard`, which shows the article there (the find window's «go to», spec §13.1).
   useEffect(() => {
     const target = normaBlock.autoFocusArticleId;
-    if (!target) return;
+    if (!target || !isDesktop) return;
 
     const exists = normaBlock.articles.some(a => getUniqueArticleId(a) === target);
     if (exists) {
@@ -108,7 +110,7 @@ export function NormaBlockComponent({
       focusArticle(target);
     }
     consumeAutoFocusArticle(tabId, normaBlock.id);
-  }, [normaBlock.autoFocusArticleId, normaBlock.articles, normaBlock.id, tabId, consumeAutoFocusArticle, focusArticle]);
+  }, [normaBlock.autoFocusArticleId, normaBlock.articles, normaBlock.id, tabId, consumeAutoFocusArticle, focusArticle, isDesktop]);
 
   // Active article: resolved tolerantly above, with fallback to first loaded.
   const activeArticle = resolvedActive ?? normaBlock.articles[0];

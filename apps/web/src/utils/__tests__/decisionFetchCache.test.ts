@@ -3,7 +3,7 @@ import type { FetchDecisionAnswer } from '../../types/decisions';
 
 vi.mock('../../services/decisionService', () => ({ fetchDecision: vi.fn() }));
 import { fetchDecision } from '../../services/decisionService';
-import { clearDecisionCache, fetchDecisionCached, forgetDecision, rememberDecision } from '../decisionFetchCache';
+import { clearDecisionCache, fetchDecisionCached, forgetDecision, peekDecision, rememberDecision } from '../decisionFetchCache';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 const mocked = vi.mocked(fetchDecision);
@@ -99,5 +99,35 @@ describe('rememberDecision', () => {
     mocked.mockResolvedValue(answer('trovata'));
     await fetchDecisionCached(REF);
     expect(mocked).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('peekDecision', () => {
+  it('reads nothing while the request is in flight, the answer once it settles, without asking again', async () => {
+    let resolve: (a: FetchDecisionAnswer) => void = () => {};
+    mocked.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const pending = fetchDecisionCached(REF);
+    expect(peekDecision(REF)).toBeUndefined();
+    const found = answer('trovata');
+    resolve(found);
+    await pending;
+    expect(peekDecision(REF)).toBe(found);
+    expect(mocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads nothing for an answer that is not kept, and nothing after forgetDecision', async () => {
+    mocked.mockResolvedValue(answer('fonte_non_raggiungibile'));
+    await fetchDecisionCached(REF);
+    expect(peekDecision(REF)).toBeUndefined();
+    mocked.mockResolvedValue(answer('trovata'));
+    await fetchDecisionCached(REF);
+    expect(peekDecision(REF)).toBeDefined();
+    forgetDecision(REF);
+    expect(peekDecision(REF)).toBeUndefined();
+  });
+
+  it('never starts a request of its own', () => {
+    expect(peekDecision(REF)).toBeUndefined();
+    expect(mocked).not.toHaveBeenCalled();
   });
 });

@@ -11,10 +11,10 @@
  * same target, takes precedence (`findRootsFor`, never both — Task 33 ruling 2).
  */
 import type { ArticleData } from '../types';
-import type { DecisionIdentity } from '../types/decisions';
+import type { DecisionIdentity, DecisionText } from '../types/decisions';
 import type { WorkspaceTab } from '../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from './normaKeys';
-import { versionKey } from './versionDisplay';
+import { describeVersion, versionKey } from './versionDisplay';
 import { shortNorm } from './sources';
 import { plainText } from './threadPassages';
 import { decisionKey, formatDecisionShort } from './decisionLinks';
@@ -39,16 +39,34 @@ export interface FindTarget {
 /** The store slice both functions here read — narrow, so each is tested without the whole store. */
 export interface FindScopeState {
   workspaceTabs: WorkspaceTab[];
+  /** The phone's tab on screen (`SearchPanel`'s carousel); absent or not open reads as the first. */
+  mobileActiveTabId?: string | null;
+}
+
+/** A decision's projection, once per text: the find window recomputes on every workspace change,
+ *  and a cached `DecisionText` object is the same object until the decision is fetched again. */
+const projections = new WeakMap<DecisionText, string>();
+
+function projectionOf(testo: DecisionText): string {
+  let projection = projections.get(testo);
+  if (projection === undefined) {
+    projection = decisionProjection(testo);
+    projections.set(testo, projection);
+  }
+  return projection;
 }
 
 function articleTargets(tabId: string, articles: ArticleData[]): FindTarget[] {
   return articles.map((article) => {
     const norma = article.norma_data;
+    // A text not shown (a version not yet in force, gotcha 32) is not searched either: the reader
+    // could never see what a match pointed at.
+    const textVisible = describeVersion(article.validity, norma).textVisible;
     return {
       tabId,
       targetKey: `${buildItemKey(norma)}|${versionKey(norma)}`,
       label: shortNorm(norma),
-      storedText: plainText(article.article_text || ''),
+      storedText: textVisible ? plainText(article.article_text || '') : undefined,
       articleId: uniqueArticleIdFromNorma(norma),
     };
   });
@@ -71,7 +89,7 @@ function decisionTarget(tab: WorkspaceTab): FindTarget | null {
     tabId: tab.id,
     targetKey: decisionKey(identity),
     label: formatDecisionShort({ ...identity, sezione: ref.sezione }),
-    storedText: cached?.esito === 'trovata' ? decisionProjection(cached.testo) : undefined,
+    storedText: cached?.esito === 'trovata' ? projectionOf(cached.testo) : undefined,
   };
 }
 
@@ -95,7 +113,8 @@ function targetsOfTab(tab: WorkspaceTab): FindTarget[] {
  * The ordered targets of the scope: «Questa scheda» is `frontTabId` alone, «Tutte le schede» is
  * every open tab in dock order (`workspaceTabs`'s own order — `WorkspaceNavigator` renders it
  * unsorted, minimised tabs included); inside a tab, block and article as the tab shows them, a
- * decision tab one text.
+ * decision tab one text. The same article twice in one tab (in a block and in a collection) is one
+ * target, where it first appears: its key names one root, so it is searched and counted once.
  */
 export function findTargetsInScope(
   state: FindScopeState,
@@ -104,22 +123,32 @@ export function findTargetsInScope(
 ): FindTarget[] {
   const tabs = scope === 'tab' ? state.workspaceTabs.filter((t) => t.id === frontTabId) : state.workspaceTabs;
   const targets: FindTarget[] = [];
-  for (const tab of tabs) targets.push(...targetsOfTab(tab));
+  const seen = new Set<string>();
+  for (const tab of tabs) {
+    for (const target of targetsOfTab(tab)) {
+      const id = `${target.tabId}|${target.targetKey}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      targets.push(target);
+    }
+  }
   return targets;
 }
 
 /**
  * The tab «Questa scheda» means: on a desktop, the visible tab (not hidden, not minimised)
- * `bringTabToFront` last raised — the highest `zIndex` among them. A phone has no such flag to
- * filter by (the carousel can swipe to a tab that stayed minimised from a wider session, gotcha:
- * `SearchPanel`'s own mobile index never touches `zIndex` on an ordinary swipe either), so the same
- * highest-`zIndex` reading is taken over every tab — the best a store-only read can do; `null` with
- * no open tab.
+ * `bringTabToFront` last raised — the highest `zIndex` among them; on a phone, the tab the carousel
+ * shows (`mobileActiveTabId`, the first tab when it names none that is open — as the carousel reads
+ * it), whatever its `zIndex`: a swipe never raises a tab. `null` with no open tab.
  */
 export function frontTabId(state: FindScopeState, isDesktop: boolean): string | null {
-  const candidates = isDesktop ? state.workspaceTabs.filter((t) => !t.isHidden && !t.isMinimized) : state.workspaceTabs;
+  if (!isDesktop) {
+    const onScreen = state.workspaceTabs.find((t) => t.id === state.mobileActiveTabId) ?? state.workspaceTabs[0];
+    return onScreen ? onScreen.id : null;
+  }
   let front: WorkspaceTab | undefined;
-  for (const tab of candidates) {
+  for (const tab of state.workspaceTabs) {
+    if (tab.isHidden || tab.isMinimized) continue;
     if (!front || tab.zIndex > front.zIndex) front = tab;
   }
   return front ? front.id : null;

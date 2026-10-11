@@ -34,6 +34,8 @@ import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 import { fixtureText, ARTICLE_FIXTURES } from '../../../../utils/__fixtures__/articleTexts';
 import { FakeHighlight } from '../../../../utils/__fixtures__/openFind';
+import { findRootsFor } from '../../../../utils/findTargets';
+import { findTargetsInScope } from '../../../../utils/findScope';
 
 const TEXT = fixtureText('nrm-cc-1284');
 const NORMA: NormaVisitata = {
@@ -185,5 +187,47 @@ describe('ArticleTabContent — «Cerca nel testo»', () => {
     for (const title of ['Apri note', 'Gestisci evidenziazioni', 'Copia', 'Altre azioni', 'Aggiungi a norme rapide']) {
       expect(screen.getAllByTitle(title).length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('ArticleTabContent — the find window\'s text root', () => {
+  const notYet: ArticleValidity = { state: 'not_yet', valid_from: null, valid_to: null, version_number: null, act_updated: null, request_in_window: true };
+
+  it('registers its text root under the key the scope computes for the article in its tab', () => {
+    const data = article();
+    const tabId = appStore.getState().addWorkspaceTab('Codice civile', NORMA, [data]);
+    const { unmount } = render(
+      <MemoryRouter>
+        <ArticleTabContent data={data} readingOrigin={{ tabId, blockId: 'b' }} />
+      </MemoryRouter>,
+    );
+
+    const roots = findRootsFor(tabId);
+    const [target] = findTargetsInScope(appStore.getState(), 'all', null).filter((t) => t.tabId === tabId);
+    expect(roots).toHaveLength(1);
+    expect(roots[0].targetKey).toBe(target.targetKey);
+    expect(roots[0].element.textContent?.replace(/\s+/g, '')).toBe(TEXT.replace(/\s+/g, ''));
+    unmount();
+    expect(findRootsFor(tabId)).toHaveLength(0);
+    appStore.getState().removeTab(tabId);
+  });
+
+  it('registers nothing while its text is not shown, and registers the text once it is', () => {
+    const ui = (data: ArticleData) => (
+      <MemoryRouter>
+        <ArticleTabContent data={data} tabId="tab-x" />
+      </MemoryRouter>
+    );
+    const { rerender, unmount } = render(ui(article({ validity: notYet })));
+    expect(findRootsFor('tab-x')).toHaveLength(0);
+    rerender(ui(article()));
+    expect(findRootsFor('tab-x')).toHaveLength(1);
+    unmount();
+  });
+
+  it('registers nothing outside a tab', () => {
+    const { unmount } = show(article());
+    expect(findRootsFor()).toHaveLength(0);
+    unmount();
   });
 });
