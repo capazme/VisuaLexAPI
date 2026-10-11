@@ -209,16 +209,34 @@ changed — without it they could no longer be removed.
 **Find in the text** («Cerca nel testo», spec §13): one floating `FindWindow` (`features/search/`,
 mounted once in `Layout`, portalled, z-index `findWindow`) opened by Cmd/Ctrl+F (`Layout.tsx`: opens,
 or focuses and selects the query when already open) and by the magnifier (`FindInTextButton`) of
-`ReadingToolbar` (desktop and phone rows) and `DecisionReadingToolbar`. `utils/findWindowControl.ts`
-(`openFindWindow`, `closeFindWindow`, `subscribeFindWindow`) is its control; `useFindWindowScopedTo`
-gives the magnifier its pressed state. Two scopes: «Questa scheda» and «Tutte le schede» (a phone leaves
-out loose articles and collections). The window is dragged by its handle (pointer or arrow keys), its
+`ReadingToolbar` (desktop and phone rows) and `DecisionReadingToolbar`. Cmd/Ctrl+F is intercepted on `/`
+only, where the workspace is drawn; on every other route it is the browser's, and leaving `/` closes the
+window. It is also the browser's while an overlay covers the workspace (`isWorkspaceCovered`): an element
+with `aria-modal="true"`, or one marked `data-find-overlay` — Study Mode, `CommandPalette`, `CompareView`,
+`PDFViewer`. A new full-screen overlay that is not a modal dialog in ARIA terms takes the mark on its
+root, rendered only while open; do not add `aria-modal` for this alone (Study Mode lost it: its note
+popovers are portalled outside it, and VoiceOver hides what lies outside a modal dialog). The hand-rolled
+`z-50`/`z-[100]` modals sit under the window, which stays over them, visible and usable.
+`utils/findWindowControl.ts` (`openFindWindow`, `closeFindWindow`, `subscribeFindWindow`,
+`isWorkspaceCovered`) is its control; `useFindWindowScopedTo` gives the magnifier its pressed state
+(pressed: open on this tab and this text; the state is read at `pointerdown`, before the tab panel's
+`mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
+with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
+session-only) and «Tutte le schede». A phone leaves out loose articles and collections: its column draws
+norm blocks only. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
+(it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
 26: use `useIsDesktop`). Esc closes it and returns focus. Text roots register through
 `useRegisterFindRoot`; `useFindWindow` finds across `utils/findTargets.ts` targets (a displayed root is
 searched in its DOM, any other in its stored projection and only counted), moves the reader only on
-next or previous, and reveals a hidden tab or collapsed block through `focusArticleInTab` /
-`bringTabToFront`. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
+next or previous, and shows an undrawn match through `revealTab` (raises the tab, restores it when
+minimised or hidden, makes it the phone's tab on screen) and `focusArticleInTab` (opens a collapsed
+block and sets its `autoFocusArticleId`, which `NormaBlockComponent` consumes on a desktop and `NormaCard`
+on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`;
+expands a collection). `revealTab` is a separate action, never
+`bringTabToFront` made to reveal: the restore button and the dock chip use `bringTabToFront`, and a
+minimised tab must stay minimised until its own button restores it. A target whose root does not
+appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
 a decision only when it has text (`hasDecisionText`). The search reads the text nodes, joined by one virtual space at every block boundary, `<br>` and skipped hidden subtree, and paints with
 the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-current)`); it adds,
 moves and changes nothing in the DOM (gotcha 23), and where the API is missing it only fails to
@@ -782,7 +800,9 @@ and raise it to `z-20`.
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`sidebar` 50, `dock` 80,
 overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
-z-index will be honoured.
+z-index will be honoured. An overlay above `findWindow` (110) that covers the
+workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
+or Cmd/Ctrl+F opens the find window hidden under it.
 
 **Beating inline `style="..."` without `!important`** — when markup you don't
 control ships inline styles (e.g. `useArticleMarkers` emits

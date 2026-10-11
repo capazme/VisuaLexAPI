@@ -961,21 +961,35 @@ open), it can be dragged by its handle, and its place is remembered for the sess
 right of the results area. On a phone it takes the full width at the top of the screen, the field
 on a row of its own, 44 px targets, and it is not dragged.
 
-**How it opens.** Cmd/Ctrl+F anywhere in the signed-in layout opens it with its field focused;
-pressed again while it is open, it focuses the field and selects the query (as a browser does).
+**How it opens.** Cmd/Ctrl+F on the search page (`/`, where the workspace is drawn) opens it with
+its field focused; pressed again while it is open, it focuses the field and selects the query (as a
+browser does). On every other page (the dossier, the forum, the history, the graph…) Cmd/Ctrl+F is
+the browser's own find, and leaving the search page closes the window: its matches are in tabs no
+longer on screen, and a «go to» would restore tabs the reader cannot see.
 The magnifier in a reading toolbar (an article's, a decision's) opens the same window, scoped to
 that tab, with the first match taken in that text; there is no box under the toolbar any more.
 Esc in the window closes it, clears the highlights and returns the focus to where it was (the
 magnifier, when it was opened from one); it does not reach an open discussion panel or citation
 preview. Enter and Shift+Enter move as in §13 and wrap.
-While a modal overlay is open (any element with `aria-modal="true"`: a dialog, the discussion
-panel, Study Mode) Cmd/Ctrl+F is not intercepted: the browser's own find works and the window does
-not open. A window already open when an overlay opens stays under it.
+While an overlay covers the workspace Cmd/Ctrl+F is not intercepted: the browser's own find works
+and the window does not open. An overlay is any element with `aria-modal="true"` (a modal dialog,
+the discussion panel) or marked `data-find-overlay` (Study Mode, the command palette, CompareView,
+the PDF viewer: they cover the reader but are not modal dialogs in ARIA terms, and Study Mode must
+not become one, since its note popovers are portalled outside it and a screen reader would hide
+them). A window already open when an overlay opens keeps its place in the stacking order: under the
+overlays above it (Study Mode and the overlay band, from z 1000), over the hand-rolled modals drawn
+at `z-50` and `z-[100]` (on the search page, the tree view and the quick norms manager), where it
+stays visible and usable. That is accepted: the window is small, not modal, and
+closes with Esc or ×; what the overlay rule prevents — a focused field the reader cannot see — cannot
+happen over a modal it sits above.
 
 **What it searches: the tab, or every tab.** A two-state switch, «Questa scheda» / «Tutte le
 schede» (`aria-pressed`), remembered for the session. «Questa scheda» is the tab in front: on a
 desktop the visible tab with the highest stacking order (the one `bringTabToFront` last raised),
-on a phone the tab on screen; it covers every article and decision in that tab. «Tutte le schede»
+on a phone the tab on screen (the store's `mobileActiveTabId`, which the carousel writes; session
+only); it covers every article and decision in that tab. On a phone both scopes leave out loose
+articles and collections: the phone column draws norm blocks only, so their matches could be
+counted but never shown. «Tutte le schede»
 covers every open tab, minimised ones included; it replaces «Cerca negli articoli aperti» and,
 unlike it, finds decisions too. The matches are ordered by tab as the dock orders them, inside a
 tab by block and article as the tab shows them; a decision tab is one text.
@@ -985,17 +999,23 @@ mounted and displayed) is searched in its text root as §13 says, and its matche
 article that is open but not drawn (another article of the same block, a loose article in a
 minimised tab) is searched in its stored text (`article_text`, the projection: every `\n`
 dropped, folded the same way), so its matches are counted but not drawn. Going to one of them
-brings its tab to the front and shows the article (`bringTabToFront`, `focusArticleInTab`); once
-its text root is on screen the match is found there by its ordinal within that text and becomes
-current. The two counts can differ by a match at a block boundary or in folded update notes; the
+reveals its tab — raises it, restores it when minimised or hidden, and makes it the phone's tab on
+screen (`revealTab`) — and shows the article (`focusArticleInTab`: it opens a collapsed block or
+collection, and signals a loose article to open); once its text root is on screen the match is
+found there by its ordinal within that text and becomes current. `revealTab` is an action of its
+own rather than `bringTabToFront` made to reveal, because the restore button and the dock chip use
+`bringTabToFront`, and there a minimised tab stays minimised until its own button restores it. A
+text whose root does not appear within 3 seconds is given up for that query and its matches leave
+the counter. Typing never moves the reader; only «next» and «previous» do. The two counts can differ by a match at a block boundary or in folded update notes; the
 drawn count replaces the stored one as soon as the text is on screen. A decision tab always draws
 its text when it is shown; a decision whose tab is minimised is searched in the session cache of
 decisions, or, if absent, counted as nothing until it is shown.
 
 **The counter and the place.** «3 di 12», «Nessun risultato», «oltre 1000: affina la ricerca» as
-in §13; under «Tutte le schede» the window also names where the current match is, with the
-labels the workspace already uses (`shortNorm` for an article, `formatDecisionShort` for a
-decision). The counter is in a polite live region.
+in §13; under «Tutte le schede» the window also names where the current match is, as one label, never
+two joined: for an article its `shortNorm`, for a decision its tab's own label (the richer one: it
+carries the section the text was read with). The counter and the place are in a polite live
+region.
 
 **Kept current.** The window recomputes when a text on screen is drawn again (§13's observer),
 when tabs are opened, closed, raised or minimised, and when an article is shown in a block; the
@@ -1008,8 +1028,8 @@ and the navigation request), the article renderer's `search` mark kind (`searchQ
 in the two toolbars). With the `search` marks gone the article renderer adds no element for a
 search at all, so a search never changes the text DOM on either surface (root rule 23).
 
-**Not covered yet.** The dossier reader and Study Mode (Later). Cmd/Ctrl+F in Study Mode is left to the browser (see «How it opens»); on the dossier it opens the
-window over the workspace's tabs, not over the dossier's text.
+**Not covered yet.** The dossier reader and Study Mode (Later). In both Cmd/Ctrl+F is the
+browser's own find (see «How it opens»).
 
 ## Security and data
 
