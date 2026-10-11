@@ -959,12 +959,29 @@ meant to stay split; add new features as new files, not inside the shells:
   workspace is persisted).
 - `features/practice/` — the norm-tab redesign, behind `VITE_FEATURE_PRACTICE_TABLE` (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
-  header, count line, «⋯», the streaming bar, the topic searches' band `PracticeTopicSearches`, then
-  `PracticeColumn`), `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place; its
-  measured height, `--practice-bar-height` on the workspace area, keeps the column's last row clear of it),
-  `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column),
+  header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, the topic
+  searches' band `PracticeTopicSearches`, then `PracticeColumn`); `PracticeColumn` (the acts, dragged
+  into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act: its sticky
+  heading with Studio, Struttura, PDF and «⋯», the index line of its rows, the rows; the structure
+  window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
+  only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
+  `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»);
+  `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place, a «⋯» per chip);
+  `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column);
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
-  the toast band; the empty practice; the name editor).
+  the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
+  component files). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
+  (pure: the items in table order, each article from its own `norma_data`, a code's search and index
+  copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
+  wait for the items to settle and count them; one save at a time per practice, `usePracticeSaving`),
+  `usePracticeSaveActions` (the header's button, the «⋯» entries, the picker and the outcome's toast,
+  portalled in the toast band: inside the bar a `fixed` child would be placed against it, gotchas 22
+  and 26) and `PracticeDossierPicker` (a `ui/Modal`). Three CSS variables carry measured heights:
+  `--practice-head` (the act block's sticky heading; the rows' scroll margin reads it, and an open row
+  passes it on as `--reading-toolbar-top`, which `ReadingToolbar` reads with a `0px` fallback, so the
+  toolbar pins under the heading and is unchanged elsewhere) and `--practice-bar-height` (the bar's
+  height, set by `SearchPanel` on the workspace area: the column's bottom padding keeps its last row
+  clear of the bar).
   `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with
   the flag off none of it is loaded; with it on, searches, the index, decisions, topic searches and
   the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread, identified

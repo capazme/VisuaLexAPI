@@ -384,15 +384,15 @@ Branch `feat/practice-table`. Everything new is drawn only with the flag on, on 
 - Create: `apps/web/src/components/features/practice/PracticeBar.tsx` and `apps/web/src/components/features/practice/PracticeChip.tsx` (spec §5: chips, `aria-current`, rename, drag reorder, per-chip «⋯», «+ Nuova pratica», «Chiudi tutte» behind its danger confirmation, collapse; `Z_INDEX.dock`; `id="tour-workspace-dock"` kept)
 - Create: `apps/web/src/components/features/practice/PracticePhoneView.tsx` (spec §8, P3 part: the header switching practices — chevrons, name, dots — then `PracticeTopicSearches` and `PracticeColumn`; the notice toast as on the desktop)
 - Modify: `apps/web/src/components/features/search/SearchPanel.tsx` (flag on: one layout through `useIsDesktop` — `PracticeTable` + `PracticeBar` on the desktop in place of `WorkspaceManager` + `WorkspaceNavigator`, `PracticePhoneView` on the phone in place of today's phone view; `processResult` and the buffered path call `addArticlesToPractice(targetTabId ?? null, …)` with R1/R2's reveal rules; `handleBrowseStructure` calls `addActIndexToPractice`; `handleCrossReferenceNavigate` calls `revealPracticeArticle`, else searches into the act; the auto-switch's duplicate removal per spec §5.2)
-- Modify: `apps/web/src/components/features/dossier/DossierDetailView.tsx` (flag on: `openGroupsOnDashboard` creates one practice before `navigate('/')` — `const practiceId = createPractice(dossier.title, { custom: true, activate: true })` — and passes `() => practiceId` to `searchesForGroups`; when every group is opened (the picker's «Apri tutto», or a dossier with one group) it adds the dossier's decisions with `openDecision(reference, { practiceId, open: false })`, closed and not fetched)
-- Modify: `apps/web/src/components/features/dossier/DossierListView.tsx` (flag on: `openAllGroupsOnDashboard` as above, and `openGroupOnDashboard` (one group) calls `createPractice(dossier.title, { custom: true, activate: true })` in place of `addWorkspaceTab` and passes the practice id as `targetTabId`)
+- Modify: `apps/web/src/components/features/dossier/DossierDetailView.tsx` (flag on: `openGroupsOnDashboard` creates one practice before `navigate('/')` — `const practiceId = createPractice(dossier.title, { custom: true, activate: true })` — and passes `() => practiceId` to `searchesForGroups`; when every group is opened (the picker's «Apri tutto», or a dossier with one group) it adds the dossier's decisions with `addKnownDecisions(practiceId, decisions)` — one write, closed and not fetched, identified with what the dossier kept (`dossier/openInPractice.ts`, `searchesIntoOnePractice`))
+- Modify: `apps/web/src/components/features/dossier/DossierListView.tsx` (flag on: `openAllGroupsOnDashboard` as above, also for the quick-open of a dossier with one group (the whole dossier, its decisions included); `openGroupOnDashboard` (one group picked from the picker) calls `createPractice(dossier.title, { custom: true, activate: true })` in place of `addWorkspaceTab` and passes the practice id as `targetTabId`)
 - Modify: `apps/web/src/utils/findScope.ts`, `apps/web/src/hooks/useFindWindow.ts`, `apps/web/src/components/features/search/FindWindow.tsx` (PR 4d's files; flag on: spec §6.6–§6.7 — the scope from the practices, the front = the active practice, «Questa pratica» / «Tutte le pratiche», one `targetKey` per subject, a decision never read counts nothing; reaching an undrawn match = `setActivePractice` + reveal the row; recompute on practice switch, row open and close, practice content changes), keeping PR 4d's target keys (an article's `buildItemKey|versionKey`, equal to `practiceArticleKey`; a decision's `decisionKey`). Rows need no registration change: a row's `readingOrigin.tabId` and a row decision's `hostId` are the practice's id, under which PR 4d's surfaces already register (spec §6.6)
 - Modify: `apps/web/src/components/features/compare/CompareView.tsx` (flag on: the practices' articles, labelled with the practice)
 - Modify: `apps/web/src/components/features/search/ReadingBackControl.tsx` (flag on, the `table` half of spec §6.3: a popped `table` entry activates its practice and reveals the row; `onNavigated` gets the practice id. P3 rows push such entries, so the way back works from P3)
 - Modify: `apps/web/src/store/useAppStore.ts` (flag on: `openDecisionTab(ref, …)` → `openDecision(ref, { beside: false })`, the decision's row revealed — P4 turns it to beside on the desktop; `openDecisionSearchTab` → a `decision-search` ref in the active practice's `beside`, on both breakpoints, drawn by `PracticeTopicSearches` in the desktop table until P4 and in the phone table until P5; `drainPendingDecision` once, gotcha 14; `focusArticleInTab` → reveal in the practice; `addNormaIndexToTab` → `addActIndexToPractice`)
 - Test: `apps/web/src/components/features/practice/PracticeTable.test.tsx`, `apps/web/src/components/features/practice/PracticeBar.test.tsx`, `apps/web/src/components/features/practice/PracticePhoneView.test.tsx`, `apps/web/src/components/features/search/SearchPanel.practice.test.tsx` (new), the flag cases of PR 4d's `apps/web/src/utils/__tests__/findScope.test.ts` (or wherever 4d put it) and `useFindWindow.test.tsx`, `apps/web/src/components/features/compare/CompareView.test.tsx` (flag cases), `apps/web/src/components/features/search/ReadingBackControl.test.tsx` (flag cases), the dossier's open-all tests with the flag (`apps/web/src/components/features/dossier/`)
 
-- [ ] **Step 1: Failing tests**: a one-article search lands in the active practice and opens its row, on the desktop and at 390 px; a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens in place; a topic search from the palette shows in the band and a decision opened from it enters «Giurisprudenza»; a range opens the first row of a new act and leaves the others closed; a search with no practice creates one named after the act; «Apri tutto» of a dossier with two past groups creates **one** practice, active, holding the texts in force and both past texts as rows, and its decisions closed and unread (`openDecision` called with `open: false`; `fetchDecision` never called, no row open); one group opened from `DossierListView` creates one practice and adds no decision; the bar switches the table, renames, creates «Nuova pratica», closes after confirming; «Chiudi tutte» then a reload shows no practice; the phone's header switches practices by chevrons; **at 390 px a topic search from the palette shows in the phone table's band**, and a decision opened from its list enters «Giurisprudenza»; the migration notice shows once; the find window on «Questa pratica» finds a word in a closed row and, on «Tutte le pratiche», in another practice, and going there activates the practice and opens the row; a decision never read counts nothing; a match in an open row is drawn (its root registered under the practice's id), not counted from the stored text; compare lists the practices' articles; a citation jump from a row, then the back control, reveals the row left; with the flag off, `SearchPanel`'s existing tests (`SearchPanel.*.test.tsx`) and the dossier's pass unchanged.
+- [ ] **Step 1: Failing tests**: a one-article search lands in the active practice and opens its row, on the desktop and at 390 px; a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens in place; a topic search from the palette shows in the band and a decision opened from it enters «Giurisprudenza»; a range opens the first row of a new act and leaves the others closed; a search with no practice creates one named after the act; «Apri tutto» of a dossier with two past groups creates **one** practice, active, holding the texts in force and both past texts as rows, and its decisions closed and unread (`addKnownDecisions`; `fetchDecision` never called, no row open); a dossier of one group opened from `DossierListView` creates one practice with its decisions, as from its page, and one group picked from the list's picker adds no decision; the bar switches the table, renames, creates «Nuova pratica», closes after confirming; «Chiudi tutte» then a reload shows no practice; the phone's header switches practices by chevrons; **at 390 px a topic search from the palette shows in the phone table's band**, and a decision opened from its list enters «Giurisprudenza»; the migration notice shows once; the find window on «Questa pratica» finds a word in a closed row and, on «Tutte le pratiche», in another practice, and going there activates the practice and opens the row; a decision never read counts nothing; a match in an open row is drawn (its root registered under the practice's id), not counted from the stored text; compare lists the practices' articles; a citation jump from a row, then the back control, reveals the row left; with the flag off, `SearchPanel`'s existing tests (`SearchPanel.*.test.tsx`) and the dossier's pass unchanged.
 - [ ] **Step 2: Run to see them fail** — `npm --prefix apps/web run test -- --run src/components/features/practice src/components/features/search src/components/features/dossier src/components/features/compare`.
 - [ ] **Step 3: Implement.** No change to `ArticleTabContent`'s rendering.
 - [ ] **Step 4: Run; web build and lint.**
@@ -403,10 +403,11 @@ Branch `feat/practice-table`. Everything new is drawn only with the flag on, on 
 **Files:**
 - Create: `apps/web/src/components/features/practice/practiceDossierItems.ts` (pure: `practiceDossierItems(practice): { norms: NormaVisitata[]; decisions: DossierSentenzaData[]; unidentified: number }` in table order, spec §7)
 - Create: `apps/web/src/components/features/practice/useSavePracticeAsDossier.ts` (new dossier: `createDossier` → `addToDossier` each → one `setDossierItemOrder`; existing dossier: skip what `dossierContainsArticle` or the same decision identity finds; returns the counts for the toast)
-- Modify: `apps/web/src/components/features/practice/PracticeTable.tsx`, `apps/web/src/components/features/practice/PracticeChip.tsx` (the actions; «Aggiungi a un dossier…» lists the dossiers as `AddToDossierPopover` does)
+- Create: `apps/web/src/components/features/practice/PracticeDossierPicker.tsx` («Aggiungi a un dossier…»: the dossiers as `AddToDossierPopover` lists them, in a `ui/Modal`) and `apps/web/src/components/features/practice/usePracticeSaveActions.tsx` (the menu items, the header's button, the picker and the outcome's toast, portalled in the toast band; one save at a time per practice, `usePracticeSaving`)
+- Modify: `apps/web/src/components/features/practice/PracticeTable.tsx` (a «Salva come dossier» button in the header, and the «⋯» entries), `apps/web/src/components/features/practice/PracticeChip.tsx` (the «⋯» entries)
 - Test: `apps/web/src/components/features/practice/practiceDossierItems.test.ts`, `apps/web/src/components/features/practice/useSavePracticeAsDossier.test.tsx`
 
-- [ ] **Step 1: Failing tests**: items in table order, a past text kept with its version, two rows of one code article (search and index copies) saved as two items, decisions in `decisionOrder` with `sezione`, `tipo`, `data_deposito`, an unidentified decision (a migrated entry not read since included) counted not saved; a refused `createDossier` adds nothing and says so; the order is written once after the adds; into an existing dossier, duplicates skipped and counted; the toast wording («Salvato nel dossier «…»: 4 articoli, 2 sentenze»; «1 sentenza non identificata non è stata salvata»; «2 già presenti»).
+- [ ] **Step 1: Failing tests**: items in table order, a past text kept with its version, each row saved from its own `norma_data`, the two rows of one code article (the search's copy, annex 2, and the index's, none) saved as one item and recognised in an existing dossier, while outside a code annex 2 and no annex stay two items, decisions in `decisionOrder` with `sezione`, `tipo`, `data_deposito`, an unidentified decision (a migrated entry not read since included) counted not saved; a refused `createDossier` adds nothing and says so; the order is written once after the adds; into an existing dossier, duplicates skipped and counted; the toast wording («Salvato nel dossier «…»: 4 articoli, 2 sentenze»; «1 sentenza non identificata non è stata salvata»; «2 già presenti»).
 - [ ] **Step 2: Run to see them fail** — `npm --prefix apps/web run test -- --run src/components/features/practice/practiceDossierItems.test.ts src/components/features/practice/useSavePracticeAsDossier.test.tsx`.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run; web build and lint.**
@@ -548,4 +549,52 @@ Then: the owner's trial on the development stack, and the deploy on the deployme
 
 ## Amendments during execution
 
-(None yet.)
+**P1–P3 as built** (what the rounds of review decided; the spec states the result):
+- **Carry-overs.** The rulings of one PR's reviews bind the next (`carry-over.md` in the ledger):
+  the sanitiser's and the migration's `dropped` list is logged once, item by item (gotcha 18); a
+  second entry of one decision is merged into the first, never dropped (the migration's twin rule
+  and Task 7's runtime merge alike), and an absorbed or re-id'd act or decision id is carried into
+  the back stack, `practiceRows`, `pendingReveal`, the structure window and the windows; acts and
+  decisions have separate id maps in `sanitizePractices`. From P3: P2's rule «a back-stack entry
+  still live in a tab stays a tab entry» is gone (carry-over 10), `moveActToPractice` rewrites only
+  practice entries (14), a practice entry carries the row's `articleKey` so a past text comes back
+  as itself (12), and `markDecisionEntryRecorded` records a decision's Cronologia key in one `set`
+  (13).
+- **The seeding marker.** `practicesSeeded` is set by the load that runs with the flag on, whatever
+  the seeding found, and the seed is written at once (`seededOnLoad`: zustand saves after a hydrate
+  only when it migrated). «Chiudi tutte» keeps it; `clearUserData` sets it to the flag; practices
+  saved without it are replaced by the ones seeded from the tabs, and the replacement is listed in
+  `dropped`.
+- **Reveals are actions of their own**, as PR 4d's `revealTab` is beside `bringTabToFront`:
+  `revealPracticeRow`, `revealPracticeArticle`, `revealPracticeDecision` open the row and make its
+  practice active in one `set`; the column takes the reveal once (`takeReveal`, gotcha 14). An
+  action that changes nothing returns before `set`.
+- **`addKnownDecisions`** replaces `openDecision(reference, { practiceId, open: false })` for the
+  dossier's «Apri tutto»: one write, the entries identified with what the dossier kept, so «Salva
+  come dossier» saves them back. A dossier of one group opened from the list's quick-open takes the
+  same path as from its page.
+- **The row shell.** `PracticeRowShell` is shared by the article and the decision rows: the toggle
+  scoped to the row's header (gotcha 22), the hover tint on the header only, «Togli dal tavolo»; a
+  closed row mounts nothing.
+- **The CSS variables.** `--practice-head` is the act block's measured sticky heading: the rows'
+  `scroll-margin-top` reads it, and an open row hands it to its reading toolbar as
+  `--reading-toolbar-top`, which `ReadingToolbar` reads with a `0px` fallback (flag off: unchanged),
+  so the toolbar pins under the heading. `--practice-bar-height` is the bar's measured height
+  (`PracticeBar`'s `onHeightChange`, set by `SearchPanel` on the workspace area), the column's bottom
+  padding (spec §3.4).
+- **The lazy table.** `SearchPanel` loads `PracticeTable`, `PracticeBar`, `PracticePhoneView` and
+  `PracticeNotice` with `React.lazy`: with the flag off none of it is loaded
+  (`SearchPanel.lazy.test.tsx`), and the main bundle holds none of their copy. The migration's notice
+  is mounted once by `SearchPanel`, over both layouts, in the toast band.
+- **The topic window's id is scoped to its practice**: `search:<practiceId>:<stableQueryKey>`
+  (`topicWindowId`), so the same topic in two practices is two windows, each read as its own.
+- **The annex auto-switch** removes a search's stray rows only once the annex's first article has
+  landed; the rows are named by the search's own params object, never by number or date.
+- **«Salva come dossier».** A button in the header beside «⋯», and the «⋯» entries of the header
+  and the chip; one save at a time per practice. Each article is saved from its own `norma_data`, and
+  a code's search and index copies are one item (`dossierArticleKey`, `dossierHoldsArticle`).
+  Failures: the save waits for its items to settle and counts them — a refused creation adds
+  nothing; a new dossier left empty is deleted again; one left with some items is kept and «Salvato
+  solo in parte»; an existing dossier that took nothing says «Nessun elemento è stato salvato». The
+  outcome's toast is portalled to the toast band (gotchas 22, 26); «Aggiungi a un dossier…» is a
+  `ui/Modal`.

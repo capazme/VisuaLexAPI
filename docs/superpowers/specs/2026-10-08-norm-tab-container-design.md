@@ -215,7 +215,7 @@ an earlier decision was put to him and answered (§13, D15); none of the others 
 | T14 | **The windows are persisted with their practice** (references only, at most two). They are the desktop's: the phone's full-screen reader is separate session state (T19). | Returning to a practice, or reloading, shows what was beside it. |
 | T15 | **Open rows are session state**; after a reload every row is closed, like the dossier. | The column loads no article surface it does not need. |
 | T16 | **The window a link was clicked in is never the one replaced** (§4.2): with two windows, the oldest window *that is not the asker* goes. | Q10 says «the oldest»; read literally, a decision opened from an article read in the older window would close that article. The rule differs from the answer only in that case. |
-| T17 | **The whole dossier's «Apri tutto» also puts the dossier's decisions under «Giurisprudenza»**, unread (§5.1). New: today it opens only the articles. | The practice is the dossier's shape (D6); leaving the decisions out would make «Apri tutto» open half the dossier. No request is sent until a row or a window opens one. A single group or act opened from the dossier brings no decision. |
+| T17 | **The whole dossier's «Apri tutto» also puts the dossier's decisions under «Giurisprudenza»**, unread (§5.1). New: today it opens only the articles. | The practice is the dossier's shape (D6); leaving the decisions out would make «Apri tutto» open half the dossier. No request is sent until a row or a window opens one. A single group or act picked from the dossier brings no decision; a dossier of one group is the whole dossier. |
 | T18 | **With the flag on, the desktop and the phone both draw the practices from P3.** P3 brings a plain phone table (the switcher over practices and the column); P5 adds the full-screen reader and the practice list. | Every store action that routes into a practice is drawn on both breakpoints, so nothing is written where nothing draws it, the tabs and the practices never diverge by breakpoint, and P6's migration finds everything in the practices. The other way — routing only on the desktop until P5 — keeps P3 smaller but lets a phone with the flag on keep writing tabs that P6 then drops. |
 | T19 | **The phone's full-screen reader is session state of its own** (`phoneReader`, one subject — an article, a decision or a topic search — or none), never the desktop's persisted `beside`. | A reload on a phone, or a desktop window narrowed below 768 px, lands on the table (D11); «‹ Pratica» always returns to the table; rows are folded only by the desktop's windows. |
 | T20 | **The persist storage is wrapped** (P2): a failed save is caught, logged with context and shown once as a sync error, never thrown out of `set`. | The app keeps working in memory and says that the table is not being saved; without the wrapper an overflow throws out of every store action (searches, decisions, dossier actions). |
@@ -285,8 +285,9 @@ export interface PracticeDecision {
 }
 
 /** What a light window shows. `id` is stable for the subject, so opening it twice finds it; a
- *  topic-search window's id is derived from the store's `stableQueryKey(query)` (P4), and a window
- *  the migration made, which carries its old tab's id, is re-id'd on read. */
+ *  topic-search window's id is `search:<practiceId>:<stableQueryKey(query)>` (the store's
+ *  `topicWindowId`: the same topic in two practices is two windows, each read as its own practice),
+ *  and a window the migration made, which carries its old tab's id, is re-id'd on read (P4). */
 export type BesideRef =
   | { id: string; kind: 'article'; actId: string; articleKey: string }
   | { id: string; kind: 'decision'; decisionId: string }
@@ -467,7 +468,7 @@ where it was read (§6.3).
 same collapse toggle («N pratiche»); the column keeps clear of it (§3.4).
 - **One chip per practice**: the name and a count («2 atti · 1 sentenza»); the active one marked
   (`aria-current`); a click makes it active; double-click renames; drag reorders (today's sortable
-  list); «⋯» per chip: «Rinomina», «Salva come dossier», «Chiudi la pratica» (danger confirmation).
+  list); «⋯» per chip: «Rinomina», «Salva come dossier», «Aggiungi a un dossier…», «Chiudi la pratica» (danger confirmation).
 - **«+ Nuova pratica»**: creates «Nuova pratica», makes it active and opens its name for editing.
 - **«Chiudi tutte»** stays, behind its danger confirmation (the practices are persisted). It never
   brings the old tabs back: the seeding marker stays set (§9).
@@ -483,12 +484,15 @@ user asked to see the dossier on the table. `searchesForGroups` is called with `
 so the texts in force and every past group target that one practice, the past groups as rows of
 their acts (D15). This holds for every way in: `DossierDetailView`'s action and its picker
 («Apri tutto» or one group), `DossierListView.openAllGroupsOnDashboard`, and
-`DossierListView.openGroupOnDashboard` (one group: it calls `createPractice` in place of
-`addWorkspaceTab` and passes the practice's id). When every group of the dossier is opened (the
-picker's «Apri tutto», or a dossier with one group), the dossier's decisions also enter that
-practice's «Giurisprudenza» through `openDecision(reference, { practiceId, open: false })`, closed
-and unread: `open: false` adds the entry and nothing else — no window, no revealed row (so no
-`DecisionEntryView` is mounted and no request is sent) — until a row or a window opens one (T17). One group picked brings no decision. A dossier
+`DossierListView.openGroupOnDashboard` (one group picked from the list's picker: it calls
+`createPractice` in place of `addWorkspaceTab` and passes the practice's id). When every group of
+the dossier is opened (the picker's «Apri tutto», or a dossier with one group, from its page or from
+the list's quick-open, which then takes `openAllGroupsOnDashboard`), the dossier's decisions also
+enter that practice's «Giurisprudenza» through `addKnownDecisions(practiceId, decisions)`, in one
+write, closed and unread: it adds the entries and nothing else — no window, no revealed row (so no
+`DecisionEntryView` is mounted and no request is sent) — until a row or a window opens one (T17).
+Each entry is identified with what the dossier kept (identity, section, type, date of deposit), so
+«Salva come dossier» saves it back (§7). One group picked brings no decision. A dossier
 with no article still opens nothing, as today.
 
 «Apri l'indice e sfoglia» drops an article-less act on the active practice and points the
@@ -496,9 +500,11 @@ structure window at it (today's `addNormaIndexToTab`).
 
 **5.2 The annex auto-switch.** `useAutoSwitch` today closes every tab holding the act it switches.
 With the flag on it closes nothing: the annex's articles are separate rows of the same act
-(`allegato` is part of `buildItemKey`, hence of `practiceArticleKey`); the stray row from the first
-search is removed from the active practice only when that search created it. To confirm against
-`SearchPanel`'s auto-switch tests in plan Task 10.
+(`allegato` is part of `buildItemKey`, hence of `practiceArticleKey`); the stray rows from the first
+search are removed only when that search created them (`SearchPanel` tracks each search's rows by
+its own params object, so no number or date is compared), and only once the annex's first article
+has landed: an annex search that fails or finds nothing leaves the act as it was. The auto-switch
+itself is still disabled in the production configuration (`ANNEX_AUTO_SWITCH_CONFIG.ENABLED`).
 
 **5.3 Past texts** (D15, T2). A text asked for by date or as the original enters its act as a row of
 its own, chip «Testo al …», read-only per gotcha 32 (`describeVersion` in `ArticleTabContent`, as
@@ -624,22 +630,38 @@ callback returns the one practice's id for every group. P6 renames `SearchParams
 
 ### 7. «Salva come dossier» (D6)
 
-From the practice header, the chip's «⋯» and «⋯ › Aggiungi a un dossier…» (an existing dossier).
+From the practice header (a button «Salva come dossier», and «⋯»), the chip's «⋯» and «⋯ ›
+Aggiungi a un dossier…» (an existing dossier). One save at a time per practice, wherever it starts:
+every way in is disabled while one runs.
 - **Order of the items**: the acts in table order, each act's articles in table order, then the
   decisions in `decisionOrder`. A pure function `practiceDossierItems(practice)` returns the norma
-  items (`normaForDossier(act.norma, article)`) and the decision items (`sentenzaFromDecision(
-  identity, { sezione, tipo, data_deposito })`), and the decisions it cannot save: an entry never
-  identified (a citation that did not resolve, a choice between candidates not made, or a decision
-  carried over from a tab and not read since, §9).
+  items and the decision items (`sentenzaFromDecision(identity, { sezione, tipo, data_deposito
+  })`), and the decisions it cannot save: an entry never identified (a citation that did not
+  resolve, a choice between candidates not made, or a decision carried over from a tab and not
+  read since, §9; the dossier's own decisions brought by «Apri tutto» are identified, §5.1).
+- **Each article as its own `norma_data` names it** (its act's number and date, its annex), through
+  `normaForDossier`, not as `act.norma`, which is only the copy that first opened the act (for a
+  code, perhaps the index's, bare). The two rows a code's article can have (a search's copy, annex
+  «2» and the R.D.; the index's, none; T2) are one item, the search's copy kept: the identity is
+  `actKeyOf`, the annex as shown (`shownAnnex`), the article id normalised (gotcha 9) and the
+  version (`dossierArticleKey`). Outside a code, annex 2 and no annex stay two articles.
 - **A new dossier** (gotcha 17): `createDossier(practice.label)` first — the server's id or
   nothing — then `addToDossier` per item, then one `setDossierItemOrder` with the computed order,
   which waits for every pending id (`pendingDossierOrders`). Duplicates cannot occur in a new
   dossier.
-- **An existing dossier**: items already there (`dossierContainsArticle`, which compares versions;
-  for decisions, the same identity) are skipped and counted; nothing is reordered.
+- **An existing dossier**: items already there (`dossierHoldsArticle`: `dossierContainsArticle`,
+  which compares versions, or another copy of a code's article; for decisions, the same identity)
+  are skipped and counted; nothing is reordered.
+- **Failures.** `addToDossier` rolls a refused item back silently, so the save waits for its items
+  to settle and counts what stayed. A refused dossier creation adds nothing, keeps the practice
+  untouched and says so (its own sync error). A new dossier left with none of its items is deleted
+  again, with a sync error; one left with some is kept, the sync error counting the missing ones and
+  the toast saying «Salvato solo in parte». Into an existing dossier, a save of which nothing stayed
+  says «Nessun elemento è stato salvato nel dossier «…»».
 - **The toast** says what happened: «Salvato nel dossier «…»: 4 articoli, 2 sentenze», plus «1
-  sentenza non identificata non è stata salvata» or «2 già presenti» when so. A refused dossier
-  creation keeps the practice untouched and says so.
+  sentenza non identificata non è stata salvata» or «2 già presenti» when so. It is portalled to the
+  document in the toast band (`Z_INDEX.toast`), wherever the save started: inside the bar a `fixed`
+  child is placed against the bar and stacked in it (gotchas 22, 26).
 - The practice stays as it is (D6: it is not linked to the dossier).
 
 ### 8. The phone (D11)
@@ -695,8 +717,8 @@ highest z-index among them.
    is listed in `dropped`.
 4. The decision-search tab in front becomes the only window of that practice; any
    other is not reopened: its label goes into `droppedSearches`. The other decision tabs become
-   entries without windows. The window keeps its old tab's id until P4 re-ids it from
-   `stableQueryKey` on read (§2).
+   entries without windows. The window keeps its old tab's id until P4 re-ids it on read to
+   `search:<practiceId>:<stableQueryKey>` (§2).
 5. The active practice is the one whose tab was in front. Positions, sizes, z-indexes
    and flags are dropped.
 
@@ -855,7 +877,7 @@ alternative is dropped.
   tutte» then a reload stays empty; P6's `migrate` with and without the marker); the wrapped storage
   (a `setItem` that throws `QuotaExceededError`: the action completes, nothing is thrown, one log
   and one sync error); «Apri tutto» with two past groups creates one practice, its decisions closed
-  and not fetched (`open: false`); an unknown `targetTabId`; `clearUserData`, and logout, login and
+  and not fetched (`addKnownDecisions`); an unknown `targetTabId`; `clearUserData`, and logout, login and
   a reload with the flag on keeping the table built after the login.
 - **Components**: the act block (index line, rows, Studio locked on a past text, «Sposta in…»,
   «Rimuovi l'atto»), the row (rubrica, chips, «Apri accanto», folded when beside on the desktop
