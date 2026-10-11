@@ -961,13 +961,6 @@ meant to stay split; add new features as new files, not inside the shells:
     raising the child's value does nothing.
 
 
-25. **`store/workspaceTabActions.ts` is a dead duplicate — edit `useAppStore.ts`.**
-    The live workspace-tab actions are inlined in the store (`addNormaToTab` and
-    friends); nothing imports the factory in that file. Its only live export is
-    the `NormaBlock` / `LooseArticle` *types*, which nothing imports any more
-    (`useGlobalSearch.ts` is gone).
-    Editing an action there changes nothing at runtime. The file carries a header
-    saying so; relocating the types and deleting the rest is queued for round 2b.
 26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**
     `display: none` hides descendants, but a portal re-parents to `document.body`
     and leaves the hidden subtree behind — the desktop renderer would surface its
