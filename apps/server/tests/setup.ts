@@ -4,6 +4,16 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// The texts the migrations insert (version 1 of the notice to accept). The TRUNCATE
+// below empties their table, since it references `users`; they are read once after
+// the reset and put back after every truncation, so the migration stays the one
+// place that holds their wording and every test starts from "one version, number 1".
+type TextVersionRow = {
+  id: string; chiave: string; versione: number; titolo: string; corpo: string;
+  conferma: string; azione: string; created_at: Date; autore_id: string | null;
+};
+let seededTexts: TextVersionRow[] = [];
+
 // The OAuth endpoints' own rate limits are per address, and the whole suite
 // comes from 127.0.0.1: lift them here (the flood test builds its own router
 // with a low one), and give the MCP server's credential a test value.
@@ -29,7 +39,7 @@ function assertTestDatabase(): void {
   }
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   assertTestDatabase();
   // Pass process.env explicitly so the child process uses the test DATABASE_URL
   // (dotenv-cli sets it in process.env before vitest starts, but execSync forks
@@ -38,6 +48,10 @@ beforeAll(() => {
     stdio: 'ignore',
     env: process.env,
   });
+  seededTexts = await prisma.$queryRaw<TextVersionRow[]>`
+    SELECT id, chiave::text AS chiave, versione, titolo, corpo, conferma, azione, created_at, autore_id
+    FROM lingo_testi_versioni`;
+  if (seededTexts.length === 0) throw new Error('The migrations seed no text version: expected version 1 of PROPOSTA_SCHEDA.');
 });
 
 beforeEach(async () => {
@@ -69,7 +83,10 @@ beforeEach(async () => {
       "feedbacks",
       "lingo_tracce",
       "lingo_card_ancore",
+      "lingo_validazioni_card",
+      "lingo_accettazioni_testi",
       "lingo_cards",
+      "lingo_testi_versioni",
       "oauth_tokens",
       "trash_entries",
       "oauth_authorization_codes",
@@ -79,6 +96,11 @@ beforeEach(async () => {
       "users"
     RESTART IDENTITY CASCADE;
   `);
+  for (const t of seededTexts) {
+    await prisma.$executeRaw`
+      INSERT INTO lingo_testi_versioni (id, chiave, versione, titolo, corpo, conferma, azione, created_at, autore_id)
+      VALUES (${t.id}, ${t.chiave}::"LingoTestoChiave", ${t.versione}, ${t.titolo}, ${t.corpo}, ${t.conferma}, ${t.azione}, ${t.created_at}, ${t.autore_id})`;
+  }
 });
 
 export { prisma };

@@ -73,6 +73,14 @@ model User {
   // LingoLex: the study cards this user wrote
   lingoCards LingoCard[]
 
+  // LingoLex validation: set by an administrator; the votes this user cast (kept,
+  // anonymous, when the account goes), the notice versions they wrote (same) and
+  // the ones they accepted (removed with the account).
+  lingoValidatore       Boolean                  @default(false) @map("lingo_validatore")
+  lingoValidazioni      LingoValidazioneCard[]
+  lingoTestiScritti     LingoTestoVersione[]
+  lingoAccettazioni     LingoAccettazioneTesto[]
+
   // OAuth: the applications this user connected (MCP spike)
   oauthAuthorizationRequests OAuthAuthorizationRequest[]
   oauthAuthorizationCodes    OAuthAuthorizationCode[]
@@ -1020,6 +1028,8 @@ model LingoCard {
   // The connected application that created the card (Claude Code, LibreLex), as on DossierItem.
   createdByClientId   String?        @map("created_by_client_id")
   createdByClientName String?        @map("created_by_client_name")
+  // The version of the notice the card was proposed under; null for a draft, cleared on withdrawal.
+  propostaTestoId     String?        @map("proposta_testo_id")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
@@ -1027,8 +1037,10 @@ model LingoCard {
   // to review) is community property and outlives its author, anonymous. What
   // belongs to the person alone (drafts, archived) is removed in
   // `deleteUserAccount`, because only the application knows the card's state.
-  autore User?             @relation(fields: [autoreId], references: [id], onDelete: SetNull)
-  ancore LingoCardAncora[]
+  autore        User?                  @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  ancore        LingoCardAncora[]
+  propostaTesto LingoTestoVersione?    @relation(fields: [propostaTestoId], references: [id], onDelete: Restrict)
+  validazioni   LingoValidazioneCard[]
 
   @@index([materia, istituto, stato])
   @@index([stato])
@@ -1058,6 +1070,67 @@ model LingoCardAncora {
   @@index([normaKey, articleId, aknFingerprint])
   @@index([cardId])
   @@map("lingo_card_ancore")
+}
+
+enum LingoGiudizio {
+  APPROVATA
+  MIGLIORABILE
+  ERRATA
+}
+
+model LingoValidazioneCard {
+  id          String        @id @default(uuid())
+  cardId      String        @map("card_id")
+  // Null once the validator's account is gone: the vote stays (decision 19).
+  utenteId    String?       @map("utente_id")
+  giudizio    LingoGiudizio
+  motivazione String?       @db.Text
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  utente User?     @relation(fields: [utenteId], references: [id], onDelete: SetNull)
+
+  @@unique([cardId, utenteId])
+  @@index([utenteId])
+  @@map("lingo_validazioni_card")
+}
+
+enum LingoTestoChiave {
+  PROPOSTA_SCHEDA
+}
+
+// A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
+model LingoTestoVersione {
+  id        String           @id @default(uuid())
+  chiave    LingoTestoChiave
+  versione  Int
+  titolo    String
+  corpo     String           @db.Text
+  conferma  String           // the checkbox, e.g. «Ho letto e accetto»
+  azione    String           // the button, e.g. «Proponi»
+  createdAt DateTime         @default(now()) @map("created_at")
+  // The administrator who wrote it; null for version 1 (written by the migration) or once that account is gone.
+  autoreId  String?          @map("autore_id")
+
+  autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  accettazioni LingoAccettazioneTesto[]
+  carte        LingoCard[]
+
+  @@unique([chiave, versione])
+  @@map("lingo_testi_versioni")
+}
+
+model LingoAccettazioneTesto {
+  id         String   @id @default(uuid())
+  utenteId   String   @map("utente_id")
+  testoId    String   @map("testo_id")
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+
+  utente User               @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  testo  LingoTestoVersione @relation(fields: [testoId], references: [id], onDelete: Restrict)
+
+  @@unique([utenteId, testoId])
+  @@map("lingo_accettazioni_testi")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
