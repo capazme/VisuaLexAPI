@@ -1,6 +1,7 @@
 import { actHeading, citeNorm, normFromUrn } from '../../../utils/sources';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import type { AncoraScheda, Materia, Scheda, StatoScheda, TipoScheda } from '../../../types/studia';
+import { todayInRome } from '../../../utils/dateUtils';
 import { searchParamsFromNorma } from '../dossier/dossierUtils';
 
 export const MATERIA_LABEL: Record<Materia, string> = {
@@ -70,4 +71,22 @@ export function normaFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): NormaVisitat
 export function searchParamsFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): SearchParams | null {
   const norma = normaFromAnchor(anchor);
   return norma ? searchParamsFromNorma(norma) : null;
+}
+
+const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+
+/**
+ * When a card is next reviewed, as a row says it: «Da ripassare oggi» from today on, else
+ * «Prossimo ripasso: 12 ottobre» (with the year when it is not this one). Read from the parts of
+ * the 'YYYY-MM-DD' day, never through `Date`, which would read it as UTC; null when the card has no date.
+ * `todayInRome()` only words the label: whether a card is due is the server's decision (spec D18).
+ */
+export function nextReviewLabel(day: string | null | undefined, today: string = todayInRome()): string | null {
+  if (!day) return null;
+  if (day <= today) return 'Da ripassare oggi';
+  const [year, month, date] = day.split('-').map(Number);
+  const monthName = MONTHS[month - 1];
+  if (!year || !monthName || !date) return null;
+  const sameYear = day.slice(0, 4) === today.slice(0, 4);
+  return `Prossimo ripasso: ${date} ${monthName}${sameYear ? '' : ` ${year}`}`;
 }

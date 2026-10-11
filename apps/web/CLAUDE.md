@@ -10,11 +10,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
-  in `infra/compose.app.yml`), which also hides the Sidebar's «Studia»; `/studia` redirects to `schede`; «Le mie schede» is
+  in `infra/compose.app.yml`), which also hides the Sidebar's «Studia»; `/studia` redirects to `ripasso` (see «Card review» below); «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
-  keeping what a narrowed list hid until a deletion starts it over; the detail proposes a draft
+  keeping what a narrowed list hid until a deletion starts it over; each row shows the next review,
+  `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; the detail proposes a draft
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
@@ -28,7 +29,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
   verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
-  (`ServiceHealthBanner`) below `md` on this route, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
+  (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
@@ -80,7 +81,7 @@ annotations and highlights (these two hydrate per-article via
 not a store slice: `HistoryView` keeps it in local state and reloads it on mount.
 
 **Not in the store:** study cards are server state fetched per view (`studiaService`, `useMyCards`,
-`useArticleCards` over `utils/articleCardsCache.ts`), never in `useAppStore`.
+`useArticleCards` over `utils/articleCardsCache.ts`, `useReviewSession`), never in `useAppStore`.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
 workspace tabs and z-index, settings, `searchPanelState`.
@@ -260,6 +261,26 @@ original's; a query needs two characters (digits count); past 1000 matches the r
 Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
 `decisionRender.test.ts` check the projection with a search open (`utils/__fixtures__/openFind.ts`).
 The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
+
+**Card review** (`/studia/ripasso`, `ReviewHome` with `StudyPreferences`; the session is
+`/studia/ripasso/sessione?materia=`, `ReviewSession`): the server builds the day's queue and decides
+what «today» is (Studia spec decision 18), so the web app never computes a due date; the one exception,
+`nextReviewLabel`'s «Da ripassare oggi», is a display label. `useReviewSession` holds the queue: a card's
+first grade is posted, «Di nuovo» puts it back at the end, and its later passes that day are practice,
+never posted (the bar then shows the grades without intervals and «Ripasso di pratica: non registrato»).
+Its key handler reads the queue from refs and every queue update checks the head is still the graded
+card: a second key pressed between a post resolving and the re-render must not drop the next card.
+Keys: space reveals (ignored on a focused button or link, in a field, under an `aria-modal` dialog or a
+`data-find-overlay` layer), 1–4 grade after the reveal, Esc closes the article first, then asks
+«Interrompere il ripasso?»; listed in the «?» dialog's «Ripasso» group. The visual rule of the review
+card (`ReviewCard`) is the spec's §6 and is not to be restyled: the anchor's citation small in slate sans
+above, question and answer in the reader's serif at a 60ch measure, the question a step larger, no
+shadow or gradient; the reveal is the area's one motion (a hairline, then the answer, `motion-safe:`
+only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
+but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
+menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
+(`DossierItemReader`) in a side panel on desktop and in `studia/Sheet` on a phone (the bottom sheet
+shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
@@ -814,7 +835,7 @@ the row an opaque background matching the panel, bleed it edge-to-edge with
 negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
-**Stacking** — use the bands in `constants/zIndex.ts` (`sidebar` 50, `dock` 80,
+**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80,
 overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,

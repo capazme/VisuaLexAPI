@@ -29,6 +29,7 @@ import lingoArticoloRoutes from './routes/lingoArticolo';
 import lingoValidazioneRoutes from './routes/lingoValidazione';
 import lingoTestiRoutes from './routes/lingoTesti';
 import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
+import lingoSrsRoutes from './routes/lingoSrs';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -76,7 +77,7 @@ app.use(createOAuthRouter(oauthConfig));
 // it is counted per user rather than per address.
 app.use('/api', delegatedAuth);
 
-// Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
+// Rate limiting: anonymous 100/min, authenticated 300/min, writes 200/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory
 app.use(globalRateLimiter);
 
@@ -135,6 +136,7 @@ app.use('/api/lingo/validazione', lingoValidazioneRoutes);
 app.use('/api/lingo/testi', lingoTestiRoutes);
 // Behind its own authenticate + requireAdmin, like the rest of /api/admin, but ahead of the catch-all routers.
 app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
+app.use('/api/lingo/srs', lingoSrsRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 app.use('/api', authRoutes);

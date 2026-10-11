@@ -50,7 +50,7 @@ describe('StudiaPage', () => {
     );
     expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex Studia' })).toHaveClass('pl-12', 'lg:pl-0');
     expect(container.firstElementChild?.className).not.toMatch(/\bp[xy]?-\d|md:p-\d/);
-    expect(screen.getByRole('link', { name: 'Le mie schede' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ripasso', 'Le mie schede']);
     expect(screen.getByText('vista')).toBeInTheDocument();
   });
 });

@@ -184,6 +184,43 @@ describe('«Le mie schede», the filters', () => {
     expect(screen.getByRole('combobox', { name: 'Stato' })).toBeDisabled();
   });
 
+  it('asks for the cards due today', async () => {
+    renderView();
+    await screen.findAllByRole('link');
+    const toggle = screen.getByRole('button', { name: 'Da ripassare oggi' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.setup().click(toggle);
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ dovuteOggi: 'true' })));
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    // Not together with «Claude»: they are separate filters, and the state select stays free.
+    expect(screen.getByRole('combobox', { name: 'Stato' })).toBeEnabled();
+    await userEvent.setup().click(toggle);
+    await waitFor(() => expect(list.mock.lastCall?.[0]).not.toHaveProperty('dovuteOggi'));
+  });
+
+  describe('the next review in each row', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('says when a card comes back, and «Da ripassare oggi» from the day on', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-11T10:00:00+02:00'));
+      list.mockResolvedValue(page([
+        card('f1', { prossimoRipasso: '2026-10-12' }),
+        card('f2', { prossimoRipasso: '2026-10-11' }),
+        card('f3', { prossimoRipasso: '2026-10-01' }),
+        card('f4', { prossimoRipasso: null }),
+        card('f5'),
+      ]));
+      renderView();
+      const rows = await screen.findAllByRole('link');
+      expect(within(rows[0]).getByText('Prossimo ripasso: 12 ottobre')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('Da ripassare oggi')).toBeInTheDocument();
+      expect(within(rows[2]).getByText('Da ripassare oggi')).toBeInTheDocument();
+      expect(within(rows[3]).queryByText(/ripass/i)).not.toBeInTheDocument();
+      expect(within(rows[4]).queryByText(/ripass/i)).not.toBeInTheDocument();
+    });
+  });
+
   it('filters by subject, state and kind', async () => {
     renderView();
     await screen.findAllByRole('link');

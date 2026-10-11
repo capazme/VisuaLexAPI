@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const get = vi.fn();
 const post = vi.fn();
 const patch = vi.fn();
-vi.mock('./api', () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), patch: (...a: unknown[]) => patch(...a) } }));
+const put = vi.fn();
+vi.mock('./api', () => ({ apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a), patch: (...a: unknown[]) => patch(...a), put: (...a: unknown[]) => put(...a) } }));
 
 import { studiaService } from './studiaService';
 import type { SchedaInput } from '../types/studia';
@@ -102,5 +103,37 @@ describe('studiaService', () => {
     get.mockResolvedValue({ data: { id: 't1', chiave: 'PROPOSTA_SCHEDA', accettata: false } });
     expect(await studiaService.text('PROPOSTA_SCHEDA')).toEqual({ id: 't1', chiave: 'PROPOSTA_SCHEDA', accettata: false });
     expect(get).toHaveBeenCalledWith('/lingo/testi/PROPOSTA_SCHEDA');
+  });
+
+  describe('the review', () => {
+    it('reads today’s session, for a subject or for all', async () => {
+      const session = { conteggi: { dovute: 1, nuove: 2 }, cards: [] };
+      get.mockResolvedValue({ data: session });
+      expect(await studiaService.session('DIRITTO_PENALE')).toEqual(session);
+      expect(get).toHaveBeenLastCalledWith('/lingo/srs/sessione', { params: { materia: 'DIRITTO_PENALE' } });
+      await studiaService.session();
+      expect(get).toHaveBeenLastCalledWith('/lingo/srs/sessione', { params: {} });
+    });
+
+    it('records a grade and hands back when the card is next due', async () => {
+      post.mockResolvedValue({ data: { registrata: true, prossimoRipasso: '2026-10-12', scheduledDays: 1 } });
+      expect(await studiaService.review({ cardId: 'k1', rating: 3, durataMs: 4200 })).toEqual({ registrata: true, prossimoRipasso: '2026-10-12', scheduledDays: 1 });
+      expect(post).toHaveBeenCalledWith('/lingo/srs/revisioni', { cardId: 'k1', rating: 3, durataMs: 4200 });
+    });
+
+    it('reads and saves the study preferences', async () => {
+      get.mockResolvedValue({ data: { nuoveAlGiorno: 20, materieComunita: [] } });
+      expect(await studiaService.preferences()).toEqual({ nuoveAlGiorno: 20, materieComunita: [] });
+      expect(get).toHaveBeenLastCalledWith('/lingo/srs/preferenze');
+      put.mockResolvedValue({ data: { nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE'] } });
+      expect(await studiaService.savePreferences({ materieComunita: ['DIRITTO_CIVILE'] })).toEqual({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE'] });
+      expect(put).toHaveBeenCalledWith('/lingo/srs/preferenze', { materieComunita: ['DIRITTO_CIVILE'] });
+    });
+
+    it('asks for the cards due today when the list is filtered so', async () => {
+      get.mockResolvedValue({ data: { cards: [], nextOffset: null } });
+      await studiaService.list({ dovuteOggi: 'true' });
+      expect(get).toHaveBeenCalledWith('/lingo/cards', { params: { dovuteOggi: 'true' } });
+    });
   });
 });

@@ -157,6 +157,76 @@ describe('votes and texts to accept, when an account goes', () => {
   });
 });
 
+// A review of `card` by `user`: the state row and one log row, as the review route writes them.
+async function reviewed(user: TestUser, cardId: string) {
+  await prisma.lingoStatoRipasso.create({
+    data: { utenteId: user.id, cardId, stability: 2.4, difficulty: 4.93, dueAt: new Date('2026-10-20T22:00:00Z'), lastReviewAt: new Date('2026-10-18T10:00:00Z') },
+  });
+  await prisma.lingoRevisioneSRS.create({
+    data: { utenteId: user.id, cardId, rating: 3, scheduledDays: 2, stability: 2.4, difficulty: 4.93, durataMs: 4200 },
+  });
+}
+
+describe('what happens to a user’s reviews when the account goes', () => {
+  it('removes their review state, log and preferences, and nobody else’s', async () => {
+    const alice = await createTestUser('review-erasure-alice');
+    const bob = await createTestUser('review-erasure-bob');
+    const shared = await cardIn(bob, 'VALIDATA');
+    await reviewed(alice, shared.id);
+    await reviewed(bob, shared.id);
+    await prisma.lingoPreferenzeStudio.create({ data: { utenteId: alice.id, nuoveAlGiorno: 5, materieComunita: ['DIRITTO_CIVILE'] } });
+    await prisma.lingoPreferenzeStudio.create({ data: { utenteId: bob.id } });
+
+    const response = await request(app)
+      .delete('/api/auth/account')
+      .set(authHeader(alice))
+      .send({ password: 'test-password', confirmation: 'ELIMINA ACCOUNT' });
+    expect(response.status).toBe(204);
+
+    expect(await prisma.lingoStatoRipasso.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
+    expect(await prisma.lingoRevisioneSRS.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
+    expect(await prisma.lingoPreferenzeStudio.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
+  });
+
+  it('removes the reviews of a card that goes with its author', async () => {
+    const alice = await createTestUser('review-erasure-own');
+    const draft = await cardIn(alice, 'BOZZA_PERSONALE');
+    await reviewed(alice, draft.id);
+    await request(app)
+      .delete('/api/auth/account')
+      .set(authHeader(alice))
+      .send({ password: 'test-password', confirmation: 'ELIMINA ACCOUNT' });
+    expect(await prisma.lingoStatoRipasso.count()).toBe(0);
+    expect(await prisma.lingoRevisioneSRS.count()).toBe(0);
+  });
+
+  it('removes everyone’s reviews of a card when the card is deleted', async () => {
+    const author = await createTestUser('review-card-author');
+    const reader = await createTestUser('review-card-reader');
+    const card = await cardIn(author, 'VALIDATA');
+    await reviewed(author, card.id);
+    await reviewed(reader, card.id);
+    const other = await cardIn(author, 'PROPOSTA_COMMUNITY');
+    await reviewed(reader, other.id);
+
+    await prisma.lingoCard.delete({ where: { id: card.id } });
+
+    expect(await prisma.lingoStatoRipasso.findMany({ select: { cardId: true } })).toEqual([{ cardId: other.id }]);
+    expect(await prisma.lingoRevisioneSRS.findMany({ select: { cardId: true } })).toEqual([{ cardId: other.id }]);
+  });
+
+  it('keeps one state row per user and card', async () => {
+    const alice = await createTestUser('review-state-unique');
+    const card = await cardIn(alice, 'BOZZA_PERSONALE');
+    await reviewed(alice, card.id);
+    await expect(
+      prisma.lingoStatoRipasso.create({
+        data: { utenteId: alice.id, cardId: card.id, stability: 1, difficulty: 5, dueAt: new Date(), lastReviewAt: new Date() },
+      })
+    ).rejects.toMatchObject({ code: 'P2002' });
+  });
+});
+
 describe('exporting an account', () => {
   it('includes the user’s own cards, in every state, with their anchors, and nobody else’s', async () => {
     const alice = await createTestUser('export-alice');
@@ -174,6 +244,40 @@ describe('exporting an account', () => {
       expect(c.autoreId).toBe(alice.id);
       expect(c.ancore).toHaveLength(1);
     }
+  });
+
+  it('includes the review log, oldest first, and the preferences, and nobody else’s', async () => {
+    const alice = await createTestUser('export-review-alice');
+    const bob = await createTestUser('export-review-bob');
+    const first = await cardIn(alice, 'BOZZA_PERSONALE');
+    const second = await cardIn(alice, 'VALIDATA');
+    await prisma.lingoRevisioneSRS.create({
+      data: { utenteId: alice.id, cardId: second.id, dataRevisione: new Date('2026-10-19T09:00:00Z'), rating: 4, scheduledDays: 9, stability: 8.2, difficulty: 4.1 },
+    });
+    await prisma.lingoRevisioneSRS.create({
+      data: { utenteId: alice.id, cardId: first.id, dataRevisione: new Date('2026-10-18T09:00:00Z'), rating: 3, scheduledDays: 2, stability: 2.4, difficulty: 4.93, durataMs: 4200 },
+    });
+    await prisma.lingoRevisioneSRS.create({
+      data: { utenteId: bob.id, cardId: second.id, rating: 1, scheduledDays: 1, stability: 0.4, difficulty: 7.2 },
+    });
+    await prisma.lingoPreferenzeStudio.create({ data: { utenteId: alice.id, nuoveAlGiorno: 12, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] } });
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    expect(response.status).toBe(200);
+    expect(response.body.schemaVersion).toBe(1);
+    expect(response.body.data.lingoRipassi).toEqual([
+      { cardId: first.id, dataRevisione: '2026-10-18T09:00:00.000Z', rating: 3, scheduledDays: 2, stability: 2.4, difficulty: 4.93, durataMs: 4200 },
+      { cardId: second.id, dataRevisione: '2026-10-19T09:00:00.000Z', rating: 4, scheduledDays: 9, stability: 8.2, difficulty: 4.1, durataMs: null },
+    ]);
+    expect(response.body.data.lingoPreferenze).toEqual({ nuoveAlGiorno: 12, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
+  });
+
+  it('has an empty log and no preferences for a user who never studied', async () => {
+    const dora = await createTestUser('export-review-dora');
+    const response = await request(app).get('/api/auth/export').set(authHeader(dora));
+    expect(response.body.data.lingoRipassi).toEqual([]);
+    expect(response.body.data.lingoPreferenze).toBeNull();
   });
 
   it('has an empty list for a user with no cards', async () => {

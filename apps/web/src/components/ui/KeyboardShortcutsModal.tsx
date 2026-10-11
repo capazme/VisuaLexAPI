@@ -52,6 +52,14 @@ const shortcutGroups: ShortcutGroup[] = [
       { keys: [modKey, 'C'], description: 'Copia articolo' },
     ],
   },
+  {
+    title: 'Ripasso',
+    shortcuts: [
+      { keys: ['Spazio'], description: 'Mostra risposta' },
+      { keys: ['1–4'], description: 'Di nuovo / Difficile / Bene / Facile' },
+      { keys: ['Esc'], description: 'Interrompi il ripasso' },
+    ],
+  },
 ];
 
 function KeyBadge({ children }: { children: React.ReactNode }) {

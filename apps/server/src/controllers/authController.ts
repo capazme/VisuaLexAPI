@@ -211,7 +211,7 @@ export const changePassword = async (req: Request, res: Response) => {
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -235,6 +235,12 @@ export const exportAccountData = async (req: Request, res: Response) => {
       select: { acceptedAt: true, testo: { select: { chiave: true, versione: true } } },
       orderBy: { acceptedAt: 'asc' },
     }),
+    prisma.lingoRevisioneSRS.findMany({
+      where: { utenteId: userId },
+      select: { cardId: true, dataRevisione: true, rating: true, scheduledDays: true, stability: true, difficulty: true, durataMs: true },
+      orderBy: [{ dataRevisione: 'asc' }, { id: 'asc' }],
+    }),
+    prisma.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId }, select: { nuoveAlGiorno: true, materieComunita: true } }),
   ]);
 
   res.json({
@@ -247,6 +253,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
       threads: threads.map(({ passageReleasedById: _releasedBy, ...thread }) => thread),
       comments, lingoCards, lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
+      // The review log (the scheduling state is derived from it and not exported) and the daily goal.
+      lingoRipassi, lingoPreferenze,
     },
   });
 };

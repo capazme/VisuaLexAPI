@@ -52,6 +52,8 @@ vi.mock('../services/studiaService', () => ({
     vote: vi.fn().mockRejectedValue({ status: 404 }),
   },
 }));
+vi.mock('../components/features/studia/ReviewHome', () => ({ ReviewHome: () => <h2>Ripasso di oggi</h2> }));
+vi.mock('../components/features/studia/ReviewSession', () => ({ ReviewSession: () => <h2>Sessione di ripasso</h2> }));
 
 import App from '../App';
 
@@ -120,10 +122,16 @@ describe('App routing — Studia', () => {
     expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
   });
 
-  it('sends /studia to the cards', async () => {
+  it('sends /studia to the review', async () => {
     renderAt('/studia');
-    expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/studia/schede');
+    expect(await screen.findByRole('heading', { name: 'Ripasso di oggi' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/studia/ripasso');
+  });
+
+  it('opens a session at /studia/ripasso/sessione, inside the area', async () => {
+    renderAt('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
+    expect(await screen.findByRole('heading', { name: 'Sessione di ripasso' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Studia' })).toBeInTheDocument();
   });
 
   it('keeps a card’s address inside the Studia area', async () => {

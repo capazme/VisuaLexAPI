@@ -8,8 +8,10 @@ import { createLingoCard } from '../lingo/cards';
 import { canTransition } from '../lingo/cardStates';
 import { hasNoNul } from '../lingo/noNul';
 import { cardInputSchema, planCards } from '../lingo/planCards';
+import { REVIEWABLE_OWN_STATES } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
 import { currentText, hasAccepted, serializeText } from '../lingo/texts';
+import { romeDay, startOfRomeDay } from '../lingo/studyDay';
 import { lingoCardCreateSchema } from '../schemas/lingo/card';
 import { trashLingoCards } from '../trash/trash';
 
@@ -50,6 +52,8 @@ const listSchema = z.object({
   normaKey: z.string().max(100).regex(/^[a-z0-9]+(_[a-z0-9]+)*$/).optional(),
   q: z.string().trim().min(1).max(100).refine(hasNoNul, { message: 'Il testo contiene un carattere non valido.' }).optional(),
   origine: z.literal('applicazione').optional(),
+  // Cards due for review up to today (Rome), by the caller's own review state.
+  dovuteOggi: z.literal('true').optional(),
   ordine: z.enum(['recenti', 'materia']).default('recenti'),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).max(100000).default(0),
@@ -58,6 +62,21 @@ const proposeSchema = z
   .object({ accettoTestoId: z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' }).optional() })
   .strict();
 const trashSchema = z.object({ cardIds: z.array(z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' })).min(1).max(MAX_CARDS_PER_CALL) }).strict();
+
+/**
+ * What the caller's own review state adds to a card: the Rome day it is next due, null before its first
+ * review, and null for a card that can no longer be reviewed (its state row stays but nothing is due). The
+ * study state is the user's session's: a connected application gets the card as before.
+ */
+const reviewedBy = (userId: string) => ({ ancore: true, statiRipasso: { where: { utenteId: userId } } }) satisfies Prisma.LingoCardInclude;
+type CardWithReview = Prisma.LingoCardGetPayload<{ include: ReturnType<typeof reviewedBy> }>;
+const serializeForCaller = (req: Request) => (card: CardWithReview) =>
+  req.delegation
+    ? serialize(card)
+    : {
+        ...serialize(card),
+        prossimoRipasso: card.statiRipasso[0] && REVIEWABLE_OWN_STATES.includes(card.stato) ? romeDay(card.statiRipasso[0].dueAt) : null,
+      };
 
 router.post('/', async (req, res) => {
   const { cards } = createSchema.parse(req.body);
@@ -94,9 +113,11 @@ router.post('/trash', async (req: Request, res) => {
 });
 
 router.get('/', async (req, res) => {
-  const { materia, stato, tipo, normaKey, q, origine, ordine, limit, offset } = listSchema.parse(req.query);
+  const { materia, stato, tipo, normaKey, q, origine, dovuteOggi, ordine, limit, offset } = listSchema.parse(req.query);
+  const userId = req.user!.id;
+  if (dovuteOggi && req.delegation) throw new AppError(403, 'Il ripasso è dell’utente: questo filtro non è disponibile alle applicazioni collegate.');
   const where: Prisma.LingoCardWhereInput = {
-    autoreId: req.user!.id,
+    autoreId: userId,
     ...(materia ? { materia } : {}),
     ...(stato ? { stato } : {}),
     ...(tipo ? { tipo } : {}),
@@ -104,6 +125,18 @@ router.get('/', async (req, res) => {
     ...(normaKey ? { ancore: { some: { normaKey } } } : {}),
     ...(q ? { OR: [{ istituto: { contains: q, mode: 'insensitive' } }, { domanda: { contains: q, mode: 'insensitive' } }] } : {}),
     ...(origine ? { createdByClientId: { not: null } } : {}),
+    // A review state due before tomorrow's first instant in Rome: today's, or overdue.
+    // An AND, so that it does not collide with the `stato` filter; the states are the ones a session offers.
+    ...(dovuteOggi
+      ? {
+          AND: [
+            {
+              stato: { in: REVIEWABLE_OWN_STATES },
+              statiRipasso: { some: { utenteId: userId, dueAt: { lt: startOfRomeDay(romeDay(new Date()), 1) } } },
+            },
+          ],
+        }
+      : {}),
   };
   const orderBy: Prisma.LingoCardOrderByWithRelationInput[] =
     ordine === 'materia'
@@ -111,22 +144,22 @@ router.get('/', async (req, res) => {
       : [{ createdAt: 'desc' }, { id: 'desc' }];
   const cards = await prisma.lingoCard.findMany({
     where,
-    include: { ancore: true },
+    include: reviewedBy(userId),
     // The id breaks ties: restored cards keep their creation time, and pages must not repeat or skip one.
     orderBy,
     take: limit + 1,
     skip: offset,
   });
-  res.json({ cards: cards.slice(0, limit).map(serialize), nextOffset: cards.length > limit ? offset + limit : null });
+  res.json({ cards: cards.slice(0, limit).map(serializeForCaller(req)), nextOffset: cards.length > limit ? offset + limit : null });
 });
 
 router.get('/:id', async (req, res) => {
-  const card = await prisma.lingoCard.findFirst({ where: { id: req.params.id, autoreId: req.user!.id }, include: { ancore: true } });
+  const card = await prisma.lingoCard.findFirst({ where: { id: req.params.id, autoreId: req.user!.id }, include: reviewedBy(req.user!.id) });
   if (!card) throw new AppError(404, 'Scheda non trovata.');
   // A connected application reads the card as before: a validator's reason is their writing and may name
   // someone (spec decision 19), so it is not handed to an application unless the owner decides it.
   if (req.delegation) {
-    res.json(serialize(card));
+    res.json(serializeForCaller(req)(card));
     return;
   }
   // What the validators said about the current proposal: the count of approvals and each remark, never who made it.
@@ -138,7 +171,7 @@ router.get('/:id', async (req, res) => {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }),
   ]);
-  res.json({ ...serialize(card), approvazioni, rilievi: rilievi.map((r) => ({ ...r, motivazione: r.motivazione ?? '' })) });
+  res.json({ ...serializeForCaller(req)(card), approvazioni, rilievi: rilievi.map((r) => ({ ...r, motivazione: r.motivazione ?? '' })) });
 });
 
 router.post('/:id/proponi', async (req, res) => {
