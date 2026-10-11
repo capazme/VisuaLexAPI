@@ -1,4 +1,4 @@
-import type { LingoCardStato, LingoMateria } from '@prisma/client';
+import type { LingoCardStato, LingoMateria, Prisma } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
@@ -550,6 +550,58 @@ describe('the review routes', () => {
       // The state filter still works alongside.
       expect((await list(a, { dovuteOggi: 'true', stato: 'ARCHIVIATA' })).body.cards).toEqual([]);
       expect((await list(a, { dovuteOggi: 'true', stato: 'PROPOSTA_COMMUNITY' })).body.cards).toHaveLength(1);
+    });
+  });
+
+  describe('a grade racing a change to its card', () => {
+    /**
+     * Holds the card's row locked in another transaction (as the trash and an edit do), fires the grade, shows it
+     * waiting, then lets `change` run and commit. Resolves with the grade's answer.
+     */
+    async function gradeWhileLocked(cardId: string, change: (tx: Prisma.TransactionClient) => Promise<unknown>) {
+      let release!: () => void;
+      let locked!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      const lockedNow = new Promise<void>((resolve) => (locked = resolve));
+      const holder = prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id = ${cardId} FOR UPDATE`;
+          locked();
+          await released;
+          await change(tx);
+        },
+        { timeout: 20_000 },
+      );
+      await lockedNow;
+      let settled = false;
+      const pending = Promise.resolve(grade(a, { cardId, rating: 3 })).then((response) => {
+        settled = true;
+        return response;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(settled, 'the grade waits for the card’s lock').toBe(false);
+      release();
+      await holder;
+      return pending;
+    }
+
+    it('answers 404, and writes nothing, when the card is deleted meanwhile', async () => {
+      setClock(MONDAY_MORNING);
+      const c = await card(alice);
+      const response = await gradeWhileLocked(c.id, (tx) => tx.lingoCard.delete({ where: { id: c.id } }));
+      expect(response.status).toBe(404);
+      expect(response.body.detail).toBe('Scheda non trovata.');
+      expect(await prisma.lingoStatoRipasso.count()).toBe(0);
+      expect(await prisma.lingoRevisioneSRS.count()).toBe(0);
+    });
+
+    it('sees the state the card has after the lock: archived meanwhile, it is refused', async () => {
+      setClock(MONDAY_MORNING);
+      const c = await card(alice);
+      const response = await gradeWhileLocked(c.id, (tx) => tx.lingoCard.update({ where: { id: c.id }, data: { stato: 'ARCHIVIATA' } }));
+      expect(response.status).toBe(404);
+      expect(await prisma.lingoStatoRipasso.count()).toBe(0);
+      expect(await prisma.lingoRevisioneSRS.count()).toBe(0);
     });
   });
 

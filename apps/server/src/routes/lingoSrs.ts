@@ -1,4 +1,4 @@
-import { LingoMateria, type LingoPreferenzeStudio, type Prisma } from '@prisma/client';
+import { LingoMateria, Prisma, type LingoPreferenzeStudio } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -107,6 +107,11 @@ router.post('/revisioni', async (req, res) => {
     // so FOR UPDATE cannot lock it: serialise on the pair itself.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}::text || ':' || ${cardId}::text))`;
 
+    // Lock the card's row against deletion and key changes (what the state row's foreign key needs): the trash
+    // deletes under FOR UPDATE, so a grade racing it waits, then finds no card (404) instead of a foreign-key error.
+    const present = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_cards WHERE id = ${cardId} FOR KEY SHARE`;
+    if (present.length !== 1) throw cardNotFound();
+
     // The scope is read with the user's current preferences: a card that left the pool since the session was fetched is refused.
     const { materieComunita } = await readPreferences(tx, userId);
     const inScope = await tx.lingoCard.findFirst({ where: { AND: [{ id: cardId }, reviewScope(userId, materieComunita)] }, select: { id: true } });
@@ -140,6 +145,10 @@ router.post('/revisioni', async (req, res) => {
       },
     });
     return { registrata: true, prossimoRipasso: romeDay(dueAt), scheduledDays: result.scheduledDays };
+  }).catch((error: unknown) => {
+    // Belt: a card that vanished under the insert is a missing card, never a 500.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') throw cardNotFound();
+    throw error;
   });
   res.json(answer);
 });
