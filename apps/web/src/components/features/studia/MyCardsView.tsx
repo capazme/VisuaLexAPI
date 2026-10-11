@@ -31,19 +31,30 @@ function useDebounced<T>(value: T, ms: number): [T, (next: T) => void] {
   return [settled, setSettled];
 }
 
-/** The acts the cards rest on (by `normaKey`), each named by the source convention; what was seen once stays on offer. */
-function withActsOf(known: ReadonlyMap<string, string>, cards: Scheda[]): ReadonlyMap<string, string> {
-  let next: Map<string, string> | null = null;
+/**
+ * The acts the cards rest on (by `normaKey`), each named by the source convention. A narrowed list
+ * adds to what was on offer; with `rebuild` the options are those of these cards alone, so an act
+ * whose last card is gone stops being offered. The act now selected is always kept. The same
+ * instance comes back when nothing changes.
+ */
+function withActsOf(
+  known: ReadonlyMap<string, string>,
+  cards: Scheda[],
+  selected: string | undefined,
+  rebuild: boolean,
+): ReadonlyMap<string, string> {
+  const next = new Map(rebuild ? [] : known);
   for (const card of cards) {
     for (const anchor of card.ancore) {
-      if ((next ?? known).has(anchor.normaKey)) continue;
+      if (next.has(anchor.normaKey)) continue;
       const label = anchorActLabel(anchor);
-      if (!label) continue;
-      next ??= new Map(known);
-      next.set(anchor.normaKey, label);
+      if (label) next.set(anchor.normaKey, label);
     }
   }
-  return next ?? known;
+  const kept = selected ? known.get(selected) : undefined;
+  if (selected && kept && !next.has(selected)) next.set(selected, kept);
+  const unchanged = next.size === known.size && [...next].every(([key, label]) => known.get(key) === label);
+  return unchanged ? known : next;
 }
 
 /**
@@ -71,11 +82,16 @@ export function MyCardsView() {
     }),
     [filterState, q],
   );
-  const { cards, groups, loadMore, hasMore, loading, error, refresh } = useMyCards(filters);
+  const { cards, groups, loadMore, hasMore, loading, settled, error, refresh } = useMyCards(filters);
+  const filtered = Boolean(q) || Object.values(filterState).some(Boolean);
 
   const [knownActs, setKnownActs] = useState<ReadonlyMap<string, string>>(new Map());
-  const acts = withActsOf(knownActs, cards);
+  // A deletion starts the options over even under a filter: the act of the card that went must not stay on offer.
+  const [restartActs, setRestartActs] = useState(false);
+  const rebuildActs = settled && !error && (!filtered || restartActs);
+  const acts = withActsOf(knownActs, cards, filterState.normaKey, rebuildActs);
   if (acts !== knownActs) setKnownActs(acts);
+  if (rebuildActs && restartActs) setRestartActs(false);
   const actOptions = useMemo<ActOption[]>(
     () => [...acts].map(([normaKey, label]) => ({ normaKey, label })).sort((a, b) => a.label.localeCompare(b.label, 'it')),
     [acts],
@@ -129,6 +145,7 @@ export function MyCardsView() {
     if (!card) return;
     try {
       const outcome = await studiaService.trash([card.id]);
+      setRestartActs(true);
       if (outcome.moved.includes(card.id)) {
         setToast({ message: 'Scheda nel cestino', type: 'success' });
       } else if (outcome.notDeletable.includes(card.id)) {
@@ -155,7 +172,6 @@ export function MyCardsView() {
     setSearch('');
     settleSearch('');
   };
-  const filtered = Boolean(q) || Object.values(filterState).some(Boolean);
   const showList = desktop || !id;
 
   return (

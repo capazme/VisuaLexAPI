@@ -56,6 +56,17 @@ beforeEach(() => {
 
 afterEach(() => setDesktop(false));
 
+describe('CardForm, on a phone', () => {
+  it('gives every field a 44 px target', async () => {
+    setDesktop(false);
+    renderForm(fromReader());
+    await userEvent.setup().click(screen.getByRole('button', { name: /\+ Ancora/ }));
+    for (const field of [screen.getByLabelText('Materia'), screen.getByLabelText('Istituto'), screen.getByRole('combobox', { name: 'Tipo di scheda' }), screen.getByLabelText('Riferimento dell’ancora')]) {
+      expect(field).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    }
+  });
+});
+
 describe('CardForm, opened from an article', () => {
   it('anchors the card to the article, fixed, and takes the subject from the act', () => {
     renderForm(fromReader());

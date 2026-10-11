@@ -324,6 +324,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               }}
               error={errors.materia}
               aria-invalid={errors.materia ? true : undefined}
+              className="min-h-[44px] md:min-h-0"
             >
               <option value="" disabled>Seleziona…</option>
               {(Object.keys(MATERIA_LABEL) as Materia[]).map((value) => (
@@ -341,6 +342,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               setErrors((x) => ({ ...x, istituto: undefined }));
             }}
             error={errors.istituto}
+            className="min-h-[44px] md:min-h-0"
             helperText={countdown(istituto.trim().length, LIMITS.istituto) ?? undefined}
             placeholder="es. Risoluzione per inadempimento"
             autoComplete="off"
@@ -359,7 +361,12 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               />
             </div>
           ) : (
-            <FormSelect aria-labelledby={fieldId('tipo')} value={tipo} onChange={(e) => setTipo(e.target.value as TipoScheda)}>
+            <FormSelect
+              aria-labelledby={fieldId('tipo')}
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as TipoScheda)}
+              className="min-h-[44px] md:min-h-0"
+            >
               {(Object.keys(TIPO_LABEL) as TipoScheda[]).map((value) => (
                 <option key={value} value={value}>{TIPO_LABEL[value]}</option>
               ))}
@@ -448,6 +455,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               <Input
                 autoFocus
                 aria-label="Riferimento dell’ancora"
+                className="min-h-[44px] md:min-h-0"
                 value={pending}
                 onChange={(e) => {
                   setPending(e.target.value);

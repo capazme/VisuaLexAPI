@@ -56,6 +56,8 @@ export function useMyCards(filters: CardQuery) {
   const [cards, setCards] = useState<Scheda[]>([]);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  // The filters the cards in hand answer: they are those of the request that wrote them last.
+  const [answeredKey, setAnsweredKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Only the latest request may write: an answer to an older filter is dropped.
   const latest = useRef(0);
@@ -73,12 +75,14 @@ export function useMyCards(filters: CardQuery) {
         return [...before, ...page.cards.filter((card) => !known.has(card.id))];
       });
       setNextOffset(page.nextOffset);
+      setAnsweredKey(key);
     } catch {
       if (request !== latest.current) return;
       // Cards of another filter would be read as this one's.
       if (offset === 0) {
         setCards([]);
         setNextOffset(null);
+        setAnsweredKey(key);
       }
       setError('Non riesco a leggere le schede. Riprova.');
     } finally {
@@ -97,5 +101,8 @@ export function useMyCards(filters: CardQuery) {
 
   const groups = useMemo(() => groupCards(cards), [cards]);
 
-  return { cards, groups, loadMore, hasMore: nextOffset !== null, loading, error, refresh };
+  // Not loading, and the cards answer the filters now in force (for a render after a change of filters, they do not yet).
+  const settled = !loading && answeredKey === key;
+
+  return { cards, groups, loadMore, hasMore: nextOffset !== null, loading, settled, error, refresh };
 }

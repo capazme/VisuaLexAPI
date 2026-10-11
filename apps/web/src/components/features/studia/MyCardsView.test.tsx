@@ -208,6 +208,49 @@ describe('«Le mie schede», the filters', () => {
   });
 });
 
+describe('«Le mie schede», the act filter after a deletion', () => {
+  const CIVILE = card('c1', { istituto: 'Contratto' });
+  const LEGGE = card('a1', { materia: 'DIRITTO_AMMINISTRATIVO', istituto: 'Termine', ancore: [{ normaKey: 'l_241_1990', articleId: 'art_2', urn: LEGGE_URN, isPrimary: true }] });
+  const actValues = () => within(screen.getByRole('combobox', { name: 'Atto' })).getAllByRole('option').map((o) => (o as HTMLOptionElement).value);
+
+  const deleteCard = async (id: string) => {
+    const detail = await screen.findByRole('article', { name: 'Scheda' });
+    await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await waitFor(() => expect(trash).toHaveBeenCalledWith([id]));
+  };
+
+  it('stops offering the act whose only card was deleted', async () => {
+    list.mockResolvedValue(page([CIVILE, LEGGE]));
+    renderView('/studia/schede/a1');
+    await screen.findByRole('combobox', { name: 'Atto' });
+    expect(actValues()).toEqual(['', 'codice_civile', 'l_241_1990']);
+    trash.mockResolvedValue({ trashId: 't1', moved: ['a1'], notFound: [], notDeletable: [] });
+    list.mockResolvedValue(page([CIVILE]));
+    await deleteCard('a1');
+    await waitFor(() => expect(actValues()).toEqual(['', 'codice_civile']));
+  });
+
+  it('forgets the act of a deleted card even while a filter narrows the list, but keeps the selected one', async () => {
+    list.mockResolvedValue(page([CIVILE, LEGGE]));
+    renderView();
+    const acts = await screen.findByRole('combobox', { name: 'Atto' });
+    list.mockResolvedValue(page([LEGGE]));
+    await userEvent.setup().selectOptions(acts, 'l_241_1990');
+    await screen.findByRole('link', { name: /Domanda a1\?/ });
+    // Narrowed, the options are kept: the civil code is still on offer.
+    expect(actValues()).toEqual(['', 'codice_civile', 'l_241_1990']);
+    await userEvent.setup().click(screen.getByRole('link', { name: /Domanda a1\?/ }));
+    trash.mockResolvedValue({ trashId: 't1', moved: ['a1'], notFound: [], notDeletable: [] });
+    list.mockResolvedValue(page([]));
+    await deleteCard('a1');
+    // The act of the empty list is the selected one and stays; the civil code, no longer read, goes.
+    await waitFor(() => expect(actValues()).toEqual(['', 'l_241_1990']));
+    expect(screen.getByRole('combobox', { name: 'Atto' })).toHaveValue('l_241_1990');
+  });
+});
+
 describe('«Le mie schede», the detail', () => {
   it('opens beside the list from a row, at its own address', async () => {
     renderView();

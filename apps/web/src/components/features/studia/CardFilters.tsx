@@ -57,7 +57,7 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
     <div
       role="group"
       aria-label="Filtri"
-      // Opaque, bled over the page padding (StudiaPage p-4 md:p-6) so cards scrolling under it do not show.
+      // Opaque, bled over the layout's page padding (p-4 md:p-8) so cards scrolling under it do not show.
       className={cn('sticky top-0 -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950', Z_INDEX.sticky)}
     >
       <div className="flex gap-2">

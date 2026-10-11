@@ -143,17 +143,52 @@ describe('ArticleCardsRow', () => {
     expect(forArticle).not.toHaveBeenCalled();
   });
 
-  it('disables «+ Nuova scheda» on a past text and says why', async () => {
-    const user = userEvent.setup();
-    forArticle.mockResolvedValue([card('a')]);
-    renderRow({ historical: true });
-    const button = await screen.findByRole('button', { name: '+ Nuova scheda' });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription('Le schede si ancorano al testo vigente');
-    await user.hover(button.parentElement as HTMLElement);
-    expect((await screen.findAllByText('Le schede si ancorano al testo vigente')).length).toBeGreaterThan(0);
-    // The cards already written still open.
-    expect(screen.getByRole('button', { name: 'Schede su questo articolo (1)' })).toBeEnabled();
+  describe('on a past text', () => {
+    const REASON = 'Le schede si ancorano al testo vigente';
+    const shown = () => screen.getAllByText(REASON).length;
+
+    it('marks «+ Nuova scheda» unavailable and says why, keeping it reachable', async () => {
+      forArticle.mockResolvedValue([card('a')]);
+      renderRow({ historical: true });
+      const button = await screen.findByRole('button', { name: '+ Nuova scheda' });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(button).not.toBeDisabled();
+      expect(button).toHaveAccessibleDescription(REASON);
+      // The cards already written still open.
+      expect(screen.getByRole('button', { name: 'Schede su questo articolo (1)' })).toBeEnabled();
+    });
+
+    it('shows the reason on hover', async () => {
+      const user = userEvent.setup();
+      forArticle.mockResolvedValue([card('a')]);
+      renderRow({ historical: true });
+      const button = await screen.findByRole('button', { name: '+ Nuova scheda' });
+      expect(shown()).toBe(1);
+      await user.hover(button);
+      await waitFor(() => expect(shown()).toBe(2));
+    });
+
+    it('shows the reason on keyboard focus, and hides it on leaving', async () => {
+      const user = userEvent.setup();
+      forArticle.mockResolvedValue([]);
+      renderRow({ historical: true });
+      const button = await screen.findByRole('button', { name: '+ Nuova scheda' });
+      await user.tab();
+      expect(button).toHaveFocus();
+      await waitFor(() => expect(shown()).toBe(2));
+      await user.tab();
+      await waitFor(() => expect(shown()).toBe(1));
+    });
+
+    it('does nothing on click, nor when the reader asks for a card from a selection', async () => {
+      const user = userEvent.setup();
+      forArticle.mockResolvedValue([]);
+      const handle = renderRow({ historical: true });
+      await user.click(await screen.findByRole('button', { name: '+ Nuova scheda' }));
+      act(() => handle.current?.createFromPassage('words'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Istituto')).not.toBeInTheDocument();
+    });
   });
 
   it('opens the form from «+ Nuova scheda» with the article’s rubric as the institute', async () => {

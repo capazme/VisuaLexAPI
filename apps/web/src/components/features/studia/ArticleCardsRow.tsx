@@ -57,13 +57,16 @@ export function ArticleCardsRow({ norma, articleText, structure, historical, ref
   const newCard = (
     <button
       type="button"
-      onClick={() => setForm({ open: true })}
-      disabled={!canCreate}
+      onClick={() => {
+        if (canCreate) setForm({ open: true });
+      }}
+      // Not `disabled`: a disabled button takes no focus and gives its Tooltip no hover.
+      aria-disabled={canCreate ? undefined : true}
       aria-describedby={canCreate ? undefined : reasonId}
       className={cn(
         ACTION,
         'font-medium text-primary-600 hover:underline dark:text-primary-400',
-        'disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline dark:disabled:text-slate-600',
+        'aria-disabled:cursor-not-allowed aria-disabled:text-slate-400 aria-disabled:hover:no-underline dark:aria-disabled:text-slate-600',
       )}
     >
       + Nuova scheda
