@@ -154,7 +154,12 @@ function PeekBody({ cards, articleLabel, onClose }: Pick<ArticleCardsPeekProps, 
               onClick={onClose}
               className="flex min-h-[44px] items-start justify-between gap-3 px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-800/60"
             >
-              <span className="min-w-0 break-words">{card.domanda}</span>
+              <span className="min-w-0 break-words">
+                {card.domanda}
+                {card.comunita && card.stato === 'VALIDATA' && card.approvazioni !== null && (
+                  <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Validata da {card.approvazioni}</span>
+                )}
+              </span>
               <StateChip stato={card.stato} className="mt-0.5 shrink-0" />
             </Link>
           </li>

@@ -56,9 +56,13 @@ export interface AdminUserUpdate {
   isAdmin?: boolean;
   isActive?: boolean;
   isVerified?: boolean;
+  /** Names the user a validator of VisuaLex Studia's cards. */
+  lingoValidatore?: boolean;
 }
 
 export interface AdminUserResponse extends UserResponse {
+  /** A validator of VisuaLex Studia's cards. */
+  lingo_validatore: boolean;
   login_count?: number;
   last_login_at?: string | null;
   stats?: {

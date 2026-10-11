@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
-  studiaService: { list: vi.fn(), get: vi.fn(), trash: vi.fn(), create: vi.fn(), update: vi.fn() },
+  studiaService: { list: vi.fn(), get: vi.fn(), trash: vi.fn(), create: vi.fn(), update: vi.fn(), propose: vi.fn(), withdraw: vi.fn() },
 }));
 
 vi.mock('../../../utils/articleCardsCache', async (importOriginal) => ({
@@ -21,6 +21,8 @@ import { MyCardsView } from './MyCardsView';
 const list = vi.mocked(studiaService.list);
 const get = vi.mocked(studiaService.get);
 const trash = vi.mocked(studiaService.trash);
+const propose = vi.mocked(studiaService.propose);
+const withdraw = vi.mocked(studiaService.withdraw);
 
 const CIVILE_URN = 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453';
 const LEGGE_URN = 'urn:nir:stato:legge:1990-08-07;241~art2';
@@ -73,6 +75,8 @@ beforeEach(() => {
   list.mockReset();
   get.mockReset();
   trash.mockReset();
+  propose.mockReset();
+  withdraw.mockReset();
   vi.mocked(invalidateArticleCards).mockClear();
   list.mockResolvedValue(page(FIVE));
   appStore.setState({ searchTrigger: null });
@@ -286,7 +290,9 @@ describe('«Le mie schede», the detail', () => {
   });
 
   it('shows the explanation, the origin and the state', async () => {
-    list.mockResolvedValue(page([card('r1', { spiegazione: 'Perché la prestazione è corrispettiva.', stato: 'DA_RIVEDERE', origine: { clientName: 'Claude Code' } })]));
+    const rivedere = card('r1', { spiegazione: 'Perché la prestazione è corrispettiva.', stato: 'DA_RIVEDERE', origine: { clientName: 'Claude Code' } });
+    list.mockResolvedValue(page([rivedere]));
+    get.mockResolvedValue({ ...rivedere, approvazioni: 0, rilievi: [] });
     renderView('/studia/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     expect(within(detail).getByText('Perché la prestazione è corrispettiva.')).toBeInTheDocument();
@@ -346,6 +352,8 @@ describe('«Le mie schede», the detail', () => {
 describe('«Le mie schede», the actions a state allows', () => {
   const actions = async (stato: StatoScheda) => {
     list.mockResolvedValue(page([card('k', { stato })]));
+    // A card past the drafts is completed from its own address (approvals and remarks).
+    get.mockResolvedValue(card('k', { stato, approvazioni: 0, rilievi: [] }));
     renderView('/studia/schede/k');
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     return {
@@ -452,5 +460,69 @@ describe('«Le mie schede», edit', () => {
     expect(await screen.findByText('Scheda salvata')).toBeInTheDocument();
     await waitFor(() => expect(list).toHaveBeenCalled());
     expect(await screen.findByRole('heading', { level: 3, name: 'Domanda cambiata?' })).toBeInTheDocument();
+  });
+});
+
+describe('«Le mie schede», proposing and withdrawing', () => {
+  const draft = card('d1');
+  const proposed = card('d1', { stato: 'PROPOSTA_COMMUNITY' });
+  const notice = { id: 't1', chiave: 'PROPOSTA_SCHEDA' as const, versione: 1, titolo: 'Titolo inventato', corpo: 'Uno.\n\nDue.', conferma: 'Conferma inventata', azione: 'Azione inventata' };
+
+  it('proposes under the notice, says so, reads the list again and drops the reader\'s cached cards', async () => {
+    const user = userEvent.setup();
+    list.mockResolvedValue(page([draft]));
+    renderView('/studia/schede/d1');
+    propose.mockResolvedValueOnce({ richiedeTesto: notice });
+    await user.click(await screen.findByRole('button', { name: 'Proponi alla comunità' }));
+    await screen.findByRole('dialog', { name: 'Titolo inventato' });
+
+    propose.mockResolvedValueOnce(proposed);
+    list.mockResolvedValue(page([proposed]));
+    get.mockResolvedValue({ ...proposed, approvazioni: 0, rilievi: [] });
+    list.mockClear();
+    await user.click(screen.getByRole('checkbox', { name: 'Conferma inventata' }));
+    await user.click(screen.getByRole('button', { name: 'Azione inventata' }));
+
+    expect(await screen.findByText('Scheda proposta alla comunità')).toBeInTheDocument();
+    expect(propose).toHaveBeenLastCalledWith('d1', 't1');
+    expect(invalidateArticleCards).toHaveBeenCalled();
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    // The detail now follows the proposed card: Ritira, no more Modifica.
+    expect(await screen.findByRole('button', { name: 'Ritira' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Modifica' })).not.toBeInTheDocument();
+  });
+
+  it('withdraws a proposal and shows the card as a draft again', async () => {
+    const user = userEvent.setup();
+    list.mockResolvedValue(page([proposed]));
+    get.mockResolvedValue({ ...proposed, approvazioni: 1, rilievi: [] });
+    renderView('/studia/schede/d1');
+    await user.click(await screen.findByRole('button', { name: 'Ritira' }));
+    withdraw.mockResolvedValue(draft);
+    list.mockResolvedValue(page([draft]));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Ritira' }));
+    expect(await screen.findByText('Proposta ritirata: la scheda è di nuovo una bozza')).toBeInTheDocument();
+    expect(invalidateArticleCards).toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Proponi alla comunità' })).toBeInTheDocument();
+  });
+
+  it('reads the validators\' remarks of a proposed card from its own address, since the list does not carry them', async () => {
+    list.mockResolvedValue(page([proposed]));
+    get.mockResolvedValue({
+      ...proposed, approvazioni: 1,
+      rilievi: [{ giudizio: 'MIGLIORABILE', motivazione: 'Manca la diffida.', createdAt: '2026-10-06T09:00:00Z' }],
+    });
+    renderView('/studia/schede/d1');
+    const section = await screen.findByRole('region', { name: 'Rilievi dei validatori' });
+    expect(get).toHaveBeenCalledWith('d1');
+    expect(within(section).getByText('Manca la diffida.')).toBeInTheDocument();
+    expect(screen.getByText('Approvazioni: 1')).toBeInTheDocument();
+  });
+
+  it('does not read a draft again: it has no votes', async () => {
+    list.mockResolvedValue(page([draft]));
+    renderView('/studia/schede/d1');
+    await screen.findByRole('button', { name: 'Proponi alla comunità' });
+    expect(get).not.toHaveBeenCalled();
   });
 });

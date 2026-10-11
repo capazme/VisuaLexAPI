@@ -115,6 +115,22 @@ describe('ArticleCardsRow', () => {
     expect(within(peek).queryByRole('textbox')).not.toBeInTheDocument();
   });
 
+  it('says «Validata da n» on a community card, and nothing of the kind on the reader\'s own', async () => {
+    const user = userEvent.setup();
+    forArticle.mockResolvedValue([
+      card('a', { stato: 'VALIDATA', comunita: true, approvazioni: 2 }),
+      card('b', { stato: 'VALIDATA', comunita: false, approvazioni: 3 }),
+      card('c', { stato: 'PROPOSTA_COMMUNITY', comunita: false, approvazioni: null }),
+    ]);
+    renderRow();
+    await user.click(await screen.findByRole('button', { name: 'Schede su questo articolo (3)' }));
+    const rows = within(await screen.findByRole('dialog')).getAllByRole('link');
+    expect(within(rows[0]).getByText('Validata da 2')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Validata')).toBeInTheDocument();
+    expect(within(rows[1]).queryByText(/Validata da/)).not.toBeInTheDocument();
+    expect(within(rows[2]).queryByText(/Validata da/)).not.toBeInTheDocument();
+  });
+
   it('closes the Peek with its button', async () => {
     const user = userEvent.setup();
     forArticle.mockResolvedValue([card('a')]);

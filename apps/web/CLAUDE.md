@@ -14,7 +14,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
-  keeping what a narrowed list hid until a deletion starts it over),
+  keeping what a narrowed list hid until a deletion starts it over; the detail proposes a draft
+  («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
+  accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
+  withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
+  validators' `rilievi`, which the list does not carry; the admin page's «Testi di VisuaLex Studia»
+  tab (`features/admin/StudiaTextsAdmin`) saves a text as a new version and its user list names the
+  validators),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an
