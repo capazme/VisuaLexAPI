@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -40,6 +41,11 @@ const variantIconStyles: Record<ModalVariant, string> = {
   success: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
 };
 
+// Open modals, oldest first. Each one registers its Tab trap and Esc handler on
+// `document`; with a dialog opened from another dialog, only the last one opened
+// may act, or the parent would pull the focus back from its child.
+const openModals: symbol[] = [];
+
 export function Modal({
   isOpen,
   onClose,
@@ -64,11 +70,24 @@ export function Modal({
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const tokenRef = useRef<symbol>(Symbol('modal'));
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const token = tokenRef.current;
+    openModals.push(token);
+    return () => {
+      const at = openModals.indexOf(token);
+      if (at !== -1) openModals.splice(at, 1);
+    };
+  }, [isOpen]);
+
+  const isTopmost = () => openModals[openModals.length - 1] === tokenRef.current;
 
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && isTopmost()) onClose();
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
@@ -77,7 +96,7 @@ export function Modal({
   useEffect(() => {
     if (!isOpen) return;
     const handleTab = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
+      if (e.key !== 'Tab' || !isTopmost()) return;
       const dialog = dialogRef.current;
       if (!dialog) return;
       const focusable = Array.from(
@@ -129,7 +148,9 @@ export function Modal({
 
   const hasHeader = Boolean(title || icon || showCloseButton);
 
-  return (
+  // Portaled: inside a reading window (transformed, stacked) the dialog would be
+  // confined to it, with the dock or another window above.
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -244,6 +265,7 @@ export function Modal({
           </div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
