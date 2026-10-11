@@ -182,6 +182,7 @@ describe('partialize', () => {
 
 describe('a full storage', () => {
   it('a store action completes without throwing, the change is kept, one log and one sync error, once a session', async () => {
+    flagOn();
     const quota = new DOMException('The quota has been exceeded.', 'QuotaExceededError');
     vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw quota; });
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -196,7 +197,7 @@ describe('a full storage', () => {
 
     await Promise.resolve();
     expect(appStore.getState().lastSyncError?.message)
-      .toBe('Il tavolo di lavoro non viene più salvato nel browser: lo spazio è esaurito. Chiudi qualche pratica.');
+      .toBe('Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.');
 
     // a second failing save logs nothing more and raises nothing more
     expect(() => appStore.setState({ practices: [practice('p1', 'Uno')] })).not.toThrow();
@@ -205,6 +206,35 @@ describe('a full storage', () => {
     expect(error).toHaveBeenCalledTimes(1);
     expect(appStore.getState().lastSyncError?.message).toBe('seconda');
     expect(appStore.getState().practices).toHaveLength(1);
+  });
+});
+
+describe('a full storage, flag off', () => {
+  it('the message does not mention practices', async () => {
+    flagOff();
+    vi.resetModules(); // the report is once a module: a fresh one
+    const fresh = await import('../useAppStore');
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    fresh.appStore.getState().pushSyncError('prima');
+    await Promise.resolve();
+    const message = fresh.appStore.getState().lastSyncError?.message ?? '';
+    expect(message).toMatch(/spazio del browser/);
+    expect(message).not.toMatch(/pratich/i);
+  });
+});
+
+describe('a load that seeds writes at once', () => {
+  it('the seeded practices are in storage before any action, so a reload does not seed again', async () => {
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
+    localStorage.setItem('visualex-storage', JSON.stringify({ state: { workspaceTabs: twoTabs }, version: 0 }));
+    vi.resetModules();
+    const fresh = await import('../useAppStore');
+    expect(fresh.appStore.getState().practicesSeeded).toBe(true);
+    const saved = JSON.parse(localStorage.getItem('visualex-storage') ?? '{}').state;
+    expect(saved.practicesSeeded).toBe(true);
+    expect(saved.practices.length).toBeGreaterThan(0);
+    localStorage.removeItem('visualex-storage');
   });
 });
 

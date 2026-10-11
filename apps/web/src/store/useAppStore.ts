@@ -637,6 +637,11 @@ const generateKey = (n: NormaVisitata) => {
     return parts.map(part => sanitize(part || '')).join('--');
 };
 
+// Declared before the store: a synchronous save during creation (a migration) may report a failure.
+let saveFailureReported = false;
+// Set by `practicesOnLoad` when it seeded: the seed is written at once, not at the next action.
+let seededOnLoad = false;
+
 const appStore = createStore<AppState>()(
     persist(
         immer((set, get) => ({
@@ -3319,9 +3324,10 @@ const appStore = createStore<AppState>()(
                 practices: state.practices,
                 activePracticeId: state.activePracticeId,
                 practicesSeeded: state.practicesSeeded,
-                // Every user-data slice is now server-backed and hydrated by
-                // fetchUserData. Nothing user-owned survives in localStorage
-                // anymore — persisting would cause drift with the server.
+                // Every other user-data slice is server-backed and hydrated by
+                // fetchUserData, so it does not survive in localStorage —
+                // persisting would cause drift with the server. The practices
+                // above are the deliberate exception (browser-only, spec D6).
                 // Excluded on purpose:
                 //   bookmarks, dossiers, environments, quickNorms,
                 //   customAliases, annotations, highlights
@@ -3363,6 +3369,10 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 
 // Export store for direct access (e.g., appStore.getState())
 export { appStore };
+
+// A load that seeded the practices writes them now: zustand saves after a hydrate only when it
+// migrated, so without this a reload before any action would seed (and tell the notice) again.
+if (seededOnLoad) appStore.setState({ practicesSeeded: true });
 
 // Export types
 /** A new, empty practice: the label trimmed and capped, «Pratica» when nothing is left of it. */
@@ -3437,6 +3447,7 @@ function practicesOnLoad(persisted: unknown): Pick<AppState,
         dropped.push(...seeded.dropped);
         practiceNotice = practiceNoticeText(seeded.droppedSearches);
         practicesSeeded = true;
+        seededOnLoad = true;
     }
     let activePracticeId: string | null = null;
     if (typeof wantedActive === 'string' && practices.some((x) => x.id === wantedActive)) {
@@ -3453,8 +3464,6 @@ function practicesOnLoad(persisted: unknown): Pick<AppState,
     return { practices, activePracticeId, practicesSeeded, practiceRows: {}, pendingReveal: null, practiceNotice };
 }
 
-let saveFailureReported = false;
-
 /** A save the browser refused (T20): logged once a session with the key, the size and the error's
  *  name (gotcha 18), and told once as a sync error, in a microtask so it does not run inside the
  *  `set` whose save failed. The state stays in memory; the next saves fail quietly. */
@@ -3464,7 +3473,9 @@ function reportSaveFailure({ name, bytes, error }: StorageFailure): void {
     const errorName = (error as { name?: unknown } | null)?.name;
     console.error(`persist: the browser refused to save "${name}" (${bytes} bytes): ${typeof errorName === 'string' ? errorName : String(error)}`, error);
     queueMicrotask(() => {
-        appStore.getState().pushSyncError('Il tavolo di lavoro non viene più salvato nel browser: lo spazio è esaurito. Chiudi qualche pratica.');
+        appStore.getState().pushSyncError(isPracticeTableEnabled()
+            ? 'Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.'
+            : 'Lo spazio del browser è esaurito: le schede aperte potrebbero non essere salvate. Chiudi qualche scheda.');
     });
 }
 

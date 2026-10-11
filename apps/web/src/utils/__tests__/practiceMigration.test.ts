@@ -424,6 +424,18 @@ describe('sanitizePractices', () => {
     expect(both.dropped).toHaveLength(2);
   });
 
+  it('two windows on decisions that merged become one window on the survivor', () => {
+    const r = sanitizePractices([{
+      id: 'p', label: 'P', labelIsCustom: false, acts: [],
+      decisions: [
+        { id: 'd1', reference: FOUND, label: 'Cass.', identified: false },
+        { id: 'd2', reference: FOUND, label: 'Cass.', identified: false },
+      ],
+      beside: [{ id: 'w1', kind: 'decision', decisionId: 'd1' }, { id: 'w2', kind: 'decision', decisionId: 'd2' }],
+    }]);
+    expect(r.practices[0].beside).toEqual([{ id: 'w1', kind: 'decision', decisionId: 'd1' }]);
+  });
+
   it('keeps an act and a decision that share a saved id apart: each window finds its own', () => {
     const law = article(L24, '1');
     const r = sanitizePractices([{

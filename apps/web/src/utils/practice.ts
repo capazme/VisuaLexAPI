@@ -359,6 +359,13 @@ interface SavedIds {
   decisions: Map<string, string>;
 }
 
+/** Two windows on one subject: after the id maps, two decisions (or acts) that merged are one. */
+function sameBesideSubject(a: BesideRef, b: BesideRef): boolean {
+  if (a.kind === 'article' && b.kind === 'article') return a.actId === b.actId && a.articleKey === b.articleKey;
+  if (a.kind === 'decision' && b.kind === 'decision') return a.decisionId === b.decisionId;
+  return false;
+}
+
 function sanitizeBeside(raw: unknown, practice: Practice, ids: SavedIds): BesideRef | null {
   if (!isObject(raw) || !isText(raw.id) || raw.id === '') return null;
   if (raw.kind === 'article' && isText(raw.actId) && isText(raw.articleKey)) {
@@ -480,7 +487,7 @@ export function sanitizePractices(raw: unknown): { practices: Practice[]; droppe
     const beside: BesideRef[] = [];
     for (const rawRef of entry.beside) {
       const ref = sanitizeBeside(rawRef, practice, ids);
-      if (!ref || beside.some((b) => b.id === ref.id)) {
+      if (!ref || beside.some((b) => b.id === ref.id || sameBesideSubject(b, ref))) {
         dropped.push(`${where}: a window that points at nothing the practice holds (${shapeOf(isObject(rawRef) ? rawRef.kind : rawRef)})`);
         continue;
       }

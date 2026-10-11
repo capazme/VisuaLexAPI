@@ -976,7 +976,9 @@ meant to stay split; add new features as new files, not inside the shells:
     looked fine until the first `addItem` 404'd on a ghost entity. Creation goes
     through `service.create()` first so the store holds server ids; mutations are
     optimistic + sync + revert. `applyEnvironment(replace)` also wipes
-    server-side first, gated behind a danger `ConfirmDialog`.
+    server-side first, gated behind a danger `ConfirmDialog`. The one deliberate
+    exception is the practices (spec D6): UI state, browser-only, saved in
+    localStorage and never sent to the server.
 18. **Never silently swallow errors in load paths** — `.catch(() => [])` in
     `fetchUserData` once hid a backend restart behind an empty UI for a whole
     session. Log with context before any fallback.
