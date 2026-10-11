@@ -2,14 +2,53 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
+import { readDecisionKey } from '../norms/decisionKey';
 
-// Validation schemas
-const addHistorySchema = z.object({
+// A history row is a norm or a court decision, never both. The messages are Italian: the first
+// one alone is the answer, as in the discussion controller. Unknown fields are ignored, as they
+// always were; parseHistory refuses the two kinds together before the schemas see the body.
+const normFields = z.object({
   act_type: z.string().min(1),
   act_number: z.string().optional(),
   article: z.string().optional(),
   date: z.string().optional(),
   version: z.string().optional().default('vigente'),
+});
+
+const decisionFields = z.object({
+  decision_key: z.string({ message: 'La chiave della sentenza non è valida' })
+    .refine((key) => readDecisionKey(key) !== null, 'La chiave della sentenza non è valida'),
+});
+
+type HistoryInput = z.infer<typeof normFields> | z.infer<typeof decisionFields>;
+
+function parseHistory(body: unknown): HistoryInput {
+  const record = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  const hasDecision = record.decision_key !== undefined;
+  const hasNorm = record.act_type !== undefined;
+  if (hasDecision && hasNorm) throw new AppError(400, 'Una voce della cronologia è una norma o una sentenza, non entrambe');
+  if (!hasDecision && !hasNorm) throw new AppError(400, 'Manca la norma o la sentenza');
+  const result = (hasDecision ? decisionFields : normFields).safeParse(body);
+  if (!result.success) {
+    throw new AppError(400, hasDecision ? 'La chiave della sentenza non è valida' : 'La norma della cronologia non è valida');
+  }
+  return result.data;
+}
+
+type HistoryRow = {
+  id: string; actType: string | null; actNumber: string | null; article: string | null;
+  date: string | null; version: string | null; decisionKey: string | null; createdAt: Date;
+};
+
+const toJson = (item: HistoryRow) => ({
+  id: item.id,
+  act_type: item.actType,
+  act_number: item.actNumber,
+  article: item.article,
+  date: item.date,
+  version: item.version,
+  decision_key: item.decisionKey,
+  created_at: item.createdAt,
 });
 
 /**
@@ -31,15 +70,7 @@ export const getHistory = async (req: Request, res: Response) => {
     skip: offset,
   });
 
-  res.json(history.map(item => ({
-    id: item.id,
-    act_type: item.actType,
-    act_number: item.actNumber,
-    article: item.article,
-    date: item.date,
-    version: item.version,
-    created_at: item.createdAt,
-  })));
+  res.json(history.map(toJson));
 };
 
 /**
@@ -51,20 +82,21 @@ export const addHistory = async (req: Request, res: Response) => {
     throw new AppError(401, 'Not authenticated');
   }
 
-  const data = addHistorySchema.parse(req.body);
+  const data = parseHistory(req.body);
+  const since = new Date(Date.now() - 5 * 60 * 1000); // duplicates within the last 5 minutes
 
-  // Check for duplicate recent entry (within last 5 minutes)
+  // Check for a duplicate recent entry
   const recentDuplicate = await prisma.searchHistory.findFirst({
-    where: {
-      userId: req.user.id,
-      actType: data.act_type,
-      actNumber: data.act_number || null,
-      article: data.article || null,
-      date: data.date || null,
-      createdAt: {
-        gte: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-      },
-    },
+    where: 'decision_key' in data
+      ? { userId: req.user.id, decisionKey: data.decision_key, createdAt: { gte: since } }
+      : {
+          userId: req.user.id,
+          actType: data.act_type,
+          actNumber: data.act_number || null,
+          article: data.article || null,
+          date: data.date || null,
+          createdAt: { gte: since },
+        },
   });
 
   if (recentDuplicate) {
@@ -73,40 +105,25 @@ export const addHistory = async (req: Request, res: Response) => {
       where: { id: recentDuplicate.id },
       data: { createdAt: new Date() },
     });
-
-    res.json({
-      id: updated.id,
-      act_type: updated.actType,
-      act_number: updated.actNumber,
-      article: updated.article,
-      date: updated.date,
-      version: updated.version,
-      created_at: updated.createdAt,
-    });
+    res.json(toJson(updated));
     return;
   }
 
   // Create new history entry
   const item = await prisma.searchHistory.create({
-    data: {
-      actType: data.act_type,
-      actNumber: data.act_number,
-      article: data.article,
-      date: data.date,
-      version: data.version,
-      userId: req.user.id,
-    },
+    data: 'decision_key' in data
+      ? { decisionKey: data.decision_key, userId: req.user.id }
+      : {
+          actType: data.act_type,
+          actNumber: data.act_number,
+          article: data.article,
+          date: data.date,
+          version: data.version,
+          userId: req.user.id,
+        },
   });
 
-  res.status(201).json({
-    id: item.id,
-    act_type: item.actType,
-    act_number: item.actNumber,
-    article: item.article,
-    date: item.date,
-    version: item.version,
-    created_at: item.createdAt,
-  });
+  res.status(201).json(toJson(item));
 };
 
 /**
