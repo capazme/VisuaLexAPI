@@ -3577,3 +3577,5 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 
 **Amendment, 2026-10-11 — PR 4e added (the owner: «80 sì, subito»).** A citation typed in the find window finds every form of the same norm or decision in the text (spec §13.2, Tasks 36–37): codes through `extractCitations`, numbered acts and decision numbers through patterns over the folded text, and punctuation in abbreviations optional for every query. Real decision texts stay out of the repository; a local-only suite reads them.
 
+**Amendment, 2026-10-12 — PR 4f queued after the redesign (the owner: «tutto come raccomandi»).** The citation forms the find window does not match yet (spec §13.2's «not yet found»: decisions cited date-first, «Cass. 12 aprile 2018, n. 8980»; «primo comma»; «commi»; «e ss.»; «del c.c.») become a small PR 4f, `feat/find-citations-more`, after the norm-tab redesign's P6. The current order does not change.
+
