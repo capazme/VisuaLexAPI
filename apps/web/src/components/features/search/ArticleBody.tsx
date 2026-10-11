@@ -14,6 +14,8 @@ export interface ArticleBodyProps {
     onPopupDiscuss?: (text: string, startOffset: number) => void;
     /** Optional "Segnala come citazione" action; the popup hides it when absent. */
     onPopupReportCitation?: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
+    /** Optional "Crea scheda" action: the popup hides it when absent. Gets the selected words. */
+    onPopupCreateCard?: (text: string) => void;
     /** Unfolds the AGGIORNAMENTO notes at the bottom of the text (useArticleTextInteractions). */
     updatesOpen?: boolean;
     /** A past text: the selection popup offers only "Copia" (see SelectionPopup). */
@@ -33,6 +35,7 @@ export function ArticleBody({
     onPopupCopy,
     onPopupDiscuss,
     onPopupReportCitation,
+    onPopupCreateCard,
     updatesOpen = false,
     copyOnly = false,
     className = 'vlx-art',
@@ -53,6 +56,7 @@ export function ArticleBody({
                 onCopy={onPopupCopy}
                 onDiscuss={onPopupDiscuss}
                 onReportCitation={onPopupReportCitation}
+                onCreateCard={onPopupCreateCard}
                 copyOnly={copyOnly}
             />
             {/* A size container: with room beside the 68ch column, each

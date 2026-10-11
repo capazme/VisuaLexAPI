@@ -9,6 +9,8 @@ import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
+import { ArticleCardsRow, type ArticleCardsHandle } from '../studia/ArticleCardsRow';
+import { offersNewCard } from '../studia/articleCardsOffer';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
@@ -158,6 +160,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const contentRef = useRef<HTMLDivElement>(null);
     // The find window searches ArticleBody's text root only: not Brocardi, not the case law below it.
     const textRootRef = useRef<HTMLDivElement>(null);
+    // The cards row owns the card form; the selection popup opens it through this.
+    const cardsRowRef = useRef<ArticleCardsHandle>(null);
     // Loop β #2 "missed" surface: a selection the user flagged as a legal
     // reference the citation detector did not link. Offset is in the same
     // marker projection as highlights; the rect was captured before the
@@ -199,6 +203,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Brocardi's commentary carries no date.
     const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
     const readOnly = display.readOnly;
+    // The study cards anchor to the text in force only.
+    const cardsHistorical = readOnly || !!versionInfo?.isHistorical;
     // Where a decision opened from the article's case law walks back to
     const decisionBackEntry = useMemo(() => originTabId && originBlockId ? {
         tabId: originTabId,
@@ -852,6 +858,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onPopupCopy={handlePopupCopy}
                     onPopupDiscuss={readOnly ? undefined : discussion.popupDiscuss}
                     onPopupReportCitation={canContribute && !readOnly ? handlePopupReportCitation : undefined}
+                    onPopupCreateCard={offersNewCard(norma_data, cardsHistorical)
+                        ? (text) => cardsRowRef.current?.createFromPassage(text)
+                        : undefined}
                     updatesOpen={updatesOpen}
                     copyOnly={readOnly}
                 />
@@ -911,6 +920,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     annex={norma_data.allegato}
                 />
             )}
+
+            <ArticleCardsRow
+                ref={cardsRowRef}
+                norma={norma_data}
+                articleText={article_text || ''}
+                structure={structure}
+                historical={cardsHistorical}
+            />
 
             <PluginSlot
                 slot="article_content_after"

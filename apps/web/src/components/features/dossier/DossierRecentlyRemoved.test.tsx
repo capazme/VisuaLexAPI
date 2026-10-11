@@ -6,7 +6,7 @@ import type { TrashEntry } from '../../../services/trashService';
 const entry: TrashEntry = {
   id: 't1', kind: 'DOSSIER_ITEMS', dossierId: 'd1', label: 'Ricorso Rossi', itemCount: 1,
   items: [{ itemType: 'note', citation: null, actCitation: null }],
-  clientName: 'Claude Code', deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z',
+  clientName: 'Claude Code', byApplication: true, deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z',
 };
 const props = { dossiers: [], onRestore: vi.fn(), onPurge: vi.fn(), showToast: vi.fn() };
 

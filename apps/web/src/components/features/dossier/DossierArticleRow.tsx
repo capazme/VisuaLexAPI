@@ -6,8 +6,9 @@ import { getRubricText, parseArticleStructure } from '../../../utils/articleStru
 import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
-import { ClaudeMark } from './ClaudeMark';
-import { claudeMarkSentence, formatTimestampLong } from './dossierUtils';
+import { ClaudeMark } from '../../ui/ClaudeMark';
+import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
+import { formatTimestampLong } from './dossierUtils';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;

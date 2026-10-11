@@ -4,7 +4,7 @@ import { TrashEntryRow } from './TrashEntryRow';
 import type { TrashEntry } from '../../../services/trashService';
 import type { Dossier } from '../../../types';
 
-const base = { clientName: 'Claude Code', deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z' };
+const base = { clientName: 'Claude Code', byApplication: true, deletedAt: '2026-10-04T10:00:00Z', expiresAt: '2026-11-03T10:00:00Z' };
 const items: TrashEntry = {
   ...base, id: 't1', kind: 'DOSSIER_ITEMS', dossierId: 'd1', label: 'Ricorso Rossi', itemCount: 3,
   items: [
@@ -13,7 +13,7 @@ const items: TrashEntry = {
     { itemType: 'note', citation: null, actCitation: null },
   ],
 };
-// The agreed shape of a LingoLex entry: live cards come with the MCP round's card PR.
+// The shape of a study-card entry. The server may still carry the old label «Schede LingoLex» on entries stored before the rename.
 const cards: TrashEntry = {
   ...base, id: 't2', kind: 'LINGO_CARDS', dossierId: null, label: 'Schede LingoLex', itemCount: 4,
   cards: [
@@ -52,10 +52,21 @@ describe('TrashEntryRow', () => {
     expect(screen.getByText('7 elementi')).toBeInTheDocument();
   });
 
-  it('shows LingoLex cards by their first questions', () => {
+  it('shows study cards by their first questions, under its own words and not the stored label', () => {
     renderRow(cards);
-    expect(screen.getByText('Schede LingoLex (4)')).toBeInTheDocument();
+    expect(screen.getByText('Schede di studio (4)')).toBeInTheDocument();
+    expect(screen.queryByText(/LingoLex/)).toBeNull();
     expect(screen.getByText('«Che cos’è la causa?» · «Quando è nullo?» · «Che cos’è la forma?» e altre 1')).toBeInTheDocument();
+  });
+
+  it('names one card in the singular', () => {
+    renderRow({ ...cards, itemCount: 1, cards: [cards.cards![0]] });
+    expect(screen.getByText('Scheda di studio')).toBeInTheDocument();
+  });
+
+  it('says «te» for an entry the web app moved, with no connected application', () => {
+    renderRow({ ...cards, clientName: null, byApplication: false, itemCount: 1, cards: [cards.cards![0]] });
+    expect(screen.getByText(/Rimosso da te il 4 ottobre 2026/)).toBeInTheDocument();
   });
 
   it('asks where to restore when the dossier is gone, then restores there', async () => {

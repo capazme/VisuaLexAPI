@@ -13,8 +13,8 @@ interface Props {
 
 /**
  * «Cestino», from the dossier list (spec §10): everything a connected
- * application deleted — dossiers, entries of a dossier, LingoLex cards (only
- * here, until LingoLex has screens) — each restored whole or emptied.
+ * application deleted — dossiers, entries of a dossier, study cards — and the
+ * study cards the user deleted in the app, each restored whole or emptied.
  */
 export function TrashPage({ trash, onBack, showToast }: Props) {
   const dossiers = useAppStore((s) => s.dossiers);
@@ -35,12 +35,12 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
           <Trash2 className="text-slate-500" size={22} aria-hidden /> Cestino
         </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni. Ciò che elimini tu nell’app si può annullare subito e non passa di qui.
+          Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni, come le schede di studio che elimini tu. Il resto di ciò che elimini nell’app si può annullare subito e non passa di qui.
         </p>
       </header>
       {error && <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {entries && entries.length === 0 && !error && (
-        <EmptyState variant="generic" title="Il cestino è vuoto" description="Nessun elemento eliminato da un’applicazione collegata." />
+        <EmptyState variant="generic" title="Il cestino è vuoto" description="Nessun elemento eliminato da un’applicazione collegata, nessuna scheda di studio eliminata da te." />
       )}
       {entries && entries.length > 0 && (
         <ul className="space-y-2">
