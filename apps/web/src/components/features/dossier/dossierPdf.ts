@@ -5,7 +5,7 @@ import { getRubricText, parseArticleStructure } from '../../../utils/articleStru
 import { describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
 import { articleLabel, layoutDossier } from './dossierLayout';
 import { PDF_MARGIN, createPdfWriter } from '../../../utils/pdfWriter';
-import { claudeMarkSentence } from './dossierUtils';
+import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
 
 /**
  * The dossier's PDF as the page is (spec §9): the notes, then each act named

@@ -12,7 +12,7 @@ fail=0
 # Hermetic: nothing the developer has exported may change what is rendered.
 for v in INGRESS_BIND INGRESS_PORT PUBLIC_ORIGIN APP_SUBNET EDGE_SUBNET MCP_PUBLIC_URL MCP_CLIENT_SECRET MCP_PORT SCRAPERS_ADDR SCRAPERS_MEM_LIMIT \
          MERLT_ENABLED POSTGRES_PASSWORD PLATFORM_DB_PASSWORD MERLT_DB_PASSWORD \
-         VITE_FEATURE_MERLT VITE_FEATURE_MERLT_GRAPH VISUALEX_STACK ENV_FILE; do
+         VITE_FEATURE_MERLT VITE_FEATURE_MERLT_GRAPH VITE_FEATURE_STUDIA VISUALEX_STACK ENV_FILE; do
   unset "$v"
 done
 
@@ -47,7 +47,7 @@ all="compose.yml compose.app.yml compose.scrapers.yml compose.prod.yml"
 (scenario dev-merlt merlt compose.yml) || fail=1
 (INGRESS_BIND=192.0.2.10; export INGRESS_BIND; scenario prod-lan merlt $all) || fail=1
 (scenario prod-default merlt $all) || fail=1
-(VITE_FEATURE_MERLT=false; export VITE_FEATURE_MERLT; scenario prod-flags merlt $all) || fail=1
+(VITE_FEATURE_MERLT=false VITE_FEATURE_STUDIA=false; export VITE_FEATURE_MERLT VITE_FEATURE_STUDIA; scenario prod-flags merlt $all) || fail=1
 (MERLT_ENABLED=false; export MERLT_ENABLED; scenario prod-merlt-off "" $all) || fail=1
 (SCRAPERS_ADDR=192.0.2.20:5000; export SCRAPERS_ADDR; scenario no-scrapers merlt compose.yml compose.app.yml compose.prod.yml) || fail=1
 (scenario scrapers-alone "" compose.scrapers.yml) || fail=1

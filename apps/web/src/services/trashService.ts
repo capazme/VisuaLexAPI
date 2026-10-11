@@ -2,8 +2,9 @@ import { apiClient } from './api';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application deleted,
- * kept 30 days. The web app lists, restores and empties it; it never moves
- * anything there (its own deletions stay immediate, with an undo).
+ * kept 30 days. The web app lists, restores and empties it. Its own deletions
+ * stay immediate, with an undo, except for study cards: those go through the
+ * trash too (`studiaService.trash`).
  */
 
 export type TrashKind = 'DOSSIER' | 'DOSSIER_ITEMS' | 'LINGO_CARDS';
@@ -18,6 +19,8 @@ export interface TrashEntry {
   items?: { itemType: string; citation: string | null; actCitation: string | null }[];
   cards?: { istituto: string; domanda: string }[];
   clientName: string | null;
+  /** False when the user moved it from the web app: no connected application is behind it. */
+  byApplication: boolean;
   deletedAt: string;
   expiresAt: string;
 }

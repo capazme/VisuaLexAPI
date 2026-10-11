@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
@@ -97,5 +97,33 @@ describe('App routing', () => {
     renderAt('/sentenze/cassazione-civile/99999/2024');
     expect(await screen.findByTestId('search-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
+  });
+});
+
+describe('App routing — Studia', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('opens «Le mie schede» at /studia/schede', async () => {
+    renderAt('/studia/schede');
+    expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
+  });
+
+  it('sends /studia to the cards', async () => {
+    renderAt('/studia');
+    expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/studia/schede');
+  });
+
+  it('keeps a card’s address inside the Studia area', async () => {
+    renderAt('/studia/schede/k1');
+    expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
+  });
+
+  it('is the 404 page when VITE_FEATURE_STUDIA is off', async () => {
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    renderAt('/studia');
+    expect(await screen.findByText('Pagina non trovata')).toBeInTheDocument();
   });
 });

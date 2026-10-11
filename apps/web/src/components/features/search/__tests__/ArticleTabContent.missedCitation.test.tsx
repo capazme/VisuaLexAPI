@@ -17,6 +17,9 @@ vi.mock('../../../../services/merltService', async (importOriginal) => ({
   sendNerFeedback: (...a: unknown[]) => sendNerFeedback(...a),
 }));
 
+// The cards row reads the study cards of the article; they are not under test.
+vi.mock('../../../../services/studiaService', () => ({ studiaService: { forArticle: () => Promise.resolve([]) } }));
+
 // The MERL-T plugin slots need the consent provider; they are not under test.
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 

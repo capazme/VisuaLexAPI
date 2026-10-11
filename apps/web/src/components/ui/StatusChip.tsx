@@ -7,6 +7,9 @@ export interface StatusChipProps {
   status: StatusType;
   size?: 'sm' | 'md';
   showLabel?: boolean;
+  /** Words of its own on the tone's colours (the cards' states); `showIcon={false}` drops the icon. */
+  label?: string;
+  showIcon?: boolean;
   className?: string;
 }
 
@@ -46,6 +49,8 @@ export function StatusChip({
   status,
   size = 'md',
   showLabel = true,
+  label,
+  showIcon = true,
   className,
 }: StatusChipProps) {
   const config = STATUS_CONFIG[status];
@@ -66,10 +71,10 @@ export function StatusChip({
         sizeStyles[size],
         className
       )}
-      title={config.label}
+      title={label ?? config.label}
     >
-      <Icon size={iconSize} className={config.iconClass} />
-      {showLabel && <span>{config.label}</span>}
+      {showIcon && <Icon size={iconSize} className={config.iconClass} />}
+      {showLabel && <span>{label ?? config.label}</span>}
     </span>
   );
 }

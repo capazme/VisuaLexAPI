@@ -79,7 +79,7 @@ export function cardDeletionMessage(lines: string[]): string {
   const shown = lines.slice(0, MAX_LINES).map((line) => `- ${clean(line)}`);
   if (lines.length > MAX_LINES) shown.push(`e altre ${lines.length - MAX_LINES}`);
   return [
-    `ELIMINAZIONE — Spostare nel cestino ${total} ${total === 1 ? 'scheda LingoLex' : 'schede LingoLex'}?`,
+    `ELIMINAZIONE — Spostare nel cestino ${total} ${total === 1 ? 'scheda di VisuaLex Studia' : 'schede di VisuaLex Studia'}?`,
     ...shown,
     `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di VisuaLex.`,
   ].join('\n');

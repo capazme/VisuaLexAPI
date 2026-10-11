@@ -1,6 +1,6 @@
 import nock from 'nock';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { anchorKeys, fingerprintFor } from '../src/lingo/anchors';
+import { anchorKeys, anchorUrn, fingerprintFor } from '../src/lingo/anchors';
 import type { NormaVisitata } from '../src/norms/resolveReference';
 
 // The anchors of a study card (MCP second round, spec §6; owner's answers S6 and
@@ -46,6 +46,46 @@ describe('anchorKeys', () => {
 
   it('gives no anchor for a norm without an official URN (an EU act)', () => {
     expect(anchorKeys(norm({ tipo_atto: 'regolamento UE', url: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita', urn: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita~art5' }))).toBeNull();
+  });
+});
+
+describe('anchorUrn', () => {
+  it.each([
+    ['the c.c. address with an article', `${CC}:2~art1453`, 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453'],
+    ['the same address with the version the reader adds', `${CC}:2~art1453!vig=2026-10-07`, 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453'],
+    ['an original-text suffix', `${LAW}~art2bis@originale`, 'urn:nir:stato:legge:1990-08-07;241~art2bis'],
+    ['both suffixes, original text then version', `${LAW}~art2@originale!vig=2026-10-07`, 'urn:nir:stato:legge:1990-08-07;241~art2'],
+    ['both suffixes, version then original text', `${LAW}~art2!vig=2026-10-07@originale`, 'urn:nir:stato:legge:1990-08-07;241~art2'],
+    ['an address that is already the URN', 'urn:nir:stato:legge:1990-08-07;241~art2bis', 'urn:nir:stato:legge:1990-08-07;241~art2bis'],
+  ])('%s', (_label, raw, expected) => {
+    expect(anchorUrn(raw)).toBe(expected);
+  });
+
+  it('is null for an EUR-Lex address or an empty string', () => {
+    expect(anchorUrn('https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita~art5')).toBeNull();
+    expect(anchorUrn('')).toBeNull();
+  });
+
+  // `GET /api/lingo/articolo?urn=` takes 600 characters from any signed-in user: the cut must not backtrack.
+  it.each([
+    ['repeated version suffixes before a tilde', 'urn:x' + '!vig='.repeat(100) + '~'],
+    ['a run of original-text marks before a tilde', 'urn:x' + '@'.repeat(500) + '~'],
+    ['both suffixes mixed, 600 characters, before a tilde', 'urn:x' + '!vig=@'.repeat(99) + '~'],
+  ])('is linear on %s', (_label, raw) => {
+    const started = performance.now();
+    expect(anchorUrn(raw)).toBe(raw);
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+
+  it('cuts any number of suffixes at the end, in either order, in linear time', () => {
+    const started = performance.now();
+    expect(anchorUrn(`${LAW}~art2${'@originale!vig=2026-10-07'.repeat(20)}`)).toBe('urn:nir:stato:legge:1990-08-07;241~art2');
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+
+  it('agrees with the cut anchorKeys stores', () => {
+    const stored = anchorKeys(norm({ urn: `${CC}:2~art1453!vig=2026-10-07` }));
+    expect(stored!.urn).toBe(anchorUrn(`${CC}:2~art1453`));
   });
 });
 

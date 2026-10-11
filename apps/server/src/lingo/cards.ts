@@ -11,9 +11,16 @@ import { lingoCardCreateSchema } from '../schemas/lingo/card';
  * route or an MCP tool, and neither may vouch for its own body. The author comes
  * from the session, never from the input, and the state starts at
  * `BOZZA_PERSONALE` whatever the input says (the schema refuses one that tries).
- * When no anchor is marked primary the first one is.
+ * When no anchor is marked primary the first one is. `origin` is the connected
+ * application acting for the author, taken by the route from the delegation and
+ * never from the input; null when the author wrote the card in the web app.
  */
-export async function createLingoCard(authorId: string, input: unknown, client: Prisma.TransactionClient = prisma) {
+export async function createLingoCard(
+  authorId: string,
+  input: unknown,
+  client: Prisma.TransactionClient = prisma,
+  origin: { clientId: string; clientName: string | null } | null = null,
+) {
   const card = lingoCardCreateSchema.parse(input);
   const markFirstPrimary = !card.ancore.some((a) => a.isPrimary);
 
@@ -26,6 +33,8 @@ export async function createLingoCard(authorId: string, input: unknown, client: 
       domanda: card.domanda,
       risposta: card.risposta,
       spiegazione: card.spiegazione,
+      createdByClientId: origin?.clientId ?? null,
+      createdByClientName: origin?.clientName ?? null,
       ancore: {
         create: card.ancore.map((a, i) => ({
           normaKey: a.normaKey,

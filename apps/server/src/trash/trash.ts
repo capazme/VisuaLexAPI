@@ -16,11 +16,15 @@ import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const SWEEP_EVERY_MS = 10 * 60 * 1000;
 
-/** Which connection deleted: the trash outlives the client and the grant, so plain values. */
+/**
+ * Which connection deleted: the trash outlives the client and the grant, so
+ * plain values. All null when the user deleted from the web app themselves
+ * (study cards only; the dossier's routes stay for connected applications).
+ */
 export interface DeletedBy {
-  clientId: string;
+  clientId: string | null;
   clientName: string | null;
-  grantId: string;
+  grantId: string | null;
 }
 
 export interface TrashListEntry {
@@ -32,6 +36,8 @@ export interface TrashListEntry {
   items?: { itemType: string; citation: string | null; actCitation: string | null }[];
   cards?: { istituto: string; domanda: string }[];
   clientName: string | null;
+  /** Deleted through a connected application, whose name may still be unknown (null): not the user's own deletion. */
+  byApplication: boolean;
   deletedAt: string;
   expiresAt: string;
 }
@@ -187,6 +193,9 @@ export async function trashLingoCards(
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
     const wanted = [...new Set(cardIds)];
+    // Lock the rows first, in id order: an edit in flight (PATCH) finishes before the payload is read, and one
+    // that comes after waits, then finds no card.
+    await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id IN (${Prisma.join(wanted)}) AND autore_id = ${userId} ORDER BY id FOR UPDATE`;
     const cards = await tx.lingoCard.findMany({ where: { id: { in: wanted }, autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } });
     const movable = cards.filter((card) => PERSONAL_STATES.includes(card.stato));
     const moved = movable.map((card) => card.id);
@@ -199,7 +208,7 @@ export async function trashLingoCards(
         userId,
         kind: 'LINGO_CARDS',
         dossierId: null,
-        label: 'Schede LingoLex',
+        label: 'Schede di studio',
         summary: asJson({
           itemCount: movable.length,
           cards: movable.map((card) => ({ istituto: card.istituto, domanda: card.domanda.length > 120 ? `${card.domanda.slice(0, 119)}…` : card.domanda })),
@@ -237,6 +246,7 @@ export async function listTrash(userId: string): Promise<TrashListEntry[]> {
       ...(summary.items ? { items: summary.items } : {}),
       ...(summary.cards ? { cards: summary.cards } : {}),
       clientName: entry.clientName,
+      byApplication: entry.clientId !== null,
       deletedAt: entry.deletedAt.toISOString(),
       expiresAt: entry.expiresAt.toISOString(),
     };

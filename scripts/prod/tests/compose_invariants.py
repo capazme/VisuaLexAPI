@@ -182,6 +182,10 @@ def prod(cfg, lan_bind):
         "VITE_FEATURE_MERLT_GRAPH" not in args,
         "the unset graph flag is not passed at all (an empty string would switch it off)",
     )
+    check(
+        "VITE_FEATURE_STUDIA" not in args,
+        "and neither is the unset Studia flag",
+    )
 
 
 def prod_lan(cfg):
@@ -196,6 +200,7 @@ def prod_flags(cfg):
     args = (cfg["services"]["ingress"].get("build") or {}).get("args") or {}
     check(args.get("VITE_FEATURE_MERLT") == "false", "a MERL-T front-end flag that IS set reaches the build as given")
     check("VITE_FEATURE_MERLT_GRAPH" not in args, "and the one that is not set still is not passed")
+    check(args.get("VITE_FEATURE_STUDIA") == "false", "the Studia front-end flag, when set, reaches the build as given")
 
 
 def prod_merlt_off(cfg):

@@ -59,6 +59,7 @@ export function SegmentedControl({
         return (
           <button
             key={option.value}
+            type="button"
             role="tab"
             aria-selected={isActive}
             disabled={option.disabled}
