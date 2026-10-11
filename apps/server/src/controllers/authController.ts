@@ -209,7 +209,7 @@ export const changePassword = async (req: Request, res: Response) => {
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoRipassi, lingoPreferenze] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -223,6 +223,12 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.articleThread.findMany({ where: { userId }, include: { comments: true }, orderBy: { createdAt: 'asc' } }),
     prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.lingoCard.findMany({ where: { autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.lingoRevisioneSRS.findMany({
+      where: { utenteId: userId },
+      select: { cardId: true, dataRevisione: true, rating: true, scheduledDays: true, stability: true, difficulty: true, durataMs: true },
+      orderBy: [{ dataRevisione: 'asc' }, { id: 'asc' }],
+    }),
+    prisma.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId }, select: { nuoveAlGiorno: true, materieComunita: true } }),
   ]);
 
   res.json({
@@ -234,6 +240,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
       // The release time is the author's; the releasing admin's id is another person's identifier.
       threads: threads.map(({ passageReleasedById: _releasedBy, ...thread }) => thread),
       comments, lingoCards,
+      // The review log (the scheduling state is derived from it and not exported) and the daily goal.
+      lingoRipassi, lingoPreferenze,
     },
   });
 };

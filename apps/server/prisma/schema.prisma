@@ -72,6 +72,9 @@ model User {
 
   // LingoLex: the study cards this user wrote
   lingoCards LingoCard[]
+  lingoStatiRipasso     LingoStatoRipasso[]
+  lingoRevisioni        LingoRevisioneSRS[]
+  lingoPreferenzeStudio LingoPreferenzeStudio?
 
   // OAuth: the applications this user connected (MCP spike)
   oauthAuthorizationRequests OAuthAuthorizationRequest[]
@@ -983,8 +986,9 @@ model LingoTraccia {
 
 // LINGOLEX — study cards and their anchors in the norm text.
 // The card's state follows the lifecycle in `src/lingo/cardStates.ts`. Reviews
-// (`LingoRevisioneSRS`) and validations (`LingoValidazioneCard`) are not here yet:
-// they arrive with the routes that write them.
+// (`LingoStatoRipasso`, `LingoRevisioneSRS`) are below, after the anchors;
+// validations (`LingoValidazioneCard`) are not here yet: they arrive with the
+// routes that write them.
 
 enum LingoCardStato {
   BOZZA_PERSONALE
@@ -1029,6 +1033,8 @@ model LingoCard {
   // `deleteUserAccount`, because only the application knows the card's state.
   autore User?             @relation(fields: [autoreId], references: [id], onDelete: SetNull)
   ancore LingoCardAncora[]
+  statiRipasso LingoStatoRipasso[]
+  revisioni    LingoRevisioneSRS[]
 
   @@index([materia, istituto, stato])
   @@index([stato])
@@ -1058,6 +1064,60 @@ model LingoCardAncora {
   @@index([normaKey, articleId, aknFingerprint])
   @@index([cardId])
   @@map("lingo_card_ancore")
+}
+
+// LINGOLEX — review (Studia PR C). What the scheduler knows about a card for one
+// user, the append-only log of their grades, and their study preferences.
+// All three are personal: they cascade from the user, and from the card (the
+// reviews of a card that is deleted go with it). Days are Europe/Rome days
+// (`src/lingo/studyDay.ts`).
+
+model LingoStatoRipasso {
+  utenteId     String   @map("utente_id")
+  cardId       String   @map("card_id")
+  stability    Float
+  difficulty   Float
+  dueAt        DateTime @map("due_at")      // the Europe/Rome day the card is due, at 00:00 local
+  lastReviewAt DateTime @map("last_review_at")
+  reps         Int      @default(1)
+  lapses       Int      @default(0)
+
+  utente User      @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([utenteId, cardId])
+  @@index([utenteId, dueAt])
+  @@map("lingo_stato_ripasso")
+}
+
+model LingoRevisioneSRS {
+  id            String   @id @default(uuid())
+  utenteId      String   @map("utente_id")
+  cardId        String   @map("card_id")
+  dataRevisione DateTime @default(now()) @map("data_revisione")
+  rating        Int      // 1 = Di nuovo, 2 = Difficile, 3 = Bene, 4 = Facile
+  scheduledDays Int      @map("scheduled_days")
+  stability     Float
+  difficulty    Float
+  durataMs      Int?     @map("durata_ms")
+
+  utente User      @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([utenteId, cardId, dataRevisione])
+  @@index([utenteId, dataRevisione])
+  @@map("lingo_revisioni_srs")
+}
+
+model LingoPreferenzeStudio {
+  utenteId        String         @id @map("utente_id")
+  nuoveAlGiorno   Int            @default(20) @map("nuove_al_giorno")   // 1–200
+  materieComunita LingoMateria[] @default([]) @map("materie_comunita")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@map("lingo_preferenze_studio")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
