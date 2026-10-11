@@ -69,7 +69,14 @@ not a store slice: `HistoryView` keeps it in local state and reloads it on mount
 `useArticleCards` over `utils/articleCardsCache.ts`, `useReviewSession`), never in `useAppStore`.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
-workspace tabs and z-index, settings, `searchPanelState`.
+workspace tabs and z-index, settings, `searchPanelState`, and the practices of the norm-tab redesign
+(`practices`, `activePracticeId`, the seeding marker `practicesSeeded`; spec
+`docs/superpowers/specs/2026-10-08-norm-tab-container-design.md` §9-10). The practices are drawn only
+behind `VITE_FEATURE_PRACTICE_TABLE` (`features/practice/featureFlag.ts`, off unless `true`); `merge`
+sanitizes them (`sanitizePractices`) and, with the flag on and no marker, seeds them once from the
+saved tabs (`practicesFromTabs`). `persist` writes through `utils/guardedStorage.ts`: a save the
+browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
+`set`. `clearUserData` empties the practices and sets the marker to the flag, never clears it.
 
 The partialize deliberately holds UI state only. **Every user-owned slice is
 server-backed** — see gotcha 17, which is the rule any new slice must follow.

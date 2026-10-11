@@ -1,6 +1,6 @@
 import { useStore } from 'zustand/react';
 import { createStore } from 'zustand/vanilla';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
@@ -16,7 +16,10 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
-import { isStoredArticle, isValidView, sameDecision } from '../utils/practice';
+import { isStoredArticle, isValidView, sameDecision, sanitizePractices, type Practice } from '../utils/practice';
+import { practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
+import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
+import { isPracticeTableEnabled } from '../features/practice/featureFlag';
 import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
@@ -299,6 +302,33 @@ interface AppState {
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
+
+    /**
+     * The practices: the tables of the questions, which replace the tabs (spec
+     * `2026-10-08-norm-tab-container-design.md` §2). UI state saved in the browser (D6), checked by
+     * `sanitizePractices` on every load. Drawn only behind `VITE_FEATURE_PRACTICE_TABLE`
+     * (`isPracticeTableEnabled`); until P6 they are saved beside the tabs.
+     */
+    practices: Practice[];
+    /** The practice on screen; null with none. Persisted. */
+    activePracticeId: string | null;
+    /**
+     * The practices were seeded from the tabs (spec §9): set once, by the load with the flag on,
+     * whatever the result, so a reload after «Chiudi tutte» never seeds again. Persisted; read only
+     * as a boolean. A session with the flag off never sets it; `clearUserData` sets it to the flag.
+     */
+    practicesSeeded: boolean;
+    /** The open rows (T15), keyed `practiceId/actId/articleKey` or `practiceId/decisionId`.
+     *  Session-only, absent from `partialize`: after a reload every row is closed. */
+    practiceRows: Record<string, true>;
+    /** One row to open and scroll to, a `practiceRows` key; consumed once (gotcha 14). Session-only. */
+    pendingReveal: string | null;
+    /** The topic searches the seeding did not reopen, told once (`practiceNoticeText`); taken by
+     *  `takePracticeNotice`. Session-only. */
+    practiceNotice: string | null;
+    /** The notice, once: returns it and clears it in one step; null after. */
+    takePracticeNotice: () => string | null;
+
     /**
      * The tab the phone's carousel shows (`SearchPanel`, below `md`): the one tab on screen there,
      * which «Questa scheda» of the find window means on a phone (`utils/findScope.ts`). Null, or an
@@ -591,6 +621,17 @@ const appStore = createStore<AppState>()(
                 position: { x: window.innerWidth - 420, y: 20 },
             },
             workspaceTabs: [],
+            practices: [],
+            activePracticeId: null,
+            practicesSeeded: false,
+            practiceRows: {},
+            pendingReveal: null,
+            practiceNotice: null,
+            takePracticeNotice: () => {
+                const notice = get().practiceNotice;
+                if (notice !== null) set((state) => { state.practiceNotice = null; });
+                return notice;
+            },
             pendingDecision: null,
             decisionFocusRequest: null,
             highestZIndex: 100,
@@ -699,6 +740,15 @@ const appStore = createStore<AppState>()(
                 // Each user should start with a clean workspace
                 state.workspaceTabs = [];
                 state.highestZIndex = 100;
+                // and the practices: a shared browser must not show the last user's table (spec §10).
+                // The marker is set to the flag, never cleared: with the flag on, a cleared marker
+                // would seed again at the next reload over the table the next user built (§9).
+                state.practices = [];
+                state.activePracticeId = null;
+                state.practiceRows = {};
+                state.pendingReveal = null;
+                state.practiceNotice = null;
+                state.practicesSeeded = isPracticeTableEnabled();
                 // a decision asked for, a focus asked for, a citation waiting for the palette
                 state.pendingDecision = null;
                 state.decisionFocusRequest = null;
@@ -3002,6 +3052,8 @@ const appStore = createStore<AppState>()(
         })),
         {
             name: 'visualex-storage',
+            // A write the browser refuses (a full localStorage) is caught, never thrown out of `set` (T20).
+            storage: createJSONStorage<Partial<AppState>>(() => guardedStorage(localStorage, reportSaveFailure)),
             // Only persist UI state and settings, NOT user data. Bookmarks,
             // dossiers, environments, quickNorms, customAliases, annotations,
             // highlights are now all server-backed and hydrated by
@@ -3016,6 +3068,11 @@ const appStore = createStore<AppState>()(
                 // the owning block id is not — it would rehydrate a window
                 // belonging to a block that no longer exists.
                 structureWindow: { position: state.structureWindow.position, blockId: null },
+                // The practices are UI state too (spec D6); the open rows, the pending reveal and
+                // the notice are the session's.
+                practices: state.practices,
+                activePracticeId: state.activePracticeId,
+                practicesSeeded: state.practicesSeeded,
                 // Every user-data slice is now server-backed and hydrated by
                 // fetchUserData. Nothing user-owned survives in localStorage
                 // anymore — persisting would cause drift with the server.
@@ -3033,6 +3090,7 @@ const appStore = createStore<AppState>()(
                     ...current,
                     ...p,
                     ...(p.workspaceTabs !== undefined ? { workspaceTabs: foldCollections(sanitizeViews(p.workspaceTabs)) ?? current.workspaceTabs } : {}),
+                    ...practicesOnLoad(persisted),
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
@@ -3061,6 +3119,60 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 export { appStore };
 
 // Export types
+/** The practices as a load finds them (spec §9, §10): the saved ones sanitized; with the flag on and
+ *  no marker, seeded from the saved tabs, as they are, and marked, whatever the result. What could
+ *  not be read is logged once (gotcha 18); nothing is thrown, since a throw in `merge` would reset
+ *  the store. The session-only fields start empty, whatever the storage holds. */
+function practicesOnLoad(persisted: unknown): Pick<AppState,
+    'practices' | 'activePracticeId' | 'practicesSeeded' | 'practiceRows' | 'pendingReveal' | 'practiceNotice'> {
+    const p = (persisted ?? {}) as { practices?: unknown; activePracticeId?: unknown; practicesSeeded?: unknown; workspaceTabs?: unknown };
+    const sanitized = sanitizePractices(p.practices);
+    const dropped = [...sanitized.dropped];
+    let practices = sanitized.practices;
+    let practicesSeeded = p.practicesSeeded === true;
+    let wantedActive = p.activePracticeId;
+    let practiceNotice: string | null = null;
+    if (isPracticeTableEnabled() && !practicesSeeded) {
+        const seeded = practicesFromTabs(p.workspaceTabs, uuidv4);
+        if (practices.length > 0) {
+            dropped.push(`practices: ${practices.length} saved without the seeding marker, replaced by the ones seeded from the tabs`);
+        }
+        practices = seeded.practices;
+        wantedActive = seeded.activePracticeId;
+        dropped.push(...seeded.dropped);
+        practiceNotice = practiceNoticeText(seeded.droppedSearches);
+        practicesSeeded = true;
+    }
+    let activePracticeId: string | null = null;
+    if (typeof wantedActive === 'string' && practices.some((x) => x.id === wantedActive)) {
+        activePracticeId = wantedActive;
+    } else {
+        if (wantedActive !== null && wantedActive !== undefined) {
+            dropped.push(`activePracticeId: ${JSON.stringify(wantedActive)} names no practice`);
+        }
+        activePracticeId = practices[0]?.id ?? null;
+    }
+    if (dropped.length > 0) {
+        console.warn(`practices: ${dropped.length} saved item(s) could not be restored as they were:\n- ${dropped.join('\n- ')}`);
+    }
+    return { practices, activePracticeId, practicesSeeded, practiceRows: {}, pendingReveal: null, practiceNotice };
+}
+
+let saveFailureReported = false;
+
+/** A save the browser refused (T20): logged once a session with the key, the size and the error's
+ *  name (gotcha 18), and told once as a sync error, in a microtask so it does not run inside the
+ *  `set` whose save failed. The state stays in memory; the next saves fail quietly. */
+function reportSaveFailure({ name, bytes, error }: StorageFailure): void {
+    if (saveFailureReported) return;
+    saveFailureReported = true;
+    const errorName = (error as { name?: unknown } | null)?.name;
+    console.error(`persist: the browser refused to save "${name}" (${bytes} bytes): ${typeof errorName === 'string' ? errorName : String(error)}`, error);
+    queueMicrotask(() => {
+        appStore.getState().pushSyncError('Il tavolo di lavoro non viene più salvato nel browser: lo spazio è esaurito. Chiudi qualche pratica.');
+    });
+}
+
 /** Drops a persisted tab's malformed `view`; a tab left without content goes with it. */
 function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
     if (!Array.isArray(tabs)) return undefined;

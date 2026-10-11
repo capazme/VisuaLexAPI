@@ -679,8 +679,9 @@ highest z-index among them.
    logged, never labelled as another court's), with the tab's `historyRecordedKey` and
    `identified: false`: the saved reference does not say whether it was found, so the
    entry is identified the first time it is read (`setDecisionEntryIdentity`); until then «Salva come
-   dossier» counts it as not identified (§7). Two tabs of one decision cannot exist; if they do, one
-   entry is kept.
+   dossier» counts it as not identified (§7). Two tabs of one decision cannot exist; if they do, they
+   become one entry, the first one's, holding what either held (`historyRecordedKey`), and the merge
+   is listed in `dropped`.
 4. The decision-search tab in front becomes the only window of that practice; any
    other is not reopened: its label goes into `droppedSearches`. The other decision tabs become
    entries without windows. The window keeps its old tab's id until P4 re-ids it from
@@ -727,14 +728,22 @@ empty tab, malformed entries (§10).
 
 - **Saved state is untrusted input.** `localStorage` can hold an old shape, a hand-edited value or
   garbage. `sanitizePractices` keeps a practice only with a string `id` and `label` and arrays where
-  arrays belong; an act only with a `norma.tipo_atto` string and articles with a `norma_data` and
-  an `article_text` that is a string when present; a decision only with a reference that passes
+  arrays belong; an act only with a `norma.tipo_atto` string and articles with a `norma_data`
+  whose act type and article number are text and whose other fields the keys and the sort read
+  (`data`, `numero_atto`, `tipo_atto_reale`, `allegato`, `versione`, `data_versione`, `urn`) are
+  text or empty, and an `article_text` that is a string when present; a decision only with a reference that passes
   today's `isValidView` checks (court, positive integer number and year) and names a court
   VisuaLex reads, its `historyRecordedKey` only as a string; a `BesideRef` only when it points at
   something the practice holds, a topic query's `normaLabel` only as a string;
-  `practicesSeeded` only as a boolean. Act and decision ids are unique across practices: a taken
-  one is re-id'd and the practice's windows follow it. What fails is dropped and logged, never thrown: a throw in
-  `merge` would reset the whole store.
+  `practicesSeeded` only as a boolean; `activePracticeId` only when it names a practice kept (else
+  the first). A second entry of one decision in a practice is merged into the first, never dropped:
+  the first one's id, and the richer fields of either (`identified`, with its reference and label,
+  `depositDate`, `tipo`, `historyRecordedKey`). Act and decision ids are unique across practices: a
+  taken one is re-id'd and the practice's windows follow it, through one map for acts and one for
+  decisions (an act and a decision that share a saved id are two things). The back-stack entries
+  and the structure window's owner are not saved, so no other saved state names those ids. What
+  fails, and every merge and re-id, is listed and logged once (`console.warn`, naming each item and
+  its practice or tab), never thrown: a throw in `merge` would reset the whole store.
 - **User isolation.** `clearUserData` empties `practices`, `activePracticeId`, the open rows, the
   pending reveal, `phoneReader` and `practiceNotice` and sets `practicesSeeded` to
   `isPracticeTableEnabled()` at logout (§9), as it
