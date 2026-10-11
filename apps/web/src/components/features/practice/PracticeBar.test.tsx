@@ -1,5 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../../../services/dossierService', () => ({
+  dossierService: { create: vi.fn(), addItem: vi.fn(), reorderItems: vi.fn(), delete: vi.fn() },
+}));
+
+import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
 import { PracticeBar } from './PracticeBar';
 import { L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
@@ -112,5 +117,23 @@ describe('PracticeBar (spec §5)', () => {
     appStore.setState({ commandPaletteOpen: true });
     render(<PracticeBar />);
     expect(screen.queryByRole('navigation', { name: 'Pratiche' })).toBeNull();
+  });
+});
+
+describe('PracticeBar: the chip’s «⋯» saves the practice (spec §7)', () => {
+  it('offers «Salva come dossier» and «Aggiungi a un dossier…», and saves', async () => {
+    vi.mocked(dossierService.create).mockResolvedValue({ id: 'srv-d', name: 'x', created_at: '2026-10-12T00:00:00Z' } as never);
+    vi.mocked(dossierService.addItem).mockResolvedValue({
+      id: 'srv-i', item_type: 'norm', title: 't', content: {}, position: 0, status: 'unread', created_at: '2026-10-12T00:00:00Z',
+    } as never);
+    vi.mocked(dossierService.reorderItems).mockResolvedValue(undefined as never);
+    appStore.setState({ dossiers: [], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    const id = s().createPractice('Appalti');
+    s().addArticlesToPractice(id, L24, [article(L24, '5')]);
+    render(<PracticeBar />);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Appalti' }));
+    expect(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Salva come dossier' }));
+    expect(await screen.findByText('Salvato nel dossier «Appalti»: 1 articolo')).toBeInTheDocument();
   });
 });

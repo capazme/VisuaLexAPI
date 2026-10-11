@@ -6,6 +6,7 @@ import { MenuButton } from '../../ui/MenuButton';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { CLOSE_PRACTICE_MESSAGE, isEmptyPractice } from './practiceView';
+import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
 import { PracticeTopicSearches } from './PracticeTopicSearches';
 import {
@@ -52,6 +53,7 @@ function PracticeHeader({ practice }: { practice: Practice }) {
   const [editing, setEditing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const countLine = practiceCountLine(practiceCounts(practice));
+  const save = usePracticeSaveActions(practice.id);
 
   return (
     <header className="flex items-start gap-2 px-1">
@@ -81,11 +83,13 @@ function PracticeHeader({ practice }: { practice: Practice }) {
         triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-2 dark:text-slate-300 dark:hover:bg-slate-800"
         items={[
           { label: 'Rinomina', icon: Pencil, onSelect: () => setEditing(true) },
+          ...save.items,
           { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => setConfirmClose(true) },
         ]}
       >
         <MoreHorizontal size={18} aria-hidden />
       </MenuButton>
+      {save.overlay}
       <ConfirmDialog
         open={confirmClose}
         variant="danger"

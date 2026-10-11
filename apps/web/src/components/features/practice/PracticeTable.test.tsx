@@ -16,6 +16,11 @@ vi.mock('../decisions/DecisionSearchTabView', () => ({
   DecisionSearchTabView: ({ tabId }: { tabId: string }) => <div data-testid="topic-list" data-tab={tabId} />,
 }));
 
+vi.mock('../../../services/dossierService', () => ({
+  dossierService: { create: vi.fn(), addItem: vi.fn(), reorderItems: vi.fn(), delete: vi.fn() },
+}));
+
+import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
 import { PracticeTable } from './PracticeTable';
 import { FOUND, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
@@ -123,3 +128,40 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(screen.queryByText(/Una ricerca per tema non è stata riaperta/)).toBeNull();
   });
 });
+
+describe('PracticeTable: «Salva come dossier» (spec §7)', () => {
+  beforeEach(() => {
+    vi.mocked(dossierService.create).mockClear();
+    vi.mocked(dossierService.addItem).mockClear();
+    vi.mocked(dossierService.create).mockResolvedValue({ id: 'srv-d', name: 'x', created_at: '2026-10-12T00:00:00Z' } as never);
+    vi.mocked(dossierService.addItem).mockResolvedValue({
+      id: 'srv-i', item_type: 'norm', title: 't', content: {}, position: 0, status: 'unread', created_at: '2026-10-12T00:00:00Z',
+    } as never);
+    vi.mocked(dossierService.reorderItems).mockResolvedValue(undefined as never);
+    appStore.setState({ dossiers: [], lastSyncError: null, pendingDossierItemIds: {}, pendingDossierOrders: {} });
+  });
+
+  it('the header menu saves the practice as a new dossier and says what was saved', async () => {
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    s().renamePractice(practiceId, 'Responsabilità medica');
+    render(table());
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Responsabilità medica' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Salva come dossier' }));
+    expect(await screen.findByText('Salvato nel dossier «Responsabilità medica»: 2 articoli')).toBeInTheDocument();
+    expect(dossierService.create).toHaveBeenCalledTimes(1);
+    expect(dossierService.addItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('«Aggiungi a un dossier…» lists the dossiers and adds to the picked one', async () => {
+    const { practiceId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().renamePractice(practiceId, 'Pratica');
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Esistente', createdAt: '2026-10-01T00:00:00Z', items: [] }] as never });
+    render(table());
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Pratica' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).getByRole('button', { name: /Esistente/ }));
+    expect(await screen.findByText('Salvato nel dossier «Esistente»: 1 articolo')).toBeInTheDocument();
+    expect(dossierService.create).not.toHaveBeenCalled();
+  });
+});
+

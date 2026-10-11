@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { practiceCountLine, practiceCounts } from '../../../utils/practice';
 import { PracticeNameInput } from './PracticeParts';
 import { CLOSE_PRACTICE_MESSAGE } from './practiceView';
+import { usePracticeSaveActions } from './usePracticeSaveActions';
 
 export interface PracticeChipProps {
   practiceId: string;
@@ -29,6 +30,7 @@ export function PracticeChip({ practiceId, isActive, editing, onEditingChange }:
   const renamePractice = useAppStore((s) => s.renamePractice);
   const closePractice = useAppStore((s) => s.closePractice);
   const [confirmClose, setConfirmClose] = useState(false);
+  const save = usePracticeSaveActions(practiceId);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: practiceId });
 
   if (!practice) return null;
@@ -91,11 +93,13 @@ export function PracticeChip({ practiceId, isActive, editing, onEditingChange }:
         triggerClassName="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200"
         items={[
           { label: 'Rinomina', icon: Pencil, onSelect: () => onEditingChange(true) },
+          ...save.items,
           { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => setConfirmClose(true) },
         ]}
       >
         <MoreHorizontal size={14} aria-hidden />
       </MenuButton>
+      {save.overlay}
       <ConfirmDialog
         open={confirmClose}
         variant="danger"
