@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -25,6 +25,11 @@ vi.mock('../../services/adminService', () => ({
   listFeedbacks: vi.fn().mockResolvedValue([]),
   getFeedbackStats: vi.fn().mockResolvedValue({ new: 0, bugs: 0, suggestions: 0 }),
   listSharedEnvironments: vi.fn().mockResolvedValue({ data: [], pagination: { page: 1, pages: 1, total: 0 } }),
+  updateUser: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('../../components/features/admin/StudiaTextsAdmin', () => ({
+  StudiaTextsAdmin: () => <div data-testid="studia-texts-admin">texts</div>,
 }));
 
 vi.mock('../../services/sharedEnvironmentService', () => ({
@@ -33,6 +38,7 @@ vi.mock('../../services/sharedEnvironmentService', () => ({
   },
 }));
 
+import * as adminService from '../../services/adminService';
 import { AdminPage } from '../AdminPage';
 
 // Mounts AdminPage the way production does: inside a Router but OUTSIDE the
@@ -97,5 +103,59 @@ describe('AdminPage — Ingestione tab gating (MERL-T ops)', () => {
     expect(screen.queryByTestId('ingestion-admin-panel')).not.toBeInTheDocument();
     fireEvent.click(tabButton);
     expect(screen.getByTestId('ingestion-admin-panel')).toBeInTheDocument();
+  });
+});
+
+describe('AdminPage — VisuaLex Studia', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('opens the texts section from its tab', async () => {
+    renderAdminPage();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Utenti' })).toBeInTheDocument());
+    expect(screen.queryByTestId('studia-texts-admin')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Testi di VisuaLex Studia' }));
+    expect(screen.getByTestId('studia-texts-admin')).toBeInTheDocument();
+  });
+
+  const row = (id: string, username: string, validator: boolean) => ({
+    id, username, email: `${username}@example.com`, is_active: true, is_verified: true, is_admin: false,
+    lingo_validatore: validator, created_at: '2026-10-01T10:00:00Z',
+  });
+
+  it('shows a «Validatore di VisuaLex Studia» checkbox on each user, ticked for the validators', async () => {
+    vi.mocked(adminService.listUsers).mockResolvedValue([row('a', 'alice', true), row('b', 'bob', false)]);
+    renderAdminPage();
+    const alice = await screen.findByRole('checkbox', { name: 'Validatore di VisuaLex Studia: alice' });
+    const bob = screen.getByRole('checkbox', { name: 'Validatore di VisuaLex Studia: bob' });
+    expect([alice, bob].map((box) => (box as HTMLInputElement).checked)).toEqual([true, false]);
+    // The visible label stays.
+    expect(screen.getAllByText('Validatore di VisuaLex Studia')).toHaveLength(2);
+  });
+
+  it('shows neither the texts tab nor the validator checkbox with the feature off', async () => {
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    vi.mocked(adminService.listUsers).mockResolvedValue([row('a', 'alice', true)]);
+    renderAdminPage();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Utenti' })).toBeInTheDocument());
+    await screen.findByText('alice');
+    expect(screen.queryByRole('button', { name: 'Testi di VisuaLex Studia' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Validatore di VisuaLex Studia/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Validatore di VisuaLex Studia')).not.toBeInTheDocument();
+  });
+
+  it('sends lingoValidatore, camelCase, when the box is toggled, and reads the users again', async () => {
+    const listUsers = vi.mocked(adminService.listUsers);
+    listUsers.mockResolvedValue([row('a', 'alice', true), row('b', 'bob', false)]);
+    vi.mocked(adminService.updateUser).mockClear();
+    renderAdminPage();
+    const alice = await screen.findByRole('checkbox', { name: 'Validatore di VisuaLex Studia: alice' });
+    const bob = screen.getByRole('checkbox', { name: 'Validatore di VisuaLex Studia: bob' });
+    listUsers.mockClear();
+    fireEvent.click(bob);
+    await waitFor(() => expect(adminService.updateUser).toHaveBeenCalledWith('b', { lingoValidatore: true }));
+    await waitFor(() => expect(listUsers).toHaveBeenCalled());
+
+    fireEvent.click(alice);
+    await waitFor(() => expect(adminService.updateUser).toHaveBeenCalledWith('a', { lingoValidatore: false }));
   });
 });

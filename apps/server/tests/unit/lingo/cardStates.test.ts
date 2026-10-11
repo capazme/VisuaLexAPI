@@ -9,6 +9,7 @@ const ARROWS: Array<[LingoCardStato, LingoCardStato]> = [
   ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY'],
   ['PROPOSTA_COMMUNITY', 'VALIDATA'],
   ['PROPOSTA_COMMUNITY', 'ARCHIVIATA'],
+  ['PROPOSTA_COMMUNITY', 'BOZZA_PERSONALE'],
   ['VALIDATA', 'DA_RIVEDERE'],
   ['DA_RIVEDERE', 'VALIDATA'],
 ];
@@ -31,6 +32,16 @@ describe('canTransition', () => {
     expect(canTransition('BOZZA_PERSONALE', 'VALIDATA')).toBe(false);
   });
 
+  it('lets the author take a proposal back to a draft (spec decision 20)', () => {
+    expect(canTransition('PROPOSTA_COMMUNITY', 'BOZZA_PERSONALE')).toBe(true);
+  });
+
+  it('lets nothing but a proposal go back to a draft', () => {
+    for (const from of STATES.filter((s) => s !== 'PROPOSTA_COMMUNITY')) {
+      expect(canTransition(from, 'BOZZA_PERSONALE'), `${from} → BOZZA_PERSONALE`).toBe(false);
+    }
+  });
+
   it('lets nothing leave the archive', () => {
     for (const to of STATES) expect(canTransition('ARCHIVIATA', to)).toBe(false);
   });
@@ -43,7 +54,7 @@ describe('canTransition', () => {
 describe('allowedTransitions', () => {
   it('lists the ways out of each state', () => {
     expect(allowedTransitions('BOZZA_PERSONALE')).toEqual(['PROPOSTA_COMMUNITY']);
-    expect([...allowedTransitions('PROPOSTA_COMMUNITY')].sort()).toEqual(['ARCHIVIATA', 'VALIDATA']);
+    expect([...allowedTransitions('PROPOSTA_COMMUNITY')].sort()).toEqual(['ARCHIVIATA', 'BOZZA_PERSONALE', 'VALIDATA']);
     expect(allowedTransitions('VALIDATA')).toEqual(['DA_RIVEDERE']);
     expect(allowedTransitions('DA_RIVEDERE')).toEqual(['VALIDATA']);
     expect(allowedTransitions('ARCHIVIATA')).toEqual([]);

@@ -390,7 +390,7 @@ const MyCardsView = lazy(() => import('./components/features/studia/MyCardsView'
 
 **Files:**
 - Modify: `apps/server/prisma/schema.prisma`, `apps/server/tests/setup.ts` (truncate the new tables), `apps/server/src/controllers/authController.ts` (export), `apps/server/src/controllers/adminController.ts` (the flag)
-- Create: `apps/server/prisma/migrations/20261017100000_lingo_validation/migration.sql`
+- Create: `apps/server/prisma/migrations/20261019100000_lingo_validation/migration.sql`
 - Test: `apps/server/tests/lingoAccountErasure.test.ts`, `apps/server/tests/accountData.test.ts`, `apps/server/tests/lingoValidation.schema.test.ts`
 
 **Interfaces:**

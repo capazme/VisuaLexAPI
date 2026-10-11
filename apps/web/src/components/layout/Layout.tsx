@@ -37,8 +37,11 @@ export function Layout() {
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
   const { pathname } = useLocation();
   const onSearchPage = pathname === '/';
-  // The review's grade bar is pinned where the feedback button and the services pill sit, on a phone.
+  // The review's grade bar and the validators' vote bar are pinned to the bottom edge on a phone,
+  // where the feedback button and the services pill would cover them.
   const inReviewSession = pathname.startsWith('/studia/ripasso/sessione');
+  const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
+  const barPinnedAtBottom = inReviewSession || onValidationQueue;
 
   // Leaving the search page closes the window: its matches are in tabs no longer on screen.
   useEffect(() => {
@@ -232,7 +235,7 @@ export function Layout() {
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
 
       {/* Feedback Button - only for authenticated users */}
-      {isAuthenticated && <FeedbackButton className={inReviewSession ? 'max-md:hidden' : undefined} />}
+      {isAuthenticated && <FeedbackButton className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />}
 
       {/* Version changelog notification */}
       <ChangelogNotification />
@@ -248,7 +251,7 @@ export function Layout() {
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
 
-      <ServiceHealthBanner className={inReviewSession ? 'max-md:hidden' : undefined} />
+      <ServiceHealthBanner className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />

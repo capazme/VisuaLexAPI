@@ -15,7 +15,22 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
   keeping what a narrowed list hid until a deletion starts it over; each row shows the next review,
-  `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`),
+  `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; the detail proposes a draft
+  («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
+  accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
+  withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
+  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di VisuaLex Studia»
+  tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
+  names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/studia/valida`
+  (`ValidationQueueView`), linked for validators only (`useAuth().isValidator`, from `lingo_validatore`
+  on `/auth/me`; the server checks the flag on every call): `useValidationQueue` shows the proposed cards
+  one at a time, oldest first, refilling when two are left; the primary anchor's article sits beside the
+  card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
+  dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
+  `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
+  verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
+  (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
+  change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an
@@ -294,7 +309,9 @@ shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
 (find-in-text and the offsets never see it): «Schede su questo articolo (n) · + Nuova scheda». The count
 (`useArticleCards`: one read per address from `/api/lingo/articolo`, kept for the session in
-`utils/articleCardsCache.ts`, shared between copies, `refresh()` after a save) opens `ArticleCardsPeek`; the row owns the
+`utils/articleCardsCache.ts`, shared between copies, `refresh()` after a save) opens `ArticleCardsPeek` (the reader's own
+card is a link to `/studia/schede/:id`; a community card — `comunita: true` — is a 44 px `aria-expanded` button that opens in
+place with its answer and explanation as text, because `GET /lingo/cards/:id` answers only the author); the row owns the
 `CardFormDialog`, and the selection popup's «Crea scheda» (`SelectionPopup.onCreateCard`, passed through
 `ArticleBody.onPopupCreateCard`, offered only by the article tab) reaches it through the row's `ref`
 (`createFromPassage`). `articleCardsOffer.ts` is the one rule: a row needs a `urn:` in `norma_data.urn`

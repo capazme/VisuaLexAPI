@@ -37,6 +37,9 @@ const StudiaPage = lazy(() =>
 const MyCardsView = lazy(() =>
   import('./components/features/studia/MyCardsView').then(m => ({ default: m.MyCardsView })),
 );
+const ValidationQueueView = lazy(() =>
+  import('./components/features/studia/ValidationQueueView').then(m => ({ default: m.ValidationQueueView })),
+);
 const ReviewHome = lazy(() =>
   import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
 );
@@ -133,7 +136,7 @@ function App() {
               </Suspense>
             }
           />
-          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review. */}
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; valida is the validators' queue. */}
           {isStudiaEnabled() && (
             <Route
               path="studia"
@@ -148,6 +151,7 @@ function App() {
               <Route path="ripasso/sessione" element={<Suspense fallback={null}><ReviewSession /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+              <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />
             </Route>
           )}
           <Route path="sentenze" element={<DecisionAddress />} />

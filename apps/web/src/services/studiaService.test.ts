@@ -73,6 +73,38 @@ describe('studiaService', () => {
     expect(get).toHaveBeenCalledWith('/lingo/articolo', { params: { urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453' } });
   });
 
+  it('proposes a card, with the accepted version when there is one', async () => {
+    post.mockResolvedValue({ data: { id: 'k1', stato: 'PROPOSTA_COMMUNITY' } });
+    expect(await studiaService.propose('k1')).toEqual({ id: 'k1', stato: 'PROPOSTA_COMMUNITY' });
+    expect(post).toHaveBeenLastCalledWith('/lingo/cards/k1/proponi', {});
+    await studiaService.propose('k1', 't1');
+    expect(post).toHaveBeenLastCalledWith('/lingo/cards/k1/proponi', { accettoTestoId: 't1' });
+  });
+
+  it('hands back the notice a 409 asks to accept, and lets every other rejection through', async () => {
+    const notice = { id: 't2', chiave: 'PROPOSTA_SCHEDA', versione: 2, titolo: 'T', corpo: 'C', conferma: 'K', azione: 'A' };
+    post.mockRejectedValueOnce({ status: 409, data: { richiedeTesto: notice } });
+    expect(await studiaService.propose('k1')).toEqual({ richiedeTesto: notice });
+    const notDraft = { status: 409, data: { detail: 'not a draft' } };
+    post.mockRejectedValueOnce(notDraft);
+    await expect(studiaService.propose('k1')).rejects.toBe(notDraft);
+    const gone = { status: 404 };
+    post.mockRejectedValueOnce(gone);
+    await expect(studiaService.propose('k1')).rejects.toBe(gone);
+  });
+
+  it('withdraws a proposal and returns the card', async () => {
+    post.mockResolvedValue({ data: { id: 'k1', stato: 'BOZZA_PERSONALE' } });
+    expect(await studiaService.withdraw('k1')).toEqual({ id: 'k1', stato: 'BOZZA_PERSONALE' });
+    expect(post).toHaveBeenCalledWith('/lingo/cards/k1/ritira');
+  });
+
+  it('reads the current version of a text to accept', async () => {
+    get.mockResolvedValue({ data: { id: 't1', chiave: 'PROPOSTA_SCHEDA', accettata: false } });
+    expect(await studiaService.text('PROPOSTA_SCHEDA')).toEqual({ id: 't1', chiave: 'PROPOSTA_SCHEDA', accettata: false });
+    expect(get).toHaveBeenCalledWith('/lingo/testi/PROPOSTA_SCHEDA');
+  });
+
   describe('the review', () => {
     it('reads today’s session, for a subject or for all', async () => {
       const session = { conteggi: { dovute: 1, nuove: 2 }, cards: [] };

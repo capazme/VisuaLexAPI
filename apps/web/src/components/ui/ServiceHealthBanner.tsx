@@ -4,6 +4,7 @@ import { useServiceHealth } from '../../hooks/useServiceHealth';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 
+/** `className` lets a page hide the pill where it would cover its own controls (a bar pinned to the bottom on a phone). */
 export function ServiceHealthBanner({ className }: { className?: string }) {
   const { snapshot, refresh } = useServiceHealth();
   const [expanded, setExpanded] = useState(false);

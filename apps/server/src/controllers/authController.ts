@@ -119,6 +119,7 @@ export const login = async (req: Request, res: Response) => {
       is_active: updatedUser.isActive,
       is_verified: updatedUser.isVerified,
       is_admin: updatedUser.isAdmin,
+      lingo_validatore: updatedUser.lingoValidatore,
       created_at: updatedUser.createdAt,
       login_count: updatedUser.loginCount,
       last_login_at: updatedUser.lastLoginAt,
@@ -169,6 +170,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     is_active: req.user.isActive,
     is_verified: req.user.isVerified,
     is_admin: req.user.isAdmin,
+    lingo_validatore: req.user.lingoValidatore,
     created_at: req.user.createdAt,
     login_count: req.user.loginCount,
     last_login_at: req.user.lastLoginAt,
@@ -209,7 +211,7 @@ export const changePassword = async (req: Request, res: Response) => {
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoRipassi, lingoPreferenze] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -223,6 +225,16 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.articleThread.findMany({ where: { userId }, include: { comments: true }, orderBy: { createdAt: 'asc' } }),
     prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.lingoCard.findMany({ where: { autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.lingoValidazioneCard.findMany({
+      where: { utenteId: userId },
+      select: { cardId: true, giudizio: true, motivazione: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.lingoAccettazioneTesto.findMany({
+      where: { utenteId: userId },
+      select: { acceptedAt: true, testo: { select: { chiave: true, versione: true } } },
+      orderBy: { acceptedAt: 'asc' },
+    }),
     prisma.lingoRevisioneSRS.findMany({
       where: { utenteId: userId },
       select: { cardId: true, dataRevisione: true, rating: true, scheduledDays: true, stability: true, difficulty: true, durataMs: true },
@@ -239,7 +251,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
       folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases,
       // The release time is the author's; the releasing admin's id is another person's identifier.
       threads: threads.map(({ passageReleasedById: _releasedBy, ...thread }) => thread),
-      comments, lingoCards,
+      comments, lingoCards, lingoValidazioni,
+      lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
       // The review log (the scheduling state is derived from it and not exported) and the daily goal.
       lingoRipassi, lingoPreferenze,
     },

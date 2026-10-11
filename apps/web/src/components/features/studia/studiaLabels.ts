@@ -54,7 +54,7 @@ export function anchorActLabel(anchor: Pick<AncoraScheda, 'urn'>): string | null
   return norm?.tipo_atto ? actHeading(norm) : null;
 }
 
-/** The norm an anchor's article is read as (the dossier's `NormaVisitata`); null when its address names no article. */
+/** The norm an anchor rests on, as the reader asks for it; null when its address names no article. */
 export function normaFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): NormaVisitata | null {
   const norm = normFromUrn(anchor.urn);
   if (!norm?.tipo_atto || !norm.numero_articolo) return null;

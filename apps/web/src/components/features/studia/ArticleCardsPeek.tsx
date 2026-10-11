@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FloatingFocusManager,
@@ -13,7 +13,7 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
-import { X } from 'lucide-react';
+import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -32,8 +32,10 @@ export interface ArticleCardsPeekProps {
 
 /**
  * The cards on an article, as the notes' Peek lists the notes: a header, a scrollable list, no
- * composer. A popover beside the row on a desktop, a bottom sheet on a phone. A row opens the card in
- * «Le mie schede».
+ * composer. A popover beside the row on a desktop, a bottom sheet on a phone. The reader's own card
+ * opens in «Le mie schede»; a community card is not theirs to open there (the card's address answers
+ * only its author), so its row opens in place and shows the answer and the explanation the list
+ * already carries.
  */
 export function ArticleCardsPeek({ isOpen, anchorEl, ...body }: ArticleCardsPeekProps) {
   const desktop = useIsDesktop();
@@ -128,6 +130,54 @@ function MobileSheet({ onClose, ...rest }: Omit<ArticleCardsPeekProps, 'isOpen' 
   );
 }
 
+const ROW =
+  'flex min-h-[44px] w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-800/60';
+
+function RowBody({ card }: { card: SchedaDellArticolo }) {
+  return (
+    <>
+      <span className="min-w-0 break-words">
+        {card.domanda}
+        {card.comunita && card.stato === 'VALIDATA' && card.approvazioni !== null && (
+          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Validata da {card.approvazioni}</span>
+        )}
+      </span>
+      <StateChip stato={card.stato} className="mt-0.5 shrink-0" />
+    </>
+  );
+}
+
+/** A community card: its row opens in place, the answer and the explanation as plain text. */
+function CommunityRow({ card }: { card: SchedaDellArticolo }) {
+  const [open, setOpen] = useState(false);
+  const detailId = useId();
+  const Chevron = open ? ChevronDown : ChevronRight;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls={open ? detailId : undefined} className={ROW}>
+        <Chevron size={16} aria-hidden className="mt-0.5 shrink-0 text-slate-400" />
+        <span className="flex min-w-0 flex-1 items-start justify-between gap-3">
+          <RowBody card={card} />
+        </span>
+      </button>
+      {open && (
+        <div id={detailId} className="space-y-2 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Risposta</p>
+            <p className="whitespace-pre-line break-words">{card.risposta}</p>
+          </div>
+          {card.spiegazione && (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Spiegazione</p>
+              <p className="whitespace-pre-line break-words">{card.spiegazione}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 function PeekBody({ cards, articleLabel, onClose }: Pick<ArticleCardsPeekProps, 'cards' | 'articleLabel' | 'onClose'>) {
   return (
     <>
@@ -149,14 +199,13 @@ function PeekBody({ cards, articleLabel, onClose }: Pick<ArticleCardsPeekProps, 
       <ul className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
         {cards.map((card) => (
           <li key={card.id}>
-            <Link
-              to={`/studia/schede/${encodeURIComponent(card.id)}`}
-              onClick={onClose}
-              className="flex min-h-[44px] items-start justify-between gap-3 px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-800/60"
-            >
-              <span className="min-w-0 break-words">{card.domanda}</span>
-              <StateChip stato={card.stato} className="mt-0.5 shrink-0" />
-            </Link>
+            {card.comunita ? (
+              <CommunityRow card={card} />
+            ) : (
+              <Link to={`/studia/schede/${encodeURIComponent(card.id)}`} onClick={onClose} className={ROW}>
+                <RowBody card={card} />
+              </Link>
+            )}
           </li>
         ))}
       </ul>
