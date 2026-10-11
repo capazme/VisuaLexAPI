@@ -63,11 +63,19 @@ describe('the anchors', () => {
 });
 
 describe('normaFromAnchor', () => {
-  it('reads the norm of an anchor as the dossier holds it, null when the address names no article', () => {
+  it('rebuilds the norm the reader asks for from the address an anchor holds', () => {
+    expect(normaFromAnchor({ urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453' })).toEqual({
+      tipo_atto: 'codice civile', data: '1942-03-16', numero_articolo: '1453', numero_atto: '262',
+    });
     expect(normaFromAnchor({ urn: 'urn:nir:stato:legge:1990-08-07;241~art2' })).toEqual({
       tipo_atto: 'legge', data: '1990-08-07', numero_articolo: '2', numero_atto: '241',
     });
+  });
+
+  it('is null when the address names no article, or no act the reader can ask for', () => {
     expect(normaFromAnchor({ urn: 'non è un indirizzo' })).toBeNull();
+    expect(normaFromAnchor({ urn: 'urn:nir:stato:legge:1990-08-07;241' })).toBeNull();
+    expect(normaFromAnchor({ urn: 'urn:nir:stato:regio.decreto:1942-03-16;262~art1218' })).toBeNull();
   });
 });
 

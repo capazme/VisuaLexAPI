@@ -94,6 +94,69 @@ describe('what happens to a user’s cards when the account goes', () => {
   });
 });
 
+describe('votes and texts to accept, when an account goes', () => {
+  let alice: TestUser;
+  let carol: TestUser;
+  let cardId: string;
+  let versionOne: { id: string };
+
+  beforeEach(async () => {
+    alice = await createTestUser('votes-alice');
+    carol = await createTestUser('votes-carol');
+    await prisma.user.update({ where: { id: carol.id }, data: { lingoValidatore: true } });
+    cardId = (await cardIn(alice, 'PROPOSTA_COMMUNITY')).id;
+    versionOne = await prisma.lingoTestoVersione.findFirstOrThrow({ where: { chiave: 'PROPOSTA_SCHEDA', versione: 1 } });
+    await prisma.lingoValidazioneCard.create({ data: { cardId, utenteId: carol.id, giudizio: 'MIGLIORABILE', motivazione: 'Cita la norma.' } });
+    await prisma.lingoAccettazioneTesto.create({ data: { utenteId: carol.id, testoId: versionOne.id } });
+  });
+
+  async function expectTheVoteOutlivesCarol() {
+    expect(await prisma.user.findUnique({ where: { id: carol.id } })).toBeNull();
+    // The vote stays, anonymous; the card is untouched; the acceptance went with her.
+    const votes = await prisma.lingoValidazioneCard.findMany();
+    expect(votes).toHaveLength(1);
+    expect(votes[0]).toMatchObject({ cardId, utenteId: null, giudizio: 'MIGLIORABILE', motivazione: 'Cita la norma.' });
+    const card = await prisma.lingoCard.findUniqueOrThrow({ where: { id: cardId } });
+    expect(card).toMatchObject({ autoreId: alice.id, stato: 'PROPOSTA_COMMUNITY' });
+    expect(await prisma.lingoAccettazioneTesto.count()).toBe(0);
+    // The text she accepted is still there.
+    expect(await prisma.lingoTestoVersione.findUnique({ where: { id: versionOne.id } })).not.toBeNull();
+  }
+
+  it('keeps the vote without a voter and drops the acceptance, when the user deletes the account', async () => {
+    const response = await request(app)
+      .delete('/api/auth/account')
+      .set(authHeader(carol))
+      .send({ password: 'test-password', confirmation: 'ELIMINA ACCOUNT' });
+    expect(response.status).toBe(204);
+    await expectTheVoteOutlivesCarol();
+  });
+
+  it('does the same when an administrator deletes the user', async () => {
+    const admin = await createTestUser('votes-admin');
+    await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true } });
+    const response = await request(app).delete(`/api/admin/users/${carol.id}`).set(authHeader(admin));
+    expect(response.status).toBe(204);
+    await expectTheVoteOutlivesCarol();
+  });
+
+  it('keeps a text version whose administrator is deleted, without its author', async () => {
+    const writer = await createTestUser('votes-writer');
+    await prisma.user.update({ where: { id: writer.id }, data: { isAdmin: true } });
+    const version = await prisma.lingoTestoVersione.create({
+      data: { chiave: 'PROPOSTA_SCHEDA', versione: 2, titolo: 'T', corpo: 'C', conferma: 'Ok', azione: 'Vai', autoreId: writer.id },
+    });
+    const admin = await createTestUser('votes-other-admin');
+    await prisma.user.update({ where: { id: admin.id }, data: { isAdmin: true } });
+
+    const response = await request(app).delete(`/api/admin/users/${writer.id}`).set(authHeader(admin));
+    expect(response.status).toBe(204);
+    const kept = await prisma.lingoTestoVersione.findUniqueOrThrow({ where: { id: version.id } });
+    expect(kept.autoreId).toBeNull();
+    expect(kept.versione).toBe(2);
+  });
+});
+
 // A review of `card` by `user`: the state row and one log row, as the review route writes them.
 async function reviewed(user: TestUser, cardId: string) {
   await prisma.lingoStatoRipasso.create({

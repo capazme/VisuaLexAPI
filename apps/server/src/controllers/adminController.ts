@@ -20,6 +20,8 @@ const updateUserSchema = z.object({
   isAdmin: z.boolean().optional(),
   isActive: z.boolean().optional(),
   isVerified: z.boolean().optional(),
+  // May vote on the community's study cards (set here, never by the user).
+  lingoValidatore: z.boolean().optional(),
 });
 
 const resetPasswordSchema = z.object({
@@ -38,6 +40,7 @@ export const listUsers = async (_req: Request, res: Response) => {
       isActive: true,
       isVerified: true,
       isAdmin: true,
+      lingoValidatore: true,
       loginCount: true,
       lastLoginAt: true,
       createdAt: true,
@@ -61,6 +64,7 @@ export const listUsers = async (_req: Request, res: Response) => {
     is_active: user.isActive,
     is_verified: user.isVerified,
     is_admin: user.isAdmin,
+    lingo_validatore: user.lingoValidatore,
     login_count: user.loginCount,
     last_login_at: user.lastLoginAt,
     created_at: user.createdAt,
@@ -89,6 +93,7 @@ export const getUser = async (req: Request, res: Response) => {
       isActive: true,
       isVerified: true,
       isAdmin: true,
+      lingoValidatore: true,
       loginCount: true,
       lastLoginAt: true,
       createdAt: true,
@@ -116,6 +121,7 @@ export const getUser = async (req: Request, res: Response) => {
     is_active: user.isActive,
     is_verified: user.isVerified,
     is_admin: user.isAdmin,
+    lingo_validatore: user.lingoValidatore,
     login_count: user.loginCount,
     last_login_at: user.lastLoginAt,
     created_at: user.createdAt,
@@ -168,6 +174,7 @@ export const createUser = async (req: Request, res: Response) => {
     is_active: user.isActive,
     is_verified: user.isVerified,
     is_admin: user.isAdmin,
+    lingo_validatore: user.lingoValidatore,
     created_at: user.createdAt,
   });
 };
@@ -228,6 +235,7 @@ export const updateUser = async (req: Request, res: Response) => {
       ...(data.isAdmin !== undefined && { isAdmin: data.isAdmin }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
       ...(data.isVerified !== undefined && { isVerified: data.isVerified }),
+      ...(data.lingoValidatore !== undefined && { lingoValidatore: data.lingoValidatore }),
     },
   });
 
@@ -238,6 +246,7 @@ export const updateUser = async (req: Request, res: Response) => {
     is_active: user.isActive,
     is_verified: user.isVerified,
     is_admin: user.isAdmin,
+    lingo_validatore: user.lingoValidatore,
     created_at: user.createdAt,
     updated_at: user.updatedAt,
   });

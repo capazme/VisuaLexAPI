@@ -1,24 +1,32 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
+import { useAuth } from '../../../hooks/useAuth';
 
-// The views of the area; «Da validare» joins this list with its PR.
-const VIEWS = [
-  { to: 'ripasso', label: 'Ripasso' },
-  { to: 'schede', label: 'Le mie schede' },
-];
+// The views of the area.
+const REVIEW = { to: 'ripasso', label: 'Ripasso' };
+const MY_CARDS = { to: 'schede', label: 'Le mie schede' };
+// Only for the people the administrator named validators; the server checks it again on every call.
+const TO_VALIDATE = { to: 'valida', label: 'Da validare' };
+
+/** What the area tells its views; `validator` is undefined while the account is still loading. */
+export interface StudiaOutletContext {
+  validator: boolean | undefined;
+}
 
 /**
  * VisuaLex Studia: the area's heading, the links to its views, and the view itself. The layout
  * already pads the page; below `lg` its fixed menu button sits over the top-left corner, so the
- * heading starts to its right.
+ * heading starts to its right. «Da validare» is offered to validators only.
  */
 export function StudiaPage() {
+  const { isValidator, loading } = useAuth();
+  const views = isValidator ? [REVIEW, MY_CARDS, TO_VALIDATE] : [REVIEW, MY_CARDS];
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4">
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
         <h1 className="pl-12 text-xl font-bold text-slate-900 lg:pl-0 md:text-2xl dark:text-white">VisuaLex Studia</h1>
         <nav aria-label="Studia" className="mt-3 flex gap-1">
-          {VIEWS.map((view) => (
+          {views.map((view) => (
             <NavLink
               key={view.to}
               to={view.to}
@@ -36,7 +44,7 @@ export function StudiaPage() {
           ))}
         </nav>
       </header>
-      <Outlet />
+      <Outlet context={{ validator: loading ? undefined : isValidator } satisfies StudiaOutletContext} />
     </div>
   );
 }

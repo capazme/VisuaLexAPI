@@ -23,14 +23,20 @@ vi.mock('../../../hooks/useTour', () => ({
 
 import { Layout } from '../Layout';
 
-describe('Layout — what sits where the review’s grade bar is pinned', () => {
-  it('hides the feedback button and the services pill on a phone during a review session, and nowhere else', () => {
-    const { unmount } = render(<MemoryRouter initialEntries={['/studia/ripasso/sessione?materia=DIRITTO_CIVILE']}><Layout /></MemoryRouter>);
-    expect(screen.getByTestId('feedback')).toHaveClass('max-md:hidden');
-    expect(screen.getByTestId('health')).toHaveClass('max-md:hidden');
-    unmount();
+const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
 
-    render(<MemoryRouter initialEntries={['/studia/ripasso']}><Layout /></MemoryRouter>);
+describe('Layout — what sits where a bar is pinned to the bottom on a phone', () => {
+  it.each(['/studia/ripasso/sessione?materia=DIRITTO_CIVILE', '/studia/valida'])(
+    'hides the feedback button and the services pill on a phone on %s',
+    (path) => {
+      at(path);
+      expect(screen.getByTestId('feedback')).toHaveClass('max-md:hidden');
+      expect(screen.getByTestId('health')).toHaveClass('max-md:hidden');
+    },
+  );
+
+  it.each(['/', '/studia', '/studia/ripasso', '/studia/schede', '/dossier'])('leaves them as they are on %s', (path) => {
+    at(path);
     expect(screen.getByTestId('feedback')).not.toHaveClass('max-md:hidden');
     expect(screen.getByTestId('health')).not.toHaveClass('max-md:hidden');
   });

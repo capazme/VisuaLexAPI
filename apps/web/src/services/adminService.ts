@@ -172,3 +172,47 @@ export const republishSharedEnvironment = async (id: string): Promise<{ id: stri
 export const deleteSharedEnvironment = async (id: string): Promise<void> => {
   return del(`/admin/shared-environments/${id}`);
 };
+
+// ============================================
+// VisuaLex Studia: the texts users accept
+// ============================================
+
+/** What the administrator writes for one version of a text; the number and the author come from the server. */
+export interface StudiaTextBody {
+  titolo: string;
+  corpo: string;
+  /** The checkbox's label. */
+  conferma: string;
+  /** The button's label. */
+  azione: string;
+}
+
+export interface StudiaTextVersion extends StudiaTextBody {
+  id: string;
+  versione: number;
+  createdAt: string;
+  /** The administrator's username; null when the version was written by a migration or the account is gone. */
+  autore: string | null;
+}
+
+export interface StudiaTextGroup {
+  chiave: string;
+  /** Newest first: the first is the current version. */
+  versioni: StudiaTextVersion[];
+}
+
+/**
+ * Every text with all its versions, newest first.
+ */
+export const studiaTexts = async (): Promise<StudiaTextGroup[]> => {
+  const response = await get<{ testi: StudiaTextGroup[] }>('/admin/studia/testi');
+  return response.testi;
+};
+
+/**
+ * Save a new version of a text (never overwrites). Rejects with status 409 when another version
+ * was saved at the same moment.
+ */
+export const saveStudiaText = async (chiave: string, body: StudiaTextBody): Promise<StudiaTextVersion> => {
+  return post<StudiaTextVersion>(`/admin/studia/testi/${encodeURIComponent(chiave)}`, body);
+};

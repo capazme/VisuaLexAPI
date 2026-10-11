@@ -17,6 +17,13 @@ export interface AncoraScheda {
   isPrimary: boolean;
 }
 
+/** What a validator judged against a card: only the two verdicts that carry a reason, and never who gave it. */
+export interface RilievoValidatore {
+  giudizio: 'MIGLIORABILE' | 'ERRATA';
+  motivazione: string;
+  createdAt: string;
+}
+
 export interface Scheda {
   id: string;
   materia: Materia;
@@ -31,6 +38,9 @@ export interface Scheda {
   ancore: AncoraScheda[];
   /** The connected application that wrote the card; null for a card written here. */
   origine: { clientName: string | null } | null;
+  /** Approvals so far. Only the card read by its id (`studiaService.get`) carries it, with `rilievi`. */
+  approvazioni?: number | null;
+  rilievi?: RilievoValidatore[];
   /**
    * The day of the next review, 'YYYY-MM-DD' in Rome; null when the user has never reviewed the card or it can no longer be reviewed.
    * Carried by the list (`/lingo/cards`); absent where the card is read some other way.
@@ -43,6 +53,33 @@ export interface SchedaDellArticolo extends Scheda {
   comunita: boolean;
   approvazioni: number | null;
 }
+
+/**
+ * A text the user must accept before an action (the notice for proposing a card), as the server's
+ * current version of it. Nothing of its wording is in the web app.
+ */
+export interface TestoDaAccettare {
+  id: string;
+  chiave: 'PROPOSTA_SCHEDA';
+  versione: number;
+  titolo: string;
+  corpo: string;
+  /** The checkbox's label. */
+  conferma: string;
+  /** The button's label. */
+  azione: string;
+}
+
+/** `GET /lingo/testi/:chiave`: the current version, and whether this user has accepted it. */
+export interface TestoCorrente extends TestoDaAccettare {
+  accettata: boolean;
+}
+
+/** What a validator can say about a card. */
+export type Giudizio = 'APPROVATA' | 'MIGLIORABILE' | 'ERRATA';
+
+/** Proposing a card answers the card, or the notice to accept first. */
+export type EsitoProposta = Scheda | { richiedeTesto: TestoDaAccettare };
 
 /** What the form sends: anchors as references («art. 1453 c.c.»), which the server resolves and checks. */
 export interface SchedaInput {

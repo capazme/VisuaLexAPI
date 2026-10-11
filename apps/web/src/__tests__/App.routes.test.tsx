@@ -42,9 +42,15 @@ vi.mock('../features/merlt/graph/page/GraphExplorerPage', () => ({
 }));
 vi.mock('../features/merlt/contrib/ContribPage', () => ({ ContribPage: () => <div /> }));
 vi.mock('../features/merlt/validate/ValidationPage', () => ({ ValidationPage: () => <div /> }));
-// «Le mie schede» is the real view: its list is read through the service, which must not reach for a server.
+// The Studia views are real (their headings are under test), so their requests are answered here:
+// unmocked, jsdom's XHR reaches for a server that isn't there.
 vi.mock('../services/studiaService', () => ({
-  studiaService: { list: () => Promise.resolve({ cards: [], nextOffset: null }), get: () => Promise.reject(new Error('not found')) },
+  studiaService: {
+    list: vi.fn().mockResolvedValue({ cards: [], nextOffset: null }),
+    get: vi.fn().mockRejectedValue({ status: 404 }),
+    queue: vi.fn().mockResolvedValue({ cards: [] }),
+    vote: vi.fn().mockRejectedValue({ status: 404 }),
+  },
 }));
 vi.mock('../components/features/studia/ReviewHome', () => ({ ReviewHome: () => <h2>Ripasso di oggi</h2> }));
 vi.mock('../components/features/studia/ReviewSession', () => ({ ReviewSession: () => <h2>Sessione di ripasso</h2> }));
@@ -131,6 +137,12 @@ describe('App routing — Studia', () => {
   it('keeps a card’s address inside the Studia area', async () => {
     renderAt('/studia/schede/k1');
     expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
+  });
+
+  it('opens «Da validare» at /studia/valida', async () => {
+    renderAt('/studia/valida');
+    expect(await screen.findByRole('heading', { name: 'Da validare' })).toBeInTheDocument();
+    expect(await screen.findByText('Nessuna scheda da validare')).toBeInTheDocument();
   });
 
   it('is the 404 page when VITE_FEATURE_STUDIA is off', async () => {

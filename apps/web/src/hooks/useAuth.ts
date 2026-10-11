@@ -184,6 +184,7 @@ export function useAuth() {
   return {
     ...state,
     isAdmin: state.user?.is_admin ?? false,
+    isValidator: state.user?.lingo_validatore ?? false,
     register,
     login,
     logout,

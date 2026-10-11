@@ -10,7 +10,7 @@ import type { AncoraScheda, Scheda } from '../../../types/studia';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { Toast } from '../../ui/Toast';
-import { CardDetail } from './CardDetail';
+import { CardDetail, type CardDetailProps } from './CardDetail';
 import { CardFilters } from './CardFilters';
 import { CardGroups } from './CardGroups';
 import { CardFormDialog } from './CardFormDialog';
@@ -30,6 +30,52 @@ function useDebounced<T>(value: T, ms: number): [T, (next: T) => void] {
     return () => clearTimeout(timer);
   }, [value, ms]);
   return [settled, setSettled];
+}
+
+/**
+ * The card with what only its own address carries: the approvals and the validators' remarks of a
+ * card that has left the drafts (the list does not carry them). Read again when its state or
+ * date moves, so a withdrawn or newly validated card shows the present. Until the answer comes, or
+ * if it never does, the card is shown as the list gave it.
+ */
+function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: () => void } {
+  const needsDetail = card.stato !== 'BOZZA_PERSONALE' && card.rilievi === undefined;
+  const [detail, setDetail] = useState<Scheda | null>(null);
+  // The card, state and date whose reading failed: a different one starts without the failure.
+  const asked = `${card.id}|${card.stato}|${card.updatedAt}`;
+  const [failedFor, setFailedFor] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!needsDetail) return;
+    let live = true;
+    studiaService.get(card.id).then(
+      (full) => {
+        if (!live) return;
+        setDetail(full);
+        setFailedFor(null);
+      },
+      (error) => {
+        console.error(`Could not read the validators' remarks of study card ${card.id}`, error);
+        if (live) setFailedFor(asked);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [needsDetail, card.id, asked, attempt]);
+  const retry = () => {
+    setFailedFor(null);
+    setAttempt((n) => n + 1);
+  };
+  // Only an answer for this very card and state: another one's, or a draft's, is not shown.
+  const shown = needsDetail && detail && detail.id === card.id && detail.stato === card.stato ? detail : card;
+  return { card: shown, failed: needsDetail && failedFor === asked, retry };
+}
+
+/** The detail of a card, completed with what its own address carries (`useCardDetail`). */
+function DetailOf({ card, ...rest }: CardDetailProps) {
+  const full = useCardDetail(card);
+  return <CardDetail {...rest} card={full.card} rilieviFailed={full.failed} onRetryRilievi={full.retry} />;
 }
 
 /**
@@ -171,6 +217,14 @@ export function MyCardsView() {
     }
   };
 
+  // A card proposed, withdrawn or refused: the lists are read again where they are shown next.
+  const handleChanged = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setFetched(null);
+    invalidateArticleCards();
+    void refresh();
+  };
+
   const resetFilters = () => {
     setFilterState(NO_FILTERS);
     setSearch('');
@@ -224,12 +278,15 @@ export function MyCardsView() {
       {id ? (
         <div className={cn('min-w-0 pt-2 md:pt-3', desktop && 'sticky top-0 max-h-screen overflow-y-auto pb-4')}>
           {selected ? (
-            <CardDetail
+            <DetailOf
+              // Its confirmations and pending request belong to this card: another one starts clean.
+              key={selected.id}
               card={selected}
               onBack={desktop ? undefined : () => navigate(LIST_PATH)}
               onEdit={() => setEdit({ card: selected, open: true })}
               onDelete={() => setToDelete(selected)}
               onOpenAnchor={openAnchor}
+              onChanged={handleChanged}
             />
           ) : (
             <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">

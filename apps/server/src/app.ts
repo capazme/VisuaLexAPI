@@ -26,6 +26,9 @@ import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
 import lingoCardsRoutes from './routes/lingoCards';
 import lingoArticoloRoutes from './routes/lingoArticolo';
+import lingoValidazioneRoutes from './routes/lingoValidazione';
+import lingoTestiRoutes from './routes/lingoTesti';
+import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
 import lingoSrsRoutes from './routes/lingoSrs';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
@@ -129,6 +132,10 @@ app.use('/api/merlt', merltKillSwitch, merltRoutes);
 app.use('/api/lingo/simulazioni', lingoSimulazioniRoutes);
 app.use('/api/lingo/cards', lingoCardsRoutes);
 app.use('/api/lingo/articolo', lingoArticoloRoutes);
+app.use('/api/lingo/validazione', lingoValidazioneRoutes);
+app.use('/api/lingo/testi', lingoTestiRoutes);
+// Behind its own authenticate + requireAdmin, like the rest of /api/admin, but ahead of the catch-all routers.
+app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
 app.use('/api/lingo/srs', lingoSrsRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
