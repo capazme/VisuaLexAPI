@@ -28,6 +28,11 @@ export interface ReviewSessionOptions {
 
 const GRADE_KEYS: Record<string, Voto> = { '1': 1, '2': 2, '3': 3, '4': 4 };
 
+/** The card is no longer the user's to review (an `apiClient` rejection carries `status`). */
+function isGone(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 404;
+}
+
 /** Keys typed into a field, or meant for a control that has its own, are not the session's. */
 function isForOtherControl(target: EventTarget | null, key: string): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -41,7 +46,9 @@ function isForOtherControl(target: EventTarget | null, key: string): boolean {
  * 1–4 grade it (only once shown). The first grade of a card is sent to the server, with the time
  * spent; «Di nuovo» (1) puts the card back at the end, and its later passes (`practice`) are not
  * sent — 1 sends it back again, 2–4 take it out. A grade that fails to reach the server leaves the
- * card in place, shown, with `saveError` set; grading again sends it again.
+ * card in place, shown, with `saveError` set; grading again sends it again. A grade answered 404
+ * (the card left the user's scope meanwhile) is no failure to retry: the card is dropped and
+ * `skipped` set, uncounted, until the user moves on.
  *
  * The queue and the shown flag live in refs as well as in state: the key listener in place between
  * a post resolving and the screen rendering would otherwise act on the card already graded. Every
@@ -54,6 +61,7 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
   const [revealed, setRevealedState] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [skipped, setSkipped] = useState(false);
   const [reviewedIds, setReviewedIds] = useState<ReadonlySet<string>>(new Set());
   const [againIds, setAgainIds] = useState<ReadonlySet<string>>(new Set());
   const [nextDue, setNextDue] = useState<number | null>(null);
@@ -89,6 +97,7 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
       setReviewedIds(new Set());
       setAgainIds(new Set());
       setNextDue(null);
+      setSkipped(false);
       setStep((n) => n + 1);
       shownAt.current = Date.now();
     } catch {
@@ -112,7 +121,9 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
   const current = queue[0]?.card ?? null;
 
   const reveal = useCallback(() => {
-    if (queueRef.current.length > 0) setRevealed(true);
+    if (queueRef.current.length === 0) return;
+    setRevealed(true);
+    setSkipped(false);
   }, [setRevealed]);
 
   const grade = useCallback(
@@ -139,8 +150,19 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
           shownAt.current = Date.now();
         }
         setSaveError(false);
-      } catch {
-        setSaveError(true);
+      } catch (error) {
+        if (isGone(error)) {
+          if (queueRef.current[0]?.card.id === card.id) {
+            setQueue(queueRef.current.slice(1));
+            setRevealed(false);
+            setStep((n) => n + 1);
+            shownAt.current = Date.now();
+          }
+          setSaveError(false);
+          setSkipped(true);
+        } else {
+          setSaveError(true);
+        }
       } finally {
         busy.current = false;
         setSaving(false);
@@ -187,6 +209,8 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     loading,
     loadError,
     saveError,
+    /** The last grade found the card gone from the review: it was dropped, not graded. */
+    skipped,
     saving,
     reload: load,
   };

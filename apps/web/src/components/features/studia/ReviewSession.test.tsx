@@ -305,6 +305,27 @@ describe('the review session', () => {
     });
   });
 
+  it('says a card left the review, and shows the next question', async () => {
+    renderSession([card('a'), card('b')]);
+    await show();
+    review.mockRejectedValueOnce({ status: 404, message: 'Scheda non trovata', data: {} });
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Domanda b?')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Questa scheda non è più da ripassare.');
+    expect(screen.queryByText('Non registrato: riprova')).not.toBeInTheDocument();
+    await show();
+    expect(screen.queryByText('Questa scheda non è più da ripassare.')).not.toBeInTheDocument();
+  });
+
+  it('says it on the end screen too, when the card that left was the last', async () => {
+    renderSession([card('a')]);
+    await show();
+    review.mockRejectedValueOnce({ status: 404, message: 'Scheda non trovata', data: {} });
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Nessuna scheda da ripassare per ora.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Questa scheda non è più da ripassare.');
+  });
+
   describe('a pass for practice', () => {
     it('shows the grade names alone, with a line saying nothing is recorded', async () => {
       renderSession([card('a'), card('b')]);

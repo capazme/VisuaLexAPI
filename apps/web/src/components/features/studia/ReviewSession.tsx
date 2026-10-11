@@ -101,7 +101,7 @@ export function ReviewSession() {
     else setConfirmStop(true);
   }, []);
 
-  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, saving, reload } =
+  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload } =
     useReviewSession(materia, { paused: confirmStop, onEscape: handleEscape });
 
   // An article belongs to the step it was opened at: a card that comes back is a new step.
@@ -171,6 +171,11 @@ export function ReviewSession() {
   return (
     // Room for the bar pinned at the bottom of a phone.
     <section aria-label="Ripasso" className="pb-28 md:pb-0">
+      {skipped && (
+        <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
+          Questa scheda non è più da ripassare.
+        </p>
+      )}
       {body}
       <ConfirmDialog
         open={confirmStop}

@@ -150,6 +150,39 @@ describe('useReviewSession', () => {
     expect(result.current.summary.reviewed).toBe(1);
   });
 
+  it('drops a card the server no longer has in scope, counts nothing for it, and goes on', async () => {
+    const { result } = await started([card('a'), card('b')]);
+    review.mockRejectedValueOnce({ status: 404, message: 'Scheda non trovata', data: {} });
+    act(() => result.current.reveal());
+    const stepBefore = result.current.step;
+    await act(async () => result.current.grade(3));
+    expect(review).toHaveBeenCalledTimes(1);
+    expect(result.current.current?.id).toBe('b');
+    expect(result.current.remaining).toBe(1);
+    expect(result.current.revealed).toBe(false);
+    expect(result.current.saveError).toBe(false);
+    expect(result.current.skipped).toBe(true);
+    expect(result.current.step).toBe(stepBefore + 1);
+    expect(result.current.summary).toEqual({ reviewed: 0, again: 0, nextDue: null });
+    // The notice goes when the user moves on.
+    act(() => result.current.reveal());
+    expect(result.current.skipped).toBe(false);
+  });
+
+  it('keeps the retry for a network error and for a server error', async () => {
+    const { result } = await started([card('a'), card('b')]);
+    act(() => result.current.reveal());
+    review.mockRejectedValueOnce({ status: 503, message: 'down', data: {} });
+    await act(async () => result.current.grade(3));
+    expect(result.current.saveError).toBe(true);
+    expect(result.current.skipped).toBe(false);
+    expect(result.current.current?.id).toBe('a');
+    review.mockRejectedValueOnce(new Error('Network Error'));
+    await act(async () => result.current.grade(3));
+    expect(result.current.saveError).toBe(true);
+    expect(result.current.current?.id).toBe('a');
+  });
+
   it('does not send one grade twice while it is on its way', async () => {
     let finish: (value: Awaited<ReturnType<typeof studiaService.review>>) => void = () => {};
     review.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
