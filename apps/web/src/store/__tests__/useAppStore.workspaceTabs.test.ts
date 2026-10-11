@@ -196,4 +196,21 @@ describe('useAppStore persisted workspace — a saved article collection', () =>
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('Tab t'));
         warn.mockRestore();
     });
+
+    it('drops, with a warning naming the tab, a collection whose articles are not a list and an entry without norma_data', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const saved = { workspaceTabs: [{ ...makeTab('t'), content: [
+            { type: 'collection', id: 'c1', label: 'R', isCollapsed: false, articles: 'none' },
+            { type: 'collection', id: 'c2', label: 'R', isCollapsed: false, articles: [
+                { article: { article_text: 'senza norma' }, sourceNorma: CC },
+                { article: ARTICLE_2043, sourceNorma: CC },
+            ] },
+        ] }] };
+        const content = merge(saved, appStore.getState()).workspaceTabs[0].content;
+        expect(content).toEqual([{ type: 'loose-article', id: expect.any(String), article: ARTICLE_2043, sourceNorma: CC }]);
+        expect(warn).toHaveBeenCalledTimes(2);
+        expect(warn).toHaveBeenNthCalledWith(1, expect.stringMatching(/articles are not a list.*"Tab t"/));
+        expect(warn).toHaveBeenNthCalledWith(2, expect.stringMatching(/without an article and its norma_data.*"Tab t"/));
+        warn.mockRestore();
+    });
 });

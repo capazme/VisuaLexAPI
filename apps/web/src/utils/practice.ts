@@ -1,8 +1,9 @@
 import type { ArticleData, Norma } from '../types';
-import type { DecisionReference, DecisionSearchQuery } from '../types/decisions';
+import type { DecisionCourt, DecisionReference, DecisionSearchQuery } from '../types/decisions';
 import { actKeyOf, compareArticles, shownAnnex } from '../components/features/dossier/dossierLayout';
+import { findArticleByNormalizedId } from './articleIds';
+import { formatDecisionShort } from './decisionLinks';
 import { buildItemKey } from './normaKeys';
-import { normalizeArticleId } from './treeUtils';
 import { requestIsHistorical, versionKey } from './versionDisplay';
 
 /**
@@ -50,6 +51,8 @@ export interface PracticeDecision {
   depositDate?: string;
   /** `attributi.tipo`, kept for «Salva come dossier». */
   tipo?: string;
+  /** The `decisionKey` this entry's reading recorded in the Cronologia: once per opening (PR 5). */
+  historyRecordedKey?: string;
 }
 
 /** What a light window shows. `id` is stable for the subject, so opening it twice finds it. */
@@ -72,28 +75,30 @@ export function practiceArticleKey(article: ArticleData): string {
   return `${buildItemKey(article.norma_data)}|${versionKey(article.norma_data)}`;
 }
 
-// An article id as a row of `tipoAtto` shows it: a code's annex («2» of the R.D.) is dropped.
-function shownArticleId(tipoAtto: string, allegato: string | undefined, numero: string): string {
-  const annex = shownAnnex({ tipo_atto: tipoAtto, allegato });
-  return normalizeArticleId(annex ? `all${annex}:${numero}` : numero);
-}
-
 const ANNEX_PREFIX = /^all([^:]+):(.+)$/;
+
+// An article as a row of its act shows it: a code's annex («2» of the R.D.) is dropped.
+function asShown(article: ArticleData): ArticleData {
+  return { ...article, norma_data: { ...article.norma_data, allegato: shownAnnex(article.norma_data) || undefined } };
+}
 
 /**
  * The row of `act` holding the article `articleId` names (an index pick, an arrow, a citation, a
- * back-stack entry): ids compared through `normalizeArticleId` (gotcha 9), a code's annex through
- * `shownAnnex`; the text in force before a past text.
+ * back-stack entry): `findArticleByNormalizedId` over the rows (gotcha 9), a code's annex compared
+ * through `shownAnnex`; the text in force before a past text.
  */
 export function findPracticeArticle(act: PracticeAct, articleId: string): ArticleData | undefined {
   if (!articleId) return undefined;
   const prefixed = ANNEX_PREFIX.exec(articleId.trim());
-  const wanted = prefixed
-    ? shownArticleId(act.norma.tipo_atto, prefixed[1], prefixed[2])
-    : shownArticleId(act.norma.tipo_atto, undefined, articleId);
-  const matches = act.articles.filter((a) =>
-    shownArticleId(a.norma_data.tipo_atto, a.norma_data.allegato, a.norma_data.numero_articolo) === wanted);
-  return matches.find((a) => !requestIsHistorical(a.norma_data)) ?? matches[0];
+  const annex = prefixed ? shownAnnex({ tipo_atto: act.norma.tipo_atto, allegato: prefixed[1] }) : '';
+  const numero = prefixed ? prefixed[2] : articleId;
+  const wanted = annex ? `all${annex}:${numero}` : numero;
+  const pick = (rows: ArticleData[]): ArticleData | undefined => {
+    const shown = rows.map(asShown);
+    const hit = findArticleByNormalizedId(shown, wanted);
+    return hit ? rows[shown.indexOf(hit)] : undefined;
+  };
+  return pick(act.articles.filter((a) => !requestIsHistorical(a.norma_data))) ?? pick(act.articles);
 }
 
 /**
@@ -207,6 +212,17 @@ export function practiceLabel(label: string): string {
   return label.trim().slice(0, MAX_PRACTICE_LABEL);
 }
 
+/** The name of a practice whose saved name is empty. */
+export const DEFAULT_PRACTICE_LABEL = 'Pratica';
+/** The name of a topic-search window whose saved label is empty. */
+export const DEFAULT_SEARCH_LABEL = 'Ricerca per tema';
+
+/** A saved label as stored and shown (`practiceLabel`), or `fallback` when nothing is left of it. */
+export function labelOr(label: unknown, fallback: string): string {
+  const kept = typeof label === 'string' ? practiceLabel(label) : '';
+  return kept || practiceLabel(fallback);
+}
+
 type Loose = Record<string, unknown>;
 const isObject = (value: unknown): value is Loose => !!value && typeof value === 'object' && !Array.isArray(value);
 const isText = (value: unknown): value is string => typeof value === 'string';
@@ -238,10 +254,25 @@ export function isValidView(view: unknown): boolean {
   return false;
 }
 
-/** An article that can be keyed: a `norma_data` with its act type and article number. */
+// The fields of a `norma_data` the keys and the sort read with string methods, when present.
+const NORMA_TEXT_FIELDS = ['data', 'numero_atto', 'tipo_atto_reale', 'allegato', 'versione', 'data_versione', 'urn'] as const;
+
+/** An article that can be keyed, sorted and drawn: a `norma_data` with its act type and article
+ *  number, its other fields text when present, and its text, when it has one, as text. */
 export function isStoredArticle(value: unknown): value is ArticleData {
   if (!isObject(value) || !isObject(value.norma_data)) return false;
-  return isText(value.norma_data.tipo_atto) && isText(value.norma_data.numero_articolo);
+  if (value.article_text !== undefined && !isText(value.article_text)) return false;
+  const norma = value.norma_data;
+  return isText(norma.tipo_atto) && isText(norma.numero_articolo) &&
+    NORMA_TEXT_FIELDS.every((field) => norma[field] === undefined || norma[field] === null || isText(norma[field]));
+}
+
+/** A topic search's query that can be run and drawn: `isValidView`'s checks, and its norm's label,
+ *  when it has one, as text. */
+export function isStoredQuery(value: unknown): value is DecisionSearchQuery {
+  if (!isValidView({ kind: 'decision-search', query: value })) return false;
+  const label = (value as { normaLabel?: unknown }).normaLabel;
+  return label === undefined || isText(label);
 }
 
 /** An act as stored: its type required, the other fields kept only when they are text. */
@@ -254,9 +285,13 @@ export function storedNorma(value: unknown): Norma | null {
   return norma;
 }
 
-/** A decision's reference that passes `isValidView`, with its known fields only. */
+const COURTS: readonly DecisionCourt[] = ['cassazione', 'corte_costituzionale'];
+
+/** A decision's reference that passes `isValidView`, of a court VisuaLex reads, with its known
+ *  fields only. The migration and `sanitizePractices` both keep this, so it is a fixed point. */
 export function storedReference(value: unknown): DecisionReference | null {
   if (!isObject(value) || !isValidView({ kind: 'decision', reference: value })) return null;
+  if (!COURTS.includes(value.corte as DecisionCourt)) return null;
   if (value.archivio !== undefined && value.archivio !== 'civile' && value.archivio !== 'penale') return null;
   const reference = { corte: value.corte, numero: value.numero, anno: value.anno } as DecisionReference;
   if (value.archivio !== undefined) reference.archivio = value.archivio as DecisionReference['archivio'];
@@ -278,7 +313,7 @@ function sanitizeAct(raw: unknown, where: string, dropped: string[]): PracticeAc
   const keys = new Set<string>();
   raw.articles.forEach((article: unknown, i: number) => {
     if (!isStoredArticle(article)) {
-      dropped.push(`${where}, act ${raw.id}: article #${i} has no norma_data (${shapeOf(article)})`);
+      dropped.push(`${where}, act ${raw.id}: article #${i} cannot be read: no norma_data, or a field that is not text (${shapeOf(article)})`);
       return;
     }
     const key = practiceArticleKey(article);
@@ -298,36 +333,49 @@ function sanitizeDecision(raw: unknown, where: string, dropped: string[]): Pract
     dropped.push(`${where}: a decision without an id, a label or a valid reference (${shapeOf(isObject(raw) ? raw.reference : raw)})`);
     return null;
   }
-  const decision: PracticeDecision = { id: raw.id, reference, label: raw.label, identified: raw.identified === true };
+  const decision: PracticeDecision = {
+    id: raw.id, reference, label: labelOr(raw.label, formatDecisionShort(reference)), identified: raw.identified === true,
+  };
   if (isText(raw.depositDate)) decision.depositDate = raw.depositDate;
   if (isText(raw.tipo)) decision.tipo = raw.tipo;
+  if (isText(raw.historyRecordedKey)) decision.historyRecordedKey = raw.historyRecordedKey;
   return decision;
 }
 
-function sanitizeBeside(raw: unknown, practice: Practice): BesideRef | null {
+// `ids` names, for this practice, the act or decision a saved id meant after any re-id.
+function sanitizeBeside(raw: unknown, practice: Practice, ids: Map<string, string>): BesideRef | null {
   if (!isObject(raw) || !isText(raw.id) || raw.id === '') return null;
   if (raw.kind === 'article' && isText(raw.actId) && isText(raw.articleKey)) {
-    const act = practice.acts.find((a) => a.id === raw.actId);
+    const actId = ids.get(raw.actId);
+    const act = practice.acts.find((a) => a.id === actId);
     const held = act?.articles.some((a) => practiceArticleKey(a) === raw.articleKey);
-    return held ? { id: raw.id, kind: 'article', actId: raw.actId, articleKey: raw.articleKey } : null;
+    return act && held ? { id: raw.id, kind: 'article', actId: act.id, articleKey: raw.articleKey } : null;
   }
   if (raw.kind === 'decision' && isText(raw.decisionId)) {
-    return practice.decisions.some((d) => d.id === raw.decisionId)
-      ? { id: raw.id, kind: 'decision', decisionId: raw.decisionId }
+    const decisionId = ids.get(raw.decisionId);
+    return decisionId && practice.decisions.some((d) => d.id === decisionId)
+      ? { id: raw.id, kind: 'decision', decisionId }
       : null;
   }
-  if (raw.kind === 'decision-search' && isText(raw.label) && isValidView({ kind: 'decision-search', query: raw.query })) {
-    return { id: raw.id, kind: 'decision-search', query: raw.query as DecisionSearchQuery, label: raw.label };
+  if (raw.kind === 'decision-search' && isText(raw.label) && isStoredQuery(raw.query)) {
+    return { id: raw.id, kind: 'decision-search', query: raw.query, label: labelOr(raw.label, DEFAULT_SEARCH_LABEL) };
   }
   return null;
 }
 
+// Two entries show one decision when every field of their identity is equal (as the migration reads two tabs).
+const sameEntry = (a: DecisionReference, b: DecisionReference): boolean =>
+  a.corte === b.corte && a.numero === b.numero && a.anno === b.anno && a.archivio === b.archivio;
+
 /**
  * The saved practices, checked (spec §10): a practice is kept only with a string id and label and
  * lists where lists belong; an act only with an act type, and its articles only with a
- * `norma_data`; a decision only with a reference `isValidView` accepts; a window only when it
- * points at something the practice holds, at most two. What fails goes into `dropped`, for the
- * caller to log (gotcha 18); nothing is thrown, since a throw in the store's `merge` would reset it.
+ * `norma_data` and a text that is text; a decision only with a reference `storedReference`
+ * accepts; a window only when it points at something the practice holds, at most two. Act and
+ * decision ids are unique across practices: a taken one is re-id'd (`<id>-2`, …), and the
+ * practice's windows follow it. Labels are trimmed and capped. What fails goes into `dropped`, for
+ * the caller to log (gotcha 18); nothing is thrown, since a throw in the store's `merge` would
+ * reset it.
  */
 export function sanitizePractices(raw: unknown): { practices: Practice[]; dropped: string[] } {
   const dropped: string[] = [];
@@ -335,6 +383,15 @@ export function sanitizePractices(raw: unknown): { practices: Practice[]; droppe
   if (!Array.isArray(raw)) return { practices: [], dropped: [`practices: not a list (${shapeOf(raw)})`] };
 
   const practices: Practice[] = [];
+  // Act and decision ids taken so far, across practices.
+  const taken = new Set<string>();
+  const claim = (id: string): string => {
+    let next = id;
+    for (let n = 2; taken.has(next); n++) next = `${id}-${n}`;
+    taken.add(next);
+    return next;
+  };
+
   raw.forEach((entry: unknown, index: number) => {
     if (!isObject(entry) || !isText(entry.id) || entry.id === '' || !isText(entry.label) ||
       !Array.isArray(entry.acts) || !Array.isArray(entry.decisions) || !Array.isArray(entry.beside)) {
@@ -347,9 +404,12 @@ export function sanitizePractices(raw: unknown): { practices: Practice[]; droppe
     }
     const where = `practice ${entry.id}`;
     const practice: Practice = {
-      id: entry.id, label: practiceLabel(entry.label), labelIsCustom: entry.labelIsCustom === true,
+      id: entry.id, label: labelOr(entry.label, DEFAULT_PRACTICE_LABEL), labelIsCustom: entry.labelIsCustom === true,
       acts: [], decisions: [], beside: [],
     };
+    // A saved act or decision id → the id it has now; the first of a practice's equal ids wins.
+    const ids = new Map<string, string>();
+    const keep = (saved: string, now: string) => { if (!ids.has(saved)) ids.set(saved, now); };
     for (const rawAct of entry.acts) {
       const act = sanitizeAct(rawAct, where, dropped);
       if (!act) continue;
@@ -357,24 +417,31 @@ export function sanitizePractices(raw: unknown): { practices: Practice[]; droppe
       if (same) {
         // Two acts of one identity: one act, the first one's id (no article is lost).
         practice.acts = addArticles(practice.acts, act.norma, act.articles, () => same.id).acts;
-      } else if (practice.acts.some((a) => a.id === act.id)) {
-        dropped.push(`${where}: the act id ${act.id} is already taken`);
-      } else {
-        practice.acts.push(act);
+        keep(act.id, same.id);
+        continue;
       }
+      const id = claim(act.id);
+      if (id !== act.id) dropped.push(`${where}: the act id ${act.id} is already taken, re-id'd ${id}`);
+      keep(act.id, id);
+      practice.acts.push({ ...act, id });
     }
     for (const rawDecision of entry.decisions) {
       const decision = sanitizeDecision(rawDecision, where, dropped);
       if (!decision) continue;
-      if (practice.decisions.some((d) => d.id === decision.id)) {
-        dropped.push(`${where}: the decision id ${decision.id} is already taken`);
+      const twin = practice.decisions.find((d) => sameEntry(d.reference, decision.reference));
+      if (twin) {
+        dropped.push(`${where}: a second entry of the decision ${twin.label}`);
+        keep(decision.id, twin.id);
         continue;
       }
-      practice.decisions.push(decision);
+      const id = claim(decision.id);
+      if (id !== decision.id) dropped.push(`${where}: the decision id ${decision.id} is already taken, re-id'd ${id}`);
+      keep(decision.id, id);
+      practice.decisions.push({ ...decision, id });
     }
     const beside: BesideRef[] = [];
     for (const rawRef of entry.beside) {
-      const ref = sanitizeBeside(rawRef, practice);
+      const ref = sanitizeBeside(rawRef, practice, ids);
       if (!ref || beside.some((b) => b.id === ref.id)) {
         dropped.push(`${where}: a window that points at nothing the practice holds (${shapeOf(isObject(rawRef) ? rawRef.kind : rawRef)})`);
         continue;

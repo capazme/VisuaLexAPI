@@ -16,6 +16,7 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
+import { isStoredArticle, isValidView, sameDecision } from '../utils/practice';
 import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
@@ -3060,34 +3061,6 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 export { appStore };
 
 // Export types
-/** Does the tab's reference (`tab`) show the decision a citation (`wanted`) names? Same court,
- *  number and year; a citation with an archive matches only a tab of that archive (civil and
- *  penal numbers run in separate series), one without matches a tab of either. */
-function sameDecision(tab: DecisionReference, wanted: DecisionReference): boolean {
-    return tab.corte === wanted.corte && tab.numero === wanted.numero && tab.anno === wanted.anno &&
-        (wanted.archivio === undefined || tab.archivio === wanted.archivio);
-}
-
-function isValidView(view: unknown): boolean {
-    if (!view || typeof view !== 'object') return false;
-    const v = view as { kind?: unknown; reference?: Record<string, unknown>; query?: unknown };
-    if (v.kind === 'decision') {
-        const r = v.reference;
-        return !!r && typeof r.corte === 'string' && r.corte !== '' &&
-            Number.isInteger(r.numero) && (r.numero as number) > 0 &&
-            Number.isInteger(r.anno) && (r.anno as number) > 0;
-    }
-    if (v.kind === 'decision-search') {
-        const q = v.query as { tema?: unknown; norma?: unknown } | null | undefined;
-        if (!q || typeof q !== 'object') return false;
-        if (q.tema !== undefined && typeof q.tema !== 'string') return false;
-        const n = q.norma as Record<string, unknown> | null | undefined;
-        if (n !== undefined && (!n || typeof n !== 'object' || typeof n.tipo_atto !== 'string' || typeof n.numero_articolo !== 'string')) return false;
-        return q.tema !== undefined || n !== undefined;
-    }
-    return false;
-}
-
 /** Drops a persisted tab's malformed `view`; a tab left without content goes with it. */
 function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
     if (!Array.isArray(tabs)) return undefined;
@@ -3100,8 +3073,10 @@ function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
 }
 
 /** Article collections were removed; a browser may still hold one. Each article of a saved collection
- *  becomes a loose article of the same tab with its `norma_data` untouched (annotation keys read it),
- *  and any other unknown item type is dropped with a warning naming the tab (gotcha 18). */
+ *  becomes a loose article of the same tab with its `norma_data` untouched (annotation keys read it).
+ *  A collection whose articles are not a list, an entry without an article that has a `norma_data`
+ *  (`isStoredArticle`), and any other unknown item type are dropped with a warning naming the tab
+ *  (gotcha 18). */
 function foldCollections(tabs: WorkspaceTab[] | undefined): WorkspaceTab[] | undefined {
     if (!tabs) return tabs;
     return tabs.map((tab) => {
@@ -3111,10 +3086,13 @@ function foldCollections(tabs: WorkspaceTab[] | undefined): WorkspaceTab[] | und
             if (type === 'norma' || type === 'loose-article') return [item as TabContent];
             if (type === 'collection') {
                 const articles = (item as { articles?: unknown }).articles;
-                if (!Array.isArray(articles)) return [];
+                if (!Array.isArray(articles)) {
+                    console.warn(`workspace: dropped a saved collection whose articles are not a list from the tab "${tab.label}"`);
+                    return [];
+                }
                 return articles.flatMap((entry: { article?: ArticleData; sourceNorma?: Norma } | null): LooseArticle[] => {
-                    if (!entry?.article) {
-                        console.warn(`workspace: skipped a malformed entry of a saved collection in the tab "${tab.label}"`);
+                    if (!entry || !isStoredArticle(entry.article)) {
+                        console.warn(`workspace: skipped an entry without an article and its norma_data from a saved collection in the tab "${tab.label}"`);
                         return [];
                     }
                     return [{ type: 'loose-article', id: uuidv4(), article: entry.article, sourceNorma: entry.sourceNorma ?? entry.article.norma_data }];

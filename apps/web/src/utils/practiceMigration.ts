@@ -2,8 +2,8 @@ import type { ArticleData, Norma } from '../types';
 import type { DecisionSearchQuery } from '../types/decisions';
 import { formatDecisionShort } from './decisionLinks';
 import {
-  addArticles, isStoredArticle, isValidView, practiceLabel, storedNorma, storedReference,
-  type BesideRef, type Practice, type PracticeAct, type PracticeDecision,
+  addArticles, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, isStoredArticle, isStoredQuery, isValidView, labelOr,
+  storedNorma, storedReference, type BesideRef, type Practice, type PracticeAct, type PracticeDecision,
 } from './practice';
 
 /**
@@ -16,15 +16,19 @@ import {
 // The shapes the store persisted, as far as the migration reads them. Typed loosely on purpose:
 // saved state is untrusted, and the tab types themselves retire with this migration.
 
-/** A saved workspace tab. `position`, `size`, `isMinimized`, `isHidden` and `historyRecordedKey`
- *  were persisted too and are dropped. */
+/** A saved workspace tab. `position` and `size` were persisted too and are dropped; `isMinimized`
+ *  and `isHidden` only decide which tab was in front; a decision tab's `historyRecordedKey` is
+ *  kept on its entry. */
 interface LegacyTab {
   id?: unknown;
   label?: unknown;
   labelIsCustom?: unknown;
   zIndex?: unknown;
+  isMinimized?: unknown;
+  isHidden?: unknown;
   content?: unknown;
   view?: unknown;
+  historyRecordedKey?: unknown;
 }
 
 /** A norm block: `{ type: 'norma', id, norma, articles, isCollapsed, autoFocusArticleId? }`. */
@@ -67,29 +71,38 @@ export interface MigratedWorkspace {
   droppedSearches: string[];
 }
 
-// The act an extracted article belongs to: its saved source, else the act its norma_data names.
-function actOfArticle(article: ArticleData, sourceNorma: unknown): Norma {
+// The act an extracted article belongs to: its saved source, else the act its norma_data names;
+// null when neither names an act type.
+function actOfArticle(article: ArticleData, sourceNorma: unknown): Norma | null {
   const source = storedNorma(sourceNorma);
   if (source) return source;
   const { tipo_atto, data, numero_atto, tipo_atto_reale } = article.norma_data;
-  return storedNorma({ tipo_atto, data, numero_atto, tipo_atto_reale }) as Norma;
+  return storedNorma({ tipo_atto, data, numero_atto, tipo_atto_reale });
 }
 
 const zOf = (tab: LegacyTab): number => (typeof tab.zIndex === 'number' && Number.isFinite(tab.zIndex) ? tab.zIndex : -Infinity);
+const isVisible = (tab: LegacyTab): boolean => tab.isMinimized !== true && tab.isHidden !== true;
 
-// The entry with the highest z-index; the first of equals (array order is the dock's order).
+// Is `a` in front of `b`? As PR 4d's `frontTabId` reads it: a visible tab (not minimised, not
+// hidden) before any other, then the higher z-index (minimising does not lower it).
+const before = (a: LegacyTab, b: LegacyTab): boolean =>
+  isVisible(a) !== isVisible(b) ? isVisible(a) : zOf(a) > zOf(b);
+
+// The entry in front; the first of equals (array order is the dock's order). With no visible tab,
+// the highest z-index of the others, so the decisions still join a practice the user made.
 function front<T extends { tab: LegacyTab }>(entries: T[]): T | undefined {
-  return entries.reduce<T | undefined>((best, e) => (!best || zOf(e.tab) > zOf(best.tab) ? e : best), undefined);
+  return entries.reduce<T | undefined>((best, e) => (!best || before(e.tab, best.tab) ? e : best), undefined);
 }
 
 /**
  * Turns the saved tabs into practices (spec §9): each tab without a view is a practice with its
  * id, label and order, its blocks merged into acts by `actKeyOf` (the first block's id kept), its
  * loose articles and a collection's articles into their acts; the decision tabs go under
- * «Giurisprudenza» of the practice whose tab had the highest z-index, or of a new practice
- * «Sentenze»; the topic search in front becomes that practice's window, the others are named in
- * `droppedSearches`; the practice of the front tab is active. Ids come from `newId` only where a
- * saved one is missing or taken.
+ * «Giurisprudenza» of the practice whose tab was in front (`before`: visible, then the highest
+ * z-index), or of a new practice «Sentenze»; the topic search in front becomes that practice's
+ * window, the others are named in `droppedSearches`; that practice is active. References, queries
+ * and labels are kept as `sanitizePractices` keeps them, so its output is a fixed point. Ids come
+ * from `newId` only where a saved one is missing or taken.
  */
 export function practicesFromTabs(tabs: unknown, newId: () => string): MigratedWorkspace {
   const dropped: string[] = [];
@@ -108,7 +121,7 @@ export function practicesFromTabs(tabs: unknown, newId: () => string): MigratedW
   };
 
   const normTabs: { tab: LegacyTab; practice: Practice }[] = [];
-  const decisionTabs: { tab: LegacyTab; reference: PracticeDecision['reference'] }[] = [];
+  const decisionTabs: { tab: LegacyTab; reference: PracticeDecision['reference']; label: string }[] = [];
   const searchTabs: { tab: LegacyTab; query: DecisionSearchQuery; label: string }[] = [];
 
   tabs.forEach((raw: unknown, index: number) => {
@@ -121,23 +134,25 @@ export function practicesFromTabs(tabs: unknown, newId: () => string): MigratedW
     const where = `tab "${label || tab.id}"`;
 
     if (tab.view !== undefined) {
-      const view = tab.view as { kind?: unknown; reference?: unknown; query?: unknown };
+      const view = (isObject(tab.view) ? tab.view : {}) as { kind?: unknown; reference?: unknown; query?: unknown };
       const reference = view.kind === 'decision' ? storedReference(view.reference) : null;
       if (reference) {
-        decisionTabs.push({ tab, reference: view.reference as PracticeDecision['reference'] });
+        decisionTabs.push({ tab, reference, label: labelOr(label, formatDecisionShort(reference)) });
         return;
       }
-      if (view.kind === 'decision-search' && isValidView(view)) {
-        searchTabs.push({ tab, query: view.query as DecisionSearchQuery, label: label || 'Ricerca per tema' });
+      if (view.kind === 'decision-search' && isStoredQuery(view.query)) {
+        searchTabs.push({ tab, query: view.query, label: labelOr(label, DEFAULT_SEARCH_LABEL) });
         return;
       }
       // As the store did on rehydration: a malformed view goes; a tab left without content with it.
-      dropped.push(`${where}: a view that cannot be read (${String(view.kind)})`);
+      // A decision of a court VisuaLex does not read goes too, never labelled as another court's.
+      const court = view.kind === 'decision' && isValidView(view) ? `, the court ${String((view.reference as { corte?: unknown }).corte)}` : '';
+      dropped.push(`${where}: a view that cannot be read (${String(view.kind)}${court})`);
       if (!Array.isArray(tab.content) || tab.content.length === 0) return;
     }
 
     const practice: Practice = {
-      id: claim(tab.id), label: practiceLabel(label), labelIsCustom: tab.labelIsCustom === true,
+      id: claim(tab.id), label: labelOr(label, DEFAULT_PRACTICE_LABEL), labelIsCustom: tab.labelIsCustom === true,
       acts: [], decisions: [], beside: [],
     };
     if (tab.content !== undefined && !Array.isArray(tab.content)) {
@@ -146,7 +161,12 @@ export function practicesFromTabs(tabs: unknown, newId: () => string): MigratedW
     const content: unknown[] = Array.isArray(tab.content) ? tab.content : [];
     content.forEach((rawItem, i) => {
       const item = rawItem as LegacyItem | null;
-      practice.acts = addItem(practice.acts, item, `${where}, item #${i}`, claim, dropped);
+      try {
+        practice.acts = addItem(practice.acts, item, `${where}, item #${i}`, claim, dropped);
+      } catch (error) {
+        // A shape no check foresaw: the item goes, the rest of the workspace stays (never thrown).
+        dropped.push(`${where}, item #${i}: could not be read (${error instanceof Error ? error.message : String(error)})`);
+      }
     });
     normTabs.push({ tab, practice });
   });
@@ -158,20 +178,18 @@ export function practicesFromTabs(tabs: unknown, newId: () => string): MigratedW
     practices.push(host);
   }
 
-  for (const { tab, reference } of decisionTabs) {
+  for (const { tab, reference, label } of decisionTabs) {
     const target = host as Practice;
     const twin = target.decisions.find((d) => d.reference.corte === reference.corte && d.reference.numero === reference.numero &&
       d.reference.anno === reference.anno && d.reference.archivio === reference.archivio);
     if (twin) continue; // two tabs of one decision cannot exist; if they do, one entry
-    target.decisions.push({
-      id: claim(tab.id),
-      reference,
-      label: typeof tab.label === 'string' && tab.label.trim() !== '' ? tab.label : formatDecisionShort(reference),
-      identified: false,
-    });
+    const entry: PracticeDecision = { id: claim(tab.id), reference, label, identified: false };
+    if (typeof tab.historyRecordedKey === 'string') entry.historyRecordedKey = tab.historyRecordedKey;
+    target.decisions.push(entry);
   }
 
-  const ordered = [...searchTabs].sort((a, b) => zOf(b.tab) - zOf(a.tab));
+  // In front first; a stable sort keeps the dock's order among equals.
+  const ordered = [...searchTabs].sort((a, b) => (before(a.tab, b.tab) ? -1 : before(b.tab, a.tab) ? 1 : 0));
   ordered.forEach((search, i) => {
     if (i > 0) {
       droppedSearches.push(search.label);
@@ -215,7 +233,12 @@ function addItem(
       dropped.push(`${where}: an extracted article without norma_data`);
       return acts;
     }
-    return addArticles(acts, actOfArticle(loose.article, loose.sourceNorma), [loose.article], () => claim(undefined)).acts;
+    const act = actOfArticle(loose.article, loose.sourceNorma);
+    if (!act) {
+      dropped.push(`${where}: an extracted article whose act has no type`);
+      return acts;
+    }
+    return addArticles(acts, act, [loose.article], () => claim(undefined)).acts;
   }
   if (type === 'collection') {
     const entries = (item as LegacyCollection).articles;
@@ -230,7 +253,12 @@ function addItem(
         dropped.push(`${where}: entry #${i} of a collection has no article`);
         return;
       }
-      next = addArticles(next, actOfArticle(e.article, e.sourceNorma), [e.article], () => claim(undefined)).acts;
+      const act = actOfArticle(e.article, e.sourceNorma);
+      if (!act) {
+        dropped.push(`${where}: entry #${i} of a collection names an act without a type`);
+        return;
+      }
+      next = addArticles(next, act, [e.article], () => claim(undefined)).acts;
     });
     return next;
   }

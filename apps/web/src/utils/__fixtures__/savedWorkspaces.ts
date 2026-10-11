@@ -48,8 +48,8 @@ export function decisionTab(id: string, label: string, zIndex: number, reference
   return tab(id, label, zIndex, [], { view: { kind: 'decision', reference }, ...more });
 }
 
-export function searchTab(id: string, label: string, zIndex: number, query: DecisionSearchQuery): SavedTab {
-  return tab(id, label, zIndex, [], { view: { kind: 'decision-search', query } });
+export function searchTab(id: string, label: string, zIndex: number, query: DecisionSearchQuery, more: SavedTab = {}): SavedTab {
+  return tab(id, label, zIndex, [], { view: { kind: 'decision-search', query }, ...more });
 }
 
 /** Two tabs; the second was the one in front. */
@@ -127,6 +127,34 @@ export const topicTabs = [
   searchTab('search-front', 'Tema: danno da ritardo', 9, { tema: 'danno da ritardo', norma: { tipo_atto: 'codice civile', numero_articolo: '1223' }, normaLabel: 'art. 1223 c.c.' }),
 ];
 
+/** Minimised and hidden tabs keep their z-index: the one in front is the visible one (PR 4d's
+ *  `frontTabId`), which hosts the decision and the topic search shown. */
+export const minimisedAndHidden = [
+  tab('tab-visible', 'Legge 24', 3, [block('blk-vis', L24, [article(L24, '5')])]),
+  tab('tab-minimised', 'Codice civile', 9, [block('blk-min', CC_RD, [article(CC_RD, '2043', { allegato: '2' })])], { isMinimized: true }),
+  tab('tab-hidden', 'Legge 241', 8, [block('blk-hid', L241, [article(L241, '2')])], { isHidden: true }),
+  decisionTab('dec-min', 'Cass. civ., sez. III, n. 28994/2019', 10, FOUND, { isMinimized: true }),
+  searchTab('search-min', 'Tema: nesso causale', 11, { tema: 'nesso causale' }, { isMinimized: true }),
+  searchTab('search-vis', 'Tema: danno da ritardo', 4, { tema: 'danno da ritardo' }),
+];
+
+/** Every norm tab minimised or hidden: the highest z-index among them is in front. */
+export const noneVisible = [
+  tab('tab-low', 'Legge 24', 2, [block('blk-low', L24, [article(L24, '5')])], { isHidden: true }),
+  tab('tab-high', 'Codice civile', 6, [block('blk-high', CC_RD, [article(CC_RD, '2043', { allegato: '2' })])], { isMinimized: true }),
+  decisionTab('dec-x', 'Cass. civ., sez. III, n. 28994/2019', 9, FOUND),
+];
+
+/** An extracted article and a collection entry whose act type is blank, with no saved source. */
+export const blankActType = [
+  tab('tab-blank', 'Atto senza tipo', 1, [
+    block('blk-ok', L24, [article(L24, '1')]),
+    loose('loose-blank', article({ tipo_atto: '', data: '' }, '3'), { tipo_atto: '  ', data: '' }),
+    { type: 'collection', id: 'coll-blank', label: 'R', isCollapsed: false,
+      articles: [{ article: article({ tipo_atto: '  ', data: '' }, '4') }] },
+  ]),
+];
+
 /** A tab the user named and left empty. */
 export const emptyTab = [tab('tab-empty', 'Ricorso Rossi', 1, [], { labelIsCustom: true })];
 
@@ -148,5 +176,5 @@ export const garbage: unknown[] = [
 /** Every well-formed state above, for the checks that nothing is lost. */
 export const ALL_SAVED_STATES: Record<string, unknown[]> = {
   twoTabs, codeTwoBlocks, codeSearchAndIndex, looseArticles, forgedCollection, pastTextTab,
-  decisionTabs, onlyDecisions, topicTabs, emptyTab,
+  decisionTabs, onlyDecisions, topicTabs, emptyTab, minimisedAndHidden, noneVisible,
 };
