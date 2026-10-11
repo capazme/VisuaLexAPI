@@ -1,6 +1,6 @@
 import { useStore } from 'zustand/react';
 import { createStore } from 'zustand/vanilla';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
@@ -9,6 +9,9 @@ import { getErrorMessage } from '../utils/errors';
 import {
     appendBackEntry,
     findLiveBackIndex,
+    isPracticeBackEntry,
+    type BackStackEntry,
+    type PracticeBackEntry,
     type ReadingBackEntry,
 } from '../utils/readingBackStack';
 import { topicKey } from '../utils/decisionSearchNorma';
@@ -16,7 +19,16 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
-import { isStoredArticle, isValidView, sameDecision } from '../utils/practice';
+import {
+    addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, decisionRowKey,
+    findPracticeArticle, holdsSubject, isStoredArticle, isValidView, labelOr, mergeDecisionEntries, practiceArticleKey,
+    practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
+    type PracticeDecision, type PracticeSubject,
+} from '../utils/practice';
+import { shortAct } from '../utils/sources';
+import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
+import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
+import { isPracticeTableEnabled } from '../features/practice/featureFlag';
 import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
@@ -299,6 +311,130 @@ interface AppState {
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
+
+    /**
+     * The practices: the tables of the questions, which replace the tabs (spec
+     * `2026-10-08-norm-tab-container-design.md` §2). UI state saved in the browser (D6), checked by
+     * `sanitizePractices` on every load. Drawn only behind `VITE_FEATURE_PRACTICE_TABLE`
+     * (`isPracticeTableEnabled`); until P6 they are saved beside the tabs.
+     */
+    practices: Practice[];
+    /** The practice on screen; null with none. Persisted. */
+    activePracticeId: string | null;
+    /**
+     * The practices were seeded from the tabs (spec §9): set once, by the load with the flag on,
+     * whatever the result, so a reload after «Chiudi tutte» never seeds again. Persisted; read only
+     * as a boolean. A session with the flag off never sets it; `clearUserData` sets it to the flag.
+     */
+    practicesSeeded: boolean;
+    /** The open rows (T15), keyed `practiceId/actId/articleKey` or `practiceId/decisionId`.
+     *  Session-only, absent from `partialize`: after a reload every row is closed. */
+    practiceRows: Record<string, true>;
+    /** One row to open and scroll to: its practice and its `practiceRows` key; taken once by
+     *  `takeReveal` (gotcha 14). Session-only. */
+    pendingReveal: { practiceId: string; rowKey: string } | null;
+    /** The topic searches the seeding did not reopen, told once (`practiceNoticeText`); taken by
+     *  `takePracticeNotice`. Session-only. */
+    practiceNotice: string | null;
+    /** The notice, once: returns it and clears it in one step; null after. */
+    takePracticeNotice: () => string | null;
+
+    // Practice actions (spec §2-§5). Each is one `set`. Until P3 draws the practices behind the
+    // flag, nothing calls them: with the flag off they are unused.
+    /** A new practice at the end of the bar: its label trimmed and capped (`practiceLabel`,
+     *  «Pratica» when empty), `custom` marks a name the user gave (default false). It becomes the
+     *  active one unless `activate: false`, which still activates it when no practice is active. */
+    createPractice: (label: string, options?: { custom?: boolean; activate?: boolean }) => string;
+    /** Trimmed and capped at 120 characters; sets `labelIsCustom`. A name empty once trimmed is ignored. */
+    renamePractice: (id: string, label: string) => void;
+    /** Closes it with its open rows, its reveal and the structure window one of its acts owned; the
+     *  active one hands over to its neighbour, the next, else the previous. */
+    closePractice: (id: string) => void;
+    /** Empties the table; the seeding marker stays set, so a reload never brings the tabs back (§5). */
+    closeAllPractices: () => void;
+    /** Ignored for an id that names no practice. */
+    setActivePractice: (id: string) => void;
+    reorderPractices: (fromIndex: number, toIndex: number) => void;
+    /**
+     * A search's articles into a practice (T11, §5.1): `null` is the active practice, created when
+     * there is none (named `options.label ?? shortAct(norma)`) and made active; an id that names no
+     * practice (closed meanwhile) falls back to the same, with a `console.warn` naming it. The
+     * articles join their act (`addArticles`, T2). `reveal`, `'first'` (the first article given) or
+     * an article id (found through `findPracticeArticle`), opens that row and sets `pendingReveal`.
+     */
+    addArticlesToPractice: (
+        practiceId: string | null,
+        norma: Norma,
+        articles: ArticleData[],
+        options?: { reveal?: 'first' | string; label?: string },
+    ) => { practiceId: string; actId: string };
+    /** An article-less act, or the act already there (its URN backfilled), and the structure window
+     *  pointed at it, in one step («Apri l'indice e sfoglia», today's `addNormaIndexToTab`). The
+     *  practice is resolved as `addArticlesToPractice` does and made active, so the window's owner is
+     *  on screen. Returns the act's id. */
+    addActIndexToPractice: (practiceId: string | null, norma: Norma) => string;
+    /** The row of `act` holding `articleId` (`findPracticeArticle`): when found, opens and reveals it
+     *  and returns true. The index pick, the arrows and a citation jump call it before fetching. */
+    revealPracticeArticle: (practiceId: string, actId: string, articleId: string) => boolean;
+    /** Takes the row off the table (the act stays, even empty), with its open row, its reveal and a
+     *  window showing it. */
+    removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
+    /** Takes the act off the table with its rows, its reveal, its windows and the structure window it owned. */
+    removePracticeAct: (practiceId: string, actId: string) => void;
+    /**
+     * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
+     * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
+     * the open rows and the structure window follow. The windows of `from` that showed it close: their
+     * subject is now on the other table.
+     */
+    moveActToPractice: (actId: string, fromPracticeId: string, toPracticeId: string) => void;
+    reorderActs: (practiceId: string, fromIndex: number, toIndex: number) => void;
+    toggleActCollapse: (practiceId: string, actId: string) => void;
+    /** Opens or closes a row (`articleRowKey`, `decisionRowKey`). */
+    setRowOpen: (rowKey: string, open: boolean) => void;
+    /** The row to reveal in this practice, once: returns it and clears it in one step; null after,
+     *  and null when the reveal belongs to another practice (gotcha 14). */
+    takeReveal: (practiceId: string) => { rowKey: string } | null;
+    /**
+     * A decision into a practice (D7, §6.1): `practiceId`, else the active practice, else a new one
+     * («Sentenze»), as `addArticlesToPractice` lands. One entry per decision: an entry `sameDecision`
+     * matches is reused (an unresolved one learns the section a later citation adds), else a new one,
+     * not identified. Opened to be read: `beside` (the default) opens its window (`besideAfterOpen`:
+     * the window `askerId` names is never the one replaced, T16); `beside: false` opens and reveals
+     * its row; either makes the practice active. `open: false` (the dossier's «Apri tutto», T17)
+     * only adds the entry, closed: no window, no row, no reveal, so nothing is fetched; it wins over
+     * `beside`. Nothing routes here before P3 draws the practices.
+     */
+    openDecision: (
+        reference: DecisionReference,
+        options?: { practiceId?: string; beside?: boolean; open?: boolean; askerId?: string },
+    ) => { practiceId: string; decisionId: string };
+    /**
+     * The entry's decision was found: its identity, label, date of deposit, type and section, and
+     * `identified`. When another entry of the practice already holds that decision (a candidate chosen
+     * here), this one merges into it (`mergeDecisionEntries`): its window, its row, its reveal and the
+     * way back name the survivor (carry-over rulings 2, 7), which is asked to take focus
+     * (`decisionFocusRequest`).
+     */
+    setDecisionEntryIdentity: (
+        practiceId: string,
+        decisionId: string,
+        identity: DecisionIdentity,
+        attrs: { sezione?: string; tipo?: string; data_deposito?: string },
+        label: string,
+    ) => void;
+    /** Takes the decision off «Giurisprudenza» with its window, its row and its reveal. */
+    removePracticeDecision: (practiceId: string, decisionId: string) => void;
+    /**
+     * «Apri accanto» (§4.2): a window on `ref` beside the practice's table, which is made active.
+     * Nothing moves when a window already shows that subject; with two, the oldest that is not the
+     * asker goes and its subject stays in the table (D10, T16). A ref to something the practice does
+     * not hold, or a practice that is not open, opens nothing and is warned.
+     */
+    openBeside: (practiceId: string, ref: BesideRef, askerId?: string) => void;
+    /** Closes the window; its subject stays in the table (D7). */
+    closeBeside: (practiceId: string, refId: string) => void;
+
     /**
      * The tab the phone's carousel shows (`SearchPanel`, below `md`): the one tab on screen there,
      * which «Questa scheda» of the find window means on a phone (`utils/findScope.ts`). Null, or an
@@ -318,10 +454,10 @@ interface AppState {
     /**
      * Undo stack for citation jumps. See `utils/readingBackStack.ts` for what
      * goes in it and why nothing else does. Session-scoped: its entries point
-     * at tab and block ids that mean nothing after a reload, so it is
-     * deliberately absent from `partialize`.
+     * at tab and block ids, or practice and subject ids, that mean nothing
+     * after a reload, so it is deliberately absent from `partialize`.
      */
-    readingBackStack: ReadingBackEntry[];
+    readingBackStack: BackStackEntry[];
 
     /**
      * A decision some other page asked the workspace to open; drained once by
@@ -331,6 +467,7 @@ interface AppState {
     /**
      * The decision tab that should take keyboard focus: set when a tab closes because the decision
      * it resolved to was already open in another (that one survives). Taken once by the tab's view.
+     * With the practices, the id of the entry another merged into (`setDecisionEntryIdentity`).
      * Session-only, absent from `partialize`.
      */
     decisionFocusRequest: string | null;
@@ -416,13 +553,20 @@ interface AppState {
     setStructureWindowPosition: (position: { x: number; y: number }) => void;
 
     // Reading Back-Stack Actions
+    /**
+     * Records a jump. With the flag on, an entry whose `tabId` names a practice is kept as a `table`
+     * entry (its `blockId` an act, the row found through `findPracticeArticle`, or a decision) and
+     * one whose `tabId` names a window as a `beside` entry (spec §6.3); any other is kept as given.
+     */
     pushReadingBack: (entry: ReadingBackEntry) => void;
     /**
      * Removes and returns the newest entry that still points at a live tab and
-     * block, discarding any dead ones above it. Returns null when nothing is
-     * left to go back to.
+     * block, or at a practice still holding its subject, discarding any dead
+     * ones above it. A practice's entry is walked back to here, in the same
+     * step: its practice made active, its row revealed (`table`) or its window
+     * opened (`beside`). Returns null when nothing is left to go back to.
      */
-    popReadingBack: () => ReadingBackEntry | null;
+    popReadingBack: () => BackStackEntry | null;
 
     // Drag & Drop Actions
     moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => void;
@@ -545,6 +689,11 @@ const generateKey = (n: NormaVisitata) => {
     return parts.map(part => sanitize(part || '')).join('--');
 };
 
+// Declared before the store: a synchronous save during creation (a migration) may report a failure.
+let saveFailureReported = false;
+// Set by `practicesOnLoad` when it seeded: the seed is written at once, not at the next action.
+let seededOnLoad = false;
+
 const appStore = createStore<AppState>()(
     persist(
         immer((set, get) => ({
@@ -591,6 +740,341 @@ const appStore = createStore<AppState>()(
                 position: { x: window.innerWidth - 420, y: 20 },
             },
             workspaceTabs: [],
+            practices: [],
+            activePracticeId: null,
+            practicesSeeded: false,
+            practiceRows: {},
+            pendingReveal: null,
+            practiceNotice: null,
+            takePracticeNotice: () => {
+                const notice = get().practiceNotice;
+                if (notice !== null) set((state) => { state.practiceNotice = null; });
+                return notice;
+            },
+
+            // ── Practices (spec §2-§5) ───────────────────────────────────
+            // Each action computes from the plain state and writes it in one `set` (gotcha 14).
+            createPractice: (label, options = {}) => {
+                const created = newPractice(label, options.custom === true);
+                set((state) => {
+                    state.practices.push(created);
+                    if (options.activate !== false || !state.practices.some((p) => p.id === state.activePracticeId)) {
+                        state.activePracticeId = created.id;
+                    }
+                });
+                return created.id;
+            },
+
+            renamePractice: (id, label) => {
+                // A write that changes nothing would still serialise the whole store.
+                const kept = practiceLabel(label);
+                if (!kept || !get().practices.some((p) => p.id === id)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === id) as Practice;
+                    practice.label = kept;
+                    practice.labelIsCustom = true;
+                });
+            },
+
+            closePractice: (id) => {
+                if (!get().practices.some((p) => p.id === id)) return;
+                set((state) => {
+                const index = state.practices.findIndex((p) => p.id === id);
+                if (index < 0) return;
+                const closed = state.practices[index];
+                if (state.activePracticeId === id) {
+                    state.activePracticeId = (state.practices[index + 1] ?? state.practices[index - 1])?.id ?? null;
+                }
+                if (closed.acts.some((a) => a.id === state.structureWindow.blockId)) state.structureWindow.blockId = null;
+                state.practices.splice(index, 1);
+                dropRows(state, `${id}/`);
+                });
+            },
+
+            closeAllPractices: () => set((state) => {
+                if (state.practices.some((p) => p.acts.some((a) => a.id === state.structureWindow.blockId))) {
+                    state.structureWindow.blockId = null;
+                }
+                state.practices = [];
+                state.activePracticeId = null;
+                state.practiceRows = {};
+                state.pendingReveal = null;
+            }),
+
+            setActivePractice: (id) => {
+                const { practices, activePracticeId } = get();
+                if (activePracticeId === id || !practices.some((p) => p.id === id)) return;
+                set((state) => { state.activePracticeId = id; });
+            },
+
+            reorderPractices: (fromIndex, toIndex) => {
+                if (!movable(get().practices.length, fromIndex, toIndex)) return;
+                set((state) => {
+                    const [moved] = state.practices.splice(fromIndex, 1);
+                    state.practices.splice(toIndex, 0, moved);
+                });
+            },
+
+            addArticlesToPractice: (practiceId, norma, articles, options = {}) => {
+                const landing = landingPractice(get(), practiceId, () => labelOr(options.label, shortAct(norma)), 'addArticlesToPractice');
+                const id = landing.practice.id;
+                const { acts, actId } = addArticles(landing.practice.acts, norma, articles, uuidv4);
+                const act = acts.find((a) => a.id === actId);
+                let shown: ArticleData | undefined;
+                if (act && options.reveal === 'first') {
+                    const first = articles[0] && practiceArticleKey(articles[0]);
+                    shown = act.articles.find((a) => practiceArticleKey(a) === first);
+                } else if (act && options.reveal) {
+                    // The asked article is first one of those this call brought in (a past text
+                    // search keeps its own row, D15), else any row of the act.
+                    const brought = findPracticeArticle({ ...act, articles }, options.reveal);
+                    const key = brought && practiceArticleKey(brought);
+                    shown = act.articles.find((a) => practiceArticleKey(a) === key) ?? findPracticeArticle(act, options.reveal);
+                }
+                set((state) => {
+                    state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
+                    state.activePracticeId = landing.activePracticeId;
+                    if (shown) revealRow(state, id, actId, practiceArticleKey(shown));
+                });
+                return { practiceId: id, actId };
+            },
+
+            addActIndexToPractice: (practiceId, norma) => {
+                const landing = landingPractice(get(), practiceId, () => shortAct(norma), 'addActIndexToPractice');
+                const id = landing.practice.id;
+                const { acts, actId } = addArticles(landing.practice.acts, norma, [], uuidv4);
+                set((state) => {
+                    state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
+                    state.activePracticeId = id;
+                    state.structureWindow.blockId = actId;
+                });
+                return actId;
+            },
+
+            revealPracticeArticle: (practiceId, actId, articleId) => {
+                const act = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                const hit = act ? findPracticeArticle(act, articleId) : undefined;
+                if (!hit) return false;
+                // Its practice comes on screen in the same step (carry-over ruling 9: the way back, a find match).
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    revealRow(state, practiceId, actId, practiceArticleKey(hit));
+                });
+                return true;
+            },
+
+            removePracticeArticle: (practiceId, actId, articleKey) => {
+                const held = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (!held || !held.articles.some((a) => practiceArticleKey(a) === articleKey)) return;
+                set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                const act = practice?.acts.find((a) => a.id === actId);
+                const at = act ? act.articles.findIndex((a) => practiceArticleKey(a) === articleKey) : -1;
+                if (!practice || !act || at < 0) return;
+                act.articles.splice(at, 1);
+                practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId && b.articleKey === articleKey));
+                dropRows(state, articleRowKey(practiceId, actId, articleKey), true);
+                });
+            },
+
+            removePracticeAct: (practiceId, actId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.acts.some((a) => a.id === actId)) return;
+                set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice || !practice.acts.some((a) => a.id === actId)) return;
+                practice.acts = practice.acts.filter((a) => a.id !== actId);
+                practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId));
+                if (state.structureWindow.blockId === actId) state.structureWindow.blockId = null;
+                dropRows(state, `${practiceId}/${actId}/`);
+                });
+            },
+
+            moveActToPractice: (actId, fromPracticeId, toPracticeId) => {
+                if (fromPracticeId === toPracticeId) return;
+                const { practices } = get();
+                const source = practices.find((p) => p.id === fromPracticeId);
+                const target = practices.find((p) => p.id === toPracticeId);
+                const act = source?.acts.find((a) => a.id === actId);
+                if (!source || !target || !act) return;
+                // Into a practice holding the same act, it joins that act and takes its id.
+                const merged = addArticles(target.acts, act.norma, act.articles, () => act.id);
+                const nowId = merged.actId;
+                const targetActs = nowId === act.id
+                    ? merged.acts.map((a) => (a.id === act.id ? { ...a, isCollapsed: act.isCollapsed } : a))
+                    : merged.acts;
+                const oldPrefix = `${fromPracticeId}/${actId}/`;
+                const newPrefix = `${toPracticeId}/${nowId}/`;
+                set((state) => {
+                    state.practices = practices.map((p) => {
+                        if (p.id === fromPracticeId) {
+                            return {
+                                ...p,
+                                acts: p.acts.filter((a) => a.id !== actId),
+                                beside: p.beside.filter((b) => !(b.kind === 'article' && b.actId === actId)),
+                            };
+                        }
+                        return p.id === toPracticeId ? { ...p, acts: targetActs } : p;
+                    });
+                    for (const key of Object.keys(state.practiceRows)) {
+                        if (!key.startsWith(oldPrefix)) continue;
+                        delete state.practiceRows[key];
+                        state.practiceRows[newPrefix + key.slice(oldPrefix.length)] = true;
+                    }
+                    if (state.pendingReveal?.rowKey.startsWith(oldPrefix)) {
+                        state.pendingReveal = { practiceId: toPracticeId, rowKey: newPrefix + state.pendingReveal.rowKey.slice(oldPrefix.length) };
+                    }
+                    if (state.structureWindow.blockId === actId) {
+                        // Its owner is off screen when the target is not the active practice (as closePractice).
+                        state.structureWindow.blockId = state.activePracticeId === toPracticeId ? nowId : null;
+                    }
+                    // Carry-over rulings 4 and 9: the way back names the act where it now is.
+                    for (const entry of state.readingBackStack) {
+                        if (isPracticeBackEntry(entry)) {
+                            if (entry.practiceId === fromPracticeId && entry.subject.kind === 'article' && entry.subject.actId === actId) {
+                                entry.practiceId = toPracticeId;
+                                entry.subject.actId = nowId;
+                            }
+                        } else if (entry.tabId === fromPracticeId && entry.blockId === actId) {
+                            entry.tabId = toPracticeId;
+                            entry.blockId = nowId;
+                        }
+                    }
+                });
+            },
+
+            reorderActs: (practiceId, fromIndex, toIndex) => {
+                const held = get().practices.find((p) => p.id === practiceId);
+                if (!held || !movable(held.acts.length, fromIndex, toIndex)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    const [moved] = practice.acts.splice(fromIndex, 1);
+                    practice.acts.splice(toIndex, 0, moved);
+                });
+            },
+
+            toggleActCollapse: (practiceId, actId) => set((state) => {
+                const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (act) act.isCollapsed = !act.isCollapsed;
+            }),
+
+            setRowOpen: (rowKey, open) => {
+                // A write that changes nothing would still serialise the whole store.
+                if ((get().practiceRows[rowKey] === true) === open) return;
+                set((state) => {
+                    if (open) state.practiceRows[rowKey] = true;
+                    else delete state.practiceRows[rowKey];
+                });
+            },
+
+            takeReveal: (practiceId) => {
+                const pending = get().pendingReveal;
+                if (pending?.practiceId !== practiceId) return null;
+                set((state) => { state.pendingReveal = null; });
+                return { rowKey: pending.rowKey };
+            },
+
+            openDecision: (reference, options = {}) => {
+                const before = get();
+                const landing = landingPractice(before, options.practiceId ?? null, () => DECISIONS_PRACTICE_LABEL, 'openDecision');
+                const practiceId = landing.practice.id;
+                const existing = landing.practice.decisions.find((d) => sameDecision(d.reference, reference));
+                const decisionId = existing?.id ?? uuidv4();
+                // Already there, its window already open, in the active practice: nothing to write.
+                if (existing && landing.practices === before.practices && options.open !== false && options.beside !== false &&
+                    before.activePracticeId === practiceId &&
+                    besideWith(landing.practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId) === landing.practice.beside &&
+                    (existing.identified || existing.reference.archivio || !reference.sezione ||
+                        decisionPath(existing.reference) === decisionPath(reference))) {
+                    return { practiceId, decisionId };
+                }
+                set((state) => {
+                    // a practice landingPractice created is new and unfrozen: pushed, never one already stored
+                    if (landing.practices !== before.practices) state.practices.push(landing.practice);
+                    state.activePracticeId = landing.activePracticeId;
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    const entry = practice.decisions.find((d) => d.id === decisionId);
+                    if (!entry) {
+                        practice.decisions.push({ id: decisionId, reference: { ...reference }, label: formatDecisionShort(reference), identified: false });
+                    } else if (!entry.identified && !entry.reference.archivio && reference.sezione &&
+                        decisionPath(entry.reference) !== decisionPath(reference)) {
+                        // an unresolved entry learns the section a later citation adds: it may be what
+                        // settles the homonyms, so it asks again (as `openDecisionTab` does)
+                        entry.reference = { ...reference };
+                        entry.label = formatDecisionShort(reference);
+                    }
+                    if (options.open === false) return;
+                    state.activePracticeId = practiceId;
+                    if (options.beside === false) {
+                        const rowKey = decisionRowKey(practiceId, decisionId);
+                        state.practiceRows[rowKey] = true;
+                        state.pendingReveal = { practiceId, rowKey };
+                    } else {
+                        practice.beside = besideWith(practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId);
+                    }
+                });
+                return { practiceId, decisionId };
+            },
+
+            setDecisionEntryIdentity: (practiceId, decisionId, identity, attrs, label) => {
+                const practice = get().practices.find((p) => p.id === practiceId);
+                const entry = practice?.decisions.find((d) => d.id === decisionId);
+                if (!practice || !entry) return;
+                const found: PracticeDecision = { ...entry, reference: identityOf(identity), label, identified: true };
+                if (attrs.data_deposito) found.depositDate = attrs.data_deposito;
+                if (attrs.tipo) found.tipo = attrs.tipo;
+                if (attrs.sezione) found.sezione = attrs.sezione;
+                // One entry per decision: one already holding it (a candidate chosen here) absorbs this one.
+                const survivor = practice.decisions.find((d) => d.id !== decisionId && sameDecision(d.reference, identity));
+                // The same identity again (every found answer, cache hits included): keep the reference.
+                if (!survivor && entry.identified && entry.label === label && sameDecision(entry.reference, identity) &&
+                    JSON.stringify(found) === JSON.stringify(entry)) return;
+                set((state) => {
+                    const target = state.practices.find((p) => p.id === practiceId) as Practice;
+                    if (!survivor) {
+                        target.decisions = target.decisions.map((d) => (d.id === decisionId ? found : d));
+                        return;
+                    }
+                    target.decisions = target.decisions
+                        .filter((d) => d.id !== decisionId)
+                        .map((d) => (d.id === survivor.id ? mergeDecisionEntries(survivor, found) : d));
+                    absorbDecision(state, target, decisionId, survivor.id);
+                    state.decisionFocusRequest = survivor.id;
+                });
+            },
+
+            removePracticeDecision: (practiceId, decisionId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return;
+                set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice || !practice.decisions.some((d) => d.id === decisionId)) return;
+                practice.decisions = practice.decisions.filter((d) => d.id !== decisionId);
+                practice.beside = practice.beside.filter((b) => !(b.kind === 'decision' && b.decisionId === decisionId));
+                dropRows(state, decisionRowKey(practiceId, decisionId), true);
+                });
+            },
+
+            openBeside: (practiceId, ref, askerId) => {
+                const practice = get().practices.find((p) => p.id === practiceId);
+                const subject = subjectOfRef(ref);
+                if (!practice || (subject && !holdsSubject(practice, subject))) {
+                    console.warn(`openBeside: ${practice ? `the practice ${JSON.stringify(practiceId)} does not hold the ${ref.kind} of the window ${JSON.stringify(ref.id)}` : `the practice ${JSON.stringify(practiceId)} is not open`}; no window opened`);
+                    return;
+                }
+                const beside = besideWith(practice.beside, ref, askerId);
+                if (beside === practice.beside && get().activePracticeId === practiceId) return;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    (state.practices.find((p) => p.id === practiceId) as Practice).beside = beside;
+                });
+            },
+
+            closeBeside: (practiceId, refId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === refId)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    practice.beside = practice.beside.filter((b) => b.id !== refId);
+                });
+            },
             pendingDecision: null,
             decisionFocusRequest: null,
             highestZIndex: 100,
@@ -699,6 +1183,15 @@ const appStore = createStore<AppState>()(
                 // Each user should start with a clean workspace
                 state.workspaceTabs = [];
                 state.highestZIndex = 100;
+                // and the practices: a shared browser must not show the last user's table (spec §10).
+                // The marker is set to the flag, never cleared: with the flag on, a cleared marker
+                // would seed again at the next reload over the table the next user built (§9).
+                state.practices = [];
+                state.activePracticeId = null;
+                state.practiceRows = {};
+                state.pendingReveal = null;
+                state.practiceNotice = null;
+                state.practicesSeeded = isPracticeTableEnabled();
                 // a decision asked for, a focus asked for, a citation waiting for the palette
                 state.pendingDecision = null;
                 state.decisionFocusRequest = null;
@@ -1155,12 +1648,13 @@ const appStore = createStore<AppState>()(
 
             // ── Reading back-stack ───────────────────────────────────────
             pushReadingBack: (entry) => set((state) => {
-                state.readingBackStack = appendBackEntry(state.readingBackStack, entry);
+                const kept: BackStackEntry = practiceBackEntry(state, entry) ?? entry;
+                state.readingBackStack = appendBackEntry(state.readingBackStack, kept);
             }),
 
             popReadingBack: () => {
-                const { readingBackStack, workspaceTabs } = get();
-                const index = findLiveBackIndex(readingBackStack, workspaceTabs);
+                const { readingBackStack, workspaceTabs, practices } = get();
+                const index = findLiveBackIndex(readingBackStack, workspaceTabs, practices);
                 if (index < 0) {
                     // Everything above (and including) the oldest entry is dead;
                     // drop the lot so the control stops offering a dead end.
@@ -1172,7 +1666,10 @@ const appStore = createStore<AppState>()(
                 const entry = readingBackStack[index];
                 // Entries newer than the live one point at closed tabs/blocks:
                 // they are discarded together with the one being consumed.
-                set((state) => { state.readingBackStack = state.readingBackStack.slice(0, index); });
+                set((state) => {
+                    state.readingBackStack = state.readingBackStack.slice(0, index);
+                    if (isPracticeBackEntry(entry)) walkBackTo(state, entry);
+                });
                 return entry;
             },
 
@@ -3002,6 +3499,8 @@ const appStore = createStore<AppState>()(
         })),
         {
             name: 'visualex-storage',
+            // A write the browser refuses (a full localStorage) is caught, never thrown out of `set` (T20).
+            storage: createJSONStorage<Partial<AppState>>(() => guardedStorage(localStorage, reportSaveFailure)),
             // Only persist UI state and settings, NOT user data. Bookmarks,
             // dossiers, environments, quickNorms, customAliases, annotations,
             // highlights are now all server-backed and hydrated by
@@ -3016,9 +3515,15 @@ const appStore = createStore<AppState>()(
                 // the owning block id is not — it would rehydrate a window
                 // belonging to a block that no longer exists.
                 structureWindow: { position: state.structureWindow.position, blockId: null },
-                // Every user-data slice is now server-backed and hydrated by
-                // fetchUserData. Nothing user-owned survives in localStorage
-                // anymore — persisting would cause drift with the server.
+                // The practices are UI state too (spec D6); the open rows, the pending reveal and
+                // the notice are the session's.
+                practices: state.practices,
+                activePracticeId: state.activePracticeId,
+                practicesSeeded: state.practicesSeeded,
+                // Every other user-data slice is server-backed and hydrated by
+                // fetchUserData, so it does not survive in localStorage —
+                // persisting would cause drift with the server. The practices
+                // above are the deliberate exception (browser-only, spec D6).
                 // Excluded on purpose:
                 //   bookmarks, dossiers, environments, quickNorms,
                 //   customAliases, annotations, highlights
@@ -3033,6 +3538,7 @@ const appStore = createStore<AppState>()(
                     ...current,
                     ...p,
                     ...(p.workspaceTabs !== undefined ? { workspaceTabs: foldCollections(sanitizeViews(p.workspaceTabs)) ?? current.workspaceTabs } : {}),
+                    ...practicesOnLoad(persisted),
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
@@ -3060,7 +3566,191 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 // Export store for direct access (e.g., appStore.getState())
 export { appStore };
 
+// A load that seeded the practices writes them now: zustand saves after a hydrate only when it
+// migrated, so without this a reload before any action would seed (and tell the notice) again.
+if (seededOnLoad) appStore.setState({ practicesSeeded: true });
+
 // Export types
+/** A new, empty practice: the label trimmed and capped, «Pratica» when nothing is left of it. */
+function newPractice(label: string, custom: boolean): Practice {
+    return { id: uuidv4(), label: labelOr(label, DEFAULT_PRACTICE_LABEL), labelIsCustom: custom, acts: [], decisions: [], beside: [] };
+}
+
+/**
+ * Where a search or the index lands (T11, §5.1): the practice `wanted` names; `null`, or an id that
+ * names no practice (closed meanwhile, warned with its id), means the active practice, created when
+ * there is none (named `label()`) and then made active. Pure over the plain state.
+ */
+function landingPractice(
+    state: Pick<AppState, 'practices' | 'activePracticeId'>,
+    wanted: string | null,
+    label: () => string,
+    caller: string,
+): { practices: Practice[]; practice: Practice; activePracticeId: string | null } {
+    const { practices, activePracticeId } = state;
+    if (wanted !== null) {
+        const named = practices.find((p) => p.id === wanted);
+        if (named) return { practices, practice: named, activePracticeId };
+        console.warn(`${caller}: the practice ${JSON.stringify(wanted)} is not open (closed meanwhile?); landing in the active practice`);
+    }
+    const active = practices.find((p) => p.id === activePracticeId);
+    if (active) return { practices, practice: active, activePracticeId };
+    const created = newPractice(label(), false);
+    return { practices: [...practices, created], practice: created, activePracticeId: created.id };
+}
+
+/** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. */
+function revealRow(state: AppState, practiceId: string, actId: string, articleKey: string): void {
+    const rowKey = articleRowKey(practiceId, actId, articleKey);
+    const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+    if (act) act.isCollapsed = false;
+    state.practiceRows[rowKey] = true;
+    state.pendingReveal = { practiceId, rowKey };
+}
+
+/** Closes the open rows under `key` (a prefix, or exactly that key) and drops a reveal of one. */
+function dropRows(state: AppState, key: string, exact = false): void {
+    const hit = (rowKey: string) => (exact ? rowKey === key : rowKey.startsWith(key));
+    for (const rowKey of Object.keys(state.practiceRows)) {
+        if (hit(rowKey)) delete state.practiceRows[rowKey];
+    }
+    if (state.pendingReveal && hit(state.pendingReveal.rowKey)) state.pendingReveal = null;
+}
+
+/** The windows after `ref` opens beside (`besideAfterOpen`): the same array, unchanged, when a
+ *  window already shows that subject, whatever its id (a topic search by its query's key). */
+function besideWith(beside: BesideRef[], ref: BesideRef, askerId?: string): BesideRef[] {
+    const shown = beside.some((b) => b.id === ref.id || sameBesideSubject(b, ref) ||
+        (b.kind === 'decision-search' && ref.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(ref.query)));
+    return shown ? beside : besideAfterOpen(beside, ref, askerId);
+}
+
+/** A decision entry merged into `survivorId`: what named the absorbed one names the survivor — its
+ *  window (one window per subject), its open row and reveal, the way back (carry-over ruling 7). */
+function absorbDecision(state: AppState, practice: Practice, absorbedId: string, survivorId: string): void {
+    const onSurvivor = practice.beside.some((b) => b.kind === 'decision' && b.decisionId === survivorId);
+    practice.beside = practice.beside.flatMap((b): BesideRef[] => {
+        if (b.kind !== 'decision' || b.decisionId !== absorbedId) return [b];
+        return onSurvivor ? [] : [besideRefFor({ kind: 'decision', decisionId: survivorId })];
+    });
+    const absorbedRow = decisionRowKey(practice.id, absorbedId);
+    const survivorRow = decisionRowKey(practice.id, survivorId);
+    if (state.practiceRows[absorbedRow]) {
+        delete state.practiceRows[absorbedRow];
+        state.practiceRows[survivorRow] = true;
+    }
+    if (state.pendingReveal?.rowKey === absorbedRow) state.pendingReveal = { practiceId: practice.id, rowKey: survivorRow };
+    for (const entry of state.readingBackStack) {
+        if (isPracticeBackEntry(entry) && entry.practiceId === practice.id &&
+            entry.subject.kind === 'decision' && entry.subject.decisionId === absorbedId) {
+            entry.subject.decisionId = survivorId;
+        }
+    }
+}
+
+/**
+ * A pushed entry as a practice's (spec §6.3), or null to keep it as given: with the flag off; when
+ * it is live in a tab; when its `tabId` names neither a practice nor a window; when the practice does
+ * not hold what it names. The live-tab rule is P2's: until P3 draws the practices, a seeded practice
+ * shares its tab's id and its acts their blocks' ids, so the old surface's entries stay the old
+ * surface's. P3, which draws the practices with the flag on, drops it.
+ */
+function practiceBackEntry(state: AppState, entry: ReadingBackEntry): PracticeBackEntry | null {
+    if (!isPracticeTableEnabled() || findLiveBackIndex([entry], state.workspaceTabs) === 0) return null;
+    const { label } = entry;
+    const practice = state.practices.find((p) => p.id === entry.tabId);
+    if (practice) {
+        const act = practice.acts.find((a) => a.id === entry.blockId);
+        const hit = act && findPracticeArticle(act, entry.articleId);
+        if (act && hit) {
+            return { practiceId: practice.id, subject: { kind: 'article', actId: act.id, articleKey: practiceArticleKey(hit) }, place: 'table', label };
+        }
+        const decision = practice.decisions.find((d) => d.id === entry.blockId);
+        return decision ? { practiceId: practice.id, subject: { kind: 'decision', decisionId: decision.id }, place: 'table', label } : null;
+    }
+    for (const holder of state.practices) {
+        const ref = holder.beside.find((b) => b.id === entry.tabId);
+        const subject: PracticeSubject | null = ref ? subjectOfRef(ref) : null;
+        if (subject) return { practiceId: holder.id, subject, place: 'beside', label };
+    }
+    return null;
+}
+
+/** Back to a practice's entry: the practice on screen, then its row revealed or its window opened. */
+function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
+    const practice = state.practices.find((p) => p.id === entry.practiceId);
+    if (!practice) return;
+    state.activePracticeId = practice.id;
+    const { subject } = entry;
+    if (entry.place === 'beside') {
+        practice.beside = besideWith(practice.beside, besideRefFor(subject));
+    } else if (subject.kind === 'article') {
+        revealRow(state, practice.id, subject.actId, subject.articleKey);
+    } else {
+        const rowKey = decisionRowKey(practice.id, subject.decisionId);
+        state.practiceRows[rowKey] = true;
+        state.pendingReveal = { practiceId: practice.id, rowKey };
+    }
+}
+
+const movable = (length: number, from: number, to: number): boolean =>
+    from !== to && from >= 0 && to >= 0 && from < length && to < length;
+
+/** The practices as a load finds them (spec §9, §10): the saved ones sanitized; with the flag on and
+ *  no marker, seeded from the saved tabs, as they are, and marked, whatever the result. What could
+ *  not be read is logged once (gotcha 18); nothing is thrown, since a throw in `merge` would reset
+ *  the store. The session-only fields start empty, whatever the storage holds. */
+function practicesOnLoad(persisted: unknown): Pick<AppState,
+    'practices' | 'activePracticeId' | 'practicesSeeded' | 'practiceRows' | 'pendingReveal' | 'practiceNotice'> {
+    const p = (persisted ?? {}) as { practices?: unknown; activePracticeId?: unknown; practicesSeeded?: unknown; workspaceTabs?: unknown };
+    const sanitized = sanitizePractices(p.practices);
+    const dropped = [...sanitized.dropped];
+    let practices = sanitized.practices;
+    let practicesSeeded = p.practicesSeeded === true;
+    let wantedActive = p.activePracticeId;
+    let practiceNotice: string | null = null;
+    if (isPracticeTableEnabled() && !practicesSeeded) {
+        const seeded = practicesFromTabs(p.workspaceTabs, uuidv4);
+        if (practices.length > 0) {
+            dropped.push(`practices: ${practices.length} saved without the seeding marker, replaced by the ones seeded from the tabs`);
+        }
+        practices = seeded.practices;
+        wantedActive = seeded.activePracticeId;
+        dropped.push(...seeded.dropped);
+        practiceNotice = practiceNoticeText(seeded.droppedSearches);
+        practicesSeeded = true;
+        seededOnLoad = true;
+    }
+    let activePracticeId: string | null = null;
+    if (typeof wantedActive === 'string' && practices.some((x) => x.id === wantedActive)) {
+        activePracticeId = wantedActive;
+    } else {
+        if (wantedActive !== null && wantedActive !== undefined) {
+            dropped.push(`activePracticeId: ${JSON.stringify(wantedActive)} names no practice`);
+        }
+        activePracticeId = practices[0]?.id ?? null;
+    }
+    if (dropped.length > 0) {
+        console.warn(`practices: ${dropped.length} saved item(s) could not be restored as they were:\n- ${dropped.join('\n- ')}`);
+    }
+    return { practices, activePracticeId, practicesSeeded, practiceRows: {}, pendingReveal: null, practiceNotice };
+}
+
+/** A save the browser refused (T20): logged once a session with the key, the size and the error's
+ *  name (gotcha 18), and told once as a sync error, in a microtask so it does not run inside the
+ *  `set` whose save failed. The state stays in memory; the next saves fail quietly. */
+function reportSaveFailure({ name, bytes, error }: StorageFailure): void {
+    if (saveFailureReported) return;
+    saveFailureReported = true;
+    const errorName = (error as { name?: unknown } | null)?.name;
+    console.error(`persist: the browser refused to save "${name}" (${bytes} bytes): ${typeof errorName === 'string' ? errorName : String(error)}`, error);
+    queueMicrotask(() => {
+        appStore.getState().pushSyncError(isPracticeTableEnabled()
+            ? 'Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.'
+            : 'Lo spazio del browser è esaurito: le schede aperte potrebbero non essere salvate. Chiudi qualche scheda.');
+    });
+}
+
 /** Drops a persisted tab's malformed `view`; a tab left without content goes with it. */
 function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
     if (!Array.isArray(tabs)) return undefined;

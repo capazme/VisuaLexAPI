@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { appStore, type WorkspaceTab } from '../useAppStore';
 import type { ArticleData, Norma } from '../../types';
-import type { ReadingBackEntry } from '../../utils/readingBackStack';
+import type { BackStackEntry, ReadingBackEntry } from '../../utils/readingBackStack';
 
 function makeTab(id: string, content: WorkspaceTab['content'] = []): WorkspaceTab {
     return {
@@ -210,6 +210,12 @@ describe('focusArticleInTab id matching', () => {
     });
 });
 
+/** The article a pop returns to: these entries are all of a tab, the shape this file pushes. */
+function poppedArticleId(): string | undefined {
+    const entry: BackStackEntry | null = appStore.getState().popReadingBack();
+    return entry && 'articleId' in entry ? entry.articleId : undefined;
+}
+
 describe('reading back-stack', () => {
     beforeEach(() => {
         appStore.setState({
@@ -222,8 +228,8 @@ describe('reading back-stack', () => {
         appStore.getState().pushReadingBack(backEntry({ articleId: '2043' }));
         appStore.getState().pushReadingBack(backEntry({ articleId: '2050' }));
 
-        expect(appStore.getState().popReadingBack()?.articleId).toBe('2050');
-        expect(appStore.getState().popReadingBack()?.articleId).toBe('2043');
+        expect(poppedArticleId()).toBe('2050');
+        expect(poppedArticleId()).toBe('2043');
         expect(appStore.getState().popReadingBack()).toBeNull();
     });
 
@@ -235,7 +241,7 @@ describe('reading back-stack', () => {
         appStore.getState().pushReadingBack(backEntry({ articleId: 'live' }));
         appStore.getState().pushReadingBack(backEntry({ articleId: 'dead', tabId: 'tab-gone' }));
 
-        expect(appStore.getState().popReadingBack()?.articleId).toBe('live');
+        expect(poppedArticleId()).toBe('live');
         // The dead entry above it is dropped with the one consumed, not left
         // behind to offer the same dead end again.
         expect(appStore.getState().readingBackStack).toHaveLength(0);
@@ -245,7 +251,7 @@ describe('reading back-stack', () => {
         appStore.getState().pushReadingBack(backEntry({ articleId: 'live' }));
         appStore.getState().pushReadingBack(backEntry({ articleId: 'dead', blockId: 'block-gone' }));
 
-        expect(appStore.getState().popReadingBack()?.articleId).toBe('live');
+        expect(poppedArticleId()).toBe('live');
     });
 
     it('clears the stack when every entry is unreachable', () => {

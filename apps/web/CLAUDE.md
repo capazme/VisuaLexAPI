@@ -84,7 +84,14 @@ not a store slice: `HistoryView` keeps it in local state and reloads it on mount
 `useArticleCards` over `utils/articleCardsCache.ts`, `useReviewSession`), never in `useAppStore`.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
-workspace tabs and z-index, settings, `searchPanelState`.
+workspace tabs and z-index, settings, `searchPanelState`, and the practices of the norm-tab redesign
+(`practices`, `activePracticeId`, the seeding marker `practicesSeeded`; spec
+`docs/superpowers/specs/2026-10-08-norm-tab-container-design.md` §9-10). The practices are drawn only
+behind `VITE_FEATURE_PRACTICE_TABLE` (`features/practice/featureFlag.ts`, off unless `true`); `merge`
+sanitizes them (`sanitizePractices`) and, with the flag on and no marker, seeds them once from the
+saved tabs (`practicesFromTabs`). `persist` writes through `utils/guardedStorage.ts`: a save the
+browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
+`set`. `clearUserData` empties the practices and sets the marker to the flag, never clears it.
 
 The partialize deliberately holds UI state only. **Every user-owned slice is
 server-backed** — see gotcha 17, which is the rule any new slice must follow.
@@ -474,7 +481,13 @@ opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
 per-tab copy would sit inside the very tab an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
-combination for "back" already belongs to the browser.
+combination for "back" already belongs to the browser. Behind `VITE_FEATURE_PRACTICE_TABLE` the
+stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
+practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
+live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
+practice made active, the row revealed or the window reopened); any other entry is kept as given.
+Until P3 draws the practices, an entry still live in a tab stays a tab entry even with the flag on
+(a seeded practice shares its tab's id); P3 drops that rule.
 
 **Decisions in the workspace.** A court decision is a workspace tab of its own: `WorkspaceTab.view`
 (`{ kind: 'decision', reference }`, drawn by `workspace/renderTabView.tsx` on the desktop panel and the
@@ -658,7 +671,7 @@ Duplicating any of these is a defect, not a shortcut.
   sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
   URL parameter; a logout forgets it.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
-  `findLiveBackIndex` for citation-jump undo.
+  `findLiveBackIndex` (over tabs and practices), `isPracticeBackEntry` for citation-jump undo.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
   *structurally* different markup per breakpoint (portal vs. inline). It existed
   as two private copies before round 2a; do not make a third. For anything a CSS
@@ -986,7 +999,9 @@ meant to stay split; add new features as new files, not inside the shells:
     looked fine until the first `addItem` 404'd on a ghost entity. Creation goes
     through `service.create()` first so the store holds server ids; mutations are
     optimistic + sync + revert. `applyEnvironment(replace)` also wipes
-    server-side first, gated behind a danger `ConfirmDialog`.
+    server-side first, gated behind a danger `ConfirmDialog`. The one deliberate
+    exception is the practices (spec D6): UI state, browser-only, saved in
+    localStorage and never sent to the server.
 18. **Never silently swallow errors in load paths** — `.catch(() => [])` in
     `fetchUserData` once hid a backend restart behind an empty UI for a whole
     session. Log with context before any fallback.

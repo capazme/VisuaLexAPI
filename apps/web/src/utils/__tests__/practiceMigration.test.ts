@@ -121,9 +121,11 @@ describe('practicesFromTabs', () => {
     expect(r.activePracticeId).toBe(r.practices[0].id);
   });
 
-  it('keeps one entry when two tabs show one decision', () => {
-    const r = migrate([...onlyDecisions, { ...onlyDecisions[0], id: 'dec-a2' }]);
+  it('keeps one entry when two tabs show one decision, merging what the second held and listing the merge', () => {
+    const r = migrate([...onlyDecisions, { ...onlyDecisions[0], id: 'dec-a2', historyRecordedKey: 'cassazione:civile:28994:2019' }]);
     expect(r.practices[0].decisions.map((d) => d.id)).toEqual(['dec-a', 'dec-b']);
+    expect(r.practices[0].decisions[0].historyRecordedKey).toBe('cassazione:civile:28994:2019');
+    expect(r.dropped).toEqual([expect.stringContaining('dec-a2')]);
   });
 
   it('reopens the topic search in front as the window of the front practice, and names the other', () => {
@@ -323,7 +325,7 @@ describe('sanitizePractices', () => {
   });
 
   it('drops a decision whose reference fails the checks, and keeps only known fields', () => {
-    const ok = { id: 'd1', reference: { ...FOUND, extra: 'x' }, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza', html: '<b>' };
+    const ok = { id: 'd1', reference: { ...FOUND, extra: 'x' }, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza', sezione: '3', html: '<b>' };
     const r = sanitizePractices([{
       id: 'p', label: 'P', labelIsCustom: false, acts: [], beside: [],
       decisions: [
@@ -336,7 +338,7 @@ describe('sanitizePractices', () => {
       ],
     }]);
     expect(r.practices[0].decisions).toEqual([
-      { id: 'd1', reference: FOUND, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza' },
+      { id: 'd1', reference: FOUND, label: 'Cass. civ., n. 28994/2019', identified: true, depositDate: '2019-11-11', tipo: 'Ordinanza', sezione: '3' },
     ]);
     expect(r.dropped).toHaveLength(5);
   });
@@ -396,6 +398,63 @@ describe('sanitizePractices', () => {
     expect(r.dropped).toHaveLength(4);
     // a second pass changes nothing
     expect(sanitizePractices(JSON.parse(JSON.stringify(r.practices)))).toEqual({ practices: r.practices, dropped: [] });
+  });
+
+  it('merges a second entry of one decision into the first, keeping the richer fields, and its window follows', () => {
+    const plain = { id: 'd1', reference: FOUND, label: 'Cass. civ., n. 28994/2019', identified: false };
+    const found = {
+      id: 'd2', reference: { ...FOUND, sezione: '3' }, label: 'Cass. civ., sez. III, n. 28994/2019', identified: true,
+      depositDate: '2019-11-11', tipo: 'Ordinanza', historyRecordedKey: 'cassazione:civile:28994:2019',
+    };
+    const r = sanitizePractices([{
+      id: 'p', label: 'P', labelIsCustom: false, acts: [],
+      decisions: [plain, found],
+      beside: [{ id: 'w', kind: 'decision', decisionId: 'd2' }],
+    }]);
+    const [p] = r.practices;
+    expect(p.decisions).toEqual([{ ...found, id: 'd1' }]);
+    expect(p.beside).toEqual([{ id: 'w', kind: 'decision', decisionId: 'd1' }]);
+    expect(r.dropped).toEqual([expect.stringContaining('merged')]);
+    // the first entry's own fields win when both are identified
+    const both = sanitizePractices([{
+      id: 'p', label: 'P', labelIsCustom: false, acts: [], beside: [],
+      decisions: [{ ...found, id: 'd1', tipo: 'Sentenza' }, { ...found, id: 'd2' }, { ...plain, id: 'd3' }],
+    }]);
+    expect(both.practices[0].decisions).toEqual([{ ...found, id: 'd1', tipo: 'Sentenza' }]);
+    expect(both.dropped).toHaveLength(2);
+  });
+
+  it('two windows on decisions that merged become one window on the survivor', () => {
+    const r = sanitizePractices([{
+      id: 'p', label: 'P', labelIsCustom: false, acts: [],
+      decisions: [
+        { id: 'd1', reference: FOUND, label: 'Cass.', identified: false },
+        { id: 'd2', reference: FOUND, label: 'Cass.', identified: false },
+      ],
+      beside: [{ id: 'w1', kind: 'decision', decisionId: 'd1' }, { id: 'w2', kind: 'decision', decisionId: 'd2' }],
+    }]);
+    expect(r.practices[0].beside).toEqual([{ id: 'w1', kind: 'decision', decisionId: 'd1' }]);
+  });
+
+  it('keeps an act and a decision that share a saved id apart: each window finds its own', () => {
+    const law = article(L24, '1');
+    const r = sanitizePractices([{
+      id: 'p', label: 'P', labelIsCustom: false,
+      acts: [{ id: 'x', key: 'k', norma: L24, articles: [law], isCollapsed: false }],
+      decisions: [{ id: 'x', reference: FOUND, label: 'Cass.', identified: false }],
+      beside: [
+        { id: 'w-dec', kind: 'decision', decisionId: 'x' },
+        { id: 'w-art', kind: 'article', actId: 'x', articleKey: practiceArticleKey(law) },
+      ],
+    }]);
+    const [p] = r.practices;
+    expect(p.acts[0].id).toBe('x');
+    expect(p.decisions[0].id).toBe('x-2');
+    expect(p.beside).toEqual([
+      { id: 'w-dec', kind: 'decision', decisionId: 'x-2' },
+      { id: 'w-art', kind: 'article', actId: 'x', articleKey: practiceArticleKey(law) },
+    ]);
+    expect(r.dropped).toEqual([expect.stringContaining("re-id'd x-2")]);
   });
 
   it('re-ids a second act with a taken id inside one practice instead of losing its articles', () => {

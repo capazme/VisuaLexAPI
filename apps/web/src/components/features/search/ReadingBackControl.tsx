@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { peekReadingBack } from '../../../utils/readingBackStack';
+import { isPracticeBackEntry, peekReadingBack } from '../../../utils/readingBackStack';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 
@@ -26,10 +26,11 @@ interface ReadingBackControlProps {
 }
 
 export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
-  const { readingBackStack, workspaceTabs, popReadingBack, bringTabToFront, focusArticleInTab } =
+  const { readingBackStack, workspaceTabs, practices, popReadingBack, bringTabToFront, focusArticleInTab } =
     useAppStore(useShallow(s => ({
       readingBackStack: s.readingBackStack,
       workspaceTabs: s.workspaceTabs,
+      practices: s.practices,
       popReadingBack: s.popReadingBack,
       bringTabToFront: s.bringTabToFront,
       focusArticleInTab: s.focusArticleInTab,
@@ -37,11 +38,12 @@ export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
 
   // Peeking (rather than reading the raw length) is what keeps the control
   // from offering a jump back into a tab or block that has since been closed.
-  const target = peekReadingBack(readingBackStack, workspaceTabs);
+  const target = peekReadingBack(readingBackStack, workspaceTabs, practices);
 
   const handleBack = () => {
     const entry = popReadingBack();
-    if (!entry) return;
+    // A practice's entry is walked back to by the store itself (spec §6.3); only the flag pushes one.
+    if (!entry || isPracticeBackEntry(entry)) return;
     bringTabToFront(entry.tabId);
     focusArticleInTab(entry.tabId, entry.articleId);
     onNavigated?.(entry.tabId);
