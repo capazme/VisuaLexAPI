@@ -242,13 +242,17 @@ the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-cur
 moves and changes nothing in the DOM (gotcha 23), and where the API is missing it only fails to
 draw. The article renderer emits nothing for a search (no `search` mark kind, no amber `<mark>`).
 Matching ignores case, accents and marks, folded 1:1 per UTF-16 unit so offsets are the
-original's; a query needs two characters (digits count); past 1000 matches the rest are not drawn.
-A dot or comma of an abbreviation is optional («cpa» finds «c.p.a.», «art 13» finds «art. 13»), and a
+original's; a query needs two letters or digits (punctuation does not count: «n.» is not searched); past 1000 matches the rest are not drawn.
+A dot or comma of an abbreviation is optional («cpa» finds «c.p.a.», «art 13» finds «art. 13»; «art.» never finds «articolo»), and a
 number is never cut out of a longer one («8980/2018» is not in «18980/2018»). A query that reads as a
 citation (`readQueryCitation`, spec §13.2) also finds the other forms of it: per target, the literal
-matches and `findCitationSpans` are one list, ordered by start, an overlap kept once, on a drawn text
+matches and `findCitationSpans` are one list, ordered by start, overlapping matches joined into their union, on a drawn text
 over the same separator map and on a stored text over its projection (`utils/citationSearch.ts`,
-which parses each text for citations once). Its tests use synthetic texts; the real ones live in
+which parses each text for citations once). Act types come from `sources/actTypes.ts` plus the
+palette's spellings (`NUMBERED_ACT_SPELLINGS`); a type is never found inside another's name («legge»
+in «decreto-legge»), a decision's number never inside an act's citation, and an article links to
+its act only across the gap §13.2 whitelists. Its tests use synthetic texts (no run of 30
+characters shared with the real ones); the real ones live in
 the git-ignored `utils/__fixtures__/private/` (personal data: never copy them into a committed
 file) and `citationSearch.local.test.ts` is skipped where the folder is absent.
 Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.ts` and
