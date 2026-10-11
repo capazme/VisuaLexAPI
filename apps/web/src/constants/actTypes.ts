@@ -61,6 +61,7 @@ export const ACT_TYPES: ActType[] = [
 export const ACT_TYPES_REQUIRING_DETAILS = [
   'legge', 'decreto legge', 'decreto legislativo',
   'decreto del presidente della repubblica', 'regio decreto',
+  'legge costituzionale', 'regio decreto legge', 'decreto legislativo luogotenenziale',
   'Regolamento UE', 'Direttiva UE'
 ];
 

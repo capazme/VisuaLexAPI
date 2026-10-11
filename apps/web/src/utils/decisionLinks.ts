@@ -220,6 +220,12 @@ export function identityFromKey(key: string, now: Date = new Date()): DecisionId
   return corte === 'cassazione' ? { corte, archivio: m[1] as DecisionArchive, numero, anno } : { corte, numero, anno };
 }
 
+/** The short citation of a history row's decision key, or «Sentenza» when the key no longer reads. */
+export function decisionHistoryLabel(key: string | null | undefined): string {
+  const identity = identityFromKey(key ?? '');
+  return identity ? formatDecisionShort(identity) : 'Sentenza';
+}
+
 export function isDecisionKey(key: string): boolean {
   return identityFromKey(key) !== null;
 }
