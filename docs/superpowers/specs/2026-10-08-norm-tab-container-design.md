@@ -551,7 +551,9 @@ subject beside (`beside`; on a phone, in the reader). `ReadingBackControl` stays
 without a shortcut. While the flag exists the stack accepts both shapes; P6 drops the tab shape.
 Until P3 draws the practices, an entry still live in a tab stays a tab entry: a seeded practice keeps
 its tab's id and its acts their blocks' ids, so with the flag on in P2 the old surface's way back
-keeps working; P3 drops that preference. A window's id is stable for its subject
+keeps working; P3 drops that preference. Not yet, P4/P5: the back control does not tell the phone
+view (`onNavigated`) to show a practice entry; an already open window gets no focus signal when
+its subject is opened again; a topic-search window is never a way-back target. A window's id is stable for its subject
 (`articleWindowId`, `decisionWindowId`), and opening a subject already beside, under any id, moves
 nothing. When `setDecisionEntryIdentity` merges an entry into another, its window, open row, reveal
 and back-stack entries name the survivor.
@@ -767,9 +769,11 @@ empty tab, malformed entries (§10).
   they are stored twice (tabs and practices). zustand calls `storage.setItem` inside every `set`, so
   P2 gives `persist` a wrapped storage: `createJSONStorage` over a `localStorage` adapter whose
   `setItem` catches any error, logs it once per session with context (the key, the size of the
-  value, the error's name; gotcha 18) and raises one sync error through `pushSyncError` («Il tavolo
-  di lavoro non viene più salvato nel browser: lo spazio è esaurito. Chiudi qualche pratica.»),
-  deferred to a microtask so it does not run inside the `set` that failed. Nothing is thrown out of
+  value, the error's name; gotcha 18) and raises one sync error through `pushSyncError`,
+  deferred to a microtask so it does not run inside the `set` that failed. With the flag on it says
+  «Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.»;
+  with the flag off, «Lo spazio del browser è esaurito: le schede aperte potrebbero non essere
+  salvate. Chiudi qualche scheda.» Nothing is thrown out of
   `set`; the app keeps working in memory. The flag's life is short (§12) and P6 stores the texts
   once.
 

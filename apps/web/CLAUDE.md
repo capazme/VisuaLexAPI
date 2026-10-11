@@ -469,6 +469,8 @@ stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whos
 practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
 live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
 practice made active, the row revealed or the window reopened); any other entry is kept as given.
+Until P3 draws the practices, an entry still live in a tab stays a tab entry even with the flag on
+(a seeded practice shares its tab's id); P3 drops that rule.
 
 **Decisions in the workspace.** A court decision is a workspace tab of its own: `WorkspaceTab.view`
 (`{ kind: 'decision', reference }`, drawn by `workspace/renderTabView.tsx` on the desktop panel and the
