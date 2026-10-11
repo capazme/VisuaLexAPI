@@ -286,18 +286,19 @@ describe('the way back over practices (§6.3)', () => {
     expect(s().readingBackStack).toEqual([entry]);
   });
 
-  it('flag on: an entry live in a tab stays a tab entry (a seeded practice shares its tab\'s id)', () => {
+  it('flag on: an entry naming a practice is the practice\'s even while a tab of the same id lives (P3 dropped the live-tab rule)', () => {
     flagOn();
-    const { practiceId, actId } = withArticles();
+    const { practiceId, actId, key5 } = withArticles();
     const tab = {
       id: practiceId, label: 'Tab', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1,
       isMinimized: false, isHidden: false, labelIsCustom: false,
       content: [{ type: 'norma', id: actId, norma: L24, articles: [article(L24, '5')], isCollapsed: false }],
     } as WorkspaceTab;
     appStore.setState({ workspaceTabs: [tab] });
-    const entry = { tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5' };
-    s().pushReadingBack(entry);
-    expect(s().readingBackStack).toEqual([entry]);
+    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5' });
+    expect(s().readingBackStack).toEqual([
+      { practiceId, subject: { kind: 'article', actId, articleKey: key5 }, place: 'table', label: 'art. 5' },
+    ]);
   });
 
   it('a table entry makes its practice active and reveals the row', () => {

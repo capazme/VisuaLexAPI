@@ -20,6 +20,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -327,12 +328,13 @@ describe('acts and articles', () => {
   });
 
   it('the way back follows an act moved to a practice with no same act', () => {
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     const from = s().createPractice('Da');
     const to = s().createPractice('A', { activate: false });
     const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: from, blockId: actId, articleId: '5', label: 'art. 5' });
     s().moveActToPractice(actId, from, to);
-    expect(s().readingBackStack.at(-1)).toMatchObject({ tabId: to, blockId: actId });
+    expect(s().readingBackStack.at(-1)).toMatchObject({ practiceId: to, subject: { kind: 'article', actId } });
   });
 
   it('a move raises one notification', () => {
@@ -370,9 +372,10 @@ describe('acts and articles', () => {
     const moved = s().addArticlesToPractice(from, L24, [article(L24, '5')]).actId;
     const kept = s().addArticlesToPractice(to, L24, [article(L24, '7')]).actId;
     s().openStructureWindow(moved);
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     s().pushReadingBack({ tabId: from, blockId: moved, articleId: '5', label: 'art. 5' });
     s().moveActToPractice(moved, from, to);
-    expect(s().readingBackStack.at(-1)).toMatchObject({ tabId: to, blockId: kept });
+    expect(s().readingBackStack.at(-1)).toMatchObject({ practiceId: to, subject: { kind: 'article', actId: kept } });
     expect(practice(from).acts).toEqual([]);
     expect(practice(to).acts).toHaveLength(1);
     expect(practice(to).acts[0].id).toBe(kept);

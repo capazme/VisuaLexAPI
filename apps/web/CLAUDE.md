@@ -490,9 +490,10 @@ practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject,
 the row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
 so a past text comes back as itself), else found through `findPracticeArticle`,
 live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
-practice made active, the row revealed or the window reopened); any other entry is kept as given.
-Until P3 draws the practices, an entry still live in a tab stays a tab entry even with the flag on
-(a seeded practice shares its tab's id); P3 drops that rule.
+practice made active, the row revealed or the window reopened; `ReadingBackControl` tells its
+`onNavigated` the practice's id); any other entry is kept as given. An entry naming a practice is the
+practice's even while a tab of the same id is still stored (a seeded practice keeps its tab's id):
+with the flag on the practices are what is drawn, and `moveActToPractice` rewrites only practice entries.
 
 **Decisions in the workspace.** A court decision is a workspace tab of its own: `WorkspaceTab.view`
 (`{ kind: 'decision', reference }`, drawn by `workspace/renderTabView.tsx` on the desktop panel and the
