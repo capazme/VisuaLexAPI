@@ -57,6 +57,9 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   { method: 'POST', path: '/dossiers', scope: 'dossier:write', weight: 2, counter: 'dossier_create' },
   // Each reference is checked against the sources: two points apiece (1 to 50).
   { method: 'POST', path: '/dossiers/:id/norms', scope: 'dossier:write', weight: referencesWeight },
+  // Court decisions in words (design 2026-10-12 §2.3, allowed by the owner): each confirmed at its source,
+  // two points apiece (1 to 10, refused above by the route). It only adds, like the norms.
+  { method: 'POST', path: '/dossiers/:id/decisions', scope: 'dossier:write', weight: referencesWeight },
   // A note in the dossier, or about one of its articles: a write like any other, and at most 100 a day.
   { method: 'POST', path: '/dossiers/:id/notes', scope: 'dossier:write', weight: 2, counter: 'note' },
   // Into the trash, never deleted for good; content:delete is also read live from the grant (delegated.ts).
