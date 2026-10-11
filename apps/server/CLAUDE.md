@@ -324,10 +324,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and the person's drafts and archived cards are deleted with them, in one
   transaction (plan, decision 14). `GET /auth/export` includes the user's cards
   as `data.lingoCards`.
+- **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
+  norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
+  `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
+  and `parseHistory` answers the Italian 400s first. A decision key must read back through
+  `norms/decisionKey.ts` (`readDecisionKey`). The five-minute de-duplication runs per kind
+  (by key for a decision). Responses carry `decision_key` and a nullable `act_type`.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades, except the community's study cards, which stay without an
   author: see LingoLex cards). Reached from the Settings modal. The export's
+  history rows include `decisionKey` (raw Prisma fields, as the rest of the export); its
   discussion threads keep a release's time but not the releasing admin's id.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources

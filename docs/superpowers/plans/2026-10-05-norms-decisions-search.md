@@ -1575,7 +1575,7 @@ describe('formatDecisionShort', () => {
 describe('identityFromKey', () => {
   it('reads both key shapes and refuses anything else', () => {
     expect(identityFromKey('cassazione:civile:10787:2024')).toEqual({ corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 });
-    expect(identityFromKey('corte_costituzionale:71:2020')).toEqual({ corte: 'corte_costituzionale', numero: 71, anno: 2020 });
+    expect(identityFromKey('corte_costituzionale:99999:2020')).toEqual({ corte: 'corte_costituzionale', numero: 71, anno: 2020 });
     for (const bad of ['codice-civile--2043', 'cassazione:tributario:1:2024', 'cassazione:civile:0:2024', 'corte_costituzionale:1:1900', '']) {
       expect(identityFromKey(bad), bad).toBeNull();
     }
@@ -3012,33 +3012,33 @@ Announce the migration to the orchestrator before Step 3 of Task 23, and ask its
 - Modify: `apps/server/prisma/schema.prisma` (`SearchHistory.actType String?`, `decisionKey String? @map("decision_key")`)
 - Create: `apps/server/prisma/migrations/<YYYYMMDDHHMMSS>_search_history_decisions/migration.sql` (timestamp after the latest migration on `develop` at the time)
 - Modify: `apps/server/src/controllers/historyController.ts`
-- Create: `apps/server/src/utils/decisionKey.ts` (`isDecisionKey`, mirroring the web's)
-- Test: `apps/server/src/__tests__/history.decisions.test.ts` (follow the existing history test's setup; find it with `grep -rl "/history" apps/server/src/__tests__`)
+- Reuse: `apps/server/src/norms/decisionKey.ts` (`readDecisionKey`, `inDecisionKeySpace`, pinned to `conventions/sources/decision-keys.json` with the web's `identityFromKey`); no second reader
+- Test: `apps/server/tests/history.decisions.test.ts` (helpers in `tests/helpers.ts`)
 
 **Interfaces:**
-- Produces: `POST /history` accepts `{ decision_key }` or the norm fields (not both); `GET /history` returns `decision_key: string | null`, `act_type: string | null`.
+- Produces: `POST /history` accepts `{ decision_key }` or the norm fields (not both) and answers 201 on create, 200 on a de-duplicated repeat; `GET /history` returns `decision_key: string | null`, `act_type: string | null`; `GET /auth/export` carries `decisionKey` (camelCase, as its other fields) and a null `actType` on decision rows.
 
 - [ ] **Step 1: Failing tests**
 
 ```ts
 it('records a decision and lists it with the norms', async () => {
-  const add = await agent.post('/api/history').send({ decision_key: 'cassazione:civile:10787:2024' }).expect(200);
-  expect(add.body).toMatchObject({ decision_key: 'cassazione:civile:10787:2024', act_type: null });
+  const add = await agent.post('/api/history').send({ decision_key: 'cassazione:civile:99999:2024' }).expect(201);
+  expect(add.body).toMatchObject({ decision_key: 'cassazione:civile:99999:2024', act_type: null });
   const list = await agent.get('/api/history').expect(200);
-  expect(list.body[0]).toMatchObject({ decision_key: 'cassazione:civile:10787:2024', act_type: null });
+  expect(list.body[0]).toMatchObject({ decision_key: 'cassazione:civile:99999:2024', act_type: null });
 });
 it('refuses both kinds at once, neither, and a malformed key', async () => {
-  await agent.post('/api/history').send({ decision_key: 'cassazione:civile:1:2024', act_type: 'legge' }).expect(400);
+  await agent.post('/api/history').send({ decision_key: 'cassazione:civile:99999:2024', act_type: 'legge' }).expect(400);
   await agent.post('/api/history').send({}).expect(400);
-  await agent.post('/api/history').send({ decision_key: 'cassazione:tributario:1:2024' }).expect(400);
+  await agent.post('/api/history').send({ decision_key: 'cassazione:tributario:99999:2024' }).expect(400);
 });
 it('de-duplicates a decision opened again within five minutes', async () => {
-  const a = await agent.post('/api/history').send({ decision_key: 'corte_costituzionale:71:2020' });
-  const b = await agent.post('/api/history').send({ decision_key: 'corte_costituzionale:71:2020' });
+  const a = await agent.post('/api/history').send({ decision_key: 'corte_costituzionale:99999:2020' });
+  const b = await agent.post('/api/history').send({ decision_key: 'corte_costituzionale:99999:2020' });
   expect(b.body.id).toBe(a.body.id);
 });
 it('the database refuses a row with neither kind', async () => {
-  await expect(prisma.searchHistory.create({ data: { userId: user.id } })).rejects.toThrow();
+  await expect(prisma.searchHistory.create({ data: { userId: user.id } })).rejects.toThrow(/search_history_one_kind/);
 });
 ```
 
@@ -3066,12 +3066,10 @@ const normFields = z.object({
   article: z.string().optional(),
   date: z.string().optional(),
   version: z.string().optional().default('vigente'),
-}).strict();
-const decisionFields = z.object({ decision_key: z.string().refine(isDecisionKey, 'Not a decision key') }).strict();
-const addHistorySchema = z.union([normFields, decisionFields]);
+});
 ```
 
-`.strict()` makes `{ decision_key, act_type }` fail both branches (400 through the error handler, as other zod failures do — check `errorHandler` maps `ZodError` to 400). In `addHistory`, branch on `'decision_key' in data`: the duplicate check uses `{ userId, decisionKey }` within five minutes; the create writes `decisionKey` only. The response mapper adds `decision_key: item.decisionKey`. `isDecisionKey` in `apps/server/src/utils/decisionKey.ts` is the web's regex and range check, with a comment naming the web twin (`apps/web/src/utils/decisionLinks.ts identityFromKey`): change both together.
+Built as `parseHistory`, not a `.strict()` union: it decides the kind by presence (`decision_key` or `act_type`; both, or neither, is refused) and answers with the first Italian message alone, never the global handler's English prefix. The norm schema is not strict. The decision key is read by `readDecisionKey` from `norms/decisionKey.ts`, pinned to the same golden file as the web's `identityFromKey`: change them together. In `addHistory`, the duplicate check uses `{ userId, decisionKey }` within five minutes; the create writes `decisionKey` only. The response mapper adds `decision_key: item.decisionKey`.
 
 - [ ] **Step 5: Run the server suite** (orchestrator's go): `npm --prefix apps/server test` → pass; `npm --prefix apps/server run build` → clean.
 
@@ -3088,17 +3086,20 @@ git commit -m "feat(server): decisions in the search history — decision_key, o
 - Modify: `apps/web/src/services/historyService.ts` (types; `addDecisionToHistory(decisionKey)`)
 - Modify: `apps/web/src/components/features/decisions/DecisionTabView.tsx` (records a found decision once per opening)
 - Modify: `apps/web/src/components/features/history/HistoryView.tsx` (decision rows)
+- Create: `apps/web/src/components/features/history/DecisionHistoryRow.tsx` (a decision's row)
+- Modify: `apps/web/src/store/useAppStore.ts` (`historyRecordedKey` on a decision view; `markDecisionRecorded`)
+- Modify: `apps/web/src/utils/decisionLinks.ts` (`decisionHistoryLabel`)
 - Test: `HistoryView` decision rows test; `DecisionTabView.test.tsx` (records once)
 
 **Interfaces:**
 - Consumes: Task 23; `identityFromKey`, `formatDecisionShort`; `openDecisionTab`.
 - Produces: `SearchHistoryItem.act_type: string | null; decision_key: string | null`.
 
-- [ ] **Step 1: Failing tests.** A history item `{ decision_key: 'cassazione:civile:10787:2024', act_type: null }` renders «Cass. civ., n. 10787/2024» with a gavel icon; clicking it calls `openDecisionTab(identity)` and navigates to `/`; a norm item renders as before; an item with an unreadable key renders «Sentenza» and is not clickable (logged with context, gotcha 18). `DecisionTabView` calls `addDecisionToHistory` once when the answer is `trovata`, not again on re-render, again after the tab is closed and reopened.
+- [ ] **Step 1: Failing tests.** A history item `{ decision_key: 'cassazione:civile:99999:2024', act_type: null }` renders «Cass. civ., n. 99999/2024» with a gavel icon; clicking it calls `openDecisionTab(identity)` and navigates to `/`; a norm item renders as before; an item with an unreadable key renders «Sentenza» and is not clickable (logged with context, gotcha 18). `DecisionTabView` calls `addDecisionToHistory` once per opening when the answer is `trovata`: not again on a remount, a minimise and restore or a bring to front; again for a new tab after the old one was closed; the new key when the tab's identity changes; nothing from a copy that is not on screen.
 
 - [ ] **Step 2: Run to see them fail.**
 
-- [ ] **Step 3: Implement.** In `HistoryView`, the functions that build a norm from an item (`item.act_type || ''`, lines ~52–96) run only for items with `act_type`; decision items take a separate row component. Filters by act type and the stripe colour skip decision items (their stripe is a fixed slate). In `DecisionTabView`, a `useRef<string | null>` holds the key last recorded by this mount; record when `answer.esito === 'trovata'` and the key differs; failures are logged and ignored (the history is a convenience, the reading must not fail for it).
+- [ ] **Step 3: Implement.** In `HistoryView`, the functions that build a norm from an item (`item.act_type || ''`, lines ~52–96) run only for items with `act_type`; decision items take a separate row component. The stripe colour skips decision items (their stripe is a fixed slate); `HistoryView` has no filter by act type. In `DecisionTabView`, the key recorded is kept on the tab (`historyRecordedKey`, set by `markDecisionRecorded`, persisted with the tab), not in a per-mount ref: record when `answer.esito === 'trovata'`, the copy is on screen and the tab's key differs. The tab is marked before the request, so a failed request is not retried; failures are logged and ignored (the history is a convenience, the reading must not fail for it).
 
 - [ ] **Step 4: Run tests, build, lint.**
 
@@ -3483,3 +3484,12 @@ Task 3 has not yet seen is expected to pass by a comparable margin, not by luck.
 - Button order on both surfaces: «Discussioni», then «Cerca nel testo». The magnifier is 16 px beside 16 px neighbours and 20 px in the article's phone row.
 - Phone layout: the field takes a row of its own, the counter and the three buttons share the next; targets are 44 px below `md`. Esc in the field stops there (an open discussion panel or citation preview stays open). The search landmark is named «Cerca nel testo» plus the surface.
 - Cmd/Ctrl+F is the app's «Cerca negli articoli aperti» (`Layout.tsx`), unchanged; «Cerca nel testo» has no shortcut.
+
+**Amendment, 2026-10-11 — PR 5 as built (`feat/decision-history`), after the final review.** Tasks 23 and 24 above are corrected where the code differs; what the rounds decided:
+- A row is a norm or a decision, never both, never neither: the CHECK `search_history_one_kind` (tested by name), and `parseHistory` refuses the other shapes in Italian. Migration `20261015100000_search_history_decisions`, written by hand; existing rows have `act_type NOT NULL`, so the CHECK holds when it is added.
+- The server reads the key with `readDecisionKey` (`norms/decisionKey.ts`), the one reader; tests use fictional keys only (99999) and expect 201 on create, 200 on a repeat within five minutes.
+- The author's export (`GET /auth/export`, still `schemaVersion: 1`) carries `decisionKey` and a null `actType` on decision rows; a future importer of v1 must accept a null `actType`. Account deletion cascades.
+- «Once per opening» is kept on the tab (`historyRecordedKey`, `markDecisionRecorded`, persisted with the tab), not in a ref: a remount, a minimise and restore, a reload or a bring to front never records again; a new tab does. Only the copy on screen records (the desktop panel and the phone view are both mounted). The tab is marked before the request, so a failed request is not retried; the failure is logged.
+- `DecisionHistoryRow` draws a decision's row; `decisionHistoryLabel` (`utils/decisionLinks.ts`) is the one label helper; an unreadable key shows «Sentenza», is not clickable and is logged once on load.
+- Release note, for the PR body: there is no rollback path. After `migrate deploy`, rows with a null `act_type` exist, and a build whose Prisma client types `actType` as `String` makes `GET /api/history` throw for every user holding a decision row. A downgrade needs `DELETE FROM search_history WHERE decision_key IS NOT NULL` before restoring `NOT NULL`. Commit 522cc39d's body says «decision_key» for the export; the field is `decisionKey`.
+- Left as is: an explicit `decision_key: null` beside `act_type` is refused («…non entrambe»); no client sends it.

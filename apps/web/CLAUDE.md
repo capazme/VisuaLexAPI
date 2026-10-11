@@ -47,7 +47,8 @@ actions.
 **Server-backed** (hydrated by `fetchUserData`, mutated optimistically then
 synced): bookmarks, dossiers + items, environments, quickNorms, customAliases,
 annotations and highlights (these two hydrate per-article via
-`loadAnnotationsForArticle` / `loadHighlightsForArticle`), history.
+`loadAnnotationsForArticle` / `loadHighlightsForArticle`). The search history is
+not a store slice: `HistoryView` keeps it in local state and reloads it on mount.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
 workspace tabs and z-index, settings, `searchPanelState`.
@@ -69,7 +70,13 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   sidebar badges their unread count (`useForumNotifications().count.normaChanges`,
   deliberately kept out of the Forum's `total`, which nothing on that page
   could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
-  on `window` so the badge drops before the next 30s poll.
+  on `window` so the badge drops before the next 30s poll. A row is a norm (`act_type`) or a
+  decision (`decision_key`, never both): `DecisionTabView` records a found decision once per
+  opening: the key it sent is kept on the tab (`historyRecordedKey`, persisted with it), so a
+  remount, a minimise and restore or a reload never records again, while a new tab does (the
+  copy on screen only) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab is marked
+  before the request, so a failed request is not retried (not even after a reload) and the failure
+  is logged: the history is a convenience.
 
 All of them reopen a norm through `triggerSearch()`.
 
@@ -807,8 +814,8 @@ meant to stay split; add new features as new files, not inside the shells:
   lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
   "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
   workspace is persisted).
-- `features/history/` — `HistoryView.tsx` plus `NormaChangesSection.tsx`
-  (see History above).
+- `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
+  `NormaChangesSection.tsx` (see History above).
 - `features/documents/` — `DocumentReviewPage.tsx` only.
 
 ## Gotchas

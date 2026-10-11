@@ -5,7 +5,9 @@ import { get, post, del } from './api';
 
 export interface SearchHistoryItem {
   id: string;
-  act_type: string;
+  /** A norm's row has its act type and no decision key; a decision's row is the reverse. */
+  act_type: string | null;
+  decision_key: string | null;
   act_number?: string;
   article?: string;
   date?: string;
@@ -47,4 +49,12 @@ export const deleteHistoryItem = async (id: string): Promise<void> => {
  */
 export const clearHistory = async (): Promise<void> => {
   await del('/history');
+};
+
+/**
+ * Record a decision opened in the workspace. The key is `decisionKey(identity)`; the server keeps
+ * one row per decision per five minutes.
+ */
+export const addDecisionToHistory = async (decisionKey: string): Promise<SearchHistoryItem> => {
+  return post<SearchHistoryItem>('/history', { decision_key: decisionKey });
 };
