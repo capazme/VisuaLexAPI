@@ -52,7 +52,7 @@ holding `conventions/`, and fails when it is not there.
 | Suite | Test |
 |---|---|
 | web | `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (today: shape, decided citations, current decision paths and reference paths); `apps/web/src/utils/__tests__/decisionCitationParser.test.ts` (`decision_citations`) |
-| Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys); `services/visualex/tests/test_nl_parser_convention.py` (every citation and short label reads back through the parser to its norm) |
+| Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys); `services/visualex/tests/test_nl_parser_convention.py` (every citation and short label reads back through the parser to its norm); `services/visualex/tests/test_decision_citation.py` (`decision_citations`, through `/parse_decision`) |
 | server, MCP, MERL-T | added by each area's adoption PR (plan `docs/superpowers/plans/2026-10-04-source-convention.md`) |
 
 ## Changing it
@@ -79,9 +79,8 @@ A decision as a lawyer writes it, read into the reference `/fetch_decision` take
 ```
 
 Two parsers read the same words: the web palette's `decisionCitationParser.ts`, on every
-keystroke in the browser, asserts the cases today; the Python API's `/parse_decision`, which the
-server's `POST /dossiers/:id/decisions` will call (Part A of the 12 October design), will assert
-them too. Each asserts the cases whose status is `decided`, `current` or `proposed` and lists the
+keystroke in the browser, and the Python API's `/parse_decision`, which the server's
+`POST /dossiers/:id/decisions` calls (Part A of the 12 October design). Each asserts the cases whose status is `decided`, `current` or `proposed` and lists the
 open ones as skipped. `unsupported_court` (the court the API names when it recognises one
 VisuaLex has no reader for) is the API's alone. The section is kept as written (`III`, `U`), as the palette keeps it.
 

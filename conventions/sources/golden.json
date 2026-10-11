@@ -292,7 +292,7 @@
     }
   ],
   "decision_citations": {
-    "note": "Words a lawyer writes, read into the reference /fetch_decision takes (null: not a decision VisuaLex can read). The web palette (decisionCitationParser.ts) asserts every case whose status is asserted, and the Python API's /parse_decision (Part A of the design below) will too; unsupported_court is the API's alone: the court it names when it recognises a court VisuaLex has no reader for (the palette answers null and leaves the words to the norm parser). today is the reader's clock. Design: docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1 and §3.4.",
+    "note": "Words a lawyer writes, read into the reference /fetch_decision takes (null: not a decision VisuaLex can read). The web palette (decisionCitationParser.ts) and the Python API (/parse_decision) both assert every case whose status is decided, current or proposed; unsupported_court is the API's alone: the court it names when it recognises a court VisuaLex has no reader for (the palette answers null and leaves the words to the norm parser). today is the reader's clock. Design: docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1 and §3.4.",
     "today": "2026-10-05",
     "cases": [
       {"input": "Cass. 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024}, "status": "current"}},

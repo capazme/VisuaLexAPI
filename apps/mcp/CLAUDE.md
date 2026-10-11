@@ -44,13 +44,17 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
   `omnilex_leggi_dossier`, `omnilex_crea_dossier`,
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_aggiungi_nota_dossier` (one plain-text
+  checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
+  words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
+  a court VisuaLex cannot read yet is answered `court_not_supported` with its name, and its
+  description tells the model not to fall back to a note; design
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2), `omnilex_aggiungi_nota_dossier` (one plain-text
   note up to 4,000 characters, in a dossier or about one of its articles with
   `voce`; add-only), `omnilex_stato_account`. `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
   `created_by`) and which article a note is about (`nota_su`). A norm or a decision is named by the
   server's citation (`citation` on dossier items, `display` on the norms
-  route's results: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
+  route's results, `citation` on the decisions route's: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
   dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read
   apart; `tests/sourcesGolden.test.ts` passes every decided citation of
   `conventions/sources/golden.json` through the tools byte for byte. Results are data (JSON

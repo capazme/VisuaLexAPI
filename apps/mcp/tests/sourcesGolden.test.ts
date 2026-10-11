@@ -75,4 +75,17 @@ describe('the tools pass the server\'s citations through, byte for byte', () => 
     const esiti = json(result).esiti as { display: string }[];
     expect(esiti.map((e) => e.display)).toEqual(NORMS.map((c) => c.citation));
   });
+
+  it('omnilex_aggiungi_sentenze_dossier: every reference\'s citation', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path === '/dossiers/g1/decisions'
+        ? [200, { results: DECISIONS.map((c) => ({ reference: c.id, outcome: 'added', citation: c.citation })) }]
+        : undefined;
+    const result = await client.callTool({
+      name: 'omnilex_aggiungi_sentenze_dossier',
+      arguments: { dossier: 'g1', sentenze: DECISIONS.slice(0, 10).map((c) => c.id) },
+    });
+    const esiti = json(result).esiti as { citation: string }[];
+    expect(esiti.map((e) => e.citation)).toEqual(DECISIONS.map((c) => c.citation));
+  });
 });
