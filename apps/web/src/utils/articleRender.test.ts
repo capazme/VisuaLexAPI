@@ -67,7 +67,7 @@ describe('the projection invariant — every real text', () => {
         });
       }
       const focusedThreadId = threads[0]?.thread.id ?? null;
-      const html = render(raw, { highlights, annotations, threads, focusedThreadId, searchQuery: 'del', signs: true });
+      const html = render(raw, { highlights, annotations, threads, focusedThreadId, signs: true });
       // Well-formed before the sanitizer gets a chance to repair it.
       const xml = new DOMParser().parseFromString(`<root>${html}</root>`, 'application/xml');
       expect(xml.getElementsByTagName('parsererror')).toHaveLength(0);
@@ -129,7 +129,7 @@ describe('the projection invariant — every real text', () => {
     for (const f of ARTICLE_FIXTURES) {
       const plain = f.text.replace(/\n/g, '');
       const hs = [0, 1, 2, 3].map((i) => hl(`p${i}`, plain.slice(i * 40, i * 40 + 30), i * 40));
-      render(f.text, { highlights: hs, searchQuery: 'di' });
+      render(f.text, { highlights: hs });
     }
     expect(performance.now() - t0).toBeLessThan(1500);
   });
@@ -236,13 +236,6 @@ describe('marks', () => {
     const legacy: Highlight = { ...hl('l', 'legge', 0), startOffset: undefined };
     const div = mount(render(raw, { highlights: [legacy] }));
     expect(pieces(div, '[data-highlight="l"]')).toHaveLength(2);
-  });
-
-  it('numbers search hits in text order, for the Cmd+F navigation', () => {
-    const div = mount(render(fixtureText('nrm-cc-1453'), { searchQuery: 'adempi' }));
-    const idx = pieces(div, '.search-match').map((e) => Number(e.getAttribute('data-search-idx')));
-    expect(idx.length).toBeGreaterThan(1);
-    expect(idx).toEqual([...new Set(idx)].sort((x, y) => x - y));
   });
 
   it('draws a note anchor with the attributes the reader listens for', () => {

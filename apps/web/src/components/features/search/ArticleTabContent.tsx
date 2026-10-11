@@ -20,7 +20,6 @@ import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompa
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
-import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
 import { HighlightsActionsPicker } from './HighlightsActionsPicker';
@@ -706,46 +705,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom
     // fold; an annotation sign opens its block's notes and highlights.
-    const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
+    const { updatesOpen, openNote, closeNote, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
         updatesOpenByDefault: display.updateNotesOpen,
     });
     const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
-
-    // Cmd+F click → scroll this article body to the requested occurrence.
-    // useArticleMarkers tags each search hit with `data-search-idx`; we
-    // wait one frame (so the re-render from the setGlobalHighlight typing
-    // AND the article switch has settled) before querying the DOM.
-    useEffect(() => {
-        const reveal = (target: HTMLElement) => {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.classList.add('search-match-active');
-            setTimeout(() => target.classList.remove('search-match-active'), 1600);
-        };
-        return subscribeSearchNavigation((req) => {
-            if (!req) return;
-            if (req.articleId !== uniqueArticleId) return;
-            const container = contentRef.current;
-            if (!container) return;
-            // rAF twice: first frame lets React commit, second lets the
-            // browser lay out the scrollIntoView target.
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                const target = container.querySelector<HTMLElement>(
-                    `.search-match[data-search-idx="${req.occurrenceIdx}"]`,
-                );
-                if (!target) return;
-                // A hit in the folded AGGIORNAMENTO notes is display:none, and
-                // scrolling to it would do nothing: unfold them first. Folding
-                // is a class, so the target element survives the re-render.
-                if (target.closest('.vlx-updates-body') && !target.closest('.vlx-updates-open')) {
-                    openUpdates();
-                    requestAnimationFrame(() => requestAnimationFrame(() => reveal(target)));
-                    return;
-                }
-                reveal(target);
-            }));
-        });
-    }, [uniqueArticleId, openUpdates]);
 
     // Citation hover and click: a click jumps within the same act or opens a search, recording the
     // way back from this block first.

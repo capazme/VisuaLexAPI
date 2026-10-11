@@ -130,7 +130,7 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
 /**
  * The matches across every text the current scope reaches (spec §13.1, Task 33): a target with a
  * displayed registered root (`findRootsFor`) is searched in its text root, as PR 4c's
- * `useFindInText` does for one root; a target without one is searched in its stored projection and
+ * the single-root find of PR 4c did for one root; a target without one is searched in its stored projection and
  * only counted (ruling 2 — never both for the same target).
  *
  * Where the current match is:

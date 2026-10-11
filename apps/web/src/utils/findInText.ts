@@ -121,7 +121,7 @@ export function findMatchesInFolded(
  * Where `pos` of `oldText` sits in `newText`: unchanged before the common prefix, shifted by the
  * length difference after the common suffix, and at the start of the change when it falls inside
  * what changed. How a caller keeping a current match carries its position through a redraw
- * (`useFindInText`, `useFindWindow`) without re-finding it by content.
+ * (`useFindWindow`) without re-finding it by content.
  */
 export function mapThroughEdit(oldText: string, newText: string, pos: number): number {
   const max = Math.min(oldText.length, newText.length);

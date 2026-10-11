@@ -7,14 +7,14 @@ import { toolbarToggleClass } from './toolbarToggle';
 export interface FindInTextButtonProps {
     isOpen: boolean;
     onToggle: () => void;
-    /** Lets the toolbar hand the button to `FindInTextBar` as the place to return focus to. */
+    /** Lets the toolbar hand the button to `FindWindow` as the place to return focus to. */
     ref?: Ref<HTMLButtonElement>;
     /** Icon size in px: 16 beside the 16 px icons of a desktop row, 20 in the article's phone row. */
     size?: number;
 }
 
 /**
- * The magnifier of the reading toolbar that opens `FindInTextBar`, shared by the article's toolbars and the decision's
+ * The magnifier of the reading toolbar that opens `FindWindow`, shared by the article's toolbars and the decision's
  * (like `DiscussionButton`): one look, one behaviour, a 44px target on touch screens.
  */
 export function FindInTextButton({ isOpen, onToggle, ref, size = 16 }: FindInTextButtonProps) {

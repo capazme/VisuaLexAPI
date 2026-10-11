@@ -12,7 +12,6 @@ import { UndoToastContainer } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
-import { GlobalSearch } from '../features/search/GlobalSearch';
 import { FindWindow } from '../features/search/FindWindow';
 import { openFindWindow } from '../../utils/findWindowControl';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
@@ -239,7 +238,6 @@ export function Layout() {
       <ServiceHealthBanner />
 
       {/* The old modal search over stored article texts: nothing opens it any more; it goes with Task 35. */}
-      <GlobalSearch isOpen={false} onClose={() => {}} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />

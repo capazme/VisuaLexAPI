@@ -25,7 +25,7 @@ const shortcutGroups: ShortcutGroup[] = [
     title: 'Navigazione',
     shortcuts: [
       { keys: [modKey, 'K'], description: 'Apri Command Palette' },
-      { keys: [modKey, 'F'], description: 'Cerca negli articoli aperti' },
+      { keys: [modKey, 'F'], description: 'Cerca nel testo' },
       { keys: [modKey, 'B'], description: 'Toggle Sidebar' },
       { keys: [modKey, 'D'], description: 'Vai ai Dossier' },
       { keys: [modKey, 'Shift', 'S'], description: 'Toggle Pannello Ricerca' },
