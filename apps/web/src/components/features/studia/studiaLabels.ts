@@ -53,16 +53,21 @@ export function anchorActLabel(anchor: Pick<AncoraScheda, 'urn'>): string | null
   return norm?.tipo_atto ? actHeading(norm) : null;
 }
 
-/** What the workspace's search needs to open an anchor's article in the reader; null when its address names no article. */
-export function searchParamsFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): SearchParams | null {
+/** The norm an anchor rests on, as the reader asks for it; null when its address names no article. */
+export function normaFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): NormaVisitata | null {
   const norm = normFromUrn(anchor.urn);
   if (!norm?.tipo_atto || !norm.numero_articolo) return null;
-  const norma: NormaVisitata = {
+  return {
     tipo_atto: norm.tipo_atto,
     data: norm.data ?? '',
     numero_articolo: norm.numero_articolo,
     ...(norm.numero_atto ? { numero_atto: norm.numero_atto } : {}),
     ...(norm.allegato ? { allegato: norm.allegato } : {}),
   };
-  return searchParamsFromNorma(norma);
+}
+
+/** What the workspace's search needs to open an anchor's article in the reader; null when its address names no article. */
+export function searchParamsFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): SearchParams | null {
+  const norma = normaFromAnchor(anchor);
+  return norma ? searchParamsFromNorma(norma) : null;
 }

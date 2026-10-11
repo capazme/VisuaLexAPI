@@ -48,6 +48,8 @@ vi.mock('../services/studiaService', () => ({
   studiaService: {
     list: vi.fn().mockResolvedValue({ cards: [], nextOffset: null }),
     get: vi.fn().mockRejectedValue({ status: 404 }),
+    queue: vi.fn().mockResolvedValue({ cards: [] }),
+    vote: vi.fn().mockRejectedValue({ status: 404 }),
   },
 }));
 
@@ -127,6 +129,12 @@ describe('App routing — Studia', () => {
   it('keeps a card’s address inside the Studia area', async () => {
     renderAt('/studia/schede/k1');
     expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
+  });
+
+  it('opens «Da validare» at /studia/valida', async () => {
+    renderAt('/studia/valida');
+    expect(await screen.findByRole('heading', { name: 'Da validare' })).toBeInTheDocument();
+    expect(await screen.findByText('Nessuna scheda da validare in questa materia')).toBeInTheDocument();
   });
 
   it('is the 404 page when VITE_FEATURE_STUDIA is off', async () => {

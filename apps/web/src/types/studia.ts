@@ -70,6 +70,9 @@ export interface TestoCorrente extends TestoDaAccettare {
   accettata: boolean;
 }
 
+/** What a validator can say about a card. */
+export type Giudizio = 'APPROVATA' | 'MIGLIORABILE' | 'ERRATA';
+
 /** Proposing a card answers the card, or the notice to accept first. */
 export type EsitoProposta = Scheda | { richiedeTesto: TestoDaAccettare };
 

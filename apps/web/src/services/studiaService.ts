@@ -5,6 +5,9 @@ import type {
   EsitoModifica,
   EsitoProposta,
   FiltriSchede,
+  Giudizio,
+  Materia,
+  StatoScheda,
   Scheda,
   SchedaDellArticolo,
   SchedaInput,
@@ -94,6 +97,26 @@ export const studiaService = {
   /** The current version of a text to accept, by key, and whether this user has accepted it. */
   async text(chiave: string): Promise<TestoCorrente> {
     const response = await apiClient.get(`/lingo/testi/${encodeURIComponent(chiave)}`);
+    return response.data;
+  },
+
+  /**
+   * The proposed cards this validator may judge, oldest first: not their own, not yet voted. A 403
+   * rejects when the user is not (or no longer) a validator.
+   */
+  async queue({ materia, limit }: { materia?: Materia; limit?: number } = {}): Promise<{ cards: Scheda[] }> {
+    const params = Object.fromEntries(Object.entries({ materia, limit }).filter(([, value]) => value !== undefined));
+    const response = await apiClient.get('/lingo/validazione/coda', { params });
+    return response.data;
+  },
+
+  /**
+   * One vote on a proposed card; the reason is required unless the verdict is `APPROVATA`. Answers the
+   * card's state after the vote. 403 (no longer a validator), 404 (no longer proposed) and 409
+   * (already voted) reject as they come.
+   */
+  async vote(cardId: string, giudizio: Giudizio, motivazione?: string): Promise<{ stato: StatoScheda }> {
+    const response = await apiClient.post(`/lingo/validazione/${encodeURIComponent(cardId)}`, motivazione === undefined ? { giudizio } : { giudizio, motivazione });
     return response.data;
   },
 

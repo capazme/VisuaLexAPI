@@ -37,6 +37,9 @@ const StudiaPage = lazy(() =>
 const MyCardsView = lazy(() =>
   import('./components/features/studia/MyCardsView').then(m => ({ default: m.MyCardsView })),
 );
+const ValidationQueueView = lazy(() =>
+  import('./components/features/studia/ValidationQueueView').then(m => ({ default: m.ValidationQueueView })),
+);
 
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
 function NotFoundPage() {
@@ -127,7 +130,7 @@ function App() {
               </Suspense>
             }
           />
-          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the cards (PR C will open the review). */}
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the cards (PR C will open the review); valida is the validators' queue. */}
           {isStudiaEnabled() && (
             <Route
               path="studia"
@@ -140,6 +143,7 @@ function App() {
               <Route index element={<Navigate to="schede" replace />} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+              <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />
             </Route>
           )}
           <Route path="sentenze" element={<DecisionAddress />} />

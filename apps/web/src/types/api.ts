@@ -37,6 +37,8 @@ export interface UserResponse {
   is_active: boolean;
   is_verified: boolean;
   is_admin: boolean;
+  /** A validator of VisuaLex Studia's cards (`/auth/me` carries it). */
+  lingo_validatore?: boolean;
   created_at: string;
   updated_at?: string;
 }
@@ -61,7 +63,6 @@ export interface AdminUserUpdate {
 }
 
 export interface AdminUserResponse extends UserResponse {
-  /** A validator of VisuaLex Studia's cards. */
   lingo_validatore: boolean;
   login_count?: number;
   last_login_at?: string | null;
