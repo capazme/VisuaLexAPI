@@ -132,7 +132,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   before; a deletion route also needs the read scope of what it deletes
   (`readScope` in the delegated table). `trash/trash.ts` copies the rows into
   `trash_entries` and deletes them in one transaction, the dossier row locked
-  (`FOR UPDATE`): `POST /dossiers/:id/trash {itemIds}` (the entries the user
+  (`FOR UPDATE`; for the cards, `trashLingoCards` locks the author's rows in id order,
+  so a `PATCH` in flight finishes before the payload is read and one that comes
+  after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
   saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
   `/lingo/cards/trash` — the two dossier routes for exchanged tokens only,
   whose own deletions in the web app stay immediate; the card trash is open to
@@ -325,7 +327,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   400 `{ detail, anchors }`, and the draft stays as it was — then one
   transaction locks the row (`FOR UPDATE`) and re-reads author and state (404;
   409 unless `BOZZA_PERSONALE`). It never touches `created_by_client_*`.
-  `q` refuses a NUL byte (400). Scopes
+  Postgres text cannot hold a NUL byte, which would reach it as a 500, so
+  `lingo/noNul.ts` `hasNoNul` refuses it first: a 400 on the strings of the query
+  (`q` here, `urn` on `/articolo`) and of the trash body (`cardIds`), a 404 on a
+  `:id` (`router.param`: a NUL names no card). Scopes
   `lingo:cards:read` / `lingo:cards:write`; two points per reference, one of
   the day's hundred per card. `lingo/serializeCard.ts` is the one answer shape.
 - **`GET /api/lingo/articolo?urn=`** (`routes/lingoArticolo.ts`, session only):

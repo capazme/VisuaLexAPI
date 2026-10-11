@@ -8,11 +8,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 
 - `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
   `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
-  `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on, which
-  also hides the Sidebar's «Studia»; `/studia` redirects to `schede`; «Le mie schede» is
+  `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
+  (`features/studia/featureFlag.ts`), which also hides the Sidebar's «Studia»; `/studia` redirects to `schede`; «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
-  `triggerSearch` as the dossier's rows do),
+  `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
+  keeping what a narrowed list hid until a deletion starts it over),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open as a tab; `/sentenze` alone and an
@@ -29,7 +30,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`, `environments`,
-  `bulletin` (the Forum), `history`, `compare`, `settings`, `documents`
+  `bulletin` (the Forum), `history`, `compare`, `settings`, `studia` (VisuaLex
+  Studia: the study cards, see `/studia` above and «Study cards under the article»),
+  `documents`
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
   user drops in — parsed in the browser, never uploaded — each opening the
   reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
@@ -42,6 +45,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
+  `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
+  (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
+  stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
+  from a dialog keeps the keyboard.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind.
 
@@ -54,6 +61,9 @@ actions.
 synced): bookmarks, dossiers + items, environments, quickNorms, customAliases,
 annotations and highlights (these two hydrate per-article via
 `loadAnnotationsForArticle` / `loadHighlightsForArticle`), history.
+
+**Not in the store:** study cards are server state fetched per view (`studiaService`, `useMyCards`,
+`useArticleCards` over `utils/articleCardsCache.ts`), never in `useAppStore`.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
 workspace tabs and z-index, settings, `searchPanelState`.
@@ -206,13 +216,17 @@ Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `articleRender.test.t
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
 (find-in-text and the offsets never see it): «Schede su questo articolo (n) · + Nuova scheda». The count
-(`useArticleCards`: one read per address from `/api/lingo/articolo`, kept for the session, shared between
-copies, dropped at logout, `refresh()` after a save) opens `ArticleCardsPeek`; the row owns the
+(`useArticleCards`: one read per address from `/api/lingo/articolo`, kept for the session in
+`utils/articleCardsCache.ts`, shared between copies, `refresh()` after a save) opens `ArticleCardsPeek`; the row owns the
 `CardFormDialog`, and the selection popup's «Crea scheda» (`SelectionPopup.onCreateCard`, passed through
 `ArticleBody.onPopupCreateCard`, offered only by the article tab) reaches it through the row's `ref`
 (`createFromPassage`). `articleCardsOffer.ts` is the one rule: a row needs a `urn:` in `norma_data.urn`
 (an EU act has none), «+ Nuova scheda» and «Crea scheda» need the text in force (`readOnly` or
-`versionInfo.isHistorical` disables the first, with its reason, and withholds the second). The form's
+`versionInfo.isHistorical` marks the first `aria-disabled`, not `disabled`, so it keeps focus and its
+`Tooltip` shows the reason on hover and on focus, and withholds the second). The cache is cleared at
+logout (`clearArticleCardsCache`) and invalidated (`invalidateArticleCards`) after every card saved
+(`CardForm`), moved to the trash (`MyCardsView`) and restored from it (`useTrash`, a `LINGO_CARDS`
+entry); a generation counter keeps a read that began before either from writing what it found. The form's
 institute is suggested from the article's rubric (`getRubricText`).
 
 **Passage discussions on the reading surface**: the discussion wiring of a reading surface
@@ -436,7 +450,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `created_by`, by design, so Claude's mark does not survive a web undo (the
   MCP trash, which keeps ids, restores it). The note dialog closes only once
   the server has the note, so a refused note keeps its text.
-- **The trash** (what a connected application deleted, 30 days; spec §10-11):
+- **The trash** (what a connected application deleted, and the study cards the user deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
   «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
