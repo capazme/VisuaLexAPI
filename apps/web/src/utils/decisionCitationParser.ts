@@ -10,6 +10,7 @@
 import type { DecisionArchive, DecisionReference } from '../types/decisions';
 import { FIRST_YEAR, MAX_NUMERO } from './decisionLinks';
 import { expandTwoDigitYear } from './dateUtils';
+import { EU_MAX_NUMERO } from './euCourts';
 
 const MAX_SCANNED = 600;
 
@@ -31,6 +32,41 @@ const DEPOSIT_YEAR =
 const DATE_YEAR =
   /\b\d{1,2}[°º]?\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\s+(\d{4})\b|\b\d{1,2}[/.-]\d{1,2}[/.-](\d{4})\b/i;
 
+// The courts of the Union (design 2026-10-12 §3.4, Q13): a court's name, a case number, or both; the
+// case's letter names the court (C: the Court of Justice, T: the General Court), whatever name precedes
+// it. A case before 1989 has no letter and is read only after «causa». The Python API's citation.py
+// reads the same words: both are pinned to the golden file's decision_citations.
+const DASH = '[-\u2010\u2011\u2012\u2013\u2014]';
+const TAX_COURT = /^\s*(?:corte|c\.)\s*(?:di\s+)?giust(?:izia)?\.?\s*trib/i;
+const EU_COURT =
+  /^\s*(?:cgue|c\.\s*g\.\s*u\.\s*e\.?|cgce|corte\s+giust(?:izia)?\.?|c\.\s*giust\.?|corte\s+di\s+giustizia|trib(?:unale)?\.?\s+(?:ue|dell['’]\s*unione\s+europea|i\s+grado|di\s+primo\s+grado))(?=[\s,.;:(]|$)/i;
+const EU_CASE = new RegExp(`(?<![\\w/])([CT])\\s*${DASH}?\\s*(\\d{1,4})\\s*/\\s*(\\d{4}|\\d{2})(?![\\d/])`, 'i');
+const EU_CASE_FIRST = new RegExp(`^\\s*(?:causa\\s+|cause\\s+riunite\\s+)?[CT]\\s*${DASH}?\\s*\\d`, 'i');
+const OLD_CASE = /\bcausa\s+(\d{1,4})\s*[-/]\s*(\d{2})(?![\d/])/i;
+
+/** The reference to a court of the Union, null when the words name one without a case that can be
+ *  read, undefined when they name neither. */
+function euReference(text: string, now: Date): DecisionReference | null | undefined {
+  if (TAX_COURT.test(text)) return undefined;
+  const court = EU_COURT.exec(text);
+  if (!court && !EU_CASE_FIRST.test(text)) return undefined;
+  const found = EU_CASE.exec(text);
+  let ref: DecisionReference;
+  if (found) {
+    ref = {
+      corte: found[1].toUpperCase() === 'C' ? 'corte_giustizia_ue' : 'tribunale_ue',
+      numero: Number(found[2]),
+      anno: Number(expandTwoDigitYear(found[3])),
+    };
+  } else {
+    const old = court ? OLD_CASE.exec(text) : null;
+    if (!old || court![0].trim().toLowerCase().startsWith('trib')) return null;
+    ref = { corte: 'corte_giustizia_ue', numero: Number(old[1]), anno: Number(expandTwoDigitYear(old[2])) };
+  }
+  if (ref.numero < 1 || ref.numero > EU_MAX_NUMERO || ref.anno < FIRST_YEAR[ref.corte] || ref.anno > now.getFullYear()) return null;
+  return ref;
+}
+
 function sectionCode(raw: string): string {
   const s = raw.replace(/\./g, '').toLowerCase().split('-')[0];
   if (s.startsWith('un')) return 'U';
@@ -50,7 +86,7 @@ export function parseDecisionCitation(
   const first = text.split(/[\s.,]+/, 1)[0]?.toLowerCase() ?? '';
   if (options.aliasTriggers?.some((t) => stripDots(t) === first)) return null;
   const court = COURT.exec(text);
-  if (!court) return null;
+  if (!court) return euReference(text.replace(/\s/g, ' '), now) ?? null;
   const corte = court[1] ? 'corte_costituzionale' : 'cassazione';
   const rest = text.slice(court[0].length);
 

@@ -198,8 +198,7 @@ POST unless noted, JSON bodies.
   everything, not conclude nothing changed
 - `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale |
   corte_giustizia_ue | tribunale_ue, numero, anno, archivio?, sezione?}` (the two courts of the Union
-  by their case, C-634/21 as 634 and 2021, the names waiting for the owner's Q10 of the 2026-10-12
-  design; a joined case answers the first case's judgment with the notice `causa_riunita`, two
+  by their case, C-634/21 as 634 and 2021, decided by the owner, Q10 of the 2026-10-12 design; a joined case answers the first case's judgment with the notice `causa_riunita`, two
   judgments of one case are `ambigua`) → `esito` trovata (identity, attributes, whole text,
   source) and ambigua 200, non_trovata 404 (with the reason and the archive's start),
   fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a fixed
@@ -240,8 +239,9 @@ POST unless noted, JSON bodies.
   not routed by the ingress, not proxied by Vite): 1–10 decisions cited in words (at most 300
   characters each) → one reading each, in order: `{riferimento}` (what `/fetch_decision` takes),
   `{corte_non_supportata: "<court>"}` (a court recognised that VisuaLex cannot read: Consiglio di
-  Stato, TAR, Garante, Corte EDU, the Corte di giustizia tributaria, and the CGUE and the General Court
-  until their reader ships; a case number's letter names the EU court) or `{non_riconosciuta: true}`.
+  Stato, TAR, Garante, Corte EDU, the Corte di giustizia tributaria) or `{non_riconosciuta: true}`.
+  The Court of Justice and the General Court are read by their case («CGUE, C-634/21», a bare
+  «T-612/17», «causa 26/62»): the case's letter names the court, whatever name precedes it.
   No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
@@ -575,9 +575,9 @@ Breaking one of these breaks the product. Read before editing.
     concatenated, `\n` removed) as a SHA-256 and a length in `fixtures/decisions/frozen_projections.json`.
     The CGUE reader is in it too (`curia_synthetic_*`, documents written for the test; real
     judgments as `private/curia_<CELEX>.xhtml` or `.html` in the `_local` twin). It keeps the source's
-    characters, U+2011 included; it drops the footnote calls and notes (the procedure language
-    becomes `lingua_processuale`), the former format's keywords and summary, and the General Court's
-    closing index. `tests/test_decisions_curia_live.py` (`-m live`) re-reads three real judgments.
+    characters, U+2011 included; it drops the footnote calls and the procedure-language note (which
+    becomes `lingua_processuale`; any other footnote stays, at the end), the former format's keywords
+    and summary, and the General Court's closing index. `tests/test_decisions_curia_live.py` (`-m live`) re-reads three real judgments.
     The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a
     reader that moves the projection's hash is a bug in the reader, never a reason to re-record the
     golden. The web app reads the same projection (`decisionProjection` in

@@ -643,7 +643,9 @@ Duplicating any of these is a defect, not a shortcut.
   without one, and it returns fetch's own `Response`, so the NDJSON stream and the PDF
   work as before. `/version` and `/health` are the two that stay open.
 - `utils/decisionCitationParser.ts` — `parseDecisionCitation(input, { aliasTriggers })`: a decision as
-  typed in the palette; it reads only an input that starts with a court and needs number and year.
+  typed in the palette; it reads only an input that starts with a court and needs number and year,
+  or a case of the Union («C-634/21», «causa T-612/17»: the letter names the court). The Python
+  API's `decisions/citation.py` reads the same words; both assert the golden file's `decision_citations`.
   `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session
   (50 answers, least recently used out; a failure is not kept; `clearDecisionCache` at logout). `utils/workspaceOrigin.ts` — where a
   tab's (0, 0) is on screen, and the drag limits.
@@ -651,7 +653,10 @@ Duplicating any of these is a defect, not a shortcut.
   `parseDecisionPath`, `decisionKey`, `identityFromKey` and `isDecisionKey`, which read a key back) and their names (`formatDecisionHeading`,
   `formatDecisionCitation`, and `formatDecisionShort` — «Cass. civ., sez. un., n.
   31310/2024 · Rv. …», for chips and lists — both pinned to
-  `conventions/sources/golden.json`); `brocardiDecisionRef` reads the court a Brocardi
+  `conventions/sources/golden.json`). The courts of the Union (`corte_giustizia_ue`,
+  `tribunale_ue`) are named by their case (`/sentenze/corte-giustizia-ue/634/2021`, «Corte giust.
+  UE, sez. I, sent. 7 dicembre 2023, causa C-634/21»); their closed values and labels live in
+  `utils/euCourts.ts`, the twin of the server's `norms/euCourts.ts`; `brocardiDecisionRef` reads the court a Brocardi
   massima is headed with. Never write a decision's label inline. The paths
   `/sentenze/<corte>/<numero>/<anno>` are a contract with LibreLex and the MERL-T graph: never
   rename them (spec `docs/superpowers/specs/2026-10-01-sentenze-design.md`). Its first block is

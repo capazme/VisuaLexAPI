@@ -15,6 +15,8 @@ from merlt.utils.sources import decision_short
 CASSAZIONE = "cassazione"
 CORTE_COSTITUZIONALE = "corte_costituzionale"
 ARCHIVI = ("civile", "penale")
+#: the courts of the Union, named by their case, and the first year of each
+EU_COURTS = {"corte_giustizia_ue": 1953, "tribunale_ue": 1989}
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,10 @@ class DecisionIdentity:
         elif self.corte == CORTE_COSTITUZIONALE:
             if self.archivio is not None:
                 raise ValueError("la Corte costituzionale non ha archivio")
+        elif self.corte in EU_COURTS:
+            # named by the case (convention, design 2026-10-12 §3.1): a number of four digits
+            if self.archivio is not None or self.numero > 9999 or self.anno < EU_COURTS[self.corte]:
+                raise ValueError(f"causa non valida per {self.corte}: {self.numero}/{self.anno}")
         else:
             raise ValueError(f"corte non valida: {self.corte!r}")
         if self.numero <= 0 or not 1900 <= self.anno <= 2100:
@@ -40,7 +46,7 @@ class DecisionIdentity:
     def key(self) -> str:
         if self.corte == CASSAZIONE:
             return f"{CASSAZIONE}:{self.archivio}:{self.numero}:{self.anno}"
-        return f"{CORTE_COSTITUZIONALE}:{self.numero}:{self.anno}"
+        return f"{self.corte}:{self.numero}:{self.anno}"
 
 
 @dataclass

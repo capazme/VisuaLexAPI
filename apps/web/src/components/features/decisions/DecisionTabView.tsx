@@ -16,6 +16,7 @@ const ABOUT_THE_CITATION = {
   archivio_dedotto: true,
   testo_non_disponibile: false,
   testo_da_archivio: false,
+  causa_riunita: true,
 } satisfies Record<DecisionNotice['tipo'], boolean>;
 function withoutCitationNotices(answer: FoundDecision): FoundDecision {
   return { ...answer, avvisi: answer.avvisi.filter((n) => !ABOUT_THE_CITATION[n.tipo]) };

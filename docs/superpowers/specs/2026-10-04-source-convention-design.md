@@ -158,7 +158,7 @@ area:
 
 | Field | Values |
 |---|---|
-| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); proposed on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue` |
+| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); decided on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue` |
 | `numero` | integer 1–999999, no leading zeros |
 | `anno` | the year of the number (for the penal Cassazione, the year of deposit) |
 | `archivio` | `civile`, `penale`; the Cassazione only, and always there |
@@ -194,18 +194,17 @@ penal; the Massimario's paragraphs sometimes give a hearing date
 
 A new court adds a `corte` value and its key shape `<corte>:<numero>:<anno>`,
 with the court's own qualifiers in place of `archivio` when its numbering
-needs them (a TAR's seat and section, the Consiglio di Stato's section). Where
-the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.
+needs them (a TAR's seat and section, the Consiglio di Stato's section). ~~Where
+the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.~~
 
-**Proposed to replace the last sentence for the CGUE, 12 October 2026** (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
+**Decided 12 October 2026 for the CGUE** (Q10 of the design below, «continuiamo») (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
 §3, waiting for the owner's Q10–Q13 there): the Court of Justice and the General
 Court are named by their case, as lawyers cite them and as the proposal of #112
 put it, which the owner accepted («95–100 come raccomandi»). Two courts,
 `corte_giustizia_ue` and `tribunale_ue`; the key `corte_giustizia_ue:634:2021`
 for C-634/21, the path `/sentenze/corte-giustizia-ue/634/2021`; the ECLI an
 attribute, as for the Corte costituzionale, since it names one document of a case
-(the judgment, an order, the Advocate General's opinion), not the case. Once the
-owner answers Q10, this paragraph replaces that sentence for the CGUE; the ECtHR
+(the judgment, an order, the Advocate General's opinion), not the case. The ECtHR
 is left to its own design.
 
 ## 3. Norms: labels
@@ -316,7 +315,7 @@ as `Cass. civ., sez. un., n. 10787/2024`.
 | Corte cost. 71/2020, sentenza decisa 12 febbraio, depositata 24 aprile 2020 | `Corte cost., sent. 24 aprile 2020, n. 71` | `Corte cost., n. 71/2020` |
 | with a massima (Massimario chip) | — | `Cass. civ., sez. un., n. 31310/2024 · Rv. 673165-01` |
 
-The courts of the Union (proposed 12 October 2026, Q11–Q12 of
+The courts of the Union (decided 12 October 2026, Q11–Q12 of
 `2026-10-12-decisions-mcp-and-eu-courts-design.md`):
 
 | Decision | citation | short |

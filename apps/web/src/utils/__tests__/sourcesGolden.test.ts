@@ -102,7 +102,7 @@ describe('the golden file of legal sources', () => {
     // An identity's path, or a reference's (no archive: the route resolves it).
     for (const c of golden.decisions) {
       const path = c.identity.path ?? c.identity.reference_path;
-      if (path?.status !== 'current') continue;
+      if (path?.status !== 'current' && path?.status !== 'decided') continue;
       it(c.id, () => expect(linkableDecisionPath(c.input.reference, now)).toBe(path.value));
     }
   });
@@ -113,14 +113,16 @@ describe('the golden file of legal sources', () => {
     // (two cases of nine), must say the same.
     const identityOfReference = (r: LooseDecisionRef): DecisionIdentity | null => {
       if (r.anno == null) return null;
-      if (r.corte === 'corte_costituzionale') return { corte: r.corte, numero: r.numero, anno: r.anno };
+      if (r.corte === 'corte_costituzionale' || r.corte === 'corte_giustizia_ue' || r.corte === 'tribunale_ue') {
+        return { corte: r.corte, numero: r.numero, anno: r.anno };
+      }
       if (r.corte === 'cassazione' && (r.archivio === 'civile' || r.archivio === 'penale')) {
         return { corte: r.corte, archivio: r.archivio, numero: r.numero, anno: r.anno };
       }
       return null;
     };
-    const keyed = golden.decisions.filter((c) => c.identity.key?.status === 'current' && typeof c.identity.key.value === 'string');
-    const unkeyed = golden.decisions.filter((c) => c.identity.key?.status === 'current' && c.identity.key.value === null);
+    const keyed = golden.decisions.filter((c) => ['current', 'decided'].includes(c.identity.key?.status) && typeof c.identity.key.value === 'string');
+    const unkeyed = golden.decisions.filter((c) => ['current', 'decided'].includes(c.identity.key?.status) && c.identity.key.value === null);
     const identities = keyed.flatMap((c) => {
       const identity = identityOfReference(c.input.reference);
       // the file's attributes are a decision's, plus fields the model has not got yet (data_udienza)

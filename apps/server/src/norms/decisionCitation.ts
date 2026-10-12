@@ -8,6 +8,7 @@
  * (`etichetta`, D9): every write recomputes it from the identity and the attributes.
  */
 import { citationDate, citeStoredNorm } from './citation';
+import { EU_CASE, EU_COURT_NAME, EU_SECTION, euCaseLabel, euSectionLabel, isEuCourt, joinCases } from './euCourts';
 
 export interface CitableDecision {
   corte: string;
@@ -17,6 +18,10 @@ export interface CitableDecision {
   sezione?: string | null;
   tipo?: string | null;
   data_deposito?: string | null;
+  /** The day a judgment of the Court of Justice or the General Court was delivered. */
+  data_decisione?: string | null;
+  /** Every case of a judgment on joined cases, as the convention writes them («C-293/12»). */
+  cause_riunite?: readonly string[] | null;
 }
 
 const ROMAN: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V', '6': 'VI', '7': 'VII' };
@@ -44,6 +49,7 @@ function court(decision: CitableDecision): string {
  * names it «dep.» ("Cass. pen., sez. VII, ord. dep. 14 marzo 2024, n. 10787").
  */
 export function citeDecision(decision: CitableDecision): string {
+  if (isEuCourt(decision.corte)) return citeEuDecision(decision);
   const tipo = decision.tipo && Object.hasOwn(TIPO_ABBR, decision.tipo) ? TIPO_ABBR[decision.tipo] : null;
   const date = decision.data_deposito ? citationDate(decision.data_deposito) : null;
   const numero = date || !decision.anno ? `n. ${decision.numero}` : `n. ${decision.numero}/${decision.anno}`;
@@ -58,10 +64,32 @@ export function citeDecision(decision: CitableDecision): string {
 
 /** In little room (D2): "Cass. civ., sez. un., n. 31310/2024"; with the massime "… · Rv. 673165-01". */
 export function shortDecision(decision: CitableDecision, rv?: readonly string[] | null): string {
+  if (isEuCourt(decision.corte)) {
+    return decision.anno
+      ? `${EU_COURT_NAME[decision.corte]}, ${euCaseLabel(decision.corte, decision.numero, decision.anno)}`
+      : `${EU_COURT_NAME[decision.corte]}, ${decision.numero}`;
+  }
   const numero = decision.anno ? `n. ${decision.numero}/${decision.anno}` : `n. ${decision.numero}`;
   const head = decision.corte === 'corte_costituzionale' ? [court(decision)] : [court(decision), citationSection(decision.sezione)];
   const label = [...head, numero].filter(Boolean).join(', ');
   return rv && rv.length > 0 ? `${label} · Rv. ${rv.join(', ')}` : label;
+}
+
+/**
+ * A judgment of the Court of Justice or the General Court (design 2026-10-12 §3.2, Q11–Q12):
+ * «Corte giust. UE, sez. I, sent. 7 dicembre 2023, causa C-634/21»; joined cases named as the
+ * source lists them, «cause riunite C-293/12 e C-594/12». No parties.
+ */
+function citeEuDecision(decision: CitableDecision): string {
+  const corte = decision.corte as Parameters<typeof euCaseLabel>[0];
+  const tipo = decision.tipo && Object.hasOwn(TIPO_ABBR, decision.tipo) ? TIPO_ABBR[decision.tipo] : null;
+  const date = decision.data_decisione ? citationDate(decision.data_decisione) : null;
+  const joined = (decision.cause_riunite ?? []).filter((c) => EU_CASE.test(c));
+  const own = decision.anno ? euCaseLabel(corte, decision.numero, decision.anno) : String(decision.numero);
+  const cases = joined.length > 1 ? `cause riunite ${joinCases(joined)}` : `causa ${own}`;
+  return [EU_COURT_NAME[corte], euSectionLabel(decision.sezione), [tipo, date].filter(Boolean).join(' ') || null, cases]
+    .filter(Boolean)
+    .join(', ');
 }
 
 /**
@@ -75,8 +103,21 @@ export function citeStoredDecision(itemType: string, content: unknown): string |
   const str = (k: string): string | null => (typeof raw[k] === 'string' ? (raw[k] as string) : null);
   const corte = str('corte');
   const numero = raw.numero;
-  if ((corte !== 'cassazione' && corte !== 'corte_costituzionale') || typeof numero !== 'number' || !Number.isInteger(numero)) return null;
+  if ((corte !== 'cassazione' && corte !== 'corte_costituzionale' && !isEuCourt(corte))
+    || typeof numero !== 'number' || !Number.isInteger(numero)) return null;
   const anno = typeof raw.anno === 'number' && Number.isInteger(raw.anno) ? raw.anno : null;
+  if (isEuCourt(corte)) {
+    const sezioneUe = str('sezione');
+    const cases = Array.isArray(raw.cause_riunite)
+      ? raw.cause_riunite.filter((c): c is string => typeof c === 'string' && EU_CASE.test(c)) : null;
+    return citeDecision({
+      corte, numero, anno,
+      sezione: sezioneUe && EU_SECTION.test(sezioneUe) ? sezioneUe : null,
+      tipo: str('tipo'),
+      data_decisione: str('data_decisione'),
+      cause_riunite: cases,
+    });
+  }
   // Only closed values are written — a court, an archive, a section code, a known type, a real
   // date, integers: the citation reaches the MCP client's confirmation dialog, where no text a
   // client stored may speak.
