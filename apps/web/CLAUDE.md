@@ -462,8 +462,11 @@ Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the sam
 `fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
 leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
 The scanner never links a court that is not written (D2): a bare «n. 123/2020» stays text everywhere; the one
-context rule is that inside a Cassazione decision a section without its court («Sez. U, n. 9100 del 2015») reads
-as the Cassazione. «decreto n.» of an administrative court is a known conservative miss.
+context rules (the owner, 13 October 2026) are two: inside a Cassazione decision a section without its court
+(«Sez. U, n. 9100 del 2015») reads as the Cassazione; inside a Corte costituzionale decision «sentenza/ordinanza
+n. N del YYYY» (also «sentenze n. … e n. …», each number its own span) reads as the Court's own, unless a court is
+written right before it (the court covers its own citation) or right after it («… della Corte di cassazione»).
+`DecisionReadingSurface` passes `within` for these two courts only; no other court has such a rule. «decreto n.» of an administrative court is a known conservative miss.
 
 **A past text is a reading** (round "Testo alla data", spec
 `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`). The server

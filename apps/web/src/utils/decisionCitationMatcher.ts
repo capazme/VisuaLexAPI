@@ -39,6 +39,11 @@ export interface DecisionCitationSpan {
 const MAX_TAIL = 200;
 /** What the parser reads when a section stands without its court. */
 const SYNTHETIC_COURT = 'Cass. ';
+/** The same for a kind of decision («sentenza n. 207 del 2018») inside a Corte costituzionale decision. */
+const SYNTHETIC_CORTE_COSTITUZIONALE = 'Corte cost. ';
+
+/** The court of the text being read: it decides which citations without a court are read as its own (D2). */
+export type DecisionContext = 'cassazione' | 'corte_costituzionale';
 
 // Where a head may start: not inside a word.
 const LEFT = '(?<![\\p{L}\\p{N}])';
@@ -68,6 +73,13 @@ const CORTE_DI_REACH = 30;
 // A publication date is not the decision's: the tail ends where the Gazzetta Ufficiale begins.
 const GAZZETTA = /\(\s*in\s+g\.\s*u\b|(?<![\p{L}\p{N}.])g\.\s*u\.(?!\s*e\b)|(?<![\p{L}\p{N}])gazzetta\s+ufficiale/u;
 const UNITED_SECTIONS = /^s\.?\s*u\.?$/i;
+// «sentenza n. 207 del 2018», «sent. 207/2018», «ordinanze n. 1 del 2010 e n. 2 del 2011»: a kind of decision and its number.
+const KIND_HEADS = new RegExp(`${LEFT}(sentenz[ae]|sent\\.|ordinanz[ae]|ord\\.)(?=\\s*(?:n(?:r|um(?:ero)?)?\\.?\\s*)?\\d)`, 'giu');
+// After a plural kind: «, e n. 12 del 2010» is the next decision of the list.
+const LIST_NEXT = /\s*(?:,|e|ed)\s*(n(?:r|um(?:ero)?)?\.?\s*\d{1,6}\s*(?:\/\s*\d{4}|del\s+\d{4}))/y;
+// A court named right after a citation is its court: «sentenza n. 1234 del 2015 della Corte di cassazione».
+const AFTER_CITATION = /^[\s,]*(?:(?:della|del|dello|dell['’]|dalla|dal|di|emessa|pronunciata|resa|adottata)\s*)+/u;
+const CORTE_DI_AFTER = /^(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+/u;
 
 interface Head {
   start: number;
@@ -76,11 +88,15 @@ interface Head {
   court: boolean;
   /** A section standing without its court: read as if «Cass.» were written before it. */
   section: boolean;
+  /** A kind of decision and its number inside a Corte costituzionale decision: read as if «Corte cost.» were written before it. */
+  kind?: boolean;
+  /** «sentenze», «ordinanze»: the numbers that follow, joined by «e» or a comma, are decisions too. */
+  plural?: boolean;
   /** A court the app cannot open: it links nothing and covers what follows it. */
   unsupported?: boolean;
 }
 
-function findHeads(text: string, folded: string, within: boolean): Head[] {
+function findHeads(text: string, folded: string, within: DecisionContext | undefined): Head[] {
   const heads: Head[] = [];
   for (const m of folded.matchAll(COURT_HEADS)) {
     heads.push({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, court: true, section: false });
@@ -101,7 +117,13 @@ function findHeads(text: string, folded: string, within: boolean): Head[] {
       heads.push({ start, end: start + m[0].length, court: false, section: false });
     }
   }
-  if (within) {
+  if (within === 'corte_costituzionale') {
+    for (const m of folded.matchAll(KIND_HEADS)) {
+      const start = m.index ?? 0;
+      heads.push({ start, end: start + m[0].length, court: false, section: false, kind: true, plural: /e$/.test(m[1]) });
+    }
+  }
+  if (within === 'cassazione') {
     for (const m of folded.matchAll(SECTION_HEADS)) {
       const start = m.index ?? 0;
       const written = text.slice(start, start + m[0].length);
@@ -111,6 +133,23 @@ function findHeads(text: string, folded: string, within: boolean): Head[] {
     }
   }
   return heads.sort((a, b) => a.start - b.start || b.end - a.end);
+}
+
+/** Whether a court is named right after `end`: «… del 2015 della Corte di cassazione». */
+function courtFollows(folded: string, end: number): boolean {
+  const after = folded.slice(end, end + 70);
+  const joined = AFTER_CITATION.exec(after);
+  if (!joined) return false;
+  const here = end + joined[0].length;
+  const skipped = CORTE_DI_AFTER.exec(folded.slice(here, here + 30));
+  for (const at of skipped ? [here, here + skipped[0].length] : [here]) {
+    for (const heads of [COURT_HEADS, UNSUPPORTED_HEADS]) {
+      const re = new RegExp(heads.source, 'iuy');
+      re.lastIndex = at;
+      if (re.test(folded)) return true;
+    }
+  }
+  return false;
 }
 
 /** The index of the first of `starts` (sorted) that is at or after `position`. */
@@ -160,7 +199,7 @@ function sentenceEnd(text: string, folded: string, start: number, limit: number)
 // a TAR is a proper name and is let through when it is written in capitals.
 const CITATION_WORDS = new Set([
   'civ', 'civile', 'pen', 'penale', 'sez', 'sezione', 'sezioni', 'un', 'unite', 'unita', 'su', 'lav', 'lavoro', 'fer', 'feriale', 'ss', 'uu',
-  'sent', 'sentenza', 'ord', 'ordinanza', 'decr', 'decreto', 'ad', 'adunanza', 'plen', 'plenaria', 'aut', 'ampliata', 'bis', 'ter', 'quater',
+  'sent', 'sentenza', 'sentenze', 'ord', 'ordinanza', 'ordinanze', 'decr', 'decreto', 'ad', 'adunanza', 'plen', 'plenaria', 'aut', 'ampliata', 'bis', 'ter', 'quater',
   'ud', 'udienza', 'trib', 'tributaria', 'causa', 'cause', 'riunite', 'giust', 'giustizia', 'ue', 'unione', 'europea', 'europee', 'comunita', 'primo', 'grado', 'stato', 'cost',
   'costituzionale', 'per', 'sede', 'di', 'del', 'dello', 'della', 'dell', 'dei', 'delle', 'e', 'ed', 'con', 'il', 'la', 'lo', 'in', 'data',
   'n', 'nr', 'num', 'numero', 'dep', 'depositata', 'depositato', 'deposito', 'depositi',
@@ -222,11 +261,11 @@ function firstEndingAfter(spans: ReadonlyArray<readonly [number, number]>, posit
 
 export function extractDecisionCitations(
   text: string,
-  options: { within?: 'cassazione'; now?: Date } = {},
+  options: { within?: DecisionContext; now?: Date } = {},
 ): DecisionCitationSpan[] {
   const now = options.now ?? new Date();
   const folded = foldForSearch(text);
-  const heads = findHeads(text, folded, options.within === 'cassazione');
+  const heads = findHeads(text, folded, options.within);
   const starts = heads.map((h) => h.start);
   const courtStarts = heads.filter((h) => h.court).map((h) => h.start);
   const found: DecisionCitationSpan[] = [];
@@ -237,7 +276,7 @@ export function extractDecisionCitations(
 
   for (const head of heads) {
     if (head.start < consumed) continue;
-    if (head.section && lastCourt && head.start < lastCourt.coverEnd && inCourtCitation(text, lastCourt.end, head.start)) continue;
+    if ((head.section || head.kind) && lastCourt && head.start < lastCourt.coverEnd && inCourtCitation(text, lastCourt.end, head.start)) continue;
     consumed = head.end;
     const cut = head.court ? courtStarts : starts;
     const next = firstAtOrAfter(cut, head.end);
@@ -245,7 +284,7 @@ export function extractDecisionCitations(
     const tailEnd = sentenceEnd(text, folded, head.start, limit);
     if (head.court) lastCourt = { end: head.end, coverEnd: tailEnd };
     if (head.unsupported) continue;
-    const prefix = head.section ? SYNTHETIC_COURT : '';
+    const prefix = head.kind ? SYNTHETIC_CORTE_COSTITUZIONALE : head.section ? SYNTHETIC_COURT : '';
     const read = readDecisionCitation(prefix + folded.slice(head.start, tailEnd), { aliasTriggers: [], now });
     if (!read || read.words.length === 0) continue;
 
@@ -272,6 +311,7 @@ export function extractDecisionCitations(
     const own = readDecisionCitation(prefix + folded.slice(head.start, end), { aliasTriggers: [], now });
     if (!own || own.reference.numero !== read.reference.numero || own.reference.anno !== read.reference.anno) continue;
     const { reference } = own;
+    if (head.kind && courtFollows(folded, end)) continue;
 
     acts ??= allActSpans(folded);
     const act = firstEndingAfter(acts, head.start);
@@ -289,6 +329,23 @@ export function extractDecisionCitations(
     found.push({ start, end, reference, path: decisionPath(reference) });
     consumed = end;
     if (head.court && lastCourt) lastCourt.coverEnd = end;
+
+    // «sentenze n. 253 del 2009 e n. 12 del 2010»: each number of the list is a decision of its own
+    for (let more = head.plural ? end : -1; more >= 0; ) {
+      LIST_NEXT.lastIndex = more;
+      const item = LIST_NEXT.exec(folded);
+      if (!item) break;
+      const itemStart = more + item[0].length - item[1].length;
+      const itemEnd = itemStart + item[1].length;
+      const listed = readDecisionCitation(`${prefix}sentenza ${folded.slice(itemStart, itemEnd)}`, { aliasTriggers: [], now });
+      if (!listed || courtFollows(folded, itemEnd)) break;
+      const overlapping = firstEndingAfter(acts, itemStart);
+      if (overlapping < acts.length && acts[overlapping][0] < itemEnd) break;
+      if (linkableDecisionPath(listed.reference, now) === null) break;
+      found.push({ start: itemStart, end: itemEnd, reference: listed.reference, path: decisionPath(listed.reference) });
+      consumed = itemEnd;
+      more = itemEnd;
+    }
   }
   return found;
 }
@@ -392,7 +449,7 @@ const escapeAttribute = (value: string): string => value.replace(/&/g, '&amp;').
 
 export interface WrapDecisionOptions {
   /** The court of the text being read (`extractDecisionCitations`'s context rule). */
-  within?: 'cassazione';
+  within?: DecisionContext;
   /** The reading decision's own address: a span that names it is not linked. */
   selfPath?: string;
   now?: Date;
