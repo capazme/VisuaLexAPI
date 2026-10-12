@@ -32,7 +32,8 @@ export const decisionItemContentSchema = z
     // The courts of the Union: the day the judgment was delivered, and the joined cases.
     data_decisione: z.string().regex(ISO_DAY).optional(),
     cause_riunite: z.array(z.string().regex(EU_CASE)).min(2).max(30).optional(),
-    etichetta: z.string().trim().min(1).max(200),
+    // room for a judgment of the Union on up to 30 joined cases, named one by one
+    etichetta: z.string().trim().min(1).max(600),
     _dossierMeta: z.object({ important: z.boolean() }).strict().optional(),
   })
   .strict()

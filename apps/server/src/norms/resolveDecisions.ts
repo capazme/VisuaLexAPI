@@ -83,7 +83,8 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
       ...(typeof sezione === 'string' && EU_SECTION.test(sezione) ? { sezione } : {}),
       ...(typeof tipo === 'string' && TIPI.has(tipo) ? { tipo } : {}),
       ...(typeof delivered === 'string' && ISO_DAY.test(delivered) ? { data_decisione: delivered } : {}),
-      ...(Array.isArray(joined) && joined.length > 1 && joined.every((c) => typeof c === 'string' && EU_CASE.test(c))
+      // more than 30 joined cases: the citation names the case alone, as the item schema keeps at most 30
+      ...(Array.isArray(joined) && joined.length > 1 && joined.length <= 30 && joined.every((c) => typeof c === 'string' && EU_CASE.test(c))
         ? { cause_riunite: joined } : {}),
       etichetta: '-',
     });

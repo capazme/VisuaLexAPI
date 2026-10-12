@@ -209,7 +209,7 @@ export function parseSentenzaContent(data: unknown, now: Date = new Date()): Dos
   if (typeof numero !== 'number' || !Number.isInteger(numero) || numero < 1 || numero > (eu ? EU_MAX_NUMERO : 999_999)) return null;
   const first = FIRST_YEAR[corte as DecisionCourt];
   if (typeof anno !== 'number' || !Number.isInteger(anno) || anno < first || anno > now.getFullYear()) return null;
-  if (typeof etichetta !== 'string' || !etichetta.trim() || etichetta.length > 200) return null;
+  if (typeof etichetta !== 'string' || !etichetta.trim() || etichetta.length > 600) return null;
   if (corte === 'cassazione' && archivio !== 'civile' && archivio !== 'penale') return null;
   if (corte === 'corte_costituzionale' && (archivio !== undefined || sezione !== undefined)) return null;
   if (eu && (archivio !== undefined || data_deposito !== undefined)) return null;
@@ -262,7 +262,8 @@ export function sentenzaFromDecision(identity: DecisionIdentity, attrs: Decision
     ...(attrs.tipo && TIPI.has(attrs.tipo) ? { tipo: attrs.tipo } : {}),
     ...(attrs.data_deposito && !isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
     ...(attrs.data_decisione && isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_decisione) ? { data_decisione: attrs.data_decisione } : {}),
-    ...(isEuCourt(identity.corte) && attrs.cause_riunite && attrs.cause_riunite.length > 1
+    // more than 30 joined cases: the citation names the case alone, as the item schema keeps at most 30
+    ...(isEuCourt(identity.corte) && attrs.cause_riunite && attrs.cause_riunite.length > 1 && attrs.cause_riunite.length <= 30
       && attrs.cause_riunite.every((c) => EU_CASE.test(c)) ? { cause_riunite: [...attrs.cause_riunite] } : {}),
   };
   return { ...kept, etichetta: decisionCitationOf(kept) };

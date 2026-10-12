@@ -318,7 +318,7 @@ def decision_short(corte: str, numero: int, anno: Optional[int], archivio: Optio
         # a Court of Justice case before 1989 with no letter («26/62»)
         letter = "T" if corte == "tribunale_ue" else ("C" if anno and anno >= 1989 else "")
         case = f"{letter}-{numero}" if letter else f"{numero}"
-        return f"{_EU_COURT_NAMES[corte]}, {case}/{anno % 100:02d}" if anno else f"{_EU_COURT_NAMES[corte]}, {case}"
+        return f"{_EU_COURT_NAMES[corte]}, {case}/{anno % 100:02d}" if anno else f"{_EU_COURT_NAMES[corte]}, {numero}"
     number = f"n. {numero}/{anno}" if anno else f"n. {numero}"
     if corte == "corte_costituzionale":
         head = ["Corte cost."]

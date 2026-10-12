@@ -65,7 +65,7 @@ _UNSUPPORTED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     ))
 # The courts of the Union (design 2026-10-12 §3.4, Q13 decided): a court's name, a case number, or
 # both; the case's letter names the court (C: the Court of Justice, T: the General Court), whatever
-# name precedes it. A case before 1989 has no letter and is read only after «causa».
+# name precedes it. A case before 1989 has no letter and is read only after the court's name and «causa».
 _TAX_COURT = re.compile(r"^\s*(?:corte|c\.)\s*(?:di\s+)?giust(?:izia)?\.?\s*trib", _F)
 _EU_COURT = re.compile(
     r"^\s*(?:cgue|c\.\s*g\.\s*u\.\s*e\.?|cgce|corte\s+giust(?:izia)?\.?|c\.\s*giust\.?|corte\s+di\s+giustizia"

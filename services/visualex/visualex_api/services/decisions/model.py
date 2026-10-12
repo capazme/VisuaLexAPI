@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-# The courts of the Union are named by their case (design 2026-10-12 §3, waiting for the owner's
-# Q10): the Court of Justice since its first cases, the General Court since 1989.
+# The courts of the Union are named by their case (design 2026-10-12 §3, Q10 decided on 12 October
+# 2026): the Court of Justice since its first cases, the General Court since 1989.
 EU_COURTS: tuple[str, ...] = ("corte_giustizia_ue", "tribunale_ue")
 CORTI: tuple[str, ...] = ("cassazione", "corte_costituzionale", *EU_COURTS)
 ARCHIVI: tuple[str, ...] = ("civile", "penale")

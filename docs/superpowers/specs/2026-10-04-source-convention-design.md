@@ -197,8 +197,8 @@ with the court's own qualifiers in place of `archivio` when its numbering
 needs them (a TAR's seat and section, the Consiglio di Stato's section). ~~Where
 the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.~~
 
-**Decided 12 October 2026 for the CGUE** (Q10 of the design below, «continuiamo») (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
-§3, waiting for the owner's Q10–Q13 there): the Court of Justice and the General
+**Decided 12 October 2026 for the CGUE** (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
+§3, Q10–Q13, «continuiamo»): the Court of Justice and the General
 Court are named by their case, as lawyers cite them and as the proposal of #112
 put it, which the owner accepted («95–100 come raccomandi»). Two courts,
 `corte_giustizia_ue` and `tribunale_ue`; the key `corte_giustizia_ue:634:2021`

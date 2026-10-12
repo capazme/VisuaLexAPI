@@ -97,8 +97,7 @@ def test_what_is_not_a_norm_comes_back_as_it_is():
         assert normalize_norm_urn(value) == value
 
 
-# A key still open (the courts of the Union, design 2026-10-12 §8) waits for the owner, and for this
-# model to learn those courts.
+# A key still open waits for the owner (none today: the courts of the Union were decided on 12 October 2026).
 _KEYED = [c for c in DECISIONS if not c["identity"].get("key", {}).get("status", "").startswith("open:")]
 
 

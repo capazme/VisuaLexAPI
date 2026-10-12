@@ -34,7 +34,7 @@ const DATE_YEAR =
 
 // The courts of the Union (design 2026-10-12 §3.4, Q13): a court's name, a case number, or both; the
 // case's letter names the court (C: the Court of Justice, T: the General Court), whatever name precedes
-// it. A case before 1989 has no letter and is read only after «causa». The Python API's citation.py
+// it. A case before 1989 has no letter and is read only after the court's name and «causa». The Python API's citation.py
 // reads the same words: both are pinned to the golden file's decision_citations.
 const DASH = '[-\u2010\u2011\u2012\u2013\u2014]';
 const TAX_COURT = /^\s*(?:corte|c\.)\s*(?:di\s+)?giust(?:izia)?\.?\s*trib/i;

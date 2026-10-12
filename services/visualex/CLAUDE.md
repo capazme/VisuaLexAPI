@@ -241,7 +241,7 @@ POST unless noted, JSON bodies.
   `{corte_non_supportata: "<court>"}` (a court recognised that VisuaLex cannot read: Consiglio di
   Stato, TAR, Garante, Corte EDU, the Corte di giustizia tributaria) or `{non_riconosciuta: true}`.
   The Court of Justice and the General Court are read by their case («CGUE, C-634/21», a bare
-  «T-612/17», «causa 26/62»): the case's letter names the court, whatever name precedes it.
+  «T-612/17», «Corte giust., causa 26/62»: a case before 1989 only after the court's name): the case's letter names the court, whatever name precedes it.
   No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)

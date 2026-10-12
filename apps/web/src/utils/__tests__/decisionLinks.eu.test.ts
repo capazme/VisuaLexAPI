@@ -65,3 +65,19 @@ describe('the courts of the Union', () => {
     expect(parseSentenzaContent({ corte: 'cassazione', archivio: 'civile', numero: 1, anno: 2020, data_decisione: '2020-01-01', etichetta: 'x' }, NOW)).toBeNull();
   });
 });
+
+describe('a judgment on many joined cases', () => {
+  const cases = (n: number) => Array.from({ length: n }, (_, i) => `T-${i + 1}/05`);
+  it('names up to 30 of them in a label the dossier keeps', () => {
+    const kept = sentenzaFromDecision({ corte: 'tribunale_ue', numero: 1, anno: 2005 }, { tipo: 'sentenza', cause_riunite: cases(30) });
+    expect(kept.cause_riunite).toHaveLength(30);
+    expect(kept.etichetta.length).toBeGreaterThan(200);
+    expect(parseSentenzaContent(kept, NOW)).toEqual(kept);
+  });
+  it('names the case alone past 30', () => {
+    const kept = sentenzaFromDecision({ corte: 'tribunale_ue', numero: 1, anno: 2005 }, { tipo: 'sentenza', cause_riunite: cases(31) });
+    expect(kept.cause_riunite).toBeUndefined();
+    expect(kept.etichetta).toBe('Trib. UE, sent., causa T-1/05');
+    expect(parseSentenzaContent(kept, NOW)).toEqual(kept);
+  });
+});
