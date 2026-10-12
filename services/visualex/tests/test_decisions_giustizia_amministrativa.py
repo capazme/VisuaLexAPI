@@ -52,7 +52,7 @@ def test_every_measure_is_listed_with_its_kind_and_link_on_the_document_host():
     assert [(r.kind, r.sezione, r.anno, r.numero, r.nrg, r.ecli) for r in results] == [
         ("ORDINANZA CAUTELARE", "SEZIONE 6", 2099, 42, "209900001", "ECLI:IT:CDS:2099:42OCAU"),
         ("SENTENZA", "SEZIONE 6", 2099, 42, "209800002", "ECLI:IT:CDS:2099:42SENT"),
-    ]  # the row whose link leaves the document host is dropped
+    ]
     assert results[1].sede == "CONSIGLIO DI STATO"
     assert results[1].url.startswith("https://mdp.giustizia-amministrativa.it/visualizza/?")
     assert document_format(results[1].url) == "html"
@@ -64,6 +64,51 @@ def test_an_answer_with_no_count_is_a_changed_source_and_a_count_of_zero_is_none
     with pytest.raises(SourceChanged):
         read_results("<html><body>Nessun risultato trovato</body></html>")
     assert read_results("<html><body><h2>Trovati <strong>0</strong> risultati</h2></body></html>") == []
+
+
+@pytest.mark.parametrize("change", [
+    # a row whose link leaves the document host
+    lambda page: page.replace("https://mdp.giustizia-amministrativa.it/visualizza/?nodeRef=&amp;schema=cds&amp;nrg=209800002",
+                              "https://example.org/visualizza/?nodeRef=&amp;schema=cds&amp;nrg=209800002"),
+    # a row with no number the reader can read
+    lambda page: page.replace("numero provv.: <b>209900042</b></div>\n<div class=\"col-sm-12\">Numero ricorso: <b>209800002",
+                              "numero: <b>?</b></div>\n<div class=\"col-sm-12\">Numero ricorso: <b>209800002"),
+    # fewer rows than announced
+    lambda page: page.replace("Trovati <strong>2</strong>", "Trovati <strong>3</strong>"),
+])
+def test_a_row_the_reader_cannot_read_is_a_changed_source_never_dropped(change):
+    changed = change(RESULTS)
+    assert changed != RESULTS
+    with pytest.raises(SourceChanged):
+        read_results(changed)
+
+
+def test_a_seat_the_form_does_not_offer_is_a_changed_source():
+    form = read_search_form(PAGE)
+    assert form.seats == frozenset({"Consiglio di Stato"})
+    with pytest.raises(SourceChanged):
+        search_fields(form, "Roma", 1, 2020)
+
+
+def test_an_empty_or_binary_document_is_a_changed_source():
+    for body in (b"", b"\x00\x01\x02"):
+        with pytest.raises(SourceChanged):
+            text_from_document(body)
+        with pytest.raises(SourceChanged):
+            ga.published_on(body)
+
+
+def test_a_div_inside_a_div_is_read_once():
+    nested = DOCUMENT.replace("<h:div>FATTO e DIRITTO</h:div>", "<h:div>FATTO <h:div>e DIRITTO</h:div></h:div>")
+    assert text_from_document(nested)["motivazione"].split("\n\n")[0] == "FATTO e DIRITTO"
+
+
+def test_the_count_is_read_quickly_from_a_hostile_page():
+    import time
+    start = time.perf_counter()
+    with pytest.raises(SourceChanged):
+        read_results("Trovati" + " " * 50000 + "x")
+    assert time.perf_counter() - start < 0.5
 
 
 def test_results_announced_and_not_read_are_a_changed_source():

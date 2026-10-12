@@ -14,8 +14,12 @@ TODAY = date(2026, 10, 12)
 URL = "https://mdp.giustizia-amministrativa.it/visualizza/?nodeRef=&schema=cds&nrg=1&nomeFile=209900042_11.html&subDir=Provvedimenti"
 
 
-def r(kind: str, numero=42, anno=2020, sezione="SEZIONE 6") -> Result:
-    return Result(kind, "x", sezione, anno, numero, "1", f"ECLI:IT:CDS:{anno}:{numero}{kind}", URL)
+def r(kind: str, numero=42, anno=2020, sezione="SEZIONE 6", sede="CONSIGLIO DI STATO", ecli=True) -> Result:
+    return Result(kind, sede, sezione, anno, numero, "1", f"ECLI:IT:CDS:{anno}:{numero}{kind}" if ecli else None, URL)
+
+
+def tr(kind: str, sede: str, **kw) -> Result:
+    return r(kind, sede=sede.upper(), **kw)
 
 
 class MemoryCache:
@@ -94,7 +98,7 @@ async def test_nothing_of_the_kind_named_is_not_found():
 
 
 async def test_a_tar_named_by_its_region_searches_every_seat_and_says_which_one():
-    admin = FakeAdmin({"Latina": [r("SENT")]})
+    admin = FakeAdmin({"Latina": [tr("SENT", "Latina")]})
     outcome = await resolver(admin).resolve(ref(corte="tar", regione="Lazio"))
     assert admin.searches == ["Roma", "Latina"]
     assert outcome.decisione.identita.key() == "tar:latina:sent:42:2020"
@@ -102,14 +106,14 @@ async def test_a_tar_named_by_its_region_searches_every_seat_and_says_which_one(
 
 
 async def test_two_seats_of_a_region_holding_the_number_are_ambiguous():
-    admin = FakeAdmin({"Roma": [r("SENT")], "Latina": [r("SENT")]})
+    admin = FakeAdmin({"Roma": [tr("SENT", "Roma")], "Latina": [tr("SENT", "Latina")]})
     outcome = await resolver(admin).resolve(ref(corte="tar", regione="Lazio"))
     assert outcome.esito == "ambigua"
     assert sorted(c.identita.sede for c in outcome.candidati) == ["latina", "roma"]
 
 
 async def test_a_tar_named_by_its_seat_searches_that_seat_alone_and_says_nothing():
-    admin = FakeAdmin({"Roma": [r("SENT")]})
+    admin = FakeAdmin({"Roma": [tr("SENT", "Roma")]})
     outcome = await resolver(admin).resolve(ref(corte="tar", sede="roma"))
     assert admin.searches == ["Roma"] and outcome.avvisi == []
 
@@ -129,3 +133,23 @@ async def test_a_source_that_fails_or_changed_is_unreachable_never_not_found(err
     with pytest.raises(SourceUnavailable):
         await resolver(FakeAdmin(error=error), cache).resolve(ref(corte="consiglio_di_stato"))
     assert cache.data == {}
+
+
+async def test_an_answer_for_another_seat_is_unreachable_never_labelled_as_the_one_asked():
+    admin = FakeAdmin({"Roma": [tr("SENT", "Latina")]})
+    with pytest.raises(SourceUnavailable):
+        await resolver(admin).resolve(ref(corte="tar", sede="roma"))
+
+
+async def test_a_measure_with_that_number_and_no_readable_ecli_is_unreachable_never_not_found():
+    admin = FakeAdmin({"Consiglio di Stato": [r("SENT", ecli=False), r("OCAU")]})
+    with pytest.raises(SourceUnavailable):
+        await resolver(admin).resolve(ref(corte="consiglio_di_stato"))
+
+
+@pytest.mark.parametrize("body", [{"sede": ["roma"]}, {"sede": {"x": 1}}, {"regione": "Lazio", "tipo": {}},
+                                  {"regione": "Lazio", "tipo": ["sentenza"]}])
+def test_a_field_of_the_wrong_type_is_an_invalid_reference_never_a_crash(body):
+    from visualex_api.services.decisions.model import InvalidReference
+    with pytest.raises(InvalidReference):
+        parse_reference({"corte": "tar", "numero": 1, "anno": 2020, **body}, TODAY)

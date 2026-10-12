@@ -219,7 +219,7 @@ def _admin_reference(body: dict, corte: str, numero: int | None, anno: int | Non
     sede, regione = body.get("sede"), body.get("regione")
     provvedimento, tipo = body.get("provvedimento"), body.get("tipo")
     if corte == "tar":
-        if sede is not None and sede not in BY_SLUG:
+        if sede is not None and not (isinstance(sede, str) and sede in BY_SLUG):
             errors["sede"] = "sede del TAR non riconosciuta"
         if regione is not None and (not isinstance(regione, str) or region_named(regione) is None):
             errors["regione"] = "regione non riconosciuta"
@@ -229,7 +229,7 @@ def _admin_reference(body: dict, corte: str, numero: int | None, anno: int | Non
         errors["sede"] = "la sede vale solo per un TAR"
     if provvedimento is not None and not (isinstance(provvedimento, str) and PROVVEDIMENTO.fullmatch(provvedimento)):
         errors["provvedimento"] = "tipo di provvedimento non valido"
-    if tipo is not None and tipo not in FAMIGLIE:
+    if tipo is not None and not (isinstance(tipo, str) and tipo in FAMIGLIE):
         errors["tipo"] = "atteso sentenza, ordinanza o decreto"
     if errors:
         raise InvalidReference(errors)

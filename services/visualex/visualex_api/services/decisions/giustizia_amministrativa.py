@@ -43,7 +43,7 @@ _TIMEOUT = 20
 _FIELD = re.compile(r'name="(_decisioni_pareri_web_DecisioniPareriWebPortlet_INSTANCE_[A-Za-z0-9]{1,40}_)numeroProvvedimenti"')
 _NUMBER = re.compile(r"^(\d{4})(\d{5})$")
 # «Trovati <strong>3</strong> risultati»
-_COUNT = re.compile(r"Trovati\s*(?:<strong>)?\s*(\d+)\s*(?:</strong>)?\s*risultat", re.IGNORECASE)
+_COUNT = re.compile(r"Trovati\s*(?:<strong>\s*)?(\d+)\s*(?:</strong>\s*)?risultat", re.IGNORECASE)
 _HTML_NS = "http://www.w3.org/HTML/1998/html4"
 _WS = re.compile(r"[ \t\r\n\f\v]+")
 
@@ -56,6 +56,7 @@ class SourceChanged(ValueError):
 class SearchForm:
     action: str
     prefix: str
+    seats: frozenset[str] = frozenset()  # the seats the form offers, as it names them
 
 
 @dataclass(frozen=True)
@@ -82,12 +83,17 @@ def read_search_form(page: str) -> SearchForm:
     parsed = urlparse(action)
     if parsed.scheme != "https" or parsed.hostname != _SEARCH_HOST or "p_auth=" not in parsed.query:
         raise SourceChanged("giustizia-amministrativa: azione del modulo inattesa")
-    return SearchForm(action, field.group(1))
+    select = soup.find("select", attrs={"name": f"{field.group(1)}sedeProvvedimenti"})
+    seats = frozenset(o.get("value", "").strip() for o in select.find_all("option")) if select else frozenset()
+    return SearchForm(action, field.group(1), seats - {""})
 
 
 def search_fields(form: SearchForm, sede: str, numero: int, anno: int) -> dict[str, str]:
     """The fields of a search by seat, number and year (the mode «provv»: without it the year is
-    ignored and every year's measure with that number comes back)."""
+    ignored and every year's measure with that number comes back). A seat the form does not offer
+    is a changed source: the portal would ignore it and answer for every seat."""
+    if sede not in form.seats:
+        raise SourceChanged(f"giustizia-amministrativa: la sede «{sede[:40]}» non è tra quelle del modulo")
     p = form.prefix
     return {
         f"{p}sedeProvvedimenti": sede,
@@ -116,15 +122,24 @@ def read_results(page: str) -> list[Result]:
     if count.group(1) == "0":
         return []
     results = []
-    for article in BeautifulSoup(page, "lxml").find_all("article", class_="ricerca--item"):
-        link = next((a["href"] for a in article.find_all("a", href=True)
-                     if urlparse(a["href"]).hostname == _DOCUMENT_HOST), None)
+    # a result names its «numero provv.»; the other items (the pager: «Risultati da 1 a 3 di 3
+    # totali») are not results
+    articles = [a for a in BeautifulSoup(page, "lxml").find_all("article", class_="ricerca--item")
+                if "numero provv" in a.get_text(" ")]
+    # a page lists at most pageSize (60) rows: fewer rows than announced, under that, is a page the
+    # reader does not read whole
+    if len(articles) < min(int(count.group(1)), 60):
+        raise SourceChanged("giustizia-amministrativa: meno risultati di quelli annunciati")
+    for article in articles:
+        links = [a["href"] for a in article.find_all("a", href=True) if not a["href"].startswith("javascript:")]
+        link = next((h for h in links if urlparse(h).scheme == "https" and urlparse(h).hostname == _DOCUMENT_HOST), None)
         markup = str(article)
         first = article.find("b")
         number = _bold(markup, "numero provv.:")
         m = _NUMBER.match(number or "")
         if link is None or first is None or m is None:
-            continue
+            # never dropped in silence: a row the reader cannot read could be the one asked for
+            raise SourceChanged("giustizia-amministrativa: una riga dei risultati non è leggibile")
         ecli = next((b.get_text(strip=True) for b in article.find_all("b")
                      if b.get_text(strip=True).startswith("ECLI:")), None)
         results.append(Result(
@@ -136,8 +151,6 @@ def read_results(page: str) -> list[Result]:
             ecli=ecli,
             url=html.unescape(link),
         ))
-    if not results:
-        raise SourceChanged("giustizia-amministrativa: risultati annunciati ma non leggibili")
     return results
 
 
@@ -150,6 +163,8 @@ def document_format(url: str) -> str | None:
 def _lines(element: etree._Element) -> list[str]:
     out = []
     for div in element.iter(f"{{{_HTML_NS}}}div"):
+        if any(a.tag == f"{{{_HTML_NS}}}div" for a in div.iterancestors()):
+            continue  # a div inside a div is read once, with its outer one
         if any(isinstance(a.tag, str) and a.tag.endswith("Ted") for a in div.iterancestors()):
             continue  # the German twin of the Bolzano section
         line = _WS.sub(" ", "".join(div.itertext())).strip()
@@ -166,7 +181,10 @@ def text_from_document(document: bytes | str) -> dict[str, str]:
     """The decision's blocks from the court's XML; the German twins (`…Ted`) and the metadata left out."""
     data = document.encode("utf-8") if isinstance(document, str) else document
     parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, recover=True, huge_tree=False)
-    root = etree.fromstring(data, parser)
+    try:
+        root = etree.fromstring(data, parser)
+    except etree.XMLSyntaxError as exc:  # an empty or binary body
+        raise SourceChanged("giustizia-amministrativa: documento non leggibile") from exc
     if root is None:
         raise SourceChanged("giustizia-amministrativa: documento non leggibile")
     provvedimento = root.find("Provvedimento")
@@ -201,8 +219,11 @@ class GiustiziaAmministrativaReader:
             return {}, None
         answer = await decisions_http_client.request(
             "GET", result.url, source="giustizia_amministrativa", timeout=_TIMEOUT, max_retries=1,
-            headers=http_headers({"Accept": "text/xml, application/xml"}))
-        return text_from_document(answer.text), published_on(answer.text)
+            text_encoding="latin-1", headers=http_headers({"Accept": "text/xml, application/xml"}))
+        # latin-1 maps the bytes one to one: lxml reads them in the encoding the document declares,
+        # whatever the HTTP header said (a text frozen in the wrong encoding would stay wrong)
+        body = answer.text.encode("latin-1")
+        return text_from_document(body), published_on(body)
 
 
 # --- from a result to a decision ---------------------------------------------------------------
@@ -253,7 +274,10 @@ def section_of(raw: str | None) -> str | None:
 def published_on(document: bytes | str) -> str | None:
     """The day of publication the document's metadata gives («08/04/2019» → «2019-04-08»)."""
     data = document.encode("utf-8") if isinstance(document, str) else document
-    root = etree.fromstring(data, etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, recover=True))
+    try:
+        root = etree.fromstring(data, etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, recover=True))
+    except etree.XMLSyntaxError as exc:
+        raise SourceChanged("giustizia-amministrativa: documento non leggibile") from exc
     found = root.find(".//dataPubblicazione") if root is not None else None
     m = re.fullmatch(r"(\d{2})/(\d{2})/(\d{4})", (found.text or "").strip()) if found is not None else None
     return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None

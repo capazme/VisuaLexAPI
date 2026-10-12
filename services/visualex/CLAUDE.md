@@ -586,6 +586,12 @@ Breaking one of these breaks the product. Read before editing.
     characters, U+2011 included; it drops the footnote calls and the procedure-language note (which
     becomes `lingua_processuale`; any other footnote stays, at the end), the former format's keywords
     and summary, and the General Court's closing index. `tests/test_decisions_curia_live.py` (`-m live`) re-reads three real judgments.
+    The administrative courts' reader is in it too (`ga_synthetic_document`; real documents as
+    `private/ga_<key>.xml`): each `h:div` of the court's XML is a line, a div inside a div is read
+    once, ASCII whitespace runs become one space; it leaves out the metadata block and the German
+    twins (`…Ted`), and reads the bytes in the encoding the document declares. Its search never
+    drops a result row in silence: a row it cannot read, fewer rows than the portal's count, a
+    seat the form does not offer or an answer for another seat is `fonte_non_raggiungibile`.
     The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a
     reader that moves the projection's hash is a bug in the reader, never a reason to re-record the
     golden. The web app reads the same projection (`decisionProjection` in

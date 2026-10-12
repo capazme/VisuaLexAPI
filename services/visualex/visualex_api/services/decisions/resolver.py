@@ -29,7 +29,7 @@ from ...tools.tls import IntermediateCertificateMismatch
 from .corte_cost import CorteCostReader
 from .curia import CuriaReader
 from . import giustizia_amministrativa as ga
-from .tar_seats import BY_SLUG, seats_of
+from .tar_seats import BY_SLUG, fold, seats_of
 from .italgiure import ItalgiureReader, SourceAnswerError
 from .model import ADMIN_COURTS, EU_COURTS, FAMIGLIE, Decision, Identity, Reference
 from .pdf_text import MAX_BYTES
@@ -292,7 +292,11 @@ class Resolver:
             return [ga.Result(**row) for row in cached]
         if await self.absent.get(key) is not None:
             return []
-        results = await self.admin.search(ga.portal_seat(corte, sede), numero, anno)
+        portal = ga.portal_seat(corte, sede)
+        results = await self.admin.search(portal, numero, anno)
+        if any(fold(r.sede) != fold(portal) for r in results):
+            # the portal answered for another seat than the one asked: never labelled as the one asked
+            raise ga.SourceChanged("giustizia-amministrativa: la risposta è di un'altra sede")
         if results:
             await self.pending.set(key, [r.__dict__ for r in results])
         else:
@@ -328,13 +332,15 @@ class Resolver:
             return found
         try:
             listed = await asyncio.wait_for(gather(), GA_TIMEOUT)
+            same = [(sede, r) for sede, r in listed if r.anno == ref.anno and r.numero == ref.numero]
+            if any(ga.kind_of(r) is None for _, r in same):
+                # a measure with that number the reader cannot identify could be the one asked for
+                raise ga.SourceChanged("giustizia-amministrativa: un provvedimento senza ECLI leggibile")
         except _SOURCE_ERRORS as exc:
             log.warning("Decision source failed", fonte="giustizia_amministrativa", error=str(exc),
                         error_type=type(exc).__name__)
             raise SourceUnavailable("giustizia_amministrativa", str(exc)) from exc
-        measures = [(d, r) for sede, r in listed
-                    if r.anno == ref.anno and r.numero == ref.numero
-                    and (d := ga.to_decision(r, ref.corte, sede)) is not None]
+        measures = [(d, r) for sede, r in same if (d := ga.to_decision(r, ref.corte, sede)) is not None]
         wanted = ((ref.provvedimento,) if ref.provvedimento
                   else FAMIGLIE.get(ref.tipo or "sentenza", ()))
         hits = [(d, r) for d, r in measures if d.identita.provvedimento in wanted]
