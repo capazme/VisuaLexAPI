@@ -114,5 +114,13 @@
   "corte_giustizia_ue_634_2021": {
     "sha256": "264d4b3a78b70c1c9aface04de56a9aa0d1b670911475904321b1475ae543772",
     "length": 51850
+  },
+  "ga_synthetic_document": {
+    "sha256": "d4418d20c4f1fcafde96a00760ceac2ac777eda59296ec8f3635375597ab49c0",
+    "length": 295
+  },
+  "consiglio_di_stato_sent_2270_2019": {
+    "sha256": "1fd8d86089bd69f946da2289c663f603aa9764d7341194819c59f7179499e83e",
+    "length": 22232
   }
 }

@@ -13,6 +13,8 @@ is actually enforced today:
 | `publications.europa.eu` | Ufficio delle pubblicazioni UE — archivio CELLAR (EUR-Lex): sentenze della Corte di giustizia e del Tribunale UE |
 | `www.italgiure.giustizia.it` | Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb) |
 | `dati.cortecostituzionale.it` | Corte costituzionale — dati aperti (CC BY-SA 3.0) |
+| `www.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR (ricerca dei provvedimenti) |
+| `mdp.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR (testi dei provvedimenti) |
 | `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.portaledelmassimario.ipzs.it` | Portale del Massimario — Corte di cassazione (realizzazione Istituto Poligrafico e Zecca dello Stato) |
