@@ -1398,15 +1398,15 @@ const appStore = createStore<AppState>()(
                     const shownId = beside.find((b) => b.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(query))?.id ?? ref.id;
                     const alreadyShown = beside === landing.practice.beside;
                     if (alreadyShown && landing.practices === before.practices && before.activePracticeId === landing.practice.id &&
-                        before.windowFocusRequest === shownId) {
+                        (before.windowFocusRequest === shownId || !isDesktopViewport())) {
                         return shownId;
                     }
                     set((state) => {
                         if (landing.practices !== before.practices) state.practices.push(landing.practice);
                         state.activePracticeId = landing.practice.id;
                         (state.practices.find((p) => p.id === landing.practice.id) as Practice).beside = beside;
-                        // Asked again, the window already showing the topic takes focus.
-                        if (alreadyShown) state.windowFocusRequest = shownId;
+                        // Asked again, the window already showing the topic takes focus (a phone has no windows).
+                        if (alreadyShown && isDesktopViewport()) state.windowFocusRequest = shownId;
                     });
                     return shownId;
                 }
@@ -3747,16 +3747,27 @@ function landingPractice(
     return { practices: [...practices, created], practice: created, activePracticeId: created.id };
 }
 
+/** The window of `practiceId` showing `subject` while its row is folded because of it (desktop only:
+ *  a phone draws no window and folds no row), else undefined. */
+function foldedBy(state: AppState, practiceId: string, subject: PracticeSubject): string | undefined {
+    if (!isDesktopViewport()) return undefined;
+    const practice = state.practices.find((p) => p.id === practiceId);
+    return practice ? shownWindowId(practice.beside, besideRefFor(subject)) : undefined;
+}
+
 /** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. The row moves
  *  to the end of `practiceRows`, open already or not: the act's last row there is the one its block
- *  reads from (Studio, the arrows). */
+ *  reads from (Studio, the arrows). A row folded because a window shows its article is not scrolled
+ *  to: the window is focused instead (spec §4.2, «a subject already shown beside is focused»). */
 function revealRow(state: AppState, practiceId: string, actId: string, articleKey: string): void {
     const rowKey = articleRowKey(practiceId, actId, articleKey);
     const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
     if (act) act.isCollapsed = false;
     delete state.practiceRows[rowKey];
     state.practiceRows[rowKey] = true;
-    state.pendingReveal = { practiceId, rowKey };
+    const window_ = foldedBy(state, practiceId, { kind: 'article', actId, articleKey });
+    if (window_) state.windowFocusRequest = window_;
+    else state.pendingReveal = { practiceId, rowKey };
 }
 
 /** Closes the open rows under `key` (a prefix, or exactly that key) and drops a reveal of one. */
@@ -3851,7 +3862,9 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
 function revealDecisionRow(state: AppState, practiceId: string, decisionId: string): void {
     const rowKey = decisionRowKey(practiceId, decisionId);
     state.practiceRows[rowKey] = true;
-    state.pendingReveal = { practiceId, rowKey };
+    const window_ = foldedBy(state, practiceId, { kind: 'decision', decisionId });
+    if (window_) state.windowFocusRequest = window_;
+    else state.pendingReveal = { practiceId, rowKey };
 }
 
 /** The id of the window of `beside` already showing `ref`'s subject, whatever its id; undefined when none. */

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const env = vi.hoisted(() => ({ deepStack: false }));
 
-vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
+vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true, isDesktopViewport: () => true }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
 vi.mock('./PracticeTable', () => ({
   PracticeTable: () => (
@@ -82,7 +82,7 @@ const pxOf = (el: Element | null) => parseFloat((el as HTMLElement | null)?.styl
 function fakeRect(this: Element): DOMRect {
   const id = this.getAttribute('data-testid');
   if (id === 'reading-row') return box(AREA_LEFT, AREA_TOP, areaWidth, 800);
-  if (id === 'results-area') return box(AREA_LEFT, AREA_TOP, 1216, 800);
+  if (id === 'results-area') return box(AREA_LEFT, AREA_TOP, 960, 800);
   const columnLeft = (column: Element) => {
     let left = AREA_LEFT;
     for (let sibling = column.previousElementSibling; sibling; sibling = sibling.previousElementSibling) left += pxOf(sibling);
@@ -122,6 +122,9 @@ function practiceWithWindows(count: 0 | 1 | 2 = 2) {
     besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(A5) }),
     besideRefFor({ kind: 'decision', decisionId }),
   ];
+  // A second article, shown in no window: the one a reveal reaches in the table.
+  s().addArticlesToPractice(practiceId, L24, [article(L24, '7')]);
+  appStore.setState({ pendingReveal: null });
   for (const ref of refs.slice(0, count)) s().openBeside(practiceId, ref);
   return { practiceId, actId, decisionId, refs };
 }
@@ -204,7 +207,7 @@ describe('ReadingRow — the table and its windows (spec §4.2-§4.3)', () => {
     expect(windows().map((w) => w.getAttribute('data-window-id'))).toEqual([refs[1].id]);
     const practice = s().practices.find((p) => p.id === practiceId)!;
     expect(practice.beside.map((b) => b.id)).toEqual([refs[1].id]);
-    expect(practice.acts[0].articles).toHaveLength(1);
+    expect(practice.acts[0].articles).toHaveLength(2);
     expect(practice.decisions).toHaveLength(1);
   });
 });
@@ -245,7 +248,7 @@ describe('ReadingRow — widths (besideLayout)', () => {
 });
 
 describe('ReadingRow — past the page\'s width cap while a window is beside', () => {
-  /** Layout's shape: a scroller, a padded `max-w-7xl` container, the results area, the row. */
+  /** The page's shape: Layout's scroller and padded container, the search page's `max-w-5xl` results area (about 960 px of content), the row. */
   function inPage() {
     const scroller = document.createElement('div');
     scroller.style.overflowY = 'auto';
@@ -261,16 +264,16 @@ describe('ReadingRow — past the page\'s width cap while a window is beside', (
   }
   const root = () => screen.getByTestId('reading-row');
 
-  it('takes the scroller\'s width less the gutter, centred: 1500 - 64 against the area\'s 1216', () => {
+  it('takes the scroller\'s width less the gutter, centred: 1500 - 64 against the area\'s 960', () => {
     areaWidth = 1436;
     practiceWithWindows(2);
     render(row(), { container: inPage() });
-    expect(root().style.marginInline).toBe('-110px');
-    expect(root().style.width).toBe('calc(100% + 220px)');
+    expect(root().style.marginInline).toBe('-238px');
+    expect(root().style.width).toBe('calc(100% + 476px)');
   });
 
   it('with no window the row keeps the page\'s measure', () => {
-    areaWidth = 1216;
+    areaWidth = 960;
     practiceWithWindows(0);
     render(row(), { container: inPage() });
     expect(root().style.marginInline).toBe('');
@@ -281,7 +284,7 @@ describe('ReadingRow — past the page\'s width cap while a window is beside', (
     areaWidth = 1436;
     const { practiceId, refs } = practiceWithWindows(1);
     render(row(), { container: inPage() });
-    expect(root().style.marginInline).toBe('-110px');
+    expect(root().style.marginInline).toBe('-238px');
     act(() => s().closeBeside(practiceId, refs[0].id));
     expect(root().style.marginInline).toBe('');
   });
@@ -298,7 +301,7 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     const rail = screen.getByTestId('practice-rail');
     expect(rail).toHaveAccessibleName('Pratica l. 24/2017');
     expect(rail).toHaveAttribute('aria-expanded', 'false');
-    expect(within(rail).getByTestId('practice-rail-count')).toHaveTextContent('2');
+    expect(within(rail).getByTestId('practice-rail-count')).toHaveTextContent('3');
     expect(screen.queryByTestId('practice-table')).not.toBeInTheDocument();
   });
 
@@ -395,7 +398,7 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
 
     rail.focus();
-    act(() => { s().revealPracticeArticle(practiceId, actId, '5'); });
+    act(() => { s().revealPracticeArticle(practiceId, actId, '7'); });
     expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
     expect(rail).toHaveFocus();
   });
@@ -417,11 +420,19 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
   });
 
+  it('a reveal of a row folded by its window opens no overlay: the window is focused instead', () => {
+    const { practiceId, actId } = practiceWithWindows(2);
+    render(row());
+    act(() => { s().revealPracticeArticle(practiceId, actId, '5'); });
+    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+    expect(windows()[0]).toHaveFocus();
+  });
+
   it('opens by itself when a row is revealed in a practice whose table is folded', () => {
     const { practiceId, actId } = practiceWithWindows(2);
     render(row());
     expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
-    act(() => { s().revealPracticeArticle(practiceId, actId, '5'); });
+    act(() => { s().revealPracticeArticle(practiceId, actId, '7'); });
     expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
   });
 });

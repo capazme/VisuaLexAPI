@@ -35,8 +35,8 @@ function scrollParentOf(el: HTMLElement): HTMLElement | null {
 
 /**
  * The row's width, kept current by a `ResizeObserver`, and — when `wide` — how far past its parent
- * it may reach on each side. Layout caps the results area at `max-w-7xl`, under the 1260 px that
- * three columns need; with a window beside, the row takes the scroller's full width (less the
+ * it may reach on each side. The search page holds the results area to `ReaderLayout`'s `max-w-5xl`
+ * (about 960 px of content), under the 1260 px that three columns need; with a window beside, the row takes the scroller's full width (less the
  * gutter the page keeps), measured here rather than assumed, and only for this row: Layout and the
  * other routes are untouched. Before it is measured, the results area's width.
  */

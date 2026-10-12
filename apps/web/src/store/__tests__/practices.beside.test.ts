@@ -144,3 +144,57 @@ describe('the way back to a window (spec §6.3, carry-over 11)', () => {
     expect(practice(p).beside).toHaveLength(1);
   });
 });
+
+describe('a reveal that targets a row folded by its window focuses the window (spec §4.2)', () => {
+  function foldedRow() {
+    const a = article(L24, '5');
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [a]);
+    const key = practiceArticleKey(a);
+    const ref = besideRefFor({ kind: 'article', actId, articleKey: key });
+    s().openBeside(practiceId, ref);
+    appStore.setState({ pendingReveal: null, windowFocusRequest: null });
+    return { practiceId, actId, key, ref };
+  }
+
+  it('desktop: revealPracticeRow asks the window to take focus and scrolls to nothing', () => {
+    viewport(true);
+    const { practiceId, actId, key, ref } = foldedRow();
+    expect(s().revealPracticeRow(practiceId, actId, key)).toBe(true);
+    expect(s().windowFocusRequest).toBe(ref.id);
+    expect(s().pendingReveal).toBeNull();
+  });
+
+  it('desktop: the way back to a row (`table`) whose article is beside focuses the window too', () => {
+    viewport(true);
+    const { practiceId, actId, ref } = foldedRow();
+    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
+    s().popReadingBack();
+    expect(s().windowFocusRequest).toBe(ref.id);
+    expect(s().pendingReveal).toBeNull();
+  });
+
+  it('desktop: a row nothing shows beside is revealed as before', () => {
+    viewport(true);
+    const { practiceId, actId, key, ref } = foldedRow();
+    s().closeBeside(practiceId, ref.id);
+    s().revealPracticeRow(practiceId, actId, key);
+    expect(s().windowFocusRequest).toBeNull();
+    expect(s().pendingReveal?.practiceId).toBe(practiceId);
+  });
+
+  it('phone: no window folds a row, so the row is revealed', () => {
+    viewport(false);
+    const { practiceId, actId, key } = foldedRow();
+    s().revealPracticeRow(practiceId, actId, key);
+    expect(s().windowFocusRequest).toBeNull();
+    expect(s().pendingReveal?.practiceId).toBe(practiceId);
+  });
+
+  it('phone: a topic search asked again writes no focus request (there is no window)', () => {
+    viewport(false);
+    s().createPractice('P');
+    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    expect(s().windowFocusRequest).toBeNull();
+  });
+});

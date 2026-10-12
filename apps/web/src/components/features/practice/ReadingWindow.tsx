@@ -71,7 +71,7 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference }: Readi
   const focusRequested = useAppStore((s) => s.windowFocusRequest === besideRef.id);
   const takeFocusRequest = useAppStore((s) => s.takeWindowFocusRequest);
   useEffect(() => {
-    if (focusRequested && takeFocusRequest(besideRef.id)) sectionRef.current?.focus();
+    if (focusRequested && takeFocusRequest(besideRef.id)) sectionRef.current?.focus({ preventScroll: true }); // the window is already on screen: the page stays where it is
   }, [focusRequested, takeFocusRequest, besideRef.id]);
 
   return (

@@ -987,7 +987,7 @@ meant to stay split; add new features as new files, not inside the shells:
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
   from the pure `besideLayout`: half and half, thirds from 420 px a column, else a 48 px rail that opens
   the table as an overlay closed by Esc or a click outside; `SearchPanel` mounts it on the desktop in
-  place of the bare table, and with a window beside it reaches past Layout's `max-w-7xl` to the scroller's
+  place of the bare table, and with a window beside it reaches past the search page's `ReaderLayout` cap (`max-w-5xl`, about 960 px) to the scroller's
   width, measured, for that row only) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
   the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
   `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`

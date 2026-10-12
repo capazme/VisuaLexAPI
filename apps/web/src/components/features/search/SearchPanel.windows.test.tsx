@@ -7,7 +7,13 @@ const env = vi.hoisted(() => ({
   requests: [] as Array<Record<string, unknown>>,
   /** The article a reader's citation link names. */
   jumpTo: '',
+  /** What a decision window's citation link searches. */
+  citation: null as null | Record<string, unknown>,
+  stream: null as null | ((params: Record<string, unknown>) => unknown[]),
+  tree: null as unknown,
+  annex: { MAX_MAIN_ARTICLES: 50, MIN_ANNEX_ARTICLES: 10, TOAST_DURATION: 3000, ENABLED: false, AUTO_CONFIRM: true },
 }));
+vi.mock('../../../config/annexConfig', () => ({ ANNEX_AUTO_SWITCH_CONFIG: env.annex }));
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true, isDesktopViewport: () => true }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
@@ -46,9 +52,9 @@ vi.mock('../decisions/DecisionEntryView', async () => {
       <div data-testid="decision-reader">
         n. {reference.numero}
         <button type="button" onClick={() => store.getState().triggerSearch({
-          act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente',
-          show_brocardi_info: false, besideTabId: hostId,
-        })}>
+          ...(env.citation ?? { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente', show_brocardi_info: false }),
+          besideTabId: hostId,
+        } as never)}>
           Cita l'art. 2043 c.c.
         </button>
       </div>
@@ -59,9 +65,11 @@ vi.mock('../decisions/DecisionSearchTabView', () => ({ DecisionSearchTabView: ()
 vi.mock('../../../services/historyService', () => ({ addToHistory: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../../services/legalFetch', () => ({
   legalFetch: async (path: string, init?: RequestInit) => {
-    if (path === '/fetch_tree') return new Response('', { status: 500 });
-    env.requests.push(init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {});
-    return new Response(env.lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    if (path === '/fetch_tree') return env.tree ? new Response(JSON.stringify(env.tree)) : new Response('', { status: 500 });
+    const params = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+    env.requests.push(params);
+    const lines = env.stream ? env.stream(params) : env.lines;
+    return new Response(lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
   },
 }));
 
@@ -84,6 +92,10 @@ beforeEach(() => {
   env.lines = [];
   env.requests = [];
   env.jumpTo = '';
+  env.citation = null;
+  env.stream = null;
+  env.tree = null;
+  env.annex.ENABLED = false;
   appStore.setState({
     practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDecision: null,
@@ -125,26 +137,32 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     await waitFor(() => expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'))).toEqual(['beside']));
   });
 
-  it('with two windows open, the cited norm replaces the oldest other, never the asker', async () => {
+  it('with two windows open, the cited norm replaces the oldest OTHER window: the asker, the oldest, stays', async () => {
     env.lines = [ccArticle('2043')];
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    const five = practiceArticleKey(article(L24, '5'));
     const { decisionId } = s().openDecision(REF, { practiceId, beside: false });
-    s().openBeside(practiceId, { id: articleWindowId(actId, practiceArticleKey(article(L24, '5'))), kind: 'article', actId, articleKey: practiceArticleKey(article(L24, '5')) });
+    // The decision window is the asker and the oldest; art. 5's window came after it.
     s().openBeside(practiceId, { id: decisionWindowId(decisionId), kind: 'decision', decisionId });
+    s().openBeside(practiceId, { id: articleWindowId(actId, five), kind: 'article', actId, articleKey: five });
     panel();
     fireEvent.click(await screen.findByRole('button', { name: "Cita l'art. 2043 c.c." }));
     await waitFor(() => expect(s().practices[0].acts).toHaveLength(2));
-    const cited = s().practices[0].acts.find((a) => a.key !== s().practices[0].acts[0].key) ?? s().practices[0].acts[1];
+    const cited = s().practices[0].acts.find((a) => a.id !== actId);
+    if (!cited) throw new Error('the cited act did not land');
     await waitFor(() => expect(s().practices[0].beside.map((b) => b.id)).toEqual([
       decisionWindowId(decisionId), articleWindowId(cited.id, practiceArticleKey(cited.articles[0])),
     ]));
   });
 
-  it('a norm cited from an article window that the act already holds opens beside it, nothing searched', async () => {
+  it('a norm cited from an article window that the act already holds opens beside it, replacing the other window, nothing searched', async () => {
     env.jumpTo = '7';
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     const five = practiceArticleKey(article(L24, '5'));
+    const { decisionId } = s().openDecision(REF, { practiceId, beside: false });
+    // Art. 5's window is the asker and the oldest; the decision's window came after it.
     s().openBeside(practiceId, { id: articleWindowId(actId, five), kind: 'article', actId, articleKey: five });
+    s().openBeside(practiceId, { id: decisionWindowId(decisionId), kind: 'decision', decisionId });
     panel();
     fireEvent.click(await screen.findByRole('button', { name: 'Citazione in art. 5 (beside)' }));
     const seven = practiceArticleKey(article(L24, '7'));
@@ -152,6 +170,37 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
       articleWindowId(actId, five), articleWindowId(actId, seven),
     ]));
     expect(env.requests).toEqual([]);
+  });
+
+  it('a citation that switches annex still opens its article beside the window, and the main text\'s stray row goes with its window', async () => {
+    const DLGS = { tipo_atto: 'decreto legislativo', data: '2008-04-09', numero_atto: '81', url: 'urn:nir:stato:decreto.legislativo:2008-04-09;81' };
+    const dlgs = (n: string, allegato?: string) => ({
+      article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...DLGS, numero_articolo: n, ...(allegato ? { allegato } : {}) }, brocardi_info: null,
+    });
+    env.annex.ENABLED = true;
+    env.tree = { metadata: { annexes: [
+      { number: null, label: 'Testo', article_count: 3, article_numbers: ['1', '2', '3'] },
+      { number: '2', label: 'Allegato 2', article_count: 20, article_numbers: ['5', '6'] },
+    ] } };
+    env.citation = { act_type: 'decreto legislativo', act_number: '81', date: '2008', article: '5', version: 'vigente', show_brocardi_info: false };
+    env.stream = (params) => (params.annex === '2' ? [dlgs('5', '2')] : [dlgs('5')]);
+    const p = s().createPractice('P');
+    const { decisionId } = s().openDecision(REF, { practiceId: p });
+    panel();
+    fireEvent.click(await screen.findByRole('button', { name: "Cita l'art. 2043 c.c." }));
+    await waitFor(() => expect(env.requests.some((r) => r.annex === '2')).toBe(true));
+    // The annex search carries the window that asked.
+    expect(env.requests.find((r) => r.annex === '2')).toMatchObject({ besideTabId: decisionWindowId(decisionId) });
+    await waitFor(() => {
+      const practice = s().practices[0];
+      const articles = practice.acts.flatMap((a) => a.articles.map((x) => `${x.norma_data.allegato ?? ''}:${x.norma_data.numero_articolo}`));
+      expect(articles).toEqual(['2:5']);
+    });
+    const practice = s().practices[0];
+    const act = practice.acts[0];
+    await waitFor(() => expect(s().practices[0].beside.map((b) => b.id)).toEqual([
+      decisionWindowId(decisionId), articleWindowId(act.id, practiceArticleKey(act.articles[0])),
+    ]));
   });
 
   it('a norm cited from a row of the table is revealed in the table, as before', async () => {

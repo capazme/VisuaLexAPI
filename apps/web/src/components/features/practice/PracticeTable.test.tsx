@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
+vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true, isDesktopViewport: () => true }));
 vi.mock('../../../services/legalFetch', () => ({ legalFetch: vi.fn() }));
 vi.mock('../../../utils/actStructureCache', () => ({
   fetchActTree: () => Promise.resolve([]),

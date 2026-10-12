@@ -70,7 +70,7 @@ afterEach(() => {
 });
 
 /** The row of an article, found by its accessible name. */
-const articleRow = (n: string) => screen.getByRole('button', { name: new RegExp(`(Espandi|Comprimi) .*art\\. ${n}`) }).closest('[data-practice-row]') as HTMLElement;
+const articleRow = (n: string) => screen.getByRole('button', { name: new RegExp(`(Espandi|Comprimi|Vai alla finestra su) .*art\\. ${n}`) }).closest('[data-practice-row]') as HTMLElement;
 
 describe('«Apri accanto» on an article row (spec §4.2, T5)', () => {
   it('opens the window and folds the row, which says so; closing the window gives the row back as it was', () => {
@@ -85,6 +85,10 @@ describe('«Apri accanto» on an article row (spec §4.2, T5)', () => {
     // One subject, one mounted reading surface: the window's, not the row's.
     expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'))).toEqual(['beside']);
     expect(within(articleRow('5')).getByText(/Aperto accanto/)).toBeInTheDocument();
+    // The folded header does not claim to expand: it goes to the window.
+    const header = within(articleRow('5')).getByRole('button', { name: /^Vai alla finestra su/ });
+    expect(header).not.toHaveAttribute('aria-expanded');
+    expect(within(articleRow('5')).queryByRole('button', { name: /^(Espandi|Comprimi)/ })).not.toBeInTheDocument();
     expect(within(articleRow('5')).queryByRole('button', { name: /^Apri accanto/ })).not.toBeInTheDocument();
     // The other row still offers it.
     expect(within(articleRow('7')).getByRole('button', { name: /^Apri accanto/ })).toBeInTheDocument();
@@ -99,7 +103,7 @@ describe('«Apri accanto» on an article row (spec §4.2, T5)', () => {
     render(row());
     fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ }));
     const window_ = windows()[0];
-    fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Espandi/ }));
+    fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Vai alla finestra su/ }));
     expect(window_).toHaveFocus();
     expect(s().windowFocusRequest).toBeNull();
   });

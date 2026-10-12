@@ -58,8 +58,9 @@ export function PracticeRowShell({
         <div
           role="button"
           tabIndex={0}
-          aria-label={`${isOpen ? 'Comprimi' : 'Espandi'} ${name}`}
-          aria-expanded={isOpen}
+          // Folded because a window shows the subject, the header does not expand: it goes to the window.
+          aria-label={folded ? `Vai alla finestra su ${name}` : `${isOpen ? 'Comprimi' : 'Espandi'} ${name}`}
+          aria-expanded={folded ? undefined : isOpen}
           aria-controls={isOpen ? regionId : undefined}
           onClick={folded ? beside.onOpen : onToggle}
           onKeyDown={(e) => {
