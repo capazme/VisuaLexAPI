@@ -454,6 +454,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and `parseHistory` answers the Italian 400s first. A decision key must read back through
   `norms/decisionKey.ts` (`readDecisionKey`). The five-minute de-duplication runs per kind
   (by key for a decision). Responses carry `decision_key` and a nullable `act_type`.
+- **Development mode**: `User.devModeAllowed` is set only by `PUT /admin/users/:id`
+  (`devModeAllowed`); revoking it writes `devMode: false` in the same update. The user's own
+  switch is `PUT /auth/dev-mode {enabled}`, a strict schema (an extra key is a 400, not
+  stripped), session-only (not among the delegated routes), 403 «Modalità sviluppo non
+  abilitata per questo account» without the permission; the check is part of the write
+  (`updateMany` with `devModeAllowed: true` in the `where`), so a revocation between
+  `authenticate` and the write cannot leave the mode on. The mode only hides surfaces in the
+  web app, it never grants a permission. `GET /auth/me`, the login and the switch answer with
+  one shape (`toMeResponse`) carrying `dev_mode_allowed` and `dev_mode`;
+  `tests/devMode.test.ts`.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades, except the community's study cards, which stay without an

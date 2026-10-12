@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard, FileSearch, Gavel, Scale, Network, GraduationCap } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Globe, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, GraduationCap } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -29,7 +29,11 @@ interface NavItemProps {
   onClick?: () => void;
   id?: string;
   badgeCount?: number;
+  /** The keyboard shortcut that does the same, shown in the hover label (not part of the name). */
+  hint?: string;
 }
+
+const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
 
 // Spring config for smooth animations
 const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
@@ -40,7 +44,7 @@ const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
  * clips whatever sticks out of it), and the aside is a stacking context (backdrop blur), so a label
  * drawn inside either would be cut or trapped (gotcha 22).
  */
-function SidebarTooltip({ anchor, label, onDismiss }: { anchor: HTMLElement | null; label: string; onDismiss: () => void }) {
+function SidebarTooltip({ anchor, label, hint, onDismiss }: { anchor: HTMLElement | null; label: string; hint?: string; onDismiss: () => void }) {
   // Placed from the rectangle it had when it appeared: the navigation scrolling under it, or the
   // window being resized, takes it away rather than leaving it where the control no longer is.
   useEffect(() => {
@@ -68,6 +72,7 @@ function SidebarTooltip({ anchor, label, onDismiss }: { anchor: HTMLElement | nu
       )}
     >
       {label}
+      {hint && <span className="ml-2 opacity-60">{hint}</span>}
       {/* Arrow */}
       <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45" />
     </motion.div>,
@@ -103,7 +108,7 @@ function useSidebarLabel() {
   return { shown, hide, handlers };
 }
 
-function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavItemProps) {
   const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
@@ -175,64 +180,11 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProp
 
           {/* Tooltip - hidden on mobile */}
           <AnimatePresence>
-            {showTooltip && <SidebarTooltip anchor={linkEl} label={label} onDismiss={hide} />}
+            {showTooltip && <SidebarTooltip anchor={linkEl} label={label} hint={hint} onDismiss={hide} />}
           </AnimatePresence>
         </>
       )}
     </NavLink>
-  );
-}
-
-interface ActionButtonProps {
-  icon: React.ElementType;
-  label: string;
-  onClick: () => void;
-  isActive?: boolean;
-}
-
-function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProps) {
-  const { shown: showTooltip, hide, handlers } = useSidebarLabel();
-  const [buttonEl, setButtonEl] = useState<HTMLButtonElement | null>(null);
-
-  return (
-    <button
-      ref={setButtonEl}
-      aria-label={label}
-      onClick={() => {
-        hide();
-        onClick();
-      }}
-      {...handlers}
-      className={cn(
-        "relative flex items-center justify-center rounded-xl transition-all duration-200",
-        "hover:bg-slate-100 dark:hover:bg-slate-800",
-        // Mobile: larger touch target
-        "w-12 h-12 md:w-11 md:h-11",
-        isActive && "bg-primary-50 dark:bg-primary-900/10"
-      )}
-    >
-      <motion.div
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-        transition={SPRING_CONFIG}
-      >
-        <Icon
-          size={20}
-          aria-hidden
-          className={cn(
-            "transition-colors duration-200",
-            isActive
-              ? "text-primary-600 dark:text-primary-400"
-              : "text-slate-500 dark:text-slate-400"
-          )}
-        />
-      </motion.div>
-
-      {/* Tooltip */}
-      <AnimatePresence>
-        {showTooltip && <SidebarTooltip anchor={buttonEl} label={label} onDismiss={hide} />}
-      </AnimatePresence>
-    </button>
   );
 }
 
@@ -242,10 +194,11 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     openCommandPalette: s.openCommandPalette,
     quickNorms: s.quickNorms,
   })));
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, devMode, logout } = useAuth();
   const { count: forumNotifications } = useForumNotifications(!!user);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0 });
 
   // Calculate menu position when showing
@@ -260,17 +213,71 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     }
   }, [showUserMenu]);
 
-  const handleSparklesClick = () => {
-    // Navigate to search page first, then open command palette
-    navigate('/');
-    openCommandPalette();
-  };
-
-  // Decisions are not a page: «Sentenze» opens the palette, which lives in the search space.
-  const handleDecisionsClick = () => {
-    navigate('/');
+  // «Ricerca» is the search space and the palette (⌘K) together: decisions are not a page, they
+  // are found through the palette, which lives in the search space. The link itself navigates.
+  const handleSearchClick = () => {
     openCommandPalette();
     closeMobile();
+  };
+
+  // The development mode's entries (spec D3), on top of the MERL-T flags. Plain flag functions (not
+  // useMerltFeatures) keep the Sidebar free of the consent/auth providers.
+  const showAssistant = devMode && isMerltEnabled();
+  const showGraph = showAssistant && isMerltGraphEnabled();
+
+  // The menu is drawn through a portal, so it is a menu button of its own (WAI-ARIA, as `ui/MenuButton`):
+  // focus goes to the first entry when it opens (the last, from ArrowUp), the arrows, Home and End move,
+  // Esc closes and gives focus back to the avatar, Tab closes and goes on from the avatar, a click
+  // outside closes (the backdrop).
+  const [openAt, setOpenAt] = useState<'first' | 'last'>('first');
+  const menuItems = () => [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+  const openMenu = (at: 'first' | 'last') => {
+    setOpenAt(at);
+    setShowUserMenu(true);
+  };
+  const closeMenu = (returnFocus: boolean) => {
+    setShowUserMenu(false);
+    if (returnFocus) userButtonRef.current?.focus();
+  };
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const items = menuItems();
+    (openAt === 'last' ? items[items.length - 1] : items[0])?.focus();
+    // Once per opening; `openAt` is set in the same update that opens it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showUserMenu]);
+
+  const onTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    // Enter and Space are the button's own click.
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      openMenu(event.key === 'ArrowDown' ? 'first' : 'last');
+    }
+  };
+
+  const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const items = menuItems();
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const move = (to: number) => {
+      event.preventDefault();
+      items[(to + items.length) % items.length]?.focus();
+    };
+    if (event.key === 'ArrowDown') move(at + 1);
+    else if (event.key === 'ArrowUp') move(at < 0 ? -1 : at - 1);
+    else if (event.key === 'Home') move(0);
+    else if (event.key === 'End') move(items.length - 1);
+    else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu(true);
+    } else if (event.key === 'Tab') closeMenu(true);
+  };
+
+  // A menu entry closes the menu (and the phone's off-canvas copy), gives focus back to the avatar (where a
+  // dialog it opens returns it) and then acts.
+  const fromMenu = (action: () => void) => () => {
+    closeMenu(true);
+    closeMobile();
+    action();
   };
 
   return (
@@ -306,23 +313,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         </motion.div>
       </div>
 
-      {/* Quick Search Button */}
-      <div className="flex flex-col items-center pt-4 pb-2 border-b border-slate-100 dark:border-slate-800/50">
-        <div id="tour-quick-search">
-          <ActionButton
-            icon={Sparkles}
-            label="Ricerca Veloce ⌘K"
-            onClick={handleSparklesClick}
-            isActive={false}
-          />
-        </div>
-        {quickNorms.length > 0 && (
-          <div className="mt-1 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
-        )}
-      </div>
-
       {/* Navigation */}
-      {/* The one part that scrolls when the window is low (16 icons are 935 px tall): its labels are
+      {/* The one part that scrolls when the window is low (sixteen icons were 935 px tall): its labels are
           portalled (`SidebarTooltip`), so the overflow clips nothing. The scrollbar is thin, so a
           very low window shows there is more; the column is 64 px wide. */}
       {/* `layoutScroll`: the active indicator's shared-layout animation measures against the nav's scroll. */}
@@ -331,45 +323,27 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         id="tour-sidebar"
         className="min-h-0 flex-1 flex flex-col items-center overflow-y-auto overflow-x-hidden py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
-        <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
+        <NavItem to="/" icon={Search} label="Ricerca" hint="⌘K" id="tour-nav-search" onClick={handleSearchClick} />
+        {quickNorms.length > 0 && (
+          <div className="-mt-1 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
+        )}
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
         {isStudiaEnabled() && (
           <NavItem to="/studia" icon={GraduationCap} label="Studia" id="tour-nav-studia" onClick={closeMobile} />
         )}
+        <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} badgeCount={forumNotifications.normaChanges} />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
-        <ActionButton icon={Gavel} label="Sentenze" onClick={handleDecisionsClick} />
-        <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} badgeCount={forumNotifications.normaChanges} />
-        {isMerltEnabled() && (
-          <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} />
-        )}
-        {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt.
-            Plain flag functions (not useMerltFeatures) keep the Sidebar free of
-            the consent/auth providers. */}
-        {isMerltEnabled() && isMerltGraphEnabled() && (
-          <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} />
+        {showAssistant && (
+          <div role="group" aria-label="Sviluppo" className="mt-1 flex w-full flex-col items-center gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-2">
+            <span aria-hidden className="text-[9px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">Sviluppo</span>
+            <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} />
+            {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
+            {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} />}
+          </div>
         )}
       </motion.nav>
-
-      {/* System Actions */}
-      <div className="flex flex-col items-center py-4 gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50">
-        <ActionButton
-          icon={Settings}
-          label="Impostazioni"
-          onClick={openSettings}
-        />
-        <ActionButton
-          icon={Keyboard}
-          label="Scorciatoie (?)"
-          onClick={openKeyboardShortcuts}
-        />
-        <ActionButton
-          icon={theme === 'dark' ? Sun : Moon}
-          label={theme === 'dark' ? 'Tema Chiaro' : 'Tema Scuro'}
-          onClick={toggleTheme}
-        />
-      </div>
 
       {/* User Menu */}
       <div className="flex flex-col items-center py-4 border-t border-slate-100 dark:border-slate-800/50">
@@ -378,7 +352,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           aria-label="Menu utente"
           aria-haspopup="menu"
           aria-expanded={showUserMenu}
-          onClick={() => setShowUserMenu(!showUserMenu)}
+          onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
+          onKeyDown={onTriggerKeyDown}
           className={cn(
             "relative flex items-center justify-center rounded-xl transition-all duration-200",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
@@ -408,10 +383,14 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             {/* Backdrop - cattura click esterni */}
             <div
               className={cn("fixed inset-0", Z_INDEX.menuBackdrop)}
-              onClick={() => setShowUserMenu(false)}
+              onClick={() => closeMenu(false)}
             />
             {/* Menu popup */}
             <div
+              ref={menuRef}
+              role="menu"
+              aria-label="Menu utente"
+              onKeyDown={onMenuKeyDown}
               style={{ bottom: menuPosition.bottom, left: menuPosition.left }}
               className={cn("fixed w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
             >
@@ -431,14 +410,25 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
               {/* Menu Items */}
               <div className="py-1">
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openSettings)} className={menuItemClass}>
+                  <Settings size={16} />
+                  Impostazioni
+                </button>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(toggleTheme)} className={menuItemClass}>
+                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                  {theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
+                </button>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openKeyboardShortcuts)} className={menuItemClass}>
+                  <Keyboard size={16} />
+                  Scorciatoie (?)
+                </button>
                 {isAdmin && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      navigate('/admin');
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    role="menuitem"
+                    tabIndex={-1}
+                    onClick={fromMenu(() => navigate('/admin'))}
+                    className={menuItemClass}
                   >
                     <Shield size={16} />
                     Pannello Admin
@@ -446,12 +436,14 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 )}
                 <button
                   type="button"
+                  role="menuitem"
+                  tabIndex={-1}
                   onClick={() => {
                     setShowUserMenu(false);
                     logout();
                     navigate('/login');
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 focus-visible:outline-none focus-visible:bg-red-50 dark:focus-visible:bg-red-900/20 transition-colors cursor-pointer"
                 >
                   <LogOut size={16} />
                   Esci

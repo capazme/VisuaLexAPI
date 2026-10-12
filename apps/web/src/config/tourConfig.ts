@@ -59,11 +59,11 @@ export const WELCOME_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-quick-search',
+        element: '#tour-nav-search',
         popover: {
             title: 'Inizia a Cercare',
-            description: 'Premi Cmd+K (Mac) o Ctrl+K (Windows) per aprire la ricerca veloce. Prova subito!',
-            side: 'bottom',
+            description: 'Clicca Ricerca, oppure premi Cmd+K (Mac) o Ctrl+K (Windows), per aprire la ricerca veloce. Prova subito!',
+            side: 'right',
             align: 'start',
         }
     }
@@ -119,10 +119,10 @@ export const SEARCH_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-quick-search',
+        element: '#tour-nav-search',
         popover: {
-            title: 'Ricerca Veloce (Cmd+K)',
-            description: 'Preferisci digitare? Usa la ricerca veloce per inserire citazioni naturali come "art. 2043 cc".',
+            title: 'Ricerca e Cmd+K',
+            description: 'Preferisci digitare? Usa Ricerca (o Cmd+K) per inserire citazioni naturali come "art. 2043 cc".',
             side: 'right',
             align: 'start',
         }

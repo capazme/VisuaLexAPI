@@ -39,6 +39,10 @@ export interface UserResponse {
   is_admin: boolean;
   /** A validator of VisuaLex Studia's cards (`/auth/me` carries it). */
   lingo_validatore?: boolean;
+  /** The administrator let this account use the development mode (`/auth/me` carries it). */
+  dev_mode_allowed?: boolean;
+  /** The account's own choice of the development mode; counts only with `dev_mode_allowed`. */
+  dev_mode?: boolean;
   created_at: string;
   updated_at?: string;
 }
@@ -60,6 +64,8 @@ export interface AdminUserUpdate {
   isVerified?: boolean;
   /** Names the user a validator of VisuaLex Studia's cards. */
   lingoValidatore?: boolean;
+  /** Lets the user switch the development mode on; revoking it turns their choice off too. */
+  devModeAllowed?: boolean;
 }
 
 export interface AdminUserResponse extends UserResponse {

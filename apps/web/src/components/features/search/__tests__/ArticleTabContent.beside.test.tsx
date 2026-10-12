@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArticleData, ArticleValidity, NormaVisitata } from '../../../../types';
 
-const { listPassages, listDiscussions } = vi.hoisted(() => ({ listPassages: vi.fn(), listDiscussions: vi.fn() }));
+const { listPassages, listDiscussions, devMode } = vi.hoisted(() => ({ listPassages: vi.fn(), listDiscussions: vi.fn(), devMode: vi.fn() }));
 
 vi.mock('../../../../services/articleDiscussionService', () => ({
   articleDiscussionService: {
@@ -19,6 +19,7 @@ vi.mock('../../../../services/notificationService', () => ({ notificationService
 vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true }),
 }));
+vi.mock('../../../../features/devMode/useDevMode', () => ({ useDevMode: () => devMode() }));
 // The slots are named, so the test sees which are drawn.
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: ({ slot }: { slot: string }) => <div data-testid={`slot-${slot}`} /> }));
 vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi">Nemo iudex sine actore</div> }));
@@ -66,6 +67,7 @@ let savedMatchMedia: typeof window.matchMedia;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  devMode.mockReturnValue(false);
   listDiscussions.mockResolvedValue({ data: [], pagination: { page: 1, limit: 20, total: 0, pages: 1 } });
   listPassages.mockResolvedValue([]);
   registry = new Map();
@@ -159,7 +161,8 @@ describe('ArticleTabContent variant="beside" — what is folded and what is left
 });
 
 describe('ArticleTabContent variant="row" — everything as today', () => {
-  it('keeps the whole bar, Brocardi open under the text, Studio, the Studia row, the MERL-T entry and the rail', async () => {
+  it('keeps the whole bar, Brocardi open under the text, Studio, the Studia row, the MERL-T entry and the rail, in the development mode', async () => {
+    devMode.mockReturnValue(true);
     const { container } = show('row', article(), vi.fn());
     const desktop = labels(desktopRow(container));
     expect(desktop).toEqual(expect.arrayContaining(['Aggiungi a norme rapide', 'Apri note', 'Aggiungi a dossier', 'Altre azioni']));
@@ -169,6 +172,24 @@ describe('ArticleTabContent variant="row" — everything as today', () => {
     await waitFor(() => expect(screen.getByText(/scheda su questo articolo/i)).toBeInTheDocument());
     expect(screen.getByText(/Chiedi su questo articolo/)).toBeInTheDocument();
     expect(screen.getByTestId('slot-article_sidebar')).toBeInTheDocument();
+  });
+});
+
+// Spec D3/D4: the mode hides the graph rail and the entry that asks MERL-T; it leaves the Massimario's panel
+// and the viewing tracker, which are content and collection for every reader.
+describe('ArticleTabContent variant="row" — without the development mode', () => {
+  it('draws no graph rail and no «Chiedi su questo articolo»', async () => {
+    show('row', article(), vi.fn());
+    await waitFor(() => expect(screen.getByText(/scheda su questo articolo/i)).toBeInTheDocument());
+    expect(screen.queryByText(/Chiedi su questo articolo/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slot-article_sidebar')).not.toBeInTheDocument();
+  });
+
+  it('still draws the tracker, «Giurisprudenza» and the Massimario\'s slot', () => {
+    show('row', article(), vi.fn());
+    expect(screen.getByTestId('slot-article_content_after')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Giurisprudenza/ }));
+    expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
   });
 });
 

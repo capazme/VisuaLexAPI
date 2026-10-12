@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { hashPassword, verifyPassword } from '../utils/password';
@@ -31,9 +32,31 @@ const changePasswordSchema = z.object({
   new_password: z.string().min(8).regex(passwordRegex, passwordErrorMessage),
 });
 
+// Strict on purpose: an extra key (`devModeAllowed` above all) is refused, not stripped.
+const setDevModeSchema = z.object({
+  enabled: z.boolean(),
+}).strict();
+
 const deleteAccountSchema = z.object({
   password: z.string().min(1),
   confirmation: z.literal('ELIMINA ACCOUNT'),
+});
+
+// The account as the client reads it: /auth/me, the login and the development-mode switch all answer
+// with this one shape.
+const toMeResponse = (user: User) => ({
+  id: user.id,
+  email: user.email,
+  username: user.username,
+  is_active: user.isActive,
+  is_verified: user.isVerified,
+  is_admin: user.isAdmin,
+  lingo_validatore: user.lingoValidatore,
+  dev_mode_allowed: user.devModeAllowed,
+  dev_mode: user.devMode,
+  created_at: user.createdAt,
+  login_count: user.loginCount,
+  last_login_at: user.lastLoginAt,
 });
 
 // Register - creates inactive user pending admin approval
@@ -112,18 +135,7 @@ export const login = async (req: Request, res: Response) => {
     access_token: accessToken,
     refresh_token: refreshToken,
     token_type: 'Bearer',
-    user: {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      username: updatedUser.username,
-      is_active: updatedUser.isActive,
-      is_verified: updatedUser.isVerified,
-      is_admin: updatedUser.isAdmin,
-      lingo_validatore: updatedUser.lingoValidatore,
-      created_at: updatedUser.createdAt,
-      login_count: updatedUser.loginCount,
-      last_login_at: updatedUser.lastLoginAt,
-    },
+    user: toMeResponse(updatedUser),
   });
 };
 
@@ -163,18 +175,31 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     throw new AppError(401, 'Not authenticated');
   }
 
-  res.json({
-    id: req.user.id,
-    email: req.user.email,
-    username: req.user.username,
-    is_active: req.user.isActive,
-    is_verified: req.user.isVerified,
-    is_admin: req.user.isAdmin,
-    lingo_validatore: req.user.lingoValidatore,
-    created_at: req.user.createdAt,
-    login_count: req.user.loginCount,
-    last_login_at: req.user.lastLoginAt,
+  res.json(toMeResponse(req.user));
+};
+
+// Turn the development mode on or off for the signed-in user
+export const setDevMode = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+
+  const { enabled } = setDevModeSchema.parse(req.body);
+
+  // The permission is checked in the write itself: `req.user` was read before this point, and an
+  // administrator may revoke the permission in between, which must not leave the mode on.
+  const { count } = await prisma.user.updateMany({
+    where: { id: req.user.id, ...(enabled && { devModeAllowed: true }) },
+    data: { devMode: enabled },
   });
+
+  if (count === 0) {
+    throw new AppError(403, 'Modalità sviluppo non abilitata per questo account');
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user.id } });
+
+  res.json(toMeResponse(user));
 };
 
 // Change password

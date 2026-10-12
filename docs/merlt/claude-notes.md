@@ -275,8 +275,22 @@ declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
 |---|---|---|
 | `article_content_after` | `ArticleMerltSlot` | `VITE_FEATURE_MERLT` |
 | `global` (mounted once in `Layout`) | `GlobalMerltSlot` | `VITE_FEATURE_MERLT` |
-| `article_sidebar` | `ArticleGraphSideRail` | `VITE_FEATURE_MERLT_GRAPH` |
+| `article_sidebar` | `ArticleGraphSideRail` | `VITE_FEATURE_MERLT_GRAPH`, and the development mode (`ArticleTabContent` draws the slot only with it) |
 
+- **The development mode** (`apps/web/src/features/devMode/`, spec
+  `docs/superpowers/specs/2026-10-12-dev-mode-and-sidebar.md`) hides the MERL-T
+  surfaces that are still in testing from everyone but the accounts the
+  administrator enabled and that switched it on. Behind it: the Sidebar's
+  «Assistente» and «Grafo», the routes `/merlt`, `/merlt/contribuisci`,
+  `/merlt/valida`, `/grafo` (and the redirects `/merlt/qa`, `/merlt/chiedi`),
+  the `article_sidebar` graph rail, `AskMerltEntry`, and the citation reports
+  that feed MERL-T («Segnala come citazione», `MissedCitationReporter`). Not
+  behind it: the `article_content_after` tracker, the `global` slot (the
+  trackers and `ConsentBanner`), `article_case_law` (the Massimario's panel,
+  content for every reader) and the implicit citation feedback on a click, so
+  collection runs for whoever consented, with or without the mode. The mode
+  never replaces a permission: the consent ladder and the server's guards stay
+  the real barrier.
 - `ArticleMerltSlot` hosts **only** `useArticleViewedTracker`, the
   IntersectionObserver dwell tracker (≥3 s, or ≥30 % read progress).
   - Progress is how much of the article has been revealed inside its nearest
@@ -439,7 +453,8 @@ turns the article URN into the arguments of `ingest_norm`:
   - Detail drawers: `NodeDetailsDrawer`, `EdgeDetailsDrawer`.
   - The Q&A column: see Slice 4.
 - The route `/grafo` and the Sidebar entry "Grafo" are gated by
-  `isMerltEnabled() && isMerltGraphEnabled()`.
+  `isMerltEnabled() && isMerltGraphEnabled()`, and both need the development
+  mode (the route redirects to `/` without it).
 
 **Slice 2a gotchas:**
 1. **The graph is G6, not Cytoscape.** `cytoscape`, `react-cytoscapejs` and
