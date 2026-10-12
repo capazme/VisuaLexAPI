@@ -84,6 +84,13 @@ keystroke in the browser, and the Python API's `/parse_decision`, which the serv
 open ones as skipped. `unsupported_court` (the court the API names when it recognises one
 VisuaLex has no reader for) is the API's alone. The section is kept as written (`III`, `U`), as the palette keeps it.
 
+## `tar-seats.json`
+
+The 29 seats of the Tribunali amministrativi regionali, as the portal of giustizia-amministrativa.it
+names them, with their region and whether each is the region's main seat
+(`docs/superpowers/specs/2026-10-12-administrative-courts-design.md`). A TAR named by its region
+alone is read as its main seat; a citation names the seat only where the region has more than one.
+
 ## `norm-entries.json`
 
 A norm that comes from someone else — a Forum proposal, a published environment, a file or a

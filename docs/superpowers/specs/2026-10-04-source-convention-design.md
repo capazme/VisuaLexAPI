@@ -158,7 +158,7 @@ area:
 
 | Field | Values |
 |---|---|
-| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); decided on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue` |
+| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); decided on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue`, `consiglio_di_stato`, `tar`, `cgars` |
 | `numero` | integer 1–999999, no leading zeros |
 | `anno` | the year of the number (for the penal Cassazione, the year of deposit) |
 | `archivio` | `civile`, `penale`; the Cassazione only, and always there |
@@ -194,7 +194,10 @@ penal; the Massimario's paragraphs sometimes give a hearing date
 
 A new court adds a `corte` value and its key shape `<corte>:<numero>:<anno>`,
 with the court's own qualifiers in place of `archivio` when its numbering
-needs them (a TAR's seat and section, the Consiglio di Stato's section). ~~Where
+needs them. **Decided 12 October 2026 for the administrative courts**
+(`2026-10-12-administrative-courts-design.md` §2, D1, «continuiamo»): the qualifiers are the kind
+of measure and, for a TAR, its seat (`consiglio_di_stato:sent:2270:2019`,
+`tar:roma:ocau:1234:2020`); the section stays an attribute, as for the Cassazione (§2.2). ~~Where
 the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.~~
 
 **Decided 12 October 2026 for the CGUE** (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
@@ -323,6 +326,10 @@ The courts of the Union (decided 12 October 2026, Q11–Q12 of
 | C-634/21, sez. I, 7 dicembre 2023 | `Corte giust. UE, sez. I, sent. 7 dicembre 2023, causa C-634/21` | `Corte giust. UE, C-634/21` |
 | C-293/12 and C-594/12, grande sez., 8 aprile 2014 | `Corte giust. UE, grande sez., sent. 8 aprile 2014, cause riunite C-293/12 e C-594/12` | `Corte giust. UE, C-293/12` |
 | T-612/17, sez. IX ampliata, 10 novembre 2021 | `Trib. UE, sez. IX ampliata, sent. 10 novembre 2021, causa T-612/17` | `Trib. UE, T-612/17` |
+
+The administrative courts (decided 12 October 2026, D4 of
+`2026-10-12-administrative-courts-design.md`, its §3): «Cons. Stato, sez. VI, sent. 8 aprile 2019,
+n. 2270», «TAR Lazio, Roma, sez. I, ord., n. 1234/2020», «T.R.G.A. Bolzano, …».
 
 ### 4.3 Section names
 
