@@ -50,7 +50,7 @@ function PracticeHeader({ practice }: { practice: Practice }) {
   const save = usePracticeSaveActions(practice.id);
 
   return (
-    <header className="flex items-start gap-2 px-1">
+    <header data-pinned-head className="flex items-start gap-2 px-1">
       <div className="min-w-0 flex-1">
         {editing ? (
           <PracticeNameInput

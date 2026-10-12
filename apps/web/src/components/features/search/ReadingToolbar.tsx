@@ -116,7 +116,7 @@ export function ReadingToolbar({
     // carries no version: anything that may not be copied, or is a reading, stays in.
     const exportLockedReason = copyLockedReason ?? lockedReason;
     return (
-        <div className={cn('glass-toolbar sticky top-[var(--reading-toolbar-top,0px)] flex flex-wrap gap-x-1 gap-y-1 items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
+        <div data-pinned-head className={cn('glass-toolbar sticky top-[var(--reading-toolbar-top,0px)] flex flex-wrap gap-x-1 gap-y-1 items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
             {/* Version Info & Annex Source Badge */}
             <div className="contents md:flex md:items-center md:gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {versionChip && <VersionStatusChip chip={versionChip} onClick={onOpenVersionInput} />}

@@ -6,14 +6,20 @@ vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }
 vi.mock('./PracticeTable', () => ({
   PracticeTable: () => (
     <div data-testid="practice-table">
-      <header>La pratica</header>
+      <header data-pinned-head data-testid="stub-practice-head">La pratica</header>
+      <div data-pinned-head data-testid="stub-act-head">Atto</div>
+      <div data-pinned-head data-testid="stub-toolbar">Barra della riga aperta</div>
+      <div data-pinned-head data-testid="stub-toolbar-later">Barra di una riga più in basso</div>
       <button type="button">Dentro il tavolo</button>
     </div>
   ),
 }));
 vi.mock('../search/ArticleTabContent', () => ({
   ArticleTabContent: ({ data, findHostId, readingOrigin }: { data: { article_text: string }; findHostId?: string; readingOrigin?: { tabId: string } }) => (
-    <div data-testid="article-reader" data-find-host={findHostId} data-origin={readingOrigin?.tabId}>{data.article_text}</div>
+    <div data-testid="article-reader" data-find-host={findHostId} data-origin={readingOrigin?.tabId}>
+      <div data-pinned-head data-testid="stub-window-toolbar">Barra compatta</div>
+      {data.article_text}
+    </div>
   ),
 }));
 vi.mock('../decisions/DecisionEntryView', () => ({
@@ -36,6 +42,8 @@ const s = () => appStore.getState();
 const AREA_LEFT = 100;
 const AREA_TOP = 50;
 let areaWidth = 1300;
+/** The page is scrolled: the practice header is gone, the act's heading and the open row's toolbar are stuck at the top. */
+let scrolled = false;
 
 class FakeResizeObserver {
   static all: FakeResizeObserver[] = [];
@@ -69,14 +77,21 @@ function fakeRect(this: Element): DOMRect {
     return left;
   };
   if (id === 'reading-row-table' || id === 'reading-row-rail' || id === 'reading-row-window') {
-    return box(columnLeft(this), AREA_TOP, pxOf(this) || areaWidth, 800);
+    return box(columnLeft(this), scrolled && id === 'reading-row-table' ? -300 : AREA_TOP, pxOf(this) || areaWidth, 800);
   }
   const column = this.closest('[data-testid="reading-row-window"]');
   if (column && this.hasAttribute('data-reading-window-header')) return box(columnLeft(column) + 16, AREA_TOP, pxOf(column) - 16, 44);
   if (column && this.hasAttribute('data-reading-window-body')) return box(columnLeft(column) + 16, AREA_TOP + 44, pxOf(column) - 16, 756);
-  if (this.tagName === 'HEADER') {
-    const table = this.closest('[data-testid="reading-row-table"]');
-    return box(table ? columnLeft(table) : AREA_LEFT, AREA_TOP, pxOf(table) || areaWidth, 60);
+  if (column && id === 'stub-window-toolbar') return box(columnLeft(column) + 16, AREA_TOP + 44, pxOf(column) - 16, 40);
+  const table = this.closest('[data-testid="reading-row-table"]');
+  if (table) {
+    const left = columnLeft(table);
+    const width = pxOf(table) || areaWidth;
+    // Unscrolled: the practice header 50..110, 12 px, the act's heading 122..172, its open row's toolbar 172..212.
+    if (id === 'stub-practice-head') return box(left, scrolled ? -200 : AREA_TOP, width, 60);
+    if (id === 'stub-act-head') return box(left, scrolled ? 0 : 122, width, 50);
+    if (id === 'stub-toolbar') return box(left, scrolled ? 50 : 172, width, 40);
+    if (id === 'stub-toolbar-later') return box(left, 600, width, 40);
   }
   return box(0, 0, 0, 0);
 }
@@ -102,6 +117,7 @@ const widthOf = (testId: string, index = 0) => (screen.getAllByTestId(testId)[in
 
 beforeEach(() => {
   areaWidth = 1300;
+  scrolled = false;
   FakeResizeObserver.all = [];
   vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
@@ -267,6 +283,49 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
   });
 
+  it('Esc under an open modal dialog leaves the overlay open (the dialog takes it)', () => {
+    practiceWithWindows(2);
+    render(row());
+    fireEvent.click(screen.getByTestId('practice-rail'));
+    const modal = document.createElement('div');
+    modal.setAttribute('aria-modal', 'true');
+    document.body.appendChild(modal);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    modal.remove();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+  });
+
+  it('a press in a floating tool (the structure window, the find window) is not a click away', () => {
+    practiceWithWindows(2);
+    render(row());
+    fireEvent.click(screen.getByTestId('practice-rail'));
+    const tool = document.createElement('aside');
+    tool.setAttribute('data-floating-tool', '');
+    document.body.appendChild(tool);
+    fireEvent.pointerDown(tool);
+    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    tool.remove();
+  });
+
+  it('the rail names the overlay it opens, and opening it moves focus in; a reveal opening it does not', () => {
+    const { practiceId, actId } = practiceWithWindows(2);
+    render(row());
+    const rail = screen.getByTestId('practice-rail');
+    fireEvent.click(rail);
+    const overlay = screen.getByTestId('reading-row-overlay');
+    expect(rail).toHaveAttribute('aria-controls', overlay.id);
+    expect(within(overlay).getByRole('button', { name: 'Dentro il tavolo' })).toHaveFocus();
+    fireEvent.click(rail);
+    expect(screen.queryByTestId('reading-row-overlay')).not.toBeInTheDocument();
+
+    rail.focus();
+    act(() => { s().revealPracticeArticle(practiceId, actId, '5'); });
+    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+    expect(rail).toHaveFocus();
+  });
+
   it('is closed by a room for the table again, and by switching practice', () => {
     const { practiceId } = practiceWithWindows(2);
     const other = s().createPractice('Altra');
@@ -297,20 +356,29 @@ describe('ReadingRow — where the find window opens (spec §4.4)', () => {
   const win = () => screen.getByTestId('find-window');
   const placeOf = () => ({ x: parseFloat(win().style.left), y: parseFloat(win().style.top) });
 
-  it('with no window, where PR 4d puts it: the top right of the results area', () => {
+  it('with no window: the table column\'s top right, under the practice header, the act\'s heading and the open row\'s toolbar', () => {
     practiceWithWindows(0);
     render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    expect(placeOf().y).toBe(16);
+    // Column 100..1400; header 50..110, heading 122..172, toolbar 172..212 (the later row's toolbar is not in the stack).
+    expect(placeOf()).toEqual({ x: 1400 - 420 - 16, y: 212 + 8 });
   });
 
-  it('with windows beside: the table column\'s top right, under the practice header and every window\'s header', () => {
+  it('scrolled: under the heading and the toolbar stuck at the top, the header being gone', () => {
+    scrolled = true;
+    practiceWithWindows(0);
+    render(<>{row()}<FindWindow /></>);
+    act(() => openFindWindow());
+    expect(placeOf()).toEqual({ x: 1400 - 420 - 16, y: 90 + 8 });
+  });
+
+  it('with windows beside: the table column\'s top right, under the same stack and every window\'s header', () => {
     areaWidth = 1400;
     practiceWithWindows(1);
     render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    // Table column: 100..800; its header ends at 110, the window's at 94.
-    expect(placeOf()).toEqual({ x: 800 - 420 - 16, y: 118 });
+    // Table column: 100..800; the window\'s header ends at 94, the table\'s stack at 212.
+    expect(placeOf()).toEqual({ x: 800 - 420 - 16, y: 220 });
   });
 
   it('never over a window\'s ×: below its header even when the table column is narrower than the window', () => {
@@ -318,18 +386,18 @@ describe('ReadingRow — where the find window opens (spec §4.4)', () => {
     practiceWithWindows(2);
     render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    // The table column is 420 wide, narrower than the window: it starts at the column's left edge.
-    expect(placeOf().x).toBe(100);
-    expect(placeOf().y).toBeGreaterThanOrEqual(AREA_TOP + 44);
+    // The table column is 420 wide, narrower than the window: it starts at the column\'s left edge.
+    expect(placeOf()).toEqual({ x: 100, y: 220 });
+    expect(placeOf().y).toBeGreaterThan(AREA_TOP + 44);
   });
 
-  it('with the rail: at the first window\'s body, under its header', () => {
+  it('with the rail: at the first window\'s body, under its header and its pinned compact bar', () => {
     areaWidth = 1100;
     practiceWithWindows(2);
     render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    // First window: column 148..674, body from 164 (the column's 16 px gap) to 674, from 94 down.
-    expect(placeOf()).toEqual({ x: 674 - 420 - 16, y: 94 + 8 });
+    // First window: column 148..674, body from 164 (the column\'s 16 px gap) to 674, from 94; its bar 94..134.
+    expect(placeOf()).toEqual({ x: 674 - 420 - 16, y: 134 + 8 });
   });
 
   it('a place the user dragged it to wins', () => {
@@ -341,16 +409,16 @@ describe('ReadingRow — where the find window opens (spec §4.4)', () => {
     expect(placeOf()).toEqual({ x: 20, y: 30 });
   });
 
-  it('goes back to PR 4d\'s place when the last window closes, and when the row goes', () => {
+  it('keeps the table\'s place when the last window closes, and goes back to PR 4d\'s when the row goes', () => {
     areaWidth = 1400;
     const { practiceId, refs } = practiceWithWindows(1);
     const { unmount } = render(<>{row()}<FindWindow /></>);
     act(() => openFindWindow());
-    expect(placeOf().y).toBe(118);
+    expect(placeOf().x).toBe(800 - 420 - 16);
     act(() => closeFindWindow());
     act(() => s().closeBeside(practiceId, refs[0].id));
     act(() => openFindWindow());
-    expect(placeOf().y).toBe(16);
+    expect(placeOf()).toEqual({ x: 1500 - 420 - 16, y: 220 });
     act(() => closeFindWindow());
 
     act(() => s().openBeside(practiceId, refs[0]));

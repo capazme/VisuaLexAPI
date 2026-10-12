@@ -12,6 +12,11 @@ import { ReadingWindow } from './ReadingWindow';
 
 const NO_WINDOWS: BesideRef[] = [];
 
+/** The gap, in pixels, between two pinned elements still read as one stack (`space-y-3` is 12). */
+const PINNED_GAP = 16;
+
+const OVERLAY_ID = 'reading-row-overlay';
+
 /** A row's column is as tall as the viewport less the margins above and below it, and holds its
  *  place while the table beside it scrolls (the windows are in-flow columns, spec §4). */
 const COLUMN_FRAME = 'sticky top-4 h-[calc(100vh-2rem)] flex-none';
@@ -72,15 +77,17 @@ export function ReadingRow(props: PracticeTableProps) {
     if (!overlayOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
+      // A dialog opened from the table (a confirmation) takes this Esc; the overlay stays under it.
+      if (document.querySelector('[aria-modal="true"]')) return;
       setOpenFor(null);
       railButtonRef.current?.focus();
     };
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target instanceof Element ? e.target : null;
       if (!target || overlayRef.current?.contains(target) || railButtonRef.current?.contains(target)) return;
-      // What the table's own controls open outside it (a confirmation, a menu, the find window) is
-      // part of the overlay's use, not a click away from it.
-      if (target.closest('[role="dialog"], [aria-modal="true"], [role="menu"], [data-testid="find-window"]')) return;
+      // What the table's own controls open outside it (a confirmation, a menu, the structure window,
+      // the find window) is part of the overlay's use, not a click away from it.
+      if (target.closest('[role="dialog"], [aria-modal="true"], [role="menu"], [data-floating-tool]')) return;
       setOpenFor(null);
     };
     document.addEventListener('keydown', onKeyDown);
@@ -91,32 +98,49 @@ export function ReadingRow(props: PracticeTableProps) {
     };
   }, [overlayOpen]);
 
-  // The find window's default place (spec §4.4), asked when it opens: at the table's top right under
-  // the practice header with windows beside; at the first window's body when the table is a rail.
-  // Either way below every window's header, so never over a window's ×.
+  // Opened by the reader on the rail, the overlay takes the focus (its first control); one a reveal
+  // opened does not steal it.
+  const focusOnOpenRef = useRef(false);
+  useEffect(() => {
+    if (!overlayOpen || !focusOnOpenRef.current) return;
+    focusOnOpenRef.current = false;
+    const overlay = overlayRef.current;
+    (overlay?.querySelector<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? overlay)?.focus();
+  }, [overlayOpen]);
+
+  // The find window's default place (spec §4.4), asked when it opens: right-aligned in its target
+  // column and under whatever is pinned at the column's top, never over a control: the practice
+  // header, the first act's heading (sticky from `md`), an open row's reading toolbar pinned under it
+  // (all marked `data-pinned-head`), and every window's header. The target is the table's column
+  // (with or without windows), or the first window's body when the table is a rail.
   const railRef = useRef(isRail);
   useEffect(() => {
     railRef.current = isRail;
   });
   useEffect(() => {
-    if (count === 0) return;
     setFindWindowDefaultPlace(() => {
       const root = rootRef.current;
       if (!root) return null;
-      if (railRef.current) {
-        const body = root.querySelector('[data-reading-window-body]')?.getBoundingClientRect();
-        return body ? { x: Math.max(body.left, body.right - FIND_WINDOW_WIDTH - FIND_WINDOW_MARGIN), y: body.top + 8 } : null;
-      }
-      const column = tableRef.current?.getBoundingClientRect();
+      const rail = railRef.current;
+      const column = (rail ? root.querySelector('[data-reading-window-body]') : tableRef.current)?.getBoundingClientRect();
       if (!column) return null;
-      let top = tableRef.current?.querySelector('header')?.getBoundingClientRect().bottom ?? column.top;
+      let bottom = Math.max(column.top, 0);
       for (const header of root.querySelectorAll('[data-reading-window-header]')) {
-        top = Math.max(top, header.getBoundingClientRect().bottom);
+        bottom = Math.max(bottom, header.getBoundingClientRect().bottom);
       }
-      return { x: Math.max(column.left, column.right - FIND_WINDOW_WIDTH - FIND_WINDOW_MARGIN), y: top + 8 };
+      // The pinned stack, followed from the top: each element that starts where the last one ends
+      // (a few pixels of gap allowed) is under the window's way.
+      const target = rail ? root.querySelector('[data-reading-window-body]') : tableRef.current;
+      const pinned = [...(target?.querySelectorAll('[data-pinned-head]') ?? [])]
+        .map((el) => el.getBoundingClientRect())
+        .sort((x, y) => x.top - y.top);
+      for (const rect of pinned) {
+        if (rect.top <= bottom + PINNED_GAP && rect.bottom > bottom) bottom = rect.bottom;
+      }
+      return { x: Math.max(column.left, column.right - FIND_WINDOW_WIDTH - FIND_WINDOW_MARGIN), y: bottom + 8 };
     });
     return () => setFindWindowDefaultPlace(null);
-  }, [count]);
+  }, []);
 
   const tableWidth = layout.table === 'rail' ? undefined : layout.table;
 
@@ -129,9 +153,13 @@ export function ReadingRow(props: PracticeTableProps) {
               ref={railButtonRef}
               type="button"
               aria-expanded={overlayOpen}
+              aria-controls={OVERLAY_ID}
               aria-label={`Pratica ${practice.label}`}
               title={practice.label}
-              onClick={() => setOpenFor(overlayOpen ? null : practice.id)}
+              onClick={() => {
+                focusOnOpenRef.current = !overlayOpen;
+                setOpenFor(overlayOpen ? null : practice.id);
+              }}
               data-testid="practice-rail"
               className={cn(
                 'flex h-full w-full flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
@@ -156,6 +184,8 @@ export function ReadingRow(props: PracticeTableProps) {
       {overlayOpen && (
         <div
           ref={overlayRef}
+          id={OVERLAY_ID}
+          tabIndex={-1}
           role="region"
           aria-label={`Pratica ${practice?.label ?? ''}`}
           data-testid="reading-row-overlay"

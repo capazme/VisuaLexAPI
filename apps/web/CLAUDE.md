@@ -255,8 +255,11 @@ newest first) and «Tutte le pratiche» (the bar's order, each place named with 
 root registers under its practice's id with the same keys, and so does a light window's (the
 surface's `findHostId` prop, which also names the practice for the magnifier's pressed state and
 request; the window's own id stays the way back's and the focus's); `setFindWindowDefaultPlace` lets a
-layout give the window its opening place (`ReadingRow`: the table's top right under the practice header,
-or the first window's body with the rail, never over a window's ×; a dragged place wins); a decision never read counts nothing (it
+layout give the window its opening place (`ReadingRow`, in every case: right-aligned in the table's
+column, or the first window's body with the rail, under the stack pinned at its top — the practice header,
+the first act's heading, an open row's toolbar, each marked `data-pinned-head` — and every window's
+header, so never over a control; a dragged place wins; a tool held over the table carries
+`data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
 is not in the session's cache); reaching an undrawn match opens its row with its practice made active
 (`revealPracticeRow`, `revealPracticeDecision`), and the window recomputes on a practice switched, a
 row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label

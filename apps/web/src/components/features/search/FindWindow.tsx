@@ -290,6 +290,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
       role="search"
       aria-label="Cerca nel testo"
       data-testid="find-window"
+      data-floating-tool
       onKeyDown={onKeyDown}
       style={isDesktop ? { left: place.x, top: place.y, width: WIDTH } : undefined}
       className={cn(
