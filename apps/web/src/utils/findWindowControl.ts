@@ -34,6 +34,8 @@ export function closeFindWindow(): void {
 /** The floating window's width on a desktop (spec §13.1), and how far it keeps from an edge. */
 export const FIND_WINDOW_WIDTH = 420;
 export const FIND_WINDOW_MARGIN = 16;
+/** Its height before it is measured: the field row and the scope row. */
+export const FIND_WINDOW_ESTIMATED_HEIGHT = 80;
 
 /** A place for the window: its top-left corner, in viewport coordinates (it is `position: fixed`). */
 export interface FindWindowPlace {

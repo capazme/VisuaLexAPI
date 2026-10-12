@@ -10,6 +10,7 @@ import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { frontTabId as computeFrontTabId } from '../../../utils/findScope';
 import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 import {
+  FIND_WINDOW_ESTIMATED_HEIGHT,
   FIND_WINDOW_MARGIN,
   FIND_WINDOW_WIDTH,
   findWindowDefaultPlace,
@@ -26,7 +27,7 @@ const SCOPE_KEY = 'visualex:find-window-scope';
 const WIDTH = FIND_WINDOW_WIDTH;
 const MARGIN = FIND_WINDOW_MARGIN;
 /** Two lines: the field row and the scope row (used until the element is measured). */
-const ESTIMATED_HEIGHT = 80;
+const ESTIMATED_HEIGHT = FIND_WINDOW_ESTIMATED_HEIGHT;
 const KEY_STEP = 16;
 
 interface Place {

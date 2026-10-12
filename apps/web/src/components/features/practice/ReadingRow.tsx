@@ -3,7 +3,7 @@ import { FOCUS_RING } from '../../../constants/interactions';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
-import { FIND_WINDOW_MARGIN, FIND_WINDOW_WIDTH, setFindWindowDefaultPlace } from '../../../utils/findWindowControl';
+import { FIND_WINDOW_ESTIMATED_HEIGHT, FIND_WINDOW_MARGIN, FIND_WINDOW_WIDTH, setFindWindowDefaultPlace } from '../../../utils/findWindowControl';
 import { MAX_BESIDE, practiceCounts, type BesideRef, type Practice } from '../../../utils/practice';
 import { workspaceOrigin } from '../../../utils/workspaceOrigin';
 import { RAIL_WIDTH, besideLayout } from './besideLayout';
@@ -14,6 +14,9 @@ const NO_WINDOWS: BesideRef[] = [];
 
 /** The gap, in pixels, between two pinned elements still read as one stack (`space-y-3` is 12). */
 const PINNED_GAP = 16;
+
+/** The practice header, the first act's heading and the pinned reading bar. */
+const FIRST_GROUP = 3;
 
 const OVERLAY_ID = 'reading-row-overlay';
 
@@ -160,8 +163,19 @@ export function ReadingRow(props: PracticeTableProps) {
       const pinned = [...(target?.querySelectorAll('[data-pinned-head]') ?? [])]
         .map((el) => el.getBoundingClientRect())
         .sort((x, y) => x.top - y.top);
+      const base = bottom;
+      const stack: DOMRect[] = [];
       for (const rect of pinned) {
-        if (rect.top <= bottom + PINNED_GAP && rect.bottom > bottom) bottom = rect.bottom;
+        if (rect.top <= bottom + PINNED_GAP && rect.bottom > bottom) {
+          stack.push(rect);
+          bottom = rect.bottom;
+        }
+      }
+      // A stack so deep that the window would run off the screen (several acts folded one under the
+      // other, each heading pinned): only the first group counts — the practice header, the first
+      // act's heading and the pinned bar — and the window may sit over the headings below them.
+      if (bottom + 8 + FIND_WINDOW_ESTIMATED_HEIGHT > window.innerHeight) {
+        bottom = stack.slice(0, FIRST_GROUP).reduce((low, rect) => Math.max(low, rect.bottom), base);
       }
       return { x: Math.max(column.left, column.right - FIND_WINDOW_WIDTH - FIND_WINDOW_MARGIN), y: bottom + 8 };
     });

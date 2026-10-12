@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const env = vi.hoisted(() => ({ deepStack: false }));
+
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
 vi.mock('./PracticeTable', () => ({
@@ -10,6 +12,12 @@ vi.mock('./PracticeTable', () => ({
       <div data-pinned-head data-testid="stub-act-head">Atto</div>
       <div data-pinned-head data-testid="stub-toolbar">Barra della riga aperta</div>
       <div data-pinned-head data-testid="stub-toolbar-later">Barra di una riga più in basso</div>
+      {env.deepStack && (
+        <>
+          <div data-pinned-head data-testid="stub-act-head-2">Secondo atto</div>
+          <div data-pinned-head data-testid="stub-act-head-3">Terzo atto</div>
+        </>
+      )}
       <button type="button">Dentro il tavolo</button>
     </div>
   ),
@@ -24,7 +32,9 @@ vi.mock('../search/ArticleTabContent', () => ({
 }));
 vi.mock('../decisions/DecisionEntryView', () => ({
   DecisionEntryView: ({ hostId, findHostId }: { hostId: string; findHostId?: string }) => (
-    <div data-testid="decision-reader" data-host={hostId} data-find-host={findHostId} />
+    <div data-testid="decision-reader" data-host={hostId} data-find-host={findHostId}>
+      <div data-pinned-head data-testid="stub-decision-toolbar">Barra della decisione</div>
+    </div>
   ),
 }));
 vi.mock('../decisions/DecisionSearchTabView', () => ({
@@ -34,6 +44,7 @@ vi.mock('../decisions/DecisionSearchTabView', () => ({
 import { appStore } from '../../../store/useAppStore';
 import { FindWindow } from '../search/FindWindow';
 import { closeFindWindow, openFindWindow, setFindWindowDefaultPlace } from '../../../utils/findWindowControl';
+import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { FOUND, L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 import { besideRefFor, practiceArticleKey, type BesideRef } from '../../../utils/practice';
 import { ReadingRow } from './ReadingRow';
@@ -83,7 +94,7 @@ function fakeRect(this: Element): DOMRect {
   const column = this.closest('[data-testid="reading-row-window"]');
   if (column && this.hasAttribute('data-reading-window-header')) return box(columnLeft(column) + 16, AREA_TOP, pxOf(column) - 16, 44);
   if (column && this.hasAttribute('data-reading-window-body')) return box(columnLeft(column) + 16, AREA_TOP + 44, pxOf(column) - 16, 756);
-  if (column && id === 'stub-window-toolbar') return box(columnLeft(column) + 16, AREA_TOP + 44, pxOf(column) - 16, 40);
+  if (column && (id === 'stub-window-toolbar' || id === 'stub-decision-toolbar')) return box(columnLeft(column) + 16, AREA_TOP + 44, pxOf(column) - 16, 40);
   const table = this.closest('[data-testid="reading-row-table"]');
   if (table) {
     const left = columnLeft(table);
@@ -93,6 +104,9 @@ function fakeRect(this: Element): DOMRect {
     if (id === 'stub-act-head') return box(left, scrolled ? 0 : 122, width, 50);
     if (id === 'stub-toolbar') return box(left, scrolled ? 50 : 172, width, 40);
     if (id === 'stub-toolbar-later') return box(left, 600, width, 40);
+    // A deep stack: two more acts folded one under the other, each heading pinned right under the last.
+    if (id === 'stub-act-head-2') return box(left, 212, width, 50);
+    if (id === 'stub-act-head-3') return box(left, 262, width, 50);
   }
   return box(0, 0, 0, 0);
 }
@@ -119,11 +133,13 @@ const widthOf = (testId: string, index = 0) => (screen.getAllByTestId(testId)[in
 beforeEach(() => {
   areaWidth = 1300;
   scrolled = false;
+  env.deepStack = false;
   FakeResizeObserver.all = [];
   vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(fakeRect);
   window.innerWidth = 1920;
+  window.innerHeight = 768;
   sessionStorage.clear();
   appStore.setState({
     practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
@@ -353,6 +369,20 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
     tool.remove();
   });
 
+  it('a press in a link popup portalled out of the table (a citation preview) leaves the overlay open', () => {
+    practiceWithWindows(2);
+    render(<>
+      {row()}
+      <CitationPreviewPopup
+        isVisible isLoading={false} error={null} citation={{ act_type: 'codice civile', article: '2043', confidence: 1 }}
+        article={null} position={{ top: 0, left: 0 }} onClose={vi.fn()} onOpenInTab={vi.fn()}
+      />
+    </>);
+    fireEvent.click(screen.getByTestId('practice-rail'));
+    fireEvent.pointerDown(screen.getByRole('tooltip'));
+    expect(screen.getByTestId('reading-row-overlay')).toBeInTheDocument();
+  });
+
   it('the rail names the overlay it opens, and opening it moves focus in; a reveal opening it does not', () => {
     const { practiceId, actId } = practiceWithWindows(2);
     render(row());
@@ -442,6 +472,37 @@ describe('ReadingRow — where the find window opens (spec §4.4)', () => {
     act(() => openFindWindow());
     // First window: column 148..674, body from 164 (the column\'s 16 px gap) to 674, from 94; its bar 94..134.
     expect(placeOf()).toEqual({ x: 674 - 420 - 16, y: 134 + 8 });
+  });
+
+  it('with the rail and a decision as the first window: under its pinned reading bar too', () => {
+    areaWidth = 1100;
+    const { practiceId, refs } = practiceWithWindows(0);
+    s().openBeside(practiceId, refs[1]);
+    s().openBeside(practiceId, refs[0]);
+    render(<>{row()}<FindWindow /></>);
+    act(() => openFindWindow());
+    // First window (the decision): body from 94, its bar 94..134.
+    expect(screen.getAllByTestId('reading-window')[0]).toContainElement(screen.getByTestId('stub-decision-toolbar'));
+    expect(placeOf()).toEqual({ x: 674 - 420 - 16, y: 134 + 8 });
+  });
+
+  it('a stack too deep for the screen falls back to the first group: header, first heading, pinned bar', () => {
+    env.deepStack = true;
+    practiceWithWindows(0);
+    window.innerHeight = 300;
+    render(<>{row()}<FindWindow /></>);
+    act(() => openFindWindow());
+    // The full chain ends at 312: 312 + 8 + 80 is past the 300 px screen. The first group ends at 212.
+    expect(placeOf()).toEqual({ x: 1400 - 420 - 16, y: 212 + 8 });
+  });
+
+  it('a deep stack that fits is followed to its end', () => {
+    env.deepStack = true;
+    practiceWithWindows(0);
+    window.innerHeight = 900;
+    render(<>{row()}<FindWindow /></>);
+    act(() => openFindWindow());
+    expect(placeOf().y).toBe(312 + 8);
   });
 
   it('a place the user dragged it to wins', () => {

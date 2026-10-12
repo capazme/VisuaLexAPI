@@ -35,7 +35,7 @@ export function DecisionReadingToolbar({
   isFindOpen, onToggleFind, findButtonRef,
 }: DecisionReadingToolbarProps) {
   return (
-    <div className={cn('glass-toolbar sticky top-0 mb-4 flex flex-wrap items-center justify-end gap-1 rounded-t-xl border border-b-2 border-slate-200/50 bg-white/80 p-2 backdrop-blur-md dark:border-slate-800/50 dark:bg-slate-900/80', Z_INDEX.sticky)}>
+    <div data-pinned-head className={cn('glass-toolbar sticky top-0 mb-4 flex flex-wrap items-center justify-end gap-1 rounded-t-xl border border-b-2 border-slate-200/50 bg-white/80 p-2 backdrop-blur-md dark:border-slate-800/50 dark:bg-slate-900/80', Z_INDEX.sticky)}>
       <NotesHighlightsButtons
         notesCount={notesCount}
         highlightsCount={highlightsCount}
