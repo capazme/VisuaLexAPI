@@ -43,8 +43,11 @@ const g = globalThis as unknown as Record<string, unknown>;
 let registry: Map<string, FakeHighlight>;
 let savedMatchMedia: typeof window.matchMedia;
 
+// With a URN, so the Studia row would be offered in the row variant: the window must not draw it.
+const A5_BASE = article(L24, '5');
 const A5: ArticleData = {
-  ...article(L24, '5'),
+  ...A5_BASE,
+  norma_data: { ...A5_BASE.norma_data, urn: 'urn:nir:stato:legge:2017-03-08;24~art5' },
   article_text: 'Art. 5\n\nIl risarcimento del danno ingiusto è dovuto a chi lo subisce.',
 };
 const FOUND_ANSWER: FetchDecisionAnswer = {
