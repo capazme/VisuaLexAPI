@@ -3,15 +3,31 @@ import { execSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
 import { dropDevelopmentEnv } from './devEnvGuard';
 
-// `src/config.ts` calls `dotenv.config()`, which would read a development `apps/server/.env`
-// into the run: the suite's environment is `.env.test` alone (`tests/devEnvGuard.ts`).
+// The suite's environment is `.env.test` alone (`tests/devEnvGuard.ts`). `src/config.ts` calls
+// `dotenv.config()`, which would read a development `apps/server/.env` into the run: a no-op here.
 vi.mock('dotenv', () => {
   const config = () => ({ parsed: {} });
   return { default: { config }, config };
 });
+// Prisma loads that `.env` itself, at the import and at every construction (the clients of
+// `src/lib/prisma.ts` and `tests/helpers.ts` come after this file): whatever it adds goes at once.
+vi.mock('@prisma/client', async (importOriginal) => {
+  const { dropAddedSince } = await import('./devEnvGuard');
+  const before = new Set(Object.keys(process.env));
+  const actual = await importOriginal<typeof import('@prisma/client')>();
+  dropAddedSince(before);
+  class PrismaClient extends actual.PrismaClient {
+    constructor(...args: ConstructorParameters<typeof actual.PrismaClient>) {
+      const known = new Set(Object.keys(process.env));
+      super(...args);
+      dropAddedSince(known);
+    }
+  }
+  return { ...actual, PrismaClient };
+});
 
 const prisma = new PrismaClient();
-// What constructing the client may have loaded from a development `.env`.
+// A guarded name exported by the shell, or anywhere else outside `.env.test`.
 dropDevelopmentEnv();
 
 // The texts the migrations insert (version 1 of the notice to accept). The TRUNCATE

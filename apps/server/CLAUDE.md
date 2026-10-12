@@ -499,9 +499,10 @@ database whose name lacks "test". The per-test `TRUNCATE … users CASCADE` also
 wrote once and puts them back after each truncation: every test starts with version 1 of each
 text to accept, as a fresh database has. The suite's environment is `.env.test` and the setup's own
 values, never a development `.env`: `dotenv` is mocked in the setup (so `src/config.ts` reads
-nothing), and every `OAUTH_*` / `MERLT_*` that `.env.test` does not name is dropped after the
-setup's `PrismaClient` (which loads `apps/server/.env` when the client was generated in a
-checkout that has one) — `tests/devEnvGuard.ts`. A development MCP secret once made the whole
+nothing); `@prisma/client` is wrapped there too, because Prisma loads `apps/server/.env` (when the
+client was generated in a checkout that has one) at the import and again at every construction,
+and whatever it adds is taken out at once; and every `OAUTH_*` / `MERLT_*` that `.env.test` does
+not name is dropped, a shell export too — `tests/devEnvGuard.ts`. A development MCP secret once made the whole
 OAuth suite answer `invalid_client` in the main checkout only. nock is replaced by a fetch shim (vitest
 alias) because nock 14 corrupted supertest's sockets, and the suite shares one
 persistent server bound to `127.0.0.1` (a wildcard bind on macOS could share its

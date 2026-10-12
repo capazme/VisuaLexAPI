@@ -5,9 +5,11 @@ import { resolve } from 'node:path';
  * The suite's environment is `.env.test` (through `dotenv -e .env.test`) and what the setup
  * assigns, never a development `.env`. Two things can still load `apps/server/.env` into a
  * run: `@prisma/client`, when it was generated in a checkout that has one, and
- * `dotenv.config()` in `src/config.ts`. The setup turns the second off (a mock) and drops what
- * the first brought in for the families the suite configures: every `OAUTH_*` and `MERLT_*`
- * that `.env.test` does not name. A development MCP secret once won this way, and every OAuth
+ * `dotenv.config()` in `src/config.ts`. The setup turns the second off (a mock), wraps the
+ * first so that whatever it loads is taken out at once (`dropAddedSince`, at the import and at
+ * every construction: `src/lib/prisma.ts` and `tests/helpers.ts` build clients after the setup),
+ * and drops, for the families the suite configures, every `OAUTH_*` and `MERLT_*` that
+ * `.env.test` does not name, wherever it came from (a shell export too). A development MCP secret once won this way, and every OAuth
  * exchange answered `invalid_client` in the main checkout only.
  */
 export const GUARDED = /^(OAUTH|MERLT)_/;
@@ -20,6 +22,17 @@ export function envTestKeys(file = resolve(process.cwd(), '.env.test')): Set<str
     if (name) names.add(name);
   }
   return names;
+}
+
+/**
+ * Deletes every variable that appeared since `before` was taken: what Prisma's own dotenv
+ * loaded from a development `.env` (it adds the names that are missing, at import and again
+ * at every `new PrismaClient()`). Returns the names dropped.
+ */
+export function dropAddedSince(before: ReadonlySet<string>, env: NodeJS.ProcessEnv = process.env): string[] {
+  const added = Object.keys(env).filter((name) => !before.has(name));
+  for (const name of added) delete env[name];
+  return added;
 }
 
 /** Deletes every guarded variable `.env.test` does not set; returns the names dropped. */
