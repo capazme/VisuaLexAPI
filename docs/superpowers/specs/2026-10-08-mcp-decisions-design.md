@@ -1,6 +1,6 @@
 # Court decisions through MCP, and the courts a dossier knows — proposal
 
-**Status:** proposal, nothing built. Written for the owner to accept, cut or refuse; §7 lists what only the owner can decide. No code follows until then.
+**Status:** answered and mostly built. The owner answered §7 on 12 October 2026; Part A, the Court of Justice of the EU and the administrative courts are built (`2026-10-12-decisions-mcp-and-eu-courts-design.md`, `2026-10-12-administrative-courts-design.md`). Kept as written, because those documents cite its sections. What is left of Part B — the Garante and the European Court of Human Rights — continues in `2026-10-12-garante-and-ecthr-proposal.md`.
 **Follows:** `docs/superpowers/specs/2026-10-01-sentenze-design.md` (decisions in the reader and in a dossier; its "Later" already names Consiglio di Stato, TAR and CGUE), `docs/superpowers/specs/2026-10-04-mcp-second-round-design.md` (the MCP tools, the delegated table, confirmation), `docs/superpowers/specs/2026-10-04-source-convention-design.md` (how a decision is identified and cited).
 
 ## 1. Where this comes from
