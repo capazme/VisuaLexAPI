@@ -67,6 +67,8 @@ describe('formatRetrievedUrn', () => {
     expect(formatRetrievedUrn('cassazione:civile:31310:2024')).toBe('Cass. civ., n. 31310/2024');
     expect(formatRetrievedUrn('cassazione:penale:12:2023')).toBe('Cass. pen., n. 12/2023');
     expect(formatRetrievedUrn('corte_costituzionale:131:2022')).toBe('Corte cost., n. 131/2022');
+    expect(formatRetrievedUrn('consiglio_di_stato:sent:2270:2019')).toBe('Cons. Stato, n. 2270/2019');
+    expect(formatRetrievedUrn('tar:roma:ocau:1234:2020')).toBe('TAR Lazio, Roma, n. 1234/2020');
   });
 
   it('formats a Cassazione civile massima as "Cass. civ., n. N/YYYY"', () => {

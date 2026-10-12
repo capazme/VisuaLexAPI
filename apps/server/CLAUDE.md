@@ -112,7 +112,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
   and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most
   four digits, the formation as the source names it, `data_decisione`, `cause_riunite`; design
-  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §3). Its content is checked by
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §3), and the
+  Consiglio di Stato, the C.G.A.R.S. and the TAR (`norms/adminCourts.ts`: `provvedimento`, the kind,
+  required and part of the key; a TAR's `sede`, one of the 29 of `conventions/sources/tar-seats.json`,
+  of which `SEATS` is a copy pinned by `tests/norms/adminCourts.test.ts`; numbers to 99999, years from
+  1990; design `docs/superpowers/specs/2026-10-12-administrative-courts-design.md`). Its content is checked by
   `schemas/decisionItem.ts` (unknown keys refused) when an item is added and
   when a decision's content is updated; it must stay aligned with the web's
   `parseSentenzaContent`, so change both together. The item's `title` follows
@@ -173,10 +177,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   30-second timeout. Outcomes: `added`, `already_present` (by the decision's key, against the
   dossier's `sentenza` items and earlier references: `POST /items` itself checks none),
   `not_recognised`, `court_not_supported` (with the `court` the words name), `ambiguous` (the
-  candidates' citations in `detail`), `does_not_exist` (`non_trovata` with motivo `inesistente`;
+  candidates' citations in `detail`, and what to add: the archive, a TAR's seat or the kind), `does_not_exist` (`non_trovata` with motivo `inesistente`;
   a penal suggestion in `detail`), `unavailable` (the source down, a timeout, and `fuori_archivio`
   or `anno_parziale`, which the source cannot verify). Each stored decision is what the item
-  schema admits, labelled by the server; `citation` names it in the answer. In the delegated
+  schema admits, labelled by the server; `citation` names it in the answer, and a TAR read at a
+  seat deduced from its region (D3) says which in `detail` («Sede dedotta dalla regione: Roma.»,
+  the seat named from the identity, never from the notice's words). In the delegated
   table with `dossier:write`, two points per reference, the unverified ones given back.
 - **`norms/citation.ts`** and **`norms/decisionCitation.ts`** — how the server names a
   source, in the source convention (spec
@@ -273,7 +279,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   The server derives the target from `normaKey` (`norms/decisionKey.ts`
   `readDecisionKey`, the twin of the web's `identityFromKey`, both pinned to
   `conventions/sources/decision-keys.json`): a key in the
-  `cassazione:` / `corte_costituzionale:` / `corte_giustizia_ue:` / `tribunale_ue:` space must read back (else 400) and
+  `cassazione:` / `corte_costituzionale:` / `corte_giustizia_ue:` / `tribunale_ue:` / `consiglio_di_stato:` / `cgars:` / `tar:` space must read back (else 400) and
   comes with `articleId` `''` and no `version` or `articleUrn`; an optional body
   `target: { kind, key }` is accepted only if it agrees (an article target takes no key). The answer carries
   `target` and `passageReleased`. The list queries may omit `articleId` for a

@@ -30,7 +30,7 @@ GOLDEN = _golden()
 _NORMS = [c for c in GOLDEN["norms"] if c["identity"].get("article", {}).get("status") == "current"
           and not str(c["identity"]["article"]["value"]).startswith("celex:")]
 _DECISIONS = [c for c in GOLDEN["decisions"]
-              if c["identity"].get("key", {}).get("status") in ("current", "decided") and c["identity"]["key"]["value"]]
+              if c["identity"].get("key", {}).get("status") in ("current", "decided", "proposed") and c["identity"]["key"]["value"]]
 
 
 def test_the_file_has_current_cases():
@@ -51,7 +51,8 @@ def test_current_norm_identity_is_what_generate_urn_builds(case):
 @pytest.mark.parametrize("case", _DECISIONS, ids=[c["id"] for c in _DECISIONS])
 def test_current_decision_key_is_what_the_model_builds(case):
     ref = case["input"]["reference"]
-    identity = Identity(ref["corte"], ref["numero"], ref["anno"], ref.get("archivio"))
+    identity = Identity(ref["corte"], ref["numero"], ref["anno"], ref.get("archivio"),
+                        ref.get("sede"), ref.get("provvedimento"))
     assert identity.key() == case["identity"]["key"]["value"]
 
 

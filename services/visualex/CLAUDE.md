@@ -245,8 +245,11 @@ POST unless noted, JSON bodies.
 - `POST /parse_decision {"citazioni": [...]}` — internal (the server's `POST /api/dossiers/:id/decisions`;
   not routed by the ingress, not proxied by Vite): 1–10 decisions cited in words (at most 300
   characters each) → one reading each, in order: `{riferimento}` (what `/fetch_decision` takes),
-  `{corte_non_supportata: "<court>"}` (a court recognised that VisuaLex cannot read: Consiglio di
-  Stato, TAR, Garante, Corte EDU, the Corte di giustizia tributaria) or `{non_riconosciuta: true}`.
+  `{corte_non_supportata: "<court>"}` (a court recognised that VisuaLex cannot read: the Consiglio di
+  Stato's pareri, the Garante, the Corte EDU, the Corte di giustizia tributaria) or `{non_riconosciuta: true}`.
+  The Consiglio di Stato, the C.G.A.R.S. and a TAR are read with the section, the family the words
+  name (`tipo`) and, for a TAR, the seat or the region (a region with one seat gives its seat; a
+  T.R.G.A. needs its seat): design 2026-10-12-administrative-courts §4.
   The Court of Justice and the General Court are read by their case («CGUE, C-634/21», a bare
   «T-612/17», «Corte giust., causa 26/62»: a case before 1989 only after the court's name): the case's letter names the court, whatever name precedes it.
   No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:

@@ -44,6 +44,29 @@ describe('citeStoredDecision', () => {
   });
 });
 
+describe('citeStoredDecision, the administrative courts', () => {
+  it('cites from closed values only, and needs the kind and a TAR\'s seat', () => {
+    expect(citeStoredDecision('sentenza', {
+      corte: 'tar', sede: 'roma', provvedimento: 'ocau', numero: 1234, anno: 2020, sezione: 'I', tipo: 'ordinanza',
+    })).toBe('TAR Lazio, Roma, sez. I, ord., n. 1234/2020');
+    expect(citeStoredDecision('sentenza', {
+      corte: 'consiglio_di_stato', provvedimento: 'sent', numero: 2270, anno: 2019, sezione: 'sez. VI <b>', tipo: 'sentenza',
+    })).toBe('Cons. Stato, sent., n. 2270/2019');
+    // the abbreviation is the kind's, whatever type someone else's data carries
+    expect(citeStoredDecision('sentenza', {
+      corte: 'consiglio_di_stato', provvedimento: 'ocau', numero: 2270, anno: 2019, tipo: 'sentenza',
+    })).toBe('Cons. Stato, ord., n. 2270/2019');
+    for (const content of [
+      { corte: 'tar', sede: 'atlantide', provvedimento: 'sent', numero: 1, anno: 2020 },
+      { corte: 'tar', sede: 'constructor', provvedimento: 'sent', numero: 1, anno: 2020 },
+      { corte: 'consiglio_di_stato', numero: 1, anno: 2020 },
+      { corte: 'cgars', provvedimento: 'SENT; x', numero: 1, anno: 2020 },
+    ]) {
+      expect(citeStoredDecision('sentenza', content)).toBeNull();
+    }
+  });
+});
+
 describe('citeStoredItem', () => {
   it('cites a norm by its article, a decision by its citation, anything else not at all', () => {
     expect(citeStoredItem('norm', { tipo_atto: 'codice civile', numero_articolo: '2043' })).toBe('art. 2043 c.c.');

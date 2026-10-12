@@ -163,12 +163,12 @@ def client():
 
 async def test_the_route_answers_one_reading_per_citation_in_order(client):
     resp = await client.post("/parse_decision", json={"citazioni": [
-        "Cass. civ., sez. un., n. 31310/2024", "Cons. Stato, sez. VI, n. 2270/2019", "art. 2043 c.c."]})
+        "Cass. civ., sez. un., n. 31310/2024", "Garante privacy, provv. n. 5/2021", "art. 2043 c.c."]})
     assert resp.status_code == 200
     assert (await resp.get_json()) == {"risultati": [
         {"riferimento": {"corte": "cassazione", "archivio": "civile", "sezione": "U",
                          "numero": 31310, "anno": 2024}},
-        {"corte_non_supportata": "Consiglio di Stato"},
+        {"corte_non_supportata": "Garante per la protezione dei dati personali"},
         {"non_riconosciuta": True},
     ]}
 
@@ -181,3 +181,11 @@ async def test_the_route_refuses_what_is_not_1_to_10_short_citations(client, bod
     resp = await client.post("/parse_decision", json=body)
     assert resp.status_code == 400
     assert (await resp.get_json())["esito"] == "richiesta_non_valida"
+
+
+@pytest.mark.parametrize("words", ["Cons. Stato, n. 2270/2019 e TAR Lazio", "TAR " + "Lazio " * 3000 + "n. 1/2020",
+                                   "T.R.G.A. " + "x" * 5000, "Cons. Stato, sez. " * 2000])
+def test_an_administrative_citation_is_read_quickly(words):
+    start = time.perf_counter()
+    read_decision_citation(words, TODAY)
+    assert time.perf_counter() - start < 0.2

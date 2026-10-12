@@ -47,7 +47,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
   words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
   the Cassazione, the Corte costituzionale, the Court of Justice and the General Court of the
-  Union (by their case); a court VisuaLex cannot read yet is answered `court_not_supported` with its name, and its
+  Union (by their case), the Consiglio di Stato, the C.G.A.R.S. and the TAR (by kind, and a TAR by
+  its seat, design `docs/superpowers/specs/2026-10-12-administrative-courts-design.md`); a court VisuaLex cannot read yet is answered `court_not_supported` with its name, and its
   description tells the model not to fall back to a note; design
   `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2), `omnilex_aggiungi_nota_dossier` (one plain-text
   note up to 4,000 characters, in a dossier or about one of its articles with

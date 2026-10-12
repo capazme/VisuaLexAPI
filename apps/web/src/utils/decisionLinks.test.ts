@@ -72,7 +72,7 @@ describe('decision addresses', () => {
   });
 
   it('names what is wrong and keeps what could be read', () => {
-    const parsed = parseDecisionPath({ corte: 'tar', numero: '12', anno: '2031' }, none, NOW);
+    const parsed = parseDecisionPath({ corte: 'corte-dei-conti', numero: '12', anno: '2031' }, none, NOW);
     expect(parsed.ok).toBe(false);
     if (parsed.ok) return;
     expect(Object.keys(parsed.errors).sort()).toEqual(['anno', 'corte']);

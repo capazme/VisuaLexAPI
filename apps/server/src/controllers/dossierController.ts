@@ -682,10 +682,10 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
     }
     const decision = resolution.decision!;
     const citation = citeDecision(decision);
-    if (present.has(resolution.key!)) return { reference: references[index], outcome: 'already_present', citation };
+    if (present.has(resolution.key!)) return { ...base, outcome: 'already_present', citation };
     present.add(resolution.key!);
     toCreate.push(index);
-    return { reference: references[index], outcome: 'added', citation };
+    return { ...base, outcome: 'added', citation };
   });
 
   if (toCreate.length > 0) {

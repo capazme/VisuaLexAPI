@@ -9,6 +9,7 @@ import { mapLimited, postLegalApi, SourceUnavailable } from './resolveReference'
 import { citeDecision, shortDecision, type CitableDecision } from './decisionCitation';
 import { decisionItemContentSchema, withDecisionLabel, type DecisionItemContent } from '../schemas/decisionItem';
 import { EU_CASE, EU_SECTION, isEuCourt } from './euCourts';
+import { ADMIN_SECTION, PROVVEDIMENTO, SEATS, isAdminCourt, isSeat, kindFamily } from './adminCourts';
 
 export type DecisionOutcome =
   | 'resolved'
@@ -26,7 +27,8 @@ export interface DecisionResolution {
   key?: string;
   /** The court the words name when VisuaLex has no reader for it (`court_not_supported`). */
   court?: string;
-  /** Why it was not stored, in Italian, for the person reading the answer. */
+  /** Why it was not stored, in Italian, for the person reading the answer; for a decision
+   *  stored, what the reader should know (a TAR's seat deduced from its region). */
   detail?: string;
 }
 
@@ -40,7 +42,7 @@ export const decisionLookup = { budgetMs: 100_000, concurrency: 2 };
 const SEZIONI = new Set(['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F']);
 const TIPI = new Set(['sentenza', 'ordinanza', 'ordinanza interlocutoria', 'decreto']);
 const ISO_DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
-const COURTS = new Set(['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue']);
+const COURTS = new Set(['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue', 'consiglio_di_stato', 'cgars', 'tar']);
 const ARCHIVES = new Set(['civile', 'penale']);
 
 const NOT_RECOGNISED =
@@ -52,8 +54,13 @@ type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** The decision's key, as the web's `decisionKey` writes it. */
-export function decisionKeyOf(d: { corte: string; numero: number; anno: number; archivio?: string | null }): string {
-  return d.corte === 'cassazione' ? `cassazione:${d.archivio}:${d.numero}:${d.anno}` : `${d.corte}:${d.numero}:${d.anno}`;
+export function decisionKeyOf(d: {
+  corte: string; numero: number; anno: number; archivio?: string | null; sede?: string | null; provvedimento?: string | null;
+}): string {
+  if (d.corte === 'cassazione') return `cassazione:${d.archivio}:${d.numero}:${d.anno}`;
+  if (d.corte === 'tar') return `tar:${d.sede}:${d.provvedimento}:${d.numero}:${d.anno}`;
+  if (isAdminCourt(d.corte)) return `${d.corte}:${d.provvedimento}:${d.numero}:${d.anno}`;
+  return `${d.corte}:${d.numero}:${d.anno}`;
 }
 
 /** An identity the route sent back, read from closed values only; null when it is not one. */
@@ -66,6 +73,12 @@ function identityFrom(raw: unknown): CitableDecision & { corte: string; numero: 
     if (typeof archivio !== 'string' || !ARCHIVES.has(archivio)) return null;
     return { corte, numero, anno, archivio };
   }
+  if (isAdminCourt(corte)) {
+    const { sede, provvedimento } = raw;
+    if (typeof provvedimento !== 'string' || !PROVVEDIMENTO.test(provvedimento)) return null;
+    if (corte === 'tar' && !isSeat(sede)) return null;
+    return { corte, numero, anno, provvedimento, ...(corte === 'tar' ? { sede: sede as string } : {}) };
+  }
   return { corte, numero, anno };
 }
 
@@ -76,6 +89,18 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
   if (!identity) return null;
   const attrs = isObject(attributesRaw) ? attributesRaw : {};
   const { sezione, tipo, data_deposito: deposit } = attrs;
+  if (isAdminCourt(identity.corte)) {
+    const admin = decisionItemContentSchema.safeParse({
+      corte: identity.corte, numero: identity.numero, anno: identity.anno,
+      provvedimento: identity.provvedimento,
+      ...(identity.sede ? { sede: identity.sede } : {}),
+      ...(typeof sezione === 'string' && ADMIN_SECTION.test(sezione) ? { sezione } : {}),
+      ...(typeof tipo === 'string' && tipo === kindFamily(identity.provvedimento) ? { tipo } : {}),
+      ...(typeof deposit === 'string' && ISO_DAY.test(deposit) ? { data_deposito: deposit } : {}),
+      etichetta: '-',
+    });
+    return admin.success ? withDecisionLabel(admin.data) : null;
+  }
   if (isEuCourt(identity.corte)) {
     const { data_decisione: delivered, cause_riunite: joined } = attrs;
     const eu = decisionItemContentSchema.safeParse({
@@ -104,6 +129,19 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
     etichetta: '-',
   });
   return parsed.success ? withDecisionLabel(parsed.data) : null;
+}
+
+/** What the reader should add to the words to name one of the candidates; `corte` is the court the
+ *  reference named, so a list the reader could not read still gets that court's advice. */
+function tellApart(corte: unknown, candidates: DecisionItemContent[]): string {
+  if (!isAdminCourt(corte)) return 'Indica l\'archivio (civ. o pen.).';
+  if (new Set(candidates.map((c) => c.sede)).size > 1) return 'Indica la sede del TAR.';
+  const families = new Set(candidates.map((c) => kindFamily(c.provvedimento)));
+  // two kinds of one family (an ordinanza cautelare and a collegiale): the words cannot tell them apart
+  if (candidates.length > 1 && families.size === 1 && !families.has(null)) {
+    return 'Sono provvedimenti dello stesso tipo: aprili in VisuaLex per scegliere quello giusto.';
+  }
+  return 'Indica il tipo di provvedimento (sent., ord. o decr.).';
 }
 
 /** «7 dicembre 2023» → the year an archive starts, for the reader. */
@@ -136,16 +174,21 @@ async function lookUp(reference: Json, signal: AbortSignal): Promise<DecisionRes
   if (status === 200 && data.esito === 'trovata') {
     const decision = itemFrom(data.identita, data.attributi);
     if (!decision) return { outcome: 'unavailable', detail: UNAVAILABLE };
-    return { outcome: 'resolved', decision, key: decisionKeyOf(decision) };
+    // D3: a TAR named by its region alone is read at a seat the resolver chose; say which. The
+    // seat is named from the identity, never from the notice's own words.
+    const deduced = Array.isArray(data.avvisi) && data.avvisi.some((a) => isObject(a) && a.tipo === 'sede_dedotta');
+    return {
+      outcome: 'resolved', decision, key: decisionKeyOf(decision),
+      ...(deduced && decision.sede ? { detail: `Sede dedotta dalla regione: ${SEATS[decision.sede][0]}.` } : {}),
+    };
   }
   if (status === 200 && data.esito === 'ambigua' && Array.isArray(data.candidati)) {
-    const named = data.candidati
+    const candidates = data.candidati
       .map((c) => (isObject(c) ? itemFrom(c.identita, c.attributi) : null))
-      .filter((c): c is DecisionItemContent => c !== null)
-      .map((c) => citeDecision(c));
+      .filter((c): c is DecisionItemContent => c !== null);
     return {
       outcome: 'ambiguous',
-      detail: `Più decisioni con questo numero e anno: ${named.join('; ')}. Indica l'archivio (civ. o pen.).`,
+      detail: `Più decisioni con questo numero e anno: ${candidates.map((c) => citeDecision(c)).join('; ')}. ${tellApart(reference.corte, candidates)}`,
     };
   }
   if (status === 404 && data.esito === 'non_trovata') return notFound(data);

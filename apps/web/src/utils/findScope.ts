@@ -11,13 +11,14 @@
  * same target, takes precedence (`findRootsFor`; never both, or a text would count twice).
  */
 import type { ArticleData } from '../types';
-import type { DecisionIdentity, DecisionText } from '../types/decisions';
+import type { DecisionIdentity, DecisionReference, DecisionText } from '../types/decisions';
 import type { WorkspaceTab } from '../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from './normaKeys';
 import { describeVersion, versionKey } from './versionDisplay';
 import { shortNorm } from './sources';
 import { plainText } from './threadPassages';
-import { decisionKey, formatDecisionShort } from './decisionLinks';
+import { decisionKey, formatDecisionShort, identityOf } from './decisionLinks';
+import { isAdminCourt } from './adminCourts';
 import { decisionProjection } from './decisionRender';
 import { peekDecision } from './decisionFetchCache';
 import { decisionOrder, practiceArticleKey, type Practice, type PracticeDecision } from './practice';
@@ -80,18 +81,22 @@ function articleTargets(tabId: string, articles: ArticleData[]): FindTarget[] {
   });
 }
 
+/** The identity a reference already names, or null while it names none: a bare Cassazione citation
+ *  with no archive, an administrative one with no kind, a TAR with no seat (design
+ *  2026-10-12-administrative-courts §2). There is no stable key and no text to search until then. */
+function stableIdentity(ref: DecisionReference): DecisionIdentity | null {
+  if (ref.corte === 'cassazione' && !ref.archivio) return null;
+  if (isAdminCourt(ref.corte) && (!ref.provvedimento || (ref.corte === 'tar' && !ref.sede))) return null;
+  return identityOf(ref);
+}
+
 /** A decision tab's target, or null when the reference has no archive yet (a bare Cassazione
  *  citation still resolving): there is no stable key and no text to search until then. */
 function decisionTarget(tab: WorkspaceTab): FindTarget | null {
   if (tab.view?.kind !== 'decision') return null;
   const ref = tab.view.reference;
-  if (ref.corte === 'cassazione' && !ref.archivio) return null;
-  const identity: DecisionIdentity = {
-    corte: ref.corte,
-    numero: ref.numero,
-    anno: ref.anno,
-    ...(ref.archivio ? { archivio: ref.archivio } : {}),
-  };
+  const identity = stableIdentity(ref);
+  if (!identity) return null;
   const cached = peekDecision(identity);
   return {
     tabId: tab.id,
@@ -121,8 +126,8 @@ function targetsOfTab(tab: WorkspaceTab, phone: boolean): FindTarget[] {
 /** A practice's decision entry as a target, or null while it has no archive (no stable key, no text). */
 function entryTarget(practice: Practice, entry: PracticeDecision, label: string): FindTarget | null {
   const ref = entry.reference;
-  if (ref.corte === 'cassazione' && !ref.archivio) return null;
-  const identity: DecisionIdentity = { corte: ref.corte, numero: ref.numero, anno: ref.anno, ...(ref.archivio ? { archivio: ref.archivio } : {}) };
+  const identity = stableIdentity(ref);
+  if (!identity) return null;
   const cached = peekDecision(identity);
   return {
     tabId: practice.id,
