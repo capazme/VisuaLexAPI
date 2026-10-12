@@ -47,6 +47,12 @@ describe('SettingsModal — «Modalità sviluppo»', () => {
     expect(screen.getByText(/Assistente, Grafo/)).toBeInTheDocument();
   });
 
+  it('gives the switch a 44 px hit area on a phone', () => {
+    auth.mockReturnValue({ isAdmin: false, canUseDevMode: true, devMode: false, setDevMode });
+    open();
+    expect(screen.getByRole('switch', { name: 'Modalità sviluppo' })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0');
+  });
+
   it('shows the switch on when the mode is on', () => {
     auth.mockReturnValue({ isAdmin: false, canUseDevMode: true, devMode: true, setDevMode });
     open();

@@ -98,9 +98,9 @@ describe('Sidebar — accessible names', () => {
   it('names every entry of the open user menu', () => {
     renderSidebar();
     openUserMenu();
-    for (const name of [/Impostazioni/, /Tema scuro/, /Scorciatoie/, /Esci/]) {
-      expect(screen.getByRole('button', { name })).toHaveAccessibleName();
-    }
+    const entries = screen.getAllByRole('menuitem');
+    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    for (const entry of entries) expect(entry).toHaveAccessibleName();
   });
 
   it('says whether the user menu is open', () => {
@@ -132,7 +132,7 @@ describe('Sidebar — the development mode (spec D1–D3)', () => {
     expect(within(group).getByRole('link', { name: 'Grafo' })).toHaveAttribute('href', '/grafo');
     expect(within(group).getAllByRole('link')).toHaveLength(2);
     const links = screen.getAllByRole('link');
-    expect(links.indexOf(screen.getByRole('link', { name: /Cronologia/ }))).toBeLessThan(links.indexOf(within(group).getByRole('link', { name: 'Assistente' })));
+    expect(links.indexOf(screen.getByRole('link', { name: /Analizza documento/ }))).toBeLessThan(links.indexOf(within(group).getByRole('link', { name: 'Assistente' })));
     expect(links.at(-1)).toBe(within(group).getByRole('link', { name: 'Grafo' }));
   });
 
@@ -158,48 +158,113 @@ describe('Sidebar — the user menu (spec D2)', () => {
   it('holds Impostazioni, the theme, Scorciatoie and Esci; «Pannello Admin» only for an admin', () => {
     renderSidebar();
     openUserMenu();
-    const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim());
-    expect(names).toEqual(expect.arrayContaining(['Menu utente', 'Impostazioni', 'Tema scuro', expect.stringMatching(/^Scorciatoie/), 'Esci']));
-    expect(screen.queryByRole('button', { name: /Pannello Admin/ })).toBeNull();
+    expect(screen.getByRole('menu', { name: 'Menu utente' })).toBeInTheDocument();
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    expect(screen.queryByRole('menuitem', { name: /Pannello Admin/ })).toBeNull();
   });
 
   it('shows «Pannello Admin» to an admin, before Esci', () => {
     account.isAdmin = true;
     renderSidebar();
     openUserMenu();
-    const admin = screen.getByRole('button', { name: /Pannello Admin/ });
-    expect(admin.compareDocumentPosition(screen.getByRole('button', { name: /Esci/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const admin = screen.getByRole('menuitem', { name: /Pannello Admin/ });
+    expect(admin.compareDocumentPosition(screen.getByRole('menuitem', { name: /Esci/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('names the theme it would switch to', () => {
     renderSidebar('/', { theme: 'dark' });
     openUserMenu();
-    expect(screen.getByRole('button', { name: /Tema chiaro/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Tema scuro/ })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: /Tema chiaro/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Tema scuro/ })).toBeNull();
   });
 
   it('opens Impostazioni and closes the menu (and the phone\'s menu)', () => {
     renderSidebar();
     openUserMenu();
-    fireEvent.click(screen.getByRole('button', { name: /Impostazioni/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Impostazioni/ }));
     expect(handlers.openSettings).toHaveBeenCalledTimes(1);
     expect(handlers.closeMobile).toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: /Impostazioni/ })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Impostazioni/ })).toBeNull();
   });
 
   it('opens the shortcuts', () => {
     renderSidebar();
     openUserMenu();
-    fireEvent.click(screen.getByRole('button', { name: /Scorciatoie/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Scorciatoie/ }));
     expect(handlers.openKeyboardShortcuts).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: /Scorciatoie/ })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Scorciatoie/ })).toBeNull();
   });
 
   it('switches the theme', () => {
     renderSidebar();
     openUserMenu();
-    fireEvent.click(screen.getByRole('button', { name: /Tema scuro/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Tema scuro/ }));
     expect(handlers.toggleTheme).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Sidebar — the user menu by keyboard', () => {
+  const trigger = () => screen.getByRole('button', { name: /Menu utente/ });
+
+  it('opens with ArrowDown on the first entry, and Enter on «Impostazioni» opens the settings', () => {
+    renderSidebar();
+    trigger().focus();
+    fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: /Tema scuro/ })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowUp' });
+    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
+    // Enter on a focused button is its click.
+    fireEvent.click(document.activeElement as HTMLElement);
+    expect(handlers.openSettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger()).toHaveFocus();
+  });
+
+  it('opens on the last entry with ArrowUp, and the arrows wrap, Home and End jump', () => {
+    renderSidebar();
+    trigger().focus();
+    fireEvent.keyDown(trigger(), { key: 'ArrowUp' });
+    expect(screen.getByRole('menuitem', { name: /Esci/ })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'End' });
+    expect(screen.getByRole('menuitem', { name: /Esci/ })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Home' });
+    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
+  });
+
+  it('puts focus on the first entry when the button is clicked open', () => {
+    renderSidebar();
+    openUserMenu();
+    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
+  });
+
+  it('closes with Esc and gives focus back to the avatar', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger()).toHaveFocus();
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('closes with Tab, from the avatar on', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Tab' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger()).toHaveFocus();
+  });
+
+  it('keeps its entries out of the tab order (the arrows move) and 44 px high on a phone', () => {
+    renderSidebar();
+    openUserMenu();
+    for (const entry of screen.getAllByRole('menuitem')) {
+      expect(entry).toHaveAttribute('tabindex', '-1');
+      expect(entry).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    }
   });
 });
 
@@ -207,12 +272,12 @@ describe('Sidebar — the phone\'s copy (spec D8)', () => {
   it('is the same reduced list and the same menu, closed off-canvas or open', () => {
     renderSidebar('/', { isOpen: false });
     expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
-      ['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/history'],
+      ['/', '/dossier', '/studia', '/history', '/environments', '/forum', '/documents'],
     );
     expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Sentenze|Ricerca Veloce|Impostazioni/ })).toBeNull();
     openUserMenu();
-    expect(screen.getByRole('button', { name: /Impostazioni/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toBeInTheDocument();
   });
 
   it('follows the mode like the desktop one', () => {

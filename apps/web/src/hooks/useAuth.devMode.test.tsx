@@ -77,6 +77,16 @@ describe('useAuth — development mode', () => {
     expect(sidebar.result.current.devMode).toBe(false);
   });
 
+  it('ignores a published user that is not the account it reads', async () => {
+    await signIn(user(true, false));
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { publishUser } = await import('../services/authEvents');
+    act(() => publishUser({ ...user(true, true), id: 'someone-else' }));
+    expect(result.current.devMode).toBe(false);
+    expect(result.current.user?.id).toBe('u1');
+  });
+
   it('stops listening when the component goes away', async () => {
     await signIn(user(true, false));
     const gone = renderHook(() => useAuth());

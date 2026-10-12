@@ -58,23 +58,23 @@ beforeEach(() => {
 });
 
 describe('Sidebar navigation (MERL-T single entry)', () => {
-  it('development mode on → "Assistente" (hub) plus "Grafo" (the deliberation surface), after Cronologia', () => {
+  it('development mode on → "Assistente" (hub) plus "Grafo" (the deliberation surface), after the others', () => {
     // Slice 3 D1 had a single entry; Slice 4 Decision A (absorb) made /grafo
     // the Q&A surface and points the sidebar at it too, the hub stays /merlt.
     // Both only for an account in the development mode (spec D3).
     account.devMode = true;
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/history', '/merlt', '/grafo']);
+    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/history', '/environments', '/forum', '/documents', '/merlt', '/grafo']);
     // exactly one hub entry
     expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
-    // Cronologia (/history) sits above the MERL-T entries
-    expect(hrefs.indexOf('/history')).toBeLessThan(hrefs.indexOf('/merlt'));
+    // «Analizza documento», the last of the others, sits above the MERL-T entries
+    expect(hrefs.indexOf('/documents')).toBeLessThan(hrefs.indexOf('/merlt'));
   });
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar();
-    expect(navHrefs()).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/history']);
+    expect(navHrefs()).toEqual(['/', '/dossier', '/studia', '/history', '/environments', '/forum', '/documents']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -82,7 +82,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     isMerltEnabledMock.mockReturnValue(false);
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/history']);
+    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/history', '/environments', '/forum', '/documents']);
     expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
   });
 });

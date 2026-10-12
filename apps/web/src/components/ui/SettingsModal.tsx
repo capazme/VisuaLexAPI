@@ -278,6 +278,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 <p id="dev-mode-label" className="text-sm font-medium text-slate-700 dark:text-slate-200">Modalità sviluppo</p>
                                 <p className="text-xs text-slate-500">Mostra Assistente, Grafo e gli strumenti MERL-T ancora in prova, in barra laterale e sugli articoli.</p>
                             </div>
+                            {/* The button is the hit area (44 px on a phone); the track and the thumb are drawn inside it. */}
                             <button
                                 type="button"
                                 role="switch"
@@ -285,18 +286,22 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 aria-labelledby="dev-mode-label"
                                 disabled={devModeBusy}
                                 onClick={() => void handleToggleDevMode()}
-                                className={cn(
-                                    "relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
-                                    devMode ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
-                                )}
+                                className="group inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full disabled:opacity-50 md:min-h-0 focus-visible:outline-none"
                             >
                                 <span
                                     aria-hidden
                                     className={cn(
-                                        "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                                        devMode && "translate-x-5"
+                                        "relative block h-6 w-11 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2",
+                                        devMode ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
                                     )}
-                                />
+                                >
+                                    <span
+                                        className={cn(
+                                            "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                                            devMode && "translate-x-5"
+                                        )}
+                                    />
+                                </span>
                             </button>
                         </div>
                         {devModeError && (

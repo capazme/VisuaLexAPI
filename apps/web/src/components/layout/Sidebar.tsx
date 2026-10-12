@@ -33,7 +33,7 @@ interface NavItemProps {
   hint?: string;
 }
 
-const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
+const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
 
 // Spring config for smooth animations
 const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
@@ -198,6 +198,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const { count: forumNotifications } = useForumNotifications(!!user);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0 });
 
   // Calculate menu position when showing
@@ -224,9 +225,57 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const showAssistant = devMode && isMerltEnabled();
   const showGraph = showAssistant && isMerltGraphEnabled();
 
-  // A menu entry closes the menu (and the phone's off-canvas copy) before it acts.
-  const fromMenu = (action: () => void) => () => {
+  // The menu is drawn through a portal, so it is a menu button of its own (WAI-ARIA, as `ui/MenuButton`):
+  // focus goes to the first entry when it opens (the last, from ArrowUp), the arrows, Home and End move,
+  // Esc closes and gives focus back to the avatar, Tab closes and goes on from the avatar, a click
+  // outside closes (the backdrop).
+  const [openAt, setOpenAt] = useState<'first' | 'last'>('first');
+  const menuItems = () => [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+  const openMenu = (at: 'first' | 'last') => {
+    setOpenAt(at);
+    setShowUserMenu(true);
+  };
+  const closeMenu = (returnFocus: boolean) => {
     setShowUserMenu(false);
+    if (returnFocus) userButtonRef.current?.focus();
+  };
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const items = menuItems();
+    (openAt === 'last' ? items[items.length - 1] : items[0])?.focus();
+    // Once per opening; `openAt` is set in the same update that opens it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showUserMenu]);
+
+  const onTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    // Enter and Space are the button's own click.
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      openMenu(event.key === 'ArrowDown' ? 'first' : 'last');
+    }
+  };
+
+  const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const items = menuItems();
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const move = (to: number) => {
+      event.preventDefault();
+      items[(to + items.length) % items.length]?.focus();
+    };
+    if (event.key === 'ArrowDown') move(at + 1);
+    else if (event.key === 'ArrowUp') move(at < 0 ? -1 : at - 1);
+    else if (event.key === 'Home') move(0);
+    else if (event.key === 'End') move(items.length - 1);
+    else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu(true);
+    } else if (event.key === 'Tab') closeMenu(true);
+  };
+
+  // A menu entry closes the menu (and the phone's off-canvas copy), gives focus back to the avatar (where a
+  // dialog it opens returns it) and then acts.
+  const fromMenu = (action: () => void) => () => {
+    closeMenu(true);
     closeMobile();
     action();
   };
@@ -282,10 +331,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {isStudiaEnabled() && (
           <NavItem to="/studia" icon={GraduationCap} label="Studia" id="tour-nav-studia" onClick={closeMobile} />
         )}
+        <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} badgeCount={forumNotifications.normaChanges} />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
-        <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} badgeCount={forumNotifications.normaChanges} />
         {showAssistant && (
           <div role="group" aria-label="Sviluppo" className="mt-1 flex w-full flex-col items-center gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-2">
             <span aria-hidden className="text-[9px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">Sviluppo</span>
@@ -303,7 +352,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           aria-label="Menu utente"
           aria-haspopup="menu"
           aria-expanded={showUserMenu}
-          onClick={() => setShowUserMenu(!showUserMenu)}
+          onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
+          onKeyDown={onTriggerKeyDown}
           className={cn(
             "relative flex items-center justify-center rounded-xl transition-all duration-200",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
@@ -333,10 +383,14 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             {/* Backdrop - cattura click esterni */}
             <div
               className={cn("fixed inset-0", Z_INDEX.menuBackdrop)}
-              onClick={() => setShowUserMenu(false)}
+              onClick={() => closeMenu(false)}
             />
             {/* Menu popup */}
             <div
+              ref={menuRef}
+              role="menu"
+              aria-label="Menu utente"
+              onKeyDown={onMenuKeyDown}
               style={{ bottom: menuPosition.bottom, left: menuPosition.left }}
               className={cn("fixed w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
             >
@@ -356,21 +410,23 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
               {/* Menu Items */}
               <div className="py-1">
-                <button type="button" onClick={fromMenu(openSettings)} className={menuItemClass}>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openSettings)} className={menuItemClass}>
                   <Settings size={16} />
                   Impostazioni
                 </button>
-                <button type="button" onClick={fromMenu(toggleTheme)} className={menuItemClass}>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(toggleTheme)} className={menuItemClass}>
                   {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                   {theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
                 </button>
-                <button type="button" onClick={fromMenu(openKeyboardShortcuts)} className={menuItemClass}>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openKeyboardShortcuts)} className={menuItemClass}>
                   <Keyboard size={16} />
                   Scorciatoie (?)
                 </button>
                 {isAdmin && (
                   <button
                     type="button"
+                    role="menuitem"
+                    tabIndex={-1}
                     onClick={fromMenu(() => navigate('/admin'))}
                     className={menuItemClass}
                   >
@@ -380,12 +436,14 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 )}
                 <button
                   type="button"
+                  role="menuitem"
+                  tabIndex={-1}
                   onClick={() => {
                     setShowUserMenu(false);
                     logout();
                     navigate('/login');
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 focus-visible:outline-none focus-visible:bg-red-50 dark:focus-visible:bg-red-900/20 transition-colors cursor-pointer"
                 >
                   <LogOut size={16} />
                   Esci

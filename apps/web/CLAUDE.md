@@ -64,9 +64,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   article or a topic, and `DecisionSearchTabView`, its workspace tab; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
   (a link to `/` that also opens the palette; its hover label carries ⌘K; the quick norms' dot sits under it;
-  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Ambienti, Forum,
-  «Analizza documento», Cronologia; and at the bottom only the user menu, whose dropdown holds Impostazioni,
-  the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». There is no «Ricerca Veloce», no
+  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Cronologia, Ambienti,
+  Forum, «Analizza documento»; and at the bottom only the user menu, whose dropdown holds Impostazioni,
+  the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
+  menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
+  Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
+  backdrop closes; entries are 44 px high on a phone. There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.
 - `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and

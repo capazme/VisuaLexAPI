@@ -69,7 +69,8 @@ export function useAuth() {
   useEffect(
     () =>
       subscribeToUser((user) => {
-        setState((prev) => (prev.isAuthenticated ? { ...prev, user } : prev));
+        // Only the account this instance already reads (or none yet): never a stranger's.
+        setState((prev) => (prev.isAuthenticated && (!prev.user || prev.user.id === user.id) ? { ...prev, user } : prev));
       }),
     []
   );
