@@ -56,7 +56,7 @@ const UPPERCASE_CASE_LETTER = new RegExp(`[CT](?=\\s*${EU_DASH}?\\s*\\d)`);
 // The Tribunale of the Union and the administrative tribunals are courts the app opens: they start at the
 // same place as a supported head, which wins.
 const UNSUPPORTED_HEADS = new RegExp(
-  `${LEFT}(?:corte\\s+d(?:i\\s+|['’]\\s*)appello|c\\.\\s*app(?:ello)?\\.?|app\\.|tribunale|trib\\.|corte\\s+edu|cedu|c\\.\\s*e\\.\\s*d\\.\\s*u\\.?` +
+  `${LEFT}(?:corte\\s+d(?:i\\s+|['’]\\s*)appello|c\\.\\s*app(?:ello)?\\.?|app\\.|tribunale|(?<!sez(?:ione)?\\.?\\s*|\\(\\s*)trib\\.|corte\\s+edu|cedu|c\\.\\s*e\\.\\s*d\\.\\s*u\\.?` +
     `|corte\\s+europea\\s+dei\\s+diritti\\s+dell['’]\\s*uomo|comm(?:issione)?\\.?\\s*trib(?:utaria)?\\.?|giudice\\s+di\\s+pace|g\\.\\s*d\\.\\s*p\\.)(?![\\p{L}\\p{N}])`,
   'giu',
 );
@@ -64,7 +64,7 @@ const UNSUPPORTED_HEADS = new RegExp(
 const CORTE_DI = /(?<![\p{L}\p{N}])(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+$/u;
 const CORTE_DI_REACH = 30;
 // A publication date is not the decision's: the tail ends where the Gazzetta Ufficiale begins.
-const GAZZETTA = /\(\s*in\s+g\.\s*u\b|(?<![\p{L}\p{N}])g\.\s*u\.|(?<![\p{L}\p{N}])gazzetta\s+ufficiale/u;
+const GAZZETTA = /\(\s*in\s+g\.\s*u\b|(?<![\p{L}\p{N}.])g\.\s*u\.(?!\s*e\b)|(?<![\p{L}\p{N}])gazzetta\s+ufficiale/u;
 const UNITED_SECTIONS = /^s\.?\s*u\.?$/i;
 
 interface Head {
@@ -155,7 +155,7 @@ function sentenceEnd(text: string, folded: string, start: number, limit: number)
 const CITATION_WORDS = new Set([
   'civ', 'civile', 'pen', 'penale', 'sez', 'sezione', 'sezioni', 'un', 'unite', 'unita', 'su', 'lav', 'lavoro', 'fer', 'feriale', 'ss', 'uu',
   'sent', 'sentenza', 'ord', 'ordinanza', 'decr', 'decreto', 'ad', 'adunanza', 'plen', 'plenaria', 'aut', 'ampliata', 'bis', 'ter', 'quater',
-  'causa', 'cause', 'riunite', 'giust', 'giustizia', 'ue', 'unione', 'europea', 'europee', 'comunita', 'primo', 'grado', 'stato', 'cost',
+  'ud', 'udienza', 'trib', 'tributaria', 'causa', 'cause', 'riunite', 'giust', 'giustizia', 'ue', 'unione', 'europea', 'europee', 'comunita', 'primo', 'grado', 'stato', 'cost',
   'costituzionale', 'per', 'sede', 'di', 'del', 'dello', 'della', 'dell', 'dei', 'delle', 'e', 'ed', 'con', 'il', 'la', 'lo', 'in', 'data',
   'n', 'nr', 'num', 'numero', 'dep', 'depositata', 'depositato', 'deposito', 'depositi',
   'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
@@ -163,7 +163,7 @@ const CITATION_WORDS = new Set([
 const ROMAN = /^[ivx]+$/;
 
 // Between two pieces of one citation (the number, its date, its deposit) only the words that join them.
-const JOINING_WORDS = new Set(['del', 'dell', 'il', 'dep', 'depositata', 'depositato', 'deposito']);
+const JOINING_WORDS = new Set(['del', 'dell', 'il', 'in', 'data', 'dep', 'depositata', 'depositato', 'deposito']);
 const MONTHS = 'gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre';
 // A date, or a range of days («18-25 luglio 1997»), is the citation's own when it stands between its pieces.
 const DATES = new RegExp(
@@ -179,11 +179,21 @@ function citationGap(written: string, words: ReadonlySet<string>, properNames: b
   if (STRAY_NUMBER.test(plain)) return false;
   for (const m of plain.matchAll(/\p{L}+/gu)) {
     const word = foldForSearch(m[0]);
-    if (word.length <= 1 || ROMAN.test(word) || words.has(word)) continue;
+    // single letters and Roman numerals (a section) stand in a preamble, never between the pieces of a number
+    if (words.has(word) || (words !== JOINING_WORDS && (word.length <= 1 || ROMAN.test(word)))) continue;
     if (properNames && /^\p{Lu}/u.test(m[0])) continue;
     return false;
   }
   return true;
+}
+
+// What may stand between a court's name and its own section: a seat, the court's kind («reg.», «prov.»).
+const COVER_WORDS = new Set([...CITATION_WORDS, 'reg', 'regionale', 'prov', 'provinciale', 'pace', 'appello']);
+const MAX_COVER_GAP = 60;
+
+/** Whether a section at `to` stands in the citation of the court whose name ends at `from`, not in prose after it. */
+function inCourtCitation(text: string, from: number, to: number): boolean {
+  return to - from <= MAX_COVER_GAP && citationGap(text.slice(from, to), COVER_WORDS, true);
 }
 
 /** The first index of `spans` (sorted, not overlapping) whose end is after `position`. */
@@ -210,18 +220,18 @@ export function extractDecisionCitations(
   const found: DecisionCitationSpan[] = [];
   let acts: Array<[number, number]> | null = null;
   let consumed = 0;
-  // A section written after a court belongs to that court: the context rule covers only a bare section.
-  let covered = 0;
+  // A section written in a court's citation belongs to that court: the context rule covers only a bare section.
+  let lastCourt: { end: number; coverEnd: number } | null = null;
 
   for (const head of heads) {
     if (head.start < consumed) continue;
-    if (head.section && head.start < covered) continue;
+    if (head.section && lastCourt && head.start < lastCourt.coverEnd && inCourtCitation(text, lastCourt.end, head.start)) continue;
     consumed = head.end;
     const cut = head.court ? courtStarts : starts;
     const next = firstAtOrAfter(cut, head.end);
     const limit = Math.min(head.start + MAX_TAIL, next < cut.length ? cut[next] : folded.length);
     const tailEnd = sentenceEnd(text, folded, head.start, limit);
-    if (head.court) covered = tailEnd;
+    if (head.court) lastCourt = { end: head.end, coverEnd: tailEnd };
     if (head.unsupported) continue;
     const prefix = head.section ? SYNTHETIC_COURT : '';
     const read = readDecisionCitation(prefix + folded.slice(head.start, tailEnd), { aliasTriggers: [], now });
@@ -263,7 +273,7 @@ export function extractDecisionCitations(
     }
     found.push({ start, end, reference, path: decisionPath(reference) });
     consumed = end;
-    if (head.court) covered = end;
+    if (head.court && lastCourt) lastCourt.coverEnd = end;
   }
   return found;
 }

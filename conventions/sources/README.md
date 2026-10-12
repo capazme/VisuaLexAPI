@@ -96,7 +96,9 @@ article's text or a Brocardi section, and returns the spans of the citations it 
   "cases": [
     { "text": "Cass. n. 1234 del 2020; Sez. 1, n. 5 del 2021.", "within": "cassazione",   // within: the court of the text being read
       "spans": [{ "start": 0, "end": 22, "text": "Cass. n. 1234 del 2020",             // UTF-16 offsets of `text`, and the words between them
-                  "reference": { "corte": "cassazione", "numero": 1234, "anno": 2020 }, "path": "/sentenze/cassazione/1234/2020" }],
+                  "reference": { "corte": "cassazione", "numero": 1234, "anno": 2020 }, "path": "/sentenze/cassazione/1234/2020" },
+                { "start": 24, "end": 45, "text": "Sez. 1, n. 5 del 2021",             // read as the Cassazione's because of `within`
+                  "reference": { "corte": "cassazione", "numero": 5, "anno": 2021, "sezione": "1" }, "path": "/sentenze/cassazione/5/2021?sezione=1" }],
       "status": "decided" }
   ]
 }
