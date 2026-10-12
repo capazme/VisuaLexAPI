@@ -877,7 +877,8 @@ negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80,
-overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
+`bottomNotice` 85 — MERL-T's consent prompt, over the dock and the bar of practices —, overlay band
+1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
 or Cmd/Ctrl+F opens the find window hidden under it.
@@ -977,9 +978,11 @@ meant to stay split; add new features as new files, not inside the shells:
   `usePracticeSaveActions` (the header's button, the «⋯» entries, the picker and the outcome's toast,
   portalled in the toast band: inside the bar a `fixed` child would be placed against it, gotchas 22
   and 26) and `PracticeDossierPicker` (a `ui/Modal`). Three CSS variables carry measured heights:
-  `--practice-head` (the act block's sticky heading; the rows' scroll margin reads it, and an open row
-  passes it on as `--reading-toolbar-top`, which `ReadingToolbar` reads with a `0px` fallback, so the
-  toolbar pins under the heading and is unchanged elsewhere) and `--practice-bar-height` (the bar's
+  `--practice-head` (the act block's heading, sticky from `md` up over the open rows' toolbars
+  (`Z_INDEX.stickyHead`); on a phone it wraps and scrolls with the block, and the variable is 0; the
+  rows' scroll margin reads it, and an open row passes it on as `--reading-toolbar-top`, which
+  `ReadingToolbar` reads with a `0px` fallback, so the toolbar pins under the heading and is unchanged
+  elsewhere) and `--practice-bar-height` (the bar's
   height, set by `SearchPanel` on the workspace area: the column's bottom padding keeps its last row
   clear of the bar).
   `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with

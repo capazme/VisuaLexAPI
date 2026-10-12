@@ -378,7 +378,8 @@ norma o una sentenza» (opens the palette).
   structure window (`structureWindow.blockId = act.id`); PDF calls `onViewPdf(norma.urn)`. «⋯»:
   «Sposta in un'altra pratica» (T13, a submenu of the other practices and «Nuova pratica»),
   «Rimuovi l'atto» (danger confirmation, today's wording). A chevron folds the block. The heading
-  follows the sticky-row convention (`apps/web/CLAUDE.md`, «Sticky filter rows»).
+  follows the sticky-row convention (`apps/web/CLAUDE.md`, «Sticky filter rows») from `md` up; on a phone it wraps (the title, the meta
+  line, then the tools) and scrolls with the block, since with an open row's toolbar pinned under it the two took half the screen.
 - **The index on top** (D3): one line of chips, one per row of the act («1218 · 2043 · 2236»;
   «All. A 1» for an annex, `shownAnnex`, so a code's articles show none; a past text's chip carries
   «· testo al …»), each opening its row and scrolling to it; at the end of the line, today's

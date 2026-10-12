@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
 import type { ArticleData, Norma } from '../../../types';
@@ -93,11 +93,30 @@ describe('PracticeActBlock: the heading (spec §3.2)', () => {
     expect(h.onViewPdf).toHaveBeenCalledWith(CC_RD.urn);
   });
 
-  it('the heading is sticky and tells its height to the rows, so a reading toolbar pins under it', () => {
-    const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
-    const { container } = render(<Block practiceId={practiceId} actId={actId} />);
-    expect(container.querySelector('header')).toHaveClass('sticky', 'top-0');
-    expect(container.querySelector('section')?.style.getPropertyValue('--practice-head')).toBe('0px');
+  describe('the heading\'s height, for a reading toolbar to pin under it', () => {
+    const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    beforeEach(() => {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 72 });
+    });
+    afterEach(() => {
+      if (offsetHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight);
+      h.desktop = true;
+    });
+
+    it('on the desktop the heading is sticky and tells the rows its height', () => {
+      const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
+      const { container } = render(<Block practiceId={practiceId} actId={actId} />);
+      expect(container.querySelector('header')).toHaveClass('md:sticky', 'md:top-0');
+      expect(container.querySelector('section')?.style.getPropertyValue('--practice-head')).toBe('72px');
+    });
+
+    it('on a phone the heading scrolls with the block, so the rows pin nothing under it', () => {
+      h.desktop = false;
+      const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
+      const { container } = render(<Block practiceId={practiceId} actId={actId} />);
+      expect(container.querySelector('header')).not.toHaveClass('sticky');
+      expect(container.querySelector('section')?.style.getPropertyValue('--practice-head')).toBe('0px');
+    });
   });
 
   it('the chevron folds the block: no index, no rows', () => {

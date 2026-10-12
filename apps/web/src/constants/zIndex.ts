@@ -28,6 +28,12 @@ export const Z_INDEX = {
   /** Sticky headers, fixed toolbars */
   sticky: 'z-20',
 
+  /**
+   * A sticky heading over sticky rows of its own (a practice's act heading over an open row's
+   * reading toolbar): when the row ends, its toolbar slides up under the heading, never over it.
+   */
+  stickyHead: 'z-[25]',
+
   /** Inline dropdown menus, popovers within cards */
   dropdown: 'z-30',
 
@@ -46,6 +52,13 @@ export const Z_INDEX = {
 
   /** Workspace dock / navigator — tabs clamp below this */
   dock: 'z-[80]',
+
+  /**
+   * A non-blocking notice pinned to the bottom of the screen (MERL-T's consent prompt): over the
+   * dock and the bar of practices, which sit in the same place, under the floating tools and the
+   * overlay band.
+   */
+  bottomNotice: 'z-[85]',
 
   /**
    * Floating structure (index) window. Above the dock and every tab panel,
@@ -105,11 +118,13 @@ export const Z_INDEX = {
 export const Z_INDEX_VALUES = {
   local: 10,
   sticky: 20,
+  stickyHead: 25,
   dropdown: 30,
   floating: 40,
   pinnedBar: 35,
   sidebar: 50,
   dock: 80,
+  bottomNotice: 85,
   structure: 90,
   searchPanel: 100,
   findWindow: 110,

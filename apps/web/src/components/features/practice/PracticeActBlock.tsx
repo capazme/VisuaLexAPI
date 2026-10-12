@@ -176,18 +176,24 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.6 : 1,
-        // Read by an open row's reading toolbar (`--reading-toolbar-top`) and by the rows' scroll margin.
-        ['--practice-head' as string]: `${headerHeight}px`,
+        // Read by an open row's reading toolbar (`--reading-toolbar-top`) and by the rows' scroll margin;
+        // 0 on a phone, where the heading scrolls with the block.
+        ['--practice-head' as string]: `${isDesktop ? headerHeight : 0}px`,
       }}
       aria-label={heading}
       className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
-      {/* The sticky-row convention: opaque, edge to edge, over the rows it heads. */}
+      {/* The sticky-row convention: opaque, edge to edge, over the rows it heads (and over an open
+          row's sticky toolbar, which slides up under it as the row ends). */}
       <header
         ref={headerRef}
         className={cn(
-          'sticky top-0 flex items-start gap-1 rounded-t-xl border-b border-slate-100 bg-white px-2 py-2 md:gap-2 md:px-3 dark:border-slate-700 dark:bg-slate-800',
-          Z_INDEX.sticky,
+          // On a phone the title and its meta line take the whole width and the tools wrap under
+          // them (four 44 px buttons beside the title left it a word wide); from `md` one row. Sticky
+          // from `md` only: on a phone, with an open row's toolbar pinned under it, the two took half
+          // the screen.
+          'relative flex flex-wrap items-start gap-1 rounded-t-xl border-b border-slate-100 bg-white px-2 py-2 md:sticky md:top-0 md:flex-nowrap md:gap-2 md:px-3 dark:border-slate-700 dark:bg-slate-800',
+          Z_INDEX.stickyHead,
         )}
       >
         <button
@@ -200,7 +206,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         >
           <GripVertical size={18} aria-hidden />
         </button>
-        <div className="min-w-0 flex-1 px-1 py-1">
+        <div className="min-w-0 basis-full px-1 py-1 md:flex-1 md:basis-auto">
           {/* The accordion pattern: the heading holds the toggle, its name is the act's own words. */}
           <h3 className="min-w-0">
             <div
@@ -223,14 +229,14 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                 className={cn('flex-shrink-0 text-slate-400 transition-transform', act.isCollapsed && '-rotate-90')}
               />
               {/* A cut act name says nothing: on a phone it wraps. */}
-              <span className="break-words md:truncate">{heading}</span>
+              <span className="min-w-0 break-words md:truncate">{heading}</span>
             </div>
           </h3>
           <p className="ml-6 truncate text-sm text-slate-500 dark:text-slate-400">
             {formatNormaMeta(act.norma, act.articles.length)}
           </p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-1">
+        <div className="ml-auto flex flex-shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => openStudy(current)}

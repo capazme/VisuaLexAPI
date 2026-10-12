@@ -1,7 +1,8 @@
 import { BookOpen, Layers, X } from 'lucide-react';
-import { formatDateItalianLong } from '../../../utils/dateUtils';
+import { actHeading } from '../../../utils/sources';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
 import type { NormaGroup } from './dossierUtils';
+import { shownAnnex } from './dossierLayout';
 import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 
 interface Props {
@@ -72,15 +73,15 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
               <BookOpen size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm text-slate-900 dark:text-white truncate">
-                  {g.tipo_atto}
-                  {g.numero_atto ? ` ${g.numero_atto}` : ''}
-                  {g.data ? ` — ${formatDateItalianLong(g.data)}` : ''}
+                  {actHeading(g)}
+                  {/* the main text and an annex of one act are two groups: say which is which */}
+                  {shownAnnex(g) ? ` · All. ${shownAnnex(g)}` : ''}
                 </div>
                 {historicalItemLabel(g) && (
                   <div className="text-xs font-medium text-amber-700 dark:text-amber-300 mt-0.5">{historicalItemLabel(g)}</div>
                 )}
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {g.articles.length} articoli: {g.articles.slice(0, 6).join(', ')}
+                  {g.articles.length} {g.articles.length === 1 ? 'articolo' : 'articoli'}: {g.articles.slice(0, 6).join(', ')}
                   {g.articles.length > 6 ? `, +${g.articles.length - 6} altri` : ''}
                 </div>
               </div>
