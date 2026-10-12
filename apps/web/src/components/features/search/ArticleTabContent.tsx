@@ -87,8 +87,10 @@ interface ArticleTabContentProps {
      * Where this article sits in the workspace, so a citation jump can record
      * the way back. Surfaces outside the workspace (the dossier reader) leave
      * it undefined and simply do not push — there is no tab to return to.
+     * A practice's row adds its `articleKey` (`practiceArticleKey`), so going back to a past text
+     * reveals that row, not the text in force (carry-over ruling 12).
      */
-    readingOrigin?: { tabId: string; blockId: string };
+    readingOrigin?: { tabId: string; blockId: string; articleKey?: string };
     /**
      * The workspace tab a loose article sits in, which has no norma block to come
      * back to: a decision cited in its massime opens beside that tab, with no way-back entry.
@@ -104,6 +106,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // every render and re-attach the listeners each time.
     const originTabId = readingOrigin?.tabId;
     const originBlockId = readingOrigin?.blockId;
+    const originArticleKey = readingOrigin?.articleKey;
     // Subscribe only to the store slices this component actually reads.
     // Action references are already stable across store lifetimes; the
     // useShallow on the whole picked object means a change to unrelated
@@ -211,8 +214,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         tabId: originTabId,
         blockId: originBlockId,
         articleId: uniqueArticleIdFromNorma(norma_data),
+        ...(originArticleKey ? { articleKey: originArticleKey } : {}),
         label: shortNorm(norma_data),
-    } : undefined, [originTabId, originBlockId, norma_data]);
+    } : undefined, [originTabId, originBlockId, originArticleKey, norma_data]);
     const requestedDate = norma_data.data_versione?.trim() || undefined;
     // "art. 1284 c.c., nel testo in vigore …" for a past text; null for the text in force.
     const citationNow = () => (display.canCite
@@ -721,8 +725,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Citation hover and click: a click jumps within the same act or opens a search, recording the
     // way back from this block first.
     const citationOrigin = useMemo(() => (originTabId && originBlockId
-        ? { tabId: originTabId, blockId: originBlockId, articleId: uniqueArticleIdFromNorma(norma_data), label: shortNorm(norma_data) }
-        : undefined), [originTabId, originBlockId, norma_data]);
+        ? {
+            tabId: originTabId,
+            blockId: originBlockId,
+            articleId: uniqueArticleIdFromNorma(norma_data),
+            ...(originArticleKey ? { articleKey: originArticleKey } : {}),
+            label: shortNorm(norma_data),
+        }
+        : undefined), [originTabId, originBlockId, originArticleKey, norma_data]);
     const openCitation = useCallback((parsed: ParsedCitationData) => {
         // Navigate within same norma if possible
         if (parsed.act_type === norma_data.tipo_atto && parsed.act_number === norma_data.numero_atto) {

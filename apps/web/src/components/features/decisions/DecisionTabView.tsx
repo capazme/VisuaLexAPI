@@ -1,126 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
-import type { DecisionNotice, DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
-import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
-import { addDecisionToHistory } from '../../../services/historyService';
-import { decisionKey, decisionPath, formatDecisionShort, identityOf } from '../../../utils/decisionLinks';
-import { DecisionReadingSurface } from './DecisionReadingSurface';
-import { DecisionDiscussionsWithoutText } from './DecisionDiscussionsWithoutText';
-import { DecisionView } from './DecisionView';
-
-/** Notices about what was cited (its section, the archive deduced from it), not about the decision:
- *  the tab that cited keeps them, the answer seeded for the bare identity does not carry them. */
-const ABOUT_THE_CITATION = {
-  sezione_diversa: true,
-  sezione_non_riconosciuta: true,
-  archivio_dedotto: true,
-  testo_non_disponibile: false,
-  testo_da_archivio: false,
-  causa_riunita: true,
-} satisfies Record<DecisionNotice['tipo'], boolean>;
-function withoutCitationNotices(answer: FoundDecision): FoundDecision {
-  return { ...answer, avvisi: answer.avvisi.filter((n) => !ABOUT_THE_CITATION[n.tipo]) };
-}
+import type { DecisionReference, FoundDecision } from '../../../types/decisions';
+import { formatDecisionShort } from '../../../utils/decisionLinks';
+import { DecisionAnswerBody } from './DecisionEntryView';
 
 /**
- * A decision in its workspace tab: fetched through the session cache, drawn by `DecisionView`.
- * `current` is what this tab shows (a candidate or a suggestion chosen in it replaces the tab's
- * reference); once the decision is found the store learns its identity and the tab's label. An
- * answer for a reference that is no longer `current` never reaches the view or the store.
+ * A decision in its workspace tab, the old surface's until P6: a thin wrapper over
+ * `DecisionEntryView`'s body (`DecisionAnswerBody`), which fetches and draws it. Once the decision
+ * is found the store learns the tab's identity and label (`setDecisionTabIdentity`); the Cronologia
+ * is told once per opening, the key kept on the tab (`historyRecordedKey`, persisted with it).
  */
 export function DecisionTabView({ tabId, reference }: { tabId: string; reference: DecisionReference }) {
   const setIdentity = useAppStore((s) => s.setDecisionTabIdentity);
-  const openPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const markRecorded = useAppStore((s) => s.markDecisionRecorded);
-  const takeFocusRequest = useAppStore((s) => s.takeDecisionFocusRequest);
-  const focusRequested = useAppStore((s) => s.decisionFocusRequest === tabId);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; answer: FetchDecisionAnswer } | null>(null);
-  // A candidate the reader chose in this copy. It stands only while the tab's own reference is the
-  // one it was chosen from: once the store learns the identity (`setDecisionTabIdentity`), the
-  // reference changes and every copy of this tab, the hidden one too, follows it.
-  const [chosen, setChosen] = useState<{ from: string; reference: DecisionReference } | null>(null);
-  const current = chosen && chosen.from === decisionPath(reference) ? chosen.reference : reference;
-  const key = `${decisionPath(current)}#${attempt}`;
 
-  // The store replaces a looser reference (no archive, a cited section) with the identity once the
-  // decision is found. The answer on screen is then already the one for the new reference: it stays,
-  // notices included, instead of falling back to the skeleton while the same text is asked for again.
-  const held = result?.answer.esito === 'trovata' && decisionPath(identityOf(result.answer.identita)) === decisionPath(current)
-    ? result.answer : null;
-  useEffect(() => {
-    // the answer on screen already is this reference's: nothing to ask
-    if (held) return;
-    let cancelled = false;
-    fetchDecisionCached(current).then(
-      (answer) => { if (!cancelled) setResult({ key, answer }); },
-      (error: unknown) => {
-        console.error('fetch_decision failed', { reference: current, error });
-        if (!cancelled) setResult({ key, answer: { esito: 'fonte_non_raggiungibile', fonte: 'rete' } });
-      },
-    );
-    return () => { cancelled = true; };
-  }, [current, key, held]);
-
-  const answer = result?.key === key ? result.answer : held;
-
-  useEffect(() => {
-    if (answer?.esito === 'trovata') {
-      rememberDecision(identityOf(answer.identita), withoutCitationNotices(answer));
-      setIdentity(tabId, answer.identita, formatDecisionShort({ ...answer.identita, sezione: answer.attributi.sezione }));
-    }
-  }, [answer, setIdentity, tabId]);
-
-  // The Cronologia learns the decision once per opening of the tab: the key it was told is kept on
-  // the tab (persisted with it), so a remount, a minimise and restore or a reload never records
-  // again, while a new tab for the decision does. The desktop panel and the phone view are both
-  // mounted: only the copy on screen records.
-  useEffect(() => {
-    if (answer?.esito !== 'trovata') return;
-    const panel = panelRef.current;
-    if (!panel || panel.getClientRects().length === 0) return;
-    const key = decisionKey(identityOf(answer.identita));
+  const onFound = useCallback((answer: FoundDecision) => {
+    setIdentity(tabId, answer.identita, formatDecisionShort({ ...answer.identita, sezione: answer.attributi.sezione }));
+  }, [setIdentity, tabId]);
+  const needsRecord = useCallback((key: string) => {
     const tab = appStore.getState().workspaceTabs.find((t) => t.id === tabId);
-    if (!tab || tab.historyRecordedKey === key) return;
-    markRecorded(tabId, key);
-    // the history is a convenience: the reading never fails for it
-    addDecisionToHistory(key).catch((error: unknown) => {
-      console.error('addDecisionToHistory failed', { decisionKey: key, error });
-    });
-  }, [answer, tabId, markRecorded]);
-
-  // The reader chose a candidate in another tab that turned out to be this one: the tab they were
-  // in is gone, so keyboard focus comes here rather than falling to the page.
-  // The desktop panel and the phone view are both mounted at every width and one of them is hidden:
-  // only the copy that is on screen takes the request (a hidden element cannot be focused).
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (focusRequested && panel && panel.getClientRects().length > 0 && takeFocusRequest(tabId)) {
-      (panel.querySelector<HTMLElement>('[data-decision-heading]') ?? panel)?.focus();
-    }
-  }, [focusRequested, takeFocusRequest, tabId]);
+    return Boolean(tab) && tab?.historyRecordedKey !== key;
+  }, [tabId]);
+  const onRecorded = useCallback((key: string) => markRecorded(tabId, key), [markRecorded, tabId]);
 
   return (
-    <div ref={panelRef} tabIndex={-1} data-decision-tab={tabId} className="focus:outline-none">
-      <DecisionView
-        answer={answer}
-        reference={current}
-        onRetry={() => { forgetDecision(current); setAttempt((a) => a + 1); }}
-        onChooseCandidate={(identity) => setChosen({ from: decisionPath(reference), reference: identity })}
-        onOpenPalette={() => openPaletteWith(formatDecisionShort(current))}
-        textSlot={answer?.esito === 'trovata' ? (
-          <DecisionReadingSurface
-            identity={answer.identita}
-            testo={answer.testo}
-            attributi={answer.attributi}
-            hostTabId={tabId}
-          />
-        ) : undefined}
-        noTextSlot={answer?.esito === 'trovata' ? (
-          <DecisionDiscussionsWithoutText identity={answer.identita} attributi={answer.attributi} />
-        ) : undefined}
-      />
-    </div>
+    <DecisionAnswerBody
+      reference={reference}
+      hostId={tabId}
+      focusId={tabId}
+      onFound={onFound}
+      needsRecord={needsRecord}
+      onRecorded={onRecorded}
+    />
   );
 }

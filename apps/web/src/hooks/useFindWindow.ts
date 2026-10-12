@@ -86,6 +86,8 @@ interface FlatMatch {
   targetKey: string;
   label: string;
   articleId?: string;
+  /** A practice's subject: the row to open to draw it (spec §6.7). */
+  reveal?: FindTarget['reveal'];
   onScreen: boolean;
   /** Its position among its own target's matches alone — the ordinal a pending «go to» resolves
    *  by, since the drawn and the stored count of the same text can differ (spec §13.1). */
@@ -173,6 +175,12 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const mobileActiveTabId = useAppStore((s) => s.mobileActiveTabId);
   const revealTab = useAppStore((s) => s.revealTab);
   const focusArticleInTab = useAppStore((s) => s.focusArticleInTab);
+  // The practices (flag on, spec §6.6-§6.7): what is searched, the one on screen, its open rows.
+  const practices = useAppStore((s) => s.practices);
+  const activePracticeId = useAppStore((s) => s.activePracticeId);
+  const practiceRows = useAppStore((s) => s.practiceRows);
+  const revealPracticeRow = useAppStore((s) => s.revealPracticeRow);
+  const revealPracticeDecision = useAppStore((s) => s.revealPracticeDecision);
   const isDesktop = useIsDesktop();
 
   const [state, setState] = useState(EMPTY);
@@ -203,6 +211,10 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const isDesktopRef = useRef(isDesktop);
   const revealTabRef = useRef(revealTab);
   const focusArticleInTabRef = useRef(focusArticleInTab);
+  const practicesRef = useRef(practices);
+  const activePracticeIdRef = useRef(activePracticeId);
+  const revealPracticeRowRef = useRef(revealPracticeRow);
+  const revealPracticeDecisionRef = useRef(revealPracticeDecision);
   // `prefer` applies to the first fresh computation after it is given, then it is spent: later
   // queries start from the front tab, as Cmd/Ctrl+F does.
   const preferRef = useRef(prefer);
@@ -219,6 +231,10 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
     isDesktopRef.current = isDesktop;
     revealTabRef.current = revealTab;
     focusArticleInTabRef.current = focusArticleInTab;
+    practicesRef.current = practices;
+    activePracticeIdRef.current = activePracticeId;
+    revealPracticeRowRef.current = revealPracticeRow;
+    revealPracticeDecisionRef.current = revealPracticeDecision;
   });
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -282,6 +298,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
           targetKey: target.targetKey,
           label: target.label,
           articleId: target.articleId,
+          reveal: target.reveal,
           onScreen: target.onScreen,
           ordinal,
           start,
@@ -422,8 +439,14 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
       const match = index >= 0 ? all[index] : undefined;
       if (!match || match.onScreen) return location;
       pendingRef.current = { id: match.id, ordinal: match.ordinal, direction };
-      revealTabRef.current(match.tabId);
-      if (match.articleId) focusArticleInTabRef.current(match.tabId, match.articleId);
+      if (match.reveal) {
+        // A practice's subject: its practice made active and its row opened, in one step (§6.7).
+        if (match.reveal.kind === 'article') revealPracticeRowRef.current(match.tabId, match.reveal.actId, match.reveal.articleKey);
+        else revealPracticeDecisionRef.current(match.tabId, match.reveal.decisionId);
+      } else {
+        revealTabRef.current(match.tabId);
+        if (match.articleId) focusArticleInTabRef.current(match.tabId, match.articleId);
+      }
       pendingTimerRef.current = setTimeout(onPendingTimeout, PENDING_TIMEOUT_MS);
       return location;
     },
@@ -445,7 +468,12 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
         clearPending();
         unreachableRef.current = new Set();
       }
-      const scopeState = { workspaceTabs: workspaceTabsRef.current, mobileActiveTabId: mobileActiveTabIdRef.current };
+      const scopeState = {
+        workspaceTabs: workspaceTabsRef.current,
+        mobileActiveTabId: mobileActiveTabIdRef.current,
+        practices: practicesRef.current,
+        activePracticeId: activePracticeIdRef.current,
+      };
       const front = computeFrontTabId(scopeState, isDesktopRef.current);
       // The phone's column draws norm blocks only: what it does not draw is not in the scope.
       const targets = findTargetsInScope(scopeState, scopeRef.current, front, { phone: !isDesktopRef.current });
@@ -567,10 +595,11 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   }, [open, query, run]);
 
   // The scope switches, or the workspace changes (a tab opened, closed, raised, minimised, swiped to
-  // on a phone; an article shown in a block): recompute, keeping the current match where it is.
+  // on a phone; an article shown in a block; a practice switched, a row opened or closed, a subject
+  // entering or leaving a practice): recompute, keeping the current match where it is.
   useEffect(() => {
     if (open) schedule();
-  }, [open, scope, workspaceTabs, mobileActiveTabId, isDesktop, schedule]);
+  }, [open, scope, workspaceTabs, mobileActiveTabId, practices, activePracticeId, practiceRows, isDesktop, schedule]);
 
   // A root registers or is removed anywhere (a pending «go to»'s article mounts, a tab's copy swaps
   // at a breakpoint), or a displayed root's own text changes (a note added, highlights toggled).

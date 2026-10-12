@@ -9,6 +9,8 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { versionTabSuffix } from '../../../utils/versionDisplay';
+import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
+import { practiceArticleKey } from '../../../utils/practice';
 import { SafeHTML } from '../../../utils/sanitize';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
@@ -62,7 +64,8 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
   const [version, setVersion] = useState<'vigente' | 'originale' | 'data'>('vigente');
   const [versionDate, setVersionDate] = useState('');
 
-  const { workspaceTabs } = useAppStore();
+  const workspaceTabs = useAppStore((s) => s.workspaceTabs);
+  const practices = useAppStore((s) => s.practices);
 
   // Smart citation parsing (same as CommandPalette)
   const parsedCitation = useMemo(() => {
@@ -73,10 +76,31 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
   const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
   const citationPreview = useMemo(() => parsedCitation ? formatParsedCitation(parsedCitation) : '', [parsedCitation]);
 
-  // Collect available articles from workspace tabs
+  // Collect available articles from workspace tabs, or, with the practices drawn (spec §6.8), from
+  // every practice: its acts in table order, each article named with its version and its practice.
   const availableArticles: AvailableArticle[] = [];
 
-  workspaceTabs.forEach(tab => {
+  if (isPracticeTableEnabled()) {
+    practices.forEach(practice => {
+      practice.acts.forEach(act => {
+        act.articles.forEach(article => {
+          availableArticles.push({
+            id: `${practice.id}-${act.id}-${practiceArticleKey(article)}`,
+            article,
+            sourceNorma: {
+              tipo_atto: act.norma.tipo_atto,
+              numero_atto: act.norma.numero_atto,
+              data: act.norma.data,
+              urn: act.norma.urn,
+            },
+            label: `${shortNorm(article.norma_data)}${versionSuffixOf(article)}`,
+            source: 'tab',
+            tabName: practice.label,
+          });
+        });
+      });
+    });
+  } else workspaceTabs.forEach(tab => {
     tab.content.forEach(item => {
       if (item.type === 'norma') {
         item.articles.forEach(article => {
@@ -233,7 +257,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             )}
           >
             <Layers size={14} />
-            Dalle Tab ({availableArticles.length})
+            {isPracticeTableEnabled() ? 'Dalle pratiche' : 'Dalle Tab'} ({availableArticles.length})
           </button>
           <button
             onClick={() => setActiveTab('search')}

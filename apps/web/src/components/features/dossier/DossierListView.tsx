@@ -13,7 +13,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -26,6 +26,8 @@ import {
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
+import { searchesIntoOnePractice } from './openInPractice';
+import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 import type { Dossier } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { actsSummary, layoutDossier } from './dossierLayout';
@@ -112,7 +114,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       return;
     }
     if (groups.length === 1) {
-      openGroupOnDashboard(dossier, groups[0]);
+      // With the practices a dossier of one group is opened whole, its decisions too, as from its
+      // page (spec §5.1, T17); the picker's single group below brings none.
+      if (isPracticeTableEnabled()) openAllGroupsOnDashboard(dossier, groups);
+      else openGroupOnDashboard(dossier, groups[0]);
       return;
     }
     setOpenPickerGroups({ dossier, groups });
@@ -123,7 +128,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     // (workspaceTabs is persisted in localStorage — stale tabs can linger).
     // A group asking for a past text has a tab of its own (see tabLabelForGroup).
     const tabLabel = tabLabelForGroup(dossier.title, group);
-    const tabId = addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
+    // With the practices: one practice named after the dossier, active; one group picked brings no decision.
+    const tabId = isPracticeTableEnabled()
+      ? appStore.getState().createPractice(dossier.title, { custom: true, activate: true })
+      : addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
     navigate('/');
     triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
   };
@@ -133,10 +141,13 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     // Pre-create the tabs and thread their ids to the searches so SearchPanel's
     // direct-merge path writes each group where it belongs: the texts in force
     // into the dossier's tab, every past group into a tab of its own.
-    const paramsList = searchesForGroups(
-      dossier.title, groups,
-      (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
-    );
+    // With the practices: ONE practice for every group, and the dossier's decisions, unread (T17).
+    const paramsList = isPracticeTableEnabled()
+      ? searchesIntoOnePractice(dossier, groups, true)
+      : searchesForGroups(
+        dossier.title, groups,
+        (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
+      );
     navigate('/');
     triggerMultiSearch(paramsList);
   };

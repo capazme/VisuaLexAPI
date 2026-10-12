@@ -44,6 +44,11 @@ export interface DecisionReadingSurfaceProps {
    * window) the norm opens through the ordinary search and nothing is recorded.
    */
   hostTabId?: string;
+  /**
+   * The place inside the host the way back returns to; the host itself when absent. A decision read
+   * in a row of a practice's table names its entry, so going back reveals that row.
+   */
+  hostBlockId?: string;
 }
 
 /**
@@ -52,7 +57,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle,
@@ -152,8 +157,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   }, [highlightsHidden]);
 
   const origin = useMemo<ReadingBackEntry | undefined>(
-    () => hostTabId ? { tabId: hostTabId, blockId: hostTabId, articleId: '', label } : undefined,
-    [hostTabId, label],
+    () => hostTabId ? { tabId: hostTabId, blockId: hostBlockId ?? hostTabId, articleId: '', label } : undefined,
+    [hostTabId, hostBlockId, label],
   );
 
   const openCitation = useCallback((citation: ParsedCitationData) => {

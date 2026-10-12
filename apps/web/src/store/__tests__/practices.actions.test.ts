@@ -20,6 +20,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -127,6 +128,46 @@ describe('the reveal (pendingReveal, gotcha 14)', () => {
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     expect(s().practiceRows).toEqual({});
     expect(s().pendingReveal).toBeNull();
+  });
+});
+
+describe('revealPracticeRow: the row a key names exactly (an index chip)', () => {
+  it('reveals a past-text row, never the text in force, and unfolds its act in one write', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '5', PAST)]);
+    s().toggleActCollapse(practiceId, actId);
+    const other = s().createPractice('Altra');
+    expect(s().activePracticeId).toBe(other);
+    const pastKey = practiceArticleKey(article(L24, '5', PAST));
+    const listener = vi.fn();
+    const unsubscribe = appStore.subscribe(listener);
+    expect(s().revealPracticeRow(practiceId, actId, pastKey)).toBe(true);
+    unsubscribe();
+    expect(listener).toHaveBeenCalledTimes(1);
+    const rowKey = articleRowKey(practiceId, actId, pastKey);
+    expect(s().practiceRows).toEqual({ [rowKey]: true });
+    expect(s().activePracticeId).toBe(practiceId);
+    expect(practice(practiceId).acts[0].isCollapsed).toBe(false);
+    expect(s().takeReveal(practiceId)).toEqual({ rowKey });
+  });
+
+  it('a row revealed again, already open, becomes the last one opened (the block reads from it)', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
+    const five = practiceArticleKey(article(L24, '5'));
+    const seven = practiceArticleKey(article(L24, '7'));
+    s().revealPracticeRow(practiceId, actId, five);
+    s().revealPracticeRow(practiceId, actId, seven);
+    s().revealPracticeRow(practiceId, actId, five);
+    expect(Object.keys(s().practiceRows)).toEqual([articleRowKey(practiceId, actId, seven), articleRowKey(practiceId, actId, five)]);
+  });
+
+  it('a key the act does not hold reveals nothing and writes nothing', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    const listener = vi.fn();
+    const unsubscribe = appStore.subscribe(listener);
+    expect(s().revealPracticeRow(practiceId, actId, practiceArticleKey(article(L24, '7')))).toBe(false);
+    expect(s().revealPracticeRow('nope', actId, practiceArticleKey(article(L24, '5')))).toBe(false);
+    unsubscribe();
+    expect(listener).not.toHaveBeenCalled();
   });
 });
 
@@ -247,6 +288,23 @@ describe('acts and articles', () => {
     expect(s().activePracticeId).toBe(from);
   });
 
+  it('moves an act into a practice it creates, in one write, and creates nothing when the move no-ops', () => {
+    const from = s().createPractice('Da');
+    const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')], { reveal: '5' });
+    const writes = vi.fn();
+    const stop = appStore.subscribe(writes);
+    s().moveActToPractice('no-such-act', from, { newLabel: 'l. 24/2017' });
+    expect(writes).not.toHaveBeenCalled();
+    expect(s().practices).toHaveLength(1);
+    s().moveActToPractice(actId, from, { newLabel: 'l. 24/2017' });
+    stop();
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(s().practices.map((p) => p.label)).toEqual(['Da', 'l. 24/2017']);
+    expect(practice(s().practices[1].id).acts.map((x) => x.id)).toEqual([actId]);
+    expect(practice(from).acts).toEqual([]);
+    expect(s().activePracticeId).toBe(from);
+  });
+
   it('a pending reveal follows the act it points at', () => {
     const from = s().createPractice('Da');
     const to = s().createPractice('A', { activate: false });
@@ -270,12 +328,13 @@ describe('acts and articles', () => {
   });
 
   it('the way back follows an act moved to a practice with no same act', () => {
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     const from = s().createPractice('Da');
     const to = s().createPractice('A', { activate: false });
     const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: from, blockId: actId, articleId: '5', label: 'art. 5' });
     s().moveActToPractice(actId, from, to);
-    expect(s().readingBackStack.at(-1)).toMatchObject({ tabId: to, blockId: actId });
+    expect(s().readingBackStack.at(-1)).toMatchObject({ practiceId: to, subject: { kind: 'article', actId } });
   });
 
   it('a move raises one notification', () => {
@@ -313,9 +372,10 @@ describe('acts and articles', () => {
     const moved = s().addArticlesToPractice(from, L24, [article(L24, '5')]).actId;
     const kept = s().addArticlesToPractice(to, L24, [article(L24, '7')]).actId;
     s().openStructureWindow(moved);
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     s().pushReadingBack({ tabId: from, blockId: moved, articleId: '5', label: 'art. 5' });
     s().moveActToPractice(moved, from, to);
-    expect(s().readingBackStack.at(-1)).toMatchObject({ tabId: to, blockId: kept });
+    expect(s().readingBackStack.at(-1)).toMatchObject({ practiceId: to, subject: { kind: 'article', actId: kept } });
     expect(practice(from).acts).toEqual([]);
     expect(practice(to).acts).toHaveLength(1);
     expect(practice(to).acts[0].id).toBe(kept);

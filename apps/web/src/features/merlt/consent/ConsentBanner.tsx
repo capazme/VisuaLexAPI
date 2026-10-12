@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import { Z_INDEX } from '../../../constants/zIndex';
+import { cn } from '../../../lib/utils';
 import { useConsent } from './useConsent';
 import { ConsentDialog } from './ConsentDialog';
 import { isMerltEnabled } from '../featureFlag';
@@ -101,7 +103,11 @@ export function ConsentBanner() {
           data-testid="consent-banner"
           role="region"
           aria-label="Consenso MERL-T"
-          className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-primary-200 bg-white/95 p-4 shadow-lg backdrop-blur dark:border-primary-900 dark:bg-slate-900/95"
+          className={cn(
+            'fixed bottom-4 left-1/2 w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-primary-200 bg-white/95 p-4 shadow-lg backdrop-blur dark:border-primary-900 dark:bg-slate-900/95',
+            // over the dock and the bar of practices, which sit in the same place
+            Z_INDEX.bottomNotice,
+          )}
         >
           <div className="flex items-start gap-3">
             <Sparkles className="mt-0.5 shrink-0 text-primary-500" size={20} />

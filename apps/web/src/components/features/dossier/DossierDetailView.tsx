@@ -60,6 +60,8 @@ import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
+import { searchesIntoOnePractice } from './openInPractice';
+import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 import { AddNoteModal } from './AddNoteModal';
 import { saveBlob } from '../../../utils/saveBlob';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
@@ -304,13 +306,16 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // Queue one search per norma-group (one act's, or the dossier's). The tabs are
   // created up front (the texts in force share the dossier's, each past group has
   // its own) and their ids passed as `targetTabId`, so results never leak into a
-  // pre-existing custom tab with the same label (gotcha 15).
-  const openGroupsOnDashboard = (groups: NormaGroup[]) => {
+  // pre-existing custom tab with the same label (gotcha 15). With the practices, one practice holds
+  // them all, and `everyGroup` (the whole dossier opened) brings its decisions too (spec §5.1, T17).
+  const openGroupsOnDashboard = (groups: NormaGroup[], everyGroup = false) => {
     if (groups.length === 0) return;
-    const paramsList = searchesForGroups(
-      dossier.title, groups,
-      (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
-    );
+    const paramsList = isPracticeTableEnabled()
+      ? searchesIntoOnePractice(dossier, groups, everyGroup)
+      : searchesForGroups(
+        dossier.title, groups,
+        (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
+      );
     navigate('/');
     triggerMultiSearch(paramsList);
   };
@@ -318,7 +323,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const handleOpenAllOnDashboard = () => {
     if (normaGroups.length === 0) return;
     if (normaGroups.length === 1) {
-      openGroupsOnDashboard(normaGroups);
+      openGroupsOnDashboard(normaGroups, true);
       return;
     }
     setOpenPickerGroups(normaGroups);
@@ -793,7 +798,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           }}
           onPickAll={() => {
             setOpenPickerGroups(null);
-            openGroupsOnDashboard(normaGroups);
+            openGroupsOnDashboard(normaGroups, true);
           }}
           onClose={() => setOpenPickerGroups(null)}
         />

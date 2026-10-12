@@ -20,6 +20,8 @@ import { plainText } from './threadPassages';
 import { decisionKey, formatDecisionShort } from './decisionLinks';
 import { decisionProjection } from './decisionRender';
 import { peekDecision } from './decisionFetchCache';
+import { decisionOrder, practiceArticleKey, type Practice, type PracticeDecision } from './practice';
+import { isPracticeTableEnabled } from '../features/practice/featureFlag';
 
 export type FindScope = 'tab' | 'all';
 
@@ -34,6 +36,9 @@ export interface FindTarget {
   /** Set for an article alone: `focusArticleInTab`'s second argument, to show it once its tab is
    *  raised. A decision needs no such step — bringing its tab to front shows its one text. */
   articleId?: string;
+  /** A practice's subject (flag on): the row to open to draw it (spec §6.7); its `tabId` is the
+   *  practice's id. */
+  reveal?: { kind: 'article'; actId: string; articleKey: string } | { kind: 'decision'; decisionId: string };
 }
 
 /** The store slice both functions here read — narrow, so each is tested without the whole store. */
@@ -41,6 +46,9 @@ export interface FindScopeState {
   workspaceTabs: WorkspaceTab[];
   /** The phone's tab on screen (`SearchPanel`'s carousel); absent or not open reads as the first. */
   mobileActiveTabId?: string | null;
+  /** The practices, in the bar's order, and the one on screen (flag on, spec §6.6). */
+  practices?: Practice[];
+  activePracticeId?: string | null;
 }
 
 /** A decision's projection, once per text: the find window recomputes on every workspace change,
@@ -110,6 +118,53 @@ function targetsOfTab(tab: WorkspaceTab, phone: boolean): FindTarget[] {
   return targets;
 }
 
+/** A practice's decision entry as a target, or null while it has no archive (no stable key, no text). */
+function entryTarget(practice: Practice, entry: PracticeDecision, label: string): FindTarget | null {
+  const ref = entry.reference;
+  if (ref.corte === 'cassazione' && !ref.archivio) return null;
+  const identity: DecisionIdentity = { corte: ref.corte, numero: ref.numero, anno: ref.anno, ...(ref.archivio ? { archivio: ref.archivio } : {}) };
+  const cached = peekDecision(identity);
+  return {
+    tabId: practice.id,
+    targetKey: decisionKey(identity),
+    label,
+    // A decision never read (the dossier's «Apri tutto», T17) is not in the session's cache: it counts nothing.
+    storedText: cached?.esito === 'trovata' ? projectionOf(cached.testo) : undefined,
+    reveal: { kind: 'decision', decisionId: entry.id },
+  };
+}
+
+/**
+ * A practice's targets (spec §6.6): its acts in table order, an act's articles in column order (rows
+ * open or closed, past texts included: each is its own text under its own key, which is its
+ * `practiceArticleKey`), then its decisions newest first (`decisionOrder`). A topic search holds no
+ * text. `withPractice` names the practice in each label, for «Tutte le pratiche»'s location line.
+ */
+function targetsOfPractice(practice: Practice, withPractice: boolean): FindTarget[] {
+  const named = (label: string) => (withPractice ? `${label} · ${practice.label}` : label);
+  const targets: FindTarget[] = [];
+  for (const act of practice.acts) {
+    for (const article of act.articles) {
+      const norma = article.norma_data;
+      const textVisible = describeVersion(article.validity, norma).textVisible;
+      const articleKey = practiceArticleKey(article);
+      targets.push({
+        tabId: practice.id,
+        targetKey: articleKey,
+        label: named(shortNorm(norma)),
+        storedText: textVisible ? plainText(article.article_text || '') : undefined,
+        articleId: uniqueArticleIdFromNorma(norma),
+        reveal: { kind: 'article', actId: act.id, articleKey },
+      });
+    }
+  }
+  for (const entry of decisionOrder(practice.decisions)) {
+    const target = entryTarget(practice, entry, named(entry.label));
+    if (target) targets.push(target);
+  }
+  return targets;
+}
+
 /**
  * The ordered targets of the scope: «Questa scheda» is `frontTabId` alone, «Tutte le schede» is
  * every open tab in dock order (`workspaceTabs`'s own order — `WorkspaceNavigator` renders it
@@ -125,6 +180,13 @@ export function findTargetsInScope(
   frontTabId: string | null,
   options: { phone?: boolean } = {},
 ): FindTarget[] {
+  // The practices (flag on): «Questa pratica» is the active one, «Tutte le pratiche» every practice
+  // in the bar's order. The phone draws the same column, so it leaves nothing out.
+  if (isPracticeTableEnabled()) {
+    const practices = state.practices ?? [];
+    const inScope = scope === 'tab' ? practices.filter((p) => p.id === frontTabId) : practices;
+    return inScope.flatMap((p) => targetsOfPractice(p, scope === 'all'));
+  }
   const tabs = scope === 'tab' ? state.workspaceTabs.filter((t) => t.id === frontTabId) : state.workspaceTabs;
   const targets: FindTarget[] = [];
   const seen = new Set<string>();
@@ -146,6 +208,11 @@ export function findTargetsInScope(
  * it), whatever its `zIndex`: a swipe never raises a tab. `null` with no open tab.
  */
 export function frontTabId(state: FindScopeState, isDesktop: boolean): string | null {
+  // The practices: the active one on both breakpoints (the phone shows the active practice too).
+  if (isPracticeTableEnabled()) {
+    const id = state.activePracticeId ?? null;
+    return id !== null && (state.practices ?? []).some((p) => p.id === id) ? id : null;
+  }
   if (!isDesktop) {
     const onScreen = state.workspaceTabs.find((t) => t.id === state.mobileActiveTabId) ?? state.workspaceTabs[0];
     return onScreen ? onScreen.id : null;
