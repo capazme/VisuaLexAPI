@@ -1,8 +1,18 @@
-import { beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, vi } from 'vitest';
 import { execSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
+import { dropDevelopmentEnv } from './devEnvGuard';
+
+// `src/config.ts` calls `dotenv.config()`, which would read a development `apps/server/.env`
+// into the run: the suite's environment is `.env.test` alone (`tests/devEnvGuard.ts`).
+vi.mock('dotenv', () => {
+  const config = () => ({ parsed: {} });
+  return { default: { config }, config };
+});
 
 const prisma = new PrismaClient();
+// What constructing the client may have loaded from a development `.env`.
+dropDevelopmentEnv();
 
 // The texts the migrations insert (version 1 of the notice to accept). The TRUNCATE
 // below empties their table, since it references `users`; they are read once after
@@ -17,12 +27,8 @@ let seededTexts: TextVersionRow[] = [];
 // The OAuth endpoints' own rate limits are per address, and the whole suite
 // comes from 127.0.0.1: lift them here (the flood test builds its own router
 // with a low one), and give the MCP server's credential a test value.
-// Assigned, never `??=`: `new PrismaClient()` above loads `apps/server/.env` into
-// process.env when the client was generated in a checkout that has one (the main
-// checkout, a worktree start.sh prepared), so the development stack's MCP secret was already set
-// here and won over the value the helpers send: every introspection and token
-// exchange answered `invalid_client` in those checkouts, and passed in a clean
-// worktree (`tests/oauth/testEnv.test.ts`).
+// Assigned, never `??=`: a value from outside must not win over the one the helpers
+// send (`tests/oauth/testEnv.test.ts`, and `tests/devEnvGuard.ts` for the rest).
 process.env.OAUTH_REGISTRATIONS_PER_HOUR = '100000';
 process.env.OAUTH_REQUESTS_PER_15_MINUTES = '100000';
 process.env.OAUTH_MCP_CLIENT_SECRET = 'test-mcp-client-secret';
