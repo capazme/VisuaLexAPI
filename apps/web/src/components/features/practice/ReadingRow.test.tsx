@@ -142,14 +142,13 @@ beforeEach(() => {
   scrolled = false;
   env.deepStack = false;
   FakeResizeObserver.all = [];
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(fakeRect);
   window.innerWidth = 1920;
   window.innerHeight = 768;
   sessionStorage.clear();
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     readingBackStack: [], workspaceTabs: [],
   });
 });

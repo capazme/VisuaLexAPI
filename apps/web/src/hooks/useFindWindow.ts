@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../store/useAppStore';
-import { useIsDesktop } from './useIsDesktop';
 import {
   findTargetsInScope,
   frontTabId as computeFrontTabId,
@@ -171,17 +169,14 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
  */
 export function useFindWindow({ query, scope, open, prefer = null }: UseFindWindowOptions): UseFindWindow {
   const ownerId = `find-window-${useId()}`;
-  const workspaceTabs = useAppStore(useShallow((s) => s.workspaceTabs));
-  const mobileActiveTabId = useAppStore((s) => s.mobileActiveTabId);
   const revealTab = useAppStore((s) => s.revealTab);
   const focusArticleInTab = useAppStore((s) => s.focusArticleInTab);
-  // The practices (flag on, spec §6.6-§6.7): what is searched, the one on screen, its open rows.
+  // The practices (spec §6.6-§6.7): what is searched, the one on screen, its open rows.
   const practices = useAppStore((s) => s.practices);
   const activePracticeId = useAppStore((s) => s.activePracticeId);
   const practiceRows = useAppStore((s) => s.practiceRows);
   const revealPracticeRow = useAppStore((s) => s.revealPracticeRow);
   const revealPracticeDecision = useAppStore((s) => s.revealPracticeDecision);
-  const isDesktop = useIsDesktop();
 
   const [state, setState] = useState(EMPTY);
   const stateRef = useRef(EMPTY);
@@ -206,9 +201,6 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const appliedRef = useRef('');
   const queryRef = useRef(query);
   const scopeRef = useRef(scope);
-  const workspaceTabsRef = useRef(workspaceTabs);
-  const mobileActiveTabIdRef = useRef(mobileActiveTabId);
-  const isDesktopRef = useRef(isDesktop);
   const revealTabRef = useRef(revealTab);
   const focusArticleInTabRef = useRef(focusArticleInTab);
   const practicesRef = useRef(practices);
@@ -226,9 +218,6 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
     }
     queryRef.current = query;
     scopeRef.current = scope;
-    workspaceTabsRef.current = workspaceTabs;
-    mobileActiveTabIdRef.current = mobileActiveTabId;
-    isDesktopRef.current = isDesktop;
     revealTabRef.current = revealTab;
     focusArticleInTabRef.current = focusArticleInTab;
     practicesRef.current = practices;
@@ -471,14 +460,11 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
         unreachableRef.current = new Set();
       }
       const scopeState = {
-        workspaceTabs: workspaceTabsRef.current,
-        mobileActiveTabId: mobileActiveTabIdRef.current,
         practices: practicesRef.current,
         activePracticeId: activePracticeIdRef.current,
       };
-      const front = computeFrontTabId(scopeState, isDesktopRef.current);
-      // The phone's column draws norm blocks only: what it does not draw is not in the scope.
-      const targets = findTargetsInScope(scopeState, scopeRef.current, front, { phone: !isDesktopRef.current });
+      const front = computeFrontTabId(scopeState);
+      const targets = findTargetsInScope(scopeState, scopeRef.current, front);
       const { targets: built, truncated } = buildTargets(targets, q);
       // A given-up target whose root now draws matches (a slow mount, a block the reader expanded) is
       // reachable again.
@@ -601,7 +587,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   // entering or leaving a practice): recompute, keeping the current match where it is.
   useEffect(() => {
     if (open) schedule();
-  }, [open, scope, workspaceTabs, mobileActiveTabId, practices, activePracticeId, practiceRows, isDesktop, schedule]);
+  }, [open, scope, practices, activePracticeId, practiceRows, schedule]);
 
   // A root registers or is removed anywhere (a pending «go to»'s article mounts, a tab's copy swaps
   // at a breakpoint), or a displayed root's own text changes (a note added, highlights toggled).

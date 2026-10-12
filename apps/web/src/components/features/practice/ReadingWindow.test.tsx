@@ -81,9 +81,8 @@ const drawn = (name: string) => registry.get(name)?.ranges ?? [];
 beforeEach(() => {
   vi.clearAllMocks();
   fetchDecision.mockResolvedValue(FOUND_ANSWER);
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [], bookmarks: [],
     loadAnnotationsForArticle: vi.fn(), loadHighlightsForArticle: vi.fn(),
   });

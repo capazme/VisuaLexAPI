@@ -15,7 +15,7 @@ const practice = (id: string): Practice => {
 
 beforeEach(() => {
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
   });
 });
@@ -328,7 +328,6 @@ describe('acts and articles', () => {
   });
 
   it('the way back follows an act moved to a practice with no same act', () => {
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     const from = s().createPractice('Da');
     const to = s().createPractice('A', { activate: false });
     const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
@@ -372,7 +371,6 @@ describe('acts and articles', () => {
     const moved = s().addArticlesToPractice(from, L24, [article(L24, '5')]).actId;
     const kept = s().addArticlesToPractice(to, L24, [article(L24, '7')]).actId;
     s().openStructureWindow(moved);
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     s().pushReadingBack({ tabId: from, blockId: moved, articleId: '5', label: 'art. 5' });
     s().moveActToPractice(moved, from, to);
     expect(s().readingBackStack.at(-1)).toMatchObject({ practiceId: to, subject: { kind: 'article', actId: kept } });
@@ -456,7 +454,7 @@ describe('the practices themselves', () => {
     expect(s().structureWindow.blockId).toBeNull();
   });
 
-  it('closeAllPractices empties the table and leaves the seeding marker set', () => {
+  it('closeAllPractices empties the table', () => {
     s().addArticlesToPractice(null, L24, [article(L24, '5')], { reveal: 'first' });
     s().createPractice('B');
     s().closeAllPractices();
@@ -464,7 +462,6 @@ describe('the practices themselves', () => {
     expect(s().activePracticeId).toBeNull();
     expect(s().practiceRows).toEqual({});
     expect(s().pendingReveal).toBeNull();
-    expect(s().practicesSeeded).toBe(true);
   });
 
   it('createPractice trims and caps the label, marks a custom one, activates by default', () => {

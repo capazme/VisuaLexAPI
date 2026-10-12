@@ -35,7 +35,7 @@ beforeEach(() => {
   g.CSS = { highlights: registry };
   g.Highlight = FakeHighlight;
   appStore.setState({
-    searchTrigger: null, readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [],
+    searchTrigger: null, readingBackStack: [], practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, highlights: [], annotations: [],
     loadHighlightsForArticle: vi.fn(), loadAnnotationsForArticle: vi.fn(),
   });
 });
@@ -45,8 +45,8 @@ afterEach(() => {
 });
 
 const surface = (hostTabId?: string) => <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} hostTabId={hostTabId} />;
-/** The decision in its own workspace tab, as the workspace draws it. */
-const inTab = () => surface(appStore.getState().openDecisionTab(IDENTITY));
+/** The decision as an entry of a practice, read in its row. */
+const inTab = () => surface(appStore.getState().openDecision(IDENTITY, { open: false }).practiceId);
 const withWindow = (ui: ReactNode) => <>{ui}<FindWindow /></>;
 const magnifier = () => screen.getByRole('button', { name: 'Cerca nel testo' });
 const typeQuery = (value: string) => fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value } });
@@ -77,12 +77,12 @@ describe('«Cerca nel testo» on a decision', () => {
     expect(screen.queryByRole('button', { name: 'Cerca nel testo' })).not.toBeInTheDocument();
   });
 
-  it('opens the window scoped to its tab, not a box under the toolbar', () => {
+  it('opens the window scoped to its practice, not a box under the toolbar', () => {
     render(withWindow(inTab()));
     fireEvent.click(magnifier());
     expect(screen.getByRole('search').closest('.glass-toolbar')).toBeNull();
     expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('finds a word typed without its accent, and the same word with it', async () => {

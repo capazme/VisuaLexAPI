@@ -79,8 +79,7 @@ beforeEach(() => {
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
   // The find window's scopes read the practices; the window's practice is the active one.
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
-  appStore.setState({ practices: [], activePracticeId: null, practicesSeeded: true });
+  appStore.setState({ practices: [], activePracticeId: null });
   PRACTICE = appStore.getState().createPractice('Pratica');
   appStore.setState({
     loadAnnotationsForArticle: vi.fn(), loadHighlightsForArticle: vi.fn(),

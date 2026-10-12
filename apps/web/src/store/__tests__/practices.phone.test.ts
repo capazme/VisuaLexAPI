@@ -30,11 +30,10 @@ function withArticles() {
 }
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   savedMatchMedia = window.matchMedia;
   viewport(false);
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, readingBackStack: [], workspaceTabs: [], windowFocusRequest: null, decisionFocusRequest: null,
     phoneReader: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });

@@ -14,8 +14,6 @@ const practice = (id: string): Practice => {
   if (!found) throw new Error(`no practice ${id}`);
   return found;
 };
-const flagOn = () => vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
-const flagOff = () => vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', '');
 
 const PLAIN: DecisionReference = { corte: 'cassazione', numero: 28994, anno: 2019 };
 const WITH_SECTION: DecisionReference = { ...PLAIN, sezione: '3' };
@@ -44,7 +42,7 @@ function desktop() {
 beforeEach(() => {
   savedMatchMedia = window.matchMedia;
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
     workspaceTabs: [], decisionFocusRequest: null,
   });
@@ -164,7 +162,6 @@ describe('setDecisionEntryIdentity', () => {
   });
 
   it('a found identity another entry holds merges into it: its window, its row, the way back follow, and it asks for focus', () => {
-    flagOn();
     // a citation without the archive, read in a window; then the decision cited with its archive
     const chosen = s().openDecision(HOMONYMS);
     const held = s().openDecision(FOUND, { beside: false });
@@ -277,8 +274,7 @@ describe('removePracticeDecision, openBeside, closeBeside', () => {
 });
 
 describe('the way back over practices (§6.3)', () => {
-  it('flag on: an entry naming a practice is stored as a table entry, one naming a window as a beside entry', () => {
-    flagOn();
+  it('an entry naming a practice is stored as a table entry, one naming a window as a beside entry', () => {
     const { practiceId, actId, key5, key7 } = withArticles();
     s().openBeside(practiceId, { id: articleWindowId(actId, key7), kind: 'article', actId, articleKey: key7 });
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5' });
@@ -289,16 +285,7 @@ describe('the way back over practices (§6.3)', () => {
     ]);
   });
 
-  it('flag off: every entry is kept as given', () => {
-    flagOff();
-    const { practiceId, actId } = withArticles();
-    const entry = { tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5' };
-    s().pushReadingBack(entry);
-    expect(s().readingBackStack).toEqual([entry]);
-  });
-
-  it('flag on: an entry naming a practice is the practice\'s even while a tab of the same id lives (P3 dropped the live-tab rule)', () => {
-    flagOn();
+  it('an entry naming a practice is the practice\'s even while a tab of the same id lives (P3 dropped the live-tab rule)', () => {
     const { practiceId, actId, key5 } = withArticles();
     const tab = {
       id: practiceId, label: 'Tab', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1,
@@ -313,7 +300,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('a table entry makes its practice active and reveals the row', () => {
-    flagOn();
     const { practiceId, actId, key5 } = withArticles();
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5' });
     const other = s().createPractice('Altra');
@@ -328,7 +314,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('a table entry of a decision reveals its row', () => {
-    flagOn();
     const { practiceId, decisionId } = s().openDecision(FOUND);
     s().pushReadingBack({ tabId: practiceId, blockId: decisionId, articleId: '', label: 'Cass.' });
     s().popReadingBack();
@@ -336,7 +321,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('a beside entry reopens the window, after it was closed', () => {
-    flagOn();
     desktop();
     const { practiceId, actId, key7 } = withArticles();
     const w7: BesideRef = { id: articleWindowId(actId, key7), kind: 'article', actId, articleKey: key7 };
@@ -350,7 +334,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('an entry whose practice was closed or whose subject was removed is skipped', () => {
-    flagOn();
     const kept = withArticles();
     s().pushReadingBack({ tabId: kept.practiceId, blockId: kept.actId, articleId: '5', label: 'art. 5' });
     s().pushReadingBack({ tabId: kept.practiceId, blockId: kept.actId, articleId: '7', label: 'art. 7' });
@@ -365,7 +348,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('the old tab entries still work while both shapes exist', () => {
-    flagOn();
     withArticles();
     const tab = {
       id: 'tab-a', label: 'Tab', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1,
@@ -379,7 +361,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('moving an act carries its table entries to the other practice, under the act\'s new id', () => {
-    flagOn();
     const from = s().createPractice('Da');
     const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
     const to = s().createPractice('A', { activate: false });
@@ -395,7 +376,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('an entry with the row\'s key names that row: back to a past text reveals the past text (ruling 12)', () => {
-    flagOn();
     const past = article(L24, '5', { data_versione: '2007-12-29' });
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), past]);
     const pastKey = practiceArticleKey(past);
@@ -410,7 +390,6 @@ describe('the way back over practices (§6.3)', () => {
   });
 
   it('an entry whose key no row holds falls back to the article its id names', () => {
-    flagOn();
     const { practiceId, actId, key5 } = withArticles();
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', articleKey: 'gone|key', label: 'art. 5' });
     expect(s().readingBackStack).toEqual([

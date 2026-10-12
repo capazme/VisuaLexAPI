@@ -18,7 +18,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
  */
 interface ReadingBackControlProps {
   /**
-   * Fired with the tab that was returned to, or the practice (flag on) and, for a practice, the entry
+   * Fired with the tab that was returned to, or the practice and, for a practice, the entry
    * walked back to: its subject and whether it was read in the table or beside it (spec §6.3), for
    * a view that must follow (the phone's reader, P5). The mobile layout tracks the visible tab in
    * its own index rather than through the store's front-tab ordering, so it needs telling; on

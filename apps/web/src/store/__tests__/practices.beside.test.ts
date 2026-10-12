@@ -21,10 +21,9 @@ const REF_A: DecisionReference = { corte: 'cassazione', archivio: 'civile', nume
 const REF_B: DecisionReference = { corte: 'cassazione', archivio: 'civile', numero: 22222, anno: 2021 };
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   savedMatchMedia = window.matchMedia;
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, readingBackStack: [], workspaceTabs: [], windowFocusRequest: null,
   });
 });

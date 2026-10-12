@@ -27,9 +27,8 @@ describe('ReadingBackControl after a jump to a decision', () => {
   });
 });
 
-describe('ReadingBackControl over the practices (flag on, spec §6.3 `table`)', () => {
+describe('ReadingBackControl over the practices (spec §6.3 `table`)', () => {
   it('a citation jump from a row, then back: the practice left is active, the row revealed, onNavigated names it', async () => {
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
     const { articleRowKey, practiceArticleKey } = await import('../../../utils/practice');
     appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [], workspaceTabs: [] });
@@ -49,7 +48,7 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `table`)', 
   });
 });
 
-describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)', () => {
+describe('ReadingBackControl over the practices (spec §6.3 `beside`)', () => {
   // The viewport is the store's to read once: a test that needs a desktop sets it, and it is always given back.
   const savedMatchMedia = window.matchMedia;
   const desktop = () => {
@@ -61,7 +60,6 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)',
   });
 
   async function articleWindow() {
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
     const { besideRefFor, practiceArticleKey } = await import('../../../utils/practice');
     appStore.setState({

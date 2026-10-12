@@ -31,10 +31,9 @@ const dossierOf = (items: DossierItem[]): Dossier => ({ id: 'd1', title: 'Ricors
 const TWO_PAST = dossierOf([norm('a', CIVIL), norm('b', PAST), norm('c', ORIGINAL), norm('e', L241), decision('s1', 28994), decision('s2', 577)]);
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   fetchDecision.mockReset();
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDossierItemIds: {}, pendingDossierOrders: {},
   });
 });

@@ -51,10 +51,9 @@ const title = () => screen.getByRole('heading', { level: 2 }).textContent;
 
 beforeEach(() => {
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   h.trees.length = 0;
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });

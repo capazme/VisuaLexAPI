@@ -87,7 +87,6 @@ const panel = () => render(<MemoryRouter><SearchPanel /></MemoryRouter>);
 const windowLabels = () => screen.queryAllByTestId('reading-window').map((w) => w.getAttribute('data-window-id'));
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   window.innerWidth = 1500;
   env.desktop = true;
@@ -99,7 +98,7 @@ beforeEach(() => {
   env.tree = null;
   env.annex.ENABLED = false;
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDecision: null,
     readingBackStack: [], commandPaletteOpen: false, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
     mobileActiveTabId: null, windowFocusRequest: null,

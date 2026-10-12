@@ -11,8 +11,6 @@ const practice = (id: string): Practice => {
   if (!found) throw new Error(`no practice ${id}`);
   return found;
 };
-const flagOn = () => vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
-const flagOff = () => vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', '');
 
 const REF: DecisionReference = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
 
@@ -28,7 +26,7 @@ function viewport(desktop: boolean) {
 beforeEach(() => {
   savedMatchMedia = window.matchMedia;
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
     workspaceTabs: [], decisionFocusRequest: null, pendingDecision: null,
   });
@@ -39,9 +37,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', () => {
+describe('the ways in route to the practice (spec §5, §6.1-§6.2)', () => {
   it('openDecisionTab on a phone: the decision enters the active practice once and is read in the full-screen reader', () => {
-    flagOn();
     viewport(false);
     const p = s().createPractice('Responsabilità');
     const id = s().openDecisionTab(REF);
@@ -56,13 +53,11 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
   });
 
   it('openDecisionTab with no practice creates «Sentenze»', () => {
-    flagOn();
     s().openDecisionTab(REF);
     expect(s().practices.map((p) => p.label)).toEqual(['Sentenze']);
   });
 
   it('openDecisionTab beside a practice or a window lands in that practice, not the active one', () => {
-    flagOn();
     viewport(true);
     const first = s().createPractice('Prima');
     const topic = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
@@ -75,7 +70,6 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
   });
 
   it('the same topic in two practices is two windows; a decision opened from B\'s band enters B, and B stays active', () => {
-    flagOn();
     viewport(true);
     const a = s().createPractice('A');
     const topicA = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
@@ -93,7 +87,6 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
   });
 
   it('a decision asked for by its address is drained once into the active practice', () => {
-    flagOn();
     const p = s().createPractice('P');
     s().requestOpenDecision(REF);
     s().drainPendingDecision();
@@ -103,7 +96,6 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
   });
 
   it('openDecisionSearchTab: a topic search in the active practice\'s windows, once per query', () => {
-    flagOn();
     viewport(true);
     const p = s().createPractice('P');
     const id = s().openDecisionSearchTab({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
@@ -116,14 +108,12 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
   });
 
   it('openDecisionSearchTab with no practice creates one, active', () => {
-    flagOn();
     s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
     expect(s().practices).toHaveLength(1);
     expect(s().activePracticeId).toBe(s().practices[0].id);
   });
 
   it('focusArticleInTab on a practice reveals the row holding the article', () => {
-    flagOn();
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
     s().createPractice('Altra');
     s().focusArticleInTab(practiceId, '7');
@@ -133,8 +123,28 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
     expect(s().pendingReveal).toEqual({ practiceId, rowKey });
   });
 
+  it('focusArticleInTab matches an id spelled as the tree API spells it, and an annex-prefixed one (gotcha 9)', () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, CC_RD, [
+      article(CC_RD, '1 bis'), article(CC_RD, '3', { allegato: '2' }), article(CC_RD, '9'),
+    ]);
+    s().focusArticleInTab(practiceId, '1-bis');
+    expect(s().pendingReveal).toEqual({
+      practiceId, rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(CC_RD, '1 bis'))),
+    });
+    s().focusArticleInTab(practiceId, 'all2:3');
+    expect(s().pendingReveal).toEqual({
+      practiceId, rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(CC_RD, '3', { allegato: '2' }))),
+    });
+  });
+
+  it('focusArticleInTab leaves everything alone when no article matches', () => {
+    const { practiceId } = s().addArticlesToPractice(null, CC_RD, [article(CC_RD, '1')]);
+    s().focusArticleInTab(practiceId, '9999');
+    expect(s().pendingReveal).toBeNull();
+    expect(s().practiceRows).toEqual({});
+  });
+
   it('addNormaIndexToTab drops the act on the practice it names, else the active one', () => {
-    flagOn();
     const p = s().createPractice('P');
     const actId = s().addNormaIndexToTab('not-a-practice', CC_RD);
     expect(practice(p).acts.map((a) => a.id)).toEqual([actId]);
@@ -143,7 +153,6 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
   });
 
   it('revealPracticeDecision opens the decision\'s row and makes its practice active, in one write', () => {
-    flagOn();
     const { practiceId, decisionId } = s().openDecision(FOUND, { open: false });
     s().createPractice('Altra');
     const writes: Array<string | null> = [];
@@ -163,7 +172,6 @@ describe('decisions whose identity is known (the dossier\'s «Apri tutto», T17)
   ];
 
   it('enter the practice in one write, identified with what the dossier kept, closed and unread', () => {
-    flagOn();
     const p = s().createPractice('Ricorso Rossi', { custom: true });
     const writes: number[] = [];
     const unsubscribe = appStore.subscribe((state) => writes.push(state.practices.length));
@@ -183,7 +191,6 @@ describe('decisions whose identity is known (the dossier\'s «Apri tutto», T17)
   });
 
   it('one entry per decision: an entry already there takes what the dossier knows', () => {
-    flagOn();
     const p = s().createPractice('P');
     const { decisionId } = s().openDecision({ corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019 }, { practiceId: p, open: false });
     s().addKnownDecisions(p, [DOSSIER_DECISIONS[0]]);
@@ -191,25 +198,13 @@ describe('decisions whose identity is known (the dossier\'s «Apri tutto», T17)
   });
 
   it('a practice that is not open takes nothing', () => {
-    flagOn();
     s().addKnownDecisions('gone', DOSSIER_DECISIONS);
-    expect(s().practices).toEqual([]);
-  });
-});
-
-describe('the ways in are unchanged with the flag off', () => {
-  it('openDecisionTab and openDecisionSearchTab open tabs; no practice is written', () => {
-    flagOff();
-    s().openDecisionTab(REF);
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
-    expect(s().workspaceTabs.map((t) => t.view?.kind)).toEqual(['decision', 'decision-search']);
     expect(s().practices).toEqual([]);
   });
 });
 
 describe('the live-tab rule is gone (carry-over rulings 10, 14)', () => {
   it('moving an act leaves a tab-shaped entry as it was', () => {
-    flagOn();
     const from = s().createPractice('Da');
     const { actId } = s().addArticlesToPractice(from, L24, [article(L24, '5')]);
     const to = s().createPractice('A', { activate: false });

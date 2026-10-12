@@ -106,34 +106,40 @@ function mountRoot(tabId: string, n: NormaVisitata, html: string): HTMLElement {
   return element;
 }
 
-function addTab(label: string, n: NormaVisitata, text: string, flags: { minimised?: boolean } = {}): string {
-  const id = appStore.getState().addWorkspaceTab(label, n, [article(n, text)]);
-  if (flags.minimised) {
-    appStore.setState((s) => ({ workspaceTabs: s.workspaceTabs.map((t) => (t.id === id ? { ...t, isMinimized: true } : t)) }));
-  }
+/** A practice holding `articles` of one act; it becomes the active one, as a search's would. */
+function addPractice(label: string, n: NormaVisitata, articles: ArticleData[]): string {
+  const id = appStore.getState().createPractice(label, { custom: true });
+  appStore.getState().addArticlesToPractice(id, n, articles);
+  return id;
+}
+
+/** A practice with one article, not left in front: the practice that was active stays so. */
+function addTab(label: string, n: NormaVisitata, text: string, flags: { background?: boolean } = {}): string {
+  const front = appStore.getState().activePracticeId;
+  const id = addPractice(label, n, [article(n, text)]);
+  if (flags.background && front) appStore.getState().setActivePractice(front);
   return id;
 }
 
 /** Spies on the store actions that can move the reader. */
 function spyMoves() {
   const spies = {
-    revealTab: vi.fn(appStore.getState().revealTab),
-    bringTabToFront: vi.fn(appStore.getState().bringTabToFront),
-    focusArticleInTab: vi.fn(appStore.getState().focusArticleInTab),
+    revealPracticeRow: vi.fn(appStore.getState().revealPracticeRow),
+    revealPracticeDecision: vi.fn(appStore.getState().revealPracticeDecision),
   };
   appStore.setState(spies);
   return spies;
 }
 
 const originalActions = {
-  revealTab: appStore.getState().revealTab,
-  bringTabToFront: appStore.getState().bringTabToFront,
-  focusArticleInTab: appStore.getState().focusArticleInTab,
+  revealPracticeRow: appStore.getState().revealPracticeRow,
+  revealPracticeDecision: appStore.getState().revealPracticeDecision,
 };
+const NO_PRACTICES = { practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null };
 
 beforeEach(() => {
   vi.useFakeTimers();
-  appStore.setState({ workspaceTabs: [], highestZIndex: 0, mobileActiveTabId: null, ...originalActions });
+  appStore.setState({ ...NO_PRACTICES, ...originalActions });
   saved = {
     css: g.CSS,
     highlight: g.Highlight,
@@ -159,12 +165,12 @@ afterEach(() => {
   window.matchMedia = saved.matchMedia;
   (HTMLElement.prototype as unknown as Record<string, unknown>).scrollIntoView = saved.scrollIntoView;
   document.body.innerHTML = '';
-  appStore.setState({ workspaceTabs: [], mobileActiveTabId: null, ...originalActions });
+  appStore.setState({ ...NO_PRACTICES, ...originalActions });
 });
 
 describe('useFindWindow — what is counted and drawn', () => {
   it('counts matches drawn on screen and matches only stored together, and draws only the ones on screen', async () => {
-    const tabId = appStore.getState().addWorkspaceTab('Codice civile', NORMA_1, [
+    const tabId = addPractice('Codice civile', NORMA_1, [
       article(NORMA_1, 'il fatto e certo'),
       article(NORMA_2, 'anche qui un fatto'),
     ]);
@@ -181,12 +187,13 @@ describe('useFindWindow — what is counted and drawn', () => {
     expect(currentText()?.toLowerCase()).toBe('fatto');
   });
 
-  it('orders the matches by tab as the dock orders them', async () => {
-    const a = addTab('A', NORMA_1, 'fatto a', { minimised: true });
-    const b = addTab('B', NORMA_2, 'fatto b', { minimised: true });
-    const c = addTab('C', NORMA_3, 'fatto c', { minimised: true });
-    // The dock's order is the store's: C moved first.
-    appStore.getState().reorderWorkspaceTabs(2, 0);
+  it('orders the matches by practice as the bar orders them', async () => {
+    const a = addTab('A', NORMA_1, 'fatto a', { background: true });
+    const b = addTab('B', NORMA_2, 'fatto b', { background: true });
+    const c = addTab('C', NORMA_3, 'fatto c', { background: true });
+    // The bar's order is the store's: C moved first.
+    appStore.getState().reorderPractices(2, 0);
+    appStore.getState().setActivePractice(c);
 
     render(<Harness query="fatto" scope="all" open />);
     await settle();
@@ -215,11 +222,11 @@ describe('useFindWindow — what is counted and drawn', () => {
 });
 
 describe('useFindWindow — typing never moves the reader', () => {
-  it('takes the front tab\'s first match, a drawn one first, and scrolls only to it', async () => {
-    // A, first in the dock, has a drawn match; B is in front, with a stored match first and a drawn one after.
+  it('takes the active practice\'s first match, a drawn one first, and scrolls only to it', async () => {
+    // A, first in the bar, has a drawn match; B is active, with a stored match first and a drawn one after.
     const a = addTab('A', NORMA_3, 'un fatto in A');
     mountRoot(a, NORMA_3, 'un fatto in A');
-    const b = appStore.getState().addWorkspaceTab('B', NORMA_1, [article(NORMA_1, 'fatto non disegnato'), article(NORMA_2, 'fatto disegnato')]);
+    const b = addPractice('B', NORMA_1, [article(NORMA_1, 'fatto non disegnato'), article(NORMA_2, 'fatto disegnato')]);
     const drawnB = mountRoot(b, NORMA_2, '<p>fatto disegnato</p>');
     const moves = spyMoves();
 
@@ -231,34 +238,31 @@ describe('useFindWindow — typing never moves the reader', () => {
     expect(latest.index).toBe(2);
     expect(currentRange()?.startContainer).toBe(drawnB.querySelector('p')!.firstChild);
     expect(scrolled).toHaveBeenCalledTimes(1);
-    expect(moves.revealTab).not.toHaveBeenCalled();
-    expect(moves.bringTabToFront).not.toHaveBeenCalled();
-    expect(moves.focusArticleInTab).not.toHaveBeenCalled();
+    expect(moves.revealPracticeRow).not.toHaveBeenCalled();
+    expect(moves.revealPracticeDecision).not.toHaveBeenCalled();
   });
 
-  it('with no match in the front tab, the first match overall is current but nothing is raised or shown', async () => {
+  it('with no match in the active practice, the first match overall is current but nothing is raised or shown', async () => {
     const front = addTab('Davanti', NORMA_1, 'niente qui');
     mountRoot(front, NORMA_1, 'niente qui');
-    const away = addTab('Altrove', NORMA_2, 'un fatto altrove', { minimised: true });
-    appStore.getState().bringTabToFront(front);
+    const away = addTab('Altrove', NORMA_2, 'un fatto altrove', { background: true });
+    appStore.getState().setActivePractice(front);
     const moves = spyMoves();
 
     render(<Harness query="fatto" scope="all" open />);
     await settle();
 
     expect(latest.count).toBe(1);
-    expect(latest.current).toEqual({ tabId: away, targetKey: targetKeyOf(NORMA_2), label: 'art. 2 c.c.', onScreen: false });
-    expect(moves.revealTab).not.toHaveBeenCalled();
-    expect(moves.bringTabToFront).not.toHaveBeenCalled();
-    expect(moves.focusArticleInTab).not.toHaveBeenCalled();
+    expect(latest.current).toEqual({ tabId: away, targetKey: targetKeyOf(NORMA_2), label: 'art. 2 c.c. · Altrove', onScreen: false });
+    expect(moves.revealPracticeRow).not.toHaveBeenCalled();
     expect(scrolled).not.toHaveBeenCalled();
-    expect(appStore.getState().workspaceTabs.find((t) => t.id === away)?.isMinimized).toBe(true);
+    expect(appStore.getState().activePracticeId).toBe(front);
 
     // A recompute (the workspace changes) does not move the reader either.
-    act(() => appStore.getState().addWorkspaceTab('Vuota'));
+    act(() => { appStore.getState().createPractice('Vuota', { activate: false }); });
     await settle(50);
-    expect(moves.revealTab).not.toHaveBeenCalled();
-    expect(moves.focusArticleInTab).not.toHaveBeenCalled();
+    expect(moves.revealPracticeRow).not.toHaveBeenCalled();
+    expect(appStore.getState().activePracticeId).toBe(front);
   });
 });
 
@@ -266,8 +270,8 @@ describe('useFindWindow — going to an undrawn match', () => {
   it('next() reveals its tab and shows the article, and the match becomes current once a root registers for it', async () => {
     const front = addTab('Davanti', NORMA_2, 'un fatto qui');
     mountRoot(front, NORMA_2, 'un fatto qui');
-    const away = addTab('Altrove', NORMA_1, 'il fatto e certo', { minimised: true });
-    appStore.getState().bringTabToFront(front);
+    const away = addTab('Altrove', NORMA_1, 'il fatto e certo', { background: true });
+    appStore.getState().setActivePractice(front);
     const moves = spyMoves();
 
     render(<Harness query="fatto" scope="all" open />);
@@ -275,11 +279,11 @@ describe('useFindWindow — going to an undrawn match', () => {
     expect(latest.current?.tabId).toBe(front);
 
     act(() => latest.next());
-    expect(latest.current).toEqual({ tabId: away, targetKey: targetKeyOf(NORMA_1), label: 'art. 1 c.c.', onScreen: false });
-    expect(moves.revealTab).toHaveBeenCalledExactlyOnceWith(away);
-    expect(moves.focusArticleInTab).toHaveBeenCalledWith(away, '1');
-    expect(moves.bringTabToFront).not.toHaveBeenCalled();
-    expect(appStore.getState().workspaceTabs.find((t) => t.id === away)?.isMinimized).toBe(false);
+    expect(latest.current).toEqual({ tabId: away, targetKey: targetKeyOf(NORMA_1), label: 'art. 1 c.c. · Altrove', onScreen: false });
+    expect(moves.revealPracticeRow).toHaveBeenCalledTimes(1);
+    expect(moves.revealPracticeRow.mock.calls[0][0]).toBe(away);
+    expect(moves.revealPracticeRow.mock.calls[0][2]).toBe(targetKeyOf(NORMA_1));
+    expect(appStore.getState().activePracticeId).toBe(away);
     expect(currentRange()).toBeUndefined();
 
     // The article's surface mounts (what revealing the tab causes): its root registers.
@@ -291,21 +295,21 @@ describe('useFindWindow — going to an undrawn match', () => {
     expect(latest.current?.onScreen).toBe(true);
     expect(latest.index).toBe(1);
     expect(currentText()?.toLowerCase()).toBe('fatto');
-    expect(moves.revealTab).toHaveBeenCalledTimes(1);
+    expect(moves.revealPracticeRow).toHaveBeenCalledTimes(1);
   });
 
   it('gives a target up after 3 s with no root: it is revealed once, the window moves once, and navigation skips it', async () => {
     const front = addTab('Davanti', NORMA_2, 'un fatto qui');
     mountRoot(front, NORMA_2, 'un fatto qui');
-    const away = addTab('Altrove', NORMA_1, 'il fatto mai disegnato', { minimised: true });
-    appStore.getState().bringTabToFront(front);
+    const away = addTab('Altrove', NORMA_1, 'il fatto mai disegnato', { background: true });
+    appStore.getState().setActivePractice(front);
     const moves = spyMoves();
 
     render(<Harness query="fatto" scope="all" open />);
     await settle();
     act(() => latest.next());
     expect(latest.current?.tabId).toBe(away);
-    expect(moves.revealTab).toHaveBeenCalledTimes(1);
+    expect(moves.revealPracticeRow).toHaveBeenCalledTimes(1);
 
     await settle(2900);
     expect(latest.current?.tabId).toBe(away);
@@ -318,15 +322,14 @@ describe('useFindWindow — going to an undrawn match', () => {
     act(() => latest.next());
     await settle(10_000);
     expect(latest.current?.tabId).toBe(front);
-    expect(moves.revealTab).toHaveBeenCalledTimes(1);
-    expect(moves.bringTabToFront).not.toHaveBeenCalled();
+    expect(moves.revealPracticeRow).toHaveBeenCalledTimes(1);
     // Given up, so no longer counted: the counter counts what can be reached.
     expect(latest.count).toBe(1);
     expect(latest.index).toBe(0);
   });
 
   it('a given-up target leaves the counter even when there is nowhere else to go', async () => {
-    const away = addTab('Altrove', NORMA_1, 'il fatto mai disegnato', { minimised: true });
+    const away = addTab('Altrove', NORMA_1, 'il fatto mai disegnato', { background: true });
     render(<Harness query="fatto" scope="all" open />);
     await settle();
     expect(latest.count).toBe(1);
@@ -340,8 +343,8 @@ describe('useFindWindow — going to an undrawn match', () => {
   it('a new query tries a given-up target again', async () => {
     const front = addTab('Davanti', NORMA_2, 'un fatto qui');
     mountRoot(front, NORMA_2, 'un fatto qui');
-    addTab('Altrove', NORMA_1, 'il fatto mai disegnato', { minimised: true });
-    appStore.getState().bringTabToFront(front);
+    addTab('Altrove', NORMA_1, 'il fatto mai disegnato', { background: true });
+    appStore.getState().setActivePractice(front);
     const moves = spyMoves();
 
     const { rerender } = render(<Harness query="fatto" scope="all" open />);
@@ -349,20 +352,20 @@ describe('useFindWindow — going to an undrawn match', () => {
     act(() => latest.next());
     await settle(3100);
     // The reader raises the front tab again (the «go to» left the other tab on top).
-    act(() => appStore.getState().bringTabToFront(front));
+    act(() => appStore.getState().setActivePractice(front));
     rerender(<Harness query="fatt" scope="all" open />);
     await settle();
     act(() => latest.next());
-    expect(moves.revealTab).toHaveBeenCalledTimes(2);
+    expect(moves.revealPracticeRow).toHaveBeenCalledTimes(2);
   });
 
   it('takes the last drawn match when fewer are drawn than were stored, never the first match', async () => {
     const front = addTab('Davanti', NORMA_2, 'un fatto qui');
     mountRoot(front, NORMA_2, 'un fatto qui');
     // Stored: two matches; drawn: one (the second sits in folded notes the reader does not see).
-    const away = addTab('Altrove', NORMA_1, 'fatto uno fatto due', { minimised: true });
-    addTab('Ultima', NORMA_3, 'fatto in coda', { minimised: true });
-    appStore.getState().bringTabToFront(front);
+    const away = addTab('Altrove', NORMA_1, 'fatto uno fatto due', { background: true });
+    addTab('Ultima', NORMA_3, 'fatto in coda', { background: true });
+    appStore.getState().setActivePractice(front);
     spyMoves();
 
     render(<Harness query="fatto" scope="all" open />);
@@ -386,9 +389,9 @@ describe('useFindWindow — going to an undrawn match', () => {
   it('with no match drawn at all, goes on in the direction of travel as a step would', async () => {
     const front = addTab('Davanti', NORMA_2, 'un fatto qui');
     mountRoot(front, NORMA_2, 'un fatto qui');
-    const away = addTab('Altrove', NORMA_1, 'fatto', { minimised: true });
-    const last = addTab('Ultima', NORMA_3, 'fatto in coda', { minimised: true });
-    appStore.getState().bringTabToFront(front);
+    const away = addTab('Altrove', NORMA_1, 'fatto', { background: true });
+    const last = addTab('Ultima', NORMA_3, 'fatto in coda', { background: true });
+    appStore.getState().setActivePractice(front);
     const moves = spyMoves();
 
     render(<Harness query="fatto" scope="all" open />);
@@ -404,13 +407,13 @@ describe('useFindWindow — going to an undrawn match', () => {
     expect(latest.count).toBe(2);
     expect(latest.current).toMatchObject({ tabId: last, onScreen: false });
     expect(latest.index).toBe(1);
-    expect(moves.revealTab).toHaveBeenLastCalledWith(last);
-    expect(moves.revealTab).toHaveBeenCalledTimes(2);
+    expect(moves.revealPracticeRow.mock.lastCall?.[0]).toBe(last);
+    expect(moves.revealPracticeRow).toHaveBeenCalledTimes(2);
   });
 
   it('going back, with no match drawn, goes on backwards', async () => {
-    const first = addTab('Prima', NORMA_3, 'fatto in testa', { minimised: true });
-    const away = addTab('Altrove', NORMA_1, 'fatto', { minimised: true });
+    const first = addTab('Prima', NORMA_3, 'fatto in testa', { background: true });
+    const away = addTab('Altrove', NORMA_1, 'fatto', { background: true });
     const front = addTab('Davanti', NORMA_2, 'un fatto qui');
     mountRoot(front, NORMA_2, 'un fatto qui');
     const moves = spyMoves();
@@ -427,7 +430,7 @@ describe('useFindWindow — going to an undrawn match', () => {
     await settle(50);
 
     expect(latest.current?.tabId).toBe(first);
-    expect(moves.revealTab).toHaveBeenLastCalledWith(first);
+    expect(moves.revealPracticeRow.mock.lastCall?.[0]).toBe(first);
   });
 });
 
@@ -460,7 +463,7 @@ describe('useFindWindow — kept current', () => {
     const rootB = mountRoot(b, NORMA_2, '<p>fatto b</p>');
     const c = addTab('C', NORMA_3, 'fatto c');
     mountRoot(c, NORMA_3, 'fatto c');
-    appStore.getState().bringTabToFront(a);
+    appStore.getState().setActivePractice(a);
 
     render(<Harness query="fatto" scope="all" open />);
     await settle();
@@ -485,9 +488,9 @@ describe('useFindWindow — kept current', () => {
     vi.mocked(findTargetsInScope).mockClear();
 
     act(() => {
-      appStore.getState().addWorkspaceTab('Uno');
-      appStore.getState().addWorkspaceTab('Due');
-      appStore.getState().bringTabToFront(tabId);
+      appStore.getState().createPractice('Uno');
+      appStore.getState().createPractice('Due');
+      appStore.getState().setActivePractice(tabId);
       mountRoot(tabId, NORMA_2, 'altro');
       mountRoot(tabId, NORMA_3, 'altro ancora');
     });
@@ -497,7 +500,7 @@ describe('useFindWindow — kept current', () => {
   });
 
   it('folds a stored text once, however many times the window recomputes', async () => {
-    addTab('Altrove', NORMA_1, 'un fatto conservato', { minimised: true });
+    addTab('Altrove', NORMA_1, 'un fatto conservato', { background: true });
 
     render(<Harness query="fatto" scope="all" open />);
     await settle();
@@ -506,7 +509,7 @@ describe('useFindWindow — kept current', () => {
 
     for (const label of ['Uno', 'Due', 'Tre']) {
       act(() => {
-        appStore.getState().addWorkspaceTab(label);
+        appStore.getState().createPractice(label);
       });
       await settle(50);
     }
@@ -550,11 +553,11 @@ describe('useFindWindow — kept current', () => {
   });
 });
 
-describe('useFindWindow — «Questa scheda»', () => {
-  it('searches only the front tab on a desktop', async () => {
+describe('useFindWindow — «Questa pratica»', () => {
+  it('searches only the active practice on a desktop', async () => {
     addTab('Altro', NORMA_2, 'un fatto altrove');
     const front = addTab('Codice civile', NORMA_1, 'il fatto qui');
-    appStore.getState().bringTabToFront(front);
+    appStore.getState().setActivePractice(front);
     mountRoot(front, NORMA_1, 'il fatto qui');
 
     render(<Harness query="fatto" scope="tab" open />);
@@ -564,32 +567,31 @@ describe('useFindWindow — «Questa scheda»', () => {
     expect(latest.current?.tabId).toBe(front);
   });
 
-  it('searches the tab on screen on a phone, whatever was raised last, and follows a swipe', async () => {
+  it('searches the active practice on a phone too, and follows a switch of practice', async () => {
     viewport(false);
     const shown = addTab('Sullo schermo', NORMA_1, 'fatto uno fatto due');
-    const raised = addTab('Alzata', NORMA_2, 'un fatto');
-    appStore.getState().bringTabToFront(raised);
-    appStore.getState().setMobileActiveTabId(shown);
+    const other = addTab('Altra', NORMA_2, 'un fatto');
+    appStore.getState().setActivePractice(shown);
 
     render(<Harness query="fatto" scope="tab" open />);
     await settle();
     expect(latest.count).toBe(2);
     expect(latest.current?.tabId).toBe(shown);
 
-    act(() => appStore.getState().setMobileActiveTabId(raised));
+    act(() => appStore.getState().setActivePractice(other));
     await settle(50);
     expect(latest.count).toBe(1);
-    expect(latest.current?.tabId).toBe(raised);
+    expect(latest.current?.tabId).toBe(other);
   });
 });
 
-describe('useFindWindow — starting in a given tab', () => {
+describe('useFindWindow — starting in a given practice', () => {
   it('a fresh query starts at the preferred target\'s first match, drawn first, not at the front tab\'s', async () => {
     const a = addTab('A', NORMA_1, 'un fatto in A');
     mountRoot(a, NORMA_1, 'un fatto in A');
     const b = addTab('B', NORMA_2, 'fatto uno, fatto due');
     mountRoot(b, NORMA_2, 'fatto uno, fatto due');
-    appStore.getState().bringTabToFront(b);
+    appStore.getState().setActivePractice(b);
     const moves = spyMoves();
 
     render(<Harness query="fatto" scope="all" open prefer={{ tabId: a, targetKey: targetKeyOf(NORMA_1) }} />);
@@ -597,7 +599,7 @@ describe('useFindWindow — starting in a given tab', () => {
 
     expect(latest.current).toMatchObject({ tabId: a, onScreen: true });
     expect(latest.index).toBe(0);
-    expect(moves.revealTab).not.toHaveBeenCalled();
+    expect(moves.revealPracticeRow).not.toHaveBeenCalled();
   });
 
   it('restart() applies the held query again as a fresh one, now', async () => {
@@ -605,7 +607,7 @@ describe('useFindWindow — starting in a given tab', () => {
     mountRoot(a, NORMA_1, 'un fatto in A');
     const b = addTab('B', NORMA_2, 'fatto uno, fatto due');
     mountRoot(b, NORMA_2, 'fatto uno, fatto due');
-    appStore.getState().bringTabToFront(b);
+    appStore.getState().setActivePractice(b);
 
     const { rerender } = render(<Harness query="fatto" scope="all" open />);
     await settle();
@@ -622,9 +624,9 @@ describe('useFindWindow — targets that cannot be reached', () => {
   it('does not bounce between two targets whose drawn text lacks the stored match', async () => {
     const front = addTab('Davanti', NORMA_3, 'niente qui');
     mountRoot(front, NORMA_3, 'niente qui');
-    const x = addTab('X', NORMA_1, 'fatto', { minimised: true });
-    addTab('Y', NORMA_2, 'fatto', { minimised: true });
-    appStore.getState().bringTabToFront(front);
+    const x = addTab('X', NORMA_1, 'fatto', { background: true });
+    addTab('Y', NORMA_2, 'fatto', { background: true });
+    appStore.getState().setActivePractice(front);
     // The carousel / the active article: revealing one target draws it and unmounts the other, and what is
     // drawn is split in two blocks, so the stored match is not there.
     const drawnRoots = new Map<string, () => void>();
@@ -639,7 +641,7 @@ describe('useFindWindow — targets that cannot be reached', () => {
       document.body.appendChild(element);
       drawnRoots.set(id, registerFindRoot({ tabId: id, targetKey: targetKeyOf(n), label: 'art.', element }));
     });
-    appStore.setState({ revealTab: reveal });
+    appStore.setState({ revealPracticeRow: reveal as unknown as typeof originalActions.revealPracticeRow });
 
     render(<Harness query="fatto" scope="all" open />);
     await settle();
@@ -652,7 +654,7 @@ describe('useFindWindow — targets that cannot be reached', () => {
 
   it('a given-up target is reachable again when its root registers with drawn matches', async () => {
     addTab('Davanti', NORMA_3, 'niente qui');
-    const x = addTab('X', NORMA_1, 'fatto', { minimised: true });
+    const x = addTab('X', NORMA_1, 'fatto', { background: true });
     render(<Harness query="fatto" scope="all" open />);
     await settle();
     act(() => latest.next());
@@ -686,7 +688,7 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
   });
 
   it('counts the other forms on a stored text only, and an overlap with the literal match once', async () => {
-    addTab('Altrove', NORMA_1, STORED, { minimised: true });
+    addTab('Altrove', NORMA_1, STORED, { background: true });
 
     render(<Harness query="art. 580 c.p." scope="all" open />);
     await settle();
@@ -695,14 +697,14 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
 
     // The literal match and the citation span of «art. 580 c.p.» are the same place: counted once.
     act(() => {
-      appStore.getState().addWorkspaceTab('Altra');
+      appStore.getState().createPractice('Altra');
     });
     await settle();
     expect(latest.count).toBe(2);
   });
 
   it('finds a numbered act and a decision in the forms a decision writes them', async () => {
-    addTab('Altrove', NORMA_1, 'La legge n. 219 del 2017 e la L. 219/17; Cass. n 8980/2018 e n. 8980 del 2018.', { minimised: true });
+    addTab('Altrove', NORMA_1, 'La legge n. 219 del 2017 e la L. 219/17; Cass. n 8980/2018 e n. 8980 del 2018.', { background: true });
 
     const { rerender } = render(<Harness query="l. 219/2017" scope="all" open />);
     await settle();
@@ -713,14 +715,14 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
   });
 
   it('a query that is not a citation is searched as before', async () => {
-    addTab('Altrove', NORMA_1, STORED, { minimised: true });
+    addTab('Altrove', NORMA_1, STORED, { background: true });
     render(<Harness query="codice penale" scope="all" open />);
     await settle();
     expect(latest.count).toBe(1);
   });
 
   it('does not find a number inside a longer one', async () => {
-    addTab('Altrove', NORMA_1, 'n. 18980/2018, n. 8980/20181, n. 8980/2018', { minimised: true });
+    addTab('Altrove', NORMA_1, 'n. 18980/2018, n. 8980/20181, n. 8980/2018', { background: true });
     render(<Harness query="n. 8980/2018" scope="all" open />);
     await settle();
     expect(latest.count).toBe(1);
@@ -728,7 +730,7 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
 
   it('parses a text for citations once, however many times the window recomputes', async () => {
     const UNIQUE = "Parsed once: l'art. 580 c.p. e l'art. 580 del codice penale.";
-    addTab('Altrove', NORMA_1, UNIQUE, { minimised: true });
+    addTab('Altrove', NORMA_1, UNIQUE, { background: true });
     render(<Harness query="art. 580 c.p." scope="all" open />);
     await settle();
     const parsed = () => vi.mocked(extractCitations).mock.calls.filter(([t]) => t === UNIQUE).length;
@@ -736,7 +738,7 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
 
     for (const label of ['Uno', 'Due']) {
       act(() => {
-        appStore.getState().addWorkspaceTab(label);
+        appStore.getState().createPractice(label);
       });
       await settle(50);
     }
@@ -748,7 +750,7 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
       'Altrove',
       NORMA_1,
       'Il d.l. 34/2020, il d. l. 34/2020 e la l. 34/2020; art. 1 c.p.c., art. 1 c.p.p. e art. 1 c.p.; la l. n. 99/2015 e la n. 99/2015.',
-      { minimised: true },
+      { background: true },
     );
     const { rerender } = render(<Harness query="l. 34/2020" scope="all" open />);
     await settle();
@@ -763,10 +765,9 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
 
   it('folds a stored text once for an act query, and parses every text of the scope once', async () => {
     const ACT = 'La legge n. 99 del 2015 e la l. 99/2015.';
-    addTab('Altrove', NORMA_1, ACT, { minimised: true });
+    addTab('Altrove', NORMA_1, ACT, { background: true });
     const many = Array.from({ length: 40 }, (_, i) => norma(String(i + 10)));
-    const id = appStore.getState().addWorkspaceTab('Molti', many[0], many.map((n, i) => article(n, `Testo ${i}: l'art. 580 c.p.`)));
-    appStore.setState((st) => ({ workspaceTabs: st.workspaceTabs.map((t) => (t.id === id ? { ...t, isMinimized: true } : t)) }));
+    addPractice('Molti', many[0], many.map((n, i) => article(n, `Testo ${i}: l'art. 580 c.p.`)));
     const folds = () => vi.mocked(foldForSearch).mock.calls.filter(([t]) => t === ACT).length;
     const parses = () => vi.mocked(extractCitations).mock.calls.filter(([t]) => String(t).startsWith('Testo ')).length;
 
@@ -780,7 +781,7 @@ describe('useFindWindow — a citation finds its other forms (spec §13.2)', () 
 
     for (const label of ['Uno', 'Due']) {
       act(() => {
-        appStore.getState().addWorkspaceTab(label);
+        appStore.getState().createPractice(label);
       });
       await settle(50);
     }

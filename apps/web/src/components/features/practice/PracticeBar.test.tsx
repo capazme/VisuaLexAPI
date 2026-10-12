@@ -20,9 +20,8 @@ const options = () => appStore.persist.getOptions() as unknown as {
 const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}`) });
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, commandPaletteOpen: false, workspaceTabs: [],
   });
 });
@@ -102,7 +101,6 @@ describe('PracticeBar (spec §5)', () => {
     const saved = JSON.parse(JSON.stringify(options().partialize(s())));
     const reloaded = options().merge(saved, s());
     expect(reloaded.practices).toEqual([]);
-    expect(reloaded.practicesSeeded).toBe(true);
   });
 
   it('collapses to «N pratiche» and opens again', () => {

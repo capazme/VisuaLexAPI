@@ -76,9 +76,8 @@ const draw = (onCrossReference = vi.fn()) => render(
 beforeEach(() => {
   vi.clearAllMocks();
   fetchDecision.mockResolvedValue(FOUND_ANSWER);
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [], bookmarks: [], phoneReader: null,
     loadAnnotationsForArticle: vi.fn(), loadHighlightsForArticle: vi.fn(),
   });

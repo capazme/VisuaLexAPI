@@ -3,7 +3,6 @@ import { actHeading } from '../../../utils/sources';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
 import type { NormaGroup } from './dossierUtils';
 import { shownAnnex } from './dossierLayout';
-import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 
 interface Props {
   groups: NormaGroup[];
@@ -36,9 +35,7 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
 
         <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-            Il dossier contiene articoli da {groups.length} norme o versioni. Scegli quale aprire, o {isPracticeTableEnabled()
-              ? 'apri tutto in una sola pratica.'
-              : 'apri tutto: un testo storico si apre in una tab a parte.'}
+            Il dossier contiene articoli da {groups.length} norme o versioni. Scegli quale aprire, o apri tutto in una sola pratica.
           </p>
 
           <button

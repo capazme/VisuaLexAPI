@@ -57,10 +57,9 @@ beforeEach(() => {
   env.desktop = true;
   // jsdom measures nothing: the row starts from the viewport's width, wide enough for three columns.
   window.innerWidth = 1500;
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     readingBackStack: [], workspaceTabs: [], windowFocusRequest: null, phoneReader: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });

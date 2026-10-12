@@ -171,7 +171,6 @@ describe('DecisionEntryView', () => {
   });
 
   it('a norm cited in the text opens beside the practice, and the way back names this entry\'s row', async () => {
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     fetchDecision.mockResolvedValue(foundOf(CIVILE, '3', 'Il ricorrente invoca l\'art. 2043 c.c. a torto.'));
     const e = openEntry(CIVILE);
     const { container } = render(entryView(e, CIVILE));

@@ -13,10 +13,9 @@
  * Entries point at workspace tab and block ids, or at a practice and what it holds, which are only
  * meaningful within a session: the stack is deliberately not persisted.
  *
- * Two shapes while `VITE_FEATURE_PRACTICE_TABLE` exists (spec `2026-10-08-norm-tab-container-design.md`
- * §6.3): the reading surfaces keep pushing a `ReadingBackEntry`; the store keeps it as given, or
- * turns one whose `tabId` names a practice or a window into a `PracticeBackEntry`. P6 drops the tab
- * shape.
+ * Two shapes until the tab model is deleted (spec `2026-10-08-norm-tab-container-design.md` §6.3): the
+ * reading surfaces push a `ReadingBackEntry`; the store keeps it as given, or turns one whose `tabId`
+ * names a practice or a window into a `PracticeBackEntry`.
  */
 import { holdsSubject, type Practice, type PracticeSubject } from './practice';
 
