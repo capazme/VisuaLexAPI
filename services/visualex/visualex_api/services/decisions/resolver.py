@@ -28,8 +28,10 @@ from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from ...tools.tls import IntermediateCertificateMismatch
 from .corte_cost import CorteCostReader
 from .curia import CuriaReader
+from . import giustizia_amministrativa as ga
+from .tar_seats import BY_SLUG, fold, seats_of
 from .italgiure import ItalgiureReader, SourceAnswerError
-from .model import EU_COURTS, Decision, Identity, Reference
+from .model import ADMIN_COURTS, EU_COURTS, FAMIGLIE, Decision, Identity, Reference
 from .pdf_text import MAX_BYTES
 
 log = structlog.get_logger()
@@ -37,6 +39,7 @@ log = structlog.get_logger()
 ITALGIURE_TIMEOUT = 25.0
 CORTE_COST_TIMEOUT = 240.0  # covers the first download of a bundle
 CURIA_TIMEOUT = 45.0  # two requests (the query, the document), a long judgment is over a megabyte
+GA_TIMEOUT = 60.0  # two requests a seat searched (page, search), one for the text; a region has up to two seats
 FOUND_NS, ABSENT_NS, PENDING_NS = "decisions_found", "decisions_absent", "decisions_pending"
 SEARCH_NS = "decisions_search"  # one page of /search_decisions, kept a day
 PDF_NS = "decisions_pdf"  # the court's PDFs, base64, kept 30 days
@@ -104,9 +107,10 @@ def _citata(raw: str | None) -> str | None:
 
 class Resolver:
     def __init__(self, italgiure, corte_cost, cache=None,
-                 today: Callable[[], date] = date.today, curia=None):
+                 today: Callable[[], date] = date.today, curia=None, admin=None):
         self.italgiure, self.corte_cost, self.today = italgiure, corte_cost, today
         self.curia = curia if curia is not None else CuriaReader()
+        self.admin = admin if admin is not None else ga.GiustiziaAmministrativaReader()
         manager = cache or get_cache_manager()
         self.found = manager.get_persistent(FOUND_NS)
         self.absent = manager.get_persistent(ABSENT_NS)
@@ -279,7 +283,92 @@ class Resolver:
                            "anno": str(decision.identita.anno)})
         return Outcome("trovata", decisione=decision, avvisi=avvisi + _text_notices(decision))
 
+    async def _admin_search(self, corte: str, sede: str | None, numero: int, anno: int) -> list[ga.Result]:
+        """What the portal lists for that seat, number and year, kept a day (a later measure of
+        another series can take the number) and an empty answer an hour."""
+        key = f"ga:v1:search:{corte}:{sede or '-'}:{numero}:{anno}"
+        cached = await self.pending.get(key)
+        if cached is not None:
+            return [ga.Result(**row) for row in cached]
+        if await self.absent.get(key) is not None:
+            return []
+        portal = ga.portal_seat(corte, sede)
+        results = await self.admin.search(portal, numero, anno)
+        if any(fold(r.sede) != fold(portal) for r in results):
+            # the portal answered for another seat than the one asked: never labelled as the one asked
+            raise ga.SourceChanged("giustizia-amministrativa: la risposta è di un'altra sede")
+        if results:
+            await self.pending.set(key, [r.__dict__ for r in results])
+        else:
+            await self.absent.set(key, True)
+        return results
+
+    async def _admin_text(self, decision: Decision, result: ga.Result) -> Decision:
+        """The chosen measure with its text, kept 30 days (a day when its text could not be read)."""
+        key = f"ga:v1:{decision.identita.key()}"
+        cached = await self.found.get(key) or await self.pending.get(key)
+        if cached is not None:
+            return Decision.from_dict(cached)
+        testo, published = await self.admin.text(result)
+        whole = ga.to_decision(result, decision.identita.corte, decision.identita.sede, testo, published)
+        await (self.found if whole.testo else self.pending).set(key, whole.to_dict())
+        return whole
+
+    async def _admin(self, ref: Reference) -> Outcome:
+        """The Consiglio di Stato, the C.G.A.R.S. or a TAR (design 2026-10-12-administrative-courts
+        §5): every measure with that number and year at the seat (or at each seat of the region),
+        then the kind the reference names; no kind named is a sentenza (D2)."""
+        if ref.corte != "tar":
+            seats: list[str | None] = [None]
+        elif ref.sede:
+            seats = [ref.sede]
+        else:
+            seats = [s.slug for s in seats_of(ref.regione or "")]
+
+        async def gather() -> list[tuple[str | None, ga.Result]]:
+            found = []
+            for sede in seats:
+                found += [(sede, r) for r in await self._admin_search(ref.corte, sede, ref.numero, ref.anno)]
+            return found
+        try:
+            listed = await asyncio.wait_for(gather(), GA_TIMEOUT)
+            same = [(sede, r) for sede, r in listed if r.anno == ref.anno and r.numero == ref.numero]
+            if any(ga.kind_of(r) is None for _, r in same):
+                # a measure with that number the reader cannot identify could be the one asked for
+                raise ga.SourceChanged("giustizia-amministrativa: un provvedimento senza ECLI leggibile")
+        except _SOURCE_ERRORS as exc:
+            log.warning("Decision source failed", fonte="giustizia_amministrativa", error=str(exc),
+                        error_type=type(exc).__name__)
+            raise SourceUnavailable("giustizia_amministrativa", str(exc)) from exc
+        measures = [(d, r) for sede, r in same if (d := ga.to_decision(r, ref.corte, sede)) is not None]
+        wanted = ((ref.provvedimento,) if ref.provvedimento
+                  else FAMIGLIE.get(ref.tipo or "sentenza", ()))
+        hits = [(d, r) for d, r in measures if d.identita.provvedimento in wanted]
+        # one measure listed twice (the portal repeats a row) is one measure
+        hits = list({d.identita.key(): (d, r) for d, r in hits}.values())
+        if not hits:
+            if measures and not ref.provvedimento and not ref.tipo:
+                # D2: the year holds no sentenza with that number: say what it holds, never pick one
+                return Outcome("ambigua", candidati=list({d.identita.key(): d for d, _ in measures}.values()))
+            return Outcome("non_trovata", motivo="inesistente")
+        if len(hits) > 1:
+            return Outcome("ambigua", candidati=[d for d, _ in hits])
+        decision, result = hits[0]
+        try:
+            decision = await asyncio.wait_for(self._admin_text(decision, result), GA_TIMEOUT)
+        except _SOURCE_ERRORS as exc:
+            log.warning("Decision source failed", fonte="giustizia_amministrativa", error=str(exc),
+                        error_type=type(exc).__name__)
+            raise SourceUnavailable("giustizia_amministrativa", str(exc)) from exc
+        avvisi: list[dict[str, str]] = []
+        if ref.corte == "tar" and not ref.sede and decision.identita.sede:
+            # D3: a TAR named by its region alone
+            avvisi.append({"tipo": "sede_dedotta", "sede": BY_SLUG[decision.identita.sede].sede})
+        return Outcome("trovata", decisione=decision, avvisi=avvisi + _text_notices(decision))
+
     async def resolve(self, ref: Reference) -> Outcome:
+        if ref.corte in ADMIN_COURTS:
+            return await self._admin(ref)
         if ref.corte in EU_COURTS:
             return await self._eu(ref)
         if ref.corte == "corte_costituzionale":

@@ -109,7 +109,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   restores an article with a new id and points its notes at it.
   `assertArticleOfDossier` is the one check behind both routes.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
-  identity and a label, never its text. Its content is checked by
+  identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
+  and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most
+  four digits, the formation as the source names it, `data_decisione`, `cause_riunite`; design
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §3). Its content is checked by
   `schemas/decisionItem.ts` (unknown keys refused) when an item is added and
   when a decision's content is updated; it must stay aligned with the web's
   `parseSentenzaContent`, so change both together. The item's `title` follows
@@ -270,7 +273,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   The server derives the target from `normaKey` (`norms/decisionKey.ts`
   `readDecisionKey`, the twin of the web's `identityFromKey`, both pinned to
   `conventions/sources/decision-keys.json`): a key in the
-  `cassazione:` / `corte_costituzionale:` space must read back (else 400) and
+  `cassazione:` / `corte_costituzionale:` / `corte_giustizia_ue:` / `tribunale_ue:` space must read back (else 400) and
   comes with `articleId` `''` and no `version` or `articleUrn`; an optional body
   `target: { kind, key }` is accepted only if it agrees (an article target takes no key). The answer carries
   `target` and `passageReleased`. The list queries may omit `articleId` for a

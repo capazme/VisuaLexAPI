@@ -38,7 +38,7 @@ Every expected value `E` is `{ "value": …, "status": … }`:
 | `decided` | the owner's words exist (quoted in `note` or in the spec) | every adopting suite: the web app, the server and the MCP server, the API, MERL-T |
 | `current` | what the code does today, and the convention keeps it | by the suites that hold that code (today: the API for norm identities and decision keys, the web for decision paths and `decision_citations`) |
 | `proposed` | a low-impact call stated in the spec; the owner can overturn it | once the area adopts the convention |
-| `open:Qn` | waits for question n: Q1–Q9 of the convention spec (§9), Q10–Q13 of `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` (§8); the value is the recommendation | once the owner answers and the status flips (the owner answered Q1–Q9 on 4 October 2026; Q10–Q13, the courts of the Union, are open) |
+| `open:Qn` | waits for question n: Q1–Q9 of the convention spec (§9), Q10–Q13 of `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` (§8); the value is the recommendation | once the owner answers and the status flips (the owner answered Q1–Q9 on 4 October 2026 and Q10–Q14 on 12 October 2026: none is open) |
 
 `aliases` are other spellings of the same identity (a bare URN, Normattiva's
 alias form, a version marker, a malformed type token): the normaliser maps each
@@ -83,6 +83,13 @@ keystroke in the browser, and the Python API's `/parse_decision`, which the serv
 `POST /dossiers/:id/decisions` calls (Part A of the 12 October design). Each asserts the cases whose status is `decided`, `current` or `proposed` and lists the
 open ones as skipped. `unsupported_court` (the court the API names when it recognises one
 VisuaLex has no reader for) is the API's alone. The section is kept as written (`III`, `U`), as the palette keeps it.
+
+## `tar-seats.json`
+
+The 29 seats of the Tribunali amministrativi regionali, as the portal of giustizia-amministrativa.it
+names them, with their region and whether each is the region's main seat
+(`docs/superpowers/specs/2026-10-12-administrative-courts-design.md`). A TAR named by its region
+alone is read as its main seat; a citation names the seat only where the region has more than one.
 
 ## `norm-entries.json`
 

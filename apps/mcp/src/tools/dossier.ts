@@ -217,8 +217,8 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Aggiungi sentenze a un dossier',
       description:
-        `Aggiunge a un dossier da 1 a ${MAX_DECISIONS} sentenze indicate a parole come le scrive un avvocato («Cass. civ., sez. un., n. 31310/2024», «Corte cost. n. 71/2020»), una decisione per riferimento. ` +
-        'Oggi legge la Corte di cassazione e la Corte costituzionale; di un’altra corte risponde quale ha riconosciuto e non la aggiunge. ' +
+        `Aggiunge a un dossier da 1 a ${MAX_DECISIONS} sentenze indicate a parole come le scrive un avvocato («Cass. civ., sez. un., n. 31310/2024», «Corte cost. n. 71/2020», «CGUE, C-634/21»), una decisione per riferimento. ` +
+        'Oggi legge la Corte di cassazione, la Corte costituzionale, la Corte di giustizia e il Tribunale dell’Unione europea (per numero di causa); di un’altra corte risponde quale ha riconosciuto e non la aggiunge. ' +
         'Ogni decisione è verificata sulla sua fonte prima di essere salvata: l’esito di ciascuna è aggiunta, già presente, non riconosciuta, corte non supportata, ambigua, inesistente o non verificabile. ' +
         'Una decisione non aggiunta non va riportata in una nota come se fosse verificata. Non modifica né cancella nulla.',
       inputSchema: {

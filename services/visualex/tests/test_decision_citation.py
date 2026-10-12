@@ -59,14 +59,17 @@ def test_every_reference_is_one_fetch_decision_takes(case):
     assert reference.numero == case["reference"]["value"]["numero"]
 
 
-def test_until_its_reader_ships_the_court_of_justice_is_named_not_read():
-    for words in ("CGUE, C-634/21", "C-634/21", "Corte giust. UE, sez. I, causa C-634/21"):
-        assert read_decision_citation(words, TODAY).to_dict() == {
-            "corte_non_supportata": "Corte di giustizia dell'Unione europea"}
-    for words in ("Trib. UE, T-612/17", "T-612/17", "CGUE, T-612/17", "causa T-612/17"):
-        assert read_decision_citation(words, TODAY).corte_non_supportata == "Tribunale dell'Unione europea"
-    assert read_decision_citation("causa C-634/21", TODAY).corte_non_supportata == (
-        "Corte di giustizia dell'Unione europea")
+def test_the_courts_of_the_union_are_read_by_their_case():
+    assert read_decision_citation("CGUE, C-634/21", TODAY).riferimento == {
+        "corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}
+    # the letter names the court, whatever name precedes it
+    assert read_decision_citation("CGUE, T-612/17", TODAY).riferimento == {
+        "corte": "tribunale_ue", "numero": 612, "anno": 2017}
+    # a date in the citation is the judgment's, never the case's year
+    assert read_decision_citation("Corte giust. UE, 7 dicembre 2023, causa C-634/21", TODAY).riferimento["anno"] == 2021
+    # a court of the Union named without a case it can read is not recognised, never another court
+    assert read_decision_citation("Corte di giustizia UE, sentenza del 2023", TODAY).to_dict() == {"non_riconosciuta": True}
+    assert read_decision_citation("Trib. UE, causa 26/62", TODAY).to_dict() == {"non_riconosciuta": True}
 
 
 @pytest.mark.parametrize("words,court", [

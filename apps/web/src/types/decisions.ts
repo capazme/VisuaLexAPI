@@ -2,7 +2,9 @@ import type { NormaVisitata } from './index';
 
 /** Court decisions (design docs/superpowers/specs/2026-10-01-sentenze-design.md), as
  *  POST /fetch_decision answers them (docs/backend/python_api_reference.md). */
-export type DecisionCourt = 'cassazione' | 'corte_costituzionale';
+/** The courts of the Union are named by their case (design 2026-10-12 §3.1): `numero` and `anno`
+ *  are the case's (C-634/21 → 634, 2021). */
+export type DecisionCourt = 'cassazione' | 'corte_costituzionale' | 'corte_giustizia_ue' | 'tribunale_ue';
 export type DecisionArchive = 'civile' | 'penale';
 
 /** What VisuaLex resolved: unique. `archivio` is always set for the Cassazione. */
@@ -44,6 +46,10 @@ export interface DecisionAttributes {
   testo_assente?: string;
   /** Where the Cassazione's text was read: the court's original PDF, or Italgiure's text field (provisional, with the notice `testo_da_archivio`). */
   testo_origine?: 'pdf' | 'archivio';
+  /** The courts of the Union: the parties as the source names them, the joined cases («C-293/12»), the procedure language. */
+  parti?: string;
+  cause_riunite?: string[];
+  lingua_processuale?: string;
 }
 
 /** The blocks, each whole and each optional; `{}` when the decision comes without its text
@@ -69,7 +75,9 @@ export type DecisionNotice =
   | { tipo: 'sezione_non_riconosciuta'; citata?: string }
   | { tipo: 'archivio_dedotto'; archivio: DecisionArchive; sezione: string }
   | { tipo: 'testo_non_disponibile' }
-  | { tipo: 'testo_da_archivio' };
+  | { tipo: 'testo_da_archivio' }
+  /** A joined case: the judgment is filed under the first case, whose number and year these are. */
+  | { tipo: 'causa_riunita'; numero: string; anno: string };
 
 export interface DecisionCandidate {
   identita: DecisionIdentity;
@@ -135,5 +143,8 @@ export interface DossierSentenzaData extends DecisionIdentity {
   sezione?: string;
   tipo?: string;
   data_deposito?: string;
+  /** The courts of the Union: the day the judgment was delivered, and the joined cases. */
+  data_decisione?: string;
+  cause_riunite?: string[];
   etichetta: string;
 }

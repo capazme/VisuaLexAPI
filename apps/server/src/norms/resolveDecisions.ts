@@ -8,6 +8,7 @@
 import { mapLimited, postLegalApi, SourceUnavailable } from './resolveReference';
 import { citeDecision, shortDecision, type CitableDecision } from './decisionCitation';
 import { decisionItemContentSchema, withDecisionLabel, type DecisionItemContent } from '../schemas/decisionItem';
+import { EU_CASE, EU_SECTION, isEuCourt } from './euCourts';
 
 export type DecisionOutcome =
   | 'resolved'
@@ -39,7 +40,7 @@ export const decisionLookup = { budgetMs: 100_000, concurrency: 2 };
 const SEZIONI = new Set(['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F']);
 const TIPI = new Set(['sentenza', 'ordinanza', 'ordinanza interlocutoria', 'decreto']);
 const ISO_DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
-const COURTS = new Set(['cassazione', 'corte_costituzionale']);
+const COURTS = new Set(['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue']);
 const ARCHIVES = new Set(['civile', 'penale']);
 
 const NOT_RECOGNISED =
@@ -75,6 +76,20 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
   if (!identity) return null;
   const attrs = isObject(attributesRaw) ? attributesRaw : {};
   const { sezione, tipo, data_deposito: deposit } = attrs;
+  if (isEuCourt(identity.corte)) {
+    const { data_decisione: delivered, cause_riunite: joined } = attrs;
+    const eu = decisionItemContentSchema.safeParse({
+      corte: identity.corte, numero: identity.numero, anno: identity.anno,
+      ...(typeof sezione === 'string' && EU_SECTION.test(sezione) ? { sezione } : {}),
+      ...(typeof tipo === 'string' && TIPI.has(tipo) ? { tipo } : {}),
+      ...(typeof delivered === 'string' && ISO_DAY.test(delivered) ? { data_decisione: delivered } : {}),
+      // more than 30 joined cases: the citation names the case alone, as the item schema keeps at most 30
+      ...(Array.isArray(joined) && joined.length > 1 && joined.length <= 30 && joined.every((c) => typeof c === 'string' && EU_CASE.test(c))
+        ? { cause_riunite: joined } : {}),
+      etichetta: '-',
+    });
+    return eu.success ? withDecisionLabel(eu.data) : null;
+  }
   // Through the item schema here, not only in the transaction: an identity out of range is this
   // reference's `unavailable`, never a 400 that drops every decision of the call.
   const parsed = decisionItemContentSchema.safeParse({

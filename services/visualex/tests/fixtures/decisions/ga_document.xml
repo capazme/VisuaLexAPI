@@ -1,0 +1,22 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="Sentenze.xsl"?>
+<!DOCTYPE GA SYSTEM "galight3.dtd">
+<!-- Written for VisuaLex's tests in the shape of the court's GA documents: no real decision. -->
+<GA xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h="http://www.w3.org/HTML/1998/html4">
+   <Provvedimento>
+      <meta id="x"><descrittori><fascicolo anno="2099" n="00042"/></descrittori><tipologia> Sentenza</tipologia>
+         <firmaPresidente><firma>nome di prova</firma></firmaPresidente><dataPubblicazione>01/02/2099</dataPubblicazione></meta>
+      <epigrafe id="epi">
+         <adunanza id="adu"><h:div>Il Consiglio di Stato</h:div><h:div>in sede giurisdizionale (Sezione Sesta)</h:div>
+            <h:div>Primo Esempio,	Presidente</h:div></adunanza>
+         <adunanzaTed id="adu"><h:div>Der Staatsrat</h:div></adunanzaTed>
+         <ricorrenti><h:div>sul ricorso proposto da </h:div><h:div>Alfa Srl, rappresentata da <corsivo>un avvocato</corsivo>;</h:div><h:div/></ricorrenti>
+      </epigrafe>
+      <premessa id="pre"><h:div>FATTO e DIRITTO</h:div><h:div>1. Il primo punto: «virgolette», è.</h:div></premessa>
+      <premessaTed id="pre"><h:div>Sachverhalt</h:div></premessaTed>
+      <motivazione id="mot"/>
+      <dispositivo id="dis"><h:div>P.Q.M.</h:div><h:div>Il Consiglio di Stato accoglie l'appello.</h:div></dispositivo>
+      <sottoscrizioni><dataeluogo><h:div>Così deciso in Roma il 1° gennaio 2099</h:div></dataeluogo>
+         <sottoscrivente><h:div>IL PRESIDENTE</h:div></sottoscrivente></sottoscrizioni>
+   </Provvedimento>
+</GA>

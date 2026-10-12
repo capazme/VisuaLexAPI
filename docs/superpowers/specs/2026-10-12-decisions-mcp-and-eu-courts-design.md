@@ -1,7 +1,8 @@
 # Court decisions through MCP, and the Court of Justice of the EU — Design
 
-**Status:** the convention part (§3) waits for the owner's answers to §8; Part A (§2) needs none
-and is built first. Written on 12 October 2026. It implements the proposal of pull request #112
+**Status:** built. Part A (#128), the convention (#127), the reader (#129); the courts of the
+Union in every area with the owner's answers to §8 (12 October 2026, «continuiamo», relayed by
+the orchestrator as approval of every recommendation). Written on 12 October 2026. It implements the proposal of pull request #112
 (`docs/superpowers/specs/2026-10-08-mcp-decisions-design.md`, on the branch
 `docs/mcp-decisions-proposal`), with the owner's answers to its §7.
 **Follows:** `2026-10-01-sentenze-design.md` (decisions in the reader and in a dossier),
@@ -262,7 +263,11 @@ Orders and the Advocate General's opinions (each a document of its own, with a C
 `CO`, `CC`); the Civil Service Tribunal (`F-`); the Consiglio di Stato, the TAR, the Garante and
 the ECtHR (§6.4 and later notes); a decision's text in a dossier.
 
-## 8. Questions for the owner
+## 8. Questions for the owner — answered
+
+Answered on 12 October 2026: «continuiamo», every recommendation taken (relayed by the
+orchestrator, who asked Q10–Q14 with these recommendations).
+
 
 | Q | About | Recommendation |
 | --- | --- | --- |

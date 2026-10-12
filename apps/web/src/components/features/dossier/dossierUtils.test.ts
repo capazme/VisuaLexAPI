@@ -358,7 +358,7 @@ describe('decision items', () => {
       { ...SENTENZA, tipo: 'x' },                      // not a known type
       { ...SENTENZA, data_deposito: '12/03/2024' },    // not an ISO date
       { ...SENTENZA, data_deposito: '2024-13-05' },    // no such month: the server refuses it too
-      { ...SENTENZA, etichetta: 'x'.repeat(201) },     // label too long
+      { ...SENTENZA, etichetta: 'x'.repeat(601) },     // label too long
       { ...COST, archivio: 'civile' },                 // the Corte costituzionale has no archive
     ]) {
       expect(parseSentenzaContent(bad)).toBeNull();
@@ -367,7 +367,7 @@ describe('decision items', () => {
     expect(parseSentenzaContent({ ...COST, anno: 1956 })).not.toBeNull();
     expect(parseSentenzaContent({ ...SENTENZA, anno: 1900 })).not.toBeNull();
     expect(parseSentenzaContent({ ...SENTENZA, numero: 999_999 })).not.toBeNull();
-    expect(parseSentenzaContent({ ...SENTENZA, etichetta: 'x'.repeat(200) })).not.toBeNull();
+    expect(parseSentenzaContent({ ...SENTENZA, etichetta: 'x'.repeat(600) })).not.toBeNull();
   });
 
   it('parseSentenzaContent takes the year bound from the clock it is given', () => {

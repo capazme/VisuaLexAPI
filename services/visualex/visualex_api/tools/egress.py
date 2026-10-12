@@ -37,6 +37,9 @@ ALLOWED_HOSTS: dict[str, str] = {
     # --- Italian State: courts (decision pages, design 2026-10-01) ---
     "www.italgiure.giustizia.it": "Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb)",
     "dati.cortecostituzionale.it": "Corte costituzionale — dati aperti (CC BY-SA 3.0)",
+    # The administrative courts: the decisions search and the documents (CdS/TAR design note, 2026-10-12).
+    "www.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (ricerca dei provvedimenti)",
+    "mdp.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (testi dei provvedimenti)",
     # --- Private ---
     # The only non-institutional source. Brocardi supplies doctrinal notes and
     # case-law abstracts, never the text of a norm: that always comes from
@@ -72,8 +75,9 @@ NON_NETWORK_HOSTS: dict[str, str] = {
     ),
     "github.com": "appears only in massimario_portal.USER_AGENT, which names the project; never fetched",
     "www.w3.org": (
-        "the XML Schema datatype IRIs (xsd:gYear, xsd:string) inside the CGUE reader's SPARQL "
-        "query (decisions/curia.py): names, never fetched"
+        "XML names, never fetched: the XML Schema datatype IRIs (xsd:gYear, xsd:string) inside the "
+        "CGUE reader's SPARQL query (decisions/curia.py) and the HTML namespace of the administrative "
+        "courts' documents (decisions/giustizia_amministrativa.py)"
     ),
 }
 

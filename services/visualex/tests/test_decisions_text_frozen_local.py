@@ -11,7 +11,7 @@ import pathlib
 import pytest
 
 from tests.test_decisions_text_frozen import GOLDEN, fingerprint
-from visualex_api.services.decisions import curia
+from visualex_api.services.decisions import curia, giustizia_amministrativa
 from visualex_api.services.decisions.italgiure import to_decision
 from visualex_api.services.decisions.pdf_text import text_from_pdf
 
@@ -19,6 +19,7 @@ PRIVATE = pathlib.Path(__file__).parent / "fixtures" / "decisions" / "private"
 
 _CASSAZIONE = PRIVATE.exists() and any(PRIVATE.glob("*.clean.pdf"))
 _CURIA = PRIVATE.exists() and any(PRIVATE.glob("curia_6*"))
+_GA = PRIVATE.exists() and any(PRIVATE.glob("ga_*.xml"))
 
 
 def local_cases() -> dict:
@@ -51,7 +52,22 @@ def local_curia_cases() -> dict:
     return cases
 
 
+def local_ga_cases() -> dict:
+    """{key: testo} for each private document of the administrative courts (`ga_<key>.xml`, the
+    key as the convention writes it with «_» for «:»: `ga_consiglio_di_stato_sent_2270_2019.xml`)."""
+    return {path.stem.removeprefix("ga_"): giustizia_amministrativa.text_from_document(path.read_bytes())
+            for path in sorted(PRIVATE.glob("ga_*.xml"))}
+
+
 CASES = local_cases() if _CASSAZIONE else {}
+GA_CASES = local_ga_cases() if _GA else {}
+
+
+@pytest.mark.skipif(not _GA, reason="real decisions are local only")
+@pytest.mark.parametrize("key", sorted(GA_CASES))
+def test_the_projection_of_a_real_administrative_decision_is_frozen(key):
+    assert key in GOLDEN, f"{key} has no golden entry"
+    assert fingerprint(GA_CASES[key]) == GOLDEN[key]
 CURIA_CASES = local_curia_cases() if _CURIA else {}
 
 

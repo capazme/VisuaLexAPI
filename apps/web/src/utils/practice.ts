@@ -343,7 +343,7 @@ export function storedNorma(value: unknown): Norma | null {
   return norma;
 }
 
-const COURTS: readonly DecisionCourt[] = ['cassazione', 'corte_costituzionale'];
+const COURTS: readonly DecisionCourt[] = ['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue'];
 
 /** A decision's reference that passes `isValidView`, of a court VisuaLex reads, with its known
  *  fields only. The migration and `sanitizePractices` both keep this, so it is a fixed point. */
