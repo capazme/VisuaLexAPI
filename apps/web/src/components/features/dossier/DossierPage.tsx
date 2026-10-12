@@ -8,7 +8,7 @@ import { DossierDetailView } from './DossierDetailView';
 import { ImportDossierModal } from './ImportDossierModal';
 import { TrashPage } from './TrashPage';
 import { useTrash } from './useTrash';
-import { importReport, importToastType, validateImportedDossier, type ImportCheck } from './dossierUtils';
+import { decodeDossierShare, importReport, importToastType, validateImportedDossier, type ImportCheck } from './dossierUtils';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
 
@@ -45,7 +45,7 @@ export function DossierPage() {
     const importData = searchParams.get('import');
     if (!importData) return;
     try {
-      const decoded = atob(decodeURIComponent(importData));
+      const decoded = decodeDossierShare(decodeURIComponent(importData));
       // A share link is untrusted: its decision items are checked, and what cannot be imported is listed.
       const check = validateImportedDossier(JSON.parse(decoded));
       if (!check) throw new Error('not a dossier');

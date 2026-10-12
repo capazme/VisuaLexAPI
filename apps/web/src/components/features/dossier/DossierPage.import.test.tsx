@@ -13,19 +13,21 @@ vi.mock('../../../services/trashService', () => ({ trashService: { list: vi.fn(a
 
 import { appStore } from '../../../store/useAppStore';
 import { DossierPage } from './DossierPage';
+import { encodeDossierShare } from './dossierUtils';
+import type { Dossier } from '../../../types';
 
 const SENTENZA = { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' };
 const note = { id: 'n', type: 'note', data: 'appunto', addedAt: '' };
 const badDecision = { id: 'b', type: 'sentenza', data: { ...SENTENZA, corte: 'tar' }, addedAt: '' };
 
-function link(items: unknown[]) {
-  return `/dossier?import=${encodeURIComponent(btoa(JSON.stringify({ title: 'Da link', items })))}`;
+function link(items: unknown[], title = 'Da link') {
+  return `/dossier?import=${encodeDossierShare({ title, items } as unknown as Dossier)}`;
 }
 
-async function importWith(items: unknown[], outcome: { id: string; imported: number; failed: number } | null) {
+async function importWith(items: unknown[], outcome: { id: string; imported: number; failed: number } | null, url = link(items)) {
   const importDossier = vi.fn(async () => outcome);
   appStore.setState({ dossiers: [], importDossier });
-  render(<MemoryRouter initialEntries={[link(items)]}><DossierPage /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={[url]}><DossierPage /></MemoryRouter>);
   fireEvent.click(await screen.findByRole('button', { name: 'Importa' }));
   const status = await screen.findByRole('status');
   return { importDossier, status };
@@ -60,5 +62,18 @@ describe('DossierPage: the toast after an import', () => {
     const { status } = await importWith([note], null);
     await waitFor(() => expect(status).toHaveTextContent('Impossibile importare il dossier: errore server'));
     expect(status).toHaveAttribute('data-type', 'error');
+  });
+});
+
+describe('DossierPage: share links', () => {
+  it('imports a dossier whose title holds a typographic apostrophe', async () => {
+    const { importDossier } = await importWith([note], { id: 'srv', imported: 1, failed: 0 }, link([note], 'L’azione revocatoria'));
+    expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ title: 'L’azione revocatoria' }]);
+  });
+
+  it('still imports a link made before the UTF-8 links', async () => {
+    const old = `/dossier?import=${encodeURIComponent(btoa(JSON.stringify({ title: 'Perché', items: [note] })))}`;
+    const { importDossier } = await importWith([note], { id: 'srv', imported: 1, failed: 0 }, old);
+    expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ title: 'Perché' }]);
   });
 });

@@ -6,6 +6,7 @@ import {
   dossierItemFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
   validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importReasonsText, importToastType,
+  encodeDossierShare, decodeDossierShare,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -536,5 +537,38 @@ describe('an imported dossier is rebuilt from what was checked', () => {
     expect(importToastType(0, 0)).toBe('success');
     expect(importToastType(2, 1)).toBe('info');
     expect(importToastType(0, 2)).toBe('warning');
+  });
+});
+
+describe('dossier share links', () => {
+  const dossier = (title: string, note: string): Dossier => ({
+    id: 'd1', title, createdAt: '2026-10-01T10:00:00.000Z',
+    items: [{ id: 'n1', type: 'note', data: note, addedAt: '2026-10-01T10:00:00.000Z' } as DossierItem],
+  } as Dossier);
+
+  it('carries a typographic apostrophe, accents, emoji and CJK there and back', () => {
+    const d = dossier('L’azione revocatoria — è «nulla»?', 'Cass. n. 1/2024 ✓ 😀 判例');
+    const value = encodeDossierShare(d);
+    expect(value).toMatch(/^u8\.[A-Za-z0-9_-]+$/);
+    expect(JSON.parse(decodeDossierShare(value))).toEqual(d);
+  });
+
+  it('survives the URL without further encoding', () => {
+    const value = encodeDossierShare(dossier('Città’s', 'x'.repeat(5000)));
+    expect(encodeURIComponent(value)).toBe(value);
+    expect(new URLSearchParams(`import=${value}`).get('import')).toBe(value);
+  });
+
+  it('never throws on a lone surrogate', () => {
+    expect(() => encodeDossierShare(dossier('\uD800', ''))).not.toThrow();
+  });
+
+  it('still reads a link made the old way, Latin-1 accents included', () => {
+    const d = dossier('Perché è così', 'àèìòù');
+    expect(JSON.parse(decodeDossierShare(btoa(JSON.stringify(d))))).toEqual(d);
+  });
+
+  it('refuses a new link whose bytes are not UTF-8', () => {
+    expect(() => decodeDossierShare(`u8.${btoa('\xff\xfe')}`)).toThrow();
   });
 });

@@ -333,6 +333,29 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
   return { ...base, type: 'note', data: text };
 }
 
+/**
+ * Share links carry the dossier as base64url of its UTF-8 JSON, after this prefix. The first
+ * links were `btoa` of the bare JSON, which throws on any character past U+00FF (a «’» in a
+ * title or a note); those links hold only Latin-1, so they are still read as they were made.
+ */
+const SHARE_PREFIX = 'u8.';
+
+export function encodeDossierShare(dossier: Dossier): string {
+  // Never throws on text: JSON.stringify writes a lone surrogate as `\ud800`, and TextEncoder takes any string.
+  const bytes = new TextEncoder().encode(JSON.stringify(dossier));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return SHARE_PREFIX + btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** The JSON a share link carries, new or old; throws on anything that is neither. */
+export function decodeDossierShare(value: string): string {
+  if (!value.startsWith(SHARE_PREFIX)) return atob(value);
+  const body = value.slice(SHARE_PREFIX.length).replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(body + '='.repeat((4 - (body.length % 4)) % 4));
+  return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
+}
+
 export interface ImportCheck {
   dossier: Dossier;
   discarded: Array<{ index: number; reason: string }>;
