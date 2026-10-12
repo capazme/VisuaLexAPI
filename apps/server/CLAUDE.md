@@ -440,7 +440,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `DELETE /admin/users/:id`; never delete the user row by hand) the cards the
   community has taken up (proposed, validated, to review) stay without an author,
   and the person's drafts and archived cards are deleted with them, in one
-  transaction (plan, decision 14). Their votes outlive them, anonymous
+  transaction that locks the person's cards first, so a vote archiving one meanwhile
+  finishes before the states are read (plan, decision 14). Their votes outlive them, anonymous
   (`LingoValidazioneCard.utenteId` `SET NULL`), as do the text versions they wrote
   (`autoreId` `SET NULL`); their acceptances go. A card's votes go with the card: one
   restored from the trash comes back without them. `GET /auth/export` includes the user's cards

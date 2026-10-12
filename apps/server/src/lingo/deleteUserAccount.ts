@@ -21,8 +21,12 @@ export const PERSONAL_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'ARCHIVIATA
  * for the error handler), rolling the card deletion back with it.
  */
 export async function deleteUserAccount(userId: string): Promise<void> {
-  await prisma.$transaction([
-    prisma.lingoCard.deleteMany({ where: { autoreId: userId, stato: { in: PERSONAL_STATES } } }),
-    prisma.user.delete({ where: { id: userId } }),
-  ]);
+  await prisma.$transaction(async (tx) => {
+    // The person's cards are locked first: a validator's vote in flight finishes before the
+    // states are read, so a card it has just archived goes with the account instead of
+    // staying archived with no author, where nobody could see or delete it.
+    await tx.$queryRaw`SELECT id FROM lingo_cards WHERE autore_id = ${userId} ORDER BY id FOR UPDATE`;
+    await tx.lingoCard.deleteMany({ where: { autoreId: userId, stato: { in: PERSONAL_STATES } } });
+    await tx.user.delete({ where: { id: userId } });
+  });
 }
