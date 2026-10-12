@@ -26,7 +26,8 @@ export function ReadingFullScreen({ onCrossReference }: ReadingFullScreenProps) 
   if (!reader) return null;
 
   const subject = subjectOf(practice, reader.ref);
-  const title = titleOf(subject);
+  // A topic search draws its own heading («Tema: …»): the header says what it is, once.
+  const title = subject?.kind === 'decision-search' ? 'Ricerca per tema' : titleOf(subject);
 
   return (
     <section

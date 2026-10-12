@@ -156,7 +156,9 @@ describe('ReadingFullScreen (spec §8, T19)', () => {
     const ref: BesideRef = { id: 'topic:1', kind: 'decision-search', query: { tema: 'danno non patrimoniale' }, label: 'Danno' };
     s().openPhoneReader(practiceId, ref);
     draw();
-    expect(reader()).toHaveAccessibleName('Danno');
+    // the header says what it is; the view's own heading carries the topic, once
+    expect(reader()).toHaveAccessibleName('Ricerca per tema');
+    expect(within(reader()).getAllByText(/Tema: danno non patrimoniale/)).toHaveLength(1);
     expect(within(reader()).getByTestId('topic-list')).toHaveAttribute('data-beside', 'topic:1');
   });
 

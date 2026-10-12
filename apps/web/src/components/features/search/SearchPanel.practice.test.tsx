@@ -161,7 +161,7 @@ describe.each([
     s().createPractice('Responsabilità');
     panel();
     act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
-    const place = await screen.findByRole('region', { name: 'Tema: danno' });
+    const place = await screen.findByRole('region', { name: desktop ? 'Tema: danno' : 'Ricerca per tema' });
     fireEvent.click(within(place).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
     expect(await screen.findByTestId('decision-reader')).toHaveTextContent('n. 12345');
     expect(s().practices[0].decisions.map((d) => d.reference.numero)).toEqual([12345]);

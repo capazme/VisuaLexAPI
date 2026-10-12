@@ -129,11 +129,27 @@ describe('PracticePhoneView (spec §8, P3)', () => {
 /** The page's content scroller, `Layout`'s: the view sits in it, and its scroll is what «‹ Pratica» gives back. */
 function scrolled(ui: React.ReactElement) {
   let top = 0;
+  let max = Infinity; // how far the page can scroll: a short page clamps a write, as a browser does
   const utils = render(<div data-testid="scroller" style={{ overflowY: 'auto' }}>{ui}</div>);
   const scroller = screen.getByTestId('scroller');
-  Object.defineProperty(scroller, 'scrollTop', { get: () => top, set: (v: number) => { top = v; }, configurable: true });
-  const scrollTo = (v: number) => { top = v; fireEvent.scroll(scroller); };
-  return { ...utils, scroller, scrollTo, top: () => top };
+  Object.defineProperty(scroller, 'scrollTop', { get: () => top, set: (v: number) => { top = Math.min(v, max); }, configurable: true });
+  const scrollTo = (v: number) => { top = Math.min(v, max); fireEvent.scroll(scroller); };
+  const setMax = (v: number) => { max = v; top = Math.min(top, max); };
+  return { ...utils, scroller, scrollTo, setMax, top: () => top };
+}
+
+/** A ResizeObserver the test drives: `grow()` tells every observer its element changed size. */
+function fakeResizeObserver() {
+  const callbacks = new Set<() => void>();
+  class Fake {
+    private readonly cb: () => void;
+    constructor(cb: () => void) { this.cb = cb; }
+    observe() { callbacks.add(this.cb); }
+    unobserve() { callbacks.delete(this.cb); }
+    disconnect() { callbacks.delete(this.cb); }
+  }
+  vi.stubGlobal('ResizeObserver', Fake);
+  return { grow: () => act(() => { [...callbacks].forEach((cb) => cb()); }) };
 }
 
 /** One practice with art. 5 of l. 24/2017 and a read decision. */
@@ -179,6 +195,118 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(top()).toBe(420);
   });
 
+  it('the place is asked for again while the remounted column grows, until it is reached', () => {
+    const { practiceId, articleKey, actId } = withArticleAndDecision();
+    const observer = fakeResizeObserver();
+    const { scrollTo, setMax, top } = scrolled(view());
+    scrollTo(407);
+    act(() => { s().openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })); });
+    setMax(0); // the reader is short: the scroller is clamped
+    scrollTo(0);
+    setMax(120); // the column remounts short: its open rows' text has not arrived
+    act(() => { s().closePhoneReader(); });
+    expect(top()).toBe(120); // clamped, but still asked for
+    setMax(300);
+    observer.grow();
+    expect(top()).toBe(300);
+    setMax(2000); // the text arrives
+    observer.grow();
+    expect(top()).toBe(407);
+    // reached: it stops asking
+    scrollTo(50);
+    setMax(3000);
+    observer.grow();
+    expect(top()).toBe(50);
+  });
+
+  it('a scroll of the user ends the asking', () => {
+    const { practiceId, articleKey, actId } = withArticleAndDecision();
+    const observer = fakeResizeObserver();
+    const { scroller, scrollTo, setMax, top } = scrolled(view());
+    scrollTo(407);
+    act(() => { s().openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })); });
+    setMax(0);
+    scrollTo(0);
+    setMax(120);
+    act(() => { s().closePhoneReader(); });
+    fireEvent.wheel(scroller);
+    scrollTo(10);
+    setMax(2000);
+    observer.grow();
+    expect(top()).toBe(10);
+  });
+
+  it('the asking gives up after a few seconds', () => {
+    vi.useFakeTimers();
+    try {
+      const { practiceId, articleKey, actId } = withArticleAndDecision();
+      const observer = fakeResizeObserver();
+      const { scrollTo, setMax, top } = scrolled(view());
+      scrollTo(407);
+      act(() => { s().openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })); });
+      setMax(0);
+      scrollTo(0);
+      setMax(120);
+      act(() => { s().closePhoneReader(); });
+      act(() => { vi.advanceTimersByTime(3500); });
+      setMax(2000);
+      observer.grow();
+      expect(top()).toBe(120);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('«Apri accanto» is icon-only on a phone (its name stays), a 44 px target, so the row\'s name keeps its width', () => {
+    withArticleAndDecision();
+    render(view());
+    const open = screen.getByRole('button', { name: /^Apri accanto art\. 5/ });
+    expect(open).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(open.querySelector('span')).toHaveClass('hidden', 'md:inline');
+  });
+
+  it('the count line has its own line, above the buttons: never cut by them', () => {
+    withArticleAndDecision();
+    render(view());
+    const count = screen.getByText(/1 atto · 1 articolo · 1 sentenza/);
+    expect(count.tagName).toBe('P');
+    expect(count).not.toHaveClass('truncate');
+    expect(screen.getByRole('button', { name: 'Salva come dossier' }).parentElement).not.toContainElement(count);
+  });
+
+  it('Esc on the list\'s open «⋯» menu closes the menu and leaves «Le tue pratiche» visible', async () => {
+    s().createPractice('Prima');
+    render(view());
+    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
+    const dialog = screen.getByRole('dialog', { name: 'Le tue pratiche' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Altre azioni per la pratica Prima' }));
+    const item = screen.getByRole('menuitem', { name: 'Rinomina' });
+    fireEvent.keyDown(item, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    // (a dialog that closed would still be in the DOM for its exit animation: wait it out)
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(screen.getByRole('dialog', { name: 'Le tue pratiche' })).toBeInTheDocument();
+    // a second Esc, with no menu open, is the dialog's
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('the dossier picker is one stable sibling: opening the reader does not remount it, its typed query survives', () => {
+    const { practiceId, articleKey, actId } = withArticleAndDecision();
+    appStore.setState({
+      dossiers: Array.from({ length: 6 }, (_, i) => ({ id: `d${i}`, title: `Dossier ${i}`, createdAt: '', tags: [], items: [] })),
+    });
+    render(view());
+    fireEvent.click(screen.getByRole('button', { name: /^Altre azioni per la pratica/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
+    const search = screen.getByRole('textbox', { name: 'Cerca dossier' }) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'Dossier 3' } });
+    act(() => { s().openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })); });
+    const after = screen.getByRole('textbox', { name: 'Cerca dossier' }) as HTMLInputElement;
+    expect(after).toBe(search); // the same element: not remounted
+    expect(after.value).toBe('Dossier 3');
+  });
+
   it('a pending reveal wins over the saved scroll: the row is scrolled to, not the old place', () => {
     const { practiceId, articleKey, actId } = withArticleAndDecision();
     const { scrollTo, top } = scrolled(view());
@@ -210,7 +338,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     render(view());
     act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
     const reader = screen.getByTestId('reading-full-screen');
-    expect(reader).toHaveAccessibleName('Tema: danno');
+    expect(reader).toHaveAccessibleName('Ricerca per tema');
     expect(within(reader).getByRole('button', { name: 'Pratica' })).toBeInTheDocument();
     expect(screen.queryByTestId('practice-topic-searches')).toBeNull();
     expect(s().practices[0].beside).toEqual([]);

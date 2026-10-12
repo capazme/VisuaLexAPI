@@ -1023,13 +1023,14 @@ meant to stay split; add new features as new files, not inside the shells:
   `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
   «Apri accanto» (on the desktop a row whose subject a window shows folds and says «Aperto accanto ·
   Chiudi la finestra», so one subject has one mounted reading surface, T5; on a phone it opens the
-  full-screen reader and no row ever folds));
+  full-screen reader, icon-only so the row's name keeps its width, and no row ever folds));
   `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place, a «⋯» per chip);
   `PracticePhoneView` (the phone's table: chevrons, the name — a tap lists the practices with «Nuova
   pratica» — and dots, the count line with «Salva come dossier» and its «⋯» (`usePracticeSaveActions`),
   over the same column; while `phoneReader` is set it draws `ReadingFullScreen` in the column's place
   — the column is not kept mounted under it, gotcha 26 — and gives the column back at the scroll
-  position of the page's content scroller it left) and `ReadingFullScreen` (the phone's reader, T19:
+  position of the page's content scroller it left, asked for again while the remounted column grows
+  until reached, the user scrolls or 3 s pass) and `ReadingFullScreen` (the phone's reader, T19:
   «‹ Pratica» at 44 px, the title, and `ReadingWindow`'s own body — `ReadingWindowBody` — for what
   `phoneReader` names: an article, a decision or a topic search). `phoneReader` (`{ practiceId, ref }`)
   is session state of its own, never saved and never the desktop's `beside`: `openPhoneReader`,

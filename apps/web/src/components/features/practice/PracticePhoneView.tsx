@@ -22,6 +22,11 @@ export interface PracticePhoneViewProps {
 
 const NEW_PRACTICE_LABEL = 'Nuova pratica';
 
+/** How long the column's scroll position is asked for again while its content arrives. */
+const SETTLE_MS = 3000;
+/** What a user's own scroll starts with: it ends the asking. */
+const USER_SCROLL = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+
 // 44 px touch targets (apps/web/CLAUDE.md, «Mobile-first»).
 const CHEVRON =
   'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl shadow-sm transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
@@ -61,7 +66,9 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
 
   // The column's scroll position (the page's content scroller) is kept, with its practice, while the
   // column is drawn and given back when the reader closes on the same practice — unless a row is
-  // waiting to be revealed, which scrolls to itself.
+  // waiting to be revealed, which scrolls to itself. The column remounts short and its open rows'
+  // content arrives afterwards, so one write at mount would be clamped and lost: the position is
+  // asked for again each time the view grows, until it is reached, the user scrolls, or SETTLE_MS pass.
   const rootRef = useRef<HTMLDivElement>(null);
   const lastTop = useRef<{ practiceId: string | null; top: number }>({ practiceId: null, top: 0 });
   const restore = useRef<string | null>(null);
@@ -73,114 +80,132 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
       restore.current = shownPractice.current;
       return;
     }
-    const scroller = rootRef.current ? scrollParentOf(rootRef.current) : null;
-    if (!scroller) return;
-    let frame: number | null = null;
+    const root = rootRef.current;
+    const scroller = root ? scrollParentOf(root) : null;
+    if (!root || !scroller) return;
+    let settling = false;
+    let stopSettling: (record: boolean) => void = () => {};
     if (restore.current !== null) {
       const kept = restore.current;
       restore.current = null;
       if (kept === shownPractice.current && lastTop.current.practiceId === kept && !appStore.getState().pendingReveal) {
         const target = lastTop.current.top;
-        scroller.scrollTop = target;
-        // A row's reading surface may still be settling: once more, a frame later.
-        frame = requestAnimationFrame(() => {
-          if (!appStore.getState().pendingReveal && Math.abs(scroller.scrollTop - target) > 1) scroller.scrollTop = target;
-        });
+        const observer = new ResizeObserver(() => apply());
+        const timer = setTimeout(() => stop(true), SETTLE_MS);
+        const byUser = () => stop(true);
+        settling = true;
+        function stop(record: boolean) {
+          if (!settling) return;
+          settling = false;
+          observer.disconnect();
+          clearTimeout(timer);
+          for (const type of USER_SCROLL) scroller!.removeEventListener(type, byUser);
+          if (record) lastTop.current = { practiceId: kept, top: scroller!.scrollTop };
+        }
+        function apply() {
+          if (appStore.getState().pendingReveal) return stop(true);
+          if (scroller!.scrollTop < target - 1) scroller!.scrollTop = target;
+          if (Math.abs(scroller!.scrollTop - target) <= 1) stop(true);
+        }
+        stopSettling = stop;
+        for (const type of USER_SCROLL) scroller.addEventListener(type, byUser, { passive: true });
+        observer.observe(root);
+        apply();
       }
     }
-    const onScroll = () => { lastTop.current = { practiceId: shownPractice.current, top: scroller.scrollTop }; };
+    // The clamping and the restoring write scroll events of their own: only the user's are the place.
+    const onScroll = () => {
+      if (!settling) lastTop.current = { practiceId: shownPractice.current, top: scroller.scrollTop };
+    };
     scroller.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       scroller.removeEventListener('scroll', onScroll);
-      if (frame !== null) cancelAnimationFrame(frame);
+      stopSettling(false);
     };
   }, [readerOpen]);
 
   if (list.length === 0) return null;
-  if (readerOpen) {
-    return (
-      <>
-        <ReadingFullScreen onCrossReference={onCrossReference} />
-        {save.overlay}
-      </>
-    );
-  }
-
+  // The save's picker and toast are one stable sibling of whichever branch is drawn: opening the
+  // reader does not remount the picker.
   return (
-    <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
-      {/* The layout's fixed menu button (top-left, 16px in, 56px wide) sits over the header's left
-          edge: the inset keeps the previous chevron clear of it. */}
-      <div className="flex-shrink-0 border-b border-slate-200 bg-white/80 py-2 pl-[4.5rem] pr-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => go(index - 1)}
-            disabled={index <= 0}
-            aria-label="Pratica precedente"
-            className={cn(CHEVRON, index <= 0 ? CHEVRON_OFF : CHEVRON_ON)}
-          >
-            <ChevronLeft size={20} aria-hidden />
-          </button>
-          <div className="min-w-0 flex-1 px-4 text-center">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+    <>
+      {readerOpen ? <ReadingFullScreen onCrossReference={onCrossReference} /> : (
+        <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
+          {/* The layout's fixed menu button (top-left, 16px in, 56px wide) sits over the header's left
+              edge: the inset keeps the previous chevron clear of it. */}
+          <div className="flex-shrink-0 border-b border-slate-200 bg-white/80 py-2 pl-[4.5rem] pr-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setListing(true)}
-                aria-haspopup="dialog"
-                title="Elenco delle pratiche"
-                className="inline-flex min-h-[44px] max-w-full items-center justify-center gap-1 rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                onClick={() => go(index - 1)}
+                disabled={index <= 0}
+                aria-label="Pratica precedente"
+                className={cn(CHEVRON, index <= 0 ? CHEVRON_OFF : CHEVRON_ON)}
               >
-                <span className="truncate">{practice?.label ?? ''}</span>
-                <ChevronDown size={16} aria-hidden className="flex-shrink-0 text-slate-400" />
+                <ChevronLeft size={20} aria-hidden />
               </button>
-            </h2>
-            {/* Each dot is a 44 px button around a small visual dot; many practices wrap. */}
-            <div className="flex flex-wrap justify-center">
-              {list.map((p, i) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => go(i)}
-                  aria-label={`Pratica ${i + 1}: ${p.label}`}
-                  aria-current={i === index ? 'true' : undefined}
-                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'block h-1.5 rounded-full transition-all duration-300',
-                      i === index ? 'w-6 bg-primary-500' : 'w-1.5 bg-slate-300 dark:bg-slate-700',
-                    )}
-                  />
-                </button>
-              ))}
+              <div className="min-w-0 flex-1 px-4 text-center">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  <button
+                    type="button"
+                    onClick={() => setListing(true)}
+                    aria-haspopup="dialog"
+                    title="Elenco delle pratiche"
+                    className="inline-flex min-h-[44px] max-w-full items-center justify-center gap-1 rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  >
+                    <span className="truncate">{practice?.label ?? ''}</span>
+                    <ChevronDown size={16} aria-hidden className="flex-shrink-0 text-slate-400" />
+                  </button>
+                </h2>
+                {/* Each dot is a 44 px button around a small visual dot; many practices wrap. */}
+                <div className="flex flex-wrap justify-center">
+                  {list.map((p, i) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => go(i)}
+                      aria-label={`Pratica ${i + 1}: ${p.label}`}
+                      aria-current={i === index ? 'true' : undefined}
+                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'block h-1.5 rounded-full transition-all duration-300',
+                          i === index ? 'w-6 bg-primary-500' : 'w-1.5 bg-slate-300 dark:bg-slate-700',
+                        )}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => go(index + 1)}
+                disabled={index < 0 || index >= list.length - 1}
+                aria-label="Pratica successiva"
+                className={cn(CHEVRON, index < 0 || index >= list.length - 1 ? CHEVRON_OFF : CHEVRON_ON)}
+              >
+                <ChevronRight size={20} aria-hidden />
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => go(index + 1)}
-            disabled={index < 0 || index >= list.length - 1}
-            aria-label="Pratica successiva"
-            className={cn(CHEVRON, index < 0 || index >= list.length - 1 ? CHEVRON_OFF : CHEVRON_ON)}
-          >
-            <ChevronRight size={20} aria-hidden />
-          </button>
-        </div>
-      </div>
-      {practice && (
-        <div className="space-y-4 p-4">
-          <PhonePracticeActions practice={practice} save={save} />
-          <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
-          {practice.acts.length === 0 && practice.decisions.length === 0 ? (
-            <PracticeEmpty />
-          ) : (
-            <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
+          {practice && (
+            <div className="space-y-4 p-4">
+              <PhonePracticeActions practice={practice} save={save} />
+              <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
+              {practice.acts.length === 0 && practice.decisions.length === 0 ? (
+                <PracticeEmpty />
+              ) : (
+                <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
+              )}
+            </div>
           )}
+          <PracticeList isOpen={listing} onClose={() => setListing(false)} />
         </div>
       )}
-      <PracticeList isOpen={listing} onClose={() => setListing(false)} />
       {save.overlay}
-    </div>
+    </>
   );
 }
 
@@ -189,24 +214,27 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
 function PhonePracticeActions({ practice, save }: { practice: Practice; save: PracticeSaveActions }) {
   const countLine = practiceCountLine(practiceCounts(practice));
   return (
-    <div className="flex items-center gap-2">
-      <p className="min-w-0 flex-1 truncate text-sm text-slate-500 dark:text-slate-400">{countLine}</p>
-      <button
-        type="button"
-        onClick={save.saveAsNew}
-        disabled={save.busy}
-        className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-      >
-        <FolderPlus size={16} aria-hidden />
-        Salva come dossier
-      </button>
-      <MenuButton
-        label={`Altre azioni per la pratica ${practice.label}`}
-        triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-        items={save.items}
-      >
-        <MoreHorizontal size={18} aria-hidden />
-      </MenuButton>
+    <div className="space-y-2">
+      {/* The count has its own line: it is never cut by the buttons. */}
+      {countLine && <p className="text-sm text-slate-500 dark:text-slate-400">{countLine}</p>}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={save.saveAsNew}
+          disabled={save.busy}
+          className="inline-flex min-h-[44px] min-w-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        >
+          <FolderPlus size={16} aria-hidden className="shrink-0" />
+          Salva come dossier
+        </button>
+        <MenuButton
+          label={`Altre azioni per la pratica ${practice.label}`}
+          triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          items={save.items}
+        >
+          <MoreHorizontal size={18} aria-hidden />
+        </MenuButton>
+      </div>
     </div>
   );
 }

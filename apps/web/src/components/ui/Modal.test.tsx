@@ -72,4 +72,17 @@ describe('Modal', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(closeParent).toHaveBeenCalledTimes(1);
   });
+
+  it('an Esc something inside already took (a menu closing, an edit cancelled) does not close the dialog', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal isOpen onClose={onClose} title="Con un menu">
+        <button type="button" onKeyDown={(e) => { if (e.key === 'Escape') e.preventDefault(); }}>voce</button>
+      </Modal>,
+    );
+    fireEvent.keyDown(screen.getByText('voce'), { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
