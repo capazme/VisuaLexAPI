@@ -1,0 +1,180 @@
+{
+ "version": 1,
+ "note": "The 29 seats of the Tribunali amministrativi regionali, as the portal of giustizia-amministrativa.it names them in its decisions search (sedeProvvedimenti, read on 12 October 2026), with their region and whether each is the region's main seat. A TAR named by its region alone is read as the main seat, the others searched too (design 2026-10-12-administrative-courts §5, D3). The citation names the seat only where the region has more than one (§3). Every suite that names a TAR reads this table.",
+ "seats": [
+  {
+   "slug": "ancona",
+   "sede": "Ancona",
+   "regione": "Marche",
+   "principale": true
+  },
+  {
+   "slug": "aosta",
+   "sede": "Aosta",
+   "regione": "Valle d'Aosta",
+   "principale": true
+  },
+  {
+   "slug": "bari",
+   "sede": "Bari",
+   "regione": "Puglia",
+   "principale": true
+  },
+  {
+   "slug": "lecce",
+   "sede": "Lecce",
+   "regione": "Puglia",
+   "principale": false
+  },
+  {
+   "slug": "bologna",
+   "sede": "Bologna",
+   "regione": "Emilia-Romagna",
+   "principale": true
+  },
+  {
+   "slug": "parma",
+   "sede": "Parma",
+   "regione": "Emilia-Romagna",
+   "principale": false
+  },
+  {
+   "slug": "trento",
+   "sede": "Trento",
+   "regione": "Trentino-Alto Adige",
+   "principale": true
+  },
+  {
+   "slug": "bolzano",
+   "sede": "Bolzano",
+   "regione": "Trentino-Alto Adige",
+   "principale": false
+  },
+  {
+   "slug": "milano",
+   "sede": "Milano",
+   "regione": "Lombardia",
+   "principale": true
+  },
+  {
+   "slug": "brescia",
+   "sede": "Brescia",
+   "regione": "Lombardia",
+   "principale": false
+  },
+  {
+   "slug": "cagliari",
+   "sede": "Cagliari",
+   "regione": "Sardegna",
+   "principale": true
+  },
+  {
+   "slug": "campobasso",
+   "sede": "Campobasso",
+   "regione": "Molise",
+   "principale": true
+  },
+  {
+   "slug": "palermo",
+   "sede": "Palermo",
+   "regione": "Sicilia",
+   "principale": true
+  },
+  {
+   "slug": "catania",
+   "sede": "Catania",
+   "regione": "Sicilia",
+   "principale": false
+  },
+  {
+   "slug": "catanzaro",
+   "sede": "Catanzaro",
+   "regione": "Calabria",
+   "principale": true
+  },
+  {
+   "slug": "reggio-calabria",
+   "sede": "Reggio Calabria",
+   "regione": "Calabria",
+   "principale": false
+  },
+  {
+   "slug": "firenze",
+   "sede": "Firenze",
+   "regione": "Toscana",
+   "principale": true
+  },
+  {
+   "slug": "genova",
+   "sede": "Genova",
+   "regione": "Liguria",
+   "principale": true
+  },
+  {
+   "slug": "l-aquila",
+   "sede": "L'Aquila",
+   "regione": "Abruzzo",
+   "principale": true
+  },
+  {
+   "slug": "pescara",
+   "sede": "Pescara",
+   "regione": "Abruzzo",
+   "principale": false
+  },
+  {
+   "slug": "roma",
+   "sede": "Roma",
+   "regione": "Lazio",
+   "principale": true
+  },
+  {
+   "slug": "latina",
+   "sede": "Latina",
+   "regione": "Lazio",
+   "principale": false
+  },
+  {
+   "slug": "napoli",
+   "sede": "Napoli",
+   "regione": "Campania",
+   "principale": true
+  },
+  {
+   "slug": "salerno",
+   "sede": "Salerno",
+   "regione": "Campania",
+   "principale": false
+  },
+  {
+   "slug": "perugia",
+   "sede": "Perugia",
+   "regione": "Umbria",
+   "principale": true
+  },
+  {
+   "slug": "potenza",
+   "sede": "Potenza",
+   "regione": "Basilicata",
+   "principale": true
+  },
+  {
+   "slug": "torino",
+   "sede": "Torino",
+   "regione": "Piemonte",
+   "principale": true
+  },
+  {
+   "slug": "trieste",
+   "sede": "Trieste",
+   "regione": "Friuli Venezia Giulia",
+   "principale": true
+  },
+  {
+   "slug": "venezia",
+   "sede": "Venezia",
+   "regione": "Veneto",
+   "principale": true
+  }
+ ]
+}
