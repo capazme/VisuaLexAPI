@@ -65,7 +65,7 @@ const UPPERCASE_CASE_LETTER = new RegExp(`[CT](?=\\s*${EU_DASH}?\\s*\\d)`);
 const UNSUPPORTED_HEADS = new RegExp(
   `${LEFT}(?:corte\\s+d(?:i\\s+|['’]\\s*)appello|c\\.\\s*app(?:ello)?\\.?|app\\.|tribunale|(?<!sez(?:ione)?\\.?\\s*|\\(\\s*)trib\\.|corte\\s+edu|cedu|c\\.\\s*e\\.\\s*d\\.\\s*u\\.?` +
     // courts a Corte costituzionale ruling names often; the referring judge is a court too
-    `|corte\\s+europea|corte\\s+di\\s+strasburgo|corte\\s+dei\\s+conti|corte\\s+(?:di\\s+|d['’]\\s*)assise|corte\\s+militare|csm|consiglio\\s+superiore\\s+della\\s+magistratura` +
+    `|corte\\s+europea(?:\\s+dei\\s+diritti\\s+dell['’]\\s*uomo)?|corte\\s+di\\s+strasburgo|corte\\s+dei\\s+conti|corte\\s+(?:di\\s+|d['’]\\s*)assise|corte\\s+militare|csm|consiglio\\s+superiore\\s+della\\s+magistratura` +
     `|giudice\\s+a\\s+quo|giudice\\s+rimettente|rimettente|comm(?:issione)?\\.?\\s*trib(?:utaria)?\\.?|giudice\\s+di\\s+pace|g\\.\\s*d\\.\\s*p\\.|c\\.\\s*t\\.\\s*[pr]\\.?|ct[pr])(?![\\p{L}\\p{N}])`,
   'giu',
 );
@@ -155,8 +155,9 @@ function courtFollows(folded: string, end: number, ownCourt: boolean): boolean {
   for (const at of skipped ? [here, here + skipped[0].length] : [here]) {
     for (const heads of [COURT_HEADS, UNSUPPORTED_HEADS]) {
       const re = new RegExp(heads.source, 'iuy');
-      re.lastIndex = at;
-      const found = re.exec(folded);
+      // a closing parenthesis or a semicolon after the court's name does not stop it from being one
+      const probe = folded.slice(at, at + 80).replace(/[);:\]]/g, ' ');
+      const found = re.exec(probe);
       // inside a Corte costituzionale decision, «… della Corte costituzionale» is the Court itself
       if (found && !(ownCourt && CORTE_COSTITUZIONALE.test(found[0]))) return true;
     }
