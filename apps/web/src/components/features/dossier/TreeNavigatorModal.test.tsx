@@ -45,9 +45,27 @@ describe('TreeNavigatorModal', () => {
 
   it('shows an act type the list does not offer', async () => {
     render(<TreeNavigatorModal onClose={() => {}} onImport={() => {}}
-      initialAct={{ tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016-04-27' }} />);
-    expect(screen.getByRole('combobox')).toHaveValue('regolamento ue');
+      initialAct={{ tipo_atto: 'legge regionale', numero_atto: '12', data: '2005-03-11' }} />);
+    expect(screen.getByRole('combobox')).toHaveValue('legge regionale');
     await screen.findByText('Art. 1');
+  });
+
+  it("offers the Union's regulations and directives, and imports them under the source's type", async () => {
+    resolveAct.mockResolvedValue({ urn: 'https://eur-lex.europa.eu/eli/dir/2019/1937/oj/ita', norma: { tipo_atto: 'direttiva ue', numero_atto: '1937', data: '2019' } });
+    const onImport = vi.fn();
+    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport} />);
+    const select = screen.getByRole('combobox');
+    expect(screen.getByRole('option', { name: 'Regolamento UE' })).toHaveValue('regolamento ue');
+    fireEvent.change(select, { target: { value: 'direttiva ue' } });
+    fireEvent.change(screen.getByPlaceholderText('241'), { target: { value: '1937' } });
+    fireEvent.change(screen.getByPlaceholderText('aaaa o gg-mm-aaaa'), { target: { value: '2019' } });
+    fireEvent.click(screen.getByRole('button', { name: /Cerca articoli/ }));
+    await screen.findByText('Art. 1');
+    expect(resolveAct).toHaveBeenCalledWith({ act_type: 'direttiva ue', act_number: '1937', date: '2019' });
+    fireEvent.click(screen.getByText('Art. 1'));
+    fireEvent.click(screen.getByRole('button', { name: /Importa/ }));
+    await waitFor(() => expect(onImport).toHaveBeenCalled());
+    expect(onImport.mock.calls[0][1]).toEqual({ tipo_atto: 'direttiva ue', data: '2019', numero_atto: '1937' });
   });
 });
 

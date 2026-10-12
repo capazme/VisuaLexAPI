@@ -31,6 +31,9 @@ const ACT_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: 'decreto legislativo', label: 'Decreto Legislativo' },
   { value: 'decreto legge', label: 'Decreto Legge' },
   { value: 'd.p.r.', label: 'D.P.R.' },
+  // The Union's acts by year and number (2016 and 679 for the GDPR), read from EUR-Lex.
+  { value: 'regolamento ue', label: 'Regolamento UE' },
+  { value: 'direttiva ue', label: 'Direttiva UE' },
 ];
 
 type TreeEntry = string | Record<string, string>;
