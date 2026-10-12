@@ -120,6 +120,16 @@ describe('ReadingWindow (spec §4.1)', () => {
     expect(s().practices[0].acts[0].articles).toHaveLength(1);
   });
 
+  it('reads the article as the light variant: the compact bar, no Studio, no Studia row', () => {
+    const { practiceId, articleRef } = practiceWithTwoWindows();
+    draw(practiceId, [articleRef]);
+    const window_ = windowOf(articleRef);
+    expect(within(window_).queryByTitle('Altre azioni')).not.toBeInTheDocument();
+    expect(within(window_).queryByTitle(/Modalità studio/)).not.toBeInTheDocument();
+    expect(within(window_).queryByText(/Nuova scheda/)).not.toBeInTheDocument();
+    expect(within(window_).getByRole('button', { name: 'Giurisprudenza' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('a past text carries what it asks for in its title', () => {
     const past = article(L24, '5', { versione: 'originale' }, { article_text: 'Art. 5\n\nTesto originale.' });
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [past]);

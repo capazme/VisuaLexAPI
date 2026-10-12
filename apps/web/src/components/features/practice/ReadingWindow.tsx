@@ -122,6 +122,7 @@ function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }:
         onCrossReferenceNavigate={onCrossReference}
         readingOrigin={readingOrigin}
         findHostId={practiceId}
+        variant="beside"
       />
     );
   }

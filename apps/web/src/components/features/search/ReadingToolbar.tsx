@@ -50,6 +50,14 @@ export interface ReadingToolbarProps {
     onOpenVersionInput: () => void;
     onCompare: () => void;
     /**
+     * The compact form of a light window beside a practice's table (spec §4.1, T12): notes,
+     * highlights, discussions, copy and the magnifier, nothing else (the phone row has no notes or
+     * highlights buttons to begin with). The version chip and the annex badge stay: they say which
+     * text this is. The tools the table's row keeps (quick norm, dossier, Study Mode, the source
+     * link, «⋯») are the row's.
+     */
+    compact?: boolean;
+    /**
      * «Cerca nel testo»: the magnifier (desktop row and phone row), which opens the floating find window on this tab.
      * Absent when there is no text to search.
      */
@@ -90,6 +98,7 @@ export function ReadingToolbar({
     onOpenAdvancedExport,
     onOpenVersionInput,
     onCompare,
+    compact = false,
     find,
 }: ReadingToolbarProps) {
     // Both rows are mounted and one is hidden by CSS: the window returns focus to the one on screen.
@@ -124,7 +133,7 @@ export function ReadingToolbar({
 
             {/* Mobile: Quick Actions + Study Mode toggle */}
             <div className="flex md:hidden ml-auto flex-wrap justify-end items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
-                <button
+                {!compact && <button
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}
                     className={cn(
@@ -137,7 +146,7 @@ export function ReadingToolbar({
                     {...lock(lockedReason)}
                 >
                     <Zap size={20} className={cn(isPinnedQuick && "fill-amber-500")} />
-                </button>
+                </button>}
                 <button
                     onClick={onToggleDiscussion}
                     aria-expanded={isDiscussionOpen}
@@ -157,7 +166,7 @@ export function ReadingToolbar({
                 >
                     <Copy size={20} />
                 </button>
-                <button
+                {!compact && <button
                     onClick={onOpenDossier}
                     className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
                     title={tip("Aggiungi a dossier", copyLockedReason)}
@@ -165,17 +174,17 @@ export function ReadingToolbar({
                     {...lock(copyLockedReason)}
                 >
                     <FolderPlus size={20} />
-                </button>
+                </button>}
                 {/* Study Mode button - sempre visibile */}
-                <button
+                {!compact && <button
                     onClick={onOpenStudyMode}
                     className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-purple-500 transition-colors"
                     title={tip("Modalità studio", lockedReason)}
                     {...lock(lockedReason)}
                 >
                     <BookOpen size={20} />
-                </button>
-                {url && (
+                </button>}
+                {url && !compact && (
                     <a
                         href={url}
                         target="_blank"
@@ -191,7 +200,7 @@ export function ReadingToolbar({
             {/* Desktop: Full Quick Actions */}
             <div className="hidden md:flex items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
                 {/* Primary buttons */}
-                <button
+                {!compact && <button
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}
                     className={cn(
@@ -204,7 +213,7 @@ export function ReadingToolbar({
                     {...lock(lockedReason)}
                 >
                     <Zap size={16} className={cn(isPinnedQuick && "fill-amber-500")} />
-                </button>
+                </button>}
                 <NotesHighlightsButtons
                     notesCount={notesCount}
                     highlightsCount={highlightsCount}
@@ -231,7 +240,7 @@ export function ReadingToolbar({
                 >
                     <Copy size={16} />
                 </button>
-                <button
+                {!compact && <button
                     ref={dossierButtonRef}
                     onClick={onOpenDossier}
                     className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
@@ -240,12 +249,12 @@ export function ReadingToolbar({
                     {...lock(copyLockedReason)}
                 >
                     <FolderPlus size={16} />
-                </button>
+                </button>}
 
-                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
+                {!compact && <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />}
 
                 {/* More menu */}
-                <div className="relative">
+                {!compact && <div className="relative">
                     <button
                         onClick={() => onToggleMoreMenu(!showMoreMenu)}
                         className={cn(
@@ -310,7 +319,7 @@ export function ReadingToolbar({
                             </div>
                         </>
                     )}
-                </div>
+                </div>}
             </div>
         </div>
     );

@@ -980,7 +980,9 @@ meant to stay split; add new features as new files, not inside the shells:
   the table as an overlay closed by Esc or a click outside; not yet mounted by `SearchPanel` before the
   routing of «Apri accanto») and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
   the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
-  `findHostId`). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
+  `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`
+  (notes, highlights, discussions, the magnifier and copy), Brocardi in a `ClosedSection`, and no Studio,
+  Studia row, MERL-T entry or graph rail; the `row` variant is today's). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
   (pure: the items in table order, each article from its own `norma_data`, a code's search and index
   copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
   wait for the items to settle and count them; one save at a time per practice, `usePracticeSaving`),
