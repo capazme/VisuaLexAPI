@@ -18,7 +18,10 @@ P6's `openDecision(ref, { fromLink, besideId })`).
 - Create `apps/web/src/utils/decisionCitationMatcher.ts` (`extractDecisionCitations`), reusing the
   court alternations of `decisionCitationParser.ts` (export them there, unanchored variants, rather than
   copy them), `foldForSearch`, `anyActSpans`, `linkableDecisionPath`.
-- Golden: add a `decision_citations_in_text` block (sentence, expected spans and references, «current»)
+- The context rule of D2: `extractDecisionCitations(text, { within })` takes the court of the text
+  being read; with `within: 'cassazione'` a section head without a court («Sez. U, n. 9100 del 2015»,
+  «Sez. 3», «Sez. L») reads as the Cassazione. A bare «n. 123/2020» stays plain text in every context.
+- Golden: add a `decision_citations_in_text` block (sentence, the context court if any, expected spans and references, «current»)
   with positives for every court and form of D1 and the negatives of D2; the web test asserts it; the
   Python test skips the new block explicitly.
 - Tests: the golden block; overlaps with act citations; two citations in one sentence («Cass. n. 1/2020
