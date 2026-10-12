@@ -238,9 +238,10 @@ function citationGap(written: string, words: ReadonlySet<string>, properNames: b
 // What may stand between a court's name and its own section: a seat, the court's kind («reg.», «prov.»).
 const COVER_WORDS = new Set([
   ...CITATION_WORDS, 'reg', 'regionale', 'prov', 'provinciale', 'pace', 'appello', 'secondo',
-  'min', 'minorenni', 'sorv', 'sorveglianza',
+  'min', 'minorenni', 'sorv', 'sorveglianza', 'dal', 'dalla', 'dallo', 'dalle', 'dai', 'al', 'alla',
 ]);
 const MAX_COVER_GAP = 60;
+const CONJUNCTION = /^[\s,]*(?:e|ed)(?![\p{L}\p{N}])/iu;
 
 /** Whether a section at `to` stands in the citation of the court whose name ends at `from`, not in prose after it. */
 function inCourtCitation(text: string, from: number, to: number): boolean {
@@ -292,6 +293,9 @@ export function extractDecisionCitations(
     const pieces = [...read.words].sort((a, b) => a[0] - b[0]);
     const properNames = read.reference.corte === 'tar';
     let cursor = at(Math.max(read.headEnd, prefix.length));
+    // «Consiglio di Stato e la sentenza n. 7 del 2017»: an «e» right after the court ends its citation, and the
+    // number after it is not its. (A list inside one citation, «Cass., sez. III, n. 1/2020 e n. 2/2021», is untouched.)
+    if (head.court && CONJUNCTION.test(text.slice(cursor, at(pieces[0][0])))) continue;
     let clean = true;
     const number = read.words[0]; // the parsers list the number (or the pair) first
     pieces.forEach((piece, i) => {
