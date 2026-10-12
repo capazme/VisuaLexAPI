@@ -106,8 +106,8 @@ function TextAtDateForm({ onClose, onConfirm, euAct, today, initialDate, inputRe
 /**
  * "Testo alla data": asks for the text of the article in force on a day, or for
  * its original text. It validates before it sends — a future day is not sent —
- * and refuses EUR-Lex acts with the reason. What comes back opens in a tab of
- * its own, labelled with the day asked for; the toolbar shows the window the
+ * and refuses EUR-Lex acts with the reason. What comes back opens as a row of
+ * its own in the act, labelled with the day asked for; the toolbar shows the window the
  * source states.
  */
 export function TextAtDateDialog({ isOpen, onClose, ...form }: TextAtDateDialogProps) {

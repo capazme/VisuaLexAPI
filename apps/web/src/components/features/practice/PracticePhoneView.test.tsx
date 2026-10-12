@@ -30,7 +30,7 @@ vi.mock('../decisions/DecisionSearchTabView', async () => {
   const { appStore: store } = await import('../../../store/useAppStore');
   return {
     DecisionSearchTabView: ({ tabId }: { tabId: string }) => (
-      <button type="button" data-testid="topic-list" onClick={() => store.getState().openDecisionTab(REF, { besideTabId: tabId })}>
+      <button type="button" data-testid="topic-list" onClick={() => store.getState().openDecision(REF, { fromLink: true, besideId: tabId })}>
         Cass. civ., n. 12345/2020
       </button>
     ),
@@ -51,10 +51,9 @@ const title = () => screen.getByRole('heading', { level: 2 }).textContent;
 
 beforeEach(() => {
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   h.trees.length = 0;
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, readingBackStack: [], phoneReader: null, windowFocusRequest: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
@@ -324,7 +323,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     appStore.setState((st) => ({ practices: st.practices.map((p) => ({ ...p, beside: [window_] })) }));
     render(view());
     expect(screen.queryByText(/Aperto accanto/)).toBeNull();
-    act(() => { s().openDecisionTab({ ...REF, numero: 777 }); });
+    act(() => { s().openDecision({ ...REF, numero: 777 }, { fromLink: true }); });
     const reader = screen.getByTestId('reading-full-screen');
     expect(within(reader).getByTestId('decision-reader')).toHaveTextContent('n. 777');
     expect(s().practices[0].beside).toEqual([window_]);
@@ -336,7 +335,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
   it('a topic search opens full screen with «‹ Pratica»; a decision opened from its list replaces it in the reader; `beside` is untouched', () => {
     withArticleAndDecision();
     render(view());
-    act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
+    act(() => { s().openTopicSearch({ tema: 'danno' }, 'Tema: danno'); });
     const reader = screen.getByTestId('reading-full-screen');
     expect(reader).toHaveAccessibleName('Ricerca per tema');
     expect(within(reader).getByRole('button', { name: 'Pratica' })).toBeInTheDocument();

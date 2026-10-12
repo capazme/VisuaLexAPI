@@ -24,7 +24,7 @@ beforeEach(() => {
   counter = 0;
   vi.spyOn(console, 'error').mockImplementation(() => {});
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, dossiers: [], lastSyncError: null,
+    practices: [], activePracticeId: null, practiceRows: {}, dossiers: [], lastSyncError: null,
     pendingDossierItemIds: {}, pendingDossierOrders: {},
   });
   svc.create.mockResolvedValue({ id: 'srv-d', name: 'x', created_at: '2026-10-12T00:00:00Z' } as never);
@@ -222,7 +222,6 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
 
 describe('«Apri tutto» of a dossier, then «Salva come dossier» (spec §5.1, §7, T17)', () => {
   it('the dossier\'s decisions, entered closed and unread, are saved back with what the dossier kept', async () => {
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     const kept: DossierSentenzaData = {
       corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019, sezione: '3', tipo: 'sentenza', data_deposito: '2019-11-11',
       etichetta: 'Cass. civ., sez. III, 11 novembre 2019, n. 28994',

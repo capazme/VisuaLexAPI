@@ -11,12 +11,10 @@ interface UseAnnexNavigationProps {
   norma: Norma;
   /** Currently loaded articles */
   articles: ArticleData[];
-  /** Tab ID (only for workspace - enables direct article loading) */
-  tabId?: string;
   /**
-   * Where a loaded article lands, before `tabId`: the practice's act (`addArticlesToPractice`,
-   * spec §6.4). The caller first reveals a row already holding the article (`revealPracticeArticle`)
-   * and loads only when there is none. `tabId` stays for the old surface until P6.
+   * Where a loaded article lands: the practice's act (`addArticlesToPractice`, spec §6.4). The
+   * caller first reveals a row already holding the article (`revealPracticeArticle`) and loads only
+   * when there is none. Without it, a global search is run instead.
    */
   addArticles?: (norma: Norma, articles: ArticleData[]) => void;
   /** Originally searched article (for preserving context on annex switch) */
@@ -72,18 +70,17 @@ interface UseAnnexNavigationReturn {
 }
 
 /**
- * Unified hook for annex navigation across NormaCard and NormaBlockComponent.
+ * Annex navigation for an act of a practice.
  * Handles tree fetching, annex selection, and article loading with consistent behavior.
  */
 export function useAnnexNavigation({
   norma,
   articles,
-  tabId,
   addArticles,
   searchedArticle,
   activeArticle
 }: UseAnnexNavigationProps): UseAnnexNavigationReturn {
-  const { triggerSearch, addNormaToTab } = useAppStore();
+  const { triggerSearch } = useAppStore();
 
   // Tree state
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
@@ -98,11 +95,8 @@ export function useAnnexNavigation({
   // Article loading state (for workspace direct loading)
   const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
 
-  // Where a loaded article lands: the practice's act, else the tab, else nowhere (a global search).
-  const land = useMemo(
-    () => addArticles ?? (tabId ? (n: Norma, loaded: ArticleData[]) => addNormaToTab(tabId, n, loaded) : null),
-    [addArticles, tabId, addNormaToTab],
-  );
+  // Where a loaded article lands: the practice's act, else nowhere (a global search).
+  const land = addArticles ?? null;
 
   // Derive current annex from active article (if provided) or first loaded article
   const currentAnnex = activeArticle?.norma_data?.allegato
@@ -202,7 +196,7 @@ export function useAnnexNavigation({
     }
   }, [norma.urn, treeData, treeLoading, fetchTree]);
 
-  // Handle annex selection - load into same tab if tabId is present
+  // Handle annex selection - load into the same act when there is a place to land
   const handleAnnexSelect = useCallback(async (annexNumber: string | null, articleNumber?: string): Promise<string | null> => {
     // Use the article asked for > searched article > current article > default "1"
     const articleToSearch = articleNumber
@@ -225,8 +219,7 @@ export function useAnnexNavigation({
     // This prevents smart lookup from redirecting to an allegato
     const annexForApi = annexNumber === null ? '' : annexNumber;
 
-    // With a place to land (the practice's act, or a tab), load directly into it (workspace behavior)
-    // This is now preferred for ALL contexts including search results (NormaCard will pass tabId)
+    // With a place to land (the practice's act), load directly into it
     if (land) {
       setLoadingArticle(annexNumber ? `annex-${annexNumber}` : 'main');
 
@@ -253,7 +246,7 @@ export function useAnnexNavigation({
         const validArticles = fetchedArticles.filter((a: ArticleData) => !a.error && a.norma_data);
 
         if (validArticles.length > 0) {
-          // addArticlesToPractice / addNormaToTab handle deduplication
+          // addArticlesToPractice handles deduplication
           land(norma, validArticles);
           return articleToSearch;
         }
@@ -263,7 +256,7 @@ export function useAnnexNavigation({
         setLoadingArticle(null);
       }
     } else {
-      // Fallback for cases without tabId (should be rare/legacy)
+      // Fallback for cases without a place to land (should be rare/legacy)
       triggerSearch({
         act_type: norma.tipo_atto,
         act_number: norma.numero_atto || '',
@@ -304,7 +297,7 @@ export function useAnnexNavigation({
       return; // Already loaded - caller should handle navigation
     }
 
-    // With a place to land, load directly into it (workspace behavior)
+    // With a place to land, load directly into it
     if (land) {
       if (loadingArticle) return; // Already loading something
 
@@ -341,7 +334,7 @@ export function useAnnexNavigation({
         setLoadingArticle(null);
       }
     } else {
-      // No tabId - use global search (NormaCard behavior)
+      // No place to land - use global search
       triggerSearch({
         act_type: norma.tipo_atto,
         act_number: norma.numero_atto || '',

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FolderPlus, MoreHorizontal, Pencil, X } from 'lucide-react';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
+import { useTour } from '../../../hooks/useTour';
 import type { ArticleData } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -23,6 +24,21 @@ export interface PracticeTableProps {
  */
 export function PracticeTable({ onViewPdf, onCrossReference, streaming }: PracticeTableProps) {
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
+  const theme = useAppStore((s) => s.settings.theme);
+  // The tour of the table, once; when it is done the act's follows (`PracticeActBlock`).
+  const { tryStartTour } = useTour({ theme: theme as 'light' | 'dark', onComplete: (type) => {
+    // the act's tour follows, when the practice has an act to show
+    const held = appStore.getState().practices.find((p) => p.id === appStore.getState().activePracticeId);
+    if (type === 'practice' && held && held.acts.length > 0) tryStartTour('practiceAct');
+  } });
+  // Asked once: `tryStartTour` is a new function on every render, so the effect cannot key on it.
+  const tourAsked = useRef(false);
+  const drawn = practice !== undefined;
+  useEffect(() => {
+    if (!drawn || tourAsked.current) return;
+    tourAsked.current = true;
+    tryStartTour('practice');
+  });
   if (!practice) return null;
   return (
     <div data-testid="practice-table" className="mx-auto w-full max-w-4xl space-y-3">
@@ -46,7 +62,7 @@ function PracticeHeader({ practice }: { practice: Practice }) {
   const save = usePracticeSaveActions(practice.id);
 
   return (
-    <header data-pinned-head className="flex items-start gap-2 px-1">
+    <header id="tour-practice-header" data-pinned-head className="flex items-start gap-2 px-1">
       <div className="min-w-0 flex-1">
         {editing ? (
           <PracticeNameInput
@@ -72,6 +88,7 @@ function PracticeHeader({ practice }: { practice: Practice }) {
         type="button"
         onClick={save.saveAsNew}
         disabled={save.busy}
+        id="tour-practice-save"
         className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-0 md:py-1.5 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
         <FolderPlus size={16} aria-hidden />

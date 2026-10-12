@@ -33,7 +33,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
-  address queues the decision for the search space to open as a tab; `/sentenze` alone and an
+  address queues the decision for the search space to open in a practice; `/sentenze` alone and an
   address that does not parse both open the palette, and only the address that does not parse
   says why, in the error toast (`pushSyncError`); the addresses stay the contract with LibreLex
   and the graph), then the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
@@ -55,13 +55,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   user drops in — parsed in the browser, never uploaded — each opening the
   reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
-  decision read in its row (and, from P4, its window), over `useDecisionAnswer` (the fetch, the
-  candidates, the notices) and `DecisionAnswerBody`; `DecisionTabView`, its workspace tab and the
-  phone view, a thin wrapper over the same body until P6; `DecisionAddress`, the `/sentenze/…` route element;
+  decision read in its row, its window or the phone's reader, over `useDecisionAnswer` (the fetch, the
+  candidates, the notices) and `DecisionAnswerBody`; `DecisionAddress`, the `/sentenze/…` route element;
   `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
-  article or a topic, and `DecisionSearchTabView`, its workspace tab; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
+  article or a topic, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
   (a link to `/` that also opens the palette; its hover label carries ⌘K; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Cronologia, Ambienti,
@@ -117,14 +116,20 @@ not a store slice: `HistoryView` keeps it in local state and reloads it on mount
 `useArticleCards` over `utils/articleCardsCache.ts`, `useReviewSession`), never in `useAppStore`.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
-workspace tabs and z-index, settings, `searchPanelState`, and the practices of the norm-tab redesign
-(`practices`, `activePracticeId`, the seeding marker `practicesSeeded`; spec
-`docs/superpowers/specs/2026-10-08-norm-tab-container-design.md` §9-10). The practices are drawn only
-behind `VITE_FEATURE_PRACTICE_TABLE` (`features/practice/featureFlag.ts`, off unless `true`); `merge`
-sanitizes them (`sanitizePractices`) and, with the flag on and no marker, seeds them once from the
-saved tabs (`practicesFromTabs`). `persist` writes through `utils/guardedStorage.ts`: a save the
+settings, `searchPanelState`, and the practices of the norm-tab redesign (`practices`,
+`activePracticeId`; spec `docs/superpowers/specs/2026-10-08-norm-tab-container-design.md` §9-10). The
+persist `version` is 1: `migrate` turns a browser's version-0 state into practices once —
+the sanitized `practices` when it carries `practicesSeeded: true`, else `practicesFromTabs` over its
+`workspaceTabs` — and drops `workspaceTabs`, `highestZIndex` and the marker; the topic searches it
+could not reopen are told once (`practiceNotice`). `merge` sanitizes the practices
+(`sanitizePractices`). `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
-`set`. `clearUserData` empties the practices and sets the marker to the flag, never clears it.
+`set`. `clearUserData` empties the practices.
+Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
+browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
+with a logged warning «saved workspace too large to back up», when the value is over 1 000 000
+characters, so the copy cannot fill the browser's space). The key holds a user's saved norms and
+searches: `clearUserData` (logout) removes it, and nothing reads it back in the app.
 
 The partialize deliberately holds UI state only. **Every user-owned slice is
 server-backed** — see gotcha 17, which is the rule any new slice must follow.
@@ -144,11 +149,11 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   deliberately kept out of the Forum's `total`, which nothing on that page
   could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
   on `window` so the badge drops before the next 30s poll. A row is a norm (`act_type`) or a
-  decision (`decision_key`, never both): `DecisionTabView` records a found decision once per
-  opening: the key it sent is kept on the tab (`historyRecordedKey`, persisted with it), so a
-  remount, a minimise and restore or a reload never records again, while a new tab does (the
-  copy on screen only); a practice's entry does the same through `DecisionEntryView`, the key kept
-  on the entry (`markDecisionEntryRecorded`) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab or the entry is marked
+  decision (`decision_key`, never both): `DecisionEntryView` records a found decision once per
+  opening: the key it sent is kept on the practice's entry (`historyRecordedKey`, persisted with it,
+  `markDecisionEntryRecorded`), so a remount, a closed and reopened row or a reload never records
+  again, while a new entry does (the copy on screen only), and `DecisionHistoryRow` reopens it with
+  `openDecision(…, { fromLink: true })`. The entry is marked
   before the request, so a failed request is not retried (not even after a reload) and the failure
   is logged: the history is a convenience.
 
@@ -203,7 +208,7 @@ measure, commi divided by space, hanging numbers and items. The contract is
 gotcha 23: the rendered text nodes spell `article_text` minus `\n` — any new
 label goes in CSS (`content: attr(...)`), never in a text node.
 `articleRender.test.ts` enforces it on 27 real texts
-(`utils/__fixtures__/articleTexts.ts`). Tab, dossier reader and Study Mode all
+(`utils/__fixtures__/articleTexts.ts`). The practice's rows and windows, the dossier reader and Study Mode all
 render this way; Study Mode hides the heading and rubric blocks
 (`vlx-hide-header`) instead of cutting them, so its offsets are
 document-relative like everywhere else. The Brocardi sections render flat
@@ -218,17 +223,18 @@ The renderer also accepts, at the same offset, a stored text that differs only
 in whitespace, so those older highlights show again.
 
 **«Giurisprudenza» under the article** (`CaseLawSection`, between the text and
-`BrocardiDisplay`): an accordion closed by default (state per tab in
+`BrocardiDisplay`): an accordion closed by default (state per host in
 `sessionStorage`) holding Brocardi's massime (`MassimeSection`, only where the
 doctrine is shown — gotcha 32), the Massimario's panel (the plugin slot
-`article_case_law`, which takes `articleUrn`, `isHistorical`, `besideTabId`,
+`article_case_law`, which takes `articleUrn`, `isHistorical`, `besideId`,
 `backEntry`) and the Cassazione's decisions that mention the article, searched
 only when the reader presses the button (`DecisionResultList`). On a past text the
 section stays; the massime do not. A decision opens beside the article with the way back.
-A topic opens a `decision-search` tab (`renderTabView` draws `DecisionSearchTabView`: heading
-«Tema: …», the article when the query has one, «Solo il tema» to drop it, the limits line, the
-list; a decision opened from it sits beside that tab, with no way back): from a Brocardi glossary
-term («Sentenze su questo tema», beside the article's tab, with its norm) or from the palette
+A topic opens a topic-search window of the practice (`openTopicSearch`; `ReadingWindow` draws
+`DecisionSearchTabView`: heading «Tema: …», the article when the query has one, «Solo il tema» to
+drop it, the limits line, the list; a decision opened from it sits beside that window, with no way
+back; on a phone it is the full-screen reader's subject): from a Brocardi glossary
+term («Sentenze su questo tema», beside the article's row, with its norm) or from the palette
 (a line «Cerca "…" nelle sentenze della Cassazione», shown only when the box is neither a decision,
 a norm, has at least three characters one of which is a letter or a digit, nor starts with a custom alias, nor while the server is still resolving it as an act, and announced in the palette's status region).
 
@@ -243,7 +249,7 @@ text is plain text; only `((49))` is dimmed.
 `docs/superpowers/specs/2026-09-25-annotazioni-sul-testo-design.md`).
 `utils/articleAnnotations.ts` is the one definition of where a highlight or a
 note renders (`resolveAnchors`) and of which block shows it
-(`groupAnnotationsByBlock`). With `signs: true` — the tab and the dossier
+(`groupAnnotationsByBlock`). With `signs: true` — the practice's rows and windows and the dossier
 reader, not Study Mode — the renderer ends each annotated block with an empty
 `span.vlx-sign`: the note icon, the count and one dot per colour are CSS, so
 the text nodes are untouched. The sign sits inline after the block's text, or
@@ -276,11 +282,8 @@ popovers are portalled outside it, and VoiceOver hides what lies outside a modal
 `z-50`/`z-[100]` modals sit under the window, which stays over them, visible and usable.
 `utils/findWindowControl.ts` (`openFindWindow`, `closeFindWindow`, `subscribeFindWindow`,
 `isWorkspaceCovered`) is its control; `useFindWindowScopedTo` gives the magnifier its pressed state
-(pressed: open on this tab and this text; the state is read at `pointerdown`, before the tab panel's
-`mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
-with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
-session-only) and «Tutte le schede». A phone leaves out loose articles: its column draws
-norm blocks only. Behind `VITE_FEATURE_PRACTICE_TABLE` the scopes are «Questa pratica» (the active
+(pressed: open on this practice and this text; the state is read at `pointerdown`, before a practice
+switch changes the active one). The scopes are «Questa pratica» (the active
 practice, on both breakpoints: every article of every act, its row open or closed, then its decisions
 newest first) and «Tutte le pratiche» (the bar's order, each place named with its practice); a row's
 root registers under its practice's id with the same keys, and so does a light window's (the
@@ -293,18 +296,13 @@ header, so never over a control; a dragged place wins; a tool held over the tabl
 `data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
 is not in the session's cache); reaching an undrawn match opens its row with its practice made active
 (`revealPracticeRow`, `revealPracticeDecision`; on a phone the reveal's own update takes the full-screen reader off, so the row is on screen — a match in the reader's own subject is drawn and needs nothing), and the window recomputes on a practice switched, a
-row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
-(it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
+row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le pratiche» the place of the match is one label: the target's own (a decision entry's, which carries the section, or an article's `shortNorm`), with its practice. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
 26: use `useIsDesktop`). Esc closes it and returns focus. Text roots register through
 `useRegisterFindRoot`; `useFindWindow` finds across `utils/findTargets.ts` targets (a displayed root is
 searched in its DOM, any other in its stored projection and only counted), moves the reader only on
-next or previous, and shows an undrawn match through `revealTab` (raises the tab, restores it when
-minimised or hidden, makes it the phone's tab on screen) and `focusArticleInTab` (opens a collapsed
-block and sets its `autoFocusArticleId`, which `NormaBlockComponent` consumes on a desktop and `NormaCard`
-on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`). `revealTab` is a separate action, never
-`bringTabToFront` made to reveal: the restore button and the dock chip use `bringTabToFront`, and a
-minimised tab must stay minimised until its own button restores it. A target whose root does not
+next or previous, and shows an undrawn match through `revealPracticeRow` / `revealPracticeDecision` (the practice made
+active, the row opened). A target whose root does not
 appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
 a decision only when it has text (`hasDecisionText`). The search reads the text nodes, joined by one virtual space at every block boundary, `<br>` and skipped hidden subtree, and paints with
 the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-current)`); it adds,
@@ -360,7 +358,7 @@ row after the discussion panel and «Chiedi su questo articolo», outside `Artic
 card is a link to `/studia/schede/:id`; a community card — `comunita: true` — is a 44 px `aria-expanded` button that opens in
 place with its answer and explanation as text, because `GET /lingo/cards/:id` answers only the author); the row owns the
 `CardFormDialog`, and the selection popup's «Crea scheda» (`SelectionPopup.onCreateCard`, passed through
-`ArticleBody.onPopupCreateCard`, offered only by the article tab) reaches it through the row's `ref`
+`ArticleBody.onPopupCreateCard`, offered only by the article surface) reaches it through the row's `ref`
 (`createFromPassage`). `articleCardsOffer.ts` is the one rule: a row needs a `urn:` in `norma_data.urn`
 (an EU act has none), «+ Nuova scheda» and «Crea scheda» need the text in force (`readOnly` or
 `versionInfo.isHistorical` marks the first `aria-disabled`, not `disabled`, so it keeps focus and its
@@ -389,7 +387,7 @@ words light up only for the discussion open in the panel (`focusedThreadId` →
 `.vlx-thread-focus`), nesting inside any highlight over the same words. When the
 article text changes, a discussion whose words moved re-attaches to the new location;
 a detached one stays listed in the panel with a notice and its original quotation,
-never hidden or deleted. The article tab and a found decision's surface (`DecisionReadingSurface`) use this, the
+never hidden or deleted. The article surface and a found decision's surface (`DecisionReadingSurface`) use this, the
 decision through the same hook and panel with its anchor (`articleId: ''`); its
 `renderDecisionHtml` takes `threads` and `focusedThreadId` and the text hash is that of the
 projection. A decision found without its text still takes general discussions
@@ -425,8 +423,8 @@ time, and a failure is not cached. `isAnchoredNote` (`decisionRender.ts`) is the
 a note that quotes words (a note without a quote is free). The decision downloads, the notes and
 highlights .txt, an environment's file and a dossier's JSON go through `utils/saveBlob.ts` (the
 object URL is revoked later, not at once); a few older exports still make their own link. `DecisionTextView` renders a
-found decision only for a host that mounts `DecisionView` without the reading surface; the
-workspace tab always passes the surface. A private
+found decision only for a host that mounts `DecisionView` without the reading surface; a practice's
+entry always passes the surface. A private
 environment save (create, create from a selection, update, refresh) stays in the account and keeps
 every anchor, decisions included (the owner, 8 Oct 2026). The personal files are not filtered
 either: the .txt export and the PDF «Con le mie evidenziazioni e note» list the anchors that no
@@ -453,12 +451,13 @@ states, next to `article_text`, the window the source's own page gives
 the status chip (`VersionStatusChip`: "In vigore dal …", "Testo storico · dal …
 al …"), the `VersionBanner`, and what is switched off — and it is tested without
 a DOM. `versionInfo.isHistorical` is what was ASKED for (a date, or the original
-text), never what came back. On a past text the tab, the dossier reader and
+text), never what came back. On a past text the practice's row, the dossier reader and
 Study Mode take no notes, highlights, discussions or quick-norm (the selection
 popup offers only "Copia"), Brocardi is not shown, and the update notes open;
 an article that did not exist yet draws no text, only the way forward. The
 "Testo alla data" dialog (`TextAtDateDialog`) replaces the old "Cerca versione"
-modal; the result opens in a tab of its own, labelled with the day asked for.
+modal; the result opens as a row of its own in the act, labelled with the day asked for (the text in
+force stays another row: `practiceArticleKey` carries the version).
 `utils/citation.ts` writes how a lawyer cites it, in the owner's style ("art. 1284
 c.c., nel testo in vigore al 29 dicembre 2007"; "art. 2, l. 7 agosto 1990, n. 241,
 nel testo in vigore al …"; the golden file is `utils/__fixtures__/citationGolden.ts`),
@@ -515,10 +514,11 @@ opening one block's index hands the window over rather than stacking a second.
 The floating mechanism belongs to the *tool*, not the content — the owner's own
 framing, and the correction that shaped round 2a.
 
-**Opening an act without an article.** `fetchActUrn` (`utils/actUrn.ts`) resolves
-an act's URN structurally, with no text fetched; `addNormaIndexToTab` then drops
-an article-less block on a tab and points the window at it atomically. The
-palette's "Apri l'indice e sfoglia" is the entry point. A block with zero
+**Opening an act without an article.** `resolveAct` (`utils/actUrn.ts`) resolves
+an act's URN structurally, with no text fetched; `addActIndexToPractice` then drops
+an article-less act on the active practice (created when there is none) and points the
+window at it atomically. The
+palette's "Apri l'indice e sfoglia" is the entry point. An act with zero
 articles is a legitimate state — guard anything that dereferences the active
 article (`StudyMode` is mounted conditionally for exactly this reason).
 
@@ -526,49 +526,53 @@ article (`StudyMode` is mounted conditionally for exactly this reason).
 the index does not lose your place, and a previous/next arrow is undone by the
 opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
-per-tab copy would sit inside the very tab an entry points at. It names its
+per-practice copy would sit inside the very place an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
-combination for "back" already belongs to the browser. With the practices it floats centred above the bar of practices on the desktop (`placement="bottom"`,
-`bottomOffset` from the bar's measured height) and, on a phone, a fixed 80 px up, clear of the services
-pill and the feedback button; the bottom is the one edge the table's sticky headings and the windows' headers leave free;
-the old tabs keep it at the top. Behind `VITE_FEATURE_PRACTICE_TABLE` the
-stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
-practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
-the row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
-so a past text comes back as itself), else found through `findPracticeArticle`,
-live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
-practice made active, the row revealed or the window reopened, or an open window asked to take focus
-through `windowFocusRequest`, a one-shot signal the window takes atomically; `ReadingBackControl` tells
-its `onNavigated` the practice's id and the entry; a topic-search window is never a target; on a phone the same step opens the full-screen reader on a subject read beside, or closes it for a row of the table, since a phone has no windows); any other entry is kept as given. An entry naming a practice is the
-practice's even while a tab of the same id is still stored (a seeded practice keeps its tab's id):
-with the flag on the practices are what is drawn, and `moveActToPractice` rewrites only practice entries.
+combination for "back" already belongs to the browser. It floats centred above the bar of practices on the desktop (`bottomOffset`
+from the bar's measured height) and, on a phone, a fixed 80 px up, clear of the services
+pill and the feedback button; the bottom is the one edge the table's sticky headings and the windows' headers leave free.
+The reading surfaces push a `ReadingBackEntry` (`{ tabId, blockId, articleId, articleKey?, label }`: `tabId` names a practice, one of
+its windows or the phone's reader, `blockId` an act or a decision) and `pushReadingBack` keeps it as a `PracticeBackEntry`
+(`{ practiceId, subject, place }`, spec §6.3) — `table` for a practice's row, `beside` for a window or the reader — the
+row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
+so a past text comes back as itself), else found through `findPracticeArticle`. An entry that names nothing the
+practices hold is not kept. The entry is live while its practice holds the subject, and `popReadingBack` walks back to
+it itself (the practice made active, the row revealed or the window reopened, or an open window asked to take focus
+through `windowFocusRequest`, a one-shot signal the window takes atomically; a topic-search window is never a target; on a phone the same step opens the full-screen reader on a subject read beside, or closes it for a row of the table, since a phone has no windows).
+`moveActToPractice` rewrites the entries that name the moved act.
 
-**Decisions in the workspace.** A court decision is a workspace tab of its own: `WorkspaceTab.view`
-(`{ kind: 'decision', reference }`, drawn by `workspace/renderTabView.tsx` on the desktop panel and the
-phone alike), never a `TabContent`; the norm actions refuse a view tab (`refuseViewTab`). There is
-one tab per decision (`openDecisionTab` brings an open one to the front; `setDecisionTabIdentity`
-closes the tab a candidate was chosen in when another already holds that decision, and asks the
-survivor to take keyboard focus), it opens beside the article when given `besideTabId`
-(`placeSideBySide`, in viewport pixels converted through `utils/workspaceOrigin.ts`), and it is
-persisted by its reference until the route has found it, then by identity (a cited section
-travels with the reference to the route, which uses it to tell homonyms apart): the text is fetched again through `utils/decisionFetchCache.ts`. On a
-phone one tab shows at a time, and a decision just opened becomes the visible one. The ways in:
+**The practice.** A practice is the table of one question (spec `2026-10-08-norm-tab-container-design.md`):
+acts with their articles, then «Giurisprudenza», and the light windows beside the table. It is UI state saved in
+the browser (gotcha 17); the store holds it as `practices` with `activePracticeId`, and every way in routes to it.
+A court decision is an entry of a practice, never a tab: one entry per decision per practice (`openDecision`
+reuses the entry `sameDecision` matches, and a later citation that adds a section to a still unresolved entry
+replaces its reference, so the entry asks again with it). `openDecision(reference, { fromLink: true, besideId })` is
+the read from a link — the practice `besideId` names (a practice, one of its windows or the phone's reader),
+else the active one, created as «Sentenze» when there is none; on the desktop a window beside the table, the window
+the link was clicked in being the asker and so never the one a third window replaces (`besideWith`, T16); on a phone the
+full-screen reader. A found answer gives the entry its identity (`setDecisionEntryIdentity`); when another entry already
+holds that decision the two merge — the survivor keeps the richer fields, its window, its row, its way-back entries and
+the pending reveal follow, and it asks to take keyboard focus (`decisionFocusRequest`). The ways in:
 the palette (a citation such as «Cass. civ. 10787/2024» is read by `decisionCitationParser.ts`
-before the norm parser, unless the first word is one of the user's alias triggers; Enter opens
-the tab; with no other tab on screen a new decision takes the whole free area), `DecisionLink` (a
-plain click on the search page opens the tab beside the article and, given a `backEntry`, records
+before the norm parser, unless the first word is one of the user's alias triggers), `DecisionLink` (a
+plain click on the search page opens the decision beside the article and, given a `backEntry`, records
 the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as for a citation jump; any
-other click follows the real `href`, which `DecisionAddress` turns into the same tab), the
-sidebar's «Ricerca» (which also opens the palette: there is no decisions page) and the address itself
-(queued in `pendingDecision`, drained by `SearchPanel`). The tab reads the decision on the
-reading surface, where highlights and notes work as on an article (see «A court decision takes
-the same tools»). «Cerca nella barra di ricerca», on a decision that was not found, opens the
-palette with its citation typed in (`openCommandPaletteWith`, taken once). The desktop panel and
-the phone view both mount a `DecisionTabView` for the same tab, one of them hidden: only the copy
-on screen takes the focus request, and both follow the identity the store learns, keeping the answer already shown (notices included) and seeding it
-in the cache (`rememberDecision`) so that no second request goes out. A later citation that adds a section to
-a tab still without an archive replaces its reference, so the tab asks again with it. The free-area
-placement applies from the `md` breakpoint up only: a phone's geometry is never saved with the tab.
+other click follows the real `href`, which `DecisionAddress` turns into the same entry), the
+sidebar's «Ricerca» (which also opens the palette: there is no decisions page), the Cronologia
+(`DecisionHistoryRow`) and the address itself (queued in `pendingDecision`, drained by `SearchPanel`). The entry
+persists its reference until the route has found it, then the identity (a cited section
+travels with the reference to the route, which uses it to tell homonyms apart): the text is fetched again through `utils/decisionFetchCache.ts`.
+The entry reads on the reading surface (`DecisionEntryView` over `DecisionAnswerBody`), where highlights and notes work as on an
+article (see «A court decision takes the same tools»). «Cerca nella barra di ricerca», on a decision that was not found, opens the
+palette with its citation typed in (`openCommandPaletteWith`, taken once). A subject has one mounted reading surface:
+a row whose subject a window shows folds and says «Aperto accanto» (desktop only; a phone's reader replaces the table
+instead), and the find window, the way back and the index reach the row or the window through the store's reveal actions.
+
+**The host props.** Despite their names, `ArticleTabContent`'s `tabId` and `readingOrigin.tabId`, `DecisionReadingSurface`'s
+`hostTabId` and `CaseLawSection`'s `tabId` name the host a surface reads in: a practice (its row) or one of its windows
+(or the phone's reader), never a tab. They give the find window the id it registers the text root under (`findHostId` overrides
+it with the window's practice), the way-back entry its `tabId`, and the links they render their `besideId`. A surface with no
+host (a preview such as the palette's result card) registers and records nothing.
 
 ### Dossier
 
@@ -627,7 +631,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   beaten (`createDossier`, `importDossier`, `addNoteToDossier`) replace an entry with the same id
   instead of adding it twice. No websockets.
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
-  schema accepts and a label, never the text. They are added from the decision's tab
+  schema accepts and a label, never the text. They are added from the decision's reading surface
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
   «Giurisprudenza» (`DossierDecisionsSection`: each citation links to the decision's address, and
   each row can be removed). The stored `etichetta` is a copy (source convention, D9):
@@ -656,7 +660,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `addItem` POST hasn't returned a server id yet), replaying it once settled.
   Legacy status values still hydrate and simply render as unstarred.
 - **Collection**: `AddToDossierPopover.tsx` is the add-from-reading entry
-  point for articles (from `ReadingToolbar` and `LooseArticleCard`) and for
+  point for articles (from `ReadingToolbar`) and for
   decisions (`DecisionView`'s actions, with `sentenza`). It lists recent dossiers,
   guards duplicates, and its inline "Nuovo dossier" waits for the server id
   before adding — `createDossier()` returns `Promise<string | null>`.
@@ -675,8 +679,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `versionKey` (`utils/versionDisplay.ts`): the reader's fetch cache
   (`articleFetchCache`), `computeNormaGroups`, `dossierContainsArticle`. "Apri tutto"
   and the quick-open of the list view build their searches from a group
-  (`searchParamsFromGroup`, `searchesForGroups`), and a group asking for a past text
-  opens in a tab of its own.
+  (`searchParamsFromGroup`, `searchesForGroups`) into ONE practice (`dossier/openInPractice.ts`): a
+  group asking for a past text lands as rows of its act, beside the text in force; the dossier's
+  decisions come too when the whole dossier is opened, unread (`addKnownDecisions`).
 
 ## Shared utilities — check before writing a new one
 
@@ -697,7 +702,7 @@ Duplicating any of these is a defect, not a shortcut.
   kept across a redraw, re-search when the text changes). Read-only over the DOM. `features/search/findBarParts.ts` (`counterText`, `ICON_BUTTON`) is the counter and icon button of the window; `features/search/toolbarToggle.ts`
   (`toolbarToggleClass`) is the look shared by the toolbar toggles (`DiscussionButton`,
   `FindInTextButton`): add a toggle with it, not with a copy of the classes.
-- `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
+- `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.
 - `services/legalFetch.ts` — `legalFetch(path, init)`: `fetch` for the Python routes
@@ -713,8 +718,8 @@ Duplicating any of these is a defect, not a shortcut.
   a parere is left to the API, which names it as a court it cannot read). The Python
   API's `decisions/citation.py` reads the same words; both assert the golden file's `decision_citations`.
   `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session
-  (50 answers, least recently used out; a failure is not kept; `clearDecisionCache` at logout). `utils/workspaceOrigin.ts` — where a
-  tab's (0, 0) is on screen, and the drag limits.
+  (50 answers, least recently used out; a failure is not kept; `clearDecisionCache` at logout). `utils/workspaceOrigin.ts` — the id of the results area
+  (`WORKSPACE_AREA_ID`) and its rectangle, which the find window and the row of windows are placed against.
 - `utils/decisionLinks.ts` — the addresses of court decisions (`decisionPath`,
   `parseDecisionPath`, `decisionKey`, `identityFromKey` and `isDecisionKey`, which read a key back) and their names (`formatDecisionHeading`,
   `formatDecisionCitation`, and `formatDecisionShort` — «Cass. civ., sez. un., n.
@@ -749,7 +754,13 @@ Duplicating any of these is a defect, not a shortcut.
   sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
   URL parameter; a logout forgets it.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
-  `findLiveBackIndex` (over tabs and practices), `isPracticeBackEntry` for citation-jump undo.
+  `findLiveBackIndex` (over the practices), `ReadingBackEntry` (what a surface pushes) and `PracticeBackEntry`
+  (what the stack holds) for citation-jump undo.
+- `utils/practice.ts` (+ `utils/practiceMigration.ts`) — the practice's model and its rules, pure: `practiceArticleKey`
+  (`buildItemKey|versionKey`, what makes a row), `sanitizePractices` (saved state is untrusted input), `addArticles`,
+  `findPracticeArticle` (tolerant, gotcha 9), `decisionOrder`, `holdsSubject`/`subjectOfRef`, the row and window
+  keys (`articleRowKey`, `decisionRowKey`, `articleWindowId`); `practicesFromTabs` reads the old saved workspace once.
+  Reach for these before writing a second comparison of two articles.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
   *structurally* different markup per breakpoint (portal vs. inline). It existed
   as two private copies before round 2a; do not make a third. For anything a CSS
@@ -810,9 +821,9 @@ Duplicating any of these is a defect, not a shortcut.
   `docs/superpowers/specs/2026-10-04-source-convention-design.md`; pinned to
   `conventions/sources/golden.json` by `sources/__tests__/golden.test.ts`):
   `citeNorm` («art. 2, l. 7 agosto 1990, n. 241», «art. 2043 c.c.»), `shortNorm`
-  («art. 2 l. 241/1990»: tabs of an article, comparison, chips, quick norms),
-  `citeAct`, `shortAct` (workspace tabs), `actHeading` (a code's name, else the act
-  citation: card and block titles), `actSubtitle`, `inForceCitation` (what a copy
+  («art. 2 l. 241/1990»: rows of an article, comparison, chips, quick norms),
+  `citeAct`, `shortAct` (an act's short label), `actHeading` (a code's name, else the act
+  citation: an act block's title), `actSubtitle`, `inForceCitation` (what a copy
   of the text in force starts with, D8), `labelFromParams` (the parsers'
   previews), `normFromUrn` (a Normattiva URN or an ELI read back into a norm; the
   preleggi are never the codice civile). `actTypes.ts` holds the tables; its
@@ -824,8 +835,8 @@ Duplicating any of these is a defect, not a shortcut.
   unknown keys dropped — or refused with an Italian reason. `validateImportedDossier` runs it on
   every imported norm and counts what it leaves out. A copy of the server's, both pinned to
   `conventions/sources/norm-entries.json`.
-- `utils/normaMeta.ts` — `formatNormaTitle(norma)` (the act heading) and
-  `formatNormaMeta(norma, articleCount?)`, the line under it: only
+- `utils/normaMeta.ts` — `formatNormaMeta(norma, articleCount?)`, the line under an act's
+  heading (`actHeading`, `utils/sources/`): only
   what the title does not say (a code's decree, an aliased code's name, «Estremi
   non disponibili»), often empty.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
@@ -856,7 +867,7 @@ Duplicating any of these is a defect, not a shortcut.
   plainText? })`: the anchor comes from the caller. Loads passage discussions for
   the signs via `GET /article-discussions/passages` and, given `plainText`, returns
   `locations` (the one place a passage is found or `detached`). Used by the article
-  tab and the decision's surface.
+  surface and the decision's surface.
 - `utils/threadPassages.ts` — `buildPassage`, `textFingerprint`, `locatePassage`
   (exact → whitespace-tolerant search → the occurrence whose context agrees;
   never guesses: ambiguous or missing = `detached`).
@@ -942,8 +953,8 @@ the row an opaque background matching the panel, bleed it edge-to-edge with
 negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
-**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80,
-`bottomNotice` 85 — MERL-T's consent prompt, over the dock and the bar of practices —, overlay band
+**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80 — the bar of practices —,
+`bottomNotice` 85 — MERL-T's consent prompt, over the bar —, overlay band
 1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
@@ -1018,13 +1029,11 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
   edits, not for where it opens: it is reached from the command palette, not
   from Settings (gotcha 27). See the Aliases section above.
-- `features/workspace/` — `WorkspaceManager`, `WorkspaceTabPanel`,
-  `NormaBlockComponent`, `LooseArticleCard`, `LazyStudyMode` (the
-  `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are
-  lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
-  "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
-  workspace is persisted).
-- `features/practice/` — the norm-tab redesign, behind `VITE_FEATURE_PRACTICE_TABLE` (spec
+- `features/workspace/` — what a practice's rows borrow from the old workspace: `LazyStudyMode` (the
+  `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are lazy the same way) and
+  `ArticleNavigation` (an act's previous/next arrows). The floating tabs, their dock and their panels are gone
+  (round 6 of the norm-tab redesign).
+- `features/practice/` — the practice, the norm-tab's replacement (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
   header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, then
   `PracticeColumn`; the topic searches are windows beside it on the desktop and the full-screen reader's
@@ -1037,7 +1046,7 @@ meant to stay split; add new features as new files, not inside the shells:
   «Apri accanto» (on the desktop a row whose subject a window shows folds and says «Aperto accanto ·
   Chiudi la finestra», so one subject has one mounted reading surface, T5; on a phone it opens the
   full-screen reader, icon-only so the row's name keeps its width, and no row ever folds));
-  `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place, a «⋯» per chip);
+  `PracticeBar` + `PracticeChip` (the bar of practices, `fixed bottom-6`, `Z_INDEX.dock`, `#tour-practice-bar`; a «⋯» per chip);
   `PracticePhoneView` (the phone's table: chevrons, the name — a tap lists the practices with «Nuova
   pratica» — and dots, the count line with «Salva come dossier» and its «⋯» (`usePracticeSaveActions`),
   over the same column; while `phoneReader` is set it draws `ReadingFullScreen` in the column's place
@@ -1047,7 +1056,7 @@ meant to stay split; add new features as new files, not inside the shells:
   «‹ Pratica» at 44 px, the title, and `ReadingWindow`'s own body — `ReadingWindowBody` — for what
   `phoneReader` names: an article, a decision or a topic search). `phoneReader` (`{ practiceId, ref }`)
   is session state of its own, never saved and never the desktop's `beside`: `openPhoneReader`,
-  `closePhoneReader`; on a phone `openDecisionTab` and `openDecisionSearchTab` set it and touch
+  `closePhoneReader`; on a phone `openDecision(…, { fromLink: true })` and `openTopicSearch` set it and touch
   neither `beside` nor the rows, the way back sets or clears it, a screen that widens clears it
   (`SearchPanel`), a reload starts on the table; every reveal of a row, the act's index and any other
   practice coming on screen (`activate`) clear it in their own update, and it is drawn only for the
@@ -1063,7 +1072,7 @@ meant to stay split; add new features as new files, not inside the shells:
   the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
   `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`
   (notes, highlights, discussions, the magnifier and copy), Brocardi in a `ClosedSection`, and no Studio,
-  Studia row, MERL-T entry or graph rail; the `row` variant is today's). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
+  Studia row, MERL-T entry or graph rail; the `row` variant is the table's). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
   (pure: the items in table order, each article from its own `norma_data`, a code's search and index
   copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
   wait for the items to settle and count them; one save at a time per practice, `usePracticeSaving`),
@@ -1077,12 +1086,22 @@ meant to stay split; add new features as new files, not inside the shells:
   elsewhere) and `--practice-bar-height` (the bar's
   height, set by `SearchPanel` on the workspace area: the column's bottom padding keeps its last row
   clear of the bar).
-  `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with
-  the flag off none of it is loaded; with it on, a decision opened from any link lands in its practice
+  The tours start here: `PracticeTable` asks for the `practice` tour once (the bar, the header, «Salva come dossier», an act)
+  and, when it is done, for the `practiceAct` tour, which the practice's first `PracticeActBlock` also asks for once the
+  table's has been seen (`config/tourConfig.ts`; their targets are `#tour-practice-bar`, `#tour-practice-header`,
+  `#tour-practice-save`, `.practice-act`, `.practice-act-head`, `.practice-act-index`, `.practice-row-beside`,
+  `.practice-act-study`, `.practice-act-structure`, plus the reading bar's `.glass-toolbar` and Brocardi's
+  `.brocardi-display`; `tourConfig.practice.test.tsx` fails when one is missing). Tours never overlap: `useTour` keeps one driver on screen
+  module-wide, so a tour asked while another shows is not started (it is asked again the next time its
+  surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
+  `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
+  target is written nowhere in the sources, and checks the search tour against the search page.
+  `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
+  `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window
   replaces) or in the full-screen reader on a phone (`isDesktopViewport`), a norm cited in a window (or
   in the reader) enters its act and opens beside that window (in the reader, on a phone; `SearchPanel`:
-  `besideTabId` naming a window or the reader's subject), and searches, the index, topic searches and
+  `besideId` naming a window or the reader's subject), and searches, the index, topic searches and
   the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread, identified
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
@@ -1111,8 +1130,10 @@ meant to stay split; add new features as new files, not inside the shells:
     silencing the rule. Silence only for effects synchronising with an external
     signal *and* mutating external state in the same transaction, and always
     leave the justification on the disable line.
-12. **Workspace tab pin was removed** — the flag only suppressed bring-to-front,
-    which contradicted the word "pin". Don't reintroduce without a product
+12. **A practice and its windows have no pin** — the old tab pin only suppressed
+    bring-to-front, which contradicted the word "pin", and the floating tabs it
+    belonged to are gone: a practice is a table and its windows are placed by
+    `besideLayout`, not dragged and raised. Don't reintroduce without a product
     reason. `Dossier.isPinned` is unrelated and stays.
 13. **Popover first paint at (0,0)** — floating-ui computes position
     asynchronously. Registering the reference in a layout effect leaves the first
@@ -1127,10 +1148,12 @@ meant to stay split; add new features as new files, not inside the shells:
     satisfied and no-ops.
 15. **Dossier "apri tutte le norme"** — `triggerSearch` overwrites the trigger, so
     a loop keeps only the last. The flow queues params and drains them one at a
-    time; each carries `tabLabel` (cosmetic) and `targetTabId` (load-bearing —
-    tells `processResult` to skip merge heuristics). The destination tab is
-    pre-created synchronously before `navigate('/')`. Without `targetTabId` a
-    stale orphan tab in persisted state can swallow the results.
+    time; each carries `tabLabel` (cosmetic) and `targetPracticeId` (load-bearing —
+    names the practice every search lands in, and keeps a reveal off the queue).
+    The destination practice is created synchronously before `navigate('/')`
+    (`searchesIntoOnePractice`, which passes its id on every search). Without
+    `targetPracticeId` the results land in whichever practice is active when each
+    arrives.
 16. **Capture the selection rect eagerly** — before `hidePopup()` /
     `removeAllRanges()`, because the selection is gone immediately after. The rect
     travels through `onAddNote(text, startOffset, rect)`.
@@ -1183,7 +1206,11 @@ meant to stay split; add new features as new files, not inside the shells:
     only one breakpoint needs a real viewport check (`useIsDesktop`), not a
     wrapper class. Conversely, a non-portalled `fixed` element inside a
     transformed ancestor is positioned against *that ancestor*, not the viewport
-    (see gotcha 22) — which is why the structure window portals at all.
+    (see gotcha 22) — which is why the structure window portals at all. The practice
+    is the standing example: `SearchPanel` mounts `ReadingRow` (the table and the
+    windows beside it) on the desktop and `PracticePhoneView` below `md`, one of the
+    two by `useIsDesktop`, never both under a CSS class; the phone's reader is
+    `phoneReader` state, not a hidden copy of a window.
 
 27. **A store flag only opens a modal that is actually mounted.** `AliasManager`
     (and its siblings) render inside `SearchPanel`, so `aliasManagerOpen` is
@@ -1229,7 +1256,7 @@ meant to stay split; add new features as new files, not inside the shells:
     from nothing else: `versionInfo` and `norma_data.data_versione` are what was
     ASKED for, an echo, and must never be shown as a fact ("Aggiornato al" once
     printed the typed date as if Normattiva had said it); a label built from
-    them (a tab's "testo al 29/12/2007", a dossier row's "Testo al …") says what
+    them (a row's "testo al 29/12/2007", a dossier row's "Testo al …") says what
     was asked for, and only that. With no `validity` the toolbar shows no status.
     A text the source says is past, one whose window does not contain the day
     asked for, and one asked for by date or as the original that is repealed or
@@ -1242,6 +1269,6 @@ meant to stay split; add new features as new files, not inside the shells:
     cites, the way `ArticleTabContent` and `DossierItemReader` do; and anything
     that caches, groups or compares texts by article adds `versionKey` to the
     item key, which has no version, and one that labels a text for another
-    surface (a tab, a dossier row, the comparison) names its version
+    surface (a practice's row, a dossier row, the comparison) names its version
     (`versionTabSuffix`, `historicalItemLabel`); the banner and the chip sit
     beside the text, never in it (root rule 23).

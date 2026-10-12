@@ -52,7 +52,7 @@ export function ArticleGraphSideRail({
   // A zero-size anchor kept in the normal document flow (the panel/toggle are
   // `fixed`). It lets the reflow hook locate THIS rail's Layout scroll container
   // via `closest('main')`, and lets the focus coordinator tell whether THIS
-  // copy is the one currently displayed (NormaCard renders the article twice
+  // copy is the one currently displayed (a surface may render the article twice
   // behind mutually-exclusive `md:hidden` / `hidden md:block` containers).
   const [anchorEl, setAnchorEl] = useState<HTMLSpanElement | null>(null);
 

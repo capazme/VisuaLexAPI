@@ -442,7 +442,7 @@ export interface GlossaryCaseLaw {
 
 function GlossarioSection({ entries, caseLaw }: { entries: GlossaryEntry[]; caseLaw?: GlossaryCaseLaw }) {
   const [isOpen, setIsOpen] = useState(false);
-  const openDecisionSearchTab = useAppStore((s) => s.openDecisionSearchTab);
+  const openTopicSearch = useAppStore((s) => s.openTopicSearch);
 
   const toggle = () => setIsOpen((v) => !v);
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -486,10 +486,10 @@ function GlossarioSection({ entries, caseLaw }: { entries: GlossaryEntry[]; case
               <button
                 type="button"
                 aria-label={`Sentenze su questo tema: ${entry.termine}`}
-                onClick={() => openDecisionSearchTab(
+                onClick={() => openTopicSearch(
                   { tema: entry.termine, ...(caseLaw ? { norma: caseLaw.norma, normaLabel: caseLaw.normaLabel } : {}) },
                   `Tema: ${entry.termine}`,
-                  caseLaw?.tabId ? { besideTabId: caseLaw.tabId } : undefined,
+                  caseLaw?.tabId ? { besideId: caseLaw.tabId } : undefined,
                 )}
                 className={`rounded-full px-2 py-1 text-xs text-primary-700 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE} inline-flex items-center`}
               >

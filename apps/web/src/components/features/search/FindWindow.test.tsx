@@ -52,9 +52,10 @@ const N2 = norma('2');
 const keyOf = (n: NormaVisitata) => `${buildItemKey(n)}|${versionKey(n)}`;
 const article = (n: NormaVisitata, text: string): ArticleData => ({ article_text: text, norma_data: n });
 
-/** A tab with one article drawn on screen: its text root in the document, registered. */
+/** A practice with one article drawn on screen: its text root in the document, registered. */
 function addDrawnTab(label: string, n: NormaVisitata, text: string): string {
-  const id = appStore.getState().addWorkspaceTab(label, n, [article(n, text)]);
+  const id = appStore.getState().createPractice(label, { custom: true });
+  appStore.getState().addArticlesToPractice(id, n, [article(n, text)]);
   const element = document.createElement('div');
   element.textContent = text;
   document.body.appendChild(element);
@@ -88,7 +89,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   sessionStorage.clear();
   window.innerWidth = 1024;
-  appStore.setState({ workspaceTabs: [], highestZIndex: 0, mobileActiveTabId: null });
+  appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null });
   saved = {
     css: g.CSS,
     highlight: g.Highlight,
@@ -112,7 +113,7 @@ afterEach(() => {
   window.matchMedia = saved.matchMedia;
   (HTMLElement.prototype as unknown as Record<string, unknown>).scrollIntoView = saved.scrollIntoView;
   document.body.innerHTML = '';
-  appStore.setState({ workspaceTabs: [], mobileActiveTabId: null });
+  appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null });
 });
 
 describe('FindWindow — opening', () => {
@@ -138,9 +139,9 @@ describe('FindWindow — opening', () => {
   it('a bare second request leaves the scope alone', () => {
     render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
     act(() => openFindWindow());
-    expect(screen.getByRole('button', { name: 'Tutte le schede' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Tutte le pratiche' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('the magnifier opens it scoped to its tab and takes the first match in that text', async () => {
@@ -148,7 +149,7 @@ describe('FindWindow — opening', () => {
     const b = addDrawnTab('B', N2, 'fatto uno, fatto due');
     render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
     typeQuery('fatto');
     await settle();
     expect(counter()).toHaveTextContent('di 3');
@@ -156,13 +157,12 @@ describe('FindWindow — opening', () => {
     // B was raised last; the magnifier of A asks for A.
     act(() => openFindWindow({ tabId: a, targetKey: keyOf(N1) }));
     await settle();
-    expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
     expect(counter()).toHaveTextContent('1 di 1');
     expect(registry.get('vlx-find-current')?.ranges[0].toString().toLowerCase()).toBe('fatto');
     expect(registry.get('vlx-find-current')?.ranges[0].startContainer.parentElement?.textContent).toBe('un fatto in A');
-    expect(appStore.getState().workspaceTabs.find((t) => t.id === a)!.zIndex).toBeGreaterThan(
-      appStore.getState().workspaceTabs.find((t) => t.id === b)!.zIndex,
-    );
+    expect(appStore.getState().activePracticeId).toBe(a);
+    expect(b).not.toBe(a);
   });
 
   it('typing after a magnifier opening starts in that text', async () => {
@@ -175,7 +175,7 @@ describe('FindWindow — opening', () => {
     expect(counter()).toHaveTextContent('1 di 1');
   });
 
-  it('the scope switch changes the counter and names where the match is under «Tutte le schede»', async () => {
+  it('the scope switch changes the counter and names where the match is under «Tutte le pratiche»', async () => {
     const a = addDrawnTab('Tab A', N1, 'un fatto in A');
     addDrawnTab('Tab B', N2, 'fatto uno, fatto due');
     render(<FindWindow />);
@@ -184,41 +184,40 @@ describe('FindWindow — opening', () => {
     await settle();
     expect(counter()).toHaveTextContent('1 di 1');
     expect(screen.queryByTestId('find-where')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
     await settle();
-    expect(screen.getByRole('button', { name: 'Tutte le schede' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Tutte le pratiche' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'false');
     expect(counter()).toHaveTextContent(/^\d di 3/);
-    // One label for an article, its `shortNorm`: never the tab's label joined to it.
-    expect(screen.getByTestId('find-where')).toHaveTextContent(new RegExp(`^${shortNorm(N1)}$`));
+    // One label for an article: its `shortNorm`, and the practice that holds it.
+    expect(screen.getByTestId('find-where')).toHaveTextContent(new RegExp(`^${shortNorm(N1)} · Tab A$`));
     // The place is in the polite live region with the counter.
-    expect(counter()).toHaveTextContent(shortNorm(N1));
+    expect(counter()).toHaveTextContent(`${shortNorm(N1)} · Tab A`);
     act(() => screen.getByRole('button', { name: 'Risultato successivo' }).click());
-    expect(screen.getByTestId('find-where')).toHaveTextContent(new RegExp(`^${shortNorm(N2)}$`));
-    expect(counter()).toHaveTextContent(shortNorm(N2));
-    expect(counter()).not.toHaveTextContent('Tab B');
+    expect(screen.getByTestId('find-where')).toHaveTextContent(new RegExp(`^${shortNorm(N2)} · Tab B$`));
+    expect(counter()).toHaveTextContent(`${shortNorm(N2)} · Tab B`);
   });
 
-  it('names a decision by its tab\'s label, the one with the section, alone', async () => {
-    addDrawnTab('Tab A', N1, 'nessuna corrispondenza');
+  it('names a decision by its entry\'s label, the one with the section, and its practice', async () => {
+    const practiceId = addDrawnTab('Tab A', N1, 'nessuna corrispondenza');
     const identity: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 1234, anno: 2020 };
-    const id = appStore.getState().openDecisionTab(identity);
-    act(() => appStore.getState().setDecisionTabIdentity(id, identity, 'Cass. civ., sez. III, n. 1234/2020'));
+    const { decisionId: id } = appStore.getState().openDecision(identity, { practiceId, open: false });
+    act(() => appStore.getState().setDecisionEntryIdentity(practiceId, id, identity, { sezione: 'III' }, 'Cass. civ., sez. III, n. 1234/2020'));
     const element = document.createElement('div');
     element.textContent = 'il fatto non sussiste';
     document.body.appendChild(element);
     // The surface registers the shorter label when it has no section of its own.
-    cleanups.push(registerFindRoot({ tabId: id, targetKey: decisionKey(identity), label: 'Cass. civ., n. 1234/2020', element }));
+    cleanups.push(registerFindRoot({ tabId: practiceId, targetKey: decisionKey(identity), label: 'Cass. civ., n. 1234/2020', element }));
     render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
     typeQuery('fatto');
     await settle();
     expect(counter()).toHaveTextContent('1 di 1');
-    expect(screen.getByTestId('find-where')).toHaveTextContent(/^Cass\. civ\., sez\. III, n\. 1234\/2020$/);
+    expect(screen.getByTestId('find-where')).toHaveTextContent(/^Cass\. civ\., sez\. III, n\. 1234\/2020 · Tab A$/);
   });
 
-  it('spends the magnifier\'s preference on the first query: later ones start in the front tab', async () => {
+  it('spends the magnifier\'s preference on the first query: later ones start in the active practice', async () => {
     const a = addDrawnTab('A', N1, 'un fatto in A');
     const b = addDrawnTab('B', N2, 'fatto uno, fatto due');
     render(<FindWindow />);
@@ -228,8 +227,8 @@ describe('FindWindow — opening', () => {
     expect(counter()).toHaveTextContent('1 di 1');
 
     // The reader moves on to B and widens the search; a new query starts where the reader is.
-    act(() => appStore.getState().bringTabToFront(b));
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    act(() => appStore.getState().setActivePractice(b));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
     await settle();
     typeQuery('fatt');
     await settle();
@@ -250,7 +249,8 @@ describe('FindWindow — opening', () => {
   });
 
   it('with two texts in one tab, the magnifier\'s targetKey picks the first match, not just the tab', async () => {
-    const a = appStore.getState().addWorkspaceTab('A', N1, [article(N1, 'un fatto uno'), article(N2, 'un fatto due')]);
+    const a = appStore.getState().createPractice('A', { custom: true });
+    appStore.getState().addArticlesToPractice(a, N1, [article(N1, 'un fatto uno'), article(N2, 'un fatto due')]);
     for (const [n, text] of [[N1, 'un fatto uno'], [N2, 'un fatto due']] as const) {
       const element = document.createElement('div');
       element.textContent = text;
@@ -268,10 +268,10 @@ describe('FindWindow — opening', () => {
   it('remembers the scope for the session', () => {
     const { unmount } = render(<FindWindow />);
     act(() => openFindWindow());
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
     act(() => closeFindWindow());
     act(() => openFindWindow());
-    expect(screen.getByRole('button', { name: 'Tutte le schede' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Tutte le pratiche' })).toHaveAttribute('aria-pressed', 'true');
     unmount();
   });
 
@@ -287,7 +287,7 @@ describe('FindWindow — opening', () => {
     await settle();
     expect(screen.getByTestId('probe')).toHaveTextContent('false');
     act(() => openFindWindow({ tabId: a }));
-    fireEvent.click(screen.getByRole('button', { name: 'Tutte le schede' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
     await settle();
     expect(screen.getByTestId('probe')).toHaveTextContent('false');
     act(() => closeFindWindow());
@@ -529,23 +529,14 @@ describe('FindWindow — on a phone', () => {
     for (const name of ['Risultato precedente', 'Risultato successivo', 'Chiudi la ricerca']) {
       expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
     }
-    for (const name of ['Questa scheda', 'Tutte le schede']) {
+    for (const name of ['Questa pratica', 'Tutte le pratiche']) {
       expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]');
     }
   });
 });
 
-describe('FindWindow over the practices (flag on, spec §6.6)', () => {
+describe('FindWindow over the practices (spec §6.6)', () => {
   const s = () => appStore.getState();
-  beforeEach(() => {
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
-    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null });
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null });
-  });
-
   it('names its scopes «Questa pratica» and «Tutte le pratiche», and names the practice of a match in another', async () => {
     const other = s().createPractice('Appalti');
     s().addArticlesToPractice(other, { tipo_atto: 'codice civile', data: '' }, [article(N2, 'un fatto altrove')]);

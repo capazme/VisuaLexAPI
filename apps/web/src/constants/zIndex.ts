@@ -2,20 +2,16 @@
  * Standardized z-index values for consistent layering.
  *
  * TWO BANDS design:
- * - BASE BAND (0-119): in-document stacking, sidebar, dock, floating windows
+ * - BASE BAND (0-119): in-document stacking, sidebar, bar of practices, floating windows
  *   (structure 90, search panel 100, find window 110)
  * - OVERLAY BAND (1000+): modals, drawers, tooltips, toasts, settings
  *
  * The gap (120-999) is intentionally unused: it isolates the base band from
  * the overlay band so modals cannot be hidden by dynamic counters used for
- * floating windows (workspace tabs, search panel). Study Mode's own layers
+ * floating windows (search panel). Study Mode's own layers
  * (backdrop 120, window 130) sit in that gap, over the find window; while an
  * overlay covers the workspace (`aria-modal="true"` or `data-find-overlay`,
  * `isWorkspaceCovered`) Cmd/Ctrl+F does not open the find window at all.
- *
- * The workspace tab dynamic counter is clamped in WorkspaceTabPanel.tsx to
- * stay below Z_INDEX_VALUES.dock, so stack ordering among tabs works but
- * never leaks into the overlay band.
  *
  * IMPORTANT: Import and use these constants instead of hardcoding z-index.
  */
@@ -50,7 +46,7 @@ export const Z_INDEX = {
   /** App sidebar navigation */
   sidebar: 'z-50',
 
-  /** Workspace dock / navigator — tabs clamp below this */
+  /** The bar of practices (the old dock's band) */
   dock: 'z-[80]',
 
   /**
@@ -61,13 +57,13 @@ export const Z_INDEX = {
   bottomNotice: 'z-[85]',
 
   /**
-   * Floating structure (index) window. Above the dock and every tab panel,
+   * Floating structure (index) window. Above the bar of practices and the windows beside the table,
    * because it is a tool held over the content it drives; below the overlay
    * band, so modals still cover it.
    */
   structure: 'z-[90]',
 
-  /** Floating search panel — above dock, below overlay band */
+  /** Floating search panel — above the bar of practices, below overlay band */
   searchPanel: 'z-[100]',
 
   /** Floating find window — a tool held over the workspace, above the search panel */
@@ -113,41 +109,3 @@ export const Z_INDEX = {
   /** Settings modal — ALWAYS on top of everything */
   settings: 'z-[1900]',
 } as const;
-
-/** Numeric values for inline styles or dynamic z-index (parallel to Z_INDEX) */
-export const Z_INDEX_VALUES = {
-  local: 10,
-  sticky: 20,
-  stickyHead: 25,
-  dropdown: 30,
-  floating: 40,
-  pinnedBar: 35,
-  sidebar: 50,
-  dock: 80,
-  bottomNotice: 85,
-  structure: 90,
-  searchPanel: 100,
-  findWindow: 110,
-  drawer: 1000,
-  modal: 1100,
-  heavyModal: 1100,
-  compare: 1150,
-  citationPreview: 1200,
-  commandPalette: 1250,
-  studyBackdrop: 1300,
-  studyPanel: 1310,
-  tooltip: 1400,
-  toast: 1450,
-  menuBackdrop: 1500,
-  menuPanel: 1510,
-  settings: 1900,
-} as const;
-
-/**
- * Overlays that should hide the workspace dock when active — prevents
- * interaction conflicts between floating content and full-screen overlays.
- */
-export const shouldHideDock = (activeOverlay: string | null): boolean => {
-  const overlaysThatHideDock = ['compare', 'settings', 'commandPalette', 'heavyModal', 'modal', 'study'];
-  return activeOverlay !== null && overlaysThatHideDock.includes(activeOverlay);
-};

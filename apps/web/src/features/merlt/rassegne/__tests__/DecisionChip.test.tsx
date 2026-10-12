@@ -11,19 +11,19 @@ const PRONUNCIA: RassegnaPronuncia = {
 };
 const BACK = { tabId: 't1', blockId: 'b1', articleId: 'a1', label: 'art. 2043 c.c.' };
 
-const openDecisionTab = vi.fn(() => 'tab');
+const openDecision = vi.fn(() => 'tab');
 const pushReadingBack = vi.fn();
 beforeEach(() => {
-  openDecisionTab.mockClear();
+  openDecision.mockClear();
   pushReadingBack.mockClear();
-  appStore.setState({ openDecisionTab, pushReadingBack } as never);
+  appStore.setState({ openDecision, pushReadingBack } as never);
 });
 
 describe('DecisionChip', () => {
   it('opens the decision beside the article and records the way back', () => {
-    render(<MemoryRouter initialEntries={['/']}><DecisionChip pronuncia={PRONUNCIA} besideTabId="t1" backEntry={BACK} /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/']}><DecisionChip pronuncia={PRONUNCIA} besideId="t1" backEntry={BACK} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('link'));
     expect(pushReadingBack).toHaveBeenCalledWith(BACK);
-    expect(openDecisionTab).toHaveBeenCalledWith(expect.objectContaining({ corte: 'cassazione', numero: 1234, anno: 2024 }), { besideTabId: 't1' });
+    expect(openDecision).toHaveBeenCalledWith(expect.objectContaining({ corte: 'cassazione', numero: 1234, anno: 2024 }), { fromLink: true, besideId: 't1' });
   });
 });

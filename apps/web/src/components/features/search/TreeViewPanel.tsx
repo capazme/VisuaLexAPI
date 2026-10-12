@@ -501,7 +501,7 @@ export function TreeViewPanel({
                 isWindow && "cursor-grab active:cursor-grabbing select-none touch-none",
               )}
             >
-              <div className="flex justify-between items-center mb-4">
+              <div id="tour-tree-header" className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
                   {isWindow && (
                     <GripHorizontal
@@ -720,7 +720,7 @@ export function TreeViewPanel({
   );
 
   if (isWindow) {
-    // Rendered on the viewport, not in place: the workspace tab panel this
+    // Rendered on the viewport, not in place: a window this
     // component lives under is transform-driven, and a transformed ancestor
     // becomes the containing block for `fixed` descendants — a window
     // positioned inside it would be placed against the panel rather than the

@@ -21,21 +21,21 @@ function renderAt(path: string, link: React.ReactNode) {
   );
 }
 
-const openDecisionTab = vi.fn(() => 'tab');
+const openDecision = vi.fn(() => 'tab');
 beforeEach(() => {
-  openDecisionTab.mockClear();
-  appStore.setState({ openDecisionTab } as never);
+  openDecision.mockClear();
+  appStore.setState({ openDecision } as never);
 });
 
 describe('DecisionLink', () => {
-  it('opens the tab beside the article on the search page, without navigating', () => {
-    renderAt('/', <DecisionLink to={REF} besideTabId="t1">Cass. civ., n. 99999/2024</DecisionLink>);
+  it('opens the decision beside the article on the search page, without navigating', () => {
+    renderAt('/', <DecisionLink to={REF} besideId="t1">Cass. civ., n. 99999/2024</DecisionLink>);
     const a = screen.getByRole('link');
     expect(a).toHaveAttribute('href', '/sentenze/cassazione-civile/99999/2024');
     fireEvent.click(a);
-    expect(openDecisionTab).toHaveBeenCalledWith(
+    expect(openDecision).toHaveBeenCalledWith(
       { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
-      { besideTabId: 't1' },
+      { fromLink: true, besideId: 't1' },
     );
     expect(screen.getByTestId('where')).toHaveTextContent('/');
   });
@@ -43,13 +43,13 @@ describe('DecisionLink', () => {
   it('keeps the section of a reference without the archive', () => {
     renderAt('/', <DecisionLink to={{ corte: 'cassazione', numero: 8, anno: 2018, sezione: 'U' }}>x</DecisionLink>);
     fireEvent.click(screen.getByRole('link'));
-    expect(openDecisionTab).toHaveBeenCalledWith({ corte: 'cassazione', numero: 8, anno: 2018, sezione: 'U' }, { besideTabId: undefined });
+    expect(openDecision).toHaveBeenCalledWith({ corte: 'cassazione', numero: 8, anno: 2018, sezione: 'U' }, { fromLink: true, besideId: undefined });
   });
 
   it('navigates to the address anywhere else, opening nothing itself', () => {
     renderAt('/dossier', <DecisionLink to={REF}>x</DecisionLink>);
     fireEvent.click(screen.getByRole('link'));
-    expect(openDecisionTab).not.toHaveBeenCalled();
+    expect(openDecision).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/sentenze/cassazione-civile/99999/2024');
   });
 
@@ -68,7 +68,7 @@ describe('DecisionLink', () => {
     fireEvent.click(screen.getByRole('link'), init);
     document.removeEventListener('click', record);
     expect(prevented).toBe(false);
-    expect(openDecisionTab).not.toHaveBeenCalled();
+    expect(openDecision).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/');
   });
 
@@ -85,17 +85,18 @@ describe('DecisionLink', () => {
     const BACK = { tabId: 't1', blockId: 'b1', articleId: 'a1', label: 'art. 2043 c.c.' };
     beforeEach(() => appStore.setState({ readingBackStack: [] }));
 
-    it('is recorded before the tab opens, on a plain click on the search page', () => {
+    it('is recorded before the decision opens, on a plain click on the search page', () => {
       const order: string[] = [];
       const push = appStore.getState().pushReadingBack;
+      const pushed: unknown[] = [];
       appStore.setState({
-        pushReadingBack: (e: typeof BACK) => { order.push('push'); push(e); },
-        openDecisionTab: (() => { order.push('open'); return 'tab'; }) as never,
+        pushReadingBack: (e: typeof BACK) => { order.push('push'); pushed.push(e); },
+        openDecision: (() => { order.push('open'); return 'tab'; }) as never,
       } as never);
-      renderAt('/', <DecisionLink to={REF} besideTabId="t1" backEntry={BACK}>x</DecisionLink>);
+      renderAt('/', <DecisionLink to={REF} besideId="t1" backEntry={BACK}>x</DecisionLink>);
       fireEvent.click(screen.getByRole('link'));
       expect(order).toEqual(['push', 'open']);
-      expect(appStore.getState().readingBackStack).toEqual([BACK]);
+      expect(pushed).toEqual([BACK]);
       appStore.setState({ pushReadingBack: push } as never);
     });
 

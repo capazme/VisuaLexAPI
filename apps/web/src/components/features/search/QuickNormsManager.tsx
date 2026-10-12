@@ -139,7 +139,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div id="tour-quicknorms-panel" className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -354,9 +354,10 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
               </div>
             ) : (
               <div className="space-y-2">
-                {quickNorms.map((qn) => (
+                {quickNorms.map((qn, index) => (
                   <div
                     key={qn.id}
+                    id={index === 0 ? 'tour-quicknorms-item' : undefined}
                     className="group flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     {editingId === qn.id ? (

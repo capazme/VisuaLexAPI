@@ -10,7 +10,7 @@
  */
 
 export interface FindWindowRequest {
-  /** The tab whose text the window opens on: «Questa scheda» becomes that tab. Absent from the shortcut. */
+  /** The practice whose text the window opens on: «Questa pratica» becomes that practice. Absent from the shortcut. */
   tabId?: string;
   /** Inside `tabId`, the text whose first match is taken (an article's key, a decision's key). */
   targetKey?: string;
@@ -83,9 +83,9 @@ let scopedTabId: string | null = null;
 let pointedKey: string | null = null;
 const scopeListeners = new Set<() => void>();
 
-/** What the window reports: the tab it is open on in «Questa scheda», `null` when it is closed or
- *  searching every tab; and the text in that tab it was pointed at by a magnifier (`null`: the
- *  whole tab, as a bare Cmd/Ctrl+F leaves it). */
+/** What the window reports: the practice it is open on in «Questa pratica», `null` when it is closed or
+ *  searching every practice; and the text in that practice it was pointed at by a magnifier (`null`: the
+ *  whole practice, as a bare Cmd/Ctrl+F leaves it). */
 export function reportFindWindowScope(tabId: string | null, targetKey: string | null = null): void {
   if (scopedTabId === tabId && pointedKey === targetKey) return;
   scopedTabId = tabId;

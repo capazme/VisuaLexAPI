@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
 import { besideRefFor, practiceArticleKey, type Practice } from '../../utils/practice';
-import { isPracticeBackEntry } from '../../utils/readingBackStack';
 import type { DecisionReference } from '../../types/decisions';
 import { FOUND, L24, article } from '../../utils/__fixtures__/savedWorkspaces';
 
@@ -30,12 +29,11 @@ function withArticles() {
 }
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   savedMatchMedia = window.matchMedia;
   viewport(false);
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
-    practiceNotice: null, readingBackStack: [], workspaceTabs: [], windowFocusRequest: null, decisionFocusRequest: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
+    practiceNotice: null, readingBackStack: [], windowFocusRequest: null, decisionFocusRequest: null,
     phoneReader: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
 });
@@ -121,10 +119,10 @@ describe('openPhoneReader / closePhoneReader', () => {
 });
 
 describe('a decision and a topic search on a phone', () => {
-  it('openDecisionTab adds the entry and sets the reader, touching neither `beside` nor the rows', () => {
+  it('a decision read from a link adds the entry and sets the reader, touching neither `beside` nor the rows', () => {
     const { practiceId, ref5 } = withArticles();
     appStore.setState((st) => ({ practices: st.practices.map((p) => ({ ...p, beside: [ref5] })) }));
-    const id = s().openDecisionTab(REF_A);
+    const id = s().openDecision(REF_A, { fromLink: true }).decisionId;
     expect(practice(practiceId).decisions.map((d) => d.id)).toEqual([id]);
     expect(practice(practiceId).beside).toEqual([ref5]);
     expect(s().practiceRows).toEqual({});
@@ -134,13 +132,13 @@ describe('a decision and a topic search on a phone', () => {
 
   it('the same decision again writes nothing; another decision replaces it in the reader', () => {
     const { practiceId } = withArticles();
-    const first = s().openDecisionTab(REF_A);
+    const first = s().openDecision(REF_A, { fromLink: true }).decisionId;
     const listener = vi.fn();
     const stop = appStore.subscribe(listener);
-    s().openDecisionTab(REF_A);
+    s().openDecision(REF_A, { fromLink: true });
     stop();
     expect(listener).not.toHaveBeenCalled();
-    const second = s().openDecisionTab({ ...REF_A, numero: 22222 });
+    const second = s().openDecision({ ...REF_A, numero: 22222 }, { fromLink: true }).decisionId;
     expect(second).not.toBe(first);
     expect(practice(practiceId).decisions).toHaveLength(2);
     expect(s().phoneReader?.ref).toEqual(besideRefFor({ kind: 'decision', decisionId: second }));
@@ -148,31 +146,31 @@ describe('a decision and a topic search on a phone', () => {
 
   it('the decision a topic search\'s list opens lands in the search\'s practice and replaces the search in the reader', () => {
     const first = s().createPractice('Prima');
-    const topic = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    const topic = s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     expect(s().phoneReader).toMatchObject({ practiceId: first, ref: { id: topic } });
-    s().openDecisionTab(REF_A, { besideTabId: topic });
+    s().openDecision(REF_A, { fromLink: true, besideId: topic });
     expect(practice(first).decisions).toHaveLength(1);
     expect(s().activePracticeId).toBe(first);
     expect(s().phoneReader?.ref.kind).toBe('decision');
     expect(practice(first).beside).toEqual([]);
   });
 
-  it('openDecisionSearchTab sets the reader on a topic search, beside nothing, once per query', () => {
+  it('a topic search sets the reader on a topic search, beside nothing, once per query', () => {
     const p = s().createPractice('P');
-    const id = s().openDecisionSearchTab({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
+    const id = s().openTopicSearch({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
     expect(practice(p).beside).toEqual([]);
     expect(s().phoneReader).toEqual({
       practiceId: p, ref: { id, kind: 'decision-search', query: { tema: 'perdita di chance' }, label: 'Tema: perdita di chance' },
     });
     const listener = vi.fn();
     const stop = appStore.subscribe(listener);
-    expect(s().openDecisionSearchTab({ tema: '  Perdita di  chance ' }, 'Tema: perdita di chance')).toBe(id);
+    expect(s().openTopicSearch({ tema: '  Perdita di  chance ' }, 'Tema: perdita di chance')).toBe(id);
     stop();
     expect(listener).not.toHaveBeenCalled();
   });
 
   it('with no practice a topic search creates one, active, with the reader on it', () => {
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     expect(s().practices).toHaveLength(1);
     expect(s().phoneReader?.practiceId).toBe(s().practices[0].id);
     expect(s().activePracticeId).toBe(s().practices[0].id);
@@ -181,8 +179,8 @@ describe('a decision and a topic search on a phone', () => {
   it('on the desktop neither touches the reader', () => {
     viewport(true);
     const p = s().createPractice('P');
-    s().openDecisionTab(REF_A);
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    s().openDecision(REF_A, { fromLink: true });
+    s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     expect(s().phoneReader).toBeNull();
     expect(practice(p).beside.map((b) => b.kind)).toEqual(['decision', 'decision-search']);
   });
@@ -190,7 +188,7 @@ describe('a decision and a topic search on a phone', () => {
   it('a candidate chosen in the reader that is an entry already there merges into it, and the reader names the survivor', () => {
     const p = s().createPractice('P');
     const survivor = s().openDecision(FOUND, { practiceId: p, open: false }).decisionId;
-    const homonym = s().openDecisionTab(PLAIN);
+    const homonym = s().openDecision(PLAIN, { fromLink: true }).decisionId;
     expect(s().phoneReader?.ref).toEqual(besideRefFor({ kind: 'decision', decisionId: homonym }));
     s().setDecisionEntryIdentity(p, homonym, { ...FOUND }, {}, 'Cass. civ., n. 28994/2019');
     expect(practice(p).decisions.map((d) => d.id)).toEqual([survivor]);
@@ -204,7 +202,7 @@ describe('the way back on a phone (spec §6.3)', () => {
     s().openPhoneReader(practiceId, ref5);
     s().pushReadingBack({ tabId: ref5.id, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
     const entry = s().readingBackStack[0];
-    expect(isPracticeBackEntry(entry) && entry.place).toBe('beside');
+    expect(entry.place).toBe('beside');
     s().openPhoneReader(practiceId, ref7);
     s().popReadingBack();
     expect(s().phoneReader).toEqual({ practiceId, ref: ref5 });
@@ -236,10 +234,9 @@ describe('the way back on a phone (spec §6.3)', () => {
 
   it('a topic search in the reader is never a way-back target', () => {
     const p = s().createPractice('P');
-    const id = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    const id = s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     s().pushReadingBack({ tabId: id, blockId: id, articleId: '', label: 'Tema: danno' });
-    expect(s().readingBackStack).toHaveLength(1);
-    expect(s().readingBackStack[0]).toMatchObject({ tabId: id }); // kept as given, which no tab or practice holds
+    expect(s().readingBackStack).toHaveLength(0); // a topic search holds no subject to come back to
     expect(s().popReadingBack()).toBeNull();
     expect(s().activePracticeId).toBe(p);
   });

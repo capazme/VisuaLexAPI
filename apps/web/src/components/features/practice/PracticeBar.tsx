@@ -25,10 +25,10 @@ const HEADER_BUTTON =
 
 /**
  * The bar of practices (spec §5), in the dock's place (`fixed bottom-6`, `Z_INDEX.dock`, the tour's
- * `tour-workspace-dock`): one chip per practice in the bar's order, reordered by drag; «+ Nuova
- * pratica»; «Chiudi tutte» behind its danger confirmation (the practices are persisted, and the
- * seeding marker stays set, so the old tabs never come back); a collapse toggle. Hidden while the
- * comparison or the palette covers the page, as the dock was. Its height, measured whenever it
+ * `tour-practice-bar`): one chip per practice in the bar's order, reordered by drag; «+ Nuova
+ * pratica»; «Chiudi tutte» behind its danger confirmation (the practices are persisted, so a reload
+ * shows none); a collapse toggle. Hidden while the
+ * comparison or the palette covers the page, as the old dock did. Its height, measured whenever it
  * changes (chips wrapping onto a new line, the bar collapsed), goes to `onHeightChange` — null while
  * it is not drawn — so the column keeps its last row clear of it (spec §3.4).
  */
@@ -85,7 +85,7 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
 
   return (
     <>
-      <div ref={setBarNode} id="tour-workspace-dock" className={cn('fixed bottom-6 left-1/2 -translate-x-1/2', Z_INDEX.dock)}>
+      <div ref={setBarNode} id="tour-practice-bar" className={cn('fixed bottom-6 left-1/2 -translate-x-1/2', Z_INDEX.dock)}>
         {!isExpanded ? (
           <button
             type="button"

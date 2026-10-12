@@ -4,12 +4,12 @@ import { ReaderLayout } from '../components/layout/ReaderLayout';
 import { useTour } from '../hooks/useTour';
 
 export function SearchPage() {
-  const { tryStartTour } = useTour();
+  const { tryStartTour, hasSeenTour } = useTour();
 
-  // Start search tour on first visit
+  // The search tour on a later visit; on the very first one it follows the welcome (`Layout`).
   useEffect(() => {
-    tryStartTour('search');
-  }, [tryStartTour]);
+    if (hasSeenTour('welcome')) tryStartTour('search');
+  }, [tryStartTour, hasSeenTour]);
 
   return (
     <ReaderLayout maxWidth="normal">

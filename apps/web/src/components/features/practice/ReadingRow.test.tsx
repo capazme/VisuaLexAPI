@@ -142,16 +142,14 @@ beforeEach(() => {
   scrolled = false;
   env.deepStack = false;
   FakeResizeObserver.all = [];
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(fakeRect);
   window.innerWidth = 1920;
   window.innerHeight = 768;
   sessionStorage.clear();
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
-    readingBackStack: [], workspaceTabs: [],
-  });
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
+    readingBackStack: [],  });
 });
 
 afterEach(() => {
@@ -184,7 +182,7 @@ describe('ReadingRow — the table and its windows (spec §4.2-§4.3)', () => {
 
   it('a topic window renders the topic search', () => {
     const { practiceId } = practiceWithWindows(0);
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Danno', { besideTabId: practiceId });
+    s().openTopicSearch({ tema: 'danno' }, 'Danno', { besideId: practiceId });
     render(row());
     expect(screen.getByTestId('topic-list')).toHaveAttribute('data-tab', s().practices[0].beside[0].id);
   });
@@ -443,7 +441,7 @@ describe('ReadingRow — the rail (spec §4.3)', () => {
       {row()}
       <CitationPreviewPopup
         isVisible isLoading={false} error={null} citation={{ act_type: 'codice civile', article: '2043', confidence: 1 }}
-        article={null} position={{ top: 0, left: 0 }} onClose={vi.fn()} onOpenInTab={vi.fn()}
+        article={null} position={{ top: 0, left: 0 }} onClose={vi.fn()} onOpenCitation={vi.fn()}
       />
     </>);
     fireEvent.click(screen.getByTestId('practice-rail'));

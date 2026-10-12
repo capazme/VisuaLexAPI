@@ -94,8 +94,8 @@ interface ArticleTabContentProps {
      */
     readingOrigin?: { tabId: string; blockId: string; articleKey?: string };
     /**
-     * The workspace tab a loose article sits in, which has no norma block to come
-     * back to: a decision cited in its massime opens beside that tab, with no way-back entry.
+     * The host this article is read in when it has no act to come back to (a preview): a decision
+     * cited in its massime opens beside that host, with no way-back entry.
      * `readingOrigin` wins when both are given.
      */
     tabId?: string;
@@ -107,7 +107,7 @@ interface ArticleTabContentProps {
      */
     findHostId?: string;
     /**
-     * `row` (default): the article as the table's row and the old tab show it. `beside`: in a light
+     * `row` (default): the article as the table's row shows it. `beside`: in a light
      * window (spec §4.1): the compact reading bar, Brocardi in a closed section, and none of Studio,
      * the Studia row, «Chiedi a MERL-T» or the graph rail. Only the siblings of the text root change.
      */
@@ -208,10 +208,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const devMode = useDevMode();
 
     const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
-    // The find window's target for this article (spec §13.1): the tab this surface reads in,
-    // `readingOrigin` winning like everywhere else it is given, so the root lands under the tab and
-    // key the scope computes from the store. No tab (a
-    // preview outside the workspace, such as the palette's result card) registers nothing.
+    // The find window's target for this article (spec §13.1): the host this surface reads in,
+    // `readingOrigin` winning like everywhere else it is given, so the root lands under the host and
+    // key the scope computes from the store. No host (a
+    // preview outside the practices, such as the palette's result card) registers nothing.
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
     const findHost = findHostId ?? originTabId ?? tabId;
     useRegisterFindRoot(findHost, findTargetKey, shortNorm(norma_data), textRootRef);
@@ -341,7 +341,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // Fetch persisted highlights + annotations from the Node backend when the
     // article first mounts (or when the user switches to a different article
-    // inside the same NormaCard). The store actions guard against racing
+    // inside the same row). The store actions guard against racing
     // against in-flight optimistic inserts by replacing only the entries for
     // this specific (normaKey, articleId) pair.
     useEffect(() => {
@@ -544,8 +544,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    // Handler for opening citation in new tab
-    const handleOpenCitationInTab = useCallback((citation: ParsedCitationData) => {
+    // Opens the previewed citation in the practice
+    const handleOpenCitation = useCallback((citation: ParsedCitationData) => {
         // MERLT-1.9: emit citation_click for the bus tracker. The target URN
         // is null at click time (resolution happens later via triggerSearch);
         // the BFF accepts null target and forwards it as such.
@@ -565,7 +565,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             },
         });
         // Loop β #2: the 'implicit' NER capture surface — clicking a citation
-        // chip through to a tab is a low-weight automatic CONFIRMATION that the
+        // chip through to its article is a low-weight automatic CONFIRMATION that the
         // detected reference was real. Full-consent only, fire-and-forget.
         if (canContribute) {
             const implicitPayload = buildArticleXrefNerPayload({
@@ -797,7 +797,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 if (tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase() && onCrossReferenceNavigate) {
                     onCrossReferenceNavigate(articleNumber, norma_data);
                 } else {
-                    // Altrimenti apri nuova tab
+                    // Altrimenti cerca l'articolo nella pratica
                     const isSameActType = tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase();
                     triggerSearch({
                         act_type: tipoAtto,
@@ -1104,7 +1104,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 article={citationPreviewState.article}
                 position={citationPreviewState.position}
                 onClose={hidePreview}
-                onOpenInTab={handleOpenCitationInTab}
+                onOpenCitation={handleOpenCitation}
                 nerFeedbackEnabled={canContribute}
                 onNerFeedback={handleCitationNerFeedback}
                 onMouseEnter={() => { isHoveringPopupRef.current = true; }}

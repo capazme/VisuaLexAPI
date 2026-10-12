@@ -47,13 +47,21 @@ export function Layout() {
   // header and the full-screen reader pad their headers by the button's width instead).
   const headerBesideMenuButton = onSearchPage;
 
-  // Leaving the search page closes the window: its matches are in tabs no longer on screen.
+  // Leaving the search page closes the window: its matches are in practices no longer on screen.
   useEffect(() => {
     if (!onSearchPage) closeFindWindow();
   }, [onSearchPage]);
 
   // Onboarding Tour
-  const { startTour, hasSeenTour, resetAndStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+  // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
+  // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
+  // address is read when the welcome ends, not when this callback was made.
+  const { startTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+    theme: settings.theme as 'light' | 'dark',
+    onComplete: (type) => {
+      if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
+    },
+  });
 
   // Auto-start welcome tour on first visit
   useEffect(() => {

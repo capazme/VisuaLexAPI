@@ -51,9 +51,8 @@ const UNREAD = { corte: 'cassazione' as const, archivio: 'civile' as const, nume
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   appStore.setState({
-    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, workspaceTabs: [], readingBackStack: [], phoneReader: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [], phoneReader: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
   saved = {

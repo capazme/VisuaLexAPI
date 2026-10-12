@@ -38,7 +38,7 @@ export interface RenderArticleInput {
   highlights: Highlight[];
   annotations: Annotation[];
   /**
-   * Draw each annotated block's sign (round B): the tab and the dossier
+   * Draw each annotated block's sign (round B): the practice's row and the dossier
    * reader. Study Mode has its own summary and leaves it off; flat mode has
    * no blocks and ignores it.
    */

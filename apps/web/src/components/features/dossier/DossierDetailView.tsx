@@ -44,7 +44,7 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, searchesForGroups, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { DossierActBlock } from './DossierActBlock';
@@ -61,7 +61,6 @@ import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { searchesIntoOnePractice } from './openInPractice';
-import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 import { AddNoteModal } from './AddNoteModal';
 import { saveBlob } from '../../../utils/saveBlob';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
@@ -98,7 +97,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     triggerMultiSearch,
     addToDossier,
     addNoteToDossier,
-    addWorkspaceTab,
   } = useAppStore();
   const navigate = useNavigate();
 
@@ -303,19 +301,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   const normaGroups = useMemo<NormaGroup[]>(() => computeNormaGroups(dossier.items), [dossier.items]);
 
-  // Queue one search per norma-group (one act's, or the dossier's). The tabs are
-  // created up front (the texts in force share the dossier's, each past group has
-  // its own) and their ids passed as `targetTabId`, so results never leak into a
-  // pre-existing custom tab with the same label (gotcha 15). With the practices, one practice holds
-  // them all, and `everyGroup` (the whole dossier opened) brings its decisions too (spec §5.1, T17).
+  // Queue one search per norma-group (one act's, or the dossier's). The practice is created up front
+  // and its id passed as `targetPracticeId`, so results never leak into a pre-existing practice with the
+  // same label (gotcha 15). One practice holds them all, and `everyGroup` (the whole dossier opened)
+  // brings its decisions too (spec §5.1, T17).
   const openGroupsOnDashboard = (groups: NormaGroup[], everyGroup = false) => {
     if (groups.length === 0) return;
-    const paramsList = isPracticeTableEnabled()
-      ? searchesIntoOnePractice(dossier, groups, everyGroup)
-      : searchesForGroups(
-        dossier.title, groups,
-        (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
-      );
+    const paramsList = searchesIntoOnePractice(dossier, groups, everyGroup);
     navigate('/');
     triggerMultiSearch(paramsList);
   };

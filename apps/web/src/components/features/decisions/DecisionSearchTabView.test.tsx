@@ -6,8 +6,6 @@ import type { SearchDecisionsAnswer } from '../../../types/decisions';
 
 vi.mock('../../../services/decisionSearchService');
 import { searchDecisions } from '../../../services/decisionSearchService';
-import { appStore } from '../../../store/useAppStore';
-import { renderTabView } from '../workspace/renderTabView';
 import { DecisionSearchTabView } from './DecisionSearchTabView';
 import { clearDecisionSearchCache } from '../../../utils/decisionSearchCache';
 
@@ -47,14 +45,6 @@ describe('DecisionSearchTabView', () => {
     render(<Wrapper><DecisionSearchTabView tabId="t" query={{ tema: 'perdita di chance' }} /></Wrapper>);
     await screen.findByText(/Nessuna decisione/);
     expect(screen.queryByRole('button', { name: 'Solo il tema' })).toBeNull();
-  });
-
-  it('is what the workspace draws for a decision-search tab', async () => {
-    const id = appStore.getState().openDecisionSearchTab({ tema: 'colpa' }, 'Tema: colpa');
-    const tab = appStore.getState().workspaceTabs.find((t) => t.id === id)!;
-    render(<Wrapper>{renderTabView(tab, tab.view!)}</Wrapper>);
-    expect(screen.getByRole('heading', { name: 'Tema: colpa' })).toBeInTheDocument();
-    await screen.findByText(/Nessuna decisione/);
   });
 });
 

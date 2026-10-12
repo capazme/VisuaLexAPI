@@ -34,7 +34,7 @@ const table = (streaming: Parameters<typeof PracticeTable>[0]['streaming'] = nul
 beforeEach(() => {
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, commandPaletteOpen: false, readingBackStack: [],
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
@@ -109,9 +109,8 @@ describe('PracticeTable (spec §3.1)', () => {
   });
 
   it('draws no band for the topic searches: on the desktop they are windows beside the table', () => {
-    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
-    s().openDecisionSearchTab({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
+    s().openTopicSearch({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
     render(table());
     expect(screen.queryByRole('region', { name: /Ricerca per tema/ })).toBeNull();
     expect(screen.queryByTestId('topic-list')).toBeNull();

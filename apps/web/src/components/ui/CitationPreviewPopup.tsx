@@ -1,7 +1,7 @@
 /**
  * CitationPreviewPopup - Popup hover per preview di citazioni normative.
  *
- * Mostra il contenuto dell'articolo citato con opzione per aprire in nuova tab.
+ * Mostra il contenuto dell'articolo citato con opzione per aprirlo nella pratica.
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -24,7 +24,7 @@ interface CitationPreviewPopupProps {
   article: ArticleData | null;
   position: { top: number; left: number };
   onClose: () => void;
-  onOpenInTab: (citation: ParsedCitationData) => void;
+  onOpenCitation: (citation: ParsedCitationData) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   /** When true (full-consent contributor), show the NER ✓/✗/Correggi bar. */
@@ -41,7 +41,7 @@ export function CitationPreviewPopup({
   article,
   position,
   onClose,
-  onOpenInTab,
+  onOpenCitation,
   onMouseEnter,
   onMouseLeave,
   nerFeedbackEnabled,
@@ -80,12 +80,12 @@ export function CitationPreviewPopup({
     };
   }, [isVisible]);
 
-  const handleOpenInTab = useCallback(() => {
+  const handleOpen = useCallback(() => {
     if (citation) {
-      onOpenInTab(citation);
+      onOpenCitation(citation);
       onClose();
     }
-  }, [citation, onOpenInTab, onClose]);
+  }, [citation, onOpenCitation, onClose]);
 
   // Formatta il testo dell'articolo per l'anteprima (senza troncamento)
   const getPreviewText = () => {
@@ -186,10 +186,10 @@ export function CitationPreviewPopup({
               )}
             </div>
 
-            {/* Footer - Open in Tab button (primary) + NER feedback below it (design §3.7) */}
+            {/* Footer - Open button (primary) + NER feedback below it (design §3.7) */}
             <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
               <button
-                onClick={handleOpenInTab}
+                onClick={handleOpen}
                 disabled={isLoading}
                 className={cn(
                   "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -199,7 +199,7 @@ export function CitationPreviewPopup({
                 )}
               >
                 <ExternalLink size={14} />
-                Apri in nuova tab
+                Apri nella pratica
               </button>
               {nerFeedbackEnabled && onNerFeedback && (
                 <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">

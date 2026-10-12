@@ -18,12 +18,9 @@ vi.mock('../../../config/annexConfig', () => ({ ANNEX_AUTO_SWITCH_CONFIG: env.an
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop, isDesktopViewport: () => env.desktop }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
-vi.mock('../workspace/WorkspaceManager', () => ({ WorkspaceManager: () => <div data-testid="old-workspace" /> }));
-vi.mock('../workspace/WorkspaceNavigator', () => ({ WorkspaceNavigator: () => <div data-testid="old-dock" /> }));
 vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./QuickNormsManager', () => ({ QuickNormsManager: () => null }));
 vi.mock('../settings/AliasManager', () => ({ AliasManager: () => null }));
-vi.mock('./NormaCard', () => ({ NormaCard: () => null }));
 vi.mock('./ArticleTabContent', () => ({
   ArticleTabContent: ({ data, variant = 'row', onCrossReferenceNavigate }: {
     data: { norma_data: { numero_articolo: string } };
@@ -54,7 +51,7 @@ vi.mock('../decisions/DecisionEntryView', async () => {
         n. {reference.numero}
         <button type="button" onClick={() => store.getState().triggerSearch({
           ...(env.citation ?? { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente', show_brocardi_info: false }),
-          besideTabId: hostId,
+          besideId: hostId,
         } as never)}>
           Cita l'art. 2043 c.c.
         </button>
@@ -87,7 +84,6 @@ const panel = () => render(<MemoryRouter><SearchPanel /></MemoryRouter>);
 const windowLabels = () => screen.queryAllByTestId('reading-window').map((w) => w.getAttribute('data-window-id'));
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   window.innerWidth = 1500;
   env.desktop = true;
@@ -99,10 +95,10 @@ beforeEach(() => {
   env.tree = null;
   env.annex.ENABLED = false;
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
-    practiceNotice: null, workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDecision: null,
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
+    practiceNotice: null, searchTrigger: null, searchQueue: [], pendingDecision: null,
     readingBackStack: [], commandPaletteOpen: false, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
-    mobileActiveTabId: null, windowFocusRequest: null,
+    windowFocusRequest: null,
   });
 });
 afterEach(() => {
@@ -133,7 +129,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
       decisionWindowId(decisionId), articleWindowId(practice.acts[0].id, articleKey),
     ]));
     // The search carried the window as its asker; the row did not open in the table.
-    expect(env.requests[0]).toMatchObject({ besideTabId: decisionWindowId(decisionId) });
+    expect(env.requests[0]).toMatchObject({ besideId: decisionWindowId(decisionId) });
     expect(Object.values(s().practiceRows).some(Boolean)).toBe(false);
     expect(s().pendingReveal).toBeNull();
     await waitFor(() => expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'))).toEqual(['beside']));
@@ -192,7 +188,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     fireEvent.click(await screen.findByRole('button', { name: "Cita l'art. 2043 c.c." }));
     await waitFor(() => expect(env.requests.some((r) => r.annex === '2')).toBe(true));
     // The annex search carries the window that asked.
-    expect(env.requests.find((r) => r.annex === '2')).toMatchObject({ besideTabId: decisionWindowId(decisionId) });
+    expect(env.requests.find((r) => r.annex === '2')).toMatchObject({ besideId: decisionWindowId(decisionId) });
     await waitFor(() => {
       const practice = s().practices[0];
       const articles = practice.acts.flatMap((a) => a.articles.map((x) => `${x.norma_data.allegato ?? ''}:${x.norma_data.numero_articolo}`));
@@ -216,7 +212,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
 
   it('the way back floats above the bar of practices (its measured height + 24 + 12), not at the top over the act heading', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.id === 'tour-workspace-dock' ? 138 : 0;
+      return this.id === 'tour-practice-bar' ? 138 : 0;
     });
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
@@ -238,7 +234,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
   it('a decision asked for twice (the palette, then the address) is one window, and the second ask takes focus', async () => {
     s().createPractice('P');
     panel();
-    act(() => { s().openDecisionTab(REF); });
+    act(() => { s().openDecision(REF, { fromLink: true }); });
     await screen.findByTestId('decision-reader');
     act(() => { s().requestOpenDecision(REF); });
     await waitFor(() => expect(s().pendingDecision).toBeNull());

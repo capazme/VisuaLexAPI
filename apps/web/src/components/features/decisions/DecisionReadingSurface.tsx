@@ -39,9 +39,9 @@ export interface DecisionReadingSurfaceProps {
   testo: DecisionText;
   attributi: DecisionAttributes;
   /**
-   * The workspace tab this decision is read in. With it, a norm opened from a citation is placed
-   * beside that tab and the way back names it; without it (a host with no tab, such as a light
-   * window) the norm opens through the ordinary search and nothing is recorded.
+   * The host this decision is read in: a practice (its row) or a window. With it, a norm opened from
+   * a citation is placed beside that host and the way back names it; without it the norm opens
+   * through the ordinary search and nothing is recorded.
    */
   hostTabId?: string;
   /**
@@ -176,7 +176,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       article: citation.article,
       version: 'vigente',
       show_brocardi_info: true,
-      ...(hostTabId ? { besideTabId: hostTabId } : {}),
+      ...(hostTabId ? { besideId: hostTabId } : {}),
     });
   }, [triggerSearch, hostTabId]);
 
@@ -331,7 +331,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         article={preview.article}
         position={preview.position}
         onClose={hidePreview}
-        onOpenInTab={(citation) => {
+        onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);
           openCitation(citation);

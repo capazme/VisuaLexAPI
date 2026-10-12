@@ -115,7 +115,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
         setAccountMessage(null);
         try {
             await accountService.deleteAccount(deletePassword, deleteConfirmation);
-            // Tokens AND the persisted store (workspace tabs, settings): the
+            // Tokens AND the persisted store (the practices, settings): the
             // next person on this browser must not inherit them.
             localStorage.clear();
             window.location.href = '/login?deleted=1';

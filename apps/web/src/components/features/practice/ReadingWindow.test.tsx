@@ -26,7 +26,7 @@ vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../search/BrocardiDisplay', () => ({ BrocardiDisplay: () => null }));
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 vi.mock('../decisions/DecisionResultList', () => ({
-  DecisionResultList: ({ besideTabId }: { besideTabId?: string }) => <div data-testid="topic-list" data-beside={besideTabId} />,
+  DecisionResultList: ({ besideId }: { besideId?: string }) => <div data-testid="topic-list" data-beside={besideId} />,
 }));
 
 import { appStore } from '../../../store/useAppStore';
@@ -81,10 +81,9 @@ const drawn = (name: string) => registry.get(name)?.ranges ?? [];
 beforeEach(() => {
   vi.clearAllMocks();
   fetchDecision.mockResolvedValue(FOUND_ANSWER);
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
-    readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [], bookmarks: [],
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
+    readingBackStack: [], highlights: [], annotations: [], bookmarks: [],
     loadAnnotationsForArticle: vi.fn(), loadHighlightsForArticle: vi.fn(),
   });
   registry = new Map();

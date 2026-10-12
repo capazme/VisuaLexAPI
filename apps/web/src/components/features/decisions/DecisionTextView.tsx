@@ -23,7 +23,7 @@ function copyAsRead(event: ClipboardEvent<HTMLDivElement>) {
 }
 
 /** The fallback for a host that mounts `DecisionView` without the reading surface
- *  (`DecisionReadingSurface`, which the workspace tab always passes as `textSlot`): the same
+ *  (`DecisionReadingSurface`, which a practice's entry always passes as `textSlot`): the same
  *  structure and copy behaviour, with no notes, highlights or links.
  *
  *  The decision as received: blocks as the reader divides them, one span per line. The space

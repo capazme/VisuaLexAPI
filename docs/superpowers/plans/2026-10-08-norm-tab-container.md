@@ -598,3 +598,55 @@ Then: the owner's trial on the development stack, and the deploy on the deployme
   solo in parte»; an existing dossier that took nothing says «Nessun elemento è stato salvato». The
   outcome's toast is portalled to the toast band (gotchas 22, 26); «Aggiungi a un dossier…» is a
   `ui/Modal`.
+
+**P4–P6 as built** (what the reviews and the browser passes decided; the spec states the result):
+- **The asker rule.** A decision or an article opened from a light window never replaces that
+  window: `besideWith(beside, ref, askerId)` drops the oldest window that is not the asker, and its
+  subject stays in the table (T16). A reveal aimed at a row a window folds focuses the window instead
+  (`windowFocusRequest`, a one-shot signal the window takes atomically); on a phone there are no
+  windows, so nothing asks for focus.
+- **The row of two.** `besideLayout` is pure: half and half, thirds from 420 px a column, else a
+  48 px rail that opens the table as an overlay closed by Esc or a click outside; the overlay closes
+  on the way to a window, and the row fits its scroller (`ReadingRow` measures it, and reaches past
+  the page's `max-w-5xl` cap only while a window is beside the table).
+- **The find window's place, in every case.** `ReadingRow` gives it its opening place
+  (`setFindWindowDefaultPlace`): right-aligned in the table's column, or the first window's body when
+  the rail is drawn, under the stack pinned at the top of the column (the practice header, the first
+  act's heading, an open row's toolbar, each marked `data-pinned-head`) and under every window's header,
+  so never over a control; a place the user dragged wins. A tool held over the table carries
+  `data-floating-tool`, which the rail's overlay does not read as a click away.
+- **The page is the viewport.** `Layout`'s root is `h-app` (`100dvh`, `100vh` fallback) with
+  `overflow-hidden`, a practice row's columns `h-app-row`; the sidebar scrolls on its own in a low
+  window and its labels are portalled (`SidebarTooltip`), so the document never scrolls and a
+  `scrollIntoView` never shifts the layout (carry-overs 16–18).
+- **The reader gives way.** The phone's full-screen reader (`phoneReader`) is session state: every
+  reveal of a row, the act's index and any other practice coming on screen (`activate`) clear it in
+  their own update, and it is drawn only for the active practice; a screen that widens clears it.
+  The table comes back at the scroll position of the content scroller it left, asked for again
+  while the remounted column grows until reached, the user scrolls or 3 s pass.
+- **`Modal`'s Esc.** An Esc that something inside already took (a menu closing, an edit cancelled) is
+  not the dialog's, and only the top-most open modal handles Tab and Esc; a dialog opened from a
+  reading window is portalled to the body, so it covers the app and not the window.
+- **The flag goes, the browser migrates once (P6).** `isPracticeTableEnabled` and
+  `featureFlag.ts` are deleted; persist `version: 1` with `migrate`: from version 0 a state with
+  `practicesSeeded === true` keeps its sanitized practices (an empty list too), any other is
+  converted from `workspaceTabs` with `practicesFromTabs`; `workspaceTabs`, `highestZIndex` and the
+  marker are dropped. The migration never throws: a failed conversion loses the practices only,
+  keeps the settings and says so; the raw version-0 value is first copied to
+  `visualex-storage.v0-backup` (once). The topic searches it could not reopen are told once
+  (`practiceNotice`, carried from `migrate` to `merge` by a module variable, reset at each
+  migration). The constants it reads are declared before the store: hydration runs while the store is
+  created, and a `const` below it is still in its dead zone (zustand swallowed that error and left
+  the store empty).
+- **The tab model is deleted (P6).** The floating tabs, their dock and every tab action and type
+  go; the back stack holds only `PracticeBackEntry` and drops a pushed entry that names nothing the
+  practices hold; `openDecisionTab` became `openDecision(…, { fromLink: true, besideId })`,
+  `openDecisionSearchTab` became `openTopicSearch`, `besideTabId` became `besideId` and
+  `targetTabId` became `targetPracticeId`. The props `tabId`/`hostTabId` stay and name the host (a
+  practice or a window).
+- **The tours.** `workspaceTab` and `normaBlock` become `practice` and `practiceAct`, anchored on
+  the bar of practices, the header, «Salva come dossier», the act's heading, its index line, «Apri
+  accanto», Studio and Struttura (plus the reading bar and Brocardi, which belong to the open row);
+  the table starts the first, hands over to the second when it is done, and the practice's first act
+  asks for it once the first has been seen. `TOUR_VERSION` stays 2: the tours are new keys, so every
+  user sees them once without replaying the ones already seen.

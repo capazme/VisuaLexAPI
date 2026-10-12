@@ -98,7 +98,7 @@ export function PracticeRowShell({
             onClick={beside.onOpen}
             aria-label={`Apri accanto ${removeName}`}
             title="Apri accanto"
-            className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 md:min-h-0 md:min-w-0 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            className="practice-row-beside flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 md:min-h-0 md:min-w-0 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             <PanelRightOpen size={14} aria-hidden />
             {/* Icon-only on a phone, where the row's name needs the width. */}

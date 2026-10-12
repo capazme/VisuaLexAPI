@@ -26,17 +26,17 @@ function mount() {
 
 beforeEach(() => {
   getHistory.mockReset();
-  appStore.setState({ workspaceTabs: [] });
+  appStore.setState({ practices: [], activePracticeId: null, phoneReader: null });
 });
 
 describe('HistoryView — decisions', () => {
-  it('lists a decision by its short citation and reopens it in the workspace', async () => {
+  it('lists a decision by its short citation and reopens it in a practice', async () => {
     getHistory.mockResolvedValue([decision]);
     mount();
     const buttons = await screen.findAllByRole('button', { name: /Cass\. civ\., n\. 99999\/2024/ });
     fireEvent.click(buttons[0]);
-    expect(appStore.getState().workspaceTabs.map((t) => t.view)).toEqual([
-      { kind: 'decision', reference: { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 } },
+    expect(appStore.getState().practices.flatMap((p) => p.decisions.map((d) => d.reference))).toEqual([
+      { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
     ]);
     expect(screen.getByTestId('where').textContent).toBe('/');
   });

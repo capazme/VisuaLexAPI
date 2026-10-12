@@ -21,8 +21,8 @@ interface UseAutoSwitchProps {
   onSearch: (params: SearchParams) => void;
   /** Callback when search is loading (to track completion) */
   isLoading: boolean;
-  /** Callback to remove duplicate tabs */
-  onRemoveDuplicateTabs?: (params: SearchParams) => void;
+  /** Called when the annex search replaces the first one: takes the first search's rows off */
+  onReplaceFirstSearch?: (params: SearchParams) => void;
 }
 
 interface UseAutoSwitchReturn {
@@ -55,7 +55,7 @@ interface UseAutoSwitchReturn {
 export function useAutoSwitch({
   onSearch,
   isLoading,
-  onRemoveDuplicateTabs
+  onReplaceFirstSearch
 }: UseAutoSwitchProps): UseAutoSwitchReturn {
   // Track current search params
   const currentSearchRef = useRef<SearchParams | null>(null);
@@ -109,9 +109,9 @@ export function useAutoSwitch({
     // Auto-dismiss toast
     setTimeout(() => setToast(null), ANNEX_AUTO_SWITCH_CONFIG.TOAST_DURATION);
 
-    // Remove duplicate tabs from initial search
-    if (onRemoveDuplicateTabs) {
-      onRemoveDuplicateTabs(originalParams);
+    // Take the initial search's rows off
+    if (onReplaceFirstSearch) {
+      onReplaceFirstSearch(originalParams);
     }
 
     // Trigger new search with annex parameter
@@ -124,7 +124,7 @@ export function useAutoSwitch({
     setTimeout(() => {
       onSearch(newParams);
     }, 100);
-  }, [dialogState, onSearch, onRemoveDuplicateTabs]);
+  }, [dialogState, onSearch, onReplaceFirstSearch]);
 
   // Cancel the switch
   const cancelSwitch = useCallback(() => {
@@ -280,9 +280,9 @@ export function useAutoSwitch({
               // Auto-dismiss toast
               setTimeout(() => setToast(null), ANNEX_AUTO_SWITCH_CONFIG.TOAST_DURATION);
 
-              // Remove duplicate tabs from initial search
-              if (onRemoveDuplicateTabs) {
-                onRemoveDuplicateTabs(params);
+              // Take the initial search's rows off
+              if (onReplaceFirstSearch) {
+                onReplaceFirstSearch(params);
               }
 
               // Trigger new search with annex parameter
@@ -332,7 +332,7 @@ export function useAutoSwitch({
     }
     // Intentionally keyed on the loading transition only: the check must fire
     // once per completed search (guarded by hasCheckedRef, set asynchronously).
-    // onSearch/onRemoveDuplicateTabs are inline callbacks from SearchPanel —
+    // onSearch/onReplaceFirstSearch are inline callbacks from SearchPanel —
     // adding them to deps would re-run this effect on every parent render and
     // double-fire the async check before hasCheckedRef flips.
     // eslint-disable-next-line react-hooks/exhaustive-deps

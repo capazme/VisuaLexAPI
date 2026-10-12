@@ -10,7 +10,7 @@ import { useDecisionAnswer } from './useDecisionAnswer';
 
 export interface DecisionAnswerBodyProps {
   reference: DecisionReference;
-  /** The reading place: a practice (its row), a window, or an old workspace tab. */
+  /** The reading place: a practice (its row) or a window. */
   hostId: string;
   /** Where the way back returns to inside the host (`DecisionReadingSurface.hostBlockId`). */
   hostBlockId?: string;

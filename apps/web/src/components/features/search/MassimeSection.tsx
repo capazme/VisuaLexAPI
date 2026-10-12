@@ -8,8 +8,8 @@ import { brocardiDecisionRef, DECISION_PAGE_AVAILABLE, formatDecisionShort, link
 
 interface MassimeSectionProps {
   massime: (string | MassimaStructured)[] | null;
-  /** The workspace tab the article is in: a decision opens beside it. */
-  besideTabId?: string;
+  /** The place the article is read in (a practice or one of its windows): a decision opens beside it. */
+  besideId?: string;
   /** The way back to the article, recorded when a decision is opened from here. */
   backEntry?: ReadingBackEntry;
 }
@@ -66,7 +66,7 @@ function getAuthorityColor(autorita: string | null): string {
   return 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
 }
 
-export function MassimeSection({ massime, besideTabId, backEntry }: MassimeSectionProps) {
+export function MassimeSection({ massime, besideId, backEntry }: MassimeSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>('all');
@@ -223,7 +223,7 @@ export function MassimeSection({ massime, besideTabId, backEntry }: MassimeSecti
                           decisionPath ? (
                             <DecisionLink
                               to={decision}
-                              besideTabId={besideTabId}
+                              besideId={besideId}
                               backEntry={backEntry}
                               className={cn('px-2 py-0.5 rounded text-xs font-medium hover:underline', getAuthorityColor(m.autorita))}
                             >

@@ -31,11 +31,10 @@ const dossierOf = (items: DossierItem[]): Dossier => ({ id: 'd1', title: 'Ricors
 const TWO_PAST = dossierOf([norm('a', CIVIL), norm('b', PAST), norm('c', ORIGINAL), norm('e', L241), decision('s1', 28994), decision('s2', 577)]);
 
 beforeEach(() => {
-  vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   fetchDecision.mockReset();
   appStore.setState({
-    practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
-    workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDossierItemIds: {}, pendingDossierOrders: {},
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
+    searchTrigger: null, searchQueue: [], pendingDossierItemIds: {}, pendingDossierOrders: {},
   });
 });
 afterEach(() => {
@@ -68,13 +67,12 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
     expect(s().activePracticeId).toBe(practice.id);
     const queued = searches();
     expect(queued.length).toBeGreaterThanOrEqual(3);
-    expect(queued.map((q) => q.targetTabId)).toEqual(queued.map(() => practice.id));
+    expect(queued.map((q) => q.targetPracticeId)).toEqual(queued.map(() => practice.id));
     expect(queued.some((q) => q.version_date === '2007-12-29')).toBe(true);
     expect(queued.some((q) => q.version === 'originale')).toBe(true);
     expect(practice.decisions.map((d) => d.reference.numero).sort((a, b) => a - b)).toEqual([577, 28994]);
     expect(s().practiceRows).toEqual({});
     expect(practice.beside).toEqual([]);
-    expect(s().workspaceTabs).toEqual([]);
   });
 
   it('the table draws the dossier\'s decisions closed and asks for none of them until one is opened (T17)', async () => {
@@ -99,7 +97,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
     fireEvent.click(screen.getByRole('button', { name: 'Apri tutto su Dashboard' }));
     expect(s().practices).toHaveLength(1);
     expect(s().practices[0].decisions).toHaveLength(1);
-    expect(searches().map((q) => q.targetTabId)).toEqual([s().practices[0].id]);
+    expect(searches().map((q) => q.targetPracticeId)).toEqual([s().practices[0].id]);
   });
 
   it('one group picked brings no decision', () => {
@@ -109,7 +107,7 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
     fireEvent.click(screen.getAllByText('Testo al 29/12/2007').at(-1) as HTMLElement);
     expect(s().practices).toHaveLength(1);
     expect(s().practices[0].decisions).toEqual([]);
-    expect(searches().map((q) => q.targetTabId)).toEqual([s().practices[0].id]);
+    expect(searches().map((q) => q.targetPracticeId)).toEqual([s().practices[0].id]);
   });
 
   it('a dossier with no article opens nothing', () => {
@@ -135,10 +133,9 @@ describe('DossierListView\'s quick-open with the practices', () => {
     expect(practice).toEqual(expect.objectContaining({ label: 'Ricorso Rossi', labelIsCustom: true }));
     expect(practice.decisions.map((d) => d.reference.numero)).toEqual([28994]);
     expect(practice.decisions[0].identified).toBe(true);
-    expect(searches()).toEqual([expect.objectContaining({ version_date: '2007-12-29', targetTabId: practice.id })]);
+    expect(searches()).toEqual([expect.objectContaining({ version_date: '2007-12-29', targetPracticeId: practice.id })]);
     expect(s().practiceRows).toEqual({});
     expect(fetchDecision).not.toHaveBeenCalled();
-    expect(s().workspaceTabs).toEqual([]);
   });
 
   it('one group picked from the list\'s picker brings no decision', () => {
@@ -146,7 +143,7 @@ describe('DossierListView\'s quick-open with the practices', () => {
     fireEvent.click(screen.getAllByText('Testo al 29/12/2007').at(-1) as HTMLElement);
     expect(s().practices).toHaveLength(1);
     expect(s().practices[0].decisions).toEqual([]);
-    expect(searches().map((q) => q.targetTabId)).toEqual([s().practices[0].id]);
+    expect(searches().map((q) => q.targetPracticeId)).toEqual([s().practices[0].id]);
   });
 
   it('the picker\'s «Apri tutto» creates one practice with the decisions, closed', () => {
@@ -154,7 +151,7 @@ describe('DossierListView\'s quick-open with the practices', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Apri tutto\s*\d+ gruppi/ }));
     expect(s().practices).toHaveLength(1);
     const [practice] = s().practices;
-    expect(searches().map((q) => q.targetTabId)).toEqual(searches().map(() => practice.id));
+    expect(searches().map((q) => q.targetPracticeId)).toEqual(searches().map(() => practice.id));
     expect(practice.decisions).toHaveLength(2);
     expect(s().practiceRows).toEqual({});
     expect(fetchDecision).not.toHaveBeenCalled();

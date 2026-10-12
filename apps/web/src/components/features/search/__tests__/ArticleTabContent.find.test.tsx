@@ -105,9 +105,18 @@ const typeQuery = (value: string) => fireEvent.change(screen.getByRole('searchbo
 const magnifier = () => screen.getAllByRole('button', { name: 'Cerca nel testo' })[0];
 const drawn = (name = 'vlx-find') => registry.get(name)?.ranges.length ?? 0;
 
-/** The article in a workspace tab, with the one find window mounted beside it. */
+/** A practice holding `articles` of the act of `NORMA`; it becomes the active one. */
+function addPractice(label: string, norma: NormaVisitata, articles: ArticleData[]): string {
+  const id = appStore.getState().createPractice(label, { custom: true });
+  appStore.getState().addArticlesToPractice(id, norma, articles);
+  return id;
+}
+
+const NO_PRACTICES = { practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null };
+
+/** The article in a practice, with the one find window mounted beside it. */
 function showInTab(data: ArticleData) {
-  const tabId = appStore.getState().addWorkspaceTab('Codice civile', NORMA, [data]);
+  const tabId = addPractice('Codice civile', NORMA, [data]);
   const view = render(
     <MemoryRouter>
       <ArticleTabContent data={data} readingOrigin={{ tabId, blockId: 'b' }} />
@@ -120,7 +129,7 @@ function showInTab(data: ArticleData) {
 describe('ArticleTabContent — the magnifier opens the find window', () => {
   afterEach(() => {
     act(() => closeFindWindow());
-    appStore.setState({ workspaceTabs: [] });
+    appStore.setState(NO_PRACTICES);
   });
 
   it('opens the window, not a box under the toolbar, and finds a word typed without its accent', async () => {
@@ -130,7 +139,7 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
     const window_ = screen.getByRole('search');
     expect(window_.closest('.glass-toolbar')).toBeNull();
     expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Questa scheda' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
     typeQuery('puo');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
     expect(drawn('vlx-find-current')).toBe(1);
@@ -222,7 +231,7 @@ describe('ArticleTabContent — the find window\'s text root', () => {
 
   it('registers its text root under the key the scope computes for the article in its tab', () => {
     const data = article();
-    const tabId = appStore.getState().addWorkspaceTab('Codice civile', NORMA, [data]);
+    const tabId = addPractice('Codice civile', NORMA, [data]);
     const { unmount } = render(
       <MemoryRouter>
         <ArticleTabContent data={data} readingOrigin={{ tabId, blockId: 'b' }} />
@@ -236,7 +245,7 @@ describe('ArticleTabContent — the find window\'s text root', () => {
     expect(roots[0].element.textContent?.replace(/\s+/g, '')).toBe(TEXT.replace(/\s+/g, ''));
     unmount();
     expect(findRootsFor(tabId)).toHaveLength(0);
-    appStore.getState().removeTab(tabId);
+    appStore.setState(NO_PRACTICES);
   });
 
   it('registers nothing while its text is not shown, and registers the text once it is', () => {
@@ -265,14 +274,14 @@ describe('ArticleTabContent — a magnifier that was not pressed opens the windo
 
   afterEach(() => {
     act(() => closeFindWindow());
-    appStore.setState({ workspaceTabs: [] });
+    appStore.setState(NO_PRACTICES);
   });
 
-  it('on a background tab: the mousedown that raises the tab does not turn the click into a close', () => {
+  it('in a background practice: the switch that makes it active does not turn the click into a close', () => {
     const a = article({ article_text: ACCENTED.text });
     const b = article({ article_text: ACCENTED.text, norma_data: NORMA_B });
-    const tabA = appStore.getState().addWorkspaceTab('A', NORMA, [a]);
-    const tabB = appStore.getState().addWorkspaceTab('B', NORMA_B, [b]);
+    const tabA = addPractice('A', NORMA, [a]);
+    const tabB = addPractice('B', NORMA_B, [b]);
     render(
       <MemoryRouter>
         <div data-testid="a"><ArticleTabContent data={a} readingOrigin={{ tabId: tabA, blockId: 'b' }} /></div>
@@ -282,13 +291,13 @@ describe('ArticleTabContent — a magnifier that was not pressed opens the windo
     );
     const mag = (id: string) => within(screen.getByTestId(id)).getAllByRole('button', { name: 'Cerca nel testo' })[0];
 
-    // B is in front; open on it, then go to A's magnifier.
+    // B is the active practice; open on it, then go to A's magnifier.
     fireEvent.click(mag('b'));
     expect(mag('b')).toHaveAttribute('aria-pressed', 'true');
     expect(mag('a')).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.pointerDown(mag('a'));
-    act(() => appStore.getState().bringTabToFront(tabA)); // the tab panel's mousedown
+    act(() => appStore.getState().setActivePractice(tabA)); // the practice switched on the bar
     fireEvent.click(mag('a'));
 
     expect(screen.getByRole('search')).toBeInTheDocument();
@@ -296,10 +305,10 @@ describe('ArticleTabContent — a magnifier that was not pressed opens the windo
     expect(mag('b')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('on another article of the front tab: opens on that text instead of closing', () => {
+  it('on another article of the active practice: opens on that text instead of closing', () => {
     const a = article({ article_text: ACCENTED.text });
     const b = article({ article_text: ACCENTED.text, norma_data: NORMA_B });
-    const tab = appStore.getState().addWorkspaceTab('A', NORMA, [a, b]);
+    const tab = addPractice('A', NORMA, [a, b]);
     render(
       <MemoryRouter>
         <div data-testid="a"><ArticleTabContent data={a} readingOrigin={{ tabId: tab, blockId: 'b' }} /></div>
@@ -331,7 +340,7 @@ describe('ArticleTabContent — a magnifier that was not pressed opens the windo
   ])('Enter after a press %s, with the window closed since, opens it', async (_how, abort) => {
     const user = userEvent.setup();
     const a = article({ article_text: ACCENTED.text });
-    const tab = appStore.getState().addWorkspaceTab('A', NORMA, [a]);
+    const tab = addPractice('A', NORMA, [a]);
     render(
       <MemoryRouter>
         <ArticleTabContent data={a} readingOrigin={{ tabId: tab, blockId: 'b' }} />

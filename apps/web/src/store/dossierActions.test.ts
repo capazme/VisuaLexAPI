@@ -19,7 +19,7 @@ vi.mock('../services/dossierService', () => ({
 // NOTE: `useAppStore` (default export target per the task brief) is a React-hook
 // wrapper around the vanilla zustand store in this codebase — it has no
 // `getState`/`setState` of its own. The vanilla store instance is the
-// separately-exported `appStore` (see e.g. WorkspaceTabPanel.tsx, useAuth.ts),
+// separately-exported `appStore` (see e.g. useAuth.ts),
 // so tests that need direct state access use that instead.
 import { appStore } from './useAppStore';
 import { dossierService, type DossierItemApi } from '../services/dossierService';
