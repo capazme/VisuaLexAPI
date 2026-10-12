@@ -382,6 +382,19 @@ function anyActSpans(folded: string, number: string, year: string): Span[] {
   return [...folded.matchAll(re)].map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
 }
 
+/**
+ * The citations of every act in the text, whatever its number and year: `anyActSpans` for all numbers
+ * at once, sorted by start. The decisions a text cites are never found inside one.
+ */
+export function allActSpans(folded: string): Span[] {
+  const re = new RegExp(
+    `${ACT_WORD}(?:${ACT_NAME_GAP}${ACT_NAME_WORD}){0,${ACT_NAME_WORDS}}${ACT_NAME_GAP}` +
+      numberYearSource({ numberA: '\\d{1,6}', numberB: '\\d{1,6}', slashYear: '(?:\\d{4}|\\d{2})', delYear: '\\d{4}', dateYear: '\\d{4}' }),
+    'gu',
+  );
+  return [...folded.matchAll(re)].map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
+}
+
 const overlapsAny = (spans: readonly Span[], [s, e]: Span): boolean => spans.some(([a, b]) => s < b && a < e);
 
 /** A decision's number and year in every form; never where they belong to an act (`anyActSpans`). */
