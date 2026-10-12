@@ -63,6 +63,7 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
 
   it('openDecisionTab beside a practice or a window lands in that practice, not the active one', () => {
     flagOn();
+    viewport(true);
     const first = s().createPractice('Prima');
     const topic = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
     s().createPractice('Seconda');

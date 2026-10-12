@@ -217,6 +217,24 @@ describe('SearchPanel on a phone — with the practices (flag on, spec §8, P5)'
     expect(appStore.getState().phoneReader).toBeNull();
   });
 
+  it('two windows beside on the desktop, then a phone width: the table, no row folded, «Apri accanto» on the rows', async () => {
+    desktop = true;
+    const { practiceId, refs } = withTwoWindows();
+    appStore.getState().setRowOpen(`${practiceId}/${refs[0].kind === 'article' ? refs[0].actId : ''}/${refs[0].kind === 'article' ? refs[0].articleKey : ''}`, true);
+    render(<MemoryRouter><SearchPanel /></MemoryRouter>);
+    expect(await screen.findByTestId('desktop-row')).toBeInTheDocument();
+
+    act(() => { desktop = false; listeners.forEach((fn) => fn({ matches: false })); });
+    expect(await screen.findByTestId('practice-phone-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('desktop-row')).toBeNull();
+    expect(screen.queryByTestId('reading-full-screen')).toBeNull();
+    expect(screen.queryByText(/Aperto accanto/)).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Apri accanto/ })).toHaveLength(2);
+    // the row the user had open is open in place, the windows are still saved
+    expect(screen.getAllByTestId('reader')).toHaveLength(1);
+    expect(appStore.getState().practices[0].beside).toEqual(refs);
+  });
+
   it('a screen that widens closes the reader, and the desktop draws its windows', async () => {
     const { practiceId, refs } = withTwoWindows();
     render(<MemoryRouter><SearchPanel /></MemoryRouter>);

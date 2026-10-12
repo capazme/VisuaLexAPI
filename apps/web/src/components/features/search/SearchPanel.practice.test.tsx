@@ -449,6 +449,40 @@ describe('SearchPanel with the practices: the phone\'s full-screen reader (spec 
     expect(s().practices[0].beside).toEqual([]);
   });
 
+  it('a search result that reveals a row shows the table, not the reader', async () => {
+    const p = s().createPractice('P');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
+    env.lines = [ccArticle('1218')];
+    panel();
+    await screen.findByTestId('practice-phone-view');
+    act(() => { s().openPhoneReader(p, refOf(actId, '2043')); });
+    await screen.findByTestId('reading-full-screen');
+    act(() => { s().triggerSearch(params('1218')); });
+    await waitFor(() => expect(screen.queryByTestId('reading-full-screen')).toBeNull());
+    expect(await screen.findByTestId('practice-column')).toBeInTheDocument();
+    await waitFor(() => expect(readers()).toEqual(['art. 1218']));
+    expect(s().phoneReader).toBeNull();
+  });
+
+  it('the dossier\'s «Apri tutto» (a new practice made active) shows that practice\'s table, not the old reader', async () => {
+    const p = s().createPractice('Vecchia');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
+    const dossier: Dossier = {
+      id: 'd1', title: 'Ricorso Rossi', createdAt: '2026-10-04T08:00:00Z', tags: [],
+      items: [{ id: 'a', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1284' } }],
+    };
+    env.stream = (request) => [ccArticle(String(request.article))];
+    panel();
+    await screen.findByTestId('practice-phone-view');
+    act(() => { s().openPhoneReader(p, refOf(actId, '2043')); });
+    await screen.findByTestId('reading-full-screen');
+    act(() => { s().triggerMultiSearch(searchesIntoOnePractice(dossier, computeNormaGroups(dossier.items), true)); });
+    await waitFor(() => expect(screen.queryByTestId('reading-full-screen')).toBeNull());
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Ricorso Rossi');
+    await waitFor(() => expect(s().practices.find((x) => x.label === 'Ricorso Rossi')?.acts[0]?.articles).toHaveLength(1));
+    expect(s().phoneReader).toBeNull();
+  });
+
   it('the back control returns to the reader\'s subject, or to a row of the table with the reader closed', async () => {
     const p = s().createPractice('P');
     const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043'), ccArticle('1218')]);

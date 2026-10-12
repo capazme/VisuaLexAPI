@@ -808,7 +808,7 @@ const appStore = createStore<AppState>()(
                 set((state) => {
                     state.practices.push(created);
                     if (options.activate !== false || !state.practices.some((p) => p.id === state.activePracticeId)) {
-                        state.activePracticeId = created.id;
+                        activate(state, created.id);
                     }
                 });
                 return created.id;
@@ -855,7 +855,7 @@ const appStore = createStore<AppState>()(
             setActivePractice: (id) => {
                 const { practices, activePracticeId } = get();
                 if (activePracticeId === id || !practices.some((p) => p.id === id)) return;
-                set((state) => { state.activePracticeId = id; });
+                set((state) => { activate(state, id); });
             },
 
             reorderPractices: (fromIndex, toIndex) => {
@@ -884,7 +884,8 @@ const appStore = createStore<AppState>()(
                 }
                 set((state) => {
                     state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
-                    state.activePracticeId = landing.activePracticeId;
+                    if (landing.activePracticeId !== null) activate(state, landing.activePracticeId);
+                    else state.activePracticeId = null;
                     if (shown) revealRow(state, id, actId, practiceArticleKey(shown));
                 });
                 return { practiceId: id, actId };
@@ -896,7 +897,9 @@ const appStore = createStore<AppState>()(
                 const { acts, actId } = addArticles(landing.practice.acts, norma, [], uuidv4);
                 set((state) => {
                     state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
-                    state.activePracticeId = id;
+                    activate(state, id);
+                    // The index is the act's drawer, in the column: the phone's reader gives way to it.
+                    state.phoneReader = null;
                     state.structureWindow.blockId = actId;
                 });
                 return actId;
@@ -1072,7 +1075,8 @@ const appStore = createStore<AppState>()(
                 set((state) => {
                     // a practice landingPractice created is new and unfrozen: pushed, never one already stored
                     if (landing.practices !== before.practices) state.practices.push(landing.practice);
-                    state.activePracticeId = landing.activePracticeId;
+                    if (landing.activePracticeId !== null) activate(state, landing.activePracticeId);
+                    else state.activePracticeId = null;
                     const practice = state.practices.find((p) => p.id === practiceId) as Practice;
                     const entry = practice.decisions.find((d) => d.id === decisionId);
                     if (!entry) {
@@ -1085,7 +1089,7 @@ const appStore = createStore<AppState>()(
                         entry.label = formatDecisionShort(reference);
                     }
                     if (options.open === false) return;
-                    state.activePracticeId = practiceId;
+                    activate(state, practiceId);
                     if (options.reader) {
                         state.phoneReader = { practiceId, ref: readerRef };
                     } else if (options.beside === false) {
@@ -1178,7 +1182,7 @@ const appStore = createStore<AppState>()(
                 const shownId = beside === practice.beside && isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
                 if (beside === practice.beside && get().activePracticeId === practiceId && (!shownId || get().windowFocusRequest === shownId)) return;
                 set((state) => {
-                    state.activePracticeId = practiceId;
+                    activate(state, practiceId);
                     (state.practices.find((p) => p.id === practiceId) as Practice).beside = beside;
                     if (shownId) state.windowFocusRequest = shownId;
                 });
@@ -1448,7 +1452,7 @@ const appStore = createStore<AppState>()(
                             shown?.practiceId === landing.practice.id && shown.ref.id === ref.id) return ref.id;
                         set((state) => {
                             if (landing.practices !== before.practices) state.practices.push(landing.practice);
-                            state.activePracticeId = landing.practice.id;
+                            activate(state, landing.practice.id);
                             state.phoneReader = { practiceId: landing.practice.id, ref };
                         });
                         return ref.id;
@@ -1462,7 +1466,7 @@ const appStore = createStore<AppState>()(
                     }
                     set((state) => {
                         if (landing.practices !== before.practices) state.practices.push(landing.practice);
-                        state.activePracticeId = landing.practice.id;
+                        activate(state, landing.practice.id);
                         (state.practices.find((p) => p.id === landing.practice.id) as Practice).beside = beside;
                         // Asked again, the window already showing the topic takes focus.
                         if (alreadyShown) state.windowFocusRequest = shownId;
@@ -3814,6 +3818,13 @@ function foldedBy(state: AppState, practiceId: string, subject: PracticeSubject)
     return practice ? shownWindowId(practice.beside, besideRefFor(subject)) : undefined;
 }
 
+/** Makes a practice the one on screen. The phone's reader belongs to one practice: another one
+ *  coming on screen takes the reader off, in the same update (T19). */
+function activate(state: AppState, practiceId: string): void {
+    if (state.phoneReader && state.phoneReader.practiceId !== practiceId) state.phoneReader = null;
+    state.activePracticeId = practiceId;
+}
+
 /** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. The row moves
  *  to the end of `practiceRows`, open already or not: the act's last row there is the one its block
  *  reads from (Studio, the arrows). A row folded because a window shows its article is not scrolled
@@ -3824,6 +3835,8 @@ function revealRow(state: AppState, practiceId: string, actId: string, articleKe
     if (act) act.isCollapsed = false;
     delete state.practiceRows[rowKey];
     state.practiceRows[rowKey] = true;
+    // A row is revealed in the table: the phone's reader, which replaces the column, gives way.
+    state.phoneReader = null;
     const window_ = foldedBy(state, practiceId, { kind: 'article', actId, articleKey });
     if (window_) state.windowFocusRequest = window_;
     else state.pendingReveal = { practiceId, rowKey };
@@ -3933,6 +3946,7 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
 function revealDecisionRow(state: AppState, practiceId: string, decisionId: string): void {
     const rowKey = decisionRowKey(practiceId, decisionId);
     state.practiceRows[rowKey] = true;
+    state.phoneReader = null;
     const window_ = foldedBy(state, practiceId, { kind: 'decision', decisionId });
     if (window_) state.windowFocusRequest = window_;
     else state.pendingReveal = { practiceId, rowKey };

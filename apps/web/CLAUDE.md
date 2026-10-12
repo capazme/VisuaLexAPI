@@ -289,7 +289,7 @@ the first act's heading, an open row's toolbar, each marked `data-pinned-head` �
 header, so never over a control; a dragged place wins; a tool held over the table carries
 `data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
 is not in the session's cache); reaching an undrawn match opens its row with its practice made active
-(`revealPracticeRow`, `revealPracticeDecision`; on a phone the full-screen reader is closed first, so the row is on screen — a match in the reader's own subject is drawn and needs nothing), and the window recomputes on a practice switched, a
+(`revealPracticeRow`, `revealPracticeDecision`; on a phone the reveal's own update takes the full-screen reader off, so the row is on screen — a match in the reader's own subject is drawn and needs nothing), and the window recomputes on a practice switched, a
 row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
 (it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
@@ -1035,7 +1035,10 @@ meant to stay split; add new features as new files, not inside the shells:
   is session state of its own, never saved and never the desktop's `beside`: `openPhoneReader`,
   `closePhoneReader`; on a phone `openDecisionTab` and `openDecisionSearchTab` set it and touch
   neither `beside` nor the rows, the way back sets or clears it, a screen that widens clears it
-  (`SearchPanel`), a reload starts on the table;
+  (`SearchPanel`), a reload starts on the table; every reveal of a row, the act's index and any other
+  practice coming on screen (`activate`) clear it in their own update, and it is drawn only for the
+  active practice. The practice list (a tap on the name) has «⋯» per practice: Rinomina, and Chiudi la
+  pratica behind the chip's danger confirmation;
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths

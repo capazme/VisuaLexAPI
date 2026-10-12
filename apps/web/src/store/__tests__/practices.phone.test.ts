@@ -108,7 +108,7 @@ describe('openPhoneReader / closePhoneReader', () => {
 
     const b = withArticles();
     s().openPhoneReader(b.practiceId, b.ref5);
-    s().closePractice(s().createPractice('Altra')); // another practice: the reader stays
+    s().closePractice(s().createPractice('Altra', { activate: false })); // another practice: the reader stays
     expect(s().phoneReader).not.toBeNull();
     s().closeAllPractices();
     expect(s().phoneReader).toBeNull();
@@ -149,15 +149,12 @@ describe('a decision and a topic search on a phone', () => {
   it('the decision a topic search\'s list opens lands in the search\'s practice and replaces the search in the reader', () => {
     const first = s().createPractice('Prima');
     const topic = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
-    const second = s().createPractice('Seconda');
-    expect(s().activePracticeId).toBe(second);
-    // the reader's list names the reader's subject as its place: the practice that holds the reader, not the active one
     expect(s().phoneReader).toMatchObject({ practiceId: first, ref: { id: topic } });
     s().openDecisionTab(REF_A, { besideTabId: topic });
     expect(practice(first).decisions).toHaveLength(1);
-    expect(practice(second).decisions).toEqual([]);
     expect(s().activePracticeId).toBe(first);
     expect(s().phoneReader?.ref.kind).toBe('decision');
+    expect(practice(first).beside).toEqual([]);
   });
 
   it('openDecisionSearchTab sets the reader on a topic search, beside nothing, once per query', () => {
@@ -255,6 +252,86 @@ describe('the way back on a phone (spec §6.3)', () => {
     s().closeBeside(practiceId, ref5.id);
     s().popReadingBack();
     expect(practice(practiceId).beside).toEqual([ref5]);
+    expect(s().phoneReader).toBeNull();
+  });
+});
+
+describe('the reader gives way to every reveal and to another practice, in the same update (gotcha 14)', () => {
+  /** What one write of the store showed: the reader, the reveal waiting, the practice on screen. */
+  function watch() {
+    const seen: Array<{ reader: boolean; reveal: boolean; active: string | null }> = [];
+    const stop = appStore.subscribe((st) => seen.push({ reader: st.phoneReader !== null, reveal: st.pendingReveal !== null, active: st.activePracticeId }));
+    return { seen, stop };
+  }
+  function readerOnSeven() {
+    const w = withArticles();
+    s().openPhoneReader(w.practiceId, w.ref7);
+    return w;
+  }
+
+  it('revealPracticeRow / revealPracticeArticle / revealPracticeDecision', () => {
+    const w = readerOnSeven();
+    const { decisionId } = s().openDecision(REF_A, { practiceId: w.practiceId, open: false });
+    for (const reveal of [
+      () => s().revealPracticeRow(w.practiceId, w.actId, practiceArticleKey(article(L24, '5'))),
+      () => s().revealPracticeArticle(w.practiceId, w.actId, '5'),
+      () => s().revealPracticeDecision(w.practiceId, decisionId),
+    ]) {
+      s().openPhoneReader(w.practiceId, w.ref7);
+      s().takeReveal(w.practiceId);
+      const { seen, stop } = watch();
+      expect(reveal()).toBe(true);
+      stop();
+      expect(seen).toEqual([{ reader: false, reveal: true, active: w.practiceId }]); // one write: never the reveal under the reader
+    }
+  });
+
+  it('a search result that reveals a row (addArticlesToPractice with `reveal`) shows the table', () => {
+    const w = readerOnSeven();
+    const { seen, stop } = watch();
+    s().addArticlesToPractice(w.practiceId, L24, [article(L24, '9')], { reveal: 'first' });
+    stop();
+    expect(seen).toEqual([{ reader: false, reveal: true, active: w.practiceId }]);
+  });
+
+  it('rows added without a reveal leave the reader where it is', () => {
+    const w = readerOnSeven();
+    s().addArticlesToPractice(w.practiceId, L24, [article(L24, '9')]);
+    expect(s().phoneReader).toMatchObject({ practiceId: w.practiceId });
+  });
+
+  it('addActIndexToPractice (the index is the act\'s drawer, in the column) takes the reader off', () => {
+    const w = readerOnSeven();
+    s().addActIndexToPractice(w.practiceId, L24);
+    expect(s().phoneReader).toBeNull();
+    expect(s().structureWindow.blockId).toBe(w.actId);
+  });
+
+  it('another practice made active (setActivePractice, createPractice, a landing elsewhere) takes it off; the same one does not', () => {
+    const w = readerOnSeven();
+    const other = s().createPractice('Altra', { activate: false });
+    s().setActivePractice(w.practiceId); // already the one on screen
+    expect(s().phoneReader).not.toBeNull();
+    s().setActivePractice(other);
+    expect(s().phoneReader).toBeNull();
+
+    s().openPhoneReader(w.practiceId, w.ref7);
+    s().createPractice('Terza'); // activates itself
+    expect(s().phoneReader).toBeNull();
+    expect(s().activePracticeId).not.toBe(w.practiceId);
+
+    s().openPhoneReader(w.practiceId, w.ref7);
+    s().openDecision(REF_A, { practiceId: other, open: true, beside: false }); // lands in `other`, active
+    expect(s().phoneReader).toBeNull();
+  });
+
+  it('the dossier\'s «Apri tutto» (a new active practice) shows its table, not the old reader', async () => {
+    const w = readerOnSeven();
+    const { searchesIntoOnePractice } = await import('../../components/features/dossier/openInPractice');
+    searchesIntoOnePractice({ id: 'd', title: 'Ricorso', createdAt: '', tags: [], items: [] }, [], true);
+    expect(s().practices.map((p) => p.label)).toContain('Ricorso');
+    expect(s().practices.find((p) => p.id === s().activePracticeId)?.label).toBe('Ricorso');
+    expect(s().activePracticeId).not.toBe(w.practiceId);
     expect(s().phoneReader).toBeNull();
   });
 });

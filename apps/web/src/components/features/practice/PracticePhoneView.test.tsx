@@ -41,6 +41,7 @@ import { appStore } from '../../../store/useAppStore';
 import { PracticePhoneView } from './PracticePhoneView';
 import { L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
+import { CLOSE_PRACTICE_MESSAGE } from './practiceView';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 12345, anno: 2020 };
 
@@ -225,7 +226,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
   });
 
-  it('a reload lands on the table: the reader is session state, not saved, whatever windows the desktop had', () => {
+  it('a reload lands on the table: the reader is session state, not saved, whatever windows the desktop had', async () => {
     const { practiceId, actId, articleKey, decisionId } = withArticleAndDecision();
     const two = [
       besideRefFor({ kind: 'article', actId, articleKey }),
@@ -233,15 +234,57 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     ];
     appStore.setState((st) => ({ practices: st.practices.map((p) => ({ ...p, beside: two })) }));
     act(() => { s().openPhoneReader(practiceId, two[0]); });
-    const saved = appStore.persist.getOptions().partialize?.(s()) ?? {};
-    expect(saved).not.toHaveProperty('phoneReader');
-    // what a fresh load starts from: no reader
-    act(() => { appStore.setState({ phoneReader: null }); });
-    render(view());
+    expect(s().phoneReader).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem('visualex-storage') ?? '{}').state).not.toHaveProperty('phoneReader');
+
+    // a reload: the store is built again from what the browser saved
+    vi.resetModules();
+    const fresh = await import('../../../store/useAppStore');
+    const { PracticePhoneView: Reloaded } = await import('./PracticePhoneView');
+    expect(fresh.appStore.getState().phoneReader).toBeNull();
+    expect(fresh.appStore.getState().practices[0].beside).toHaveLength(2);
+    render(<Reloaded onViewPdf={vi.fn()} onCrossReference={vi.fn()} streaming={null} />);
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
     expect(screen.queryByTestId('reading-full-screen')).toBeNull();
     expect(screen.queryByText(/Aperto accanto/)).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Espandi/ })).toHaveLength(2);
+    localStorage.removeItem('visualex-storage');
+  });
+
+  it('a reader whose practice is not the one on screen is not drawn', () => {
+    const { practiceId, articleKey, actId } = withArticleAndDecision();
+    const other = s().createPractice('Altra');
+    appStore.setState({ phoneReader: { practiceId, ref: besideRefFor({ kind: 'article', actId, articleKey }) }, activePracticeId: other });
+    render(view());
+    expect(screen.queryByTestId('reading-full-screen')).toBeNull();
+    expect(title()).toBe('Altra');
+  });
+
+  it('the saved scroll belongs to its practice: another practice comes back from its reader at the top', () => {
+    const a = withArticleAndDecision();
+    const b = s().createPractice('Seconda');
+    const { actId: actB } = s().addArticlesToPractice(b, L241, [article(L241, '2')]);
+    const refB = besideRefFor({ kind: 'article', actId: actB, articleKey: practiceArticleKey(article(L241, '2')) });
+    s().setActivePractice(a.practiceId);
+    const { scrollTo, top } = scrolled(view());
+    scrollTo(420);
+    // practice A's reader opens, then practice B comes on screen (which takes the reader off): not A's place
+    act(() => { s().openPhoneReader(a.practiceId, besideRefFor({ kind: 'article', actId: a.actId, articleKey: a.articleKey })); });
+    scrollTo(0);
+    act(() => { s().openPhoneReader(b, refB); });
+    act(() => { s().closePhoneReader(); });
+    expect(top()).toBe(0);
+  });
+
+  it('the save\'s picker is not lost when the reader opens: it is mounted outside the column the reader replaces', () => {
+    const { practiceId, articleKey, actId } = withArticleAndDecision();
+    render(view());
+    fireEvent.click(screen.getByRole('button', { name: /^Altre azioni per la pratica/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi a un dossier…' }));
+    expect(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).toBeInTheDocument();
+    act(() => { s().openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })); });
+    expect(screen.getByTestId('reading-full-screen')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Aggiungi a un dossier' })).toBeInTheDocument();
   });
 
   it('a tap on the name lists the practices (44 px entries): it switches, and «Nuova pratica» creates one', async () => {
@@ -267,6 +310,53 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(s().practices.map((p) => p.label)).toEqual(['Prima', 'Seconda', 'Nuova pratica']);
     expect(s().activePracticeId).toBe(s().practices[2].id);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('each practice in the list has «⋯» (44 px) to rename it, in place', async () => {
+    const first = s().createPractice('Prima');
+    render(view());
+    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
+    const dialog = screen.getByRole('dialog', { name: 'Le tue pratiche' });
+    const more = within(dialog).getByRole('button', { name: 'Altre azioni per la pratica Prima' });
+    expect(more).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    fireEvent.click(more);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rinomina' }));
+    const input = within(dialog).getByRole('textbox', { name: 'Nome della pratica' });
+    fireEvent.change(input, { target: { value: 'Rossi c. Bianchi' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(s().practices.find((p) => p.id === first)?.label).toBe('Rossi c. Bianchi');
+    expect(s().practices.find((p) => p.id === first)?.labelIsCustom).toBe(true);
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Rossi c\. Bianchi/ })).toBeInTheDocument());
+  });
+
+  it('«Chiudi la pratica» in the list asks first (the danger confirmation), then closes it with its reader if it had one', async () => {
+    const { practiceId, articleKey, actId } = withArticleAndDecision();
+    const keep = s().createPractice('Resta');
+    s().setActivePractice(practiceId);
+    render(view());
+    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
+    const label = s().practices.find((p) => p.id === practiceId)?.label ?? '';
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: `Altre azioni per la pratica ${label}` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
+    const confirm = await screen.findByRole('alertdialog');
+    expect(confirm).toHaveTextContent(CLOSE_PRACTICE_MESSAGE);
+    expect(s().practices).toHaveLength(2); // nothing closed yet
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Chiudi la pratica' }));
+    expect(s().practices.map((p) => p.id)).toEqual([keep]);
+    expect(s().activePracticeId).toBe(keep);
+    void articleKey; void actId;
+  });
+
+  it('declining the confirmation closes nothing', async () => {
+    withArticleAndDecision();
+    render(view());
+    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
+    const label = s().practices[0].label;
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: `Altre azioni per la pratica ${label}` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
+    const confirm = await screen.findByRole('alertdialog');
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Annulla' }));
+    expect(s().practices).toHaveLength(1);
   });
 
   it('no extracted article is drawn, and no topic band: a practice with only a desktop window is empty here', () => {

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Layers, MoreHorizontal, Plus } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Layers, MoreHorizontal, Pencil, Plus, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -7,11 +7,12 @@ import { cn } from '../../../lib/utils';
 import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { Modal } from '../../ui/Modal';
 import { MenuButton } from '../../ui/MenuButton';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { PracticeColumn } from './PracticeColumn';
 import { ReadingFullScreen } from './ReadingFullScreen';
-import { PracticeEmpty, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
-import { fromPracticePair, practicePair, scrollParentOf } from './practiceView';
-import { usePracticeSaveActions } from './usePracticeSaveActions';
+import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
+import { CLOSE_PRACTICE_MESSAGE, fromPracticePair, practicePair, scrollParentOf } from './practiceView';
+import { usePracticeSaveActions, type PracticeSaveActions } from './usePracticeSaveActions';
 
 export interface PracticePhoneViewProps {
   onViewPdf: (urn: string) => void;
@@ -43,8 +44,13 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
   const activePracticeId = useAppStore((s) => s.activePracticeId);
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
   const setActivePractice = useAppStore((s) => s.setActivePractice);
-  const readerOpen = useAppStore((s) => s.phoneReader !== null && s.practices.some((p) => p.id === s.phoneReader?.practiceId));
+  // The reader is drawn for the practice on screen only: one whose practice is not the active one is stale.
+  const readerOpen = useAppStore((s) => s.phoneReader !== null && s.phoneReader.practiceId === s.activePracticeId &&
+    s.practices.some((p) => p.id === s.phoneReader?.practiceId));
   const [listing, setListing] = useState(false);
+  // The save's picker and toast belong to the view, not to the column the reader replaces: an outcome
+  // arriving while the reader is open is not lost.
+  const save = usePracticeSaveActions(practice?.id ?? '');
 
   const list = practices.map(fromPracticePair);
   const index = list.findIndex((p) => p.id === activePracticeId);
@@ -53,23 +59,28 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
     if (target) setActivePractice(target.id);
   };
 
-  // The column's scroll position (the page's content scroller) is kept while it is drawn and given back
-  // when the reader closes — unless a row is waiting to be revealed, which scrolls to itself.
+  // The column's scroll position (the page's content scroller) is kept, with its practice, while the
+  // column is drawn and given back when the reader closes on the same practice — unless a row is
+  // waiting to be revealed, which scrolls to itself.
   const rootRef = useRef<HTMLDivElement>(null);
-  const lastTop = useRef(0);
-  const restore = useRef(false);
+  const lastTop = useRef<{ practiceId: string | null; top: number }>({ practiceId: null, top: 0 });
+  const restore = useRef<string | null>(null);
+  const shownPractice = useRef(activePracticeId);
+  // (declared before the effect that reads it: layout effects run in order)
+  useLayoutEffect(() => { shownPractice.current = activePracticeId; });
   useLayoutEffect(() => {
     if (readerOpen) {
-      restore.current = true;
+      restore.current = shownPractice.current;
       return;
     }
     const scroller = rootRef.current ? scrollParentOf(rootRef.current) : null;
     if (!scroller) return;
     let frame: number | null = null;
-    if (restore.current) {
-      restore.current = false;
-      if (!appStore.getState().pendingReveal) {
-        const target = lastTop.current;
+    if (restore.current !== null) {
+      const kept = restore.current;
+      restore.current = null;
+      if (kept === shownPractice.current && lastTop.current.practiceId === kept && !appStore.getState().pendingReveal) {
+        const target = lastTop.current.top;
         scroller.scrollTop = target;
         // A row's reading surface may still be settling: once more, a frame later.
         frame = requestAnimationFrame(() => {
@@ -77,7 +88,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
         });
       }
     }
-    const onScroll = () => { lastTop.current = scroller.scrollTop; };
+    const onScroll = () => { lastTop.current = { practiceId: shownPractice.current, top: scroller.scrollTop }; };
     scroller.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       scroller.removeEventListener('scroll', onScroll);
@@ -86,7 +97,14 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
   }, [readerOpen]);
 
   if (list.length === 0) return null;
-  if (readerOpen) return <ReadingFullScreen onCrossReference={onCrossReference} />;
+  if (readerOpen) {
+    return (
+      <>
+        <ReadingFullScreen onCrossReference={onCrossReference} />
+        {save.overlay}
+      </>
+    );
+  }
 
   return (
     <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
@@ -151,7 +169,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
       </div>
       {practice && (
         <div className="space-y-4 p-4">
-          <PhonePracticeActions practice={practice} />
+          <PhonePracticeActions practice={practice} save={save} />
           <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
           {practice.acts.length === 0 && practice.decisions.length === 0 ? (
             <PracticeEmpty />
@@ -161,14 +179,14 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
         </div>
       )}
       <PracticeList isOpen={listing} onClose={() => setListing(false)} />
+      {save.overlay}
     </div>
   );
 }
 
 /** The count line, «Salva come dossier» and its «⋯» (spec §7, carry-over 15): the desktop header's
  *  save actions, on a phone. The toast is portalled to the document in the toast band. */
-function PhonePracticeActions({ practice }: { practice: Practice }) {
-  const save = usePracticeSaveActions(practice.id);
+function PhonePracticeActions({ practice, save }: { practice: Practice; save: PracticeSaveActions }) {
   const countLine = practiceCountLine(practiceCounts(practice));
   return (
     <div className="flex items-center gap-2">
@@ -189,41 +207,32 @@ function PhonePracticeActions({ practice }: { practice: Practice }) {
       >
         <MoreHorizontal size={18} aria-hidden />
       </MenuButton>
-      {save.overlay}
     </div>
   );
 }
 
-/** A tap on the practice's name: every practice to switch to, and «+ Nuova pratica» (spec §8). */
+/** A tap on the practice's name: every practice to switch to, each with «⋯» (Rinomina, Chiudi la
+ *  pratica — the bar's chip actions, the same confirmation), and «+ Nuova pratica» (spec §8). */
 function PracticeList({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const practices = useAppStore((s) => s.practices);
-  const activePracticeId = useAppStore((s) => s.activePracticeId);
-  const setActivePractice = useAppStore((s) => s.setActivePractice);
   const createPractice = useAppStore((s) => s.createPractice);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const row =
     'flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:hover:bg-primary-900/10';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm" title="Le tue pratiche" icon={<Layers size={18} />} variant="info" contentClassName="p-0">
       <div className="space-y-1 px-2 py-2">
-        {practices.map((p) => {
-          const counts = practiceCountLine(practiceCounts(p));
-          return (
-            <button
-              key={p.id}
-              type="button"
-              aria-current={p.id === activePracticeId ? 'true' : undefined}
-              onClick={() => {
-                setActivePractice(p.id);
-                onClose();
-              }}
-              className={cn(row, p.id === activePracticeId && 'bg-primary-50 dark:bg-primary-900/20')}
-            >
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">{p.label}</span>
-              {counts && <span className="max-w-[45%] shrink-0 truncate text-xs text-slate-400 dark:text-slate-500">{counts}</span>}
-            </button>
-          );
-        })}
+        {practices.map((p) => (
+          <PracticeListRow
+            key={p.id}
+            practice={p}
+            rowClass={row}
+            editing={editingId === p.id}
+            onEditingChange={(editing) => setEditingId(editing ? p.id : null)}
+            onPicked={onClose}
+          />
+        ))}
         <button
           type="button"
           onClick={() => {
@@ -237,5 +246,72 @@ function PracticeList({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
         </button>
       </div>
     </Modal>
+  );
+}
+
+function PracticeListRow({ practice, rowClass, editing, onEditingChange, onPicked }: {
+  practice: Practice;
+  rowClass: string;
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
+  onPicked: () => void;
+}) {
+  const isActive = useAppStore((s) => s.activePracticeId === practice.id);
+  const setActivePractice = useAppStore((s) => s.setActivePractice);
+  const renamePractice = useAppStore((s) => s.renamePractice);
+  const closePractice = useAppStore((s) => s.closePractice);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const counts = practiceCountLine(practiceCounts(practice));
+
+  return (
+    <div className="flex items-center gap-1">
+      {editing ? (
+        <div className="flex min-h-[44px] min-w-0 flex-1 items-center px-1">
+          <PracticeNameInput
+            initial={practice.label}
+            className="min-h-[44px] w-full text-sm font-medium"
+            onDone={(name) => {
+              onEditingChange(false);
+              if (name !== null) renamePractice(practice.id, name);
+            }}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          aria-current={isActive ? 'true' : undefined}
+          onClick={() => {
+            setActivePractice(practice.id);
+            onPicked();
+          }}
+          className={cn(rowClass, 'min-w-0 flex-1', isActive && 'bg-primary-50 dark:bg-primary-900/20')}
+        >
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">{practice.label}</span>
+          {counts && <span className="max-w-[45%] shrink-0 truncate text-xs text-slate-400 dark:text-slate-500">{counts}</span>}
+        </button>
+      )}
+      <MenuButton
+        label={`Altre azioni per la pratica ${practice.label}`}
+        triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+        items={[
+          { label: 'Rinomina', icon: Pencil, onSelect: () => onEditingChange(true) },
+          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => setConfirmClose(true) },
+        ]}
+      >
+        <MoreHorizontal size={18} aria-hidden />
+      </MenuButton>
+      <ConfirmDialog
+        open={confirmClose}
+        variant="danger"
+        title={`Chiudere la pratica «${practice.label}»?`}
+        message={CLOSE_PRACTICE_MESSAGE}
+        confirmLabel="Chiudi la pratica"
+        onConfirm={() => {
+          setConfirmClose(false);
+          closePractice(practice.id);
+        }}
+        onCancel={() => setConfirmClose(false)}
+      />
+    </div>
   );
 }
