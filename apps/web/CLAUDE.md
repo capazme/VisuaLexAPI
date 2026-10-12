@@ -53,8 +53,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
   user drops in — parsed in the browser, never uploaded — each opening the
   reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
-  (`DecisionView`, the body of a decision wherever it is drawn; `DecisionTabView`,
-  its workspace tab and the phone view; `DecisionAddress`, the `/sentenze/…` route element;
+  (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
+  decision read in its row (and, from P4, its window), over `useDecisionAnswer` (the fetch, the
+  candidates, the notices) and `DecisionAnswerBody`; `DecisionTabView`, its workspace tab and the
+  phone view, a thin wrapper over the same body until P6; `DecisionAddress`, the `/sentenze/…` route element;
   `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
@@ -114,7 +116,8 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   decision (`decision_key`, never both): `DecisionTabView` records a found decision once per
   opening: the key it sent is kept on the tab (`historyRecordedKey`, persisted with it), so a
   remount, a minimise and restore or a reload never records again, while a new tab does (the
-  copy on screen only) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab is marked
+  copy on screen only); a practice's entry does the same through `DecisionEntryView`, the key kept
+  on the entry (`markDecisionEntryRecorded`) and `DecisionHistoryRow` reopens it with `openDecisionTab`. The tab or the entry is marked
   before the request, so a failed request is not retried (not even after a reload) and the failure
   is logged: the history is a convenience.
 
@@ -246,7 +249,13 @@ popovers are portalled outside it, and VoiceOver hides what lies outside a modal
 `mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
 with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
 session-only) and «Tutte le schede». A phone leaves out loose articles: its column draws
-norm blocks only. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
+norm blocks only. Behind `VITE_FEATURE_PRACTICE_TABLE` the scopes are «Questa pratica» (the active
+practice, on both breakpoints: every article of every act, its row open or closed, then its decisions
+newest first) and «Tutte le pratiche» (the bar's order, each place named with its practice); a row's
+root registers under its practice's id with the same keys; a decision never read counts nothing (it
+is not in the session's cache); reaching an undrawn match opens its row with its practice made active
+(`revealPracticeRow`, `revealPracticeDecision`), and the window recomputes on a practice switched, a
+row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
 (it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
 26: use `useIsDesktop`). Esc closes it and returns focus. Text roots register through
@@ -484,10 +493,13 @@ destination, and it has no keyboard shortcut on purpose: every natural
 combination for "back" already belongs to the browser. Behind `VITE_FEATURE_PRACTICE_TABLE` the
 stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
 practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
+the row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
+so a past text comes back as itself), else found through `findPracticeArticle`,
 live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
-practice made active, the row revealed or the window reopened); any other entry is kept as given.
-Until P3 draws the practices, an entry still live in a tab stays a tab entry even with the flag on
-(a seeded practice shares its tab's id); P3 drops that rule.
+practice made active, the row revealed or the window reopened; `ReadingBackControl` tells its
+`onNavigated` the practice's id); any other entry is kept as given. An entry naming a practice is the
+practice's even while a tab of the same id is still stored (a seeded practice keeps its tab's id):
+with the flag on the practices are what is drawn, and `moveActToPractice` rewrites only practice entries.
 
 **Decisions in the workspace.** A court decision is a workspace tab of its own: `WorkspaceTab.view`
 (`{ kind: 'decision', reference }`, drawn by `workspace/renderTabView.tsx` on the desktop panel and the
@@ -865,7 +877,8 @@ negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80,
-overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
+`bottomNotice` 85 — MERL-T's consent prompt, over the dock and the bar of practices —, overlay band
+1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
 or Cmd/Ctrl+F opens the find window hidden under it.
@@ -945,6 +958,38 @@ meant to stay split; add new features as new files, not inside the shells:
   lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
   "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
   workspace is persisted).
+- `features/practice/` — the norm-tab redesign, behind `VITE_FEATURE_PRACTICE_TABLE` (spec
+  `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
+  header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, the topic
+  searches' band `PracticeTopicSearches`, then `PracticeColumn`); `PracticeColumn` (the acts, dragged
+  into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act: its sticky
+  heading with Studio, Struttura, PDF and «⋯», the index line of its rows, the rows; the structure
+  window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
+  only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
+  `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»);
+  `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place, a «⋯» per chip);
+  `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column);
+  `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
+  the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
+  component files). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
+  (pure: the items in table order, each article from its own `norma_data`, a code's search and index
+  copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
+  wait for the items to settle and count them; one save at a time per practice, `usePracticeSaving`),
+  `usePracticeSaveActions` (the header's button, the «⋯» entries, the picker and the outcome's toast,
+  portalled in the toast band: inside the bar a `fixed` child would be placed against it, gotchas 22
+  and 26) and `PracticeDossierPicker` (a `ui/Modal`). Three CSS variables carry measured heights:
+  `--practice-head` (the act block's heading, sticky from `md` up over the open rows' toolbars
+  (`Z_INDEX.stickyHead`); on a phone it wraps and scrolls with the block, and the variable is 0; the
+  rows' scroll margin reads it, and an open row passes it on as `--reading-toolbar-top`, which
+  `ReadingToolbar` reads with a `0px` fallback, so the toolbar pins under the heading and is unchanged
+  elsewhere) and `--practice-bar-height` (the bar's
+  height, set by `SearchPanel` on the workspace area: the column's bottom padding keeps its last row
+  clear of the bar).
+  `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with
+  the flag off none of it is loaded; with it on, searches, the index, decisions, topic searches and
+  the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread, identified
+  from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
+  the practices.
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
   `NormaChangesSection.tsx` (see History above).
 - `features/documents/` — `DocumentReviewPage.tsx` only.

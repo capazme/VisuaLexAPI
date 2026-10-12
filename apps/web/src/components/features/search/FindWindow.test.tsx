@@ -478,3 +478,45 @@ describe('FindWindow — on a phone', () => {
     }
   });
 });
+
+describe('FindWindow over the practices (flag on, spec §6.6)', () => {
+  const s = () => appStore.getState();
+  beforeEach(() => {
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
+    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null });
+  });
+
+  it('names its scopes «Questa pratica» and «Tutte le pratiche», and names the practice of a match in another', async () => {
+    const other = s().createPractice('Appalti');
+    s().addArticlesToPractice(other, { tipo_atto: 'codice civile', data: '' }, [article(N2, 'un fatto altrove')]);
+    const here = s().createPractice('Responsabilità');
+    s().addArticlesToPractice(here, { tipo_atto: 'codice civile', data: '' }, [article(N1, 'un fatto qui')]);
+    render(<FindWindow />);
+    act(() => openFindWindow());
+    expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
+    typeQuery('fatto');
+    await settle();
+    expect(counter()).toHaveTextContent('1 di 1');
+    fireEvent.click(screen.getByRole('button', { name: 'Tutte le pratiche' }));
+    await settle();
+    expect(counter()).toHaveTextContent(/di 2/);
+    act(() => screen.getByRole('button', { name: 'Risultato successivo' }).click());
+    expect(screen.getByTestId('find-where')).toHaveTextContent(/· (Appalti|Responsabilità)$/);
+  });
+
+  it('the magnifier of a row asks for its practice: that practice becomes the one searched', async () => {
+    const here = s().createPractice('Responsabilità');
+    s().addArticlesToPractice(here, { tipo_atto: 'codice civile', data: '' }, [article(N1, 'un fatto qui')]);
+    s().createPractice('Altra');
+    render(<FindWindow />);
+    act(() => openFindWindow({ tabId: here, targetKey: keyOf(N1) }));
+    expect(s().activePracticeId).toBe(here);
+    typeQuery('fatto');
+    await settle();
+    expect(counter()).toHaveTextContent('1 di 1');
+  });
+});

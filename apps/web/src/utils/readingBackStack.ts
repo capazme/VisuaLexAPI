@@ -28,6 +28,10 @@ export interface ReadingBackEntry {
   blockId: string;
   /** `uniqueArticleId` encoding — see `utils/articleIds.ts`. */
   articleId: string;
+  /** A practice's row: its `practiceArticleKey`, version included, so the way back to a past text
+   *  reveals that row, never the text in force (carry-over ruling 12). Read only for an entry kept as
+   *  a practice's; `articleId` names the row when no row holds this key. */
+  articleKey?: string;
   /** Human-readable destination, e.g. "Art. 2043 c.c.". Shown on the control. */
   label: string;
 }

@@ -18,7 +18,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
  */
 interface ReadingBackControlProps {
   /**
-   * Fired with the tab that was returned to. The mobile layout tracks the
+   * Fired with the tab that was returned to, or the practice (flag on). The mobile layout tracks the
    * visible tab in its own index rather than through the store's front-tab
    * ordering, so it needs telling; on desktop nothing has to listen.
    */
@@ -42,8 +42,13 @@ export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
 
   const handleBack = () => {
     const entry = popReadingBack();
-    // A practice's entry is walked back to by the store itself (spec §6.3); only the flag pushes one.
-    if (!entry || isPracticeBackEntry(entry)) return;
+    if (!entry) return;
+    // A practice's entry is walked back to by the store itself (spec §6.3: its practice made active,
+    // its row revealed); only the flag pushes one. The listener learns which practice.
+    if (isPracticeBackEntry(entry)) {
+      onNavigated?.(entry.practiceId);
+      return;
+    }
     bringTabToFront(entry.tabId);
     focusArticleInTab(entry.tabId, entry.articleId);
     onNavigated?.(entry.tabId);

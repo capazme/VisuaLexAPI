@@ -100,6 +100,17 @@ describe('DecisionReadingSurface', () => {
     ]);
   });
 
+  it('a host block names the place the way back returns to, inside the host (a decision row of a practice)', () => {
+    const { container } = render(
+      <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} hostTabId="practice-1" hostBlockId="decision-1" />,
+    );
+    fireEvent.click(container.querySelector('.citation-hover')!);
+    expect(appStore.getState().searchTrigger).toMatchObject({ besideTabId: 'practice-1' });
+    expect(appStore.getState().readingBackStack).toEqual([
+      { tabId: 'practice-1', blockId: 'decision-1', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
+    ]);
+  });
+
   it('without a host tab the norm opens by the ordinary search and no way back is recorded', () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
     fireEvent.click(container.querySelector('.citation-hover')!);

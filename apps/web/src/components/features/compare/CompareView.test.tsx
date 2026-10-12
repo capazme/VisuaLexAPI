@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CompareView } from './CompareView';
 import { appStore } from '../../../store/useAppStore';
 import { closeCompare, setCompareState } from '../../../hooks/useCompare';
@@ -84,5 +84,36 @@ describe('CompareView — over the workspace', () => {
     closeCompare();
     render(<CompareView />);
     expect(isWorkspaceCovered()).toBe(false);
+  });
+});
+
+describe('CompareView — the articles of the practices (flag on, spec §6.8)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    appStore.setState({ practices: [], activePracticeId: null });
+  });
+
+  it('lists every practice\'s articles, the text in force and the past text apart, each named with its practice', () => {
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
+    appStore.setState({
+      workspaceTabs: [tab('t1', 'Una tab', [normaBlock('n1', IN_FORCE)])] as never,
+      practices: [
+        { id: 'p1', label: 'Interessi', labelIsCustom: true, decisions: [], beside: [],
+          acts: [{ id: 'a1', key: 'codice civile', norma: NORMA, articles: [article(IN_FORCE), article(PAST)], isCollapsed: false }] },
+        { id: 'p2', label: 'Originale', labelIsCustom: true, decisions: [], beside: [],
+          acts: [{ id: 'a2', key: 'codice civile', norma: NORMA, articles: [article(ORIGINAL)], isCollapsed: false }] },
+      ],
+      activePracticeId: 'p1',
+    });
+    render(<CompareView />);
+    expect(pickerLabels()).toEqual([
+      'art. 1284 c.c.',
+      'art. 1284 c.c. — testo al 29/12/2007',
+      'art. 1284 c.c. — testo originale',
+    ]);
+    expect(within(leftPanel()).getAllByText('Interessi')).toHaveLength(2);
+    expect(within(leftPanel()).getByText('Originale')).toBeInTheDocument();
+    expect(within(leftPanel()).queryByText('Una tab')).toBeNull();
+    expect(within(leftPanel()).getByRole('button', { name: 'Dalle pratiche (3)' })).toBeInTheDocument();
   });
 });

@@ -20,7 +20,7 @@ import { decisionPath, formatDecisionShort, identityOf } from '../utils/decision
 import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
 import {
-    addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, decisionRowKey,
+    addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
     findPracticeArticle, holdsSubject, isStoredArticle, isValidView, labelOr, mergeDecisionEntries, practiceArticleKey,
     practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
     type PracticeDecision, type PracticeSubject,
@@ -376,6 +376,13 @@ interface AppState {
     /** The row of `act` holding `articleId` (`findPracticeArticle`): when found, opens and reveals it
      *  and returns true. The index pick, the arrows and a citation jump call it before fetching. */
     revealPracticeArticle: (practiceId: string, actId: string, articleId: string) => boolean;
+    /** The row `articleKey` names exactly (an index chip, a past text included): opens and reveals it,
+     *  its practice made active, in one step, and returns true; false, writing nothing, when the act
+     *  holds no such row. */
+    revealPracticeRow: (practiceId: string, actId: string, articleKey: string) => boolean;
+    /** The decision's row in «Giurisprudenza»: opens and reveals it, its practice made active, in one
+     *  step, and returns true; false, writing nothing, when the practice holds no such entry. */
+    revealPracticeDecision: (practiceId: string, decisionId: string) => boolean;
     /** Takes the row off the table (the act stays, even empty), with its open row, its reveal and a
      *  window showing it. */
     removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
@@ -385,9 +392,10 @@ interface AppState {
      * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
      * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
      * the open rows and the structure window follow. The windows of `from` that showed it close: their
-     * subject is now on the other table.
+     * subject is now on the other table. `to` as `{ newLabel }` creates that practice (not activated)
+     * and moves the act into it in the same write (gotcha 14): nothing is created if the move no-ops.
      */
-    moveActToPractice: (actId: string, fromPracticeId: string, toPracticeId: string) => void;
+    moveActToPractice: (actId: string, fromPracticeId: string, to: string | { newLabel: string }) => void;
     reorderActs: (practiceId: string, fromIndex: number, toIndex: number) => void;
     toggleActCollapse: (practiceId: string, actId: string) => void;
     /** Opens or closes a row (`articleRowKey`, `decisionRowKey`). */
@@ -410,6 +418,18 @@ interface AppState {
         options?: { practiceId?: string; beside?: boolean; open?: boolean; askerId?: string },
     ) => { practiceId: string; decisionId: string };
     /**
+     * Decisions whose identity is already known (a dossier's, opened with «Apri tutto», T17) into
+     * the practice `practiceId` names, in one write: identified, with the section, type and date of
+     * deposit the dossier kept, so «Salva come dossier» saves them back; closed and unread, as
+     * `open: false` adds them (nothing is fetched until one is opened). One entry per decision: one
+     * already there takes what the new one knows (`mergeDecisionEntries`). Nothing for a practice
+     * that is not open.
+     */
+    addKnownDecisions: (
+        practiceId: string,
+        decisions: Array<DecisionIdentity & { sezione?: string; tipo?: string; data_deposito?: string }>,
+    ) => void;
+    /**
      * The entry's decision was found: its identity, label, date of deposit, type and section, and
      * `identified`. When another entry of the practice already holds that decision (a candidate chosen
      * here), this one merges into it (`mergeDecisionEntries`): its window, its row, its reveal and the
@@ -425,6 +445,12 @@ interface AppState {
     ) => void;
     /** Takes the decision off «Giurisprudenza» with its window, its row and its reveal. */
     removePracticeDecision: (practiceId: string, decisionId: string) => void;
+    /**
+     * The entry's reading told the Cronologia `key` (PR 5's once per opening, carry-over ruling 13):
+     * kept on the entry and persisted with it, so a remount or a reload never records again, while a
+     * new entry of the decision does. The same key again writes nothing.
+     */
+    markDecisionEntryRecorded: (practiceId: string, decisionId: string, key: string) => void;
     /**
      * «Apri accanto» (§4.2): a window on `ref` beside the practice's table, which is made active.
      * Nothing moves when a window already shows that subject; with two, the oldest that is not the
@@ -555,7 +581,8 @@ interface AppState {
     // Reading Back-Stack Actions
     /**
      * Records a jump. With the flag on, an entry whose `tabId` names a practice is kept as a `table`
-     * entry (its `blockId` an act, the row found through `findPracticeArticle`, or a decision) and
+     * entry (its `blockId` an act, the row its `articleKey` names, else the one `findPracticeArticle`
+     * finds, or a decision) and
      * one whose `tabId` names a window as a `beside` entry (spec §6.3); any other is kept as given.
      */
     pushReadingBack: (entry: ReadingBackEntry) => void;
@@ -863,6 +890,25 @@ const appStore = createStore<AppState>()(
                 return true;
             },
 
+            revealPracticeRow: (practiceId, actId, articleKey) => {
+                const act = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (!act || !act.articles.some((a) => practiceArticleKey(a) === articleKey)) return false;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    revealRow(state, practiceId, actId, articleKey);
+                });
+                return true;
+            },
+
+            revealPracticeDecision: (practiceId, decisionId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return false;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    revealDecisionRow(state, practiceId, decisionId);
+                });
+                return true;
+            },
+
             removePracticeArticle: (practiceId, actId, articleKey) => {
                 const held = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
                 if (!held || !held.articles.some((a) => practiceArticleKey(a) === articleKey)) return;
@@ -889,9 +935,11 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            moveActToPractice: (actId, fromPracticeId, toPracticeId) => {
+            moveActToPractice: (actId, fromPracticeId, to) => {
+                const created = typeof to === 'string' ? null : newPractice(to.newLabel, false);
+                const toPracticeId = typeof to === 'string' ? to : (created as Practice).id;
                 if (fromPracticeId === toPracticeId) return;
-                const { practices } = get();
+                const practices = created ? [...get().practices, created] : get().practices;
                 const source = practices.find((p) => p.id === fromPracticeId);
                 const target = practices.find((p) => p.id === toPracticeId);
                 const act = source?.acts.find((a) => a.id === actId);
@@ -927,16 +975,13 @@ const appStore = createStore<AppState>()(
                         // Its owner is off screen when the target is not the active practice (as closePractice).
                         state.structureWindow.blockId = state.activePracticeId === toPracticeId ? nowId : null;
                     }
-                    // Carry-over rulings 4 and 9: the way back names the act where it now is.
+                    // Carry-over rulings 4 and 9: the way back names the act where it now is. A tab-shaped
+                    // entry is a tab's (ruling 14): since P3 a row's entry is always kept as a practice's.
                     for (const entry of state.readingBackStack) {
-                        if (isPracticeBackEntry(entry)) {
-                            if (entry.practiceId === fromPracticeId && entry.subject.kind === 'article' && entry.subject.actId === actId) {
-                                entry.practiceId = toPracticeId;
-                                entry.subject.actId = nowId;
-                            }
-                        } else if (entry.tabId === fromPracticeId && entry.blockId === actId) {
-                            entry.tabId = toPracticeId;
-                            entry.blockId = nowId;
+                        if (isPracticeBackEntry(entry) && entry.practiceId === fromPracticeId &&
+                            entry.subject.kind === 'article' && entry.subject.actId === actId) {
+                            entry.practiceId = toPracticeId;
+                            entry.subject.actId = nowId;
                         }
                     }
                 });
@@ -1015,6 +1060,25 @@ const appStore = createStore<AppState>()(
                 return { practiceId, decisionId };
             },
 
+            addKnownDecisions: (practiceId, decisions) => {
+                if (decisions.length === 0 || !get().practices.some((p) => p.id === practiceId)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    for (const known of decisions) {
+                        const reference = identityOf(known);
+                        const entry: PracticeDecision = {
+                            id: uuidv4(), reference, label: formatDecisionShort({ ...reference, sezione: known.sezione }), identified: true,
+                        };
+                        if (known.data_deposito) entry.depositDate = known.data_deposito;
+                        if (known.tipo) entry.tipo = known.tipo;
+                        if (known.sezione) entry.sezione = known.sezione;
+                        const at = practice.decisions.findIndex((d) => sameDecision(d.reference, reference));
+                        if (at < 0) practice.decisions.push(entry);
+                        else practice.decisions[at] = mergeDecisionEntries(practice.decisions[at], entry);
+                    }
+                });
+            },
+
             setDecisionEntryIdentity: (practiceId, decisionId, identity, attrs, label) => {
                 const practice = get().practices.find((p) => p.id === practiceId);
                 const entry = practice?.decisions.find((d) => d.id === decisionId);
@@ -1045,11 +1109,20 @@ const appStore = createStore<AppState>()(
             removePracticeDecision: (practiceId, decisionId) => {
                 if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return;
                 set((state) => {
-                const practice = state.practices.find((p) => p.id === practiceId);
-                if (!practice || !practice.decisions.some((d) => d.id === decisionId)) return;
-                practice.decisions = practice.decisions.filter((d) => d.id !== decisionId);
-                practice.beside = practice.beside.filter((b) => !(b.kind === 'decision' && b.decisionId === decisionId));
-                dropRows(state, decisionRowKey(practiceId, decisionId), true);
+                    const practice = state.practices.find((p) => p.id === practiceId);
+                    if (!practice || !practice.decisions.some((d) => d.id === decisionId)) return;
+                    practice.decisions = practice.decisions.filter((d) => d.id !== decisionId);
+                    practice.beside = practice.beside.filter((b) => !(b.kind === 'decision' && b.decisionId === decisionId));
+                    dropRows(state, decisionRowKey(practiceId, decisionId), true);
+                });
+            },
+
+            markDecisionEntryRecorded: (practiceId, decisionId, key) => {
+                const entry = get().practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === decisionId);
+                if (!entry || entry.historyRecordedKey === key) return;
+                set((state) => {
+                    const held = state.practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === decisionId);
+                    if (held) held.historyRecordedKey = key;
                 });
             },
 
@@ -1252,6 +1325,12 @@ const appStore = createStore<AppState>()(
 
             // Decision tabs (design 2026-10-05 §2.1-§2.2).
             openDecisionTab: (reference, options) => {
+                // With the practices drawn (P3): an entry of the practice the link reads in, else the
+                // active one, opened in place (spec §6.1; P4 opens it beside on the desktop).
+                if (isPracticeTableEnabled()) {
+                    const practiceId = practiceOfPlace(get(), options?.besideTabId) ?? undefined;
+                    return get().openDecision(reference, { practiceId, beside: false }).decisionId;
+                }
                 let tabId = '';
                 set((state) => {
                     const existing = state.workspaceTabs.find(t =>
@@ -1284,6 +1363,24 @@ const appStore = createStore<AppState>()(
                 let tabId = '';
                 // the tab keeps the topic as typed, trimmed
                 const query = asked.tema === undefined ? asked : { ...asked, tema: asked.tema.trim() };
+                // With the practices drawn: a topic-search window of the practice the link reads in,
+                // else the active one (T8). P3 draws it in the band at the top of the table.
+                if (isPracticeTableEnabled()) {
+                    const before = get();
+                    const landing = landingPractice(before, practiceOfPlace(before, options?.besideTabId), () => DECISIONS_PRACTICE_LABEL, 'openDecisionSearchTab');
+                    const ref: BesideRef = { id: topicWindowId(landing.practice.id, query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
+                    const beside = besideWith(landing.practice.beside, ref);
+                    const shownId = beside.find((b) => b.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(query))?.id ?? ref.id;
+                    if (beside === landing.practice.beside && landing.practices === before.practices && before.activePracticeId === landing.practice.id) {
+                        return shownId;
+                    }
+                    set((state) => {
+                        if (landing.practices !== before.practices) state.practices.push(landing.practice);
+                        state.activePracticeId = landing.practice.id;
+                        (state.practices.find((p) => p.id === landing.practice.id) as Practice).beside = beside;
+                    });
+                    return shownId;
+                }
                 set((state) => {
                     const wanted = stableQueryKey(query);
                     const nothingOnScreen = !state.workspaceTabs.some(t => !t.isHidden && !t.isMinimized);
@@ -1590,6 +1687,10 @@ const appStore = createStore<AppState>()(
 
             // ── Structure window ─────────────────────────────────────────
             addNormaIndexToTab: (tabId, norma) => {
+                if (isPracticeTableEnabled()) {
+                    const named = get().practices.some((p) => p.id === tabId);
+                    return get().addActIndexToPractice(named ? tabId : null, norma);
+                }
                 const tab = get().workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return null;
                 if (refuseViewTab(tab, 'addNormaIndexToTab')) return null;
@@ -1674,6 +1775,18 @@ const appStore = createStore<AppState>()(
             },
 
             focusArticleInTab: (tabId, articleId) => set((state) => {
+                // A practice: the row holding the article, revealed with its practice made active.
+                const practice = isPracticeTableEnabled() ? state.practices.find((p) => p.id === tabId) : undefined;
+                if (practice) {
+                    for (const act of practice.acts) {
+                        const hit = findPracticeArticle(act, articleId);
+                        if (!hit) continue;
+                        state.activePracticeId = practice.id;
+                        revealRow(state, practice.id, act.id, practiceArticleKey(hit));
+                        return;
+                    }
+                    return;
+                }
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
                 // Find the NormaBlock that actually contains this article so
@@ -3599,11 +3712,14 @@ function landingPractice(
     return { practices: [...practices, created], practice: created, activePracticeId: created.id };
 }
 
-/** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. */
+/** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. The row moves
+ *  to the end of `practiceRows`, open already or not: the act's last row there is the one its block
+ *  reads from (Studio, the arrows). */
 function revealRow(state: AppState, practiceId: string, actId: string, articleKey: string): void {
     const rowKey = articleRowKey(practiceId, actId, articleKey);
     const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
     if (act) act.isCollapsed = false;
+    delete state.practiceRows[rowKey];
     state.practiceRows[rowKey] = true;
     state.pendingReveal = { practiceId, rowKey };
 }
@@ -3650,18 +3766,20 @@ function absorbDecision(state: AppState, practice: Practice, absorbedId: string,
 
 /**
  * A pushed entry as a practice's (spec §6.3), or null to keep it as given: with the flag off; when
- * it is live in a tab; when its `tabId` names neither a practice nor a window; when the practice does
- * not hold what it names. The live-tab rule is P2's: until P3 draws the practices, a seeded practice
- * shares its tab's id and its acts their blocks' ids, so the old surface's entries stay the old
- * surface's. P3, which draws the practices with the flag on, drops it.
+ * its `tabId` names neither a practice nor a window; when the practice does not hold what it names.
+ * With the flag on the practices are what is drawn (P3), so an entry naming a practice is the
+ * practice's even while a tab of the same id (a seeded practice keeps its tab's) is still stored:
+ * P2's live-tab rule is gone (carry-over ruling 10).
  */
 function practiceBackEntry(state: AppState, entry: ReadingBackEntry): PracticeBackEntry | null {
-    if (!isPracticeTableEnabled() || findLiveBackIndex([entry], state.workspaceTabs) === 0) return null;
+    if (!isPracticeTableEnabled()) return null;
     const { label } = entry;
     const practice = state.practices.find((p) => p.id === entry.tabId);
     if (practice) {
         const act = practice.acts.find((a) => a.id === entry.blockId);
-        const hit = act && findPracticeArticle(act, entry.articleId);
+        // The row the entry names by its key (a past text, ruling 12), else the one its id names.
+        const hit = act && ((entry.articleKey && act.articles.find((a) => practiceArticleKey(a) === entry.articleKey)) ||
+            findPracticeArticle(act, entry.articleId));
         if (act && hit) {
             return { practiceId: practice.id, subject: { kind: 'article', actId: act.id, articleKey: practiceArticleKey(hit) }, place: 'table', label };
         }
@@ -3687,10 +3805,30 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
     } else if (subject.kind === 'article') {
         revealRow(state, practice.id, subject.actId, subject.articleKey);
     } else {
-        const rowKey = decisionRowKey(practice.id, subject.decisionId);
-        state.practiceRows[rowKey] = true;
-        state.pendingReveal = { practiceId: practice.id, rowKey };
+        revealDecisionRow(state, practice.id, subject.decisionId);
     }
+}
+
+/** Opens a decision's row in «Giurisprudenza» and asks for it to be revealed. */
+function revealDecisionRow(state: AppState, practiceId: string, decisionId: string): void {
+    const rowKey = decisionRowKey(practiceId, decisionId);
+    state.practiceRows[rowKey] = true;
+    state.pendingReveal = { practiceId, rowKey };
+}
+
+/** The practice a link's `besideTabId` reads in: a practice (a row of its table) or the practice
+ *  holding the window of that id; null for anything else (an old tab), which lands in the active one. */
+function practiceOfPlace(state: Pick<AppState, 'practices'>, placeId: string | undefined): string | null {
+    if (!placeId) return null;
+    const holder = state.practices.find((p) => p.id === placeId || p.beside.some((b) => b.id === placeId));
+    return holder ? holder.id : null;
+}
+
+/** A topic-search window's id: stable for its practice and query, so asking again finds it (spec §2);
+ *  the practice is part of it, so the same topic in two practices is two windows and a decision opened
+ *  from one lands in that one (`practiceOfPlace`). */
+function topicWindowId(practiceId: string, query: DecisionSearchQuery): string {
+    return `search:${practiceId}:${stableQueryKey(query)}`;
 }
 
 const movable = (length: number, from: number, to: number): boolean =>

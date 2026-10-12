@@ -26,3 +26,23 @@ describe('ReadingBackControl after a jump to a decision', () => {
     expect(appStore.getState().readingBackStack).toEqual([]);
   });
 });
+
+describe('ReadingBackControl over the practices (flag on, spec §6.3 `table`)', () => {
+  it('a citation jump from a row, then back: the practice left is active, the row revealed, onNavigated names it', async () => {
+    vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
+    const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
+    const { articleRowKey, practiceArticleKey } = await import('../../../utils/practice');
+    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [], workspaceTabs: [] });
+    const s = appStore.getState;
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
+    s().createPractice('Altra');
+    const onNavigated = vi.fn();
+    render(<ReadingBackControl onNavigated={onNavigated} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 5 l. 24/2017' }));
+    expect(s().activePracticeId).toBe(practiceId);
+    expect(s().pendingReveal).toEqual({ practiceId, rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '5'))) });
+    expect(onNavigated).toHaveBeenCalledWith(practiceId);
+    vi.unstubAllEnvs();
+  });
+});
