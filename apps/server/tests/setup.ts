@@ -17,10 +17,16 @@ let seededTexts: TextVersionRow[] = [];
 // The OAuth endpoints' own rate limits are per address, and the whole suite
 // comes from 127.0.0.1: lift them here (the flood test builds its own router
 // with a low one), and give the MCP server's credential a test value.
-process.env.OAUTH_REGISTRATIONS_PER_HOUR ??= '100000';
-process.env.OAUTH_REQUESTS_PER_15_MINUTES ??= '100000';
-process.env.OAUTH_MCP_CLIENT_SECRET ??= 'test-mcp-client-secret';
-process.env.OAUTH_DELEGATION_SECRET ??= 'test-delegation-secret';
+// Assigned, never `??=`: importing @prisma/client above loads `apps/server/.env`
+// into process.env when the checkout has one (the main checkout, a worktree
+// start.sh prepared), so the development stack's MCP secret was already set
+// here and won over the value the helpers send: every introspection and token
+// exchange answered `invalid_client` in those checkouts, and passed in a clean
+// worktree (`tests/oauth/testEnv.test.ts`).
+process.env.OAUTH_REGISTRATIONS_PER_HOUR = '100000';
+process.env.OAUTH_REQUESTS_PER_15_MINUTES = '100000';
+process.env.OAUTH_MCP_CLIENT_SECRET = 'test-mcp-client-secret';
+process.env.OAUTH_DELEGATION_SECRET = 'test-delegation-secret';
 
 // SAFETY GUARD: this setup resets the database (drops everything). If vitest is
 // run WITHOUT the `dotenv -e .env.test` wrapper (i.e. `npx vitest` instead of
