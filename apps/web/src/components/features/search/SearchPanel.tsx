@@ -49,6 +49,9 @@ const PracticeNotice = lazy(() => import('../practice/PracticeParts').then(m => 
  *  the stray rows of the first search, and only those (spec §5.2). */
 interface CreatedRow { practiceId: string; actId: string; articleKey: string }
 /** The rows one search created, named by the search's own params (the object `handleSearch` got). */
+/** The bar of practices floats `bottom-6`: 24 px. */
+const BAR_OFFSET = 24;
+
 interface CreatedRows { search: SearchParams | null; rows: CreatedRow[] }
 
 // Estimate the number of articles a search will return based on the `article`
@@ -867,6 +870,9 @@ export function SearchPanel() {
       {/* One global control: the back-stack is global, so a per-tab copy would
           sit inside the very tab an entry points at. */}
       <ReadingBackControl
+        // With the practices it floats above the bar, clear of the act's heading and the windows' headers.
+        placement={practiceTable ? 'bottom' : 'top'}
+        bottomOffset={practiceTable && isDesktop && practiceBarHeight !== null ? practiceBarHeight + BAR_OFFSET + 12 : 16}
         onNavigated={(tabId) => {
           // The practices: going back already made the practice active, which both breakpoints draw.
           if (!practiceTable && workspaceTabs.some(t => t.id === tabId)) setMobileActiveTabId(tabId);

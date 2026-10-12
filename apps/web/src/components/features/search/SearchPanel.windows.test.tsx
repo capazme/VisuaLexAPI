@@ -163,6 +163,16 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     expect(s().practiceRows[`${practiceId}/${actId}/${practiceArticleKey(article(L24, '7'))}`]).toBe(true);
   });
 
+  it('the way back floats above the bar of practices, not at the top over the act heading', async () => {
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
+    panel();
+    const wrapper = (await screen.findByRole('button', { name: 'Torna a art. 5 l. 24/2017' })).parentElement as HTMLElement;
+    expect(wrapper).not.toHaveClass('top-4');
+    // No bar measured yet in jsdom: the least offset; with the bar, its height + 24 + 12.
+    expect(wrapper.style.bottom).toMatch(/px$/);
+  });
+
   it('a decision asked for twice (the palette, then the address) is one window, and the second ask takes focus', async () => {
     s().createPractice('P');
     panel();

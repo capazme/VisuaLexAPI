@@ -98,3 +98,27 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)',
     vi.unstubAllEnvs();
   });
 });
+
+describe('ReadingBackControl — where it floats', () => {
+  async function withOneEntry() {
+    appStore.setState({ workspaceTabs: [articleTab], readingBackStack: [] });
+    appStore.getState().pushReadingBack({ tabId: 'article-tab', blockId: 'block-1', articleId: 'x', label: 'art. 2043 c.c.' });
+  }
+
+  it('at the top, centred, by default (the old tabs)', async () => {
+    await withOneEntry();
+    render(<ReadingBackControl />);
+    const wrapper = screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }).parentElement as HTMLElement;
+    expect(wrapper).toHaveClass('fixed', 'top-4', 'left-1/2');
+    expect(wrapper.style.bottom).toBe('');
+  });
+
+  it('at the bottom, centred and clear of the bar of practices, when asked: no top-4 over the act heading', async () => {
+    await withOneEntry();
+    render(<ReadingBackControl placement="bottom" bottomOffset={96} />);
+    const wrapper = screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }).parentElement as HTMLElement;
+    expect(wrapper).toHaveClass('fixed', 'left-1/2');
+    expect(wrapper).not.toHaveClass('top-4');
+    expect(wrapper.style.bottom).toBe('96px');
+  });
+});

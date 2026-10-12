@@ -497,7 +497,9 @@ opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
 per-tab copy would sit inside the very tab an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
-combination for "back" already belongs to the browser. Behind `VITE_FEATURE_PRACTICE_TABLE` the
+combination for "back" already belongs to the browser. With the practices it floats centred above the bar of practices (`placement="bottom"`, `bottomOffset` from
+the bar's measured height), the one edge the table's sticky headings and the windows' headers leave free;
+the old tabs keep it at the top. Behind `VITE_FEATURE_PRACTICE_TABLE` the
 stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
 practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
 the row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
@@ -1095,6 +1097,9 @@ meant to stay split; add new features as new files, not inside the shells:
     element is positioned and that no ancestor sets `backdrop-filter`, `filter`,
     `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
     raising the child's value does nothing.
+    The sidebar's navigation scrolls on its own in a low window (`overflow-y-auto`, which clips what hangs
+    out of it) and the document never scrolls (`Layout`'s root is `h-screen overflow-hidden`), so its
+    hover labels are portalled to the body (`SidebarTooltip`), placed from the control's rectangle.
 
 
 26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**

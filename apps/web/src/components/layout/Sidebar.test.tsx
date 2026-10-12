@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 vi.mock('../../hooks/useAuth', () => ({
@@ -134,5 +134,42 @@ describe('Sidebar — Studia entry', () => {
     vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
     renderSidebar();
     expect(screen.queryByRole('link', { name: /Studia/ })).not.toBeInTheDocument();
+  });
+});
+
+// 16 icons are 935 px tall: in a 706 px window the sidebar made the document scroll. The navigation is
+// the part that scrolls, and because that overflow would clip a label hanging out of it, the labels are
+// portalled to the body (gotcha 22). The geometry itself is for the browser pass.
+describe('Sidebar — it fits a low window', () => {
+  it('is never taller than its row on the desktop, and only the navigation scrolls', () => {
+    renderSidebar();
+    const aside = screen.getByRole('complementary');
+    expect(aside).toHaveClass('lg:h-full');
+    const nav = document.getElementById('tour-sidebar') as HTMLElement;
+    expect(nav).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+    // The logo, the quick search, the system actions and the user menu keep their own height.
+    expect(aside).not.toHaveClass('overflow-y-auto');
+    expect(aside.querySelector('nav ~ div')).not.toHaveClass('overflow-y-auto');
+  });
+
+  it('draws a hover label outside the scrolling navigation and the aside, and removes it on leave', async () => {
+    renderSidebar();
+    const link = screen.getByRole('link', { name: 'Dossier' });
+    fireEvent.mouseEnter(link);
+    const tooltip = document.body.querySelector('[data-sidebar-tooltip]') as HTMLElement;
+    expect(tooltip).toHaveTextContent('Dossier');
+    expect(document.getElementById('tour-sidebar')).not.toContainElement(tooltip);
+    expect(screen.getByRole('complementary')).not.toContainElement(tooltip);
+    expect(tooltip).toHaveClass('fixed', 'z-[1400]');
+    fireEvent.mouseLeave(link);
+    await waitFor(() => expect(document.body.querySelector('[data-sidebar-tooltip]')).toBeNull());
+  });
+
+  it('does the same for a button of the bottom group', () => {
+    renderSidebar();
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Impostazioni' }));
+    const tooltip = document.body.querySelector('[data-sidebar-tooltip]') as HTMLElement;
+    expect(tooltip).toHaveTextContent('Impostazioni');
+    expect(screen.getByRole('complementary')).not.toContainElement(tooltip);
   });
 });

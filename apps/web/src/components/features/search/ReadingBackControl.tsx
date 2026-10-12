@@ -25,9 +25,18 @@ interface ReadingBackControlProps {
    * desktop nothing has to listen.
    */
   onNavigated?: (tabId: string, entry?: PracticeBackEntry) => void;
+  /**
+   * Where the control floats. `top` (the default, flag off) is the old tabs' place, centred at the
+   * top. With the practices it would sit on the top act's sticky heading and over a window's
+   * header, so `bottom` puts it centred above the bar of practices, `bottomOffset` px from the
+   * viewport's bottom: the bottom is the one edge the table, its headings and its windows leave free.
+   */
+  placement?: 'top' | 'bottom';
+  bottomOffset?: number;
 }
 
-export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
+export function ReadingBackControl({ onNavigated, placement = 'top', bottomOffset = 16 }: ReadingBackControlProps) {
+  const atBottom = placement === 'bottom';
   const { readingBackStack, workspaceTabs, practices, popReadingBack, bringTabToFront, focusArticleInTab } =
     useAppStore(useShallow(s => ({
       readingBackStack: s.readingBackStack,
@@ -60,11 +69,12 @@ export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
     <AnimatePresence>
       {target && (
         <motion.div
-          initial={{ opacity: 0, y: -8, x: '-50%' }}
+          initial={{ opacity: 0, y: atBottom ? 8 : -8, x: '-50%' }}
           animate={{ opacity: 1, y: 0, x: '-50%' }}
-          exit={{ opacity: 0, y: -8, x: '-50%' }}
+          exit={{ opacity: 0, y: atBottom ? 8 : -8, x: '-50%' }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className={cn('fixed top-4 left-1/2 px-4', Z_INDEX.structure)}
+          style={atBottom ? { bottom: bottomOffset } : undefined}
+          className={cn('fixed left-1/2 px-4', !atBottom && 'top-4', Z_INDEX.structure)}
         >
           <button
             onClick={handleBack}
