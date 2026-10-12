@@ -84,6 +84,11 @@ model User {
   lingoTestiScritti     LingoTestoVersione[]
   lingoAccettazioni     LingoAccettazioneTesto[]
 
+  // Development mode: the administrator allows it (set only on the admin route), the
+  // user then turns it on or off. It only shows or hides surfaces, never a permission.
+  devModeAllowed Boolean @default(false) @map("dev_mode_allowed")
+  devMode        Boolean @default(false) @map("dev_mode")
+
   // OAuth: the applications this user connected (MCP spike)
   oauthAuthorizationRequests OAuthAuthorizationRequest[]
   oauthAuthorizationCodes    OAuthAuthorizationCode[]
