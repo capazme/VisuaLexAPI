@@ -362,7 +362,7 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
 
   it('the column\'s bottom padding follows the bar\'s measured height (§3.4)', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.id === 'tour-workspace-dock' ? 138 : 0;
+      return this.id === 'tour-practice-bar' ? 138 : 0;
     });
     const p = s().createPractice('P');
     s().addArticlesToPractice(p, CC, [ccArticle('2043')]);

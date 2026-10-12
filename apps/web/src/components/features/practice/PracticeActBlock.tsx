@@ -19,6 +19,7 @@ import { PracticeArticleRow } from './PracticeArticleRow';
 import { fromPracticePair, practicePair } from './practiceView';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { useTour } from '../../../hooks/useTour';
 import { formatNormaMeta } from '../../../utils/normaMeta';
 import { actHeading, shortAct } from '../../../utils/sources';
 import { READ_ONLY_REASON, describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
@@ -78,6 +79,17 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
     .filter((key) => key.startsWith(prefix))
     .map((key) => key.slice(prefix.length))));
   const isDesktop = useIsDesktop();
+  // The act's tour, on the practice's first act and once the table's own tour has been seen (when it
+  // is done it hands over to this one, `PracticeTable`). Asked once: `tryStartTour` is new each render.
+  const isFirstAct = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.acts[0]?.id === act.id);
+  const theme = useAppStore((s) => s.settings.theme);
+  const { tryStartTour, hasSeenTour } = useTour({ theme: theme as 'light' | 'dark' });
+  const tourAsked = useRef(false);
+  useEffect(() => {
+    if (!isFirstAct || tourAsked.current || !hasSeenTour('practice')) return;
+    tourAsked.current = true;
+    tryStartTour('practiceAct');
+  });
   const [drawerToggled, setDrawerToggled] = useState(false);
   // On a phone the index is the drawer (§8). «Apri l'indice e sfoglia» points the structure window at
   // the act it drops (§5.1): on a phone that request opens this act's drawer too.
@@ -181,7 +193,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         ['--practice-head' as string]: `${isDesktop ? headerHeight : 0}px`,
       }}
       aria-label={heading}
-      className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      className="practice-act rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
       {/* The sticky-row convention: opaque, edge to edge, over the rows it heads (and over an open
           row's sticky toolbar, which slides up under it as the row ends). */}
@@ -194,7 +206,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
           // them (four 44 px buttons beside the title left it a word wide); from `md` one row. Sticky
           // from `md` only: on a phone, with an open row's toolbar pinned under it, the two took half
           // the screen.
-          'relative flex flex-wrap items-start gap-1 rounded-t-xl border-b border-slate-100 bg-white px-2 py-2 md:sticky md:top-0 md:flex-nowrap md:gap-2 md:px-3 dark:border-slate-700 dark:bg-slate-800',
+          'practice-act-head relative flex flex-wrap items-start gap-1 rounded-t-xl border-b border-slate-100 bg-white px-2 py-2 md:sticky md:top-0 md:flex-nowrap md:gap-2 md:px-3 dark:border-slate-700 dark:bg-slate-800',
           Z_INDEX.stickyHead,
         )}
       >
@@ -245,7 +257,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
             disabled={studyLocked}
             title={current && studyLocked ? `Modalità studio — ${READ_ONLY_REASON}` : 'Modalità studio'}
             aria-label="Modalità studio"
-            className={cn(TOOL_BUTTON, 'border-purple-200 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-400')}
+            className={cn(TOOL_BUTTON, 'practice-act-study border-purple-200 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-400')}
           >
             <BookOpen size={13} aria-hidden />
             <span className="hidden lg:inline">Studio</span>
@@ -257,7 +269,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                 onClick={toggleStructure}
                 aria-label="Struttura della norma"
                 aria-pressed={isDesktop ? isStructureWindowOpen : drawerOpen}
-                className={cn(TOOL_BUTTON, 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:border-emerald-800/30 dark:bg-emerald-900/20 dark:text-emerald-400')}
+                className={cn(TOOL_BUTTON, 'practice-act-structure border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:border-emerald-800/30 dark:bg-emerald-900/20 dark:text-emerald-400')}
               >
                 <GitBranch size={13} aria-hidden />
                 <span className="hidden lg:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>
@@ -290,7 +302,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
           {/* The index on top (D3): one chip per row, then the act's arrows. */}
           {(act.articles.length > 0 || loadingArticle || showNavigation) && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1.5">
-              <ul aria-label={`Articoli sul tavolo di ${heading}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+              <ul aria-label={`Articoli sul tavolo di ${heading}`} className="practice-act-index flex min-w-0 flex-1 flex-wrap items-center gap-1">
                 {act.articles.map((article) => {
                   const key = practiceArticleKey(article);
                   return (

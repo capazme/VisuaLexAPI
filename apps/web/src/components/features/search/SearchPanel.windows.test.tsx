@@ -212,7 +212,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
 
   it('the way back floats above the bar of practices (its measured height + 24 + 12), not at the top over the act heading', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.id === 'tour-workspace-dock' ? 138 : 0;
+      return this.id === 'tour-practice-bar' ? 138 : 0;
     });
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });

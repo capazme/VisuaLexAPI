@@ -2,7 +2,7 @@
  * Tour Configuration
  *
  * Configurazione centralizzata per il sistema di onboarding/tour.
- * 12 tour totali: 5 per pagina + 7 contestuali per feature.
+ * 13 tour totali: 6 per pagina + 7 contestuali per feature.
  */
 import type { DriveStep } from 'driver.js';
 
@@ -28,8 +28,8 @@ export const TOUR_KEYS = {
     studyMode: 'studyMode',
     treeView: 'treeView',
     citationPreview: 'citationPreview',
-    workspaceTab: 'workspaceTab',
-    normaBlock: 'normaBlock',
+    practice: 'practice',
+    practiceAct: 'practiceAct',
     quickNorms: 'quickNorms',
 } as const;
 
@@ -140,7 +140,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-results-area',
         popover: {
             title: 'Area Risultati',
-            description: 'I risultati della ricerca appaiono qui. Ogni norma diventa una scheda che puoi spostare e ridimensionare.',
+            description: 'I risultati della ricerca appaiono qui, sul tavolo della pratica attiva: ogni norma diventa un atto con i suoi articoli.',
             side: 'left',
             align: 'center',
         }
@@ -608,8 +608,8 @@ export const CITATION_PREVIEW_STEPS: DriveStep[] = [
     {
         element: '.citation-preview-open',
         popover: {
-            title: 'Apri in Nuova Tab',
-            description: 'Clicca il pulsante per caricare l\'articolo completo in una nuova scheda del workspace.',
+            title: 'Apri sul Tavolo',
+            description: 'Clicca il pulsante per portare l\'articolo completo sul tavolo della pratica.',
             side: 'bottom',
             align: 'center',
         }
@@ -617,89 +617,83 @@ export const CITATION_PREVIEW_STEPS: DriveStep[] = [
 ];
 
 /**
- * Workspace Tab Tour - Gestione schede (5 step)
+ * Practice Tour - Il tavolo di lavoro (4 step)
+ *
+ * Parte la prima volta che una pratica è sul tavolo (PracticeTable); al termine parte quello
+ * dell'atto.
  */
-export const WORKSPACE_TAB_STEPS: DriveStep[] = [
+export const PRACTICE_STEPS: DriveStep[] = [
     {
-        element: '#tour-workspace-dock',
+        element: '#tour-practice-bar',
         popover: {
-            title: 'Dock delle Schede',
-            description: 'Ogni norma aperta diventa una scheda nel dock. Clicca per passare da una all\'altra.',
+            title: 'Le Pratiche',
+            description: 'Ogni pratica è un tavolo di lavoro con le norme e le sentenze di una questione. Qui passi dall\'una all\'altra, ne apri una nuova e le riordini trascinando.',
             side: 'top',
             align: 'center',
         }
     },
     {
-        element: '.workspace-tab-panel',
+        element: '#tour-practice-header',
         popover: {
-            title: 'Pannello Norma',
-            description: 'Qui trovi il testo. Puoi ridimensionare trascinando i bordi, spostare trascinando l\'intestazione.',
+            title: 'Il Tavolo',
+            description: 'Il nome della pratica (doppio clic per cambiarlo), quanto contiene e il menu delle azioni. Le ricerche e gli articoli che apri finiscono qui.',
+            side: 'bottom',
+            align: 'start',
+        }
+    },
+    {
+        element: '#tour-practice-save',
+        popover: {
+            title: 'Salva come Dossier',
+            description: 'Trasforma il tavolo in un dossier: gli articoli e le sentenze restano al loro posto, con il testo che stavi leggendo.',
+            side: 'bottom',
+            align: 'end',
+        }
+    },
+    {
+        element: '.practice-act',
+        popover: {
+            title: 'Un Atto sul Tavolo',
+            description: 'Le norme sono raggruppate per atto, con i suoi articoli in fila: aprine uno per leggerlo qui, sul posto.',
+            side: 'top',
+            align: 'start',
+        }
+    }
+];
+
+/**
+ * Practice Act Tour - Esplorazione di un atto (6 step)
+ */
+export const PRACTICE_ACT_STEPS: DriveStep[] = [
+    {
+        element: '.practice-act-head',
+        popover: {
+            title: 'Intestazione dell\'Atto',
+            description: 'Tipo, numero e data dell\'atto. Clicca per comprimerlo, trascina la maniglia per riordinare, usa il menu per spostarlo in un\'altra pratica o toglierlo.',
+            side: 'bottom',
+            align: 'start',
+        }
+    },
+    {
+        element: '.practice-act-index',
+        popover: {
+            title: 'Gli Articoli sul Tavolo',
+            description: 'Un chip per ogni articolo caricato: cliccalo per aprire e raggiungere la riga. Con le frecce scorri anche quelli non ancora caricati.',
+            side: 'bottom',
+            align: 'start',
+        }
+    },
+    {
+        element: '.practice-row-beside',
+        popover: {
+            title: 'Apri Accanto',
+            description: 'Leggi un articolo o una sentenza in una finestra accanto al tavolo, per confrontarli senza perdere il posto. Se ne aprono due alla volta.',
             side: 'left',
-            align: 'start',
-        }
-    },
-    {
-        element: '#tour-workspace-minimize',
-        popover: {
-            title: 'Minimizza',
-            description: 'Riduci a icona le schede che non stai consultando. Rimangono accessibili dal dock.',
-            side: 'bottom',
             align: 'center',
         }
     },
     {
-        element: '#tour-workspace-close',
-        popover: {
-            title: 'Chiudi Scheda',
-            description: 'Chiudi le schede che non ti servono più. Puoi sempre riaprirle dalla cronologia.',
-            side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-quicknorms',
-        popover: {
-            title: 'Norme Preferite',
-            description: 'Le norme che consulti spesso appaiono qui. Un click per aprirle direttamente.',
-            side: 'top',
-            align: 'center',
-        }
-    }
-];
-
-/**
- * Norma Block Tour - Esplorazione articolo (6 step)
- */
-export const NORMA_BLOCK_STEPS: DriveStep[] = [
-    {
-        element: '.norma-block-header',
-        popover: {
-            title: 'Intestazione Norma',
-            description: 'Tipo atto, numero e data. Clicca per espandere/comprimere, trascina per riordinare.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
-        element: '.norma-article-tabs',
-        popover: {
-            title: 'Schede Articoli',
-            description: 'Ogni articolo caricato ha la sua scheda. Passa rapidamente da uno all\'altro.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
-        element: '.glass-toolbar',
-        popover: {
-            title: 'Barra Strumenti',
-            description: 'Norme rapide, note personali, evidenziatore, copia, esportazione e altro.',
-            side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '.norma-study-mode-btn',
+        element: '.practice-act-study',
         popover: {
             title: 'Modalità Studio',
             description: 'Lettura immersiva a schermo intero con opzioni di tipografia e presa appunti.',
@@ -708,10 +702,19 @@ export const NORMA_BLOCK_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '.norma-structure-btn',
+        element: '.practice-act-structure',
         popover: {
             title: 'Struttura Atto',
-            description: 'Visualizza l\'indice completo con titoli, capi e sezioni. Clicca per caricare altri articoli.',
+            description: 'Visualizza l\'indice completo con titoli, capi e sezioni. Clicca un articolo per caricarlo sul tavolo.',
+            side: 'bottom',
+            align: 'center',
+        }
+    },
+    {
+        element: '.glass-toolbar',
+        popover: {
+            title: 'Barra Strumenti',
+            description: 'In una riga aperta: note personali, evidenziatore, discussioni, ricerca nel testo, copia, esportazione e altro.',
             side: 'bottom',
             align: 'center',
         }
@@ -783,8 +786,8 @@ export const TOUR_STEPS_MAP: Record<TourType, DriveStep[]> = {
     studyMode: STUDY_MODE_STEPS,
     treeView: TREE_VIEW_STEPS,
     citationPreview: CITATION_PREVIEW_STEPS,
-    workspaceTab: WORKSPACE_TAB_STEPS,
-    normaBlock: NORMA_BLOCK_STEPS,
+    practice: PRACTICE_STEPS,
+    practiceAct: PRACTICE_ACT_STEPS,
     quickNorms: QUICK_NORMS_STEPS,
 };
 

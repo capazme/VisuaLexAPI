@@ -41,7 +41,7 @@ describe('PracticeBar (spec §5)', () => {
     const b = s().createPractice('Appalti');
     render(<PracticeBar />);
     const bar = screen.getByRole('navigation', { name: 'Pratiche' });
-    expect(bar.closest('#tour-workspace-dock')).not.toBeNull();
+    expect(bar.closest('#tour-practice-bar')).not.toBeNull();
     expect(chip('Appalti')).toHaveAttribute('aria-current', 'true');
     expect(chip('Responsabilità medica')).not.toHaveAttribute('aria-current');
     expect(within(bar).getByText('1 atto')).toBeInTheDocument();
@@ -126,7 +126,7 @@ describe('PracticeBar: its height keeps the column clear of it (spec §3.4)', ()
     height = 113;
     observers.length = 0;
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.id === 'tour-workspace-dock' ? height : 0;
+      return this.id === 'tour-practice-bar' ? height : 0;
     });
     vi.stubGlobal('ResizeObserver', class {
       callback: () => void;
@@ -169,7 +169,7 @@ describe('PracticeBar: the chip’s «⋯» saves the practice (spec §7)', () =
     // Portalled to the document, in the toast band: inside the bar (fixed, transformed, blurred) it
     // would be placed against the bar and stacked in it (gotchas 22, 26).
     const toast = message.closest('[role="alert"]') as HTMLElement;
-    expect(toast.closest('#tour-workspace-dock')).toBeNull();
+    expect(toast.closest('#tour-practice-bar')).toBeNull();
     expect(toast.parentElement).toBe(document.body);
     expect(toast.className).toContain(Z_INDEX.toast);
   });

@@ -1,5 +1,18 @@
 # The norm tab becomes the practice's table — Design
 
+**Built.** The redesign was built in six pull requests, each merged into `develop`: P1 the
+groundwork (#122), P2 the store (#126), P3 the table and the bar of practices on the desktop and the
+phone (#131), P4 the light window and the row of two (#134), P5 reading full screen on the phone
+(#138), and P6, which removes the flag and the floating tabs and migrates every browser once
+(persist version 1; its number is set when the pull request is opened). Where the build departs
+from what is written below, the plan's «Amendments during execution»
+(`docs/superpowers/plans/2026-10-08-norm-tab-container.md`) says how and why; the departures that
+touch this document are these. The seeding marker `practicesSeeded` (§9) lived only from P2 to P6:
+the persisted state has none now, and the migration reads it from a version-0 value only. The flag
+`VITE_FEATURE_PRACTICE_TABLE` (T9) is gone with the old surface. The migration keeps the raw
+version-0 value under `visualex-storage.v0-backup` before it converts it (§9, §10). The tours are
+`practice` and `practiceAct` (`config/tourConfig.ts`).
+
 Round opened 2026-10-07 from the decision tabs of the norms-and-decisions round. The owner asked:
 
 > «vedendo la tab delle sentenze ho pensato che potremmo destrutturare un po' la tab norma, in modo
