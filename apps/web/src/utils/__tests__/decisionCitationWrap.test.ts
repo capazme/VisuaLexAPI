@@ -79,6 +79,15 @@ describe('wrapDecisionCitationsInHtml', () => {
     expect(out).toContain('Rossi &amp; Bianchi: <span');
   });
 
+  it('decodes the entities before scanning: an encoded apostrophe and an encoded no-break space', () => {
+    // «Corte d&#39;appello» is seen as a court, so the section after it is not the Cassazione's
+    expect(cites(wrap('<p>La Corte d&#39;appello di Roma, sez. lav., n. 1234/2019</p>', { within: 'cassazione' }))).toHaveLength(0);
+    // a semicolon of an entity does not end the tail
+    const out = wrap('<p>Cass.&#160;civ., sez.&nbsp;III, n.&#xA0;12789/2022 &amp; Corte&nbsp;cost. n. 71/2020</p>');
+    expect(cites(out).map((e) => e.textContent)).toEqual(['Cass.\u00a0civ., sez.\u00a0III, n.\u00a012789/2022', 'Corte\u00a0cost. n. 71/2020']);
+    expect(mount(out).textContent).toBe(mount('<p>Cass.&#160;civ., sez.&nbsp;III, n.&#xA0;12789/2022 &amp; Corte&nbsp;cost. n. 71/2020</p>').textContent);
+  });
+
   it('does not read a citation across two blocks', () => {
     expect(wrap('<div>Cass. civ.</div><div>n. 12789/2022</div>')).toBe('<div>Cass. civ.</div><div>n. 12789/2022</div>');
     // a line break inside a paragraph is not a paragraph break
