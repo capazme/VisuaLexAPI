@@ -629,7 +629,15 @@ const generateKey = (n: NormaVisitata) => {
     return parts.map(part => sanitize(part || '')).join('--');
 };
 
-// Declared before the store: a synchronous save during creation (a migration) may report a failure.
+/** The key `persist` saves the workspace under. */
+const STORAGE_NAME = 'visualex-storage';
+
+/** Where a browser's version-0 value is copied before it is migrated, so its tabs can be recovered
+ *  by hand should the conversion ever go wrong. Written once, never overwritten. */
+const V0_BACKUP_KEY = 'visualex-storage.v0-backup';
+
+// The constants above and these are declared before the store: its hydration runs while it is created,
+// and a migration may save or report a failure (a `const` after it would still be in its dead zone).
 let saveFailureReported = false;
 // Set by `migratePersisted` when it made the practices from saved tabs, taken by the `merge` that
 // follows in the same hydration (`practicesOnLoad`): the notice is session-only, so it travels here.
@@ -3029,7 +3037,7 @@ const appStore = createStore<AppState>()(
             }
         })),
         {
-            name: 'visualex-storage',
+            name: STORAGE_NAME,
             // A write the browser refuses (a full localStorage) is caught, never thrown out of `set` (T20).
             storage: createJSONStorage<Partial<AppState>>(() => guardedStorage(localStorage, reportSaveFailure)),
             // Only persist UI state and settings, NOT user data. Bookmarks,
@@ -3306,33 +3314,59 @@ function warnDropped(dropped: string[]): void {
     }
 }
 
+/** Copies the raw value `persist` is about to migrate to `V0_BACKUP_KEY`, when none is there yet.
+ *  Never throws: a browser that refuses the copy (a full `localStorage`) is logged, and the migration
+ *  goes on (gotcha 18). */
+function backupV0(name: string): void {
+    try {
+        if (typeof localStorage === 'undefined') return;
+        const raw = localStorage.getItem(name);
+        if (raw === null || localStorage.getItem(V0_BACKUP_KEY) !== null) return;
+        localStorage.setItem(V0_BACKUP_KEY, raw);
+        console.warn(`persist: the saved workspace was copied to "${V0_BACKUP_KEY}" before it is converted to practices`);
+    } catch (error) {
+        console.error(`persist: the saved workspace could not be copied to "${V0_BACKUP_KEY}" before it is converted`, error);
+    }
+}
+
 /** What persist version 1 makes of a state saved before it (spec §9, §10): from version 0, the
  *  sanitized `practices` when `practicesSeeded` is `true` (a session of the redesign built
  *  them; an empty list is the user's «Chiudi tutte»), else `practicesFromTabs` over `workspaceTabs`
  *  (a browser that never drew the practices); `workspaceTabs`, `highestZIndex` and the marker are
  *  dropped either way. The topic searches not reopened are told once, through `migrationNotice`.
- *  Pure over its input and never throwing: a throw here would leave the store at its defaults and
- *  the next save would overwrite what the browser holds, so a failure is logged with its context
- *  and yields no practice (gotcha 18). */
+ *  The raw value is copied to `V0_BACKUP_KEY` first. Never throwing: a throw here would leave the
+ *  store at its defaults and the next save would overwrite what the browser holds, so a failure is
+ *  logged with its context and loses the practices only, keeping the settings and the rest (gotcha 18). */
 function migratePersisted(persisted: unknown, from: number): Record<string, unknown> {
+    migrationNotice = null;
+    let saved: Record<string, unknown> = {};
     try {
-        const saved = persisted !== null && typeof persisted === 'object' && !Array.isArray(persisted)
-            ? { ...(persisted as Record<string, unknown>) } : {};
-        if (from >= 1) return saved;
-        const { workspaceTabs, highestZIndex: _z, practicesSeeded, ...rest } = saved;
-        void _z;
+        if (persisted !== null && typeof persisted === 'object' && !Array.isArray(persisted)) saved = { ...(persisted as Record<string, unknown>) };
+    } catch (error) {
+        console.error(`persist: the saved workspace (version ${from}) could not be read; starting with none`, error);
+    }
+    if (from >= 1) return saved;
+    backupV0(STORAGE_NAME);
+    const { workspaceTabs, highestZIndex: _z, practicesSeeded, ...rest } = saved;
+    void _z;
+    try {
         if (practicesSeeded === true) {
             const sanitized = sanitizePractices(rest.practices);
             warnDropped(sanitized.dropped);
             return { ...rest, practices: sanitized.practices };
         }
+        const dropped: string[] = [];
+        const replaced = Array.isArray(rest.practices) ? rest.practices.length : 0;
         const seeded = practicesFromTabs(workspaceTabs, uuidv4);
-        warnDropped(seeded.dropped);
+        if (replaced > 0) {
+            dropped.push(`practices: ${replaced} saved without the seeding marker, replaced by the ones seeded from the tabs`);
+        }
+        warnDropped([...dropped, ...seeded.dropped]);
         migrationNotice = practiceNoticeText(seeded.droppedSearches);
         return { ...rest, practices: seeded.practices, activePracticeId: seeded.activePracticeId };
     } catch (error) {
-        console.error(`persist: the saved workspace (version ${from}) could not be migrated to practices; starting with none`, error);
-        return { practices: [], activePracticeId: null };
+        console.error(`persist: the saved workspace (version ${from}) could not be migrated to practices; starting with none (the original is in "${V0_BACKUP_KEY}")`, error);
+        return { ...rest, practices: [], activePracticeId: null };
     }
 }
 

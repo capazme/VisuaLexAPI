@@ -274,11 +274,8 @@ popovers are portalled outside it, and VoiceOver hides what lies outside a modal
 `z-50`/`z-[100]` modals sit under the window, which stays over them, visible and usable.
 `utils/findWindowControl.ts` (`openFindWindow`, `closeFindWindow`, `subscribeFindWindow`,
 `isWorkspaceCovered`) is its control; `useFindWindowScopedTo` gives the magnifier its pressed state
-(pressed: open on this tab and this text; the state is read at `pointerdown`, before the tab panel's
-`mousedown` raises the tab). Two scopes: «Questa scheda» (the front tab: on a desktop the visible tab
-with the highest z-index, on a phone the store's `mobileActiveTabId`, the carousel's tab on screen,
-session-only) and «Tutte le schede». A phone leaves out loose articles: its column draws
-norm blocks only. The scopes are «Questa pratica» (the active
+(pressed: open on this practice and this text; the state is read at `pointerdown`, before a practice
+switch changes the active one). The scopes are «Questa pratica» (the active
 practice, on both breakpoints: every article of every act, its row open or closed, then its decisions
 newest first) and «Tutte le pratiche» (the bar's order, each place named with its practice); a row's
 root registers under its practice's id with the same keys, and so does a light window's (the
@@ -291,18 +288,13 @@ header, so never over a control; a dragged place wins; a tool held over the tabl
 `data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
 is not in the session's cache); reaching an undrawn match opens its row with its practice made active
 (`revealPracticeRow`, `revealPracticeDecision`; on a phone the reveal's own update takes the full-screen reader off, so the row is on screen — a match in the reader's own subject is drawn and needs nothing), and the window recomputes on a practice switched, a
-row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
-(it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
+row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le pratiche» the place of the match is one label: the target's own (a decision entry's, which carries the section, or an article's `shortNorm`), with its practice. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
 26: use `useIsDesktop`). Esc closes it and returns focus. Text roots register through
 `useRegisterFindRoot`; `useFindWindow` finds across `utils/findTargets.ts` targets (a displayed root is
 searched in its DOM, any other in its stored projection and only counted), moves the reader only on
-next or previous, and shows an undrawn match through `revealTab` (raises the tab, restores it when
-minimised or hidden, makes it the phone's tab on screen) and `focusArticleInTab` (opens a collapsed
-block and sets its `autoFocusArticleId`, which `NormaBlockComponent` consumes on a desktop and `NormaCard`
-on a phone, opening the card; bumps a loose article's `revealSignal`, which opens `LooseArticleCard`). `revealTab` is a separate action, never
-`bringTabToFront` made to reveal: the restore button and the dock chip use `bringTabToFront`, and a
-minimised tab must stay minimised until its own button restores it. A target whose root does not
+next or previous, and shows an undrawn match through `revealPracticeRow` / `revealPracticeDecision` (the practice made
+active, the row opened). A target whose root does not
 appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
 a decision only when it has text (`hasDecisionText`). The search reads the text nodes, joined by one virtual space at every block boundary, `<br>` and skipped hidden subtree, and paints with
 the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-current)`); it adds,

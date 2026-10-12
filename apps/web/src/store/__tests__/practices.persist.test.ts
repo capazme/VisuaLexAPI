@@ -24,6 +24,7 @@ const reload = (saved: Persisted, current: AppState = initial) => options().merg
 const SLICE_EMPTY = {
   practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, practiceNotice: null,
 };
+const BACKUP_KEY = 'visualex-storage.v0-backup';
 let initial: AppState;
 
 beforeEach(() => {
@@ -33,6 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  localStorage.removeItem(BACKUP_KEY);
 });
 
 const practice = (id: string, label: string, more: Partial<Practice> = {}): Practice => ({
@@ -93,8 +95,9 @@ describe('persist version 1: the saved tabs become practices, once', () => {
     const state = loadV0({ workspaceTabs: twoTabs, practices: [good, { id: 7, label: 'Rotta' }], activePracticeId: 'p1', practicesSeeded: true });
     expect(state.practices).toEqual([good]);
     expect(state.practices[0].acts[0].articles.map(practiceArticleKey)).toEqual([practiceArticleKey(law)]);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0].join(' ')).toContain('practice #1');
+    const lines = warn.mock.calls.map((c) => c.join(' ')).filter((line) => line.includes('could not be restored'));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('practice #1');
   });
 
   it('reads the marker only as `true`: anything else migrates from the tabs', () => {
@@ -105,7 +108,8 @@ describe('persist version 1: the saved tabs become practices, once', () => {
   it('every saved workspace of the P1 fixtures arrives sanitized as it is, its articles with their norma_data untouched', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     for (const [name, tabs] of Object.entries(ALL_SAVED_STATES)) {
-      const { practices } = options().migrate(asStored({ workspaceTabs: tabs }), 0) as { practices: Practice[] };
+      // each load is a migrate then a merge, as the middleware does: no test depends on an earlier load
+      const { practices } = loadV0({ workspaceTabs: tabs });
       // the load's own sanitizer leaves the migration's output as it is: nothing is dropped or re-id'd
       const again = sanitizePractices(asStored(practices));
       expect(again.dropped, name).toEqual([]);
@@ -187,6 +191,61 @@ describe('persist version 1: the saved tabs become practices, once', () => {
     expect(() => options().migrate(hostile, 0)).not.toThrow();
     expect((options().migrate(hostile, 0) as { practices: unknown[] }).practices).toEqual([]);
     expect(error.mock.calls[0].join(' ')).toContain('boom');
+  });
+
+  it('a conversion that throws keeps the settings and the rest, and loses the practices only', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // an array whose items cannot be read: `practicesFromTabs` meets it inside the conversion
+    const unreadable = new Proxy([{}], { get(target, key, receiver) {
+      if (key === 'length' || key === Symbol.iterator || key === 'map' || key === 'forEach' || key === 'flatMap') throw new Error('unreadable');
+      return Reflect.get(target, key, receiver);
+    } });
+    const settings = { theme: 'dark' };
+    const out = options().migrate({ workspaceTabs: unreadable, settings, searchPanelState: { isCollapsed: true } }, 0) as Persisted;
+    expect(out).toMatchObject({ settings, searchPanelState: { isCollapsed: true }, practices: [], activePracticeId: null });
+    expect(out).not.toHaveProperty('workspaceTabs');
+    expect(error.mock.calls.map((c) => c.join(' ')).join('\n')).toContain('unreadable');
+  });
+
+  it('copies the raw version-0 value to a backup key before migrating, once', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const raw = JSON.stringify({ state: { workspaceTabs: twoTabs, highestZIndex: 7 }, version: 0 });
+    localStorage.setItem(options().name, raw);
+    loadV0({ workspaceTabs: twoTabs });
+    expect(localStorage.getItem(BACKUP_KEY)).toBe(raw);
+    // a second load does not overwrite the first copy
+    localStorage.setItem(options().name, JSON.stringify({ state: { workspaceTabs: [] }, version: 0 }));
+    loadV0({ workspaceTabs: [] });
+    expect(localStorage.getItem(BACKUP_KEY)).toBe(raw);
+    localStorage.removeItem(options().name);
+  });
+
+  it('a backup that cannot be written is logged and the migration goes on', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem(options().name, '{"state":{},"version":0}');
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
+    expect(loadV0({ workspaceTabs: twoTabs }).practices).toHaveLength(2);
+    expect(error.mock.calls.map((c) => c.join(' ')).join('\n')).toContain(BACKUP_KEY);
+    vi.restoreAllMocks();
+    localStorage.removeItem(options().name);
+  });
+
+  it('logs the practices saved without the marker that the tabs replace', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    loadV0({ workspaceTabs: twoTabs, practices: [practice('stale', 'Vecchia')] });
+    expect(warn.mock.calls.map((c) => c.join(' ')).join('\n'))
+      .toContain('practices: 1 saved without the seeding marker, replaced by the ones seeded from the tabs');
+  });
+
+  it('a migration that left a notice does not leak it into the next load, whatever the order', () => {
+    const tabs = [
+      tab('tab-norm', 'Codice civile', 1, [block('blk', CC_RD, [article(CC_RD, '1223', { allegato: '2' })])]),
+      searchTab('s1', 'Tema: a', 2, { tema: 'a' }),
+      searchTab('s2', 'Tema: b', 9, { tema: 'b' }),
+    ];
+    expect(options().migrate(asStored({ workspaceTabs: tabs }), 0)).toBeDefined(); // migrated, never merged
+    expect(loadV0({ practices: [], practicesSeeded: true }).practiceNotice).toBeNull();
   });
 
   it('a version-1 state is not migrated again: leftover tabs and a marker in it are ignored', () => {
