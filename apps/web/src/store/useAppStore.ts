@@ -29,6 +29,7 @@ import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isPracticeTableEnabled } from '../features/practice/featureFlag';
+import { isDesktopViewport } from '../hooks/useIsDesktop';
 import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
@@ -497,6 +498,12 @@ interface AppState {
      * Session-only, absent from `partialize`.
      */
     decisionFocusRequest: string | null;
+    /**
+     * The id of a light window that should take keyboard focus: set when a subject already shown in
+     * a window is asked for again (a link, the way back), so the reader sees which one it is. Taken
+     * once by the window (`takeWindowFocusRequest`). Session-only, absent from `partialize`.
+     */
+    windowFocusRequest: string | null;
 
     // Search State
     searchTrigger: SearchParams | null;
@@ -541,6 +548,8 @@ interface AppState {
     requestOpenDecision: (reference: DecisionReference) => void;
     drainPendingDecision: () => string | null;
     takeDecisionFocusRequest: (tabId: string) => boolean;
+    /** True, and the request cleared in the same step, when the window `id` was asked to take focus. */
+    takeWindowFocusRequest: (id: string) => boolean;
     addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
     addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
     focusArticleInTab: (tabId: string, articleId: string) => void;
@@ -1024,12 +1033,16 @@ const appStore = createStore<AppState>()(
                 const practiceId = landing.practice.id;
                 const existing = landing.practice.decisions.find((d) => sameDecision(d.reference, reference));
                 const decisionId = existing?.id ?? uuidv4();
-                // Already there, its window already open, in the active practice: nothing to write.
+                // The window already showing it, if any: asked again, it takes focus (carry-over 11).
+                const shownId = landing.practice.beside.find((b) => b.kind === 'decision' && b.decisionId === decisionId)?.id;
+                // Already there, its window already open, in the active practice: nothing to write
+                // but the request for that window to take focus.
                 if (existing && landing.practices === before.practices && options.open !== false && options.beside !== false &&
                     before.activePracticeId === practiceId &&
                     besideWith(landing.practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId) === landing.practice.beside &&
                     (existing.identified || existing.reference.archivio || !reference.sezione ||
                         decisionPath(existing.reference) === decisionPath(reference))) {
+                    if (shownId && before.windowFocusRequest !== shownId) set((state) => { state.windowFocusRequest = shownId; });
                     return { practiceId, decisionId };
                 }
                 set((state) => {
@@ -1055,6 +1068,7 @@ const appStore = createStore<AppState>()(
                         state.pendingReveal = { practiceId, rowKey };
                     } else {
                         practice.beside = besideWith(practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId);
+                        if (shownId) state.windowFocusRequest = shownId;
                     }
                 });
                 return { practiceId, decisionId };
@@ -1134,10 +1148,13 @@ const appStore = createStore<AppState>()(
                     return;
                 }
                 const beside = besideWith(practice.beside, ref, askerId);
-                if (beside === practice.beside && get().activePracticeId === practiceId) return;
+                // Already shown: asked again, that window takes focus (carry-over 11).
+                const shownId = beside === practice.beside && isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
+                if (beside === practice.beside && get().activePracticeId === practiceId && (!shownId || get().windowFocusRequest === shownId)) return;
                 set((state) => {
                     state.activePracticeId = practiceId;
                     (state.practices.find((p) => p.id === practiceId) as Practice).beside = beside;
+                    if (shownId) state.windowFocusRequest = shownId;
                 });
             },
 
@@ -1150,6 +1167,7 @@ const appStore = createStore<AppState>()(
             },
             pendingDecision: null,
             decisionFocusRequest: null,
+            windowFocusRequest: null,
             highestZIndex: 100,
             mobileActiveTabId: null,
             structureWindow: {
@@ -1268,6 +1286,7 @@ const appStore = createStore<AppState>()(
                 // a decision asked for, a focus asked for, a citation waiting for the palette
                 state.pendingDecision = null;
                 state.decisionFocusRequest = null;
+                state.windowFocusRequest = null;
                 state.commandPaletteQuery = null;
             }),
 
@@ -1325,11 +1344,17 @@ const appStore = createStore<AppState>()(
 
             // Decision tabs (design 2026-10-05 §2.1-§2.2).
             openDecisionTab: (reference, options) => {
-                // With the practices drawn (P3): an entry of the practice the link reads in, else the
-                // active one, opened in place (spec §6.1; P4 opens it beside on the desktop).
+                // With the practices drawn: an entry of the practice the link reads in, else the active
+                // one, opened to be read (spec §6.1): beside on the desktop, the window the link was
+                // clicked in being the asker, so it is never the one a third window replaces (T16); in
+                // place in the table on a phone (P5 gives it the full-screen reader).
                 if (isPracticeTableEnabled()) {
                     const practiceId = practiceOfPlace(get(), options?.besideTabId) ?? undefined;
-                    return get().openDecision(reference, { practiceId, beside: false }).decisionId;
+                    const askerId = windowIdOf(get(), options?.besideTabId);
+                    return get().openDecision(reference, {
+                        practiceId,
+                        ...(isDesktopViewport() ? { askerId } : { beside: false }),
+                    }).decisionId;
                 }
                 let tabId = '';
                 set((state) => {
@@ -1371,13 +1396,17 @@ const appStore = createStore<AppState>()(
                     const ref: BesideRef = { id: topicWindowId(landing.practice.id, query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
                     const beside = besideWith(landing.practice.beside, ref);
                     const shownId = beside.find((b) => b.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(query))?.id ?? ref.id;
-                    if (beside === landing.practice.beside && landing.practices === before.practices && before.activePracticeId === landing.practice.id) {
+                    const alreadyShown = beside === landing.practice.beside;
+                    if (alreadyShown && landing.practices === before.practices && before.activePracticeId === landing.practice.id &&
+                        (before.windowFocusRequest === shownId || !isDesktopViewport())) {
                         return shownId;
                     }
                     set((state) => {
                         if (landing.practices !== before.practices) state.practices.push(landing.practice);
                         state.activePracticeId = landing.practice.id;
                         (state.practices.find((p) => p.id === landing.practice.id) as Practice).beside = beside;
+                        // Asked again, the window already showing the topic takes focus (a phone has no windows).
+                        if (alreadyShown && isDesktopViewport()) state.windowFocusRequest = shownId;
                     });
                     return shownId;
                 }
@@ -1442,6 +1471,12 @@ const appStore = createStore<AppState>()(
             takeDecisionFocusRequest: (tabId) => {
                 if (get().decisionFocusRequest !== tabId) return false;
                 set((state) => { state.decisionFocusRequest = null; });
+                return true;
+            },
+
+            takeWindowFocusRequest: (id) => {
+                if (get().windowFocusRequest !== id) return false;
+                set((state) => { state.windowFocusRequest = null; });
                 return true;
             },
 
@@ -3712,16 +3747,27 @@ function landingPractice(
     return { practices: [...practices, created], practice: created, activePracticeId: created.id };
 }
 
+/** The window of `practiceId` showing `subject` while its row is folded because of it (desktop only:
+ *  a phone draws no window and folds no row), else undefined. */
+function foldedBy(state: AppState, practiceId: string, subject: PracticeSubject): string | undefined {
+    if (!isDesktopViewport()) return undefined;
+    const practice = state.practices.find((p) => p.id === practiceId);
+    return practice ? shownWindowId(practice.beside, besideRefFor(subject)) : undefined;
+}
+
 /** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. The row moves
  *  to the end of `practiceRows`, open already or not: the act's last row there is the one its block
- *  reads from (Studio, the arrows). */
+ *  reads from (Studio, the arrows). A row folded because a window shows its article is not scrolled
+ *  to: the window is focused instead (spec §4.2, «a subject already shown beside is focused»). */
 function revealRow(state: AppState, practiceId: string, actId: string, articleKey: string): void {
     const rowKey = articleRowKey(practiceId, actId, articleKey);
     const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
     if (act) act.isCollapsed = false;
     delete state.practiceRows[rowKey];
     state.practiceRows[rowKey] = true;
-    state.pendingReveal = { practiceId, rowKey };
+    const window_ = foldedBy(state, practiceId, { kind: 'article', actId, articleKey });
+    if (window_) state.windowFocusRequest = window_;
+    else state.pendingReveal = { practiceId, rowKey };
 }
 
 /** Closes the open rows under `key` (a prefix, or exactly that key) and drops a reveal of one. */
@@ -3801,7 +3847,10 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
     state.activePracticeId = practice.id;
     const { subject } = entry;
     if (entry.place === 'beside') {
-        practice.beside = besideWith(practice.beside, besideRefFor(subject));
+        const ref = besideRefFor(subject);
+        const shownId = isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
+        practice.beside = besideWith(practice.beside, ref);
+        if (shownId) state.windowFocusRequest = shownId;
     } else if (subject.kind === 'article') {
         revealRow(state, practice.id, subject.actId, subject.articleKey);
     } else {
@@ -3813,7 +3862,21 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
 function revealDecisionRow(state: AppState, practiceId: string, decisionId: string): void {
     const rowKey = decisionRowKey(practiceId, decisionId);
     state.practiceRows[rowKey] = true;
-    state.pendingReveal = { practiceId, rowKey };
+    const window_ = foldedBy(state, practiceId, { kind: 'decision', decisionId });
+    if (window_) state.windowFocusRequest = window_;
+    else state.pendingReveal = { practiceId, rowKey };
+}
+
+/** The id of the window of `beside` already showing `ref`'s subject, whatever its id; undefined when none. */
+function shownWindowId(beside: BesideRef[], ref: BesideRef): string | undefined {
+    return beside.find((b) => b.id === ref.id || sameBesideSubject(b, ref) ||
+        (b.kind === 'decision-search' && ref.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(ref.query)))?.id;
+}
+
+/** `placeId` when it names a light window of some practice (the asker of a link, T16); else undefined:
+ *  a practice (a row of the table) or an old tab asks nothing of the windows. */
+function windowIdOf(state: Pick<AppState, 'practices'>, placeId: string | undefined): string | undefined {
+    return placeId && state.practices.some((p) => p.beside.some((b) => b.id === placeId)) ? placeId : undefined;
 }
 
 /** The practice a link's `besideTabId` reads in: a practice (a row of its table) or the practice

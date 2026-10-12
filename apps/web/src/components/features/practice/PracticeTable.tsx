@@ -8,19 +8,18 @@ import { practiceCountLine, practiceCounts, type Practice } from '../../../utils
 import { CLOSE_PRACTICE_MESSAGE, isEmptyPractice } from './practiceView';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
-import { PracticeTopicSearches } from './PracticeTopicSearches';
 import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
 
 export interface PracticeTableProps {
   onViewPdf: (urn: string) => void;
-  onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
+  onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => void;
   streaming: PracticeStreaming | null;
 }
 
 /**
  * The active practice's table on the desktop (spec §3): its header (name, count line, «Salva come
- * dossier», «⋯»), the streaming bar of a search landing in it, the topic searches' band (P3, T8),
- * then its column. An empty practice says so. (The migration's notice is `SearchPanel`'s, over both layouts.)
+ * dossier», «⋯»), the streaming bar of a search landing in it, then its column. An empty practice
+ * says so. Topic searches are windows beside it (`ReadingRow`, T8); the phone's table keeps its band. (The migration's notice is `SearchPanel`'s, over both layouts.)
  */
 export function PracticeTable({ onViewPdf, onCrossReference, streaming }: PracticeTableProps) {
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
@@ -32,10 +31,7 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming }: Practi
       {isEmptyPractice(practice) ? (
         <PracticeEmpty />
       ) : (
-        <>
-          <PracticeTopicSearches practiceId={practice.id} />
-          <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
-        </>
+        <PracticeColumn practiceId={practice.id} onViewPdf={onViewPdf} onCrossReference={onCrossReference} />
       )}
     </div>
   );
@@ -50,7 +46,7 @@ function PracticeHeader({ practice }: { practice: Practice }) {
   const save = usePracticeSaveActions(practice.id);
 
   return (
-    <header className="flex items-start gap-2 px-1">
+    <header data-pinned-head className="flex items-start gap-2 px-1">
       <div className="min-w-0 flex-1">
         {editing ? (
           <PracticeNameInput

@@ -451,9 +451,13 @@ outside. Below 768 px there are no windows (§8).
 
 **4.4 Where the find window opens.** PR 4d opens the find window at the top right of the results
 area, which with windows beside is the right-hand window's header and its ×. So `ReadingRow`
-gives the find window its default place: with no window, PR 4d's; with windows beside, the top
-right of the table's column, under the practice header; with the rail, the top of the first
-window's body, under its header. A place the user dragged it to is kept for the session and
+gives the find window its default place, in every case right-aligned in its target column and
+under the stack pinned at that column's top, so it never covers a control: the practice header, the
+first act's heading (sticky from `md`) and an open row's pinned reading bar, and below every window's
+header. The target is the table's column (with no window as well as with windows beside) or, with the
+rail, the first window's body. The stack is followed from the top while each element starts where the
+last one ends; one so deep that the window would run off the screen is bounded to its first group
+(header, first heading, pinned bar). A place the user dragged it to is kept for the session and
 clamped, as PR 4d does.
 
 **4.5 What opens beside, and what goes back.** «Apri accanto» on a row; a decision opened from any

@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { isPracticeBackEntry, peekReadingBack } from '../../../utils/readingBackStack';
+import { isPracticeBackEntry, peekReadingBack, type PracticeBackEntry } from '../../../utils/readingBackStack';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 
@@ -18,14 +18,25 @@ import { Z_INDEX } from '../../../constants/zIndex';
  */
 interface ReadingBackControlProps {
   /**
-   * Fired with the tab that was returned to, or the practice (flag on). The mobile layout tracks the
-   * visible tab in its own index rather than through the store's front-tab
-   * ordering, so it needs telling; on desktop nothing has to listen.
+   * Fired with the tab that was returned to, or the practice (flag on) and, for a practice, the entry
+   * walked back to: its subject and whether it was read in the table or beside it (spec §6.3), for
+   * a view that must follow (the phone's reader, P5). The mobile layout tracks the visible tab in
+   * its own index rather than through the store's front-tab ordering, so it needs telling; on
+   * desktop nothing has to listen.
    */
-  onNavigated?: (tabId: string) => void;
+  onNavigated?: (tabId: string, entry?: PracticeBackEntry) => void;
+  /**
+   * Where the control floats. `top` (the default, flag off) is the old tabs' place, centred at the
+   * top. With the practices it would sit on the top act's sticky heading and over a window's
+   * header, so `bottom` puts it centred above the bar of practices, `bottomOffset` px from the
+   * viewport's bottom: the bottom is the one edge the table, its headings and its windows leave free.
+   */
+  placement?: 'top' | 'bottom';
+  bottomOffset?: number;
 }
 
-export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
+export function ReadingBackControl({ onNavigated, placement = 'top', bottomOffset = 16 }: ReadingBackControlProps) {
+  const atBottom = placement === 'bottom';
   const { readingBackStack, workspaceTabs, practices, popReadingBack, bringTabToFront, focusArticleInTab } =
     useAppStore(useShallow(s => ({
       readingBackStack: s.readingBackStack,
@@ -46,7 +57,7 @@ export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
     // A practice's entry is walked back to by the store itself (spec §6.3: its practice made active,
     // its row revealed); only the flag pushes one. The listener learns which practice.
     if (isPracticeBackEntry(entry)) {
-      onNavigated?.(entry.practiceId);
+      onNavigated?.(entry.practiceId, entry);
       return;
     }
     bringTabToFront(entry.tabId);
@@ -58,11 +69,12 @@ export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
     <AnimatePresence>
       {target && (
         <motion.div
-          initial={{ opacity: 0, y: -8, x: '-50%' }}
+          initial={{ opacity: 0, y: atBottom ? 8 : -8, x: '-50%' }}
           animate={{ opacity: 1, y: 0, x: '-50%' }}
-          exit={{ opacity: 0, y: -8, x: '-50%' }}
+          exit={{ opacity: 0, y: atBottom ? 8 : -8, x: '-50%' }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className={cn('fixed top-4 left-1/2 px-4', Z_INDEX.structure)}
+          style={atBottom ? { bottom: bottomOffset } : undefined}
+          className={cn('fixed left-1/2 px-4', !atBottom && 'top-4', Z_INDEX.structure)}
         >
           <button
             onClick={handleBack}

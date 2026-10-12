@@ -750,6 +750,8 @@ export function TreeViewPanel({
             exit={{ opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
             aria-label={`${title} — finestra`}
+            // A tool held over the table: a press in it is not a click away from the rail's overlay.
+            data-floating-tool
             className={cn(
               "fixed top-0 left-0 max-h-[76vh] rounded-2xl overflow-hidden",
               "bg-white dark:bg-slate-900 shadow-2xl flex flex-col",

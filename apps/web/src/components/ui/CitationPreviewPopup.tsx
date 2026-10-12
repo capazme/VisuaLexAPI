@@ -119,6 +119,8 @@ export function CitationPreviewPopup({
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           role="tooltip"
+          // Holds links: a press in it is not a click away from a practice's folded-table overlay.
+          data-floating-tool
           aria-live="polite"
         >
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">

@@ -155,6 +155,8 @@ export function FootnoteTooltip({
           <div
             ref={tooltipRef}
             role="tooltip"
+            // Holds links: a press in it is not a click away from a practice's folded-table overlay.
+            data-floating-tool
             className={cn('fixed max-w-xs w-full animate-in fade-in-0 zoom-in-95 duration-150', Z_INDEX.tooltip)}
             style={{
               top: position.top,

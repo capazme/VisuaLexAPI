@@ -10,6 +10,10 @@ import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { frontTabId as computeFrontTabId } from '../../../utils/findScope';
 import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 import {
+  FIND_WINDOW_ESTIMATED_HEIGHT,
+  FIND_WINDOW_MARGIN,
+  FIND_WINDOW_WIDTH,
+  findWindowDefaultPlace,
   reportFindWindowScope,
   subscribeFindWindow,
   type FindWindowRequest,
@@ -20,10 +24,10 @@ import { counterText, ICON_BUTTON } from './findBarParts';
 const PLACE_KEY = 'visualex:find-window-place';
 const SCOPE_KEY = 'visualex:find-window-scope';
 /** About 420 px wide on a desktop (spec §13.1). */
-const WIDTH = 420;
-const MARGIN = 16;
+const WIDTH = FIND_WINDOW_WIDTH;
+const MARGIN = FIND_WINDOW_MARGIN;
 /** Two lines: the field row and the scope row (used until the element is measured). */
-const ESTIMATED_HEIGHT = 80;
+const ESTIMATED_HEIGHT = FIND_WINDOW_ESTIMATED_HEIGHT;
 const KEY_STEP = 16;
 
 interface Place {
@@ -68,8 +72,11 @@ function savePlace(place: Place): void {
   }
 }
 
-/** Top right of the results area, 16 px in. */
+/** The place a layout set (the windows beside a practice's table, spec §4.4), else the top right of
+ *  the results area, 16 px in. */
 function defaultPlace(): Place {
+  const layout = findWindowDefaultPlace();
+  if (layout) return layout;
   const origin = workspaceOrigin();
   return { x: origin.left + origin.width - WIDTH - MARGIN, y: origin.top + MARGIN };
 }
@@ -284,6 +291,7 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
       role="search"
       aria-label="Cerca nel testo"
       data-testid="find-window"
+      data-floating-tool
       onKeyDown={onKeyDown}
       style={isDesktop ? { left: place.x, top: place.y, width: WIDTH } : undefined}
       className={cn(

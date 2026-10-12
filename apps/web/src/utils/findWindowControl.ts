@@ -31,6 +31,35 @@ export function closeFindWindow(): void {
   for (const listener of commandListeners) listener({ type: 'close' });
 }
 
+/** The floating window's width on a desktop (spec §13.1), and how far it keeps from an edge. */
+export const FIND_WINDOW_WIDTH = 420;
+export const FIND_WINDOW_MARGIN = 16;
+/** Its height before it is measured: the field row and the scope row. */
+export const FIND_WINDOW_ESTIMATED_HEIGHT = 80;
+
+/** A place for the window: its top-left corner, in viewport coordinates (it is `position: fixed`). */
+export interface FindWindowPlace {
+  x: number;
+  y: number;
+}
+
+let defaultPlaceSource: FindWindowPlace | (() => FindWindowPlace | null) | null = null;
+
+/**
+ * Where the window opens when the user has not dragged it this session (spec §4.4): a layout that
+ * puts something where the default would land (the windows beside a practice's table) sets its own
+ * place. A function is asked each time the window opens, since a layout moves with the page's
+ * scroll; `null` goes back to the default, the top right of the results area.
+ */
+export function setFindWindowDefaultPlace(place: FindWindowPlace | (() => FindWindowPlace | null) | null): void {
+  defaultPlaceSource = place;
+}
+
+/** The place a layout set, or null when none did (or its function has nothing to say). */
+export function findWindowDefaultPlace(): FindWindowPlace | null {
+  return typeof defaultPlaceSource === 'function' ? defaultPlaceSource() : defaultPlaceSource;
+}
+
 export function subscribeFindWindow(listener: (command: FindWindowCommand) => void): () => void {
   commandListeners.add(listener);
   return () => {

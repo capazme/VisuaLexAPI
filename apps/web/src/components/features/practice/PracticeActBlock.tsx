@@ -187,6 +187,8 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
           row's sticky toolbar, which slides up under it as the row ends). */}
       <header
         ref={headerRef}
+        // Pinned at the top of its column from `md`: the find window opens under it (`ReadingRow`).
+        data-pinned-head
         className={cn(
           // On a phone the title and its meta line take the whole width and the tools wrap under
           // them (four 44 px buttons beside the title left it a word wide); from `md` one row. Sticky

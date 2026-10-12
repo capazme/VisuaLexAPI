@@ -14,6 +14,8 @@ export interface DecisionAnswerBodyProps {
   hostId: string;
   /** Where the way back returns to inside the host (`DecisionReadingSurface.hostBlockId`). */
   hostBlockId?: string;
+  /** The id the find window knows the reading place by, when it is not `hostId` (a window's practice). */
+  findHostId?: string;
   /** The id `decisionFocusRequest` names when this reading place is asked to take focus. */
   focusId: string;
   /** A found answer: the holder learns the identity. Stable (it is an effect's dependency). */
@@ -32,7 +34,7 @@ export interface DecisionAnswerBodyProps {
  * of one holder may be mounted, one hidden: only the copy on screen records and takes focus.
  */
 export function DecisionAnswerBody({
-  reference, hostId, hostBlockId, focusId, onFound, needsRecord, onRecorded,
+  reference, hostId, hostBlockId, findHostId, focusId, onFound, needsRecord, onRecorded,
 }: DecisionAnswerBodyProps) {
   const openPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const takeFocusRequest = useAppStore((s) => s.takeDecisionFocusRequest);
@@ -82,6 +84,7 @@ export function DecisionAnswerBody({
             attributi={answer.attributi}
             hostTabId={hostId}
             hostBlockId={hostBlockId}
+            findHostId={findHostId}
           />
         ) : undefined}
         noTextSlot={answer?.esito === 'trovata' ? (
@@ -99,6 +102,8 @@ export interface DecisionEntryViewProps {
   reference: DecisionReference;
   /** The reading place: the practice for its row, the window's id for a window. */
   hostId: string;
+  /** The id the find window knows it by when `hostId` is a window's: the window's practice (spec §6.6). */
+  findHostId?: string;
 }
 
 /**
@@ -108,7 +113,7 @@ export interface DecisionEntryViewProps {
  * focus); the Cronologia is told once per opening, the key kept on the entry (carry-over ruling 13).
  * The way back from a norm it cites names this entry, so it reveals the row or reopens the window.
  */
-export function DecisionEntryView({ practiceId, decisionId, reference, hostId }: DecisionEntryViewProps) {
+export function DecisionEntryView({ practiceId, decisionId, reference, hostId, findHostId }: DecisionEntryViewProps) {
   const setIdentity = useAppStore((s) => s.setDecisionEntryIdentity);
   const markRecorded = useAppStore((s) => s.markDecisionEntryRecorded);
 
@@ -128,6 +133,7 @@ export function DecisionEntryView({ practiceId, decisionId, reference, hostId }:
       reference={reference}
       hostId={hostId}
       hostBlockId={decisionId}
+      findHostId={findHostId}
       focusId={decisionId}
       onFound={onFound}
       needsRecord={needsRecord}

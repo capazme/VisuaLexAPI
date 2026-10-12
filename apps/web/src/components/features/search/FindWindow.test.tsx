@@ -21,7 +21,7 @@ import type { ArticleData, NormaVisitata } from '../../../types';
 import { buildItemKey } from '../../../utils/normaKeys';
 import { versionKey } from '../../../utils/versionDisplay';
 import { registerFindRoot } from '../../../utils/findTargets';
-import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
+import { closeFindWindow, openFindWindow, setFindWindowDefaultPlace } from '../../../utils/findWindowControl';
 import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { FakeHighlight } from '../../../utils/__fixtures__/openFind';
 import { shortNorm } from '../../../utils/sources';
@@ -104,6 +104,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => closeFindWindow());
+  setFindWindowDefaultPlace(null);
   while (cleanups.length) cleanups.pop()?.();
   vi.useRealTimers();
   g.CSS = saved.css;
@@ -451,6 +452,61 @@ describe('FindWindow — its place', () => {
     render(<FindWindow />);
     act(() => openFindWindow());
     expect(parseFloat(win().style.top)).toBe(16);
+  });
+
+  describe('a default place a layout sets (spec §4.4)', () => {
+    it('opens there instead of at the top right of the results area', () => {
+      setFindWindowDefaultPlace({ x: 120, y: 90 });
+      render(<FindWindow />);
+      act(() => openFindWindow());
+      expect(win().style.left).toBe('120px');
+      expect(win().style.top).toBe('90px');
+    });
+
+    it('asks a function each time the window opens, so the place follows the layout', () => {
+      let y = 90;
+      setFindWindowDefaultPlace(() => ({ x: 120, y }));
+      render(<FindWindow />);
+      act(() => openFindWindow());
+      expect(win().style.top).toBe('90px');
+      act(() => closeFindWindow());
+      y = 140;
+      act(() => openFindWindow());
+      expect(win().style.top).toBe('140px');
+    });
+
+    it('falls back to the top right of the results area when the function has nothing to say, and on null', () => {
+      setFindWindowDefaultPlace(() => null);
+      render(<FindWindow />);
+      act(() => openFindWindow());
+      expect(win().style.top).toBe('16px');
+      act(() => closeFindWindow());
+      setFindWindowDefaultPlace({ x: 10, y: 10 });
+      setFindWindowDefaultPlace(null);
+      act(() => openFindWindow());
+      expect(win().style.top).toBe('16px');
+    });
+
+    it('is clamped into the viewport like any other place', () => {
+      setFindWindowDefaultPlace({ x: 99999, y: -50 });
+      render(<FindWindow />);
+      act(() => openFindWindow());
+      expect(parseFloat(win().style.left)).toBe(window.innerWidth - 420);
+      expect(win().style.top).toBe('0px');
+    });
+
+    it('a place the user dragged it to wins, and is kept for the session', () => {
+      setFindWindowDefaultPlace({ x: 120, y: 90 });
+      render(<FindWindow />);
+      act(() => openFindWindow());
+      fireEvent.keyDown(handle(), { key: 'ArrowRight' });
+      expect(win().style.left).toBe('136px');
+      act(() => closeFindWindow());
+      setFindWindowDefaultPlace({ x: 300, y: 300 });
+      act(() => openFindWindow());
+      expect(win().style.left).toBe('136px');
+      expect(win().style.top).toBe('90px');
+    });
   });
 
   it('is above the search panel and below the overlay band', () => {
