@@ -86,7 +86,11 @@ function findHeads(text: string, folded: string, within: boolean): Head[] {
   const supported = new Set(heads.map((h) => h.start));
   for (const m of folded.matchAll(UNSUPPORTED_HEADS)) {
     const start = m.index ?? 0;
-    if (!supported.has(start)) heads.push({ start, end: start + m[0].length, court: true, section: false, unsupported: true });
+    const end = start + m[0].length;
+    // «CTP» is also the consulente tecnico di parte: a court only with a place name after it («CTP Milano»)
+    const bare = /^ct[pr]$/i.test(m[0]);
+    if (bare && !(text.slice(start, end) === m[0].toUpperCase() && /^\s+\p{Lu}/u.test(text.slice(end, end + 40)))) continue;
+    if (!supported.has(start)) heads.push({ start, end, court: true, section: false, unsupported: true });
   }
   for (const m of folded.matchAll(CASE_HEADS)) {
     const start = m.index ?? 0;
@@ -163,11 +167,10 @@ const CITATION_WORDS = new Set([
 const ROMAN = /^[ivx]+$/;
 
 // Between two pieces of one citation (the number, its date, its deposit) only the words that join them.
-const JOINING_WORDS = new Set([
-  'del', 'dell', 'il', 'in', 'data', 'dep', 'depositata', 'depositato', 'deposito',
-  // the kind of decision between its date and its number: «15 aprile 2020, ord. n. 7890»
-  'sent', 'sentenza', 'ord', 'ordinanza', 'decr', 'decreto',
-]);
+const JOINING_WORDS = new Set(['del', 'dell', 'il', 'in', 'data', 'dep', 'depositata', 'depositato', 'deposito']);
+// The kind of decision between its date and its number: «15 aprile 2020, ord. n. 7890». After the number it
+// is not the citation's: «n. 1234, il decreto 3 marzo 2021» is another act, whose date is not the year.
+const JOINING_BEFORE_NUMBER = new Set([...JOINING_WORDS, 'sent', 'sentenza', 'ord', 'ordinanza', 'decr', 'decreto']);
 const MONTHS = 'gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre';
 // A date, or a range of days («18-25 luglio 1997»), is the citation's own when it stands between its pieces.
 const DATES = new RegExp(
@@ -184,7 +187,7 @@ function citationGap(written: string, words: ReadonlySet<string>, properNames: b
   for (const m of plain.matchAll(/\p{L}+/gu)) {
     const word = foldForSearch(m[0]);
     // single letters and Roman numerals (a section) stand in a preamble, never between the pieces of a number
-    if (words.has(word) || (words !== JOINING_WORDS && (word.length <= 1 || ROMAN.test(word)))) continue;
+    if (words.has(word) || (words !== JOINING_WORDS && words !== JOINING_BEFORE_NUMBER && (word.length <= 1 || ROMAN.test(word)))) continue;
     if (properNames && /^\p{Lu}/u.test(m[0])) continue;
     return false;
   }
@@ -249,8 +252,11 @@ export function extractDecisionCitations(
     const properNames = read.reference.corte === 'tar';
     let cursor = at(Math.max(read.headEnd, prefix.length));
     let clean = true;
-    pieces.forEach(([from, to], i) => {
-      if (at(from) > cursor && !citationGap(text.slice(cursor, at(from)), i === 0 ? CITATION_WORDS : JOINING_WORDS, properNames)) clean = false;
+    const number = read.words[0]; // the parsers list the number (or the pair) first
+    pieces.forEach((piece, i) => {
+      const [from, to] = piece;
+      const allowed = i === 0 ? CITATION_WORDS : piece === number ? JOINING_BEFORE_NUMBER : JOINING_WORDS;
+      if (at(from) > cursor && !citationGap(text.slice(cursor, at(from)), allowed, properNames)) clean = false;
       cursor = Math.max(cursor, at(to));
     });
     if (!clean) continue;

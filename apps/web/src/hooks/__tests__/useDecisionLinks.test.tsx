@@ -252,6 +252,28 @@ describe('leaving a decision link and coming back (the hide delay)', () => {
     expect(spies.hidePreview).not.toHaveBeenCalled();
   });
 
+  it('moving straight to another citation keeps the pointer’s preview: no hide, the new one asked for', () => {
+    const spies = { showPreview: vi.fn(), hidePreview: vi.fn() };
+    const html = wrapDecisionCitationsInHtml('<p>Cass. n. 1/2020 e Corte cost. n. 71/2020</p>', { now: NOW });
+    function Two() {
+      const ref = useRef<HTMLDivElement>(null);
+      const hovering = useRef(false);
+      useCitationLinks(ref, {
+        decisions: { onOpen: vi.fn(), showPreview: spies.showPreview, hidePreview: spies.hidePreview, cancelPending: vi.fn(), isHoveringPopupRef: hovering },
+      });
+      return <div ref={ref} data-testid="host" dangerouslySetInnerHTML={{ __html: html }} />;
+    }
+    render(<Two />);
+    const [a, b] = parts();
+    fireEvent.mouseEnter(a);
+    fireEvent.mouseLeave(a, { relatedTarget: b });
+    vi.advanceTimersByTime(50);
+    fireEvent.mouseEnter(b);
+    vi.advanceTimersByTime(500);
+    expect(spies.hidePreview).not.toHaveBeenCalled();
+    expect(spies.showPreview).toHaveBeenLastCalledWith(b, expect.objectContaining({ corte: 'corte_costituzionale' }), '/sentenze/corte-costituzionale/71/2020');
+  });
+
   it('hides it when the pointer stays away', () => {
     const spies = { showPreview: vi.fn(), hidePreview: vi.fn() };
     render(<Spy spies={spies} />);
