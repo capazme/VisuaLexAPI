@@ -289,7 +289,7 @@ the first act's heading, an open row's toolbar, each marked `data-pinned-head` �
 header, so never over a control; a dragged place wins; a tool held over the table carries
 `data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
 is not in the session's cache); reaching an undrawn match opens its row with its practice made active
-(`revealPracticeRow`, `revealPracticeDecision`), and the window recomputes on a practice switched, a
+(`revealPracticeRow`, `revealPracticeDecision`; on a phone the full-screen reader is closed first, so the row is on screen — a match in the reader's own subject is drawn and needs nothing), and the window recomputes on a practice switched, a
 row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
 (it carries the section), an article's `shortNorm`. The window is dragged by its handle (pointer or arrow keys), its
 place kept in sessionStorage and clamped; on a phone it is a full-width top bar, not draggable (gotcha
@@ -536,7 +536,7 @@ so a past text comes back as itself), else found through `findPracticeArticle`,
 live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
 practice made active, the row revealed or the window reopened, or an open window asked to take focus
 through `windowFocusRequest`, a one-shot signal the window takes atomically; `ReadingBackControl` tells
-its `onNavigated` the practice's id and the entry; a topic-search window is never a target); any other entry is kept as given. An entry naming a practice is the
+its `onNavigated` the practice's id and the entry; a topic-search window is never a target; on a phone the same step opens the full-screen reader on a subject read beside, or closes it for a row of the table, since a phone has no windows); any other entry is kept as given. An entry naming a practice is the
 practice's even while a tab of the same id is still stored (a seeded practice keeps its tab's id):
 with the flag on the practices are what is drawn, and `moveActToPractice` rewrites only practice entries.
 
@@ -1014,17 +1014,28 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/practice/` — the norm-tab redesign, behind `VITE_FEATURE_PRACTICE_TABLE` (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
   header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, then
-  `PracticeColumn`; the topic searches are windows beside it on the desktop, and `PracticeTopicSearches`
-  is the band of the phone's table, `PracticePhoneView`); `PracticeColumn` (the acts, dragged
+  `PracticeColumn`; the topic searches are windows beside it on the desktop and the full-screen reader's
+  subject on a phone); `PracticeColumn` (the acts, dragged
   into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act: its sticky
   heading with Studio, Struttura, PDF and «⋯», the index line of its rows, the rows; the structure
   window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
   only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
   `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
-  and on the desktop «Apri accanto»: a row whose subject a window shows folds and says «Aperto accanto ·
-  Chiudi la finestra», so one subject has one mounted reading surface, T5; a phone draws neither);
+  «Apri accanto» (on the desktop a row whose subject a window shows folds and says «Aperto accanto ·
+  Chiudi la finestra», so one subject has one mounted reading surface, T5; on a phone it opens the
+  full-screen reader and no row ever folds));
   `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place, a «⋯» per chip);
-  `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column);
+  `PracticePhoneView` (the phone's table: chevrons, the name — a tap lists the practices with «Nuova
+  pratica» — and dots, the count line with «Salva come dossier» and its «⋯» (`usePracticeSaveActions`),
+  over the same column; while `phoneReader` is set it draws `ReadingFullScreen` in the column's place
+  — the column is not kept mounted under it, gotcha 26 — and gives the column back at the scroll
+  position of the page's content scroller it left) and `ReadingFullScreen` (the phone's reader, T19:
+  «‹ Pratica» at 44 px, the title, and `ReadingWindow`'s own body — `ReadingWindowBody` — for what
+  `phoneReader` names: an article, a decision or a topic search). `phoneReader` (`{ practiceId, ref }`)
+  is session state of its own, never saved and never the desktop's `beside`: `openPhoneReader`,
+  `closePhoneReader`; on a phone `openDecisionTab` and `openDecisionSearchTab` set it and touch
+  neither `beside` nor the rows, the way back sets or clears it, a screen that widens clears it
+  (`SearchPanel`), a reload starts on the table;
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
@@ -1052,8 +1063,9 @@ meant to stay split; add new features as new files, not inside the shells:
   `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with
   the flag off none of it is loaded; with it on, a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window
-  replaces) or in place on a phone (`isDesktopViewport`), a norm cited in a window enters its act and
-  opens beside that window (`SearchPanel`: `besideTabId` naming a window), and searches, the index, topic searches and
+  replaces) or in the full-screen reader on a phone (`isDesktopViewport`), a norm cited in a window (or
+  in the reader) enters its act and opens beside that window (in the reader, on a phone; `SearchPanel`:
+  `besideTabId` naming a window or the reader's subject), and searches, the index, topic searches and
   the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread, identified
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.

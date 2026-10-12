@@ -40,14 +40,20 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
   const removePracticeDecision = useAppStore((s) => s.removePracticeDecision);
   const openBeside = useAppStore((s) => s.openBeside);
   const closeBeside = useAppStore((s) => s.closeBeside);
+  const openPhoneReader = useAppStore((s) => s.openPhoneReader);
+  const closePhoneReader = useAppStore((s) => s.closePhoneReader);
   const windowId = decisionWindowId(entry.id);
   const shownBeside = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === windowId) === true);
   const isDesktop = useIsDesktop();
-  const beside = useMemo<RowBeside | undefined>(() => isDesktop ? {
+  const beside = useMemo<RowBeside>(() => isDesktop ? {
     shown: shownBeside,
     onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'decision', decisionId: entry.id })),
     onClose: () => closeBeside(practiceId, windowId),
-  } : undefined, [isDesktop, shownBeside, openBeside, closeBeside, practiceId, entry.id, windowId]);
+  } : {
+    shown: false,
+    onOpen: () => openPhoneReader(practiceId, besideRefFor({ kind: 'decision', decisionId: entry.id })),
+    onClose: closePhoneReader,
+  }, [isDesktop, shownBeside, openBeside, closeBeside, openPhoneReader, closePhoneReader, practiceId, entry.id, windowId]);
   // «Sentenza depositata il …», once the decision was found: beside the label, never guessed.
   const deposit = formatDecisionDeposit({ tipo: entry.tipo, data_deposito: entry.depositDate });
 

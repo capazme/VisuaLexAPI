@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appStore } from '../store/useAppStore';
 import { registerFindRoot } from '../utils/findTargets';
 import { FakeHighlight } from '../utils/__fixtures__/openFind';
-import { articleRowKey, decisionRowKey, practiceArticleKey } from '../utils/practice';
+import { articleRowKey, besideRefFor, decisionRowKey, practiceArticleKey } from '../utils/practice';
 import { decisionKey } from '../utils/decisionLinks';
 import { clearDecisionCache, rememberDecision } from '../utils/decisionFetchCache';
 import { L24, L241, article } from '../utils/__fixtures__/savedWorkspaces';
@@ -53,7 +53,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   appStore.setState({
-    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, workspaceTabs: [], readingBackStack: [],
+    practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, workspaceTabs: [], readingBackStack: [], phoneReader: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
   saved = {
@@ -146,6 +146,60 @@ describe('useFindWindow over the practices (spec §6.6-§6.7)', () => {
     act(() => latest.next());
     expect(latest.current).toMatchObject({ targetKey: decisionKey(READ), onScreen: false });
     expect(s().practiceRows[decisionRowKey(here, read.decisionId)]).toBe(true);
+  });
+
+  describe('on a phone, with the full-screen reader open (spec §6.7)', () => {
+    /** The reader on a read decision of the practice «Responsabilità», its text root registered under the practice. */
+    function readerOnDecision() {
+      const { here, actId } = twoPractices();
+      const read = s().openDecision(READ, { practiceId: here, open: false });
+      s().openPhoneReader(here, besideRefFor({ kind: 'decision', decisionId: read.decisionId }));
+      const element = document.createElement('div');
+      element.textContent = 'il danno da perdita';
+      document.body.appendChild(element);
+      cleanups.push(registerFindRoot({ tabId: here, targetKey: decisionKey(READ), label: 'Cass.', element }));
+      return { here, actId };
+    }
+    const phone = () => {
+      window.matchMedia = ((query: string) => ({
+        matches: false, media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+        addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+    };
+
+    it('going to a match in a closed article row closes the reader first, then reveals the row; the match is drawn once the row mounts', async () => {
+      phone();
+      const { here, actId } = readerOnDecision();
+      render(<Harness query="danno" scope="tab" />);
+      await settle();
+      expect(latest.count).toBe(2);
+      expect(latest.current).toMatchObject({ targetKey: decisionKey(READ), onScreen: true });
+      expect(s().phoneReader).not.toBeNull();
+
+      act(() => latest.next());
+      expect(latest.current).toMatchObject({ targetKey: practiceArticleKey(A5), onScreen: false });
+      expect(s().phoneReader).toBeNull();
+      const rowKey = articleRowKey(here, actId, practiceArticleKey(A5));
+      expect(s().practiceRows[rowKey]).toBe(true);
+      expect(s().pendingReveal).toEqual({ practiceId: here, rowKey });
+      expect(s().activePracticeId).toBe(here);
+
+      act(() => { mountRow(here, A5, '<p>il danno ingiusto</p>'); });
+      await settle(50);
+      expect(latest.current).toMatchObject({ targetKey: practiceArticleKey(A5), onScreen: true });
+    });
+
+    it('a match in the reader\'s own subject is drawn and leaves the reader open', async () => {
+      phone();
+      const { here } = readerOnDecision();
+      // art. 5 and 7 hold no «perdita»: the only match is the reader's own
+      render(<Harness query="perdita" scope="tab" />);
+      await settle();
+      expect(latest.count).toBe(1);
+      act(() => latest.next());
+      expect(latest.current).toMatchObject({ targetKey: decisionKey(READ), onScreen: true });
+      expect(s().phoneReader).toMatchObject({ practiceId: here });
+    });
   });
 
   it('recomputes when the active practice changes, and when a row opens', async () => {

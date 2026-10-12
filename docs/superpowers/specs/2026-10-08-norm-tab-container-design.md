@@ -564,9 +564,11 @@ subject beside (`beside`; on a phone, in the reader). `ReadingBackControl` stays
 without a shortcut. While the flag exists the stack accepts both shapes; P6 drops the tab shape.
 Until P3 draws the practices, an entry still live in a tab stays a tab entry: a seeded practice keeps
 its tab's id and its acts their blocks' ids, so with the flag on in P2 the old surface's way back
-keeps working; P3 drops that preference. Not yet, P4/P5: the back control does not tell the phone
-view (`onNavigated`) to show a practice entry; an already open window gets no focus signal when
-its subject is opened again; a topic-search window is never a way-back target. A window's id is stable for its subject
+keeps working; P3 drops that preference. A topic-search window is never a way-back target. On a phone
+there are no windows: a `beside` entry opens the full-screen reader (`phoneReader`) on its subject,
+and a `table` entry closes the reader and reveals the row, in the same update as the practice made
+active; the reader reads under its subject's window id, so a jump out of it is kept as a `beside`
+entry. A window's id is stable for its subject
 (`articleWindowId`, `decisionWindowId`), and opening a subject already beside, under any id, moves
 nothing. When `setDecisionEntryIdentity` merges an entry into another, its window, open row, reveal
 and back-stack entries name the survivor.

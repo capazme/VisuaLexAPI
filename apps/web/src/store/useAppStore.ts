@@ -412,11 +412,12 @@ interface AppState {
      * the window `askerId` names is never the one replaced, T16); `beside: false` opens and reveals
      * its row; either makes the practice active. `open: false` (the dossier's «Apri tutto», T17)
      * only adds the entry, closed: no window, no row, no reveal, so nothing is fetched; it wins over
-     * `beside`. Nothing routes here before P3 draws the practices.
+     * `beside`. `reader` (a phone) shows it in the full-screen reader instead (`phoneReader`) and
+     * touches neither `beside` nor the rows.
      */
     openDecision: (
         reference: DecisionReference,
-        options?: { practiceId?: string; beside?: boolean; open?: boolean; askerId?: string },
+        options?: { practiceId?: string; beside?: boolean; reader?: boolean; open?: boolean; askerId?: string },
     ) => { practiceId: string; decisionId: string };
     /**
      * Decisions whose identity is already known (a dossier's, opened with «Apri tutto», T17) into
@@ -461,6 +462,18 @@ interface AppState {
     openBeside: (practiceId: string, ref: BesideRef, askerId?: string) => void;
     /** Closes the window; its subject stays in the table (D7). */
     closeBeside: (practiceId: string, refId: string) => void;
+    /**
+     * What the phone's full-screen reader shows (spec §8, T19): one subject of a practice, or a topic
+     * search, or nothing. The phone's own session state, never the desktop's `beside`: a reload, or a
+     * window narrowed below 768 px, lands on the table. Session-only, absent from `partialize`.
+     */
+    phoneReader: { practiceId: string; ref: BesideRef } | null;
+    /** «Apri accanto» on a phone: the reader on `ref`, its practice made active, in one update. A ref
+     *  to something the practice does not hold, or a practice that is not open, opens nothing and is
+     *  warned. */
+    openPhoneReader: (practiceId: string, ref: BesideRef) => void;
+    /** «‹ Pratica»: back to the table. */
+    closePhoneReader: () => void;
 
     /**
      * The tab the phone's carousel shows (`SearchPanel`, below `md`): the one tab on screen there,
@@ -824,6 +837,7 @@ const appStore = createStore<AppState>()(
                 if (closed.acts.some((a) => a.id === state.structureWindow.blockId)) state.structureWindow.blockId = null;
                 state.practices.splice(index, 1);
                 dropRows(state, `${id}/`);
+                if (state.phoneReader?.practiceId === id) state.phoneReader = null;
                 });
             },
 
@@ -835,6 +849,7 @@ const appStore = createStore<AppState>()(
                 state.activePracticeId = null;
                 state.practiceRows = {};
                 state.pendingReveal = null;
+                state.phoneReader = null;
             }),
 
             setActivePractice: (id) => {
@@ -1033,11 +1048,20 @@ const appStore = createStore<AppState>()(
                 const practiceId = landing.practice.id;
                 const existing = landing.practice.decisions.find((d) => sameDecision(d.reference, reference));
                 const decisionId = existing?.id ?? uuidv4();
+                const readerRef = besideRefFor({ kind: 'decision', decisionId });
                 // The window already showing it, if any: asked again, it takes focus (carry-over 11).
                 const shownId = landing.practice.beside.find((b) => b.kind === 'decision' && b.decisionId === decisionId)?.id;
+                // Already there and already in the phone's reader: nothing to write.
+                if (existing && options.reader && options.open !== false && landing.practices === before.practices &&
+                    before.activePracticeId === practiceId && before.phoneReader?.ref.id === readerRef.id &&
+                    before.phoneReader.practiceId === practiceId &&
+                    (existing.identified || existing.reference.archivio || !reference.sezione ||
+                        decisionPath(existing.reference) === decisionPath(reference))) {
+                    return { practiceId, decisionId };
+                }
                 // Already there, its window already open, in the active practice: nothing to write
                 // but the request for that window to take focus.
-                if (existing && landing.practices === before.practices && options.open !== false && options.beside !== false &&
+                if (existing && !options.reader && landing.practices === before.practices && options.open !== false && options.beside !== false &&
                     before.activePracticeId === practiceId &&
                     besideWith(landing.practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId) === landing.practice.beside &&
                     (existing.identified || existing.reference.archivio || !reference.sezione ||
@@ -1062,7 +1086,9 @@ const appStore = createStore<AppState>()(
                     }
                     if (options.open === false) return;
                     state.activePracticeId = practiceId;
-                    if (options.beside === false) {
+                    if (options.reader) {
+                        state.phoneReader = { practiceId, ref: readerRef };
+                    } else if (options.beside === false) {
                         const rowKey = decisionRowKey(practiceId, decisionId);
                         state.practiceRows[rowKey] = true;
                         state.pendingReveal = { practiceId, rowKey };
@@ -1165,9 +1191,30 @@ const appStore = createStore<AppState>()(
                     practice.beside = practice.beside.filter((b) => b.id !== refId);
                 });
             },
+
+            openPhoneReader: (practiceId, ref) => {
+                const practice = get().practices.find((p) => p.id === practiceId);
+                const subject = subjectOfRef(ref);
+                if (!practice || (subject && !holdsSubject(practice, subject))) {
+                    console.warn(`openPhoneReader: ${practice ? `the practice ${JSON.stringify(practiceId)} does not hold the ${ref.kind} of ${JSON.stringify(ref.id)}` : `the practice ${JSON.stringify(practiceId)} is not open`}; the reader stays as it is`);
+                    return;
+                }
+                const shown = get().phoneReader;
+                if (get().activePracticeId === practiceId && shown?.practiceId === practiceId && shown.ref.id === ref.id) return;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    state.phoneReader = { practiceId, ref };
+                });
+            },
+
+            closePhoneReader: () => {
+                if (!get().phoneReader) return;
+                set((state) => { state.phoneReader = null; });
+            },
             pendingDecision: null,
             decisionFocusRequest: null,
             windowFocusRequest: null,
+            phoneReader: null,
             highestZIndex: 100,
             mobileActiveTabId: null,
             structureWindow: {
@@ -1287,6 +1334,7 @@ const appStore = createStore<AppState>()(
                 state.pendingDecision = null;
                 state.decisionFocusRequest = null;
                 state.windowFocusRequest = null;
+                state.phoneReader = null;
                 state.commandPaletteQuery = null;
             }),
 
@@ -1347,13 +1395,13 @@ const appStore = createStore<AppState>()(
                 // With the practices drawn: an entry of the practice the link reads in, else the active
                 // one, opened to be read (spec §6.1): beside on the desktop, the window the link was
                 // clicked in being the asker, so it is never the one a third window replaces (T16); in
-                // place in the table on a phone (P5 gives it the full-screen reader).
+                // the phone's full-screen reader (spec §8).
                 if (isPracticeTableEnabled()) {
                     const practiceId = practiceOfPlace(get(), options?.besideTabId) ?? undefined;
                     const askerId = windowIdOf(get(), options?.besideTabId);
                     return get().openDecision(reference, {
                         practiceId,
-                        ...(isDesktopViewport() ? { askerId } : { beside: false }),
+                        ...(isDesktopViewport() ? { askerId } : { reader: true }),
                     }).decisionId;
                 }
                 let tabId = '';
@@ -1389,24 +1437,35 @@ const appStore = createStore<AppState>()(
                 // the tab keeps the topic as typed, trimmed
                 const query = asked.tema === undefined ? asked : { ...asked, tema: asked.tema.trim() };
                 // With the practices drawn: a topic-search window of the practice the link reads in,
-                // else the active one (T8). P3 draws it in the band at the top of the table.
+                // else the active one (T8); a phone shows it in the full-screen reader, beside nothing.
                 if (isPracticeTableEnabled()) {
                     const before = get();
                     const landing = landingPractice(before, practiceOfPlace(before, options?.besideTabId), () => DECISIONS_PRACTICE_LABEL, 'openDecisionSearchTab');
                     const ref: BesideRef = { id: topicWindowId(landing.practice.id, query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
+                    if (!isDesktopViewport()) {
+                        const shown = before.phoneReader;
+                        if (landing.practices === before.practices && before.activePracticeId === landing.practice.id &&
+                            shown?.practiceId === landing.practice.id && shown.ref.id === ref.id) return ref.id;
+                        set((state) => {
+                            if (landing.practices !== before.practices) state.practices.push(landing.practice);
+                            state.activePracticeId = landing.practice.id;
+                            state.phoneReader = { practiceId: landing.practice.id, ref };
+                        });
+                        return ref.id;
+                    }
                     const beside = besideWith(landing.practice.beside, ref);
                     const shownId = beside.find((b) => b.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(query))?.id ?? ref.id;
                     const alreadyShown = beside === landing.practice.beside;
                     if (alreadyShown && landing.practices === before.practices && before.activePracticeId === landing.practice.id &&
-                        (before.windowFocusRequest === shownId || !isDesktopViewport())) {
+                        before.windowFocusRequest === shownId) {
                         return shownId;
                     }
                     set((state) => {
                         if (landing.practices !== before.practices) state.practices.push(landing.practice);
                         state.activePracticeId = landing.practice.id;
                         (state.practices.find((p) => p.id === landing.practice.id) as Practice).beside = beside;
-                        // Asked again, the window already showing the topic takes focus (a phone has no windows).
-                        if (alreadyShown && isDesktopViewport()) state.windowFocusRequest = shownId;
+                        // Asked again, the window already showing the topic takes focus.
+                        if (alreadyShown) state.windowFocusRequest = shownId;
                     });
                     return shownId;
                 }
@@ -3802,6 +3861,10 @@ function absorbDecision(state: AppState, practice: Practice, absorbedId: string,
         state.practiceRows[survivorRow] = true;
     }
     if (state.pendingReveal?.rowKey === absorbedRow) state.pendingReveal = { practiceId: practice.id, rowKey: survivorRow };
+    if (state.phoneReader?.practiceId === practice.id && state.phoneReader.ref.kind === 'decision' &&
+        state.phoneReader.ref.decisionId === absorbedId) {
+        state.phoneReader.ref = besideRefFor({ kind: 'decision', decisionId: survivorId });
+    }
     for (const entry of state.readingBackStack) {
         if (isPracticeBackEntry(entry) && entry.practiceId === practice.id &&
             entry.subject.kind === 'decision' && entry.subject.decisionId === absorbedId) {
@@ -3832,8 +3895,10 @@ function practiceBackEntry(state: AppState, entry: ReadingBackEntry): PracticeBa
         const decision = practice.decisions.find((d) => d.id === entry.blockId);
         return decision ? { practiceId: practice.id, subject: { kind: 'decision', decisionId: decision.id }, place: 'table', label } : null;
     }
+    // The reader on a phone reads under its subject's window id, though no window holds it (T19).
+    const reader = state.phoneReader?.ref.id === entry.tabId ? state.phoneReader : null;
     for (const holder of state.practices) {
-        const ref = holder.beside.find((b) => b.id === entry.tabId);
+        const ref = holder.beside.find((b) => b.id === entry.tabId) ?? (reader?.practiceId === holder.id ? reader.ref : undefined);
         const subject: PracticeSubject | null = ref ? subjectOfRef(ref) : null;
         if (subject) return { practiceId: holder.id, subject, place: 'beside', label };
     }
@@ -3846,6 +3911,12 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
     if (!practice) return;
     state.activePracticeId = practice.id;
     const { subject } = entry;
+    if (!isDesktopViewport()) {
+        // A phone has no windows: a subject read beside is read in the full-screen reader, and a row of
+        // the table is revealed with the reader closed (T19).
+        state.phoneReader = entry.place === 'beside' ? { practiceId: practice.id, ref: besideRefFor(subject) } : null;
+        if (entry.place === 'beside') return;
+    }
     if (entry.place === 'beside') {
         const ref = besideRefFor(subject);
         const shownId = isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
@@ -3879,10 +3950,14 @@ function windowIdOf(state: Pick<AppState, 'practices'>, placeId: string | undefi
     return placeId && state.practices.some((p) => p.beside.some((b) => b.id === placeId)) ? placeId : undefined;
 }
 
-/** The practice a link's `besideTabId` reads in: a practice (a row of its table) or the practice
- *  holding the window of that id; null for anything else (an old tab), which lands in the active one. */
-function practiceOfPlace(state: Pick<AppState, 'practices'>, placeId: string | undefined): string | null {
+/** The practice a link's `besideTabId` reads in: a practice (a row of its table), the practice
+ *  holding the window of that id, or the practice of the phone's reader of that id; null for
+ *  anything else (an old tab), which lands in the active one. */
+function practiceOfPlace(state: Pick<AppState, 'practices' | 'phoneReader'>, placeId: string | undefined): string | null {
     if (!placeId) return null;
+    if (state.phoneReader?.ref.id === placeId && state.practices.some((p) => p.id === state.phoneReader?.practiceId)) {
+        return state.phoneReader.practiceId;
+    }
     const holder = state.practices.find((p) => p.id === placeId || p.beside.some((b) => b.id === placeId));
     return holder ? holder.id : null;
 }

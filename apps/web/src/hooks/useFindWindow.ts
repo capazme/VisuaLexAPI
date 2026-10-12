@@ -181,6 +181,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const practiceRows = useAppStore((s) => s.practiceRows);
   const revealPracticeRow = useAppStore((s) => s.revealPracticeRow);
   const revealPracticeDecision = useAppStore((s) => s.revealPracticeDecision);
+  const closePhoneReader = useAppStore((s) => s.closePhoneReader);
   const isDesktop = useIsDesktop();
 
   const [state, setState] = useState(EMPTY);
@@ -215,6 +216,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const activePracticeIdRef = useRef(activePracticeId);
   const revealPracticeRowRef = useRef(revealPracticeRow);
   const revealPracticeDecisionRef = useRef(revealPracticeDecision);
+  const closePhoneReaderRef = useRef(closePhoneReader);
   // `prefer` applies to the first fresh computation after it is given, then it is spent: later
   // queries start from the front tab, as Cmd/Ctrl+F does.
   const preferRef = useRef(prefer);
@@ -235,6 +237,7 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
     activePracticeIdRef.current = activePracticeId;
     revealPracticeRowRef.current = revealPracticeRow;
     revealPracticeDecisionRef.current = revealPracticeDecision;
+    closePhoneReaderRef.current = closePhoneReader;
   });
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -440,7 +443,10 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
       if (!match || match.onScreen) return location;
       pendingRef.current = { id: match.id, ordinal: match.ordinal, direction };
       if (match.reveal) {
-        // A practice's subject: its practice made active and its row opened, in one step (§6.7).
+        // A practice's subject: its practice made active and its row opened, in one step (§6.7). On a
+        // phone the full-screen reader goes first, so the revealed row is on screen: a match in the
+        // reader's own subject is drawn and never gets here.
+        if (!isDesktopRef.current) closePhoneReaderRef.current();
         if (match.reveal.kind === 'article') revealPracticeRowRef.current(match.tabId, match.reveal.actId, match.reveal.articleKey);
         else revealPracticeDecisionRef.current(match.tabId, match.reveal.decisionId);
       } else {

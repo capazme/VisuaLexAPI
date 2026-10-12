@@ -66,6 +66,8 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)',
   }
 
   it('after a jump from a window whose window was closed meanwhile: the practice active, the window reopened, onNavigated told', async () => {
+    const saved = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
     const { s, practiceId, ref } = await articleWindow();
     s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });
     s().closeBeside(practiceId, ref.id);
@@ -76,6 +78,7 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)',
     expect(s().activePracticeId).toBe(practiceId);
     expect(s().practices.find((p) => p.id === practiceId)?.beside.map((b) => b.id)).toEqual([ref.id]);
     expect(onNavigated).toHaveBeenCalledWith(practiceId, expect.objectContaining({ place: 'beside', practiceId }));
+    window.matchMedia = saved;
     vi.unstubAllEnvs();
   });
 

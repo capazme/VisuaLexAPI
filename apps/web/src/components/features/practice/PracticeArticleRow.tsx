@@ -36,15 +36,21 @@ export function PracticeArticleRow({
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
   const openBeside = useAppStore((s) => s.openBeside);
   const closeBeside = useAppStore((s) => s.closeBeside);
+  const openPhoneReader = useAppStore((s) => s.openPhoneReader);
+  const closePhoneReader = useAppStore((s) => s.closePhoneReader);
   const windowId = articleWindowId(actId, articleKey);
   const shownBeside = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === windowId) === true);
-  // Windows exist on the desktop only (P5 gives the phone its full-screen reader).
+  // Windows exist on the desktop only: a phone reads beside in its full-screen reader and folds no row.
   const isDesktop = useIsDesktop();
-  const beside = useMemo<RowBeside | undefined>(() => isDesktop ? {
+  const beside = useMemo<RowBeside>(() => isDesktop ? {
     shown: shownBeside,
     onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey })),
     onClose: () => closeBeside(practiceId, windowId),
-  } : undefined, [isDesktop, shownBeside, openBeside, closeBeside, practiceId, actId, articleKey, windowId]);
+  } : {
+    shown: false,
+    onOpen: () => openPhoneReader(practiceId, besideRefFor({ kind: 'article', actId, articleKey })),
+    onClose: closePhoneReader,
+  }, [isDesktop, shownBeside, openBeside, closeBeside, openPhoneReader, closePhoneReader, practiceId, actId, articleKey, windowId]);
 
   const { norma_data: norma } = article;
   const text = article.article_text || '';

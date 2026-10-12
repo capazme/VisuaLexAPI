@@ -31,7 +31,7 @@ import { legalFetch } from '../../../services/legalFetch';
 import { shortAct } from '../../../utils/sources';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
-import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { isDesktopViewport, useIsDesktop } from '../../../hooks/useIsDesktop';
 import { besideRefFor, findPracticeArticle, practiceArticleKey } from '../../../utils/practice';
 import { actKeyOf } from '../dossier/dossierLayout';
 import type { PracticeStreaming } from '../practice/PracticeParts';
@@ -44,6 +44,22 @@ const ReadingRow = lazy(() => import('../practice/ReadingRow').then(m => ({ defa
 const PracticeBar = lazy(() => import('../practice/PracticeBar').then(m => ({ default: m.PracticeBar })));
 const PracticePhoneView = lazy(() => import('../practice/PracticePhoneView').then(m => ({ default: m.PracticePhoneView })));
 const PracticeNotice = lazy(() => import('../practice/PracticeParts').then(m => ({ default: m.PracticeNotice })));
+
+/** The practice whose light window or, on a phone, full-screen reader `askerId` names: where a norm
+ *  cited in its text is searched and opened. */
+function askerPracticeOf(askerId: string | undefined) {
+  if (!askerId) return undefined;
+  const { practices, phoneReader } = appStore.getState();
+  return practices.find((p) => p.beside.some((b) => b.id === askerId)) ??
+    (phoneReader?.ref.id === askerId ? practices.find((p) => p.id === phoneReader.practiceId) : undefined);
+}
+
+/** A subject opened from a light window or from the phone's reader: beside the window, or in the reader. */
+function openFromAsker(practiceId: string, ref: ReturnType<typeof besideRefFor>, askerId: string): void {
+  const { openBeside, openPhoneReader } = appStore.getState();
+  if (isDesktopViewport()) openBeside(practiceId, ref, askerId);
+  else openPhoneReader(practiceId, ref);
+}
 
 /** A row a search added to a practice (it was not there before): the annex auto-switch removes
  *  the stray rows of the first search, and only those (spec §5.2). */
@@ -137,6 +153,7 @@ export function SearchPanel() {
   const practiceTable = isPracticeTableEnabled();
   const isDesktop = useIsDesktop();
   const practiceCount = useAppStore((s) => s.practices.length);
+  const closePhoneReader = useAppStore((s) => s.closePhoneReader);
   const streamingPracticeRef = useRef<string | null>(null);
   const [streamingPracticeId, setStreamingPracticeId] = useState<string | null>(null);
   const createdRowsRef = useRef<CreatedRows>({ search: null, rows: [] });
@@ -148,6 +165,10 @@ export function SearchPanel() {
   // annex search leaves the act as it was.
   const pendingStrayRef = useRef<CreatedRow[]>([]);
   const strayRowsRef = useRef<CreatedRow[]>([]);
+  // The phone's full-screen reader is closed when the screen widens: the desktop reads in windows (§8).
+  useEffect(() => {
+    if (isDesktop) closePhoneReader();
+  }, [isDesktop, closePhoneReader]);
   // The bar of practices floats over the table (§3.4): its height, measured, keeps the column clear.
   const [practiceBarHeight, setPracticeBarHeight] = useState<number | null>(null);
 
@@ -289,7 +310,7 @@ export function SearchPanel() {
         if (isNewRow) createdRowsRef.current.rows.push({ practiceId: landed.practiceId, actId: landed.actId, articleKey });
         if (asker && !asker.opened) {
           asker.opened = true;
-          store.openBeside(landed.practiceId, besideRefFor({ kind: 'article', actId: landed.actId, articleKey }), asker.windowId);
+          openFromAsker(landed.practiceId, besideRefFor({ kind: 'article', actId: landed.actId, articleKey }), asker.windowId);
         }
         if (strayRowsRef.current.length > 0) {
           // The annex's article is on the table: the main text's stray rows go (never the one just landed).
@@ -413,9 +434,7 @@ export function SearchPanel() {
     streamingTabRef.current = null; // Reset streaming tab tracker
     streamingPracticeRef.current = null;
     setStreamingPracticeId(null);
-    const askerPractice = isPracticeTableEnabled() && params.besideTabId
-      ? appStore.getState().practices.find((p) => p.beside.some((b) => b.id === params.besideTabId))
-      : undefined;
+    const askerPractice = isPracticeTableEnabled() ? askerPracticeOf(params.besideTabId) : undefined;
     askerRef.current = askerPractice && params.besideTabId
       ? { practiceId: askerPractice.id, windowId: params.besideTabId, opened: false }
       : null;
@@ -770,16 +789,16 @@ export function SearchPanel() {
     // Cited from a light window (`askerId`), the row opens beside that window instead of being
     // revealed in the table (spec §4.5), and a search it needs starts from the window.
     if (isPracticeTableEnabled() && !requestIsHistorical(normaData)) {
-      const { practices, activePracticeId, revealPracticeRow, openBeside } = appStore.getState();
-      const askerPractice = askerId ? practices.find((p) => p.beside.some((b) => b.id === askerId)) : undefined;
+      const { practices, activePracticeId, revealPracticeRow } = appStore.getState();
+      const askerPractice = askerPracticeOf(askerId);
       const practice = askerPractice ?? practices.find((p) => p.id === activePracticeId);
       const act = practice?.acts.find((a) => a.key === actKeyOf(normaData));
       const articleId = normaData.allegato ? `all${normaData.allegato}:${articleNumber}` : articleNumber;
       const inForce = act && findPracticeArticle(
         { ...act, articles: act.articles.filter((a) => !requestIsHistorical(a.norma_data)) }, articleId);
       if (practice && act && inForce) {
-        if (askerPractice) {
-          openBeside(practice.id, besideRefFor({ kind: 'article', actId: act.id, articleKey: practiceArticleKey(inForce) }), askerId);
+        if (askerPractice && askerId) {
+          openFromAsker(practice.id, besideRefFor({ kind: 'article', actId: act.id, articleKey: practiceArticleKey(inForce) }), askerId);
           return;
         }
         if (revealPracticeRow(practice.id, act.id, practiceArticleKey(inForce))) return;
@@ -879,7 +898,8 @@ export function SearchPanel() {
         placement={practiceTable ? 'bottom' : 'top'}
         bottomOffset={isDesktop ? (practiceBarHeight ?? BAR_MIN_HEIGHT) + BAR_OFFSET + 12 : PHONE_BACK_OFFSET}
         onNavigated={(tabId) => {
-          // The practices: going back already made the practice active, which both breakpoints draw.
+          // The practices: going back already made the practice active and, on a phone, opened the reader
+          // on a subject read beside or closed it for a row of the table (`walkBackTo`, in one update).
           if (!practiceTable && workspaceTabs.some(t => t.id === tabId)) setMobileActiveTabId(tabId);
         }}
       />

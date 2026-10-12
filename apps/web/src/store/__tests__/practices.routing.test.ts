@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
-import { decisionRowKey, articleRowKey, practiceArticleKey, type Practice } from '../../utils/practice';
+import { decisionRowKey, decisionWindowId, articleRowKey, practiceArticleKey, type Practice } from '../../utils/practice';
 import type { DecisionReference } from '../../types/decisions';
 import { CC_RD, FOUND, L24, article } from '../../utils/__fixtures__/savedWorkspaces';
 
@@ -16,7 +16,17 @@ const flagOff = () => vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', '');
 
 const REF: DecisionReference = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
 
+let savedMatchMedia: typeof window.matchMedia;
+/** The viewport the store's actions read once (`isDesktopViewport`); the test environment's default is a phone. */
+function viewport(desktop: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: desktop, media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+    addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
 beforeEach(() => {
+  savedMatchMedia = window.matchMedia;
   appStore.setState({
     practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
@@ -24,20 +34,24 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  window.matchMedia = savedMatchMedia;
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
 
 describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', () => {
-  it('openDecisionTab: the decision enters the active practice once and its row is opened in place', () => {
+  it('openDecisionTab on a phone: the decision enters the active practice once and is read in the full-screen reader', () => {
     flagOn();
+    viewport(false);
     const p = s().createPractice('Responsabilità');
     const id = s().openDecisionTab(REF);
     s().openDecisionTab(REF);
     expect(practice(p).decisions.map((d) => d.id)).toEqual([id]);
+    // the desktop's windows and the table's rows are left alone (T19)
     expect(practice(p).beside).toEqual([]);
-    expect(s().practiceRows[decisionRowKey(p, id)]).toBe(true);
-    expect(s().pendingReveal).toEqual({ practiceId: p, rowKey: decisionRowKey(p, id) });
+    expect(s().practiceRows).toEqual({});
+    expect(s().pendingReveal).toBeNull();
+    expect(s().phoneReader).toEqual({ practiceId: p, ref: { id: decisionWindowId(id), kind: 'decision', decisionId: id } });
     expect(s().workspaceTabs).toEqual([]);
   });
 
@@ -61,6 +75,7 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
 
   it('the same topic in two practices is two windows; a decision opened from B\'s band enters B, and B stays active', () => {
     flagOn();
+    viewport(true);
     const a = s().createPractice('A');
     const topicA = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
     const b = s().createPractice('B');
@@ -88,6 +103,7 @@ describe('the ways in route to the practice, flag on (spec §5, §6.1-§6.2)', (
 
   it('openDecisionSearchTab: a topic search in the active practice\'s windows, once per query', () => {
     flagOn();
+    viewport(true);
     const p = s().createPractice('P');
     const id = s().openDecisionSearchTab({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
     const again = s().openDecisionSearchTab({ tema: '  Perdita di  chance ' }, 'Tema: perdita di chance');

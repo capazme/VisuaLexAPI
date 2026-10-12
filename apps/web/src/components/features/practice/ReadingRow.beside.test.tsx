@@ -61,7 +61,7 @@ beforeEach(() => {
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   appStore.setState({
     practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
-    readingBackStack: [], workspaceTabs: [], windowFocusRequest: null,
+    readingBackStack: [], workspaceTabs: [], windowFocusRequest: null, phoneReader: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
 });
@@ -153,15 +153,20 @@ describe('a norm cited in a window', () => {
 });
 
 describe('on a phone', () => {
-  it('draws no «Apri accanto» and folds no row, whatever windows were saved', () => {
+  it('draws «Apri accanto» for the full-screen reader and folds no row, whatever windows were saved', () => {
     env.desktop = false;
     const { practiceId, actId } = setup();
     const a = s().practices[0].acts[0].articles[0];
+    const ref = besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(a) });
     // A real window, on a subject the practice holds: on a desktop its row would fold.
-    s().openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(a) }));
+    s().openBeside(practiceId, ref);
     expect(s().practices[0].beside).toHaveLength(1);
     render(table());
-    expect(screen.queryByRole('button', { name: /^Apri accanto/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Aperto accanto/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Espandi/ })).toHaveLength(2);
+    // It opens the phone's reader on the subject and leaves the desktop's windows as they were (T19).
+    fireEvent.click(within(articleRow('5')).getByRole('button', { name: /^Apri accanto/ }));
+    expect(s().phoneReader).toEqual({ practiceId, ref });
+    expect(s().practices[0].beside).toEqual([ref]);
   });
 });
