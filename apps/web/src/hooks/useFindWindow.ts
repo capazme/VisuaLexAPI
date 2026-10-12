@@ -440,7 +440,9 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
       if (!match || match.onScreen) return location;
       pendingRef.current = { id: match.id, ordinal: match.ordinal, direction };
       if (match.reveal) {
-        // A practice's subject: its practice made active and its row opened, in one step (§6.7).
+        // A practice's subject: its practice made active and its row opened, in one step (§6.7), which
+        // also takes the phone's full-screen reader off so the row is on screen; a match in the
+        // reader's own subject is drawn and never gets here.
         if (match.reveal.kind === 'article') revealPracticeRowRef.current(match.tabId, match.reveal.actId, match.reveal.articleKey);
         else revealPracticeDecisionRef.current(match.tabId, match.reveal.decisionId);
       } else {

@@ -54,7 +54,7 @@ vi.mock('../decisions/DecisionSearchTabView', async () => {
   const { appStore: store } = await import('../../../store/useAppStore');
   return {
     DecisionSearchTabView: ({ tabId }: { tabId: string }) => (
-      <button type="button" onClick={() => store.getState().openDecisionTab({ corte: 'cassazione', archivio: 'civile', numero: 12345, anno: 2020 }, { besideTabId: tabId })}>
+      <button type="button" data-testid="topic-list" onClick={() => store.getState().openDecisionTab({ corte: 'cassazione', archivio: 'civile', numero: 12345, anno: 2020 }, { besideTabId: tabId })}>
         Cass. civ., n. 12345/2020
       </button>
     ),
@@ -78,6 +78,7 @@ import { actKeyOf } from '../dossier/dossierLayout';
 import { searchesIntoOnePractice } from '../dossier/openInPractice';
 import { computeNormaGroups } from '../dossier/dossierUtils';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
+import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
 import type { Dossier } from '../../../types';
 
 const s = () => appStore.getState();
@@ -89,10 +90,9 @@ const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero:
 const panel = () => render(<MemoryRouter><SearchPanel /></MemoryRouter>);
 const readers = () => screen.queryAllByTestId('reader').map((el) => el.textContent);
 
-let scrolled: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
-  scrolled = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+  vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   env.desktop = true;
   env.lines = [];
   env.stream = null;
@@ -131,7 +131,7 @@ describe.each([
     expect(s().workspaceTabs).toEqual([]);
   });
 
-  it(`a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens ${desktop ? 'beside, once' : 'in place'}`, async () => {
+  it(`a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens ${desktop ? 'beside, once' : 'full screen, once'}`, async () => {
     const p = s().createPractice('Responsabilità');
     panel();
     act(() => { s().openDecisionTab(REF); });                         // the palette
@@ -140,25 +140,39 @@ describe.each([
     await waitFor(() => expect(s().pendingDecision).toBeNull());
     expect(await screen.findAllByTestId('decision-reader')).toHaveLength(1);
     expect(s().practices[0].decisions).toHaveLength(1);
-    expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
-    // On the desktop a window shows it and its row folds; on a phone its row is open in place.
+    // On the desktop a window shows it and its row folds; on a phone the full-screen reader does, in
+    // the column's place, and «‹ Pratica» gives the column back (T19).
     expect(s().practices[0].beside).toHaveLength(desktop ? 1 : 0);
     expect(screen.queryAllByTestId('reading-window')).toHaveLength(desktop ? 1 : 0);
+    expect(screen.queryAllByTestId('reading-full-screen')).toHaveLength(desktop ? 0 : 1);
+    if (desktop) {
+      expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText(/Giurisprudenza \(1\)/)).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Pratica' }));
+      expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
+      expect(screen.queryByTestId('decision-reader')).toBeNull();
+    }
   });
 
   it(desktop
     ? 'a topic search from the palette opens a window; a decision opened from it enters «Giurisprudenza» beside it'
-    : 'a topic search from the palette shows in the band; a decision opened from it enters «Giurisprudenza»', async () => {
+    : 'a topic search from the palette opens full screen; a decision opened from its list replaces it there and enters «Giurisprudenza»', async () => {
     s().createPractice('Responsabilità');
     panel();
     act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
-    const place = await screen.findByRole('region', { name: desktop ? 'Tema: danno' : 'Ricerca per tema: danno' });
+    const place = await screen.findByRole('region', { name: desktop ? 'Tema: danno' : 'Ricerca per tema' });
     fireEvent.click(within(place).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
     expect(await screen.findByTestId('decision-reader')).toHaveTextContent('n. 12345');
     expect(s().practices[0].decisions.map((d) => d.reference.numero)).toEqual([12345]);
     // The search is not a source: it stays a search. On the desktop the decision is a window beside
-    // it (the search asked, so it is not the one replaced); on a phone it is read in place.
-    expect(s().practices[0].beside.map((b) => b.kind)).toEqual(desktop ? ['decision-search', 'decision'] : ['decision-search']);
+    // it (the search asked, so it is not the one replaced); on a phone it replaces the search in the
+    // reader, and the desktop's windows are never touched (T19).
+    expect(s().practices[0].beside.map((b) => b.kind)).toEqual(desktop ? ['decision-search', 'decision'] : []);
+    if (!desktop) {
+      expect(s().phoneReader?.ref.kind).toBe('decision');
+      expect(screen.queryByTestId('topic-list')).toBeNull();
+    }
   });
 });
 
@@ -326,15 +340,20 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     expect(warn.mock.calls.filter(([message]) => String(message).includes('is not open'))).toHaveLength(1);
   });
 
-  it('a new topic search scrolls its band into view (a phone)', async () => {
+  it('a topic search opens the phone\'s full-screen reader, beside nothing; «Pratica» gives the column back', async () => {
     env.desktop = false;
     const p = s().createPractice('P');
     s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
     panel();
     await screen.findByTestId('practice-column');
     act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
-    const band = await screen.findByRole('region', { name: 'Ricerca per tema: danno' });
-    expect(scrolled.mock.contexts).toContain(band);
+    const reader = await screen.findByTestId('reading-full-screen');
+    expect(within(reader).getByTestId('topic-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('practice-column')).toBeNull();
+    expect(s().practices[0].beside).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Pratica' }));
+    expect(await screen.findByTestId('practice-column')).toBeInTheDocument();
+    expect(s().phoneReader).toBeNull();
   });
 
   it('a decision opened from practice B\'s topic window enters B, while A holds the same topic', async () => {
@@ -392,5 +411,101 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }));
     await waitFor(() => expect(s().readingBackStack).toEqual([]));
     expect(s().mobileActiveTabId).toBeNull();
+  });
+});
+
+describe('SearchPanel with the practices: the phone\'s full-screen reader (spec §4.5, §6.3, §8)', () => {
+  beforeEach(() => { env.desktop = false; });
+  const refOf = (actId: string, n: string) => besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(ccArticle(n)) });
+
+  it('a norm cited in the reader\'s text that the act already holds replaces the subject in the reader', async () => {
+    const p = s().createPractice('P');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043'), ccArticle('1218')]);
+    env.jumpTo = '1218';
+    panel();
+    await screen.findByTestId('practice-phone-view');
+    act(() => { s().openPhoneReader(p, refOf(actId, '2043')); });
+    const reader = await screen.findByTestId('reading-full-screen');
+    fireEvent.click(within(reader).getByRole('button', { name: 'Citazione in art. 2043' }));
+    await waitFor(() => expect(readers()).toEqual(['art. 1218']));
+    expect(s().phoneReader).toEqual({ practiceId: p, ref: refOf(actId, '1218') });
+    expect(s().practices[0].beside).toEqual([]);
+    expect(env.requests).toEqual([]);
+  });
+
+  it('a norm cited in the reader that the act does not hold is searched, lands in the practice and opens in the reader', async () => {
+    const p = s().createPractice('P');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
+    env.jumpTo = '1218';
+    env.lines = [ccArticle('1218')];
+    panel();
+    await screen.findByTestId('practice-phone-view');
+    act(() => { s().openPhoneReader(p, refOf(actId, '2043')); });
+    const reader = await screen.findByTestId('reading-full-screen');
+    fireEvent.click(within(reader).getByRole('button', { name: 'Citazione in art. 2043' }));
+    await waitFor(() => expect(s().practices[0].acts[0].articles).toHaveLength(2));
+    await waitFor(() => expect(readers()).toEqual(['art. 1218']));
+    expect(s().phoneReader).toEqual({ practiceId: p, ref: refOf(actId, '1218') });
+    expect(s().practices[0].beside).toEqual([]);
+  });
+
+  it('a search result that reveals a row shows the table, not the reader', async () => {
+    const p = s().createPractice('P');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
+    env.lines = [ccArticle('1218')];
+    panel();
+    await screen.findByTestId('practice-phone-view');
+    act(() => { s().openPhoneReader(p, refOf(actId, '2043')); });
+    await screen.findByTestId('reading-full-screen');
+    act(() => { s().triggerSearch(params('1218')); });
+    await waitFor(() => expect(screen.queryByTestId('reading-full-screen')).toBeNull());
+    expect(await screen.findByTestId('practice-column')).toBeInTheDocument();
+    await waitFor(() => expect(readers()).toEqual(['art. 1218']));
+    expect(s().phoneReader).toBeNull();
+  });
+
+  it('the dossier\'s «Apri tutto» (a new practice made active) shows that practice\'s table, not the old reader', async () => {
+    const p = s().createPractice('Vecchia');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
+    const dossier: Dossier = {
+      id: 'd1', title: 'Ricorso Rossi', createdAt: '2026-10-04T08:00:00Z', tags: [],
+      items: [{ id: 'a', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1284' } }],
+    };
+    env.stream = (request) => [ccArticle(String(request.article))];
+    panel();
+    await screen.findByTestId('practice-phone-view');
+    act(() => { s().openPhoneReader(p, refOf(actId, '2043')); });
+    await screen.findByTestId('reading-full-screen');
+    act(() => { s().triggerMultiSearch(searchesIntoOnePractice(dossier, computeNormaGroups(dossier.items), true)); });
+    await waitFor(() => expect(screen.queryByTestId('reading-full-screen')).toBeNull());
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Ricorso Rossi');
+    await waitFor(() => expect(s().practices.find((x) => x.label === 'Ricorso Rossi')?.acts[0]?.articles).toHaveLength(1));
+    expect(s().phoneReader).toBeNull();
+  });
+
+  it('the back control returns to the reader\'s subject, or to a row of the table with the reader closed', async () => {
+    const p = s().createPractice('P');
+    const { actId } = s().addArticlesToPractice(p, CC, [ccArticle('2043'), ccArticle('1218')]);
+    panel();
+    await screen.findByTestId('practice-phone-view');
+    act(() => { s().openPhoneReader(p, refOf(actId, '2043')); });
+    await screen.findByTestId('reading-full-screen');
+    // a jump out of the reader's article: the reader moves on, the entry names where it was read
+    act(() => {
+      s().pushReadingBack({ tabId: refOf(actId, '2043').id, blockId: actId, articleId: '2043', label: 'art. 2043 c.c.' });
+      s().openPhoneReader(p, refOf(actId, '1218'));
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Torna a art. 2043 c.c.' }));
+    await waitFor(() => expect(readers()).toEqual(['art. 2043']));
+    expect(s().phoneReader).toEqual({ practiceId: p, ref: refOf(actId, '2043') });
+
+    // a jump out of a row of the table: back to the row, the reader closed
+    act(() => {
+      s().pushReadingBack({ tabId: p, blockId: actId, articleId: '1218', label: 'art. 1218 c.c.' });
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Torna a art. 1218 c.c.' }));
+    expect(s().phoneReader).toBeNull();
+    expect(await screen.findByTestId('practice-column')).toBeInTheDocument();
+    expect(s().practiceRows[`${p}/${actId}/${practiceArticleKey(ccArticle('1218'))}`]).toBe(true);
   });
 });

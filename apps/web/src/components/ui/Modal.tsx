@@ -87,7 +87,8 @@ export function Modal({
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isTopmost()) onClose();
+      // An Esc something inside already took (a menu closing, an edit cancelled) is not the dialog's.
+      if (e.key === 'Escape' && !e.defaultPrevented && isTopmost()) onClose();
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);

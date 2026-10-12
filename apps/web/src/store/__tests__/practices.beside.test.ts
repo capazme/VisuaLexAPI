@@ -44,12 +44,14 @@ describe('a decision opened from a link: beside on the desktop, in place on a ph
     expect(Object.keys(s().practiceRows)).toEqual([]);
   });
 
-  it('phone: opened in place in the table, no window', () => {
+  it('phone: read in the full-screen reader, no window and no row opened (T19)', () => {
     viewport(false);
     const p = s().createPractice('P');
-    s().openDecisionTab(REF_A);
+    const id = s().openDecisionTab(REF_A);
     expect(practice(p).beside).toEqual([]);
-    expect(s().pendingReveal?.practiceId).toBe(p);
+    expect(s().pendingReveal).toBeNull();
+    expect(s().practiceRows).toEqual({});
+    expect(s().phoneReader).toEqual({ practiceId: p, ref: besideRefFor({ kind: 'decision', decisionId: id }) });
   });
 
   it('from an article read in a window, that window is kept; a third window replaces the oldest other (T16)', () => {
@@ -116,6 +118,7 @@ describe('the way back to a window (spec §6.3, carry-over 11)', () => {
   }
 
   it('after a jump from a window whose window was since closed: the practice active and the window reopened', () => {
+    viewport(true);
     const { practiceId, ref } = articleWindow();
     const other = s().createPractice('Altra');
     s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });

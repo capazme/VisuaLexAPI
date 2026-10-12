@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { appStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { ReadingBackControl } from './ReadingBackControl';
@@ -50,6 +50,16 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `table`)', 
 });
 
 describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)', () => {
+  // The viewport is the store's to read once: a test that needs a desktop sets it, and it is always given back.
+  const savedMatchMedia = window.matchMedia;
+  const desktop = () => {
+    window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+  };
+  afterEach(() => {
+    window.matchMedia = savedMatchMedia;
+    vi.unstubAllEnvs();
+  });
+
   async function articleWindow() {
     vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
@@ -66,6 +76,7 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)',
   }
 
   it('after a jump from a window whose window was closed meanwhile: the practice active, the window reopened, onNavigated told', async () => {
+    desktop();
     const { s, practiceId, ref } = await articleWindow();
     s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });
     s().closeBeside(practiceId, ref.id);
@@ -76,21 +87,17 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)',
     expect(s().activePracticeId).toBe(practiceId);
     expect(s().practices.find((p) => p.id === practiceId)?.beside.map((b) => b.id)).toEqual([ref.id]);
     expect(onNavigated).toHaveBeenCalledWith(practiceId, expect.objectContaining({ place: 'beside', practiceId }));
-    vi.unstubAllEnvs();
   });
 
   it('with the window still open, it takes focus instead of being opened twice', async () => {
     // The windows are the desktop's: a phone asks none to take focus.
-    const saved = window.matchMedia;
-    window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+    desktop();
     const { s, practiceId, ref } = await articleWindow();
     s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });
     render(<ReadingBackControl />);
     fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 5 l. 24/2017' }));
     expect(s().practices.find((p) => p.id === practiceId)?.beside).toHaveLength(1);
     expect(s().windowFocusRequest).toBe(ref.id);
-    window.matchMedia = saved;
-    vi.unstubAllEnvs();
   });
 
   it('a topic-search window is never offered as a place to go back to', async () => {

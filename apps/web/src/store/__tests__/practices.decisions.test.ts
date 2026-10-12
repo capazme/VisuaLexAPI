@@ -32,7 +32,17 @@ function withArticles(): { practiceId: string; actId: string; key5: string; key7
   return { practiceId, actId, key5: practiceArticleKey(article(L24, '5')), key7: practiceArticleKey(article(L24, '7')) };
 }
 
+let savedMatchMedia: typeof window.matchMedia;
+/** A desktop viewport for the actions that read it once (`isDesktopViewport`); the default here is a phone. */
+function desktop() {
+  window.matchMedia = ((query: string) => ({
+    matches: true, media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+    addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
 beforeEach(() => {
+  savedMatchMedia = window.matchMedia;
   appStore.setState({
     practices: [], activePracticeId: null, practicesSeeded: true, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
@@ -40,6 +50,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  window.matchMedia = savedMatchMedia;
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
@@ -326,6 +337,7 @@ describe('the way back over practices (§6.3)', () => {
 
   it('a beside entry reopens the window, after it was closed', () => {
     flagOn();
+    desktop();
     const { practiceId, actId, key7 } = withArticles();
     const w7: BesideRef = { id: articleWindowId(actId, key7), kind: 'article', actId, articleKey: key7 };
     s().openBeside(practiceId, w7);

@@ -9,6 +9,7 @@ import { workspaceOrigin } from '../../../utils/workspaceOrigin';
 import { RAIL_WIDTH, besideLayout } from './besideLayout';
 import { PracticeTable, type PracticeTableProps } from './PracticeTable';
 import { ReadingWindow } from './ReadingWindow';
+import { scrollParentOf } from './practiceView';
 
 const NO_WINDOWS: BesideRef[] = [];
 
@@ -23,15 +24,6 @@ const OVERLAY_ID = 'reading-row-overlay';
 /** A row's column is as tall as the viewport less the margins above and below it, and holds its
  *  place while the table beside it scrolls (the windows are in-flow columns, spec §4). */
 const COLUMN_FRAME = 'sticky top-4 h-app-row flex-none';
-
-/** The nearest ancestor that scrolls: the page's content scroller, which the results area sits in. */
-function scrollParentOf(el: HTMLElement): HTMLElement | null {
-  for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node);
-    if (overflowY === 'auto' || overflowY === 'scroll') return node;
-  }
-  return null;
-}
 
 /**
  * The row's width, kept current by a `ResizeObserver`, and — when `wide` — how far past its parent

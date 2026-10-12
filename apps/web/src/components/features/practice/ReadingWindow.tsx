@@ -4,13 +4,11 @@ import { FOCUS_RING } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
-import type { DecisionReference, DecisionSearchQuery } from '../../../types/decisions';
-import { practiceArticleKey, type BesideRef, type Practice } from '../../../utils/practice';
-import { citeNorm } from '../../../utils/sources';
-import { versionTabSuffix } from '../../../utils/versionDisplay';
+import type { BesideRef } from '../../../utils/practice';
 import { ArticleTabContent } from '../search/ArticleTabContent';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
+import { subjectOf, titleOf, type Subject } from './practiceView';
 
 /** The bar of practices floats over the results area (`fixed bottom-6`): a window's scrolling body
  *  keeps the same bottom padding as the column (spec §3.4). */
@@ -18,33 +16,6 @@ const BODY_PADDING_BOTTOM = 'pb-[calc(var(--practice-bar-height,3.75rem)+2.25rem
 
 /** A norm cited in a window's text: `askerId` is the window, which the cited article opens beside. */
 type OnCrossReference = (articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => void;
-
-/** What a window shows, found again in its practice: an article of an act, a decision entry, or a
- *  topic search (which holds its own query). Null when the practice no longer holds the subject. */
-type Subject =
-  | { kind: 'article'; actId: string; article: ArticleData }
-  | { kind: 'decision'; decisionId: string; reference: DecisionReference; label: string }
-  | { kind: 'decision-search'; query: DecisionSearchQuery; label: string };
-
-function subjectOf(practice: Practice | undefined, ref: BesideRef): Subject | null {
-  if (ref.kind === 'decision-search') return { kind: 'decision-search', query: ref.query, label: ref.label };
-  if (!practice) return null;
-  if (ref.kind === 'decision') {
-    const entry = practice.decisions.find((d) => d.id === ref.decisionId);
-    return entry ? { kind: 'decision', decisionId: entry.id, reference: entry.reference, label: entry.label } : null;
-  }
-  const article = practice.acts.find((a) => a.id === ref.actId)?.articles.find((a) => practiceArticleKey(a) === ref.articleKey);
-  return article ? { kind: 'article', actId: ref.actId, article } : null;
-}
-
-/** The window's title: an article's citation (and the text it asks for, if past), a decision's
- *  label, a topic search's label (spec §4.1). */
-function titleOf(subject: Subject | null): string {
-  if (!subject) return 'Testo non più sul tavolo';
-  if (subject.kind !== 'article') return subject.label;
-  const { norma_data } = subject.article;
-  return `${citeNorm(norma_data)}${versionTabSuffix({ version: norma_data.versione, versionDate: norma_data.data_versione })}`;
-}
 
 export interface ReadingWindowProps {
   /** The practice the window belongs to: it finds the subject there and, as `findHostId`, is the
@@ -116,13 +87,14 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTo
   );
 }
 
-interface ReadingWindowBodyProps extends ReadingWindowProps {
+interface ReadingWindowBodyProps extends Omit<ReadingWindowProps, 'clearTopRight'> {
   subject: Subject | null;
 }
 
 // The body by kind. A window reads under its own id (its way back, its focus); the find window
-// knows its text by its practice (`findHostId`), so «Questa pratica» searches it.
-function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }: ReadingWindowBodyProps) {
+// knows its text by its practice (`findHostId`), so «Questa pratica» searches it. The phone's
+// full-screen reader draws the same body (`ReadingFullScreen`).
+export function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }: ReadingWindowBodyProps) {
   const articleKey = besideRef.kind === 'article' ? besideRef.articleKey : '';
   const actId = subject?.kind === 'article' ? subject.actId : '';
   const readingOrigin = useMemo(
