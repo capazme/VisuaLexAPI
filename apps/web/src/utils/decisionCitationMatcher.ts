@@ -50,6 +50,8 @@ const CASE_HEADS = new RegExp(
   'giu',
 );
 const SECTION_HEADS = new RegExp(`${LEFT}(?:${SECTION_HEAD_SOURCE}|${SEZIONI_UNITE_HEAD_SOURCE})`, 'giu');
+// «CTR Lazio», «CTP di Milano», «la Ctr della Lombardia», «CTR dell'Emilia-Romagna»: a capitalised place follows.
+const TAX_PLACE = /^\s+(?:(?:di|del|della|dello|dell['’]|degli|dei|delle)\s*)?\p{Lu}/u;
 const UPPERCASE_CASE_LETTER = new RegExp(`[CT](?=\\s*${EU_DASH}?\\s*\\d)`);
 // Courts the app cannot open. They are never linked, but a section written after one belongs to it and
 // not to the Cassazione (the context rule reads a section only when no court is written before it).
@@ -89,7 +91,7 @@ function findHeads(text: string, folded: string, within: boolean): Head[] {
     const end = start + m[0].length;
     // «CTP» is also the consulente tecnico di parte: a court only with a place name after it («CTP Milano»)
     const bare = /^ct[pr]$/i.test(m[0]);
-    if (bare && !(text.slice(start, end) === m[0].toUpperCase() && /^\s+\p{Lu}/u.test(text.slice(end, end + 40)))) continue;
+    if (bare && !TAX_PLACE.test(text.slice(end, end + 40))) continue;
     if (!supported.has(start)) heads.push({ start, end, court: true, section: false, unsupported: true });
   }
   for (const m of folded.matchAll(CASE_HEADS)) {
