@@ -62,14 +62,21 @@ export class SourceUnavailable extends Error {}
 /** A status that says nothing about the reference: the source is down, slow or limiting us. */
 const sourceFailed = (status: number): boolean => status === 429 || status >= 500 || status === 0;
 
-export async function postLegalApi(path: string, body: unknown): Promise<{ status: number; data: Record<string, unknown> }> {
+/** A POST to the Python API. `signal` replaces the 30-second timeout: a caller with its own budget
+ *  (a cold court decision can take minutes) passes it. A network failure or an abort throws
+ *  `SourceUnavailable`. */
+export async function postLegalApi(
+  path: string,
+  body: unknown,
+  options: { signal?: AbortSignal } = {},
+): Promise<{ status: number; data: Record<string, unknown> }> {
   let response: Response;
   try {
     response = await fetch(`${apiBase()}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: options.signal ?? AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {
     throw new SourceUnavailable(error instanceof Error ? error.message : String(error));

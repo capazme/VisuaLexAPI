@@ -38,6 +38,7 @@ from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
 from visualex_api.services.akn_parser import presentable_title
+from visualex_api.services.decisions.citation import read_decision_citation
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
 from visualex_api.services.decisions.pdf_route import fetch_decision_pdf as fetch_decision_pdf_route
 from visualex_api.services.decisions.search_route import search_decisions as search_decisions_route
@@ -402,6 +403,9 @@ class NormaController:
         self.app.add_url_rule('/fetch_massimario', view_func=self.fetch_massimario, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only (not routed by the ingress).
         self.app.add_url_rule('/resolve_act_dates', view_func=self.resolve_act_dates, methods=['POST'])
+        # Internal: the server's POST /api/dossiers/:id/decisions only (design 2026-10-12 §2.1).
+        # Not routed by the ingress (/parse_query* does not cover it) nor proxied by Vite.
+        self.app.add_url_rule('/parse_decision', view_func=self.parse_decision, methods=['POST'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
         self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
@@ -1194,6 +1198,23 @@ class NormaController:
             return jsonify({'kind': kind, 'id': element_id, 'data': data})
         except Exception as exc:
             return self._error_response(exc, 'fetch_massimario')
+
+    async def parse_decision(self):
+        """Decisions as a lawyer writes them → the references /fetch_decision takes (design
+        2026-10-12 §2.1). Internal route (the server's decisions route). `{citazioni: [1-10
+        strings of at most 300 characters]}` → `{risultati: [...]}`, one per string, in order:
+        `{riferimento}`, `{corte_non_supportata}` or `{non_riconosciuta: true}`. No request
+        leaves: it reads words only."""
+        try:
+            body = await request.get_json(silent=True)
+        except (RecursionError, UnicodeDecodeError):
+            body = None
+        citazioni = body.get('citazioni') if isinstance(body, dict) else None
+        if (not isinstance(citazioni, list) or not 1 <= len(citazioni) <= 10
+                or not all(isinstance(c, str) and 0 < len(c) <= 300 for c in citazioni)):
+            return jsonify({'esito': 'richiesta_non_valida',
+                            'errori': {'citazioni': 'attese da 1 a 10 citazioni di al massimo 300 caratteri'}}), 400
+        return jsonify({'risultati': [read_decision_citation(c).to_dict() for c in citazioni]})
 
     async def resolve_act_dates(self):
         """Full dates for acts cited by year only. Internal route (MERL-T only)."""

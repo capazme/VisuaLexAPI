@@ -89,6 +89,10 @@ export async function startStubs() {
     if (req.method === 'POST' && norms) {
       return void res.json({ results: (req.body.references as string[]).map((reference) => ({ reference, outcome: 'added' })) });
     }
+    const decisions = path.match(/^\/dossiers\/([^/]+)\/decisions$/);
+    if (req.method === 'POST' && decisions) {
+      return void res.json({ results: (req.body.references as string[]).map((reference) => ({ reference, outcome: 'added' })) });
+    }
     if (req.method === 'POST' && path === '/lingo/cards') {
       const results = (req.body.cards as { ancore: { riferimento: string }[] }[]).map((card, i) =>
         card.ancore.some((a) => a.riferimento.includes('99999'))

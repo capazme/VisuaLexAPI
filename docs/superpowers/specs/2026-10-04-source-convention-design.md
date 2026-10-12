@@ -158,7 +158,7 @@ area:
 
 | Field | Values |
 |---|---|
-| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4) |
+| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); proposed on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue` |
 | `numero` | integer 1–999999, no leading zeros |
 | `anno` | the year of the number (for the penal Cassazione, the year of deposit) |
 | `archivio` | `civile`, `penale`; the Cassazione only, and always there |
@@ -195,8 +195,18 @@ penal; the Massimario's paragraphs sometimes give a hearing date
 A new court adds a `corte` value and its key shape `<corte>:<numero>:<anno>`,
 with the court's own qualifiers in place of `archivio` when its numbering
 needs them (a TAR's seat and section, the Consiglio di Stato's section). Where
-the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI. Not
-built now.
+the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.
+
+**Proposed to replace the last sentence for the CGUE, 12 October 2026** (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
+§3, waiting for the owner's Q10–Q13 there): the Court of Justice and the General
+Court are named by their case, as lawyers cite them and as the proposal of #112
+put it, which the owner accepted («95–100 come raccomandi»). Two courts,
+`corte_giustizia_ue` and `tribunale_ue`; the key `corte_giustizia_ue:634:2021`
+for C-634/21, the path `/sentenze/corte-giustizia-ue/634/2021`; the ECLI an
+attribute, as for the Corte costituzionale, since it names one document of a case
+(the judgment, an order, the Advocate General's opinion), not the case. Once the
+owner answers Q10, this paragraph replaces that sentence for the CGUE; the ECtHR
+is left to its own design.
 
 ## 3. Norms: labels
 
@@ -305,6 +315,15 @@ as `Cass. civ., sez. un., n. 10787/2024`.
 | idem, hearing date known (Massimario) | `Cass. pen., sez. VII, ord. 10 gennaio 2024 (dep. 14 marzo 2024), n. 10787` | idem |
 | Corte cost. 71/2020, sentenza decisa 12 febbraio, depositata 24 aprile 2020 | `Corte cost., sent. 24 aprile 2020, n. 71` | `Corte cost., n. 71/2020` |
 | with a massima (Massimario chip) | — | `Cass. civ., sez. un., n. 31310/2024 · Rv. 673165-01` |
+
+The courts of the Union (proposed 12 October 2026, Q11–Q12 of
+`2026-10-12-decisions-mcp-and-eu-courts-design.md`):
+
+| Decision | citation | short |
+|---|---|---|
+| C-634/21, sez. I, 7 dicembre 2023 | `Corte giust. UE, sez. I, sent. 7 dicembre 2023, causa C-634/21` | `Corte giust. UE, C-634/21` |
+| C-293/12 and C-594/12, grande sez., 8 aprile 2014 | `Corte giust. UE, grande sez., sent. 8 aprile 2014, cause riunite C-293/12 e C-594/12` | `Corte giust. UE, C-293/12` |
+| T-612/17, sez. IX ampliata, 10 novembre 2021 | `Trib. UE, sez. IX ampliata, sent. 10 novembre 2021, causa T-612/17` | `Trib. UE, T-612/17` |
 
 ### 4.3 Section names
 

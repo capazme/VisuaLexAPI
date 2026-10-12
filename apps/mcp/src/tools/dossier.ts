@@ -55,6 +55,7 @@ export const TOOL_SCOPES: Record<string, string[]> = {
   omnilex_crea_dossier: ['dossier:write'],
   // Finds the dossier first (by id or name), then writes.
   omnilex_aggiungi_norme_dossier: ['dossier:read', 'dossier:write'],
+  omnilex_aggiungi_sentenze_dossier: ['dossier:read', 'dossier:write'],
   omnilex_aggiungi_nota_dossier: ['dossier:read', 'dossier:write'],
   // content:delete is checked by the tools themselves, live, so that they can say how to turn it on.
   omnilex_elimina_dossier: ['dossier:read'],
@@ -63,6 +64,8 @@ export const TOOL_SCOPES: Record<string, string[]> = {
 };
 
 export const MAX_REFERENCES = 50;
+// Fewer than norms: one cold Corte costituzionale lookup can take minutes (the owner's answer to Q2 of #112).
+export const MAX_DECISIONS = 10;
 export const MAX_DOSSIER_NAME = 100;
 export const MAX_NOTE_LENGTH = 4000;
 
@@ -204,6 +207,39 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           'dossier:write',
           `/dossiers/${encodeURIComponent(found.id)}/norms`,
           { method: 'POST', body: { references: riferimenti } },
+        );
+        return data({ dossier: { id: found.id, nome: found.name }, esiti: answer.results });
+      }),
+  );
+
+  server.registerTool(
+    'omnilex_aggiungi_sentenze_dossier',
+    {
+      title: 'Aggiungi sentenze a un dossier',
+      description:
+        `Aggiunge a un dossier da 1 a ${MAX_DECISIONS} sentenze indicate a parole come le scrive un avvocato («Cass. civ., sez. un., n. 31310/2024», «Corte cost. n. 71/2020»), una decisione per riferimento. ` +
+        'Oggi legge la Corte di cassazione e la Corte costituzionale; di un’altra corte risponde quale ha riconosciuto e non la aggiunge. ' +
+        'Ogni decisione è verificata sulla sua fonte prima di essere salvata: l’esito di ciascuna è aggiunta, già presente, non riconosciuta, corte non supportata, ambigua, inesistente o non verificabile. ' +
+        'Una decisione non aggiunta non va riportata in una nota come se fosse verificata. Non modifica né cancella nulla.',
+      inputSchema: {
+        dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
+        sentenze: z
+          .array(z.string().trim().min(1).max(300))
+          .min(1)
+          .max(MAX_DECISIONS)
+          .describe('Le sentenze, una per riferimento: corte, numero e anno («Cass. pen., sez. VII, n. 10787/2024»)'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    ({ dossier, sentenze }, extra) =>
+      run('omnilex_aggiungi_sentenze_dossier', extra, async (caller) => {
+        const found = await findDossier(config, caller, dossier);
+        const answer = await callApi<{ results: Record<string, unknown>[] }>(
+          config,
+          caller,
+          'dossier:write',
+          `/dossiers/${encodeURIComponent(found.id)}/decisions`,
+          { method: 'POST', body: { references: sentenze } },
         );
         return data({ dossier: { id: found.id, nome: found.name }, esiti: answer.results });
       }),
