@@ -309,10 +309,37 @@ def _section(code: Optional[str]) -> Optional[str]:
 _EU_COURT_NAMES = {"corte_giustizia_ue": "Corte giust. UE", "tribunale_ue": "Trib. UE"}
 
 
+def admin_court_name(corte: str, sede: Optional[str]) -> str:
+    """«Cons. Stato», «C.G.A.R.S.», «TAR Lazio, Roma», «TAR Toscana», «T.R.G.A. Bolzano» (design
+    2026-10-12-administrative-courts §3): a TAR's seat only where its region has more than one."""
+    from merlt.utils.tar_seats import SEATS
+    if corte == "consiglio_di_stato":
+        return "Cons. Stato"
+    if corte == "cgars":
+        return "C.G.A.R.S."
+    seat = SEATS.get(sede or "")
+    if seat is None:
+        return "TAR"
+    name, region, _main, body = seat
+    if body == "TRGA":
+        return f"T.R.G.A. {name}"
+    several = sum(1 for s in SEATS.values() if s[1] == region) > 1
+    return f"TAR {region}, {name}" if several else f"TAR {region}"
+
+
+def admin_section(sezione: Optional[str]) -> Optional[str]:
+    if not sezione:
+        return None
+    return "ad. plen." if sezione == "plenaria" else f"sez. {sezione}"
+
+
 def decision_short(corte: str, numero: int, anno: Optional[int], archivio: Optional[str] = None,
-                   sezione: Optional[str] = None, rv: Optional[list[str]] = None) -> str:
+                   sezione: Optional[str] = None, rv: Optional[list[str]] = None, sede: Optional[str] = None) -> str:
     """"Cass. civ., sez. un., n. 31310/2024", "Corte cost., n. 71/2020"; with the massime,
     "… · Rv. 673165-01" (D2 of 4 October 2026)."""
+    if corte in ("consiglio_di_stato", "cgars", "tar"):
+        number = f"n. {numero}/{anno}" if anno else f"n. {numero}"
+        return ", ".join(p for p in (admin_court_name(corte, sede), admin_section(sezione), number) if p)
     if corte in _EU_COURT_NAMES:
         # by the case (design 2026-10-12 §3.2): «Corte giust. UE, C-634/21», «Trib. UE, T-612/17»,
         # a Court of Justice case before 1989 with no letter («26/62»)

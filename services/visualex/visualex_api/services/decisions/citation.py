@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from .model import FIRST_YEAR, MAX_NUMERO, MAX_NUMERO_CAUSA
+from .model import FIRST_YEAR, MAX_NUMERO, MAX_NUMERO_AMMINISTRATIVO, MAX_NUMERO_CAUSA
+from .tar_seats import REGIONS, SEATS, fold, seats_of
 
 MAX_SCANNED = 600
 _F = re.IGNORECASE | re.ASCII
@@ -52,10 +53,6 @@ _DATE_YEAR = re.compile(
 _DASH = "[-\u2010\u2011\u2012\u2013\u2014]"
 _UNSUPPORTED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(r"^\s*(?:" + pattern + r")(?=[\s,.;:(]|$)", _F), name) for pattern, name in (
-        (r"cons(?:iglio)?\.?\s*(?:di\s+)?st(?:ato)?\.?|c\.\s*d\.\s*s\.?|cds",
-         "Consiglio di Stato"),
-        (r"t\.\s*a\.\s*r\.?|tar|tribunale\s+amministrativo(?:\s+regionale)?",
-         "Tribunale amministrativo regionale"),
         (r"garante\s+(?:della\s+)?privacy|garante\s+per\s+la\s+protezione\s+dei\s+dati(?:\s+personali)?",
          "Garante per la protezione dei dati personali"),
         (r"corte\s+edu|c\.\s*edu|corte\s+europea\s+dei\s+diritti\s+dell['’]\s*uomo|cedu(?!\s*,?\s*art)",
@@ -93,6 +90,85 @@ def _eu_reference(scanned: str, today: date) -> dict[str, Any] | None | bool:
     if not 1 <= numero <= MAX_NUMERO_CAUSA or not FIRST_YEAR[corte] <= anno <= today.year:
         return None
     return {"corte": corte, "numero": numero, "anno": anno}
+
+
+# The administrative courts (design 2026-10-12-administrative-courts §4): the Consiglio di Stato, the
+# C.G.A.R.S., a TAR named by its region and perhaps its seat, the T.R.G.A. by its seat.
+_ADMIN_COURT = re.compile(
+    r"^\s*(?:(cons(?:iglio)?\.?\s*(?:di\s+)?st(?:ato)?\.?|c\.\s*d\.\s*s\.?|cds)"
+    r"|(c\.\s*g\.\s*a\.\s*r\.\s*s\.?|c\.\s*g\.\s*a\.?|cgars|consiglio\s+di\s+giustizia\s+amministrativa(?:\s+per\s+la\s+regione\s+siciliana)?)"
+    r"|(t\.\s*r\.\s*g\.\s*a\.?|trga|tribunale\s+regionale\s+di\s+giustizia\s+amministrativa)"
+    r"|(t\.\s*a\.\s*r\.?|tar|tribunale\s+amministrativo(?:\s+regionale)?))(?=[\s,.;:(]|$)", _F)
+_ADMIN_SECTION = re.compile(
+    r"\bsez(?:ione)?\.?\s*(?:(i{1,3}|iv|v|vi{0,3}|ix|x|[1-9]|10)(?:\s*-?\s*(bis|ter|quater))?(?=[\s,.;]|$))"
+    r"|\b(ad(?:unanza)?\.?\s*plen(?:aria)?\.?)", _F)
+_ADMIN_KIND = re.compile(r"\b(sent(?:enza)?|ord(?:inanza)?|decr(?:eto)?|par(?:ere)?)\b\.?", _F)
+_KIND_FAMILY = (("sent", "sentenza"), ("ord", "ordinanza"), ("decr", "decreto"), ("par", "parere"))
+_ARABIC_ROMAN = {"1": "I", "2": "II", "3": "III", "4": "IV", "5": "V", "6": "VI", "7": "VII", "8": "VIII",
+                 "9": "IX", "10": "X"}
+_WORDS = re.compile(r"[a-z]+")
+
+
+def _named_in(head: str, names: dict[str, object]) -> object | None:
+    """The first name of `names` (folded) that `head` holds as whole words."""
+    words = " " + " ".join(_WORDS.findall(fold(head))) + " "
+    for folded, value in names.items():
+        if f" {folded} " in words:
+            return value
+    return None
+
+
+_SEATS_BY_FOLD = {fold(s.sede): s for s in SEATS}
+
+
+def _admin_reference(scanned: str, today: date) -> dict[str, Any] | str | None | bool:
+    """The reference to an administrative court; the unsupported court's name for a parere; None
+    when the words name such a court but nothing it can read; False when they name none."""
+    court = _ADMIN_COURT.match(scanned)
+    if not court:
+        return False
+    rest = scanned[court.end():]
+    corte = "consiglio_di_stato" if court.group(1) else "cgars" if court.group(2) else "tar"
+    ref: dict[str, Any] = {"corte": corte}
+    if corte == "tar":
+        head = rest[:80]
+        seat = _named_in(head, _SEATS_BY_FOLD)
+        region = _named_in(head, REGIONS)
+        trga = bool(court.group(3))
+        if seat is not None and (region is None or seat.regione == region):
+            ref["sede"] = seat.slug
+        elif trga or region is None:
+            return None  # a TAR with no region the reader knows, a T.R.G.A. with no seat
+        elif len(seats_of(region)) == 1:
+            ref["sede"] = seats_of(region)[0].slug  # a region with one seat names it
+        else:
+            ref["regione"] = region
+    kind = _ADMIN_KIND.search(rest)
+    word = kind.group(1).lower() if kind else ""
+    family = next((name for prefix, name in _KIND_FAMILY if word.startswith(prefix)), None)
+    if family == "parere":
+        return "Consiglio di Stato (pareri)" if corte == "consiglio_di_stato" else None
+    pair = _NUMBER_YEAR.search(rest)
+    dated = _DATE_YEAR.search(rest)
+    only = _NUMBER_ONLY.search(rest) if pair is None else None
+    numero_raw = (pair.group(1) or pair.group(5)) if pair else (only.group(1) if only else None)
+    year_raw = (pair.group(2) or pair.group(3) or pair.group(4) or pair.group(6)) if pair else None
+    year_raw = year_raw or (dated.group(1) or dated.group(2) if dated else None)
+    if numero_raw is None or year_raw is None:
+        return None
+    numero, anno = int(numero_raw), expand_two_digit_year(year_raw)
+    if not 1 <= numero <= MAX_NUMERO_AMMINISTRATIVO or not FIRST_YEAR[corte] <= anno <= today.year:
+        return None
+    ref.update(numero=numero, anno=anno)
+    section = _ADMIN_SECTION.search(rest)
+    if section and section.group(3):
+        ref["sezione"] = "plenaria"
+    elif section and section.group(1):
+        head = section.group(1).upper()
+        ref["sezione"] = _ARABIC_ROMAN.get(head, head) + (f"-{section.group(2).lower()}" if section.group(2) else "")
+    if family:
+        ref["tipo"] = family
+    return ref
 
 
 def expand_two_digit_year(raw: str) -> int:
@@ -141,6 +217,11 @@ def read_decision_citation(text: object, today: date | None = None) -> Reading:
             eu = _eu_reference(scanned, today)
             if eu is not False:
                 return Reading(riferimento=eu) if eu else Reading()
+            admin = _admin_reference(scanned, today)
+            if isinstance(admin, str):
+                return Reading(corte_non_supportata=admin)
+            if admin is not False:
+                return Reading(riferimento=admin) if admin else Reading()
         for pattern, name in _UNSUPPORTED:
             if pattern.search(scanned):
                 return Reading(corte_non_supportata=name)

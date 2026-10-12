@@ -289,6 +289,55 @@
       "input": {"reference": {"corte": "corte_giustizia_ue", "numero": 26, "anno": 1962}, "attributes": {"tipo": "sentenza", "data_decisione": "1963-02-05", "ecli": "ECLI:EU:C:1963:1"}},
       "identity": {"key": {"value": "corte_giustizia_ue:26:1962", "status": "decided"}, "path": {"value": "/sentenze/corte-giustizia-ue/26/1962", "status": "decided"}},
       "labels": {"citation": {"value": "Corte giust. UE, sent. 5 febbraio 1963, causa 26/62", "status": "decided"}, "short": {"value": "Corte giust. UE, 26/62", "status": "decided"}}
+    },
+    {
+      "id": "cds-sent-2270-2019",
+      "note": "Read live on 12 October 2026 at giustizia-amministrativa.it: a sentenza of the sez. VI, published 8 April 2019, ECLI:IT:CDS:2019:2270SENT; the same number and year are also an ordinanza cautelare and a parere (design 2026-10-12-administrative-courts §1). Keyed by kind, number and year (D1), cited in the Cassazione's style (D4).",
+      "input": {"reference": {"corte": "consiglio_di_stato", "numero": 2270, "anno": 2019, "provvedimento": "sent"}, "attributes": {"tipo": "sentenza", "sezione": "VI", "data_deposito": "2019-04-08", "ecli": "ECLI:IT:CDS:2019:2270SENT"}},
+      "identity": {"fields": {"value": {"corte": "consiglio_di_stato", "numero": 2270, "anno": 2019, "provvedimento": "sent"}, "status": "decided"}, "key": {"value": "consiglio_di_stato:sent:2270:2019", "status": "decided"}, "path": {"value": "/sentenze/consiglio-di-stato/2270/2019", "status": "proposed"}},
+      "labels": {"citation": {"value": "Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270", "status": "decided"}, "short": {"value": "Cons. Stato, sez. VI, n. 2270/2019", "status": "decided"}}
+    },
+    {
+      "id": "cds-ad-plen-18-2021",
+      "note": "The Adunanza plenaria, a section of the Consiglio di Stato: «ad. plen.» in lower case, as «sez. un.».",
+      "input": {"reference": {"corte": "consiglio_di_stato", "numero": 18, "anno": 2021, "provvedimento": "sent"}, "attributes": {"tipo": "sentenza", "sezione": "plenaria", "data_deposito": "2021-11-09"}},
+      "identity": {"key": {"value": "consiglio_di_stato:sent:18:2021", "status": "decided"}, "path": {"value": "/sentenze/consiglio-di-stato/18/2021", "status": "proposed"}},
+      "labels": {"citation": {"value": "Cons. Stato, ad. plen., sent. 9 novembre 2021, n. 18", "status": "decided"}, "short": {"value": "Cons. Stato, ad. plen., n. 18/2021", "status": "decided"}}
+    },
+    {
+      "id": "tar-roma-ocau-1234-2020",
+      "note": "Read live on 12 October 2026: an ordinanza cautelare of the TAR of Rome, sez. I, ECLI:IT:TARLAZ:2020:1234OCAU; the same number is an ordinanza collegiale and a decreto decisorio too. No date read: the number carries its year. The seat is named because Lazio has two (proposed).",
+      "input": {"reference": {"corte": "tar", "sede": "roma", "numero": 1234, "anno": 2020, "provvedimento": "ocau"}, "attributes": {"tipo": "ordinanza", "sezione": "I", "ecli": "ECLI:IT:TARLAZ:2020:1234OCAU"}},
+      "identity": {"fields": {"value": {"corte": "tar", "sede": "roma", "numero": 1234, "anno": 2020, "provvedimento": "ocau"}, "status": "decided"}, "key": {"value": "tar:roma:ocau:1234:2020", "status": "decided"}, "path": {"value": "/sentenze/tar-roma/1234/2020?provvedimento=ocau", "status": "proposed"}},
+      "labels": {"citation": {"value": "TAR Lazio, Roma, sez. I, ord., n. 1234/2020", "status": "decided"}, "short": {"value": "TAR Lazio, Roma, sez. I, n. 1234/2020", "status": "decided"}}
+    },
+    {
+      "id": "tar-roma-2-quater",
+      "note": "A section of the TAR of Rome with its suffix: «SEZIONE 2Q» at the source. Fictional number.",
+      "input": {"reference": {"corte": "tar", "sede": "roma", "numero": 99999, "anno": 2020, "provvedimento": "sent"}, "attributes": {"tipo": "sentenza", "sezione": "II-quater", "data_deposito": "2020-03-04"}},
+      "identity": {"key": {"value": "tar:roma:sent:99999:2020", "status": "decided"}},
+      "labels": {"citation": {"value": "TAR Lazio, Roma, sez. II-quater, sent. 4 marzo 2020, n. 99999", "status": "proposed"}, "short": {"value": "TAR Lazio, Roma, sez. II-quater, n. 99999/2020", "status": "proposed"}}
+    },
+    {
+      "id": "tar-firenze-one-seat",
+      "note": "A region with one seat: the seat is not named (proposed). Fictional number.",
+      "input": {"reference": {"corte": "tar", "sede": "firenze", "numero": 99999, "anno": 2021, "provvedimento": "sent"}, "attributes": {"tipo": "sentenza", "sezione": "II", "data_deposito": "2021-03-03"}},
+      "identity": {"key": {"value": "tar:firenze:sent:99999:2021", "status": "decided"}, "path": {"value": "/sentenze/tar-firenze/99999/2021", "status": "proposed"}},
+      "labels": {"citation": {"value": "TAR Toscana, sez. II, sent. 3 marzo 2021, n. 99999", "status": "proposed"}, "short": {"value": "TAR Toscana, sez. II, n. 99999/2021", "status": "proposed"}}
+    },
+    {
+      "id": "trga-bolzano",
+      "note": "Trentino-Alto Adige's Tribunale regionale di giustizia amministrativa, autonomous section of Bolzano: «T.R.G.A. Bolzano», always with its seat (proposed). Fictional number.",
+      "input": {"reference": {"corte": "tar", "sede": "bolzano", "numero": 99999, "anno": 2020, "provvedimento": "sent"}, "attributes": {"tipo": "sentenza", "data_deposito": "2020-05-06"}},
+      "identity": {"key": {"value": "tar:bolzano:sent:99999:2020", "status": "decided"}},
+      "labels": {"citation": {"value": "T.R.G.A. Bolzano, sent. 6 maggio 2020, n. 99999", "status": "proposed"}, "short": {"value": "T.R.G.A. Bolzano, n. 99999/2020", "status": "proposed"}}
+    },
+    {
+      "id": "cgars-sent",
+      "note": "The Consiglio di giustizia amministrativa per la Regione siciliana, a court of its own (D6, the owner: «corte a sé», 12 October 2026). Fictional number.",
+      "input": {"reference": {"corte": "cgars", "numero": 99999, "anno": 2020, "provvedimento": "sent"}, "attributes": {"tipo": "sentenza", "data_deposito": "2020-07-08"}},
+      "identity": {"key": {"value": "cgars:sent:99999:2020", "status": "decided"}, "path": {"value": "/sentenze/cgars/99999/2020", "status": "proposed"}},
+      "labels": {"citation": {"value": "C.G.A.R.S., sent. 8 luglio 2020, n. 99999", "status": "decided"}, "short": {"value": "C.G.A.R.S., n. 99999/2020", "status": "decided"}}
     }
   ],
   "decision_citations": {
@@ -334,10 +383,27 @@
       {"input": "Corte cost. 1/1950", "reference": {"value": null, "status": "current"}},
       {"input": "Corte cost.\u00a0n.\u00a071/2020", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
       {"input": "Cass. civ., sez.\u00a0III, n. 99999/2024", "reference": {"value": {"corte": "cassazione", "archivio": "civile", "sezione": "III", "numero": 99999, "anno": 2024}, "status": "current"}},
-      {"input": "Cons. Stato, sez. VI, n. 2270/2019", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
-      {"input": "Consiglio di Stato, Ad. plen., 9 novembre 2021, n. 18", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
-      {"input": "TAR Lazio, Roma, sez. I, n. 1234/2020", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Tribunale amministrativo regionale", "status": "proposed"}},
-      {"input": "T.A.R. Lombardia, Milano, sez. II, 15 marzo 2021, n. 678", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Tribunale amministrativo regionale", "status": "proposed"}},
+      {"input": "Cons. Stato, sez. VI, n. 2270/2019", "reference": {"value": {"corte": "consiglio_di_stato", "numero": 2270, "anno": 2019, "sezione": "VI"}, "status": "decided"}},
+      {"input": "Consiglio di Stato, Ad. plen., 9 novembre 2021, n. 18", "reference": {"value": {"corte": "consiglio_di_stato", "numero": 18, "anno": 2021, "sezione": "plenaria"}, "status": "decided"}},
+      {"input": "TAR Lazio, Roma, sez. I, n. 1234/2020", "reference": {"value": {"corte": "tar", "numero": 1234, "anno": 2020, "sede": "roma", "sezione": "I"}, "status": "decided"}},
+      {"input": "T.A.R. Lombardia, Milano, sez. II, 15 marzo 2021, n. 678", "reference": {"value": {"corte": "tar", "numero": 678, "anno": 2021, "sede": "milano", "sezione": "II"}, "status": "decided"}},
+      {"input": "Cons. St., ord. n. 2270/2019", "reference": {"value": {"corte": "consiglio_di_stato", "numero": 2270, "anno": 2019, "tipo": "ordinanza"}, "status": "decided"}},
+      {"input": "Cons. Stato, parere n. 2270/2019", "reference": {"value": null, "status": "decided"}, "unsupported_court": {"value": "Consiglio di Stato (pareri)", "status": "proposed"}},
+      {"input": "C.d.S., sez. 6, n. 2270 del 2019", "reference": {"value": {"corte": "consiglio_di_stato", "numero": 2270, "anno": 2019, "sezione": "VI"}, "status": "decided"}},
+      {"input": "Consiglio di Stato, sentenza n. 2270/2019", "reference": {"value": {"corte": "consiglio_di_stato", "numero": 2270, "anno": 2019, "tipo": "sentenza"}, "status": "decided"}},
+      {"input": "TAR Lazio, n. 1234/2020", "reference": {"value": {"corte": "tar", "numero": 1234, "anno": 2020, "regione": "Lazio"}, "status": "decided"}},
+      {"input": "TAR Lazio, sez. II-quater, n. 1234/2020", "reference": {"value": {"corte": "tar", "numero": 1234, "anno": 2020, "regione": "Lazio", "sezione": "II-quater"}, "status": "decided"}},
+      {"input": "TAR Lazio, Latina, sez. I, n. 5/2022", "reference": {"value": {"corte": "tar", "numero": 5, "anno": 2022, "sede": "latina", "sezione": "I"}, "status": "decided"}},
+      {"input": "TAR Toscana, sez. II, sent. n. 300/2021", "reference": {"value": {"corte": "tar", "numero": 300, "anno": 2021, "sede": "firenze", "sezione": "II", "tipo": "sentenza"}, "status": "proposed"}},
+      {"input": "T.A.R. Puglia, Lecce, decr. n. 12/2023", "reference": {"value": {"corte": "tar", "numero": 12, "anno": 2023, "sede": "lecce", "tipo": "decreto"}, "status": "decided"}},
+      {"input": "T.R.G.A. Bolzano, n. 12/2020", "reference": {"value": {"corte": "tar", "numero": 12, "anno": 2020, "sede": "bolzano"}, "status": "proposed"}},
+      {"input": "T.R.G.A., sez. aut. Bolzano, n. 12/2020", "reference": {"value": {"corte": "tar", "numero": 12, "anno": 2020, "sede": "bolzano"}, "status": "proposed"}},
+      {"input": "TRGA Trento, n. 5/2021", "reference": {"value": {"corte": "tar", "numero": 5, "anno": 2021, "sede": "trento"}, "status": "proposed"}},
+      {"input": "C.G.A.R.S., n. 5/2020", "reference": {"value": {"corte": "cgars", "numero": 5, "anno": 2020}, "status": "decided"}},
+      {"input": "CGARS, sent. n. 5/2020", "reference": {"value": {"corte": "cgars", "numero": 5, "anno": 2020, "tipo": "sentenza"}, "status": "decided"}},
+      {"input": "TAR Atlantide, n. 1/2020", "reference": {"value": null, "status": "proposed"}},
+      {"input": "Cons. Stato, n. 2270/1989", "reference": {"value": null, "status": "proposed"}},
+      {"input": "Cons. Stato, n. 100000/2019", "reference": {"value": null, "status": "proposed"}},
       {"input": "Garante privacy, provv. 10 giugno 2021, n. 234", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Garante per la protezione dei dati personali", "status": "proposed"}},
       {"input": "Corte EDU, 4 dicembre 2008, S. e Marper c. Regno Unito", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Corte europea dei diritti dell'uomo", "status": "proposed"}},
       {"input": "CGUE, C-634/21", "reference": {"value": {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}, "status": "decided"}},

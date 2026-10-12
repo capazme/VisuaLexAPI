@@ -109,7 +109,8 @@ def test_a_decision_key_is_the_massimarios(case):
         with pytest.raises(ValueError):
             DecisionIdentity(ref["corte"], ref["numero"], ref.get("anno") or 0, ref.get("archivio"))
     else:
-        assert DecisionIdentity(ref["corte"], ref["numero"], ref["anno"], ref.get("archivio")).key == key
+        assert DecisionIdentity(ref["corte"], ref["numero"], ref["anno"], ref.get("archivio"),
+                                ref.get("sede"), ref.get("provvedimento")).key == key
 
 
 # --- labels of norms ----------------------------------------------------------------------
@@ -177,7 +178,8 @@ _DECISION_SHORT = [c for c in DECISIONS if c["labels"].get("short", {}).get("sta
 def _decision(case, with_rv: bool):
     ref, attrs = case["input"]["reference"], case["input"]["attributes"]
     return decision_short(ref["corte"], ref["numero"], ref.get("anno"), ref.get("archivio"),
-                          attrs.get("sezione") or ref.get("sezione"), case["input"].get("rv") if with_rv else None)
+                          attrs.get("sezione") or ref.get("sezione"), case["input"].get("rv") if with_rv else None,
+                          sede=ref.get("sede"))
 
 
 @pytest.mark.parametrize("case", _DECISION_SHORT, ids=_ids(_DECISION_SHORT))
@@ -209,7 +211,14 @@ def test_decision_short_section_codes(sezione, expected):
 def test_the_massimario_writes_the_short_label(case):
     ref, attrs = case["input"]["reference"], case["input"]["attributes"]
     cited = CitedDecision(corte=ref["corte"], numero=ref["numero"], anno=ref.get("anno"), archivio=ref.get("archivio"),
-                          sezione=attrs.get("sezione") or ref.get("sezione"), rv=case["input"].get("rv") or [])
+                          sezione=attrs.get("sezione") or ref.get("sezione"), rv=case["input"].get("rv") or [],
+                          sede=ref.get("sede"))
     assert cited.estremi == case["labels"]["short"]["value"]
     if "short_with_rv" in case["labels"]:
         assert cited.label == case["labels"]["short_with_rv"]["value"]
+
+
+def test_the_tar_seats_are_the_conventions_copy():
+    from merlt.utils.tar_seats import SEATS
+    seats = json.loads((ROOT / "conventions" / "sources" / "tar-seats.json").read_text(encoding="utf-8"))["seats"]
+    assert SEATS == {s["slug"]: (s["sede"], s["regione"], s["principale"], s["organo"]) for s in seats}
