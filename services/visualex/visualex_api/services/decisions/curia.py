@@ -53,6 +53,7 @@ SOURCE = {
 #: corte → (the case's letter, the judgment's CELEX type)
 COURTS: dict[str, tuple[str, str]] = {"corte_giustizia_ue": ("C", "CJ"), "tribunale_ue": ("T", "TJ")}
 _TIMEOUT = 20
+_ROW_LIMIT = 200
 
 _DASHES = "-‐‑‒–—"
 # A case as the source writes it: «C‑634/21», «T-612/17», «26-62» (cases before 1989 have no letter).
@@ -112,8 +113,34 @@ def sparql_query(corte: str, numero: int, anno: int, *, by_year: bool = True) ->
         "cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/ITA> ; "
         "cdm:expression_case-law_identifier_case ?case ; cdm:expression_title ?title . "
         f'FILTER(CONTAINS(STR(?case), "{case}") || CONTAINS(STR(?case), "{old}")) '
-        "} LIMIT 200"
+        f"}} LIMIT {_ROW_LIMIT}"
     )
+
+
+def celex_query(corte: str, numero: int, anno: int) -> str:
+    """The judgment by its CELEX alone, with no language: the last chance after the case's line."""
+    celex = f"6{int(anno):04d}{COURTS[corte][1]}{int(numero):04d}"
+    return (
+        "PREFIX cdm: <http://publications.europa.eu/ontology/cdm#> "
+        "SELECT DISTINCT ?ecli ?date WHERE { "
+        f'?w cdm:resource_legal_id_celex "{celex}"^^<http://www.w3.org/2001/XMLSchema#string> ; '
+        "cdm:work_date_document ?date . OPTIONAL { ?w cdm:case-law_ecli ?ecli } } LIMIT 5"
+    )
+
+
+def hits_from_celex(payload: Any, corte: str, numero: int, anno: int) -> list[Hit]:
+    """A judgment found by its CELEX: no title, so no formation or parties; the case as asked."""
+    if not isinstance(payload, dict):
+        raise ValueError("SPARQL: risposta non leggibile")
+    rows = payload.get("results", {}).get("bindings")
+    if not isinstance(rows, list):
+        raise ValueError("SPARQL: risposta non leggibile")
+    if not rows:
+        return []
+    row = rows[0] if isinstance(rows[0], dict) else {}
+    letter = COURTS[corte][0] if (corte == "tribunale_ue" or anno >= 1989) else None
+    return [Hit(f"6{anno:04d}{COURTS[corte][1]}{numero:04d}", (row.get("ecli") or {}).get("value"),
+                (row.get("date") or {}).get("value"), "", case_label(letter, numero, anno))]
 
 
 def hits_from_sparql(payload: Any, corte: str, numero: int, anno: int) -> list[Hit]:
@@ -213,11 +240,15 @@ def _lines(node: Tag, out: list[tuple[str, str]]) -> None:
                 out.extend(inner)
         elif child.name in ("div", "tbody", "td", "span"):
             _lines(child, out)
+        elif child.name not in ("hr", "col", "colgroup", "img", "br", "a") and child.get_text(strip=True):
+            # never dropped in silence: a new element in the Court's markup is seen in the log
+            log.warning("CGUE text in an element the reader does not read", element=child.name)
 
 
 def _blocks_from_lines(lines: list[str]) -> dict[str, str]:
     start = next((i for i, line in enumerate(lines) if line.strip().lower() == "sentenza"), None)
-    end = next((i for i, line in enumerate(lines) if line.startswith("Per questi motivi")), None)
+    # the last one: a paragraph of the reasons may open with the same words
+    end = next((i for i in range(len(lines) - 1, -1, -1) if lines[i].startswith("Per questi motivi")), None)
     epigrafe = lines[: start + 1] if start is not None else []
     body_from = start + 1 if start is not None else 0
     motivazione = lines[body_from:end] if end is not None else lines[body_from:]
@@ -233,11 +264,19 @@ def text_from_xhtml(markup: str) -> tuple[dict[str, str], str | None]:
         warnings.simplefilter("ignore", XMLParsedAsHTMLWarning)
         soup = BeautifulSoup(markup, "lxml")
     body = soup.body or soup
+    if not body.find(class_=re.compile(r"^(coj-)?(count|sum-title-1|normal)$")):
+        # not the Court's markup (an error page, a notice): never read as its reasons
+        raise ValueError("CGUE: documento non riconosciuto")
     language = None
+    notes: list[str] = []
     for note in body.find_all("p", class_=re.compile(r"(^|coj-)note$")):
-        m = re.search(r"Lingu[ae] process[^:]*:\s*(.+?)\.?\s*$", _text(note))
+        line = _text(note)
+        m = re.search(r"Lingu[ae] process[^:]*:\s*(.+?)\.?\s*$", line)
         if m:
             language = m.group(1)
+        elif line:
+            notes.append(line)  # a note of substance stays text, at the end
+            log.warning("CGUE judgment with a footnote other than the procedure language")
         note.decompose()
     pairs: list[tuple[str, str]] = []
     _lines(body, pairs)
@@ -246,7 +285,7 @@ def text_from_xhtml(markup: str) -> tuple[dict[str, str], str | None]:
         if "sum-title-1" in kind.split() and line.strip().lower() == "indice":
             break  # the General Court's closing table of contents
         lines.append(line)
-    return _blocks_from_lines(lines), language
+    return _blocks_from_lines(lines + notes), language
 
 
 _OLD_SECTIONS = {"I1": "epigrafe", "I2": "epigrafe", "MO": "motivazione", "CO": "motivazione", "DI": "dispositivo"}
@@ -263,7 +302,13 @@ def text_from_old_html(markup: str) -> dict[str, str]:
     section: str | None = None
     for node in root.find_all(["a", "p"]):
         if node.name == "a" and node.get("name"):
-            section = _OLD_SECTIONS.get(node["name"])
+            name = node["name"]
+            if name in _OLD_SECTIONS:
+                section = _OLD_SECTIONS[name]
+            elif name in ("SM", "top"):
+                section = None  # the summary, or the page's top: not text of the judgment
+            else:
+                log.warning("CGUE former HTML: unknown section anchor kept in the current block", anchor=name)
             continue
         if node.name == "p" and section and not node.find("p"):
             line = _text(node)
@@ -279,7 +324,14 @@ class CuriaReader:
         result = await decisions_http_client.request(
             "GET", SPARQL_URL, source="curia", params={"query": query}, timeout=_TIMEOUT, max_retries=1,
             headers=http_headers({"Accept": "application/sparql-results+json"}))
-        return json.loads(result.text)
+        if any(k.lower().startswith("x-sql-") for k in result.headers):
+            # Virtuoso's «anytime» answer: cut short by its own timeout, possibly empty
+            raise ValueError("SPARQL: risposta parziale")
+        payload = json.loads(result.text)
+        rows = payload.get("results", {}).get("bindings") if isinstance(payload, dict) else None
+        if isinstance(rows, list) and len(rows) >= _ROW_LIMIT:
+            raise ValueError("SPARQL: risposta forse troncata dal limite")
+        return payload
 
     async def find(self, corte: str, numero: int, anno: int) -> list[Hit]:
         """The case's judgments: by the case's year first, then (a case joined to one of an
@@ -288,6 +340,9 @@ class CuriaReader:
         if not hits:
             hits = hits_from_sparql(await self._sparql(sparql_query(corte, numero, anno, by_year=False)),
                                     corte, numero, anno)
+        if not hits:
+            # both queries need an Italian expression: a judgment without one is found by its CELEX
+            hits = hits_from_celex(await self._sparql(celex_query(corte, numero, anno)), corte, numero, anno)
         return hits
 
     async def _document(self, celex: str, accept: str) -> str | None:
@@ -297,6 +352,11 @@ class CuriaReader:
                 headers=http_headers({"Accept": accept, "Accept-Language": "ita"}))
         except DocumentNotFoundError:
             return None  # no such format in Italian
+        expected = "xhtml" if "xhtml" in accept else "html"
+        content_type = next((v for k, v in result.headers.items() if k.lower() == "content-type"), "")
+        if result.status != 200 or expected not in content_type.lower():
+            # a firewall's challenge (202), a choice of files (300), another page: not the judgment
+            raise ValueError(f"CGUE: risposta inattesa ({result.status}, {content_type[:40]})")
         return result.text
 
     async def text(self, celex: str) -> tuple[dict[str, str], str | None]:

@@ -23,6 +23,7 @@ from visualex_api.services.decisions.curia import (
 )
 from visualex_api.services.decisions.model import Decision, Identity, parse_reference
 from visualex_api.services.decisions.resolver import Resolver, SourceUnavailable
+from visualex_api.services.http_client import HttpResult
 from visualex_api.tools.exceptions import DocumentNotFoundError, NetworkError
 
 FIX = Path(__file__).parent / "fixtures" / "decisions"
@@ -130,6 +131,23 @@ def test_the_source_characters_stay_as_they_are():
     assert "  " not in "".join(testo.values())
 
 
+def test_a_note_of_substance_stays_text_and_the_operative_part_starts_at_the_last_marker():
+    markup = XHTML.replace(
+        '<p class="coj-normal">Il secondo punto.</p>',
+        '<p class="coj-normal">Per questi motivi, che non sono il dispositivo, il punto prosegue.</p>',
+    ).replace("</body>", '<p class="coj-note">( *2 ) Una nota di merito.</p></body>')
+    testo, language = text_from_xhtml(markup)
+    assert language == "l’italiano"
+    assert "Per questi motivi, che non sono il dispositivo" in testo["motivazione"]
+    assert testo["dispositivo"].startswith("Per questi motivi, la Corte (Terza Sezione) dichiara:")
+    assert testo["dispositivo"].endswith("Una nota di merito.")
+
+
+def test_an_unknown_section_of_the_former_html_keeps_its_text():
+    markup = OLD.replace('<a name="CO"/>', '<a name="ZZ"/>')
+    assert "NIENTE SPESE ." in text_from_old_html(markup)["motivazione"]
+
+
 def test_unprefixed_classes_read_alike():
     testo, language = text_from_xhtml(XHTML.replace('class="coj-', 'class="'))
     assert (testo, language) == text_from_xhtml(XHTML)
@@ -138,6 +156,11 @@ def test_unprefixed_classes_read_alike():
 def test_a_document_without_its_markers_keeps_every_line_in_the_reasons():
     testo, _ = text_from_xhtml("<html><body><p class='coj-normal'>Solo un capoverso.</p></body></html>")
     assert testo == {"motivazione": "Solo un capoverso."}
+
+
+def test_a_page_without_the_courts_markup_is_not_read_as_its_text():
+    with pytest.raises(ValueError):
+        text_from_xhtml("<html><body><p>Il servizio non è disponibile.</p></body></html>")
 
 
 def test_the_former_html_is_read_by_its_sections_without_keywords_or_summary():
@@ -155,21 +178,29 @@ def test_the_former_html_is_read_by_its_sections_without_keywords_or_summary():
 class FakeClient:
     """The decisions client: SPARQL answers by query kind, documents by CELEX and format."""
 
-    def __init__(self, by_year=None, anywhere=None, documents=None):
+    def __init__(self, by_year=None, anywhere=None, by_celex=None, documents=None, sparql_headers=None):
         self.by_year, self.anywhere = by_year or _payload(), anywhere or _payload()
+        self.by_celex = by_celex or _payload()
         self.documents = documents or {}
+        self.sparql_headers = sparql_headers or {}
         self.calls = []
 
     async def request(self, method, url, **kwargs):
         self.calls.append((url, kwargs.get("headers", {}).get("Accept")))
         if url == curia.SPARQL_URL:
             query = kwargs["params"]["query"]
-            body = self.by_year if "resource_legal_year" in query else self.anywhere
-            return type("R", (), {"text": json.dumps(body)})()
+            body = (self.by_year if "resource_legal_year" in query
+                    else self.by_celex if "resource_legal_id_celex \"" in query else self.anywhere)
+            return HttpResult(json.dumps(body), 200, {"Content-Type": "application/sparql-results+json",
+                                                      **self.sparql_headers})
         key = (url.rsplit("/", 1)[1], kwargs["headers"]["Accept"])
         if key not in self.documents:
             raise DocumentNotFoundError("404")
-        return type("R", (), {"text": self.documents[key]})()
+        answer = self.documents[key]
+        if isinstance(answer, HttpResult):
+            return answer
+        kind = "application/xhtml+xml" if "xhtml" in key[1] else "text/html"
+        return HttpResult(answer, 200, {"Content-Type": f"{kind};charset=UTF-8"})
 
 
 def _use(monkeypatch, client):
@@ -223,6 +254,38 @@ async def test_a_judgment_without_an_italian_text_is_found_without_text(monkeypa
     _use(monkeypatch, FakeClient(by_year=_payload(_row("62099CJ0999", "Causa C-999/99"))))
     [decision] = await CuriaReader().lookup("corte_giustizia_ue", 999, 2099)
     assert decision.testo == {}
+
+
+async def test_a_judgment_without_an_italian_case_line_is_found_by_its_celex(monkeypatch):
+    client = _use(monkeypatch, FakeClient(by_celex=_payload({"ecli": {"value": "ECLI:EU:T:2099:9"},
+                                                             "date": {"value": "2099-02-03"}})))
+    [decision] = await CuriaReader().lookup("tribunale_ue", 9, 2099)
+    assert decision.identita == Identity("tribunale_ue", 9, 2099)
+    assert (decision.ecli, decision.data_decisione, decision.testo) == ("ECLI:EU:T:2099:9", "2099-02-03", {})
+    assert sum(1 for c in client.calls if c[0] == curia.SPARQL_URL) == 3
+
+
+@pytest.mark.parametrize("answer", [
+    HttpResult("", 202, {"Content-Type": "text/html"}),            # a firewall's challenge
+    HttpResult("<html/>", 300, {"Content-Type": "text/html"}),     # a choice of files
+    HttpResult("<html><body><p>Avviso</p></body></html>", 200, {"Content-Type": "text/html"}),
+    HttpResult("<html><body><p>Avviso</p></body></html>", 200, {"Content-Type": "application/xhtml+xml"}),
+])
+async def test_an_answer_that_is_not_the_judgment_is_an_error_never_its_text(monkeypatch, answer):
+    _use(monkeypatch, FakeClient(by_year=_payload(_row("62099CJ0999", "Causa C-999/99")),
+                                 documents={("62099CJ0999", "application/xhtml+xml"): answer}))
+    with pytest.raises(ValueError):
+        await CuriaReader().lookup("corte_giustizia_ue", 999, 2099)
+
+
+async def test_a_partial_or_full_sparql_answer_is_an_error_never_none_found(monkeypatch):
+    _use(monkeypatch, FakeClient(sparql_headers={"X-SQL-State": "S1TAT"}))
+    with pytest.raises(ValueError):
+        await CuriaReader().lookup("corte_giustizia_ue", 999, 2099)
+    full = _payload(*[_row(f"62099CJ{i:04d}", "Causa C-1/99") for i in range(1, 201)])
+    _use(monkeypatch, FakeClient(by_year=full))
+    with pytest.raises(ValueError):
+        await CuriaReader().lookup("corte_giustizia_ue", 999, 2099)
 
 
 async def test_no_judgment_is_none_found(monkeypatch):
