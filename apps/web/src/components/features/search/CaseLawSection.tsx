@@ -27,7 +27,7 @@ interface CaseLawSectionProps {
   /** The article's page on Brocardi, credited beside the massime. */
   brocardiLink?: string | null;
   articleUrn?: string;
-  /** The workspace tab the article is in: a decision opens beside it. */
+  /** The place the article is read in (a practice or one of its windows): a decision opens beside it. */
   tabId?: string;
   /** The way back to the article, recorded when a decision is opened from here. */
   backEntry?: ReadingBackEntry;

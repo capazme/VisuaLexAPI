@@ -20,7 +20,7 @@ type Problem = Exclude<SearchDecisionsAnswer, { esito: 'risultati' }>;
 
 interface DecisionResultListProps {
   query: DecisionSearchQuery;
-  /** The workspace tab the list sits in: a decision opens beside it. */
+  /** The place the list sits in (a practice or one of its windows): a decision opens beside it. */
   besideId?: string;
   /** Where the reader stands in the article: the way back from an opened decision. */
   backEntry?: ReadingBackEntry;

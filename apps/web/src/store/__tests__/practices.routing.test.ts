@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
-import { decisionRowKey, decisionWindowId, articleRowKey, practiceArticleKey, type Practice } from '../../utils/practice';
+import { decisionRowKey, decisionWindowId, type Practice } from '../../utils/practice';
 import type { DecisionReference } from '../../types/decisions';
-import { CC_RD, FOUND, L24, article } from '../../utils/__fixtures__/savedWorkspaces';
+import { FOUND, L24, article } from '../../utils/__fixtures__/savedWorkspaces';
 
 type AppState = ReturnType<typeof appStore.getState>;
 const s = (): AppState => appStore.getState();
@@ -115,44 +115,6 @@ describe('the ways in route to the practice (spec §5, §6.1-§6.2)', () => {
     s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     expect(s().practices).toHaveLength(1);
     expect(s().activePracticeId).toBe(s().practices[0].id);
-  });
-
-  it('focusArticleInTab on a practice reveals the row holding the article', () => {
-    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7')]);
-    s().createPractice('Altra');
-    s().focusArticleInTab(practiceId, '7');
-    const rowKey = articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '7')));
-    expect(s().activePracticeId).toBe(practiceId);
-    expect(s().practiceRows[rowKey]).toBe(true);
-    expect(s().pendingReveal).toEqual({ practiceId, rowKey });
-  });
-
-  it('focusArticleInTab matches an id spelled as the tree API spells it, and an annex-prefixed one (gotcha 9)', () => {
-    const { practiceId, actId } = s().addArticlesToPractice(null, CC_RD, [
-      article(CC_RD, '1 bis'), article(CC_RD, '3', { allegato: '2' }), article(CC_RD, '9'),
-    ]);
-    s().focusArticleInTab(practiceId, '1-bis');
-    expect(s().pendingReveal).toEqual({
-      practiceId, rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(CC_RD, '1 bis'))),
-    });
-    s().focusArticleInTab(practiceId, 'all2:3');
-    expect(s().pendingReveal).toEqual({
-      practiceId, rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(CC_RD, '3', { allegato: '2' }))),
-    });
-  });
-
-  it('focusArticleInTab leaves everything alone when no article matches', () => {
-    const { practiceId } = s().addArticlesToPractice(null, CC_RD, [article(CC_RD, '1')]);
-    s().focusArticleInTab(practiceId, '9999');
-    expect(s().pendingReveal).toBeNull();
-    expect(s().practiceRows).toEqual({});
-  });
-
-  it('addNormaIndexToTab drops the act on the practice it names, else the active one', () => {
-    const p = s().createPractice('P');
-    const actId = s().addNormaIndexToTab('not-a-practice', CC_RD);
-    expect(practice(p).acts.map((a) => a.id)).toEqual([actId]);
-    expect(s().structureWindow.blockId).toBe(actId);
   });
 
   it('revealPracticeDecision opens the decision\'s row and makes its practice active, in one write', () => {

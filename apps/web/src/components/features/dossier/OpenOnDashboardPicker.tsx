@@ -14,7 +14,7 @@ interface Props {
 // Shown when a dossier spans multiple norms: the backend pipeline is
 // single-norma per search call, so we surface the norms as a picker. The first
 // row is an "open them all" shortcut that queues every group: the texts in force
-// into one workspace tab, each past group into a tab of its own.
+// into one practice, a past group as rows of its act.
 export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Props) {
   const totalArticles = groups.reduce((sum, g) => sum + g.articles.length, 0);
 

@@ -87,32 +87,33 @@ export function searchParamsFromGroup(group: NormaGroup): SearchParams {
   };
 }
 
-// The tab a group opens in: the dossier's own for the texts in force, and for a
-// group asking for a past text a tab of its own, named as the tabs of the "Testo
-// alla data" dialog are. A past text must not sit among the texts in force.
+// The label a group's search carries: the dossier's own for the texts in force, and for a
+// group asking for a past text the dossier's with the version, as the "Testo alla data"
+// dialog names its results. A past text must not pass for the text in force.
 export function tabLabelForGroup(dossierTitle: string, group: NormaGroup): string {
   return requestIsHistorical(group)
     ? `${dossierTitle}${versionTabSuffix({ version: group.versione, versionDate: group.data_versione })}`
     : dossierTitle;
 }
 
-// One search per group, each routed to the tab it belongs to (`createTab` makes a
-// tab and returns its id). The texts in force share the dossier's tab, created
-// only when there is one to put in it; every past group gets a tab of its own.
+// One search per group, each routed to the practice it belongs to (`createPractice` makes one
+// and returns its id). The texts in force share the dossier's practice, created only when there
+// is one to put in it; the dossier's open-all passes one id for every group, so a past group
+// lands as rows of the same acts.
 export function searchesForGroups(
   dossierTitle: string,
   groups: NormaGroup[],
-  createTab: (label: string) => string,
+  createPractice: (label: string) => string,
 ): SearchParams[] {
-  let sharedTabId: string | undefined;
+  let sharedPracticeId: string | undefined;
   return groups.map((group) => {
     const tabLabel = tabLabelForGroup(dossierTitle, group);
     let targetPracticeId: string;
     if (requestIsHistorical(group)) {
-      targetPracticeId = createTab(tabLabel);
+      targetPracticeId = createPractice(tabLabel);
     } else {
-      sharedTabId ??= createTab(tabLabel);
-      targetPracticeId = sharedTabId;
+      sharedPracticeId ??= createPractice(tabLabel);
+      targetPracticeId = sharedPracticeId;
     }
     return { ...searchParamsFromGroup(group), tabLabel, targetPracticeId };
   });

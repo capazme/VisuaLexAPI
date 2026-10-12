@@ -3,8 +3,8 @@
  *
  * The rail is mounted per `ArticleTabContent` (there is no workspace-level
  * "focused article" store to bind a single mount to — see design §3.4). With
- * several articles open (multiple NormaCards, a mobile accordion, multiple
- * workspace tabs) every card would render its own `fixed right-0` rail and they
+ * several articles open (multiple rows, a mobile accordion, multiple
+ * windows) every card would render its own `fixed right-0` rail and they
  * would stack. This module dedupes them to exactly ONE visible rail bound to the
  * most-recently-focused article.
  *

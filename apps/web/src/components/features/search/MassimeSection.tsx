@@ -8,7 +8,7 @@ import { brocardiDecisionRef, DECISION_PAGE_AVAILABLE, formatDecisionShort, link
 
 interface MassimeSectionProps {
   massime: (string | MassimaStructured)[] | null;
-  /** The workspace tab the article is in: a decision opens beside it. */
+  /** The place the article is read in (a practice or one of its windows): a decision opens beside it. */
   besideId?: string;
   /** The way back to the article, recorded when a decision is opened from here. */
   backEntry?: ReadingBackEntry;

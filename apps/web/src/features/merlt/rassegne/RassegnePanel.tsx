@@ -86,7 +86,7 @@ function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry 
 
 export interface RassegnePanelProps {
   articleUrn?: string;
-  /** The workspace tab the article is in: a decision chip opens beside it. */
+  /** The place the article is read in (a practice or one of its windows): a decision chip opens beside it. */
   besideId?: string;
   /** The way back to the article, recorded when a decision is opened from here. */
   backEntry?: ReadingBackEntry;
@@ -96,7 +96,7 @@ export interface RassegnePanelProps {
  * "Nelle rassegne della Cassazione": the paragraphs of the Massimario's annual reviews whose
  * author cited this article, by year. A closed row under the article text (spec §7; placement
  * per the text-as-at-a-date spec §9). Self-contained: it takes the article's URN and ignores
- * the slot's other props, bar the tab it opens decisions beside.
+ * the slot's other props, bar the place it opens decisions beside.
  */
 export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanelProps) {
   const [open, setOpen] = useState(false);

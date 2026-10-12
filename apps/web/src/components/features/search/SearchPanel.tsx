@@ -526,7 +526,7 @@ export function SearchPanel() {
   } = useAutoSwitch({
     onSearch: handleSearch,
     isLoading,
-    onRemoveDuplicateTabs: (params) => {
+    onReplaceFirstSearch: (params) => {
       // The practices close nothing: the annex's articles are rows of their own (`allegato` is in
       // the row's key). Only the rows the first search created are taken off (spec §5.2), named by
       // their ids — the request's number and date are not the result's (the palette sends a year,

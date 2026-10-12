@@ -43,7 +43,7 @@ export function Layout() {
   const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
   const barPinnedAtBottom = inReviewSession || onValidationQueue;
 
-  // Leaving the search page closes the window: its matches are in tabs no longer on screen.
+  // Leaving the search page closes the window: its matches are in practices no longer on screen.
   useEffect(() => {
     if (!onSearchPage) closeFindWindow();
   }, [onSearchPage]);

@@ -720,7 +720,7 @@ export function TreeViewPanel({
   );
 
   if (isWindow) {
-    // Rendered on the viewport, not in place: the workspace tab panel this
+    // Rendered on the viewport, not in place: a window this
     // component lives under is transform-driven, and a transformed ancestor
     // becomes the containing block for `fixed` descendants — a window
     // positioned inside it would be placed against the panel rather than the

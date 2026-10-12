@@ -39,9 +39,9 @@ export interface DecisionReadingSurfaceProps {
   testo: DecisionText;
   attributi: DecisionAttributes;
   /**
-   * The workspace tab this decision is read in. With it, a norm opened from a citation is placed
-   * beside that tab and the way back names it; without it (a host with no tab, such as a light
-   * window) the norm opens through the ordinary search and nothing is recorded.
+   * The host this decision is read in: a practice (its row) or a window. With it, a norm opened from
+   * a citation is placed beside that host and the way back names it; without it the norm opens
+   * through the ordinary search and nothing is recorded.
    */
   hostTabId?: string;
   /**

@@ -55,7 +55,7 @@ export function useRailMode(): RailMode {
  * The cleanup unregisters on unmount so the next-highest live rail wins.
  *
  * Only a DISPLAYED copy registers. Some containers render the same article
- * twice for responsive layout (NormaCard: `md:hidden` + `hidden md:block`), so
+ * twice for responsive layout (`md:hidden` + `hidden md:block`), so
  * two rails mount for one article; registering the copy that is `display:none`
  * at the current width would elect a winner the user cannot see (on mobile the
  * bottom-sheet would be unreachable). `anchorEl` is a zero-size in-flow probe;

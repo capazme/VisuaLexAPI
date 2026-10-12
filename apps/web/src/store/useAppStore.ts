@@ -249,7 +249,7 @@ interface AppState {
     searchPanelState: SearchPanelState;
 
     /**
-     * The practices: the tables of the questions, which replace the tabs (spec
+     * The practices: the tables of the questions, which replaced the tabs (spec
      * `2026-10-08-norm-tab-container-design.md` §2). UI state saved in the browser (D6), checked by
      * `sanitizePractices` on every load. A browser that saved tabs (persist version 0) gets its
      * practices from them once, in `migrate` (spec §9).
@@ -279,7 +279,7 @@ interface AppState {
     /** Closes it with its open rows, its reveal and the structure window one of its acts owned; the
      *  active one hands over to its neighbour, the next, else the previous. */
     closePractice: (id: string) => void;
-    /** Empties the table; the seeding marker stays set, so a reload never brings the tabs back (§5). */
+    /** Empties the table; a reload shows no practice (§5). */
     closeAllPractices: () => void;
     /** Ignored for an id that names no practice. */
     setActivePractice: (id: string) => void;
@@ -298,7 +298,7 @@ interface AppState {
         options?: { reveal?: 'first' | string; label?: string },
     ) => { practiceId: string; actId: string };
     /** An article-less act, or the act already there (its URN backfilled), and the structure window
-     *  pointed at it, in one step («Apri l'indice e sfoglia», today's `addNormaIndexToTab`). The
+     *  pointed at it, in one step («Apri l'indice e sfoglia»). The
      *  practice is resolved as `addArticlesToPractice` does and made active, so the window's owner is
      *  on screen. Returns the act's id. */
     addActIndexToPractice: (practiceId: string | null, norma: Norma) => string;
@@ -416,7 +416,7 @@ interface AppState {
     /**
      * Undo stack for citation jumps. See `utils/readingBackStack.ts` for what
      * goes in it and why nothing else does. Session-scoped: its entries point
-     * at tab and block ids, or practice and subject ids, that mean nothing
+     * at practice and subject ids, that mean nothing
      * after a reload, so it is deliberately absent from `partialize`.
      */
     readingBackStack: BackStackEntry[];
@@ -427,10 +427,9 @@ interface AppState {
      */
     pendingDecision: DecisionReference | null;
     /**
-     * The decision tab that should take keyboard focus: set when a tab closes because the decision
-     * it resolved to was already open in another (that one survives). Taken once by the tab's view.
-     * With the practices, the id of the entry another merged into (`setDecisionEntryIdentity`).
-     * Session-only, absent from `partialize`.
+     * The decision entry that should take keyboard focus: the id of the entry another one merged into
+     * when the decision it resolved to was already there (`setDecisionEntryIdentity`; that one
+     * survives). Taken once by the entry's view. Session-only, absent from `partialize`.
      */
     decisionFocusRequest: string | null;
     /**
@@ -483,20 +482,11 @@ interface AppState {
     openTopicSearch: (query: DecisionSearchQuery, label: string, options?: { besideId?: string }) => string;
     requestOpenDecision: (reference: DecisionReference) => void;
     drainPendingDecision: () => string | null;
-    takeDecisionFocusRequest: (tabId: string) => boolean;
+    takeDecisionFocusRequest: (id: string) => boolean;
     /** True, and the request cleared in the same step, when the window `id` was asked to take focus. */
     takeWindowFocusRequest: (id: string) => boolean;
-    focusArticleInTab: (tabId: string, articleId: string) => void;
 
     // Structure Window Actions
-    /**
-     * Drops an article-less norma block on a tab and points the structure
-     * window at it — the "open a code and browse" entry point. Atomic on
-     * purpose: the window can never end up pointing at a block that was not
-     * created. Reuses a block already holding the same act instead of adding
-     * a duplicate. Returns the block id, or null if the tab is gone.
-     */
-    addNormaIndexToTab: (tabId: string, norma: Norma) => string | null;
     openStructureWindow: (blockId: string) => void;
     closeStructureWindow: () => void;
     setStructureWindowPosition: (position: { x: number; y: number }) => void;
@@ -554,7 +544,7 @@ interface AppState {
     triggerSearch: (params: SearchParams) => void;
     clearSearchTrigger: () => void;
     // Queue N searches that all share the same tabLabel so they merge into one
-    // workspace tab (see SearchPanel drain effect). Replaces any pending queue.
+    // practice (see SearchPanel drain effect). Replaces any pending queue.
     triggerMultiSearch: (paramsList: SearchParams[]) => void;
     dequeueNextSearch: () => void;
     // Atomic: if no trigger is pending and the queue is non-empty, move the
@@ -1225,9 +1215,7 @@ const appStore = createStore<AppState>()(
                 state.isDataLoaded = false;
                 state.dataError = null;
 
-                // Clear workspace tabs to ensure user isolation
-                // Each user should start with a clean workspace
-                // and the practices: a shared browser must not show the last user's table (spec §10).
+                // The practices: a shared browser must not show the last user's table (spec §10).
                 state.practices = [];
                 state.activePracticeId = null;
                 state.practiceRows = {};
@@ -1293,9 +1281,9 @@ const appStore = createStore<AppState>()(
                 state.searchPanelState.position = position;
             }),
 
-            // Decision tabs (design 2026-10-05 §2.1-§2.2).
+            // Decisions and topic searches read in a practice (spec §6.1, T8).
             openTopicSearch: (asked, label, options) => {
-                // the tab keeps the topic as typed, trimmed
+                // the window keeps the topic as typed, trimmed
                 const query = asked.tema === undefined ? asked : { ...asked, tema: asked.tema.trim() };
                 // A topic-search window of the practice the link reads in,
                 // else the active one (T8); a phone shows it in the full-screen reader, beside nothing.
@@ -1335,7 +1323,7 @@ const appStore = createStore<AppState>()(
             }),
 
             drainPendingDecision: () => {
-                // Atomic enough for StrictMode: the request is cleared before the tab opens,
+                // Atomic enough for StrictMode: the request is cleared before the decision opens,
                 // so the second call finds null (gotcha 14).
                 const pending = get().pendingDecision;
                 if (!pending) return null;
@@ -1343,8 +1331,8 @@ const appStore = createStore<AppState>()(
                 return get().openDecision(pending, { fromLink: true }).decisionId;
             },
 
-            takeDecisionFocusRequest: (tabId) => {
-                if (get().decisionFocusRequest !== tabId) return false;
+            takeDecisionFocusRequest: (id) => {
+                if (get().decisionFocusRequest !== id) return false;
                 set((state) => { state.decisionFocusRequest = null; });
                 return true;
             },
@@ -1356,11 +1344,6 @@ const appStore = createStore<AppState>()(
             },
 
             // ── Structure window ─────────────────────────────────────────
-            addNormaIndexToTab: (tabId, norma) => {
-                const named = get().practices.some((p) => p.id === tabId);
-                return get().addActIndexToPractice(named ? tabId : null, norma);
-            },
-
             // Assigning `blockId` is the whole mechanism: a second open hands
             // ownership over rather than adding a window.
             openStructureWindow: (blockId) => set((state) => {
@@ -1394,7 +1377,7 @@ const appStore = createStore<AppState>()(
                     return null;
                 }
                 const entry = readingBackStack[index];
-                // Entries newer than the live one point at closed tabs/blocks:
+                // Entries newer than the live one point at subjects that are gone:
                 // they are discarded together with the one being consumed.
                 set((state) => {
                     state.readingBackStack = state.readingBackStack.slice(0, index);
@@ -1402,19 +1385,6 @@ const appStore = createStore<AppState>()(
                 });
                 return entry;
             },
-
-            focusArticleInTab: (tabId, articleId) => set((state) => {
-                // The row holding the article, revealed with its practice made active.
-                const practice = state.practices.find((p) => p.id === tabId);
-                if (!practice) return;
-                for (const act of practice.acts) {
-                    const hit = findPracticeArticle(act, articleId);
-                    if (!hit) continue;
-                    state.activePracticeId = practice.id;
-                    revealRow(state, practice.id, act.id, practiceArticleKey(hit));
-                    return;
-                }
-            }),
 
             addBookmark: (norma, tags = []) => {
                 const key = generateKey(norma);
@@ -3280,14 +3250,14 @@ function shownWindowId(beside: BesideRef[], ref: BesideRef): string | undefined 
 }
 
 /** `placeId` when it names a light window of some practice (the asker of a link, T16); else undefined:
- *  a practice (a row of the table) or an old tab asks nothing of the windows. */
+ *  a practice (a row of the table) asks nothing of the windows. */
 function windowIdOf(state: Pick<AppState, 'practices'>, placeId: string | undefined): string | undefined {
     return placeId && state.practices.some((p) => p.beside.some((b) => b.id === placeId)) ? placeId : undefined;
 }
 
 /** The practice a link's `besideId` reads in: a practice (a row of its table), the practice
  *  holding the window of that id, or the practice of the phone's reader of that id; null for
- *  anything else (an old tab), which lands in the active one. */
+ *  anything else, which lands in the active one. */
 function practiceOfPlace(state: Pick<AppState, 'practices' | 'phoneReader'>, placeId: string | undefined): string | null {
     if (!placeId) return null;
     if (state.phoneReader?.ref.id === placeId && state.practices.some((p) => p.id === state.phoneReader?.practiceId)) {

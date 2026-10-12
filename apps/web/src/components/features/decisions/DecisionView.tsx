@@ -94,8 +94,8 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot }: {
 
   return (
     <article className="space-y-5">
-      {/* h4: the tab's label is an h3 and the norm cards' titles are h4 too. Focusable by script, so a
-          tab that takes over from a closed one can put the reader's focus on the decision. */}
+      {/* h4: the practice's name is an h3 and the acts' titles are h4 too. Focusable by script, so an
+          entry that takes over from one merged into it can put the reader's focus on the decision. */}
       <h4
         tabIndex={-1}
         data-decision-heading
@@ -189,7 +189,7 @@ function unreachableMessage(fonte: string): string {
   return 'La fonte non risponde in questo momento.';
 }
 
-/** The body of a decision, wherever it is drawn: the workspace tab or the phone's view. */
+/** The body of a decision, wherever it is drawn: a row, a window or the phone's reader. */
 export function DecisionView({
   answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, noTextSlot,
 }: DecisionViewProps) {

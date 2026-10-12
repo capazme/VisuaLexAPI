@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Norma } from '../types';
-import { formatNormaMeta, formatNormaTitle } from './normaMeta';
+import { formatNormaMeta } from './normaMeta';
 
 const norma = (data?: string, over: Partial<Norma> = {}): Norma => ({
   tipo_atto: 'legge',
@@ -8,13 +8,6 @@ const norma = (data?: string, over: Partial<Norma> = {}): Norma => ({
   data,
   ...over,
 } as Norma);
-
-describe('formatNormaTitle', () => {
-  it('heads an act by its citation, a code by its name', () => {
-    expect(formatNormaTitle(norma('1990-08-07'))).toBe('l. 7 agosto 1990, n. 241');
-    expect(formatNormaTitle(norma('1942-03-16', { tipo_atto: 'Codice Civile', numero_atto: '262' }))).toBe('Codice civile');
-  });
-});
 
 describe('formatNormaMeta', () => {
   it('says nothing the title already says', () => {

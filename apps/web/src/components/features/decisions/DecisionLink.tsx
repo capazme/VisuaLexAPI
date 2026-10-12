@@ -7,9 +7,9 @@ import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 
 interface DecisionLinkProps {
   to: LooseDecisionRef;
-  /** The workspace tab the link sits in: on the search page the decision opens beside it. */
+  /** The place the link sits in (a practice, one of its windows or the phone's reader): on the search page the decision opens beside it. */
   besideId?: string;
-  /** Where the reader stands in the article: recorded as the way back when the tab opens beside it. */
+  /** Where the reader stands in the article: recorded as the way back when the decision opens beside it. */
   backEntry?: ReadingBackEntry;
   className?: string;
   title?: string;

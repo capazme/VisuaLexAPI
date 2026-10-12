@@ -17,12 +17,9 @@ const env = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop, isDesktopViewport: () => env.desktop }));
-vi.mock('../workspace/WorkspaceManager', () => ({ WorkspaceManager: () => <div data-testid="old-workspace" /> }));
-vi.mock('../workspace/WorkspaceNavigator', () => ({ WorkspaceNavigator: () => <div data-testid="old-dock" /> }));
 vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./QuickNormsManager', () => ({ QuickNormsManager: () => null }));
 vi.mock('../settings/AliasManager', () => ({ AliasManager: () => null }));
-vi.mock('./NormaCard', () => ({ NormaCard: () => null }));
 vi.mock('../../../config/annexConfig', () => ({ ANNEX_AUTO_SWITCH_CONFIG: env.annex }));
 vi.mock('./ArticleTabContent', () => ({
   ArticleTabContent: ({ data, onCrossReferenceNavigate }: {
@@ -124,8 +121,6 @@ describe.each([
     await waitFor(() => expect(readers()).toEqual(['art. 2043']));
     expect(s().practices.map((x) => x.id)).toEqual([p]);
     expect(s().practices[0].acts[0].articles).toHaveLength(1);
-    expect(screen.queryByTestId('old-workspace')).toBeNull();
-    expect(screen.queryByTestId('old-dock')).toBeNull();
   });
 
   it(`a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens ${desktop ? 'beside, once' : 'full screen, once'}`, async () => {
@@ -204,7 +199,7 @@ describe('SearchPanel with the practices: where a search lands (spec §5.1)', ()
 
   it('«Apri l\'indice e sfoglia» drops the act on the active practice (no tab)', async () => {
     const p = s().createPractice('P');
-    act(() => { s().addNormaIndexToTab(p, { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16' }); });
+    act(() => { s().addActIndexToPractice(p, { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16' }); });
     expect(s().practices[0].acts.map((a) => a.key)).toEqual([actKeyOf({ tipo_atto: 'codice civile' })]);
   });
 

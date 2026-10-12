@@ -14,7 +14,7 @@ interface UseArticleMarkersInput {
    * have no commi to divide.
    */
   structure?: ArticleStructure | null;
-  /** The annotation signs of the tab and the dossier reader; see RenderArticleInput. */
+  /** The annotation signs of the practice's row and the dossier reader; see RenderArticleInput. */
   signs?: boolean;
   /** Passage discussions located in this text: counted on the signs. */
   threads?: readonly LocatedThread[];

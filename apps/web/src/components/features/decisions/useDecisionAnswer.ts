@@ -30,7 +30,7 @@ export interface DecisionAnswerState {
 }
 
 /**
- * A decision as its reading place asks for it (a workspace tab, a practice's entry): fetched through
+ * A decision as its reading place asks for it (a practice's row, a window, the phone's reader): fetched through
  * the session cache, its candidates chosen in place, a found answer seeded in the cache under the
  * bare identity. An answer for a reference that is no longer `current` never reaches the caller.
  */

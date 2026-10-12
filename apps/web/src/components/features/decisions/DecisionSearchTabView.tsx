@@ -4,9 +4,9 @@ import type { DecisionSearchQuery } from '../../../types/decisions';
 import { DecisionResultList } from './DecisionResultList';
 
 /**
- * A decision search in its workspace tab: a topic, optionally narrowed to an article. «Solo il
- * tema» drops the article for this copy of the view (the tab's query stays as it was opened).
- * A decision opened from the list sits beside this tab; a results list is not an article, so
+ * A decision search in its window (or the phone's reader): a topic, optionally narrowed to an article. «Solo il
+ * tema» drops the article for this copy of the view (the window's query stays as it was opened).
+ * A decision opened from the list sits beside this window; a results list is not an article, so
  * there is no way back to give it.
  */
 export function DecisionSearchTabView({ tabId, query }: { tabId: string; query: DecisionSearchQuery }) {

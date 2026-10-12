@@ -18,12 +18,9 @@ vi.mock('../../../config/annexConfig', () => ({ ANNEX_AUTO_SWITCH_CONFIG: env.an
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop, isDesktopViewport: () => env.desktop }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
-vi.mock('../workspace/WorkspaceManager', () => ({ WorkspaceManager: () => <div data-testid="old-workspace" /> }));
-vi.mock('../workspace/WorkspaceNavigator', () => ({ WorkspaceNavigator: () => <div data-testid="old-dock" /> }));
 vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./QuickNormsManager', () => ({ QuickNormsManager: () => null }));
 vi.mock('../settings/AliasManager', () => ({ AliasManager: () => null }));
-vi.mock('./NormaCard', () => ({ NormaCard: () => null }));
 vi.mock('./ArticleTabContent', () => ({
   ArticleTabContent: ({ data, variant = 'row', onCrossReferenceNavigate }: {
     data: { norma_data: { numero_articolo: string } };
