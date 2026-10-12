@@ -22,7 +22,7 @@ const OVERLAY_ID = 'reading-row-overlay';
 
 /** A row's column is as tall as the viewport less the margins above and below it, and holds its
  *  place while the table beside it scrolls (the windows are in-flow columns, spec §4). */
-const COLUMN_FRAME = 'sticky top-4 h-[calc(100vh-2rem)] flex-none';
+const COLUMN_FRAME = 'sticky top-4 h-app-row flex-none';
 
 /** The nearest ancestor that scrolls: the page's content scroller, which the results area sits in. */
 function scrollParentOf(el: HTMLElement): HTMLElement | null {
@@ -94,13 +94,18 @@ export function ReadingRow(props: PracticeTableProps) {
   const layout = besideLayout(width, count);
   const isRail = layout.table === 'rail';
 
-  // The rail's overlay is open for one practice: switching practice, or a layout that has room for
-  // the table again, closes it. A row revealed while the table is folded opens it, so the reveal
-  // (a search that landed, an index pick) is not made out of sight.
+  // The rail's overlay is open for one practice and one set of windows: switching practice, a layout
+  // that has room for the table again, or a window opening or closing (an «Apri accanto» pressed in
+  // the overlay itself) closes it; so does a window being asked to take focus (a folded row's header,
+  // an index chip of an article shown beside), or the overlay would stay open over the window it sent
+  // focus to. A row revealed while the table is folded opens it, so the reveal (a search that landed,
+  // an index pick) is not made out of sight.
+  const windowsKey = practice ? `${practice.id}#${windows.map((w) => w.id).join('|')}` : null;
+  const focusNamesWindow = useAppStore((s) => s.windowFocusRequest !== null && windows.some((w) => w.id === s.windowFocusRequest));
   const [openFor, setOpenFor] = useState<string | null>(null);
-  if (openFor !== null && (!isRail || openFor !== practice?.id)) setOpenFor(null);
-  else if (isRail && practice && revealPending && openFor !== practice.id) setOpenFor(practice.id);
-  const overlayOpen = isRail && !!practice && openFor === practice.id;
+  if (openFor !== null && (!isRail || openFor !== windowsKey || focusNamesWindow)) setOpenFor(null);
+  else if (isRail && windowsKey && revealPending && !focusNamesWindow && openFor !== windowsKey) setOpenFor(windowsKey);
+  const overlayOpen = isRail && windowsKey !== null && openFor === windowsKey;
 
   useEffect(() => {
     if (!overlayOpen) return;
@@ -204,7 +209,7 @@ export function ReadingRow(props: PracticeTableProps) {
               title={practice.label}
               onClick={() => {
                 focusOnOpenRef.current = !overlayOpen;
-                setOpenFor(overlayOpen ? null : practice.id);
+                setOpenFor(overlayOpen ? null : windowsKey);
               }}
               data-testid="practice-rail"
               className={cn(
@@ -237,7 +242,7 @@ export function ReadingRow(props: PracticeTableProps) {
           data-testid="reading-row-overlay"
           style={{ left: RAIL_WIDTH, width: `min(56rem, calc(100% - ${RAIL_WIDTH}px))` }}
           className={cn(
-            'absolute top-0 h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900',
+            'absolute top-0 h-app-row overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900',
             Z_INDEX.dropdown,
           )}
         >
@@ -251,7 +256,13 @@ export function ReadingRow(props: PracticeTableProps) {
           className={cn(COLUMN_FRAME, 'pl-4')}
           style={{ width: layout.windows[index] }}
         >
-          <ReadingWindow practiceId={practice.id} besideRef={ref} onCrossReference={props.onCrossReference} />
+          <ReadingWindow
+            practiceId={practice.id}
+            besideRef={ref}
+            onCrossReference={props.onCrossReference}
+            // The right-hand window ends under Layout's full-screen toggle (fixed, top right).
+            clearTopRight={index === Math.min(windows.length, MAX_BESIDE) - 1}
+          />
         </div>
       ))}
     </div>

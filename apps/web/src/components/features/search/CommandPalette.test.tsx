@@ -504,3 +504,23 @@ describe('CommandPalette — over the workspace', () => {
     expect(isWorkspaceCovered()).toBe(false);
   });
 });
+
+describe('CommandPalette — Escape', () => {
+  it('closed, it leaves Escape alone: not prevented, onClose not called (the rail\'s overlay honours defaultPrevented)', () => {
+    const onClose = vi.fn();
+    render(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('open, it closes on Escape and takes the key', () => {
+    const onClose = vi.fn();
+    render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

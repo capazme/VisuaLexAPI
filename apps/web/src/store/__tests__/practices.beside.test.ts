@@ -128,6 +128,7 @@ describe('the way back to a window (spec §6.3, carry-over 11)', () => {
   });
 
   it('a window still open is not duplicated and takes focus', () => {
+    viewport(true);
     const { practiceId, ref } = articleWindow();
     s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });
     s().popReadingBack();
@@ -195,6 +196,31 @@ describe('a reveal that targets a row folded by its window focuses the window (s
     s().createPractice('P');
     s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
     s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    expect(s().windowFocusRequest).toBeNull();
+  });
+});
+
+describe('a phone draws no window, so it asks none to take focus (spec §6.3)', () => {
+  function oneWindow() {
+    const a = article(L24, '5');
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [a]);
+    const ref = besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(a) });
+    s().openBeside(practiceId, ref);
+    return { practiceId, actId, ref };
+  }
+
+  it('openBeside on a subject already beside', () => {
+    viewport(false);
+    const { practiceId, ref } = oneWindow();
+    s().openBeside(practiceId, ref);
+    expect(s().windowFocusRequest).toBeNull();
+  });
+
+  it('the way back to a window still open', () => {
+    viewport(false);
+    const { ref } = oneWindow();
+    s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });
+    s().popReadingBack();
     expect(s().windowFocusRequest).toBeNull();
   });
 });

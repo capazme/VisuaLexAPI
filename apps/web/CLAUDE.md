@@ -497,8 +497,9 @@ opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
 per-tab copy would sit inside the very tab an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
-combination for "back" already belongs to the browser. With the practices it floats centred above the bar of practices (`placement="bottom"`, `bottomOffset` from
-the bar's measured height), the one edge the table's sticky headings and the windows' headers leave free;
+combination for "back" already belongs to the browser. With the practices it floats centred above the bar of practices on the desktop (`placement="bottom"`,
+`bottomOffset` from the bar's measured height) and, on a phone, a fixed 80 px up, clear of the services
+pill and the feedback button; the bottom is the one edge the table's sticky headings and the windows' headers leave free;
 the old tabs keep it at the top. Behind `VITE_FEATURE_PRACTICE_TABLE` the
 stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
 practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
@@ -1098,7 +1099,7 @@ meant to stay split; add new features as new files, not inside the shells:
     `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
     raising the child's value does nothing.
     The sidebar's navigation scrolls on its own in a low window (`overflow-y-auto`, which clips what hangs
-    out of it) and the document never scrolls (`Layout`'s root is `h-screen overflow-hidden`), so its
+    out of it) and the document never scrolls (`Layout`'s root is `h-app overflow-hidden`: `index.css`'s utility, `100dvh` with a `100vh` fallback; the practice row's columns are `h-app-row`, that less the content area's 4 rem of padding), so its
     labels are portalled to the body (`SidebarTooltip`), placed from the control's rectangle; they show
     for a mouse pointer and on keyboard focus-visible (never after a tap or a click), and go with Esc, a scroll
     or a resize.

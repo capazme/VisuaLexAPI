@@ -80,12 +80,16 @@ describe('ReadingBackControl over the practices (flag on, spec §6.3 `beside`)',
   });
 
   it('with the window still open, it takes focus instead of being opened twice', async () => {
+    // The windows are the desktop's: a phone asks none to take focus.
+    const saved = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
     const { s, practiceId, ref } = await articleWindow();
     s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });
     render(<ReadingBackControl />);
     fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 5 l. 24/2017' }));
     expect(s().practices.find((p) => p.id === practiceId)?.beside).toHaveLength(1);
     expect(s().windowFocusRequest).toBe(ref.id);
+    window.matchMedia = saved;
     vi.unstubAllEnvs();
   });
 

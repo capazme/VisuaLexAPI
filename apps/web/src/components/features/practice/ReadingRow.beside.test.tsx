@@ -34,6 +34,7 @@ vi.mock('../decisions/DecisionSearchTabView', () => ({ DecisionSearchTabView: ()
 
 import { appStore } from '../../../store/useAppStore';
 import { L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
+import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
 import { PracticeTable } from './PracticeTable';
 import { ReadingRow } from './ReadingRow';
 
@@ -156,7 +157,9 @@ describe('on a phone', () => {
     env.desktop = false;
     const { practiceId, actId } = setup();
     const a = s().practices[0].acts[0].articles[0];
-    s().openBeside(practiceId, { id: `article:${actId}:x`, kind: 'article', actId, articleKey: `${a.norma_data.numero_articolo}` });
+    // A real window, on a subject the practice holds: on a desktop its row would fold.
+    s().openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(a) }));
+    expect(s().practices[0].beside).toHaveLength(1);
     render(table());
     expect(screen.queryByRole('button', { name: /^Apri accanto/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Aperto accanto/)).not.toBeInTheDocument();

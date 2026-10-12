@@ -1149,7 +1149,7 @@ const appStore = createStore<AppState>()(
                 }
                 const beside = besideWith(practice.beside, ref, askerId);
                 // Already shown: asked again, that window takes focus (carry-over 11).
-                const shownId = beside === practice.beside ? shownWindowId(practice.beside, ref) : undefined;
+                const shownId = beside === practice.beside && isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
                 if (beside === practice.beside && get().activePracticeId === practiceId && (!shownId || get().windowFocusRequest === shownId)) return;
                 set((state) => {
                     state.activePracticeId = practiceId;
@@ -3848,7 +3848,7 @@ function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
     const { subject } = entry;
     if (entry.place === 'beside') {
         const ref = besideRefFor(subject);
-        const shownId = shownWindowId(practice.beside, ref);
+        const shownId = isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
         practice.beside = besideWith(practice.beside, ref);
         if (shownId) state.windowFocusRequest = shownId;
     } else if (subject.kind === 'article') {

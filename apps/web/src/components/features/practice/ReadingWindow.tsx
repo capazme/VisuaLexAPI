@@ -52,6 +52,9 @@ export interface ReadingWindowProps {
   practiceId: string;
   besideRef: BesideRef;
   onCrossReference: OnCrossReference;
+  /** The window ends at the page's right edge, under Layout's full-screen toggle: its header leaves
+   *  that corner free, so the × is never under or touching it. */
+  clearTopRight?: boolean;
 }
 
 /**
@@ -59,7 +62,7 @@ export interface ReadingWindowProps {
  * scrolling body, and the body of its kind. Closing it leaves the subject in the table (D7). It
  * fills the column its row gives it.
  */
-export function ReadingWindow({ practiceId, besideRef, onCrossReference }: ReadingWindowProps) {
+export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTopRight = false }: ReadingWindowProps) {
   const practice = useAppStore((s) => s.practices.find((p) => p.id === practiceId));
   const closeBeside = useAppStore((s) => s.closeBeside);
   const subject = subjectOf(practice, besideRef);
@@ -85,7 +88,10 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference }: Readi
     >
       <header
         data-reading-window-header
-        className="flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 dark:border-slate-700"
+        className={cn(
+          'flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 dark:border-slate-700',
+          clearTopRight && 'md:pr-12',
+        )}
       >
         <h3 title={title} className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">
           {title}

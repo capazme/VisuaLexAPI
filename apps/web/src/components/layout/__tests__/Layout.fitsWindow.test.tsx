@@ -37,6 +37,10 @@ describe('Layout — the document never scrolls', () => {
     expect(root).not.toHaveClass('min-h-screen', 'h-screen');
     const main = container.querySelector('main') as HTMLElement;
     expect(main).toHaveClass('h-full', 'overflow-hidden');
-    expect(main.querySelector('.overflow-y-auto')).not.toBeNull();
+    const scroller = main.querySelector('.overflow-y-auto') as HTMLElement;
+    expect(scroller).not.toBeNull();
+    // The content area pads 2 rem above and below it at `md`: the practice row's `h-app-row` (100dvh - 4rem)
+    // is that, so the scroller's content is exactly its height with windows beside.
+    expect(scroller.firstElementChild).toHaveClass('md:p-8');
   });
 });

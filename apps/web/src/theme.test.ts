@@ -66,3 +66,10 @@ describe('the page height', () => {
     expect(css).toMatch(/\.h-app\s*\{\s*height:\s*100vh;\s*height:\s*100dvh;?\s*\}/);
   }, 30000);
 });
+
+describe('the practice row\'s columns', () => {
+  it('are the page height less the 4 rem of Layout\'s content padding, in dynamic viewport units with a 100vh fallback', async () => {
+    const css = await compile(['h-app-row']);
+    expect(css).toMatch(/\.h-app-row\s*\{\s*height:\s*calc\(100vh - 4rem\);\s*height:\s*calc\(100dvh - 4rem\);?\s*\}/);
+  }, 30000);
+});
