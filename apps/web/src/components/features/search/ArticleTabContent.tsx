@@ -39,6 +39,7 @@ import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/a
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
 import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
+import { useDevMode } from '../../../features/devMode/useDevMode';
 import { sendNerFeedback } from '../../../services/merltService';
 import type { NerFeedbackType, NerCorrectReference } from '../../../services/merltService';
 import { buildArticleXrefNerPayload } from './articleXrefNer';
@@ -200,6 +201,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // qaAskable/consentLevel drive the in-article "Chiedi su questo articolo"
     // entry (Slice 3 §3.5): shown from `basic`, teaser-at-`none`.
     const { canContribute, qaAskable, consentLevel, merltEnabled } = useMerltFeatures();
+    // The MERL-T surfaces on an article (the graph rail, «Chiedi su questo articolo», the citation
+    // reports) are drawn in the development mode only. It hides, never grants: the consent gates
+    // above still decide. The tracker, the Massimario's panel and the implicit citation feedback
+    // are collection and content for every reader, and stay as they are.
+    const devMode = useDevMode();
 
     const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
     // The find window's target for this article (spec §13.1): the tab this surface reads in,
@@ -891,7 +897,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            {canContribute && missedCitation && (
+            {devMode && canContribute && missedCitation && (
                 <MissedCitationReporter
                     anchorRect={missedCitation.rect}
                     selectedText={missedCitation.text}
@@ -918,7 +924,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onPopupAddNote={handlePopupAddNote}
                     onPopupCopy={handlePopupCopy}
                     onPopupDiscuss={readOnly ? undefined : discussion.popupDiscuss}
-                    onPopupReportCitation={canContribute && !readOnly ? handlePopupReportCitation : undefined}
+                    onPopupReportCitation={devMode && canContribute && !readOnly ? handlePopupReportCitation : undefined}
                     onPopupCreateCard={!isBeside && offersNewCard(norma_data, cardsHistorical)
                         ? (text) => cardsRowRef.current?.createFromPassage(text)
                         : undefined}
@@ -967,7 +973,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             />
 
             {/* It asks about the article by its URN: on a past text the answer would describe the current one. */}
-            {!readOnly && !isBeside && (
+            {devMode && !readOnly && !isBeside && (
                 <AskMerltEntry
                     merltEnabled={merltEnabled}
                     qaAskable={qaAskable}
@@ -1002,7 +1008,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 }}
             />
 
-            {!isBeside && (
+            {devMode && !isBeside && (
                 <PluginSlot
                     slot="article_sidebar"
                     props={{ articleUrn: data.norma_data.urn }}

@@ -38,7 +38,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   says why, in the error toast (`pushSyncError`); the addresses stay the contract with LibreLex
   and the graph), then the MERL-T pages `/merlt` (the hub), `/merlt/contribuisci`, `/merlt/valida` and
   `/grafo` (`/merlt/qa` and `/merlt/chiedi` redirect to `/grafo`), and a 404 for
-  anything else. The MERL-T routes are always registered: `VITE_FEATURE_MERLT`
+  anything else. The MERL-T routes are always registered, each inside `DevRoute`: without the
+  development mode (below) the address redirects to `/`. `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
   entries and whether a page says it is unavailable. Outside the layout:
   `/login`, `/register`, `/connect` (the consent page an MCP client's
@@ -61,7 +62,31 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, and `DecisionSearchTabView`, its workspace tab; design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
-- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
+- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
+  (a link to `/` that also opens the palette; its hover label carries ⌘K; the quick norms' dot sits under it;
+  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Ambienti, Forum,
+  «Analizza documento», Cronologia; and at the bottom only the user menu, whose dropdown holds Impostazioni,
+  the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». There is no «Ricerca Veloce», no
+  «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
+  the phone's off-canvas copy), so both show the same list and the same menu.
+- `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and
+  `DevRoute` (a route element: without the mode, `<Navigate to="/" replace />`; while `useAuth` is
+  still loading it draws nothing, so a reload on a development address is not mistaken for the mode
+  being off). The administrator enables an account (`dev_mode_allowed`, a checkbox in `AdminPage`);
+  the account switches the mode in Impostazioni («Modalità sviluppo», only for an enabled account;
+  `dev_mode`, stored on the server, so it follows the user across devices). `useAuth` exposes
+  `canUseDevMode`, `devMode` (`dev_mode_allowed && dev_mode`) and `setDevMode(enabled)`, which calls
+  `PUT /auth/dev-mode`, makes the answer the shared `/auth/me` and publishes it
+  (`services/authEvents.ts`), so every mounted `useAuth` — the sidebar, an article, a route guard —
+  follows at once, with no reload. **The mode hides and never grants:** it is drawn in the sidebar
+  («Assistente» and «Grafo», under a «Sviluppo» separator, on top of their `VITE_FEATURE_MERLT*`
+  flags), on the MERL-T routes, and on an article (the `article_sidebar` graph rail, `AskMerltEntry`,
+  the selection popup's «Segnala come citazione» and `MissedCitationReporter`, all gated in
+  `ArticleTabContent`, on top of the consent gates); the server's guards stay the real barrier.
+  Not behind it: the RLCF trackers and the consent banner (collection is the owner's separate
+  decision), the Massimario's panel (`article_case_law`), `article_content_after`, `global` and the
+  implicit citation feedback on a click. The mode is unrelated to the Q&A view's own `useQaDevMode`
+  (a local toggle for the pipeline trace).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
@@ -528,7 +553,7 @@ the tab; with no other tab on screen a new decision takes the whole free area), 
 plain click on the search page opens the tab beside the article and, given a `backEntry`, records
 the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as for a citation jump; any
 other click follows the real `href`, which `DecisionAddress` turns into the same tab), the
-sidebar's «Sentenze» (a button: it opens the palette, there is no page) and the address itself
+sidebar's «Ricerca» (which also opens the palette: there is no decisions page) and the address itself
 (queued in `pendingDecision`, drained by `SearchPanel`). The tab reads the decision on the
 reading surface, where highlights and notes work as on an article (see «A court decision takes
 the same tools»). «Cerca nella barra di ricerca», on a decision that was not found, opens the

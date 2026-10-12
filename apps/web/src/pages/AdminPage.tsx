@@ -362,6 +362,18 @@ export function AdminPage() {
     }
   };
 
+  const handleToggleDevModeAllowed = async (userId: string, current: boolean) => {
+    try {
+      setActionLoading(true);
+      await adminService.updateUser(userId, { devModeAllowed: !current });
+      await loadUsers();
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToggleActive = async (userId: string, currentIsActive: boolean) => {
     try {
       setActionLoading(true);
@@ -669,6 +681,17 @@ export function AdminPage() {
                                 Validatore di VisuaLex Studia
                               </label>
                             )}
+                            <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                              <input
+                                type="checkbox"
+                                checked={u.dev_mode_allowed ?? false}
+                                onChange={() => handleToggleDevModeAllowed(u.id, u.dev_mode_allowed ?? false)}
+                                disabled={actionLoading}
+                                aria-label={`Modalità sviluppo consentita: ${u.username}`}
+                                className="h-4 w-4 rounded border-gray-300"
+                              />
+                              Modalità sviluppo consentita
+                            </label>
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">

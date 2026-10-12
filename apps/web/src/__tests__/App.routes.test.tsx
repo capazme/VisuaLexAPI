@@ -14,6 +14,12 @@ vi.mock('../features/merlt/consent/ConsentContext', () => ({
   ConsentProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
+// The development mode decides the MERL-T addresses (DevRoute); each test sets it.
+const account = vi.hoisted(() => ({ devMode: true }));
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({ loading: false, devMode: account.devMode }),
+}));
+
 // Layout renders the Outlet inside a marker so tests can assert the shell stays mounted.
 vi.mock('../components/layout/Layout', async () => {
   const { Outlet } = await import('react-router-dom');
@@ -64,6 +70,7 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   window.history.pushState({}, '', '/');
+  account.devMode = true;
 });
 
 describe('App routing', () => {
@@ -99,6 +106,19 @@ describe('App routing', () => {
     renderAt('/grafo');
     expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
   });
+
+  // Spec D6: a development address opened without the development mode is not there.
+  it.each(['/merlt', '/merlt/contribuisci', '/merlt/valida', '/grafo', '/merlt/qa', '/merlt/chiedi'])(
+    'sends %s to the search page without the development mode',
+    async (path) => {
+      account.devMode = false;
+      renderAt(path);
+      expect(await screen.findByTestId('search-page')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/');
+      expect(screen.queryByTestId('graph-explorer')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('merlt-hub')).not.toBeInTheDocument();
+    },
+  );
 
   it('sends /sentenze and a decision address into the search space', async () => {
     const lookup = renderAt('/sentenze');

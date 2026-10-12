@@ -159,3 +159,44 @@ describe('AdminPage — VisuaLex Studia', () => {
     await waitFor(() => expect(adminService.updateUser).toHaveBeenCalledWith('a', { lingoValidatore: false }));
   });
 });
+
+describe('AdminPage — development mode', () => {
+  const row = (id: string, username: string, allowed: boolean) => ({
+    id, username, email: `${username}@example.com`, is_active: true, is_verified: true, is_admin: false,
+    lingo_validatore: false, dev_mode_allowed: allowed, dev_mode: allowed, created_at: '2026-10-01T10:00:00Z',
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('shows a «Modalità sviluppo consentita» checkbox on each user, ticked for those enabled', async () => {
+    vi.mocked(adminService.listUsers).mockResolvedValue([row('a', 'alice', true), row('b', 'bob', false)]);
+    renderAdminPage();
+    const alice = await screen.findByRole('checkbox', { name: 'Modalità sviluppo consentita: alice' });
+    const bob = screen.getByRole('checkbox', { name: 'Modalità sviluppo consentita: bob' });
+    expect([alice, bob].map((box) => (box as HTMLInputElement).checked)).toEqual([true, false]);
+    expect(screen.getAllByText('Modalità sviluppo consentita')).toHaveLength(2);
+  });
+
+  it('is there with VisuaLex Studia off: the two switches do not depend on each other', async () => {
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    vi.mocked(adminService.listUsers).mockResolvedValue([row('a', 'alice', true)]);
+    renderAdminPage();
+    expect(await screen.findByRole('checkbox', { name: 'Modalità sviluppo consentita: alice' })).toBeInTheDocument();
+  });
+
+  it('sends devModeAllowed, camelCase, when the box is toggled, and reads the users again', async () => {
+    const listUsers = vi.mocked(adminService.listUsers);
+    listUsers.mockResolvedValue([row('a', 'alice', true), row('b', 'bob', false)]);
+    vi.mocked(adminService.updateUser).mockClear();
+    renderAdminPage();
+    const alice = await screen.findByRole('checkbox', { name: 'Modalità sviluppo consentita: alice' });
+    const bob = screen.getByRole('checkbox', { name: 'Modalità sviluppo consentita: bob' });
+    listUsers.mockClear();
+    fireEvent.click(bob);
+    await waitFor(() => expect(adminService.updateUser).toHaveBeenCalledWith('b', { devModeAllowed: true }));
+    await waitFor(() => expect(listUsers).toHaveBeenCalled());
+
+    fireEvent.click(alice);
+    await waitFor(() => expect(adminService.updateUser).toHaveBeenCalledWith('a', { devModeAllowed: false }));
+  });
+});

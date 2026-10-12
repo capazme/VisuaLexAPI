@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 // ---- mocks (hoisted) ----
 const isMerltEnabledMock = vi.fn();
+const account = vi.hoisted(() => ({ devMode: false }));
 
 vi.mock('../../../features/merlt/featureFlag', () => ({
   isMerltEnabled: () => isMerltEnabledMock(),
@@ -13,6 +14,7 @@ vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { username: 'test', email: 'test@example.com' },
     isAdmin: false,
+    devMode: account.devMode,
     logout: vi.fn(),
   }),
 }));
@@ -52,12 +54,15 @@ function navHrefs(): string[] {
 
 beforeEach(() => {
   isMerltEnabledMock.mockReturnValue(true);
+  account.devMode = false;
 });
 
 describe('Sidebar navigation (MERL-T single entry)', () => {
-  it('flag on → "Assistente" (hub) plus "Grafo" (the deliberation surface), Cronologia above them', () => {
+  it('development mode on → "Assistente" (hub) plus "Grafo" (the deliberation surface), after Cronologia', () => {
     // Slice 3 D1 had a single entry; Slice 4 Decision A (absorb) made /grafo
     // the Q&A surface and points the sidebar at it too, the hub stays /merlt.
+    // Both only for an account in the development mode (spec D3).
+    account.devMode = true;
     renderSidebar();
     const hrefs = navHrefs();
     expect(hrefs).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/history', '/merlt', '/grafo']);
@@ -67,7 +72,13 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     expect(hrefs.indexOf('/history')).toBeLessThan(hrefs.indexOf('/merlt'));
   });
 
-  it('flag off → no MERL-T entry at all', () => {
+  it('development mode off → no MERL-T entry at all, flag on or not', () => {
+    renderSidebar();
+    expect(navHrefs()).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/history']);
+  });
+
+  it('flag off → no MERL-T entry at all, even in the development mode', () => {
+    account.devMode = true;
     isMerltEnabledMock.mockReturnValue(false);
     renderSidebar();
     const hrefs = navHrefs();

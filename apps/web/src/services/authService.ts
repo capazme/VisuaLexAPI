@@ -3,6 +3,7 @@
  */
 import { post, get, put } from './api';
 import { forgetReturnTo } from '../utils/returnTo';
+import { publishUser } from './authEvents';
 import type {
   UserRegisterRequest,
   UserLoginRequest,
@@ -69,6 +70,18 @@ export const getCurrentUser = (): Promise<UserResponse> => {
 export const changePassword = async (data: ChangePasswordRequest): Promise<UserResponse> => {
   const user = await put<UserResponse>('/auth/change-password', data);
   currentUserRequest = Promise.resolve(user);
+  return user;
+};
+
+/**
+ * Turn the development mode on or off for the signed-in account. The server refuses (403) when the
+ * administrator has not enabled the account. The answer is the user as `/auth/me` gives it: it
+ * becomes the shared current user and is published, so every mounted `useAuth()` follows at once.
+ */
+export const setDevMode = async (enabled: boolean): Promise<UserResponse> => {
+  const user = await put<UserResponse>('/auth/dev-mode', { enabled });
+  currentUserRequest = Promise.resolve(user);
+  publishUser(user);
   return user;
 };
 

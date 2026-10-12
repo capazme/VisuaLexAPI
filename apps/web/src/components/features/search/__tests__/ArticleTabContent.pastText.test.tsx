@@ -25,6 +25,8 @@ vi.mock('../../../../services/articleDiscussionService', () => ({
 vi.mock('../../../../services/studiaService', () => ({ studiaService: { forArticle: () => Promise.resolve([]) } }));
 vi.mock('../../../../services/authService', () => ({ isAuthenticated: () => true }));
 vi.mock('../../../../services/notificationService', () => ({ notificationService: { checkNorma } }));
+// The entry that asks MERL-T is drawn in the development mode only; this suite is about the text in force.
+vi.mock('../../../../features/devMode/useDevMode', () => ({ useDevMode: () => true }));
 vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true }),
 }));

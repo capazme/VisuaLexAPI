@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Type, Palette, Download, Trash2 } from 'lucide-react';
+import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Type, Palette, Download, Trash2, FlaskConical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -38,7 +38,7 @@ interface SettingsModalProps {
 
 export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalProps) {
     const navigate = useNavigate();
-    const { isAdmin } = useAuth();
+    const { isAdmin, canUseDevMode, devMode, setDevMode } = useAuth();
     const { settings, updateSettings } = useAppStore();
     const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
     const [versionLoading, setVersionLoading] = useState(false);
@@ -48,6 +48,8 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     const [accountMessage, setAccountMessage] = useState<string | null>(null);
     const [deletePassword, setDeletePassword] = useState('');
     const [deleteConfirmation, setDeleteConfirmation] = useState('');
+    const [devModeBusy, setDevModeBusy] = useState(false);
+    const [devModeError, setDevModeError] = useState(false);
 
     useEffect(() => {
         if (isOpen && !versionInfo && !versionLoading && !versionError) {
@@ -120,6 +122,20 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
         } catch {
             setAccountMessage('Impossibile eliminare l’account. Verifica la password e la conferma.');
             setAccountBusy(false);
+        }
+    };
+
+    // The server answers with the user and every mounted `useAuth()` follows: the sidebar and the open
+    // article change under this dialog, no reload. A refusal leaves the mode as it was.
+    const handleToggleDevMode = async () => {
+        setDevModeBusy(true);
+        setDevModeError(false);
+        try {
+            await setDevMode(!devMode);
+        } catch {
+            setDevModeError(true);
+        } finally {
+            setDevModeBusy(false);
         }
     };
 
@@ -248,6 +264,44 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             <HelpCircle size={16} />
                             Ricomincia il Tour Guidato
                         </button>
+                    </div>
+                )}
+
+                {/* Development mode - only for accounts the administrator enabled */}
+                {canUseDevMode && (
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                            <FlaskConical size={12} aria-hidden /> Sviluppo
+                        </label>
+                        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                            <div className="min-w-0">
+                                <p id="dev-mode-label" className="text-sm font-medium text-slate-700 dark:text-slate-200">Modalità sviluppo</p>
+                                <p className="text-xs text-slate-500">Mostra Assistente, Grafo e gli strumenti MERL-T ancora in prova, in barra laterale e sugli articoli.</p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={devMode}
+                                aria-labelledby="dev-mode-label"
+                                disabled={devModeBusy}
+                                onClick={() => void handleToggleDevMode()}
+                                className={cn(
+                                    "relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
+                                    devMode ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
+                                )}
+                            >
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                                        devMode && "translate-x-5"
+                                    )}
+                                />
+                            </button>
+                        </div>
+                        {devModeError && (
+                            <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">Impossibile cambiare la modalità sviluppo. Riprova.</p>
+                        )}
                     </div>
                 )}
 

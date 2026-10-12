@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
+const account = vi.hoisted(() => ({ isAdmin: false, devMode: false }));
 vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'u1', username: 'tester' }, isAdmin: false, logout: vi.fn() }),
+  useAuth: () => ({ user: { id: 'u1', username: 'tester' }, isAdmin: account.isAdmin, devMode: account.devMode, logout: vi.fn() }),
 }));
 vi.mock('../../hooks/useForumNotifications', () => ({
   useForumNotifications: () => ({ count: { total: 3 }, markRead: vi.fn(), refetch: vi.fn() }),
@@ -22,21 +23,24 @@ function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
 }
 
-function renderSidebar(initialPath = '/') {
+const handlers = { toggleTheme: vi.fn(), closeMobile: vi.fn(), openSettings: vi.fn(), openKeyboardShortcuts: vi.fn() };
+
+function renderSidebar(initialPath = '/', props: { theme?: string; isOpen?: boolean } = {}) {
   render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Where />
-      <Sidebar
-        theme="light"
-        toggleTheme={vi.fn()}
-        isOpen
-        closeMobile={vi.fn()}
-        openSettings={vi.fn()}
-        openKeyboardShortcuts={vi.fn()}
-      />
+      <Sidebar theme={props.theme ?? 'light'} isOpen={props.isOpen ?? true} {...handlers} />
     </MemoryRouter>,
   );
 }
+
+const openUserMenu = () => fireEvent.click(screen.getByRole('button', { name: /Menu utente/ }));
+
+beforeEach(() => {
+  account.isAdmin = false;
+  account.devMode = false;
+  Object.values(handlers).forEach((fn) => fn.mockClear());
+});
 
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
@@ -46,20 +50,29 @@ describe('Sidebar — accessible names', () => {
     }
   });
 
-  it('offers «Sentenze» as a button that opens the palette, not as a page link', () => {
+  it('has no «Ricerca Veloce» and no «Sentenze»: «Ricerca» and ⌘K open the palette', () => {
     renderSidebar();
+    expect(screen.queryByRole('button', { name: /Ricerca Veloce/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Ricerca Veloce/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Sentenze/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /Sentenze/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /Sentenze/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
   });
 
-  it('opens the palette and goes to the search page when «Sentenze» is pressed', () => {
-    appStore.setState({ commandPaletteOpen: false });
-    renderSidebar('/dossier');
-    expect(screen.getByTestId('where')).toHaveTextContent('/dossier');
-    fireEvent.click(screen.getByRole('button', { name: /Sentenze/ }));
-    expect(appStore.getState().commandPaletteOpen).toBe(true);
-    expect(screen.getByTestId('where').textContent).toBe('/');
-    appStore.setState({ commandPaletteOpen: false });
+  it('keeps the quick norms dot, now under «Ricerca»', () => {
+    appStore.setState({ quickNorms: [{ id: 'q1' } as never] });
+    renderSidebar();
+    const dot = screen.getByTitle('1 preferiti');
+    const search = screen.getByRole('link', { name: 'Ricerca' });
+    expect(search.compareDocumentPosition(dot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.getElementById('tour-sidebar')).toContainElement(dot);
+    appStore.setState({ quickNorms: [] });
+  });
+
+  it('gives «Ricerca» the id the tours point at', () => {
+    renderSidebar();
+    expect(document.getElementById('tour-nav-search')).toBe(screen.getByRole('link', { name: 'Ricerca' }));
+    expect(document.getElementById('tour-quick-search')).toBeNull();
   });
 
   it('folds the notification count into the link name', () => {
@@ -68,12 +81,9 @@ describe('Sidebar — accessible names', () => {
     expect(screen.getByRole('link', { name: /Forum, 3 notifiche/ })).toBeInTheDocument();
   });
 
-  it('names every button, including the user menu', () => {
+  it('has the user menu as its only button, with no system buttons beside it', () => {
     renderSidebar();
-    expect(screen.getByRole('button', { name: /Impostazioni/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Scorciatoie/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Tema/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Menu utente/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Menu utente']);
   });
 
   it('leaves nothing unnamed', () => {
@@ -82,6 +92,14 @@ describe('Sidebar — accessible names', () => {
     // here even if nobody remembers to add a case above.
     for (const el of [...screen.getAllByRole('link'), ...screen.getAllByRole('button')]) {
       expect(el).toHaveAccessibleName();
+    }
+  });
+
+  it('names every entry of the open user menu', () => {
+    renderSidebar();
+    openUserMenu();
+    for (const name of [/Impostazioni/, /Tema scuro/, /Scorciatoie/, /Esci/]) {
+      expect(screen.getByRole('button', { name })).toHaveAccessibleName();
     }
   });
 
@@ -94,26 +112,113 @@ describe('Sidebar — accessible names', () => {
   });
 });
 
-describe('Sidebar — MERL-T graph entry (Slice 4 Decision A)', () => {
+describe('Sidebar — the development mode (spec D1–D3)', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('links to /grafo when both MERL-T flags are on (default)', () => {
+  it('shows neither «Assistente» nor «Grafo» nor the «Sviluppo» group without the mode', () => {
     renderSidebar();
-    expect(screen.getByRole('link', { name: /Grafo/ })).toHaveAttribute('href', '/grafo');
+    expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Assistente/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Sviluppo')).not.toBeInTheDocument();
   });
 
-  it('hides the entry when VITE_FEATURE_MERLT_GRAPH is off', () => {
+  it('shows both under a quiet «Sviluppo» separator, after the others, with the mode', () => {
+    account.devMode = true;
+    renderSidebar();
+    const group = screen.getByRole('group', { name: 'Sviluppo' });
+    expect(within(group).getByRole('link', { name: 'Assistente' })).toHaveAttribute('href', '/merlt');
+    expect(within(group).getByRole('link', { name: 'Grafo' })).toHaveAttribute('href', '/grafo');
+    expect(within(group).getAllByRole('link')).toHaveLength(2);
+    const links = screen.getAllByRole('link');
+    expect(links.indexOf(screen.getByRole('link', { name: /Cronologia/ }))).toBeLessThan(links.indexOf(within(group).getByRole('link', { name: 'Assistente' })));
+    expect(links.at(-1)).toBe(within(group).getByRole('link', { name: 'Grafo' }));
+  });
+
+  it('adds nothing for the mode when VITE_FEATURE_MERLT_GRAPH is off: only «Assistente»', () => {
+    account.devMode = true;
     vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'false');
     renderSidebar();
     expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Assistente' })).toBeInTheDocument();
   });
 
-  it('hides the entry when MERL-T itself is off', () => {
+  it('never grants: with MERL-T itself off the mode shows no entry and no separator', () => {
+    account.devMode = true;
     vi.stubEnv('VITE_FEATURE_MERLT', 'false');
     renderSidebar();
     expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Assistente/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Sviluppo')).not.toBeInTheDocument();
+  });
+});
+
+describe('Sidebar — the user menu (spec D2)', () => {
+  it('holds Impostazioni, the theme, Scorciatoie and Esci; «Pannello Admin» only for an admin', () => {
+    renderSidebar();
+    openUserMenu();
+    const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim());
+    expect(names).toEqual(expect.arrayContaining(['Menu utente', 'Impostazioni', 'Tema scuro', expect.stringMatching(/^Scorciatoie/), 'Esci']));
+    expect(screen.queryByRole('button', { name: /Pannello Admin/ })).toBeNull();
+  });
+
+  it('shows «Pannello Admin» to an admin, before Esci', () => {
+    account.isAdmin = true;
+    renderSidebar();
+    openUserMenu();
+    const admin = screen.getByRole('button', { name: /Pannello Admin/ });
+    expect(admin.compareDocumentPosition(screen.getByRole('button', { name: /Esci/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('names the theme it would switch to', () => {
+    renderSidebar('/', { theme: 'dark' });
+    openUserMenu();
+    expect(screen.getByRole('button', { name: /Tema chiaro/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tema scuro/ })).toBeNull();
+  });
+
+  it('opens Impostazioni and closes the menu (and the phone\'s menu)', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('button', { name: /Impostazioni/ }));
+    expect(handlers.openSettings).toHaveBeenCalledTimes(1);
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /Impostazioni/ })).toBeNull();
+  });
+
+  it('opens the shortcuts', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('button', { name: /Scorciatoie/ }));
+    expect(handlers.openKeyboardShortcuts).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /Scorciatoie/ })).toBeNull();
+  });
+
+  it('switches the theme', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('button', { name: /Tema scuro/ }));
+    expect(handlers.toggleTheme).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Sidebar — the phone\'s copy (spec D8)', () => {
+  it('is the same reduced list and the same menu, closed off-canvas or open', () => {
+    renderSidebar('/', { isOpen: false });
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
+      ['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/history'],
+    );
+    expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Sentenze|Ricerca Veloce|Impostazioni/ })).toBeNull();
+    openUserMenu();
+    expect(screen.getByRole('button', { name: /Impostazioni/ })).toBeInTheDocument();
+  });
+
+  it('follows the mode like the desktop one', () => {
+    account.devMode = true;
+    renderSidebar('/', { isOpen: false });
+    expect(screen.getByRole('link', { name: 'Grafo' })).toBeInTheDocument();
   });
 });
 
@@ -165,7 +270,7 @@ describe('Sidebar — it fits a low window', () => {
     // A thin scrollbar, not a hidden one: a very low window shows there is more.
     expect(nav).toHaveClass('[scrollbar-width:thin]');
     expect(nav).not.toHaveClass('[scrollbar-width:none]');
-    // The logo, the quick search, the system actions and the user menu keep their own height.
+    // The logo and the user menu keep their own height.
     expect(aside).not.toHaveClass('overflow-y-auto');
     expect(aside.querySelector('nav ~ div')).not.toHaveClass('overflow-y-auto');
   });
@@ -182,20 +287,11 @@ describe('Sidebar — it fits a low window', () => {
     pointerOut(link, MOUSE);
     await waitFor(() => expect(document.body.querySelector('[data-sidebar-tooltip]')).toBeNull());
   });
-
-  it('does the same for a button of the bottom group', () => {
-    renderSidebar();
-    pointerOver(screen.getByRole('button', { name: 'Impostazioni' }), MOUSE);
-    const tooltip = document.body.querySelector('[data-sidebar-tooltip]') as HTMLElement;
-    expect(tooltip).toHaveTextContent('Impostazioni');
-    expect(screen.getByRole('complementary')).not.toContainElement(tooltip);
-  });
 });
 
 // A label that stays on screen after a tap, or over a dialog opened by the click, is worse than none.
 describe.each([
   ['a link', () => screen.getByRole('link', { name: 'Dossier' })],
-  ['a button', () => screen.getByRole('button', { name: 'Impostazioni' })],
 ])('Sidebar — when the label of %s shows', (_name, control) => {
   it('for a mouse pointer over it, not for a touch', () => {
     renderSidebar();
