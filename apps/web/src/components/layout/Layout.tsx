@@ -42,6 +42,10 @@ export function Layout() {
   const inReviewSession = pathname.startsWith('/studia/ripasso/sessione');
   const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
   const barPinnedAtBottom = inReviewSession || onValidationQueue;
+  // Below lg the menu button floats at the top left over the content: every page starts under it,
+  // except the ones that draw their own header beside it (the search page's phone table, its tab
+  // header and the full-screen reader pad their headers by the button's width instead).
+  const headerBesideMenuButton = onSearchPage;
 
   // Leaving the search page closes the window: its matches are in tabs no longer on screen.
   useEffect(() => {
@@ -220,8 +224,10 @@ export function Layout() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto w-full h-full">
-          <div className={cn(
+          <div data-testid="layout-content" className={cn(
             'max-w-7xl mx-auto p-4 md:p-8',
+            // The button is about 42 px from top-4: 4.5rem clears it (md: again, or md:p-8 wins).
+            !settings.focusMode && !headerBesideMenuButton && 'pt-[4.5rem] md:pt-[4.5rem] lg:pt-8',
             settings.focusMode && 'max-w-4xl py-12'
           )}>
             <Outlet />
