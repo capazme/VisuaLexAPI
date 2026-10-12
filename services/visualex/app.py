@@ -603,13 +603,19 @@ class NormaController:
 
         log.info("Final annex value after smart lookup", annex=annex_value)
 
+        # Where the existence check looks: the dispositivo alone ('') when the caller asked for
+        # it explicitly, otherwise the annex settled above, or the whole act (None). Without
+        # this an article that exists only in an annex passed the check, and Normattiva then
+        # answered the dispositivo's request with its art. 1.
+        scope = '' if explicit_dispositivo else annex_value
+
         norma_visitata_list = []
         missing_articles = []
         for article in articles:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
             log.info("Processing article", article=cleaned_article)
 
-            exists = await self._article_exists_in_tree(norma, cleaned_article, annex_value)
+            exists = await self._article_exists_in_tree(norma, cleaned_article, scope)
             if exists is False:
                 log.info("Requested article is not in the act",
                          article=cleaned_article, norma=str(norma))
@@ -629,11 +635,15 @@ class NormaController:
         # request where NOTHING exists is an error.
         if missing_articles and not norma_visitata_list:
             hint = ''
-            if asked_annex is not None and len(missing_articles) == 1:
-                hint = await self._where_else_in_tree(norma, missing_articles[0], asked_annex)
-            # Named the annex: the article may be elsewhere in the act, so the refusal
-            # says which part it looked in, never "not in the act".
-            where = f"nell'allegato {asked_annex} di" if asked_annex is not None else "in"
+            named = '' if explicit_dispositivo else asked_annex
+            if named is not None and len(missing_articles) == 1:
+                hint = await self._where_else_in_tree(norma, missing_articles[0], named)
+            # Named a part (an annex, or the dispositivo): the article may be elsewhere in the
+            # act, so the refusal says which part it looked in, never "not in the act".
+            if explicit_dispositivo:
+                where = "nel testo di"
+            else:
+                where = f"nell'allegato {asked_annex} di" if asked_annex is not None else "in"
             raise ResourceNotFoundError(
                 f"Articolo {', '.join(missing_articles)} non presente {where} {norma}{hint}"
             )
