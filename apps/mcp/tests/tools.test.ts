@@ -44,7 +44,7 @@ const text = (result: Awaited<ReturnType<Client['callTool']>>) => (result.conten
 const json = (result: Awaited<ReturnType<Client['callTool']>>) => JSON.parse(text(result));
 
 describe('the tool list', () => {
-  it('has the eight dossier tools and the four card tools, the read-only ones marked, and only the three deletions destructive', async () => {
+  it('has the nine dossier tools and the four card tools, the read-only ones marked, and only the three deletions destructive', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       'lingolex_elimina_card',
@@ -53,6 +53,7 @@ describe('the tool list', () => {
       'lingolex_schema_card',
       'omnilex_aggiungi_norme_dossier',
       'omnilex_aggiungi_nota_dossier',
+      'omnilex_aggiungi_sentenze_dossier',
       'omnilex_crea_dossier',
       'omnilex_elenca_dossier',
       'omnilex_elimina_dossier',
@@ -132,6 +133,31 @@ describe('omnilex_crea_dossier', () => {
     const result = await client.callTool({ name: 'omnilex_crea_dossier', arguments: { nome: 'Undicesimo' } });
     expect(result.isError).toBe(true);
     expect(text(result)).toContain('limite giornaliero di dossier');
+  });
+});
+
+describe('omnilex_aggiungi_sentenze_dossier', () => {
+  it('adds decisions in words to the dossier named, and passes each outcome through unchanged', async () => {
+    const results = [
+      { reference: 'Cass. civ., sez. un., n. 31310/2024', outcome: 'added', citation: 'Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310', itemId: 'x' },
+      { reference: 'Cons. Stato, sez. VI, n. 2270/2019', outcome: 'court_not_supported', court: 'Consiglio di Stato',
+        detail: 'VisuaLex non legge ancora le decisioni di questa corte (Consiglio di Stato): non è stata aggiunta.' },
+    ];
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path === '/dossiers/d1/decisions' ? [200, { results }] : undefined;
+    const sentenze = results.map((r) => r.reference);
+    const result = await client.callTool({ name: 'omnilex_aggiungi_sentenze_dossier', arguments: { dossier: 'Prova', sentenze } });
+    expect(json(result)).toEqual({ dossier: { id: 'd1', nome: 'Prova' }, esiti: results });
+    const write = env.stub.apiCalls.find((c) => c.method === 'POST');
+    expect(write).toMatchObject({ path: '/dossiers/d1/decisions', bearer: 'api-token-for-dossier:write', body: { references: sentenze } });
+  });
+
+  it('takes 1 to 10 references', async () => {
+    for (const sentenze of [[], Array.from({ length: 11 }, (_, i) => `Cass. civ. ${i + 1}/2024`)]) {
+      const result = await client.callTool({ name: 'omnilex_aggiungi_sentenze_dossier', arguments: { dossier: 'd1', sentenze } });
+      expect(result.isError).toBe(true);
+    }
+    expect(env.stub.apiCalls).toHaveLength(0);
   });
 });
 

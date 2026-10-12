@@ -160,6 +160,21 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   ones in one transaction, after the dossier's last item. Each resolved
   reference's `display` is its citation (below), never Python's own label
   («Art. 3 — legge» named no act).
+- **`POST /api/dossiers/:id/decisions`** — 1 to 10 court decisions in words
+  (`norms/resolveDecisions.ts`; design
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2): the Python
+  API's internal `/parse_decision` reads them in one call, then `/fetch_decision` confirms each,
+  two at a time, within a 100-second budget for the whole call (`decisionLookup`; the MCP server
+  waits 120, a cold Corte costituzionale lookup can take 240): past it a lookup is `unavailable`
+  and nothing is stored for it. `postLegalApi` takes the budget's signal in place of its own
+  30-second timeout. Outcomes: `added`, `already_present` (by the decision's key, against the
+  dossier's `sentenza` items and earlier references: `POST /items` itself checks none),
+  `not_recognised`, `court_not_supported` (with the `court` the words name), `ambiguous` (the
+  candidates' citations in `detail`), `does_not_exist` (`non_trovata` with motivo `inesistente`;
+  a penal suggestion in `detail`), `unavailable` (the source down, a timeout, and `fuori_archivio`
+  or `anno_parziale`, which the source cannot verify). Each stored decision is what the item
+  schema admits, labelled by the server; `citation` names it in the answer. In the delegated
+  table with `dossier:write`, two points per reference, the unverified ones given back.
 - **`norms/citation.ts`** and **`norms/decisionCitation.ts`** — how the server names a
   source, in the source convention (spec
   `docs/superpowers/specs/2026-10-04-source-convention-design.md`, decided by the owner):

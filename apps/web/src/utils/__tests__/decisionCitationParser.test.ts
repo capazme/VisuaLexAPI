@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { parseDecisionCitation } from '../decisionCitationParser';
 
 // The words and what they read as live in the convention's golden file (decision_citations), which
-// the Python API's /parse_decision will assert too (design 2026-10-12, Part A): the two parsers
+// the Python API's /parse_decision asserts too (tests/test_decision_citation.py): the two parsers
 // cannot drift apart.
 function findGolden(from: string): string {
   for (let dir = from; ; dir = dirname(dir)) {

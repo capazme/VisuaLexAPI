@@ -64,7 +64,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     same number), found dates cached a year. `complete_year` serves a search
     (see Date System); `resolve_many` serves MERL-T (`/resolve_act_dates`).
   - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
-    `model.py` (identity and reference), `italgiure.py` (Cassazione, Italgiure's Solr),
+    `model.py` (identity and reference), `citation.py` (a decision cited in words → its
+    reference, the palette's patterns in Python, pinned to the golden file's `decision_citations`),
+    `italgiure.py` (Cassazione, Italgiure's Solr),
     `pdf_text.py` (the Cassazione's text from the court's PDF), `corte_cost.py` (Corte
     costituzionale open data, range bundles on disk), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
@@ -228,6 +230,14 @@ POST unless noted, JSON bodies.
 - `POST /resolve_act_dates {"urns": [...]}` — internal (MERL-T): up to 20 year-only URNs (`urn:nir:stato:legge:1983;184`) → full URNs, through Normattiva's resolver; found dates cached a year. Only State acts of the nine kinds in
   `act_dates._TITLES` are resolved; any other URN, a page whose title is not that act's, a network failure and
   everything after the batch's first 120 s answer `null` for that act.
+- `POST /parse_decision {"citazioni": [...]}` — internal (the server's `POST /api/dossiers/:id/decisions`;
+  not routed by the ingress, not proxied by Vite): 1–10 decisions cited in words (at most 300
+  characters each) → one reading each, in order: `{riferimento}` (what `/fetch_decision` takes),
+  `{corte_non_supportata: "<court>"}` (a court recognised that VisuaLex cannot read: Consiglio di
+  Stato, TAR, Garante, Corte EDU, the Corte di giustizia tributaria, and the CGUE and the General Court
+  until their reader ships; a case number's letter names the EU court) or `{non_riconosciuta: true}`.
+  No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:
+  docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for

@@ -292,7 +292,7 @@
     }
   ],
   "decision_citations": {
-    "note": "Words a lawyer writes, read into the reference /fetch_decision takes (null: not a decision VisuaLex can read). The web palette (decisionCitationParser.ts) asserts every case whose status is asserted, and the Python API's /parse_decision (Part A of the design below) will too; unsupported_court is the API's alone: the court it names when it recognises a court VisuaLex has no reader for (the palette answers null and leaves the words to the norm parser). today is the reader's clock. Design: docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1 and §3.4.",
+    "note": "Words a lawyer writes, read into the reference /fetch_decision takes (null: not a decision VisuaLex can read). The web palette (decisionCitationParser.ts) and the Python API (/parse_decision) both assert every case whose status is decided, current or proposed; unsupported_court is the API's alone: the court it names when it recognises a court VisuaLex has no reader for (the palette answers null and leaves the words to the norm parser). today is the reader's clock. Design: docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1 and §3.4.",
     "today": "2026-10-05",
     "cases": [
       {"input": "Cass. 99999/2024", "reference": {"value": {"corte": "cassazione", "numero": 99999, "anno": 2024}, "status": "current"}},
@@ -332,6 +332,8 @@
       {"input": "Cass. 0/2024", "reference": {"value": null, "status": "current"}},
       {"input": "Cass. 99999/2030", "reference": {"value": null, "status": "current"}},
       {"input": "Corte cost. 1/1950", "reference": {"value": null, "status": "current"}},
+      {"input": "Corte cost.\u00a0n.\u00a071/2020", "reference": {"value": {"corte": "corte_costituzionale", "numero": 71, "anno": 2020}, "status": "current"}},
+      {"input": "Cass. civ., sez.\u00a0III, n. 99999/2024", "reference": {"value": {"corte": "cassazione", "archivio": "civile", "sezione": "III", "numero": 99999, "anno": 2024}, "status": "current"}},
       {"input": "Cons. Stato, sez. VI, n. 2270/2019", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
       {"input": "Consiglio di Stato, Ad. plen., 9 novembre 2021, n. 18", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Consiglio di Stato", "status": "proposed"}},
       {"input": "TAR Lazio, Roma, sez. I, n. 1234/2020", "reference": {"value": null, "status": "current"}, "unsupported_court": {"value": "Tribunale amministrativo regionale", "status": "proposed"}},

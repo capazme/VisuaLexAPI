@@ -79,8 +79,8 @@ One outcome per reference, the others never stopped by one that fails:
 | `not_recognised` | the words do not name a court, a number and a year |
 | `court_not_supported` | a court VisuaLex has no reader for; the answer names the court it read |
 | `ambiguous` | `ambigua`: the Cassazione, same number and year in both archives and no archive given; the candidates are listed by their citation |
-| `does_not_exist` | `non_trovata`, with the reason and the suggestion when the route gives one |
-| `unavailable` | `fonte_non_raggiungibile`, a timeout, a refusal of the quota, any other answer: never "does not exist" |
+| `does_not_exist` | `non_trovata` with the reason `inesistente`, and the penal suggestion when the route gives one |
+| `unavailable` | `fonte_non_raggiungibile`, a timeout, a refusal of the quota, any other answer, and `non_trovata` for a year the archive does not or only partly covers (`fuori_archivio`, `anno_parziale`: the source cannot say): never "does not exist" |
 
 Each `added` and `already_present` carries the server's `citation`; nothing else names a
 decision. Nothing is updated, moved or deleted.

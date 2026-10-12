@@ -18,6 +18,8 @@ router.delete('/dossiers/:id', dossierController.deleteDossier);
 router.post('/dossiers/:id/items', dossierController.addDossierItem);
 // Norms from references in free text, checked for existence (MCP spike).
 router.post('/dossiers/:id/norms', dossierController.addDossierNorms);
+// Court decisions from references in words, confirmed at their source (design 2026-10-12 §2.2).
+router.post('/dossiers/:id/decisions', dossierController.addDossierDecisions);
 // A note, or a note about one of the dossier's articles (MCP second round); the web app uses it too.
 router.post('/dossiers/:id/notes', dossierController.addDossierNote);
 router.put('/dossiers/:id/items/:itemId', dossierController.updateDossierItem);
