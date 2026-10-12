@@ -207,6 +207,8 @@ const HOSTILE: Array<[string, string]> = [
   ['one court and many case numbers', 'Cass. ' + hostile('C-1/2 ')],
   ['kinds of decision', hostile('sentenze n. 1 del 2000, ord. n. 2 e ')],
   ['lists of kinds', hostile('sentenza n. 1/2000 e n. 2/2001, n. 3 del 2002 e ')],
+  ['numbers sharing a year', hostile('Cass. n. 1 e n. 2, n. 3 e ')],
+  ['complete shared-year lists', hostile('sentenze n. 1, n. 2 e n. 3 del 2000 ')],
   ['courts the app cannot open', hostile("Trib. Milano, sez. 3, Corte d'appello ")],
   ['lists of precedents', hostile('Cass. n. 1/2020; Sez. 3, n. 2/2021 (in G.U. ')],
 ];

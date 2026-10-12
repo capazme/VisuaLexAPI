@@ -78,6 +78,10 @@ const UNITED_SECTIONS = /^s\.?\s*u\.?$/i;
 const REGISTER = /(?:reg(?:istro)?\.?|r\.\s*o\.?)\s*$/;
 // «sentenza n. 207 del 2018», «sent. 207/2018», «ordinanze n. 1 del 2010 e n. 2 del 2011»: a kind of decision and its number.
 const KIND_HEADS = new RegExp(`${LEFT}(sentenz[ae]|sent\\.|ordinanz[ae]|ord\\.)(?=\\s*(?:n(?:r|um(?:ero)?)?\\.?\\s*)?\\d)`, 'giu');
+// «n. 96 e n. 229 del 2015»: a list of numbers whose year is written once, at its end.
+const NUMBER_MARK = 'n(?:r|um(?:ero)?)?\\.?\\s*\\d{1,6}';
+const SHARED_YEAR = new RegExp(`(?<![\\p{L}\\p{N}])(${NUMBER_MARK}(?:\\s*(?:,|e|ed)\\s*${NUMBER_MARK})+)\\s*del\\s+(\\d{4})(?!\\d)`, 'iu');
+const NUMBER_MARKS = new RegExp(`(?<![\\p{L}\\p{N}])${NUMBER_MARK}`, 'giu');
 // After a plural kind: «, e n. 12 del 2010» is the next decision of the list.
 const LIST_NEXT = /\s*(?:,|e|ed)\s*(n(?:r|um(?:ero)?)?\.?\s*\d{1,6}\s*(?:\/\s*\d{4}|del\s+\d{4}))/y;
 // A court named right after a citation is its court: «sentenza n. 1234 del 2015 della Corte di cassazione».
@@ -193,6 +197,48 @@ function otherCourtBefore(text: string, folded: string, markers: readonly CourtM
   return Boolean(nearest) && !nearest!.own && sentenceEnd(text, folded, nearest!.end, position) >= position;
 }
 
+const FIRST_NUMBER_MARK = new RegExp(`(?<![\\p{L}\\p{N}])${NUMBER_MARK}`, 'iu');
+
+/**
+ * «sentenze n. 96 e n. 229 del 2015», «Cass., sez. U, n. 1 e n. 2 del 2020»: the numbers share the year
+ * written once at the end of the list. Each number is a decision of its own: the first span runs from the
+ * head to its number, the others cover «n. M» (the last one, its «del YYYY»). Null when the words before the
+ * list are not the head's own citation words (a date, another number, prose), so that two citations are
+ * never merged into one; a kind head whose list is followed by a court gives nothing either.
+ */
+function sharedYearItems(
+  text: string, folded: string, head: Head, prefix: string, tailEnd: number, now: Date, actSpans: () => Array<[number, number]>,
+): DecisionCitationSpan[] | null {
+  const tail = folded.slice(head.start, tailEnd);
+  const list = SHARED_YEAR.exec(tail);
+  if (!list || FIRST_NUMBER_MARK.exec(tail)?.index !== list.index) return null;
+  const listStart = head.start + list.index;
+  const numbers = [...list[1].matchAll(NUMBER_MARKS)].map((m) => ({ at: m.index ?? 0, length: m[0].length, value: /\d+/.exec(m[0])![0] }));
+  const own = `${prefix}${folded.slice(head.start, listStart)}`;
+  const read = (value: string) => readDecisionCitation(`${own}n. ${value} del ${list[2]}`, { aliasTriggers: [], now });
+  const probe = read(numbers[0].value);
+  if (!probe) return null;
+  const gap = text.slice(head.start + Math.max(probe.headEnd, prefix.length) - prefix.length, listStart);
+  if ((head.court && CONJUNCTION.test(gap)) || WRITTEN_DATE.test(gap)) return null;
+  if (!citationGap(gap, CITATION_WORDS, probe.reference.corte === 'tar')) return null;
+
+  const acts = actSpans();
+  const items: DecisionCitationSpan[] = [];
+  for (const [i, number] of numbers.entries()) {
+    const reference = read(number.value)?.reference;
+    if (!reference || (reference.corte !== probe.reference.corte)) return null;
+    const start = i === 0 ? head.start : listStart + number.at;
+    const end = i === numbers.length - 1 ? listStart + list[0].length : listStart + number.at + number.length;
+    const overlapping = firstEndingAfter(acts, start);
+    if (overlapping < acts.length && acts[overlapping][0] < end) return null;
+    const openable = linkableDecisionPath(reference, now) !== null || (reference.corte === 'tar' && Boolean(reference.regione));
+    if (!openable) return null;
+    items.push({ start, end, reference, path: decisionPath(reference) });
+  }
+  if (head.kind && courtFollows(folded, items[items.length - 1].end, true)) return null;
+  return items;
+}
+
 /** The index of the first of `starts` (sorted) that is at or after `position`. */
 function firstAtOrAfter(starts: readonly number[], position: number): number {
   let low = 0;
@@ -241,7 +287,7 @@ function sentenceEnd(text: string, folded: string, start: number, limit: number)
 const CITATION_WORDS = new Set([
   'civ', 'civile', 'pen', 'penale', 'sez', 'sezione', 'sezioni', 'un', 'unite', 'unita', 'su', 'lav', 'lavoro', 'fer', 'feriale', 'ss', 'uu',
   'sent', 'sentenza', 'sentenze', 'ord', 'ordinanza', 'ordinanze', 'decr', 'decreto', 'ad', 'adunanza', 'plen', 'plenaria', 'aut', 'ampliata', 'bis', 'ter', 'quater',
-  'ud', 'udienza', 'trib', 'tributaria', 'causa', 'cause', 'riunite', 'giust', 'giustizia', 'ue', 'unione', 'europea', 'europee', 'comunita', 'primo', 'grado', 'stato', 'cost',
+  'ud', 'udienza', 'trib', 'tributaria', 'prima', 'seconda', 'terza', 'quarta', 'quinta', 'sesta', 'settima', 'civili', 'penali', 'causa', 'cause', 'riunite', 'giust', 'giustizia', 'ue', 'unione', 'europea', 'europee', 'comunita', 'primo', 'grado', 'stato', 'cost',
   'costituzionale', 'per', 'sede', 'di', 'del', 'dello', 'della', 'dell', 'dei', 'delle', 'e', 'ed', 'con', 'il', 'la', 'lo', 'in', 'data',
   'n', 'nr', 'num', 'numero', 'dep', 'depositata', 'depositato', 'deposito', 'depositi',
   'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
@@ -254,6 +300,7 @@ const JOINING_WORDS = new Set(['del', 'dell', 'il', 'in', 'data', 'dep', 'deposi
 // is not the citation's: «n. 1234, il decreto 3 marzo 2021» is another act, whose date is not the year.
 const JOINING_BEFORE_NUMBER = new Set([...JOINING_WORDS, 'sent', 'sentenza', 'ord', 'ordinanza', 'decr', 'decreto']);
 const MONTHS = 'gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre';
+const WRITTEN_DATE = new RegExp(`\\d{4}|\\d{1,2}\\s+(?:${MONTHS})`, 'i');
 // A date, or a range of days («18-25 luglio 1997»), is the citation's own when it stands between its pieces.
 const DATES = new RegExp(
   `\\d{1,2}(?:\\s*[-\u2013]\\s*\\d{1,2})?[°º]?\\s+(?:${MONTHS})\\s+\\d{4}|\\d{1,2}\\s*[/.-]\\s*\\d{1,2}\\s*[/.-]\\s*\\d{4}`,
@@ -329,6 +376,13 @@ export function extractDecisionCitations(
     if (head.court) lastCourt = { end: head.end, coverEnd: tailEnd };
     if (head.unsupported) continue;
     const prefix = head.kind ? SYNTHETIC_CORTE_COSTITUZIONALE : head.section ? SYNTHETIC_COURT : '';
+    const shared = sharedYearItems(text, folded, head, prefix, tailEnd, now, () => (acts ??= allActSpans(folded)));
+    if (shared) {
+      found.push(...shared);
+      consumed = shared[shared.length - 1].end;
+      if (head.court && lastCourt) lastCourt.coverEnd = consumed;
+      continue;
+    }
     const read = readDecisionCitation(prefix + folded.slice(head.start, tailEnd), { aliasTriggers: [], now });
     if (!read || read.words.length === 0) continue;
 

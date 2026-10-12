@@ -751,7 +751,10 @@ Duplicating any of these is a defect, not a shortcut.
   { within, now })` gives `{ start, end, reference, path }` spans over the text (a court head, a bounded tail
   of 200 characters cut at the next head, at a sentence end, at «;» and at the Gazzetta Ufficiale, handed to
   `readDecisionCitation`; the words between the court and the number must be citation words, no number of
-  another, and an «e» right after the court ends its citation («Consiglio di Stato e la sentenza n. 7»); the reference is read again from the span's own words; never inside an act's citation,
+  another, and an «e» right after the court ends its citation («Consiglio di Stato e la sentenza n. 7»); a list whose
+  year is written once at its end («sentenze n. 96 e n. 229 del 2015») is one decision per number, only when nothing
+  but citation words stands before it; a section written in words («sezione prima civile») is a citation word
+  (the span links without a section: the parser reads the code of «sez. III», not of «terza»); the reference is read again from the span's own words; never inside an act's citation,
   `allActSpans`), and `wrapDecisionCitationsInHtml` (see «The decisions a text cites are links»). Pinned to
   the golden file's `decision_citations_in_text` (web only, no Python twin) by `decisionCitationMatcher.test.ts`.
   `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session
