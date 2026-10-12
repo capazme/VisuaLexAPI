@@ -465,7 +465,10 @@ The scanner never links a court that is not written (D2): a bare «n. 123/2020»
 context rules (the owner, 13 October 2026) are two: inside a Cassazione decision a section without its court
 («Sez. U, n. 9100 del 2015») reads as the Cassazione; inside a Corte costituzionale decision «sentenza/ordinanza
 n. N del YYYY» (also «sentenze n. … e n. …», each number its own span) reads as the Court's own, unless a court is
-written right before it (the court covers its own citation) or right after it («… della Corte di cassazione»).
+written right before it (the court covers its own citation) or right after it («… della Corte di cassazione»; a plural
+list is read whole first), or when another court (any head, the referring judge among them) is the nearest court named
+earlier in the same sentence ("questa Corte" or "Corte costituzionale" in between gives it back); a register number
+(«reg. ord. n. 120 del 2018») is never a ruling.
 `DecisionReadingSurface` passes `within` for these two courts only; no other court has such a rule. «decreto n.» of an administrative court is a known conservative miss.
 
 **A past text is a reading** (round "Testo alla data", spec
