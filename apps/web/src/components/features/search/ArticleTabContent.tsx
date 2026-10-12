@@ -97,9 +97,16 @@ interface ArticleTabContentProps {
      * `readingOrigin` wins when both are given.
      */
     tabId?: string;
+    /**
+     * The id the find window knows this reading place by, when it is not the place's own: a light
+     * window beside a practice's table reads under its own id (its way back and its focus) and is
+     * found under its practice's, so «Questa pratica» searches it (spec §6.6). Only the find
+     * window's registration, pressed state and opener read it; the text root is untouched.
+     */
+    findHostId?: string;
 }
 
-export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId }: ArticleTabContentProps) {
+export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId, findHostId }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
     // Flattened to scalars so the citation listener effect below depends on
     // stable values: an inline `readingOrigin` object would change identity on
@@ -192,8 +199,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // key the scope computes from the store. No tab (a
     // preview outside the workspace, such as the palette's result card) registers nothing.
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
-    useRegisterFindRoot(originTabId ?? tabId, findTargetKey, shortNorm(norma_data), textRootRef);
-    const isFindOpen = useFindWindowScopedTo(originTabId ?? tabId, findTargetKey);
+    const findHost = findHostId ?? originTabId ?? tabId;
+    useRegisterFindRoot(findHost, findTargetKey, shortNorm(norma_data), textRootRef);
+    const isFindOpen = useFindWindowScopedTo(findHost, findTargetKey);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],
@@ -793,7 +801,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     isOpen: isFindOpen,
                     onToggle: (button, wasPressed) => (wasPressed
                         ? closeFindWindow()
-                        : openFindWindow({ tabId: originTabId ?? tabId, targetKey: findTargetKey, returnFocus: button })),
+                        : openFindWindow({ tabId: findHost, targetKey: findTargetKey, returnFocus: button })),
                 } : undefined}
             />
 

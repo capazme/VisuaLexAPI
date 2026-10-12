@@ -49,6 +49,12 @@ export interface DecisionReadingSurfaceProps {
    * in a row of a practice's table names its entry, so going back reveals that row.
    */
   hostBlockId?: string;
+  /**
+   * The id the find window knows this decision's reading place by, when it is not `hostTabId`: a
+   * light window reads under its own id (its way back) and is found under its practice's (spec
+   * §6.6). Only the find window's registration, pressed state and opener read it.
+   */
+  findHostId?: string;
 }
 
 /**
@@ -57,7 +63,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle,
@@ -149,8 +155,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   // The find window's target for this decision (spec §13.1): one text, keyed by its own
   // `decisionKey`, the key the scope computes for a decision tab. No `hostTabId` (a host with no
   // tab) registers nothing.
-  useRegisterFindRoot(hostTabId, key, label, textRootRef);
-  const isFindOpen = useFindWindowScopedTo(hostTabId, key);
+  const findHost = findHostId ?? hostTabId;
+  useRegisterFindRoot(findHost, key, label, textRootRef);
+  const isFindOpen = useFindWindowScopedTo(findHost, key);
 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
@@ -225,7 +232,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
-        onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: hostTabId, targetKey: key, returnFocus: findButtonRef.current }))}
+        onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: findHost, targetKey: key, returnFocus: findButtonRef.current }))}
         findButtonRef={findButtonRef}
       />
       <NotesPeekPanel

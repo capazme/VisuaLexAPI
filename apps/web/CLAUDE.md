@@ -252,7 +252,11 @@ session-only) and «Tutte le schede». A phone leaves out loose articles: its co
 norm blocks only. Behind `VITE_FEATURE_PRACTICE_TABLE` the scopes are «Questa pratica» (the active
 practice, on both breakpoints: every article of every act, its row open or closed, then its decisions
 newest first) and «Tutte le pratiche» (the bar's order, each place named with its practice); a row's
-root registers under its practice's id with the same keys; a decision never read counts nothing (it
+root registers under its practice's id with the same keys, and so does a light window's (the
+surface's `findHostId` prop, which also names the practice for the magnifier's pressed state and
+request; the window's own id stays the way back's and the focus's); `setFindWindowDefaultPlace` lets a
+layout give the window its opening place (`ReadingRow`: the table's top right under the practice header,
+or the first window's body with the rail, never over a window's ×; a dragged place wins); a decision never read counts nothing (it
 is not in the session's cache); reaching an undrawn match opens its row with its practice made active
 (`revealPracticeRow`, `revealPracticeDecision`), and the window recomputes on a practice switched, a
 row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
@@ -971,7 +975,12 @@ meant to stay split; add new features as new files, not inside the shells:
   `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column);
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
-  component files). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
+  component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
+  from the pure `besideLayout`: half and half, thirds from 420 px a column, else a 48 px rail that opens
+  the table as an overlay closed by Esc or a click outside; not yet mounted by `SearchPanel` before the
+  routing of «Apri accanto») and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
+  the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
+  `findHostId`). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
   (pure: the items in table order, each article from its own `norma_data`, a code's search and index
   copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
   wait for the items to settle and count them; one save at a time per practice, `usePracticeSaving`),
