@@ -67,6 +67,21 @@ describe('TreeNavigatorModal', () => {
     await waitFor(() => expect(onImport).toHaveBeenCalled());
     expect(onImport.mock.calls[0][1]).toEqual({ tipo_atto: 'direttiva ue', data: '2019', numero_atto: '1937' });
   });
+
+  it('keeps only the year of an act of the Union, even when a full day is typed', async () => {
+    resolveAct.mockResolvedValue({ urn: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita', norma: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016-04-27' } });
+    const onImport = vi.fn();
+    render(<TreeNavigatorModal onClose={() => {}} onImport={onImport} />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'regolamento ue' } });
+    fireEvent.change(screen.getByPlaceholderText('241'), { target: { value: '679' } });
+    fireEvent.change(screen.getByPlaceholderText('aaaa o gg-mm-aaaa'), { target: { value: '27-04-2016' } });
+    fireEvent.click(screen.getByRole('button', { name: /Cerca articoli/ }));
+    await screen.findByText('Art. 1');
+    fireEvent.click(screen.getByText('Art. 1'));
+    fireEvent.click(screen.getByRole('button', { name: /Importa/ }));
+    await waitFor(() => expect(onImport).toHaveBeenCalled());
+    expect(onImport.mock.calls[0][1]).toEqual({ tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679' });
+  });
 });
 
 describe('TreeNavigatorModal — a second search', () => {
