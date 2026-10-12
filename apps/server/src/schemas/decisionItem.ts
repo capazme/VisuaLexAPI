@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { citeDecision } from '../norms/decisionCitation';
 import { EU_CASE, EU_COURTS, EU_FIRST_YEAR, EU_MAX_NUMERO, EU_SECTION, isEuCourt } from '../norms/euCourts';
-import { ADMIN_COURTS, ADMIN_FIRST_YEAR, ADMIN_MAX_NUMERO, ADMIN_SECTION, PROVVEDIMENTO, isAdminCourt, isSeat } from '../norms/adminCourts';
+import { ADMIN_COURTS, ADMIN_FIRST_YEAR, ADMIN_MAX_NUMERO, ADMIN_SECTION, PROVVEDIMENTO, isAdminCourt, isSeat, kindFamily } from '../norms/adminCourts';
 
 const SEZIONI = new Set(['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F']);
 const ISO_DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
@@ -65,6 +65,10 @@ export const decisionItemContentSchema = z
       }
       if ((value.corte === 'tar') !== (value.sede !== undefined) || (value.sede !== undefined && !isSeat(value.sede))) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sede'], message: 'la sede serve solo a un TAR, ed è una delle 29' });
+      }
+      // `tipo` is the kind's family, or absent: never a sentenza's word on an ordinanza's key
+      if (value.tipo !== undefined && value.tipo !== kindFamily(value.provvedimento)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tipo'], message: 'il tipo non è quello del provvedimento' });
       }
       if (value.numero > ADMIN_MAX_NUMERO) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['numero'], message: `numero da 1 a ${ADMIN_MAX_NUMERO}` });

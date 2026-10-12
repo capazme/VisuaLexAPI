@@ -7,10 +7,14 @@ attribute, never part of the identity.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
 from merlt.utils.sources import decision_short
+
+# The kind of an administrative measure: the ECLI's suffix in lower case (sent, ocau, …).
+_KIND = re.compile(r"[a-z]{3,6}")
 
 CASSAZIONE = "cassazione"
 CORTE_COSTITUZIONALE = "corte_costituzionale"
@@ -40,7 +44,7 @@ class DecisionIdentity:
         elif self.corte in ADMIN_COURTS:
             # by kind, number and year, a TAR by its seat too (design 2026-10-12-administrative-courts §2)
             from merlt.utils.tar_seats import SEATS
-            if (self.archivio is not None or not (self.provvedimento or "").isalpha()
+            if (self.archivio is not None or not _KIND.fullmatch(self.provvedimento or "")
                     or self.numero > 99999 or self.anno < 1990
                     or (self.corte == "tar") != (self.sede is not None)
                     or (self.sede is not None and self.sede not in SEATS)):

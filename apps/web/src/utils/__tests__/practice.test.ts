@@ -3,7 +3,7 @@ import type { ArticleData, BrocardiInfo, Norma, NormaVisitata } from '../../type
 import { buildItemKey, uniqueArticleIdFromNorma } from '../normaKeys';
 import {
   addArticles, articleWindowId, besideAfterOpen, besideRefFor, decisionOrder, decisionWindowId, findPracticeArticle,
-  holdsSubject, mergeDecisionEntries, practiceArticleKey, practiceCountLine, practiceCounts, sameBesideSubject, sameDecision,
+  holdsSubject, mergeDecisionEntries, practiceArticleKey, practiceCountLine, practiceCounts, sameBesideSubject, sameDecision, sameEntry,
   subjectOfRef,
   type BesideRef, type Practice, type PracticeDecision,
 } from '../practice';
@@ -110,6 +110,32 @@ describe('sameDecision', () => {
     expect(sameDecision(civ, { ...civ, archivio: 'penale' })).toBe(false);
     expect(sameDecision(civ, { ...civ, anno: 2009 })).toBe(false);
     expect(sameDecision({ corte: 'cassazione', numero: 577, anno: 2008 }, civ)).toBe(false);
+  });
+
+  // design 2026-10-12-administrative-courts §1: one number is a sentenza, an ordinanza cautelare and
+  // a parere; TAR Roma and TAR Milano number apart
+  const ocau = { corte: 'tar' as const, sede: 'roma', provvedimento: 'ocau', numero: 1234, anno: 2020 };
+  it('tells administrative decisions apart by kind and by seat', () => {
+    expect(sameDecision(ocau, { ...ocau })).toBe(true);
+    expect(sameDecision(ocau, { ...ocau, sede: 'milano' })).toBe(false);
+    expect(sameDecision(ocau, { ...ocau, provvedimento: 'ocol' })).toBe(false);
+    // no kind named is a sentenza (D2): never the ordinanza
+    expect(sameDecision(ocau, { corte: 'tar', sede: 'roma', numero: 1234, anno: 2020 })).toBe(false);
+    expect(sameDecision(ocau, { corte: 'tar', sede: 'roma', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(true);
+    expect(sameDecision(ocau, { corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(true);
+    expect(sameDecision(ocau, { corte: 'tar', regione: 'Lombardia', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(false);
+    const sent = { corte: 'consiglio_di_stato' as const, provvedimento: 'senb', numero: 2270, anno: 2019 };
+    expect(sameDecision(sent, { corte: 'consiglio_di_stato', numero: 2270, anno: 2019 })).toBe(true);
+    // an entry not resolved yet, asked as «TAR Lazio, ord.», is the ordinanza cautelare of Rome
+    expect(sameDecision({ corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 }, ocau)).toBe(true);
+    expect(sameDecision({ corte: 'tar', regione: 'Lazio', numero: 1234, anno: 2020 }, ocau)).toBe(false);
+  });
+
+  it('keeps two entries apart unless every field of their identity agrees', () => {
+    expect(sameEntry(ocau, { ...ocau })).toBe(true);
+    expect(sameEntry(ocau, { ...ocau, provvedimento: 'ocol' })).toBe(false);
+    expect(sameEntry(ocau, { ...ocau, sede: 'latina' })).toBe(false);
+    expect(sameEntry({ corte: 'tar', regione: 'Lazio', numero: 1, anno: 2020 }, { corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1, anno: 2020 })).toBe(false);
   });
 });
 

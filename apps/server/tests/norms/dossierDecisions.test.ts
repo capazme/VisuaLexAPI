@@ -199,7 +199,8 @@ describe('POST /api/dossiers/:id/decisions', () => {
     const response = await addDecisions(alice, dossierId, ['Cons. Stato, ord. n. 3000/2019', 'TAR Lombardia, n. 4000/2020']);
     expect(outcomes(response)).toEqual(['ambiguous', 'ambiguous']);
     const [kinds, seats] = response.body.results;
-    expect(kinds.detail).toContain('Indica il tipo di provvedimento');
+    // an ordinanza cautelare and a collegiale: «ord.» cannot tell them apart, so the words are not asked again
+    expect(kinds.detail).toContain('Sono provvedimenti dello stesso tipo');
     expect(seats.detail).toContain('TAR Lombardia, Milano, sent., n. 4000/2020');
     expect(seats.detail).toContain('TAR Lombardia, Brescia');
     expect(seats.detail).toContain('Indica la sede del TAR.');

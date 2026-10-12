@@ -9,7 +9,7 @@ import { mapLimited, postLegalApi, SourceUnavailable } from './resolveReference'
 import { citeDecision, shortDecision, type CitableDecision } from './decisionCitation';
 import { decisionItemContentSchema, withDecisionLabel, type DecisionItemContent } from '../schemas/decisionItem';
 import { EU_CASE, EU_SECTION, isEuCourt } from './euCourts';
-import { ADMIN_SECTION, PROVVEDIMENTO, SEATS, isAdminCourt, isSeat } from './adminCourts';
+import { ADMIN_SECTION, PROVVEDIMENTO, SEATS, isAdminCourt, isSeat, kindFamily } from './adminCourts';
 
 export type DecisionOutcome =
   | 'resolved'
@@ -95,7 +95,7 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
       provvedimento: identity.provvedimento,
       ...(identity.sede ? { sede: identity.sede } : {}),
       ...(typeof sezione === 'string' && ADMIN_SECTION.test(sezione) ? { sezione } : {}),
-      ...(typeof tipo === 'string' && TIPI.has(tipo) ? { tipo } : {}),
+      ...(typeof tipo === 'string' && tipo === kindFamily(identity.provvedimento) ? { tipo } : {}),
       ...(typeof deposit === 'string' && ISO_DAY.test(deposit) ? { data_deposito: deposit } : {}),
       etichetta: '-',
     });
@@ -131,10 +131,16 @@ function itemFrom(identityRaw: unknown, attributesRaw: unknown): DecisionItemCon
   return parsed.success ? withDecisionLabel(parsed.data) : null;
 }
 
-/** What the reader should add to the words to name one of the candidates. */
-function tellApart(candidates: DecisionItemContent[]): string {
-  if (!candidates.some((c) => isAdminCourt(c.corte))) return 'Indica l\'archivio (civ. o pen.).';
+/** What the reader should add to the words to name one of the candidates; `corte` is the court the
+ *  reference named, so a list the reader could not read still gets that court's advice. */
+function tellApart(corte: unknown, candidates: DecisionItemContent[]): string {
+  if (!isAdminCourt(corte)) return 'Indica l\'archivio (civ. o pen.).';
   if (new Set(candidates.map((c) => c.sede)).size > 1) return 'Indica la sede del TAR.';
+  const families = new Set(candidates.map((c) => kindFamily(c.provvedimento)));
+  // two kinds of one family (an ordinanza cautelare and a collegiale): the words cannot tell them apart
+  if (candidates.length > 1 && families.size === 1 && !families.has(null)) {
+    return 'Sono provvedimenti dello stesso tipo: aprili in VisuaLex per scegliere quello giusto.';
+  }
   return 'Indica il tipo di provvedimento (sent., ord. o decr.).';
 }
 
@@ -182,7 +188,7 @@ async function lookUp(reference: Json, signal: AbortSignal): Promise<DecisionRes
       .filter((c): c is DecisionItemContent => c !== null);
     return {
       outcome: 'ambiguous',
-      detail: `Più decisioni con questo numero e anno: ${candidates.map((c) => citeDecision(c)).join('; ')}. ${tellApart(candidates)}`,
+      detail: `Più decisioni con questo numero e anno: ${candidates.map((c) => citeDecision(c)).join('; ')}. ${tellApart(reference.corte, candidates)}`,
     };
   }
   if (status === 404 && data.esito === 'non_trovata') return notFound(data);

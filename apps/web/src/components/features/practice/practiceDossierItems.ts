@@ -1,5 +1,6 @@
 import type { ArticleData, Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
 import { decisionOrder, type Practice, type PracticeAct } from '../../../utils/practice';
+import { identityOf } from '../../../utils/decisionLinks';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { versionKey } from '../../../utils/versionDisplay';
 import { actKeyOf, shownAnnex } from '../dossier/dossierLayout';
@@ -71,9 +72,8 @@ export function practiceDossierItems(practice: Practice): PracticeDossierItems {
       unidentified += 1;
       continue;
     }
-    const { corte, numero, anno, archivio } = d.reference;
     decisions.push(sentenzaFromDecision(
-      { corte, numero, anno, ...(archivio ? { archivio } : {}) },
+      identityOf(d.reference),
       { sezione: d.sezione ?? d.reference.sezione, tipo: d.tipo, data_deposito: d.depositDate },
     ));
   }

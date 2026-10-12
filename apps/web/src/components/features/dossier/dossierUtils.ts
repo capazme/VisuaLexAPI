@@ -8,7 +8,7 @@ import type { DossierApi, DossierItemApi } from '../../../services/dossierServic
 import type { DecisionArchive, DecisionAttributes, DecisionCourt, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
 import { decisionKey, FIRST_YEAR, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
 import { EU_CASE, EU_MAX_NUMERO, EU_SECTION, isEuCourt } from '../../../utils/euCourts';
-import { ADMIN_MAX_NUMERO, ADMIN_SECTION, PROVVEDIMENTO, isAdminCourt, isSeat } from '../../../utils/adminCourts';
+import { ADMIN_MAX_NUMERO, ADMIN_SECTION, PROVVEDIMENTO, isAdminCourt, isSeat, kindFamily } from '../../../utils/adminCourts';
 import { rebuildNormEntry } from '../../../utils/sources';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
@@ -223,6 +223,8 @@ export function parseSentenzaContent(data: unknown, now: Date = new Date()): Dos
     // the kind is part of the key, a TAR's seat too (design 2026-10-12-administrative-courts §2)
     if (archivio !== undefined || typeof provvedimento !== 'string' || !PROVVEDIMENTO.test(provvedimento)) return null;
     if (corte === 'tar' ? !isSeat(sede) : sede !== undefined) return null;
+    // `tipo` is the kind's family, or absent (the server's rule)
+    if (tipo !== undefined && tipo !== kindFamily(provvedimento)) return null;
   } else if (sede !== undefined || provvedimento !== undefined) return null;
   const sectionOk = (value: string) => (eu ? EU_SECTION.test(value) : admin ? ADMIN_SECTION.test(value) : SEZIONI.has(value));
   if (sezione !== undefined && !(typeof sezione === 'string' && sectionOk(sezione))) return null;
@@ -275,7 +277,8 @@ export function sentenzaFromDecision(identity: DecisionIdentity, attrs: Decision
     ...(attrs.sezione && SEZIONI.has(attrs.sezione) && identity.corte === 'cassazione' ? { sezione: attrs.sezione } : {}),
     ...(attrs.sezione && isAdminCourt(identity.corte) && ADMIN_SECTION.test(attrs.sezione) ? { sezione: attrs.sezione } : {}),
     ...(attrs.sezione && isEuCourt(identity.corte) && EU_SECTION.test(attrs.sezione) ? { sezione: attrs.sezione } : {}),
-    ...(attrs.tipo && TIPI.has(attrs.tipo) ? { tipo: attrs.tipo } : {}),
+    ...(attrs.tipo && TIPI.has(attrs.tipo) && (!isAdminCourt(identity.corte) || attrs.tipo === kindFamily(identity.provvedimento))
+      ? { tipo: attrs.tipo } : {}),
     ...(attrs.data_deposito && !isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
     ...(attrs.data_decisione && isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_decisione) ? { data_decisione: attrs.data_decisione } : {}),
     // more than 30 joined cases: the citation names the case alone, as the item schema keeps at most 30

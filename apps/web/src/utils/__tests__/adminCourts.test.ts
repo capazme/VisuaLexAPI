@@ -6,6 +6,7 @@ import {
   decisionKey,
   decisionPath,
   describeNotice,
+  formatDecisionCitation,
   formatDecisionHeading,
   identityFromKey,
   linkableDecisionPath,
@@ -98,6 +99,18 @@ describe('the administrative courts', () => {
       .toBe("Nessuna ordinanza cautelare n. 1234/2020 (TAR Lazio, Roma) nell'archivio di giustizia-amministrativa.it.");
     expect(notFoundMessage({ esito: 'non_trovata', motivo: 'inesistente' }, { corte: 'consiglio_di_stato', numero: 1, anno: 2020 }))
       .toBe("Nessuna sentenza n. 1/2020 (Cons. Stato) nell'archivio di giustizia-amministrativa.it.");
+    const missing = { esito: 'non_trovata', motivo: 'inesistente' } as const;
+    expect(notFoundMessage(missing, { corte: 'consiglio_di_stato', tipo: 'ordinanza', numero: 3000, anno: 2019 }))
+      .toBe("Nessuna ordinanza n. 3000/2019 (Cons. Stato) nell'archivio di giustizia-amministrativa.it.");
+    expect(notFoundMessage(missing, { ...TAR, provvedimento: 'dcau' }))
+      .toBe("Nessun decreto cautelare n. 1234/2020 (TAR Lazio, Roma) nell'archivio di giustizia-amministrativa.it.");
+    expect(notFoundMessage(missing, { corte: 'tar', regione: 'Lombardia', numero: 5, anno: 2020 }))
+      .toBe("Nessuna sentenza n. 5/2020 (TAR Lombardia) nell'archivio di giustizia-amministrativa.it.");
+  });
+
+  it('abbreviate the kind from the kind the key holds, not from the type', () => {
+    expect(formatDecisionCitation(TAR, { sezione: 'I' })).toBe('TAR Lazio, Roma, sez. I, ord., n. 1234/2020');
+    expect(formatDecisionCitation({ ...CDS, provvedimento: 'xyz' }, { tipo: 'sentenza' })).toBe('Cons. Stato, n. 2270/2019');
   });
 
   it('keep in a dossier what the server keeps', () => {
@@ -108,6 +121,7 @@ describe('the administrative courts', () => {
       { ...kept, sede: undefined }, { ...kept, sede: 'constructor' }, { ...kept, provvedimento: undefined },
       { ...kept, provvedimento: 'OCAU' }, { ...kept, archivio: 'civile' }, { ...kept, anno: 1989 }, { ...kept, numero: 100000 },
       { ...kept, sezione: 'U' }, { ...kept, corte: 'consiglio_di_stato' }, { ...kept, data_decisione: '2020-01-01' },
+      { ...kept, tipo: 'sentenza' }, { ...kept, tipo: 'ordinanza interlocutoria' },
       { corte: 'cassazione', archivio: 'civile', numero: 1, anno: 2020, provvedimento: 'sent', etichetta: 'x' },
     ]) {
       expect(parseSentenzaContent(JSON.parse(JSON.stringify(broken)), NOW)).toBeNull();
@@ -121,6 +135,16 @@ describe('the administrative courts', () => {
       .toEqual({ corte: 'tar', sede: 'l-aquila', numero: 3, anno: 2022 });
     expect(parseDecisionCitation('Cons. Stato, parere n. 2270/2019', { now: NOW })).toBeNull();
     expect(parseDecisionCitation('TRGA, n. 1/2020', { now: NOW })).toBeNull();
+    // a type the kind does not have is not kept
+    expect(sentenzaFromDecision(TAR, { tipo: 'sentenza' }).tipo).toBeUndefined();
+  });
+
+  it('read a long hostile paste quickly', () => {
+    for (const hostile of ['TAR ' + 'Lazio '.repeat(2000), 'Cons. Stato, sez. ' + 'I-'.repeat(3000), 'T.A.R. ' + 'n. 1 '.repeat(3000)]) {
+      const start = performance.now();
+      parseDecisionCitation(hostile, { now: NOW });
+      expect(performance.now() - start).toBeLessThan(200);
+    }
   });
 
   it('survive in a practice with closed values only', () => {

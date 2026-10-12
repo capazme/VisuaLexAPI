@@ -13,6 +13,7 @@ import { EU_COURT_FULL_NAME, EU_COURT_NAME, EU_MAX_NUMERO, euCaseLabel, euCasesP
 import {
   ADMIN_MAX_NUMERO, KIND_NAME, PROVVEDIMENTO, SEATS, SENTENZA_KINDS,
   adminCourtFullName, adminCourtName, adminSectionLabel, adminSectionName, adminSlug, isAdminCourt, isSeat,
+  kindAbbreviation,
 } from './adminCourts';
 
 /** True: App.tsx routes /sentenze/:corte/:numero/:anno (the address opens the decision's tab in the
@@ -281,9 +282,11 @@ export function formatDecisionDeposit(attrs: DecisionAttributes): string | null 
 export function formatDecisionCitation(identity: DecisionIdentity, attrs: DecisionAttributes): string {
   const tipo = attrs.tipo && Object.hasOwn(TIPO_ABBR, attrs.tipo) ? TIPO_ABBR[attrs.tipo] : null;
   if (isAdminCourt(identity.corte)) {
-    // design 2026-10-12-administrative-courts §3 (D4): «Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270»
+    // design 2026-10-12-administrative-courts §3 (D4): «Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270»,
+    // the abbreviation read from the kind, which the key holds, never from `tipo`
     const date = attrs.data_deposito ? formatDateForCitation(attrs.data_deposito) : null;
-    return [adminCourtName(identity.corte, identity.sede), adminSectionLabel(attrs.sezione), [tipo, date].filter(Boolean).join(' ') || null,
+    const kind = kindAbbreviation(identity.provvedimento);
+    return [adminCourtName(identity.corte, identity.sede), adminSectionLabel(attrs.sezione), [kind, date].filter(Boolean).join(' ') || null,
       date ? `n. ${identity.numero}` : `n. ${identity.numero}/${identity.anno}`].filter(Boolean).join(', ');
   }
   if (isEuCourt(identity.corte)) {
@@ -466,10 +469,13 @@ export function notFoundMessage(answer: NotFoundDecision, ref: DecisionReference
     return `L'archivio pubblico della Cassazione copre il ${ref.anno}${since}: non si può escludere che la decisione esista.`;
   }
   if (isAdminCourt(ref.corte)) {
-    const court = ref.corte === 'tar' && ref.sede ? adminCourtName('tar', ref.sede) : adminCourtName(ref.corte, null);
-    const kind = ref.provvedimento && Object.hasOwn(KIND_NAME, ref.provvedimento)
-      ? KIND_NAME[ref.provvedimento].toLowerCase() : 'sentenza';
-    return `Nessuna ${kind} n. ${ref.numero}/${ref.anno} (${court}) nell'archivio di giustizia-amministrativa.it.`;
+    const court = ref.corte === 'tar' && !isSeat(ref.sede) && ref.regione ? `TAR ${ref.regione}` : adminCourtName(ref.corte, ref.sede);
+    // the kind asked for, else the family the words named, else a sentenza (D2)
+    const kind = ref.provvedimento
+      ? (Object.hasOwn(KIND_NAME, ref.provvedimento) ? KIND_NAME[ref.provvedimento].toLowerCase() : 'provvedimento di questo tipo')
+      : ref.tipo === 'ordinanza' || ref.tipo === 'decreto' ? ref.tipo : 'sentenza';
+    const none = kind.startsWith('decreto') || kind.startsWith('provvedimento') ? 'Nessun' : 'Nessuna';
+    return `${none} ${kind} n. ${ref.numero}/${ref.anno} (${court}) nell'archivio di giustizia-amministrativa.it.`;
   }
   if (isEuCourt(ref.corte)) {
     return `Nessuna sentenza della causa ${euCaseLabel(ref.corte, ref.numero, ref.anno)} nell'archivio dell'Ufficio delle pubblicazioni dell'Unione europea: la causa può essersi chiusa senza sentenza, o essere ancora pendente.`;

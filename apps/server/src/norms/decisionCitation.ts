@@ -9,7 +9,7 @@
  */
 import { citationDate, citeStoredNorm } from './citation';
 import { EU_CASE, EU_COURT_NAME, EU_SECTION, euCaseLabel, euSectionLabel, isEuCourt, joinCases } from './euCourts';
-import { ADMIN_SECTION, PROVVEDIMENTO, adminCourtName, adminSectionLabel, isAdminCourt, isSeat } from './adminCourts';
+import { ADMIN_SECTION, PROVVEDIMENTO, adminCourtName, adminSectionLabel, isAdminCourt, isSeat, kindAbbreviation } from './adminCourts';
 
 export interface CitableDecision {
   corte: string;
@@ -55,8 +55,9 @@ function court(decision: CitableDecision): string {
 export function citeDecision(decision: CitableDecision): string {
   if (isEuCourt(decision.corte)) return citeEuDecision(decision);
   if (isAdminCourt(decision.corte)) {
-    // design 2026-10-12-administrative-courts §3 (D4): «Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270»
-    const tipo = decision.tipo && Object.hasOwn(TIPO_ABBR, decision.tipo) ? TIPO_ABBR[decision.tipo] : null;
+    // design 2026-10-12-administrative-courts §3 (D4): «Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270»,
+    // the kind's abbreviation read from the kind, which the key holds, never from `tipo`
+    const tipo = kindAbbreviation(decision.provvedimento);
     const date = decision.data_deposito ? citationDate(decision.data_deposito) : null;
     const numero = date || !decision.anno ? `n. ${decision.numero}` : `n. ${decision.numero}/${decision.anno}`;
     return [adminCourtName(decision.corte, decision.sede), adminSectionLabel(decision.sezione),

@@ -222,3 +222,15 @@ def test_the_tar_seats_are_the_conventions_copy():
     from merlt.utils.tar_seats import SEATS
     seats = json.loads((ROOT / "conventions" / "sources" / "tar-seats.json").read_text(encoding="utf-8"))["seats"]
     assert SEATS == {s["slug"]: (s["sede"], s["regione"], s["principale"], s["organo"]) for s in seats}
+
+
+def test_an_administrative_identity_takes_the_kind_and_section_as_the_convention_writes_them():
+    from merlt.utils.sources import admin_section
+    with pytest.raises(ValueError):
+        DecisionIdentity(corte="consiglio_di_stato", numero=1, anno=2020, provvedimento="SENT")
+    with pytest.raises(ValueError):
+        DecisionIdentity(corte="tar", numero=1, anno=2020, provvedimento="sent", sede="constructor")
+    assert DecisionIdentity(corte="cgars", numero=5, anno=2020, provvedimento="sent").key == "cgars:sent:5:2020"
+    assert admin_section("6") is None
+    assert admin_section("II-quater") == "sez. II-quater"
+    assert admin_section("plenaria") == "ad. plen."

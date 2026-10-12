@@ -52,6 +52,10 @@ describe('citeStoredDecision, the administrative courts', () => {
     expect(citeStoredDecision('sentenza', {
       corte: 'consiglio_di_stato', provvedimento: 'sent', numero: 2270, anno: 2019, sezione: 'sez. VI <b>', tipo: 'sentenza',
     })).toBe('Cons. Stato, sent., n. 2270/2019');
+    // the abbreviation is the kind's, whatever type someone else's data carries
+    expect(citeStoredDecision('sentenza', {
+      corte: 'consiglio_di_stato', provvedimento: 'ocau', numero: 2270, anno: 2019, tipo: 'sentenza',
+    })).toBe('Cons. Stato, ord., n. 2270/2019');
     for (const content of [
       { corte: 'tar', sede: 'atlantide', provvedimento: 'sent', numero: 1, anno: 2020 },
       { corte: 'tar', sede: 'constructor', provvedimento: 'sent', numero: 1, anno: 2020 },

@@ -70,6 +70,8 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     ['an administrative decision before 1990', { ...TAR, anno: 1989 }],
     ['an administrative number over five digits', { ...TAR, numero: 100000 }],
     ['an administrative section of the Cassazione', { ...TAR, sezione: 'U' }],
+    ['a type that is not the kind\'s family', { ...TAR, tipo: 'sentenza' }],
+    ['an ordinanza interlocutoria of a TAR', { ...TAR, tipo: 'ordinanza interlocutoria' }],
     ['a kind on a Cassazione decision', { ...SENTENZA, provvedimento: 'sent' }],
     ['a seat on a case of the Union', { ...CGUE, sede: 'roma' }],
   ])('refuses %s', async (_label, content) => {

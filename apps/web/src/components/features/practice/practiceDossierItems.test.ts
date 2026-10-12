@@ -90,6 +90,12 @@ describe('practiceDossierItems (spec §7)', () => {
     expect(decisions[0].etichetta).toBeTruthy();
   });
 
+  it('saves an administrative decision with its kind and its seat, as the server keeps it', () => {
+    const tar = { corte: 'tar' as const, sede: 'roma', provvedimento: 'ocau', numero: 1234, anno: 2020 };
+    const { decisions } = practiceDossierItems(practice({ decisions: [decision('t', { reference: tar, tipo: 'ordinanza', sezione: 'I' })] }));
+    expect(decisions).toEqual([{ ...tar, sezione: 'I', tipo: 'ordinanza', etichetta: 'TAR Lazio, Roma, sez. I, ord., n. 1234/2020' }]);
+  });
+
   it('counts an unidentified decision and does not save it', () => {
     const { decisions, unidentified } = practiceDossierItems(practice({
       decisions: [decision('d1'), decision('d2', { identified: false, reference: { corte: 'cassazione', numero: 7, anno: 2019 } })],

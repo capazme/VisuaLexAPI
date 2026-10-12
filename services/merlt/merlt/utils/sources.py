@@ -327,8 +327,13 @@ def admin_court_name(corte: str, sede: Optional[str]) -> str:
     return f"TAR {region}, {name}" if several else f"TAR {region}"
 
 
+# I…X with -bis, -ter or -quater (the TAR of Rome), or the Adunanza plenaria: the web's ADMIN_SECTION.
+_ADMIN_SECTION = re.compile(r"(?:(?:I|II|III|IV|V|VI|VII|VIII|IX|X)(?:-(?:bis|ter|quater))?|plenaria)")
+
+
 def admin_section(sezione: Optional[str]) -> Optional[str]:
-    if not sezione:
+    """«sez. VI», «sez. II-quater», «ad. plen.»; None for none or a section written otherwise."""
+    if not sezione or not _ADMIN_SECTION.fullmatch(sezione):
         return None
     return "ad. plen." if sezione == "plenaria" else f"sez. {sezione}"
 
