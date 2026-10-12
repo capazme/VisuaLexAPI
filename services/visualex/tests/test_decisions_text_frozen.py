@@ -23,7 +23,7 @@ import pathlib
 import pytest
 
 from tests.decisions_pdf_synth import Text, make_pdf
-from visualex_api.services.decisions import corte_cost
+from visualex_api.services.decisions import corte_cost, curia
 from visualex_api.services.decisions.italgiure import to_decision
 from visualex_api.services.decisions.pdf_text import text_from_pdf
 
@@ -169,6 +169,9 @@ def synthetic_cases() -> dict:
     for record in json.loads((FIX / "corte_cost_2014_sample.json").read_text()):
         key = f"corte_cost_{record['anno_pronuncia']}_{int(record['numero_pronuncia']):04d}"
         cases[key] = corte_cost.to_decision(record).testo
+    # The CGUE reader (design 2026-10-12 §4): documents written for the test in the source's shapes.
+    cases["curia_synthetic_xhtml"] = curia.text_from_xhtml((FIX / "curia_synthetic.xhtml").read_text(encoding="utf-8"))[0]
+    cases["curia_synthetic_old_html"] = curia.text_from_old_html((FIX / "curia_synthetic_old.html").read_text(encoding="utf-8"))
     return cases
 
 

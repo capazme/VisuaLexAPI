@@ -210,9 +210,17 @@ revision): `ambigua`, with both. The 2026-08-29 case-law design and its plan
 (`docs/superpowers/plans/2026-08-29-giurisprudenza-backend.md`, a `CellarAdapter` never built)
 had chosen the same endpoint.
 
+**Older judgments.** Measured on 12 October 2026: a judgment of 1963 (26/62) has no Italian
+XHTML, only the HTML EUR-Lex used to publish, with its sections named by anchors (parties,
+subject, reasons, costs, operative part). The reader falls back to it and leaves out its keywords
+and its summary (`Massima`), which are the Office's, not the judgment. A case joined to one of an
+earlier year is not in its own year's works: when the year finds nothing, a second query looks
+for «<number>/<yy>» in any year.
+
 **The text.** `epigrafe`: from the title to «ha pronunciato la seguente / Sentenza» (the parties,
 the formation, the representatives); `motivazione`: the numbered points, with their headings, up
-to «Per questi motivi»; `dispositivo`: from «Per questi motivi» to the signatures. The procedure
+to «Per questi motivi»; `dispositivo`: from «Per questi motivi» to the signatures (the General
+Court's closing «Indice» is left out). The procedure
 language footnote becomes the attribute `lingua_processuale`. Every block is the source's
 characters: the paragraph and table cells become lines, the number of a point its line's start
 («1 La domanda …»), and nothing is added, dropped or changed beyond that. Footnote calls in the
@@ -221,8 +229,9 @@ language, never text of the judgment. This is the reader's data contract from th
 `test_decisions_text_frozen.py` gains synthetic XHTML fixtures (written for the test, no text of
 the Court) and its `_local` twin real judgments kept out of the repository.
 
-**Cache, as the other readers:** found 30 days, not found 1 hour, errors never; a version in the
-cache key (`curia:v1:…`). `fonte_non_raggiungibile` (503) for a timeout, a 5xx, a 429 or an
+**Cache, as the other readers:** found 30 days, not found 1 hour, without text a day, errors
+never; one entry per case (the list of its judgments) under a versioned key (`curia:v1:…`); the
+whole lookup within 45 seconds. `fonte_non_raggiungibile` (503) for a timeout, a 5xx, a 429 or an
 answer that cannot be read — never `non_trovata`. Egress: `publications.europa.eu` joins
 `tools/egress.py` and `SECURITY.md`. `fonte`: «Corte di giustizia dell'Unione europea —
 EUR-Lex (Ufficio delle pubblicazioni)», with the EUR-Lex address of the judgment

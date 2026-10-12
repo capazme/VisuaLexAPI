@@ -90,5 +90,29 @@
   "synthetic_pdf_without_dispositivo": {
     "length": 169,
     "sha256": "72c5a7502981be75a0e804930e9c443d5a59615a04abcf1c25c23f2ac460ff00"
+  },
+  "curia_synthetic_xhtml": {
+    "sha256": "fdaaa2a07b71a52da46674dc65a4bf4d22e8df01ab77bcb15a0166d268ba6af7",
+    "length": 542
+  },
+  "curia_synthetic_old_html": {
+    "sha256": "6116f57e12eb6485bc3d90932edf62ef4bc8674400743cf13599914cdf10c6f5",
+    "length": 146
+  },
+  "corte_giustizia_ue_26_1962": {
+    "sha256": "e4614763ec38600e94d4bba8ddb28856485528fe2e35f3a7689e5e0024e3ce54",
+    "length": 13304
+  },
+  "corte_giustizia_ue_293_2012": {
+    "sha256": "f92a08a3ba356993cba69d535e89ac76ec52b44c075164526763c7422758d8d2",
+    "length": 66526
+  },
+  "tribunale_ue_612_2017": {
+    "sha256": "93aef9596f30bf6119c3c0be923d74b248a325044df9fb51584f455352189c99",
+    "length": 565208
+  },
+  "corte_giustizia_ue_634_2021": {
+    "sha256": "264d4b3a78b70c1c9aface04de56a9aa0d1b670911475904321b1475ae543772",
+    "length": 51850
   }
 }

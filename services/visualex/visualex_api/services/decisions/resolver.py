@@ -27,14 +27,16 @@ from ...tools.config import PERSISTENT_CACHE_DIR
 from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from ...tools.tls import IntermediateCertificateMismatch
 from .corte_cost import CorteCostReader
+from .curia import CuriaReader
 from .italgiure import ItalgiureReader, SourceAnswerError
-from .model import Decision, Identity, Reference
+from .model import EU_COURTS, Decision, Identity, Reference
 from .pdf_text import MAX_BYTES
 
 log = structlog.get_logger()
 
 ITALGIURE_TIMEOUT = 25.0
 CORTE_COST_TIMEOUT = 240.0  # covers the first download of a bundle
+CURIA_TIMEOUT = 45.0  # two requests (the query, the document), a long judgment is over a megabyte
 FOUND_NS, ABSENT_NS, PENDING_NS = "decisions_found", "decisions_absent", "decisions_pending"
 SEARCH_NS = "decisions_search"  # one page of /search_decisions, kept a day
 PDF_NS = "decisions_pdf"  # the court's PDFs, base64, kept 30 days
@@ -102,8 +104,9 @@ def _citata(raw: str | None) -> str | None:
 
 class Resolver:
     def __init__(self, italgiure, corte_cost, cache=None,
-                 today: Callable[[], date] = date.today):
+                 today: Callable[[], date] = date.today, curia=None):
         self.italgiure, self.corte_cost, self.today = italgiure, corte_cost, today
+        self.curia = curia if curia is not None else CuriaReader()
         manager = cache or get_cache_manager()
         self.found = manager.get_persistent(FOUND_NS)
         self.absent = manager.get_persistent(ABSENT_NS)
@@ -237,7 +240,48 @@ class Resolver:
         """The archive's first deposit (year, date), as cached for the day; None if unknown."""
         return await self._start(archivio)
 
+    async def _eu(self, ref: Reference) -> Outcome:
+        """The Court of Justice or the General Court (design 2026-10-12 §4): the case's judgments,
+        cached as one answer per case, since the source answers per case. A judgment on joined
+        cases has the first case's identity: a reference to another of them says so."""
+        # v1: the first shape of curia.py; raise it whenever the reader changes the shape of
+        # what it returns (blocks, `\n`), never for characters (root rule 23).
+        key = f"curia:v1:{ref.corte}:{ref.numero}:{ref.anno}"
+        cached = await self.found.get(key)
+        if cached is None:
+            cached = await self.pending.get(key)
+        if cached is not None:
+            decisions = [Decision.from_dict(d) for d in cached["decisioni"]]
+        elif await self.absent.get(key) is not None:
+            decisions = []
+        else:
+            try:
+                decisions = await asyncio.wait_for(
+                    self.curia.lookup(ref.corte, ref.numero, ref.anno), CURIA_TIMEOUT)
+            except _SOURCE_ERRORS as exc:
+                log.warning("Decision source failed", fonte="curia", key=key, error=str(exc),
+                            error_type=type(exc).__name__)
+                raise SourceUnavailable("curia", str(exc)) from exc
+            if not decisions:
+                await self.absent.set(key, True)
+            elif all(d.testo for d in decisions):
+                await self.found.set(key, {"decisioni": [d.to_dict() for d in decisions]})
+            else:
+                await self.pending.set(key, {"decisioni": [d.to_dict() for d in decisions]})
+        if not decisions:
+            return Outcome("non_trovata", motivo="inesistente")
+        if len(decisions) > 1:
+            return Outcome("ambigua", candidati=decisions)
+        decision = decisions[0]
+        avvisi: list[dict[str, str]] = []
+        if decision.identita.numero != ref.numero or decision.identita.anno != ref.anno:
+            avvisi.append({"tipo": "causa_riunita", "numero": str(decision.identita.numero),
+                           "anno": str(decision.identita.anno)})
+        return Outcome("trovata", decisione=decision, avvisi=avvisi + _text_notices(decision))
+
     async def resolve(self, ref: Reference) -> Outcome:
+        if ref.corte in EU_COURTS:
+            return await self._eu(ref)
         if ref.corte == "corte_costituzionale":
             # v2 since the reader splits an epigrafe that holds the reasoning (2026-10-04): the
             # entries cached before, under "corte_cost:<numero>:<anno>", keep it unsplit for up

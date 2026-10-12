@@ -68,7 +68,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     reference, the palette's patterns in Python, pinned to the golden file's `decision_citations`),
     `italgiure.py` (Cassazione, Italgiure's Solr),
     `pdf_text.py` (the Cassazione's text from the court's PDF), `corte_cost.py` (Corte
-    costituzionale open data, range bundles on disk), `resolver.py` (one outcome, lookups
+    costituzionale open data, range bundles on disk), `curia.py` (the Court of Justice and the
+    General Court from the Publications Office's repository, CELLAR: a SPARQL query finds the
+    case's judgment, joined cases included, then its Italian XHTML or, before about 2009, the
+    former HTML; design 2026-10-12 §4), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
     User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
     (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`.
@@ -193,8 +196,11 @@ POST unless noted, JSON bodies.
   whose hash moved. `available: false` with empty maps when there is no AKN
   index, or an index without fingerprints — the caller must then refetch
   everything, not conclude nothing changed
-- `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale,
-  numero, anno, archivio?, sezione?}` → `esito` trovata (identity, attributes, whole text,
+- `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale |
+  corte_giustizia_ue | tribunale_ue, numero, anno, archivio?, sezione?}` (the two courts of the Union
+  by their case, C-634/21 as 634 and 2021, the names waiting for the owner's Q10 of the 2026-10-12
+  design; a joined case answers the first case's judgment with the notice `causa_riunita`, two
+  judgments of one case are `ambigua`) → `esito` trovata (identity, attributes, whole text,
   source) and ambigua 200, non_trovata 404 (with the reason and the archive's start),
   fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a fixed
   body). That is every answer the handler writes; the others carry no `esito`: the per-IP
@@ -559,14 +565,19 @@ Breaking one of these breaks the product. Read before editing.
     characters (the texts before about 2001): the page draws a paragraph only between blank
     lines, so without it a block is one paragraph. Both add line breaks and nothing else.
     Whatever changes the shape of what a reader returns must raise the version in its cache
-    key (`italgiure:v4:…`, `corte_cost:v2:…`), or the entries cached before are served for up
-    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
+    key (`italgiure:v4:…`, `corte_cost:v2:…`, `curia:v1:…`, one answer per case: the list of its
+    judgments), or the entries cached before are served for up to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.
     The characters of a decision's text are to be frozen like an article's (root rule 23): the readers
     may add or move `\n` and move a boundary between blocks, never change another character, and a
     cache version bump is for shape only. `tests/test_decisions_text_frozen.py` (synthetic PDFs
     and records in CI; real ones in the `_local` twin) pins the projection (blocks stripped,
     concatenated, `\n` removed) as a SHA-256 and a length in `fixtures/decisions/frozen_projections.json`.
+    The CGUE reader is in it too (`curia_synthetic_*`, documents written for the test; real
+    judgments as `private/curia_<CELEX>.xhtml` or `.html` in the `_local` twin). It keeps the source's
+    characters, U+2011 included; it drops the footnote calls and notes (the procedure language
+    becomes `lingua_processuale`), the former format's keywords and summary, and the General Court's
+    closing index. `tests/test_decisions_curia_live.py` (`-m live`) re-reads three real judgments.
     The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a
     reader that moves the projection's hash is a bug in the reader, never a reason to re-record the
     golden. The web app reads the same projection (`decisionProjection` in
