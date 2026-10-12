@@ -19,6 +19,8 @@ const NOTHING_DELETED = 'Nulla è stato eliminato: l’eliminazione non è stata
 /** What the user reads when the question did not end in a confirmation. */
 export const NOT_CONFIRMED: Record<Exclude<Confirmation, 'confirmed' | 'unsupported'>, string> = {
   declined: NOTHING_DELETED,
+  unticked:
+    'Nulla è stato eliminato: hai scelto «Accetta» senza spuntare la casella «Confermo». Per eliminare, chiedilo di nuovo e spunta la casella prima di accettare.',
   timeout: 'Nessuna risposta alla richiesta di conferma in tempo. Nulla è stato eliminato.',
   failed: 'La richiesta di conferma non è arrivata all’utente. Nulla è stato eliminato.',
 };
