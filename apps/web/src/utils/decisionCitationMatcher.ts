@@ -23,7 +23,7 @@ import {
   SEZIONI_UNITE_HEAD_SOURCE,
   readDecisionCitation,
 } from './decisionCitationParser';
-import { decisionPath, linkableDecisionPath } from './decisionLinks';
+import { decisionPath, linkableDecisionPath, parseDecisionPath } from './decisionLinks';
 import { foldForSearch } from './findInText';
 
 export interface DecisionCitationSpan {
@@ -266,4 +266,144 @@ export function extractDecisionCitations(
     if (head.court) covered = end;
   }
   return found;
+}
+
+// --- The links in a rendered text ---
+
+const NAMED_ENTITIES: Record<string, string> = { nbsp: '\u00a0', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+// A tag that ends a line of text: the scanner must not read a citation across it.
+const BLOCK_TAG = /^<\/?(?:div|p|br|li|ul|ol|h[1-6]|blockquote|tr|td|th|table|section|article)\b/i;
+
+function decodeEntity(entity: string): string {
+  const body = entity.slice(1, -1);
+  if (body[0] !== '#') return NAMED_ENTITIES[body.toLowerCase()] ?? ' ';
+  const code = body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+  return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ' ';
+}
+
+/** The text a reader sees, and for each of its characters where it sits in the HTML. */
+interface VisibleText {
+  text: string;
+  /** `from[i]`: the HTML offset where the character `i` begins; `to[i]`: where its source ends (a tag or an entity is one source). */
+  from: number[];
+  to: number[];
+}
+
+const HTML_PIECE = /<[^>]+>|&(?:#\d{1,7}|#x[\da-f]{1,6}|[a-z][a-z\d]{1,31});|[^<&]+|[<&]/gi;
+
+/**
+ * The text a reader sees: no tag (so a mark in the middle of a word or of a number does not cut it), an
+ * entity as the character it is, a line break where a tag ends a block. `from` and `to` map its offsets
+ * back to the HTML, which is where the links are put.
+ */
+function visibleText(html: string): VisibleText {
+  let text = '';
+  const from: number[] = [];
+  const to: number[] = [];
+  const push = (chars: string, start: number, end: number): void => {
+    text += chars;
+    for (let i = 0; i < chars.length; i += 1) {
+      from.push(start);
+      to.push(end);
+    }
+  };
+  for (const m of html.matchAll(HTML_PIECE)) {
+    const piece = m[0];
+    const start = m.index ?? 0;
+    if (piece[0] === '<' && piece.length > 1 && piece.endsWith('>')) {
+      if (BLOCK_TAG.test(piece)) push('\n', start, start + piece.length);
+    } else if (piece[0] === '&' && piece.length > 1) {
+      push(decodeEntity(piece), start, start + piece.length);
+    } else {
+      for (let i = 0; i < piece.length; i += 1) {
+        text += piece[i];
+        from.push(start + i);
+        to.push(start + i + 1);
+      }
+    }
+  }
+  return { text, from, to };
+}
+
+/** The HTML ranges that the norm links (`wrapCitationsInHtml`) hold: a decision link never claims one. */
+function normLinkRanges(html: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  for (const m of html.matchAll(/<span class="citation-hover"[^>]*>([^<]*)<\/span>/g)) {
+    const start = (m.index ?? 0) + m[0].indexOf('>') + 1;
+    ranges.push([start, start + m[1].length]);
+  }
+  return ranges;
+}
+
+const pathParts = (path: string): { slug: string; numero: string; anno: string } => {
+  const [, , slug = '', numero = '', anno = ''] = path.split('?')[0].split('/');
+  return { slug, numero, anno };
+};
+
+/** Whether `path` names the decision `self` does: the same number and year, and a court that agrees
+ *  (a Cassazione or a TAR written without its archive or seat agrees with any). */
+function sameDecision(path: string, self: string): boolean {
+  const a = pathParts(path);
+  const b = pathParts(self);
+  if (a.numero !== b.numero || a.anno !== b.anno) return false;
+  if (a.slug === b.slug) return true;
+  const bare = (x: string, y: string): boolean => (x === 'cassazione' && y.startsWith('cassazione-')) || (x === 'tar' && y.startsWith('tar-'));
+  return bare(a.slug, b.slug) || bare(b.slug, a.slug);
+}
+
+const escapeAttribute = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+export interface WrapDecisionOptions {
+  /** The court of the text being read (`extractDecisionCitations`'s context rule). */
+  within?: 'cassazione';
+  /** The reading decision's own address: a span that names it is not linked. */
+  selfPath?: string;
+  now?: Date;
+}
+
+/**
+ * The decisions a rendered text cites, wrapped as `<span class="decision-cite" data-decision-path
+ * data-cache-key>`, per text segment (a citation split by a highlight's `<mark>` is two spans with
+ * one key), adding no character (root rule 23). Run it after `wrapCitationsInHtml`: a range the
+ * norm links already hold is never claimed, the whole decision span being left out.
+ */
+export function wrapDecisionCitationsInHtml(html: string, options: WrapDecisionOptions = {}): string {
+  if (!html) return html;
+  const norms = normLinkRanges(html);
+  const visible = visibleText(html);
+  const spans = extractDecisionCitations(visible.text, { within: options.within, now: options.now })
+    .filter((s) => !(options.selfPath && sameDecision(s.path, options.selfPath)))
+    .map((s) => ({ start: visible.from[s.start], end: visible.to[s.end - 1], path: s.path }))
+    .filter((s) => !norms.some(([a, b]) => s.start < b && a < s.end));
+  if (spans.length === 0) return html;
+
+  // From the end, so the offsets of the spans still to wrap stay right
+  let result = html;
+  for (let i = spans.length - 1; i >= 0; i -= 1) {
+    const { start, end, path } = spans[i];
+    const attribute = escapeAttribute(path);
+    const open = `<span class="decision-cite" data-decision-path="${attribute}" data-cache-key="${attribute}">`;
+    const wrapped = result.substring(start, end).replace(/<[^>]*>|[^<]+/g, (piece) => (piece.startsWith('<') ? piece : `${open}${piece}</span>`));
+    result = result.substring(0, start) + wrapped + result.substring(end);
+  }
+  return result;
+}
+
+/** The reference a decision link's address reads back to, or null when it does not read. */
+export function decisionReferenceOfPath(path: string, now?: Date): DecisionReference | null {
+  const url = new URL(path, 'http://link.invalid');
+  const { slug, numero, anno } = pathParts(url.pathname);
+  const read = parseDecisionPath({ corte: slug, numero, anno }, url.searchParams, now);
+  return read.ok ? read.reference : null;
+}
+
+/**
+ * Whether `to` (a mouseleave's relatedTarget) is still inside the same decision link as `from`: a
+ * citation wrapped per segment is several spans with one key, and crossing between them is not leaving.
+ */
+export function isSameDecisionTarget(from: Element, to: EventTarget | null): boolean {
+  const candidate = to as Element | null;
+  if (!candidate || typeof candidate.closest !== 'function') return false;
+  const target = candidate.closest('.decision-cite');
+  return Boolean(target) && target!.getAttribute('data-cache-key') === from.getAttribute('data-cache-key');
 }

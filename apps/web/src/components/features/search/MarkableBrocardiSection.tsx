@@ -7,6 +7,11 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import type { HighlightColor } from '../../../utils/highlightColors';
+import { useCitationLinks } from '../../../hooks/useCitationLinks';
+import { useDecisionLinks } from '../../../hooks/useDecisionLinks';
+import { wrapDecisionCitationsInHtml } from '../../../utils/decisionCitationMatcher';
+import { DecisionPreviewPopup } from '../../ui/DecisionPreviewPopup';
+import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 
 interface MarkableBrocardiSectionProps {
   title: string;
@@ -23,6 +28,11 @@ interface MarkableBrocardiSectionProps {
   sectionArticleId: string;
   /** Forwarded up so the parent can open its notes panel with the anchor. */
   onRequestAddNote: (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
+  /**
+   * Where the section is read: given, the decisions its prose cites are links (the same click, way back
+   * and preview as in the article's text); absent, the prose stays plain.
+   */
+  decisionLinks?: { besideId?: string; origin?: ReadingBackEntry };
 }
 
 /**
@@ -40,6 +50,7 @@ export function MarkableBrocardiSection({
   itemKey,
   sectionArticleId,
   onRequestAddNote,
+  decisionLinks,
 }: MarkableBrocardiSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -76,6 +87,10 @@ export function MarkableBrocardiSection({
     highlights: sectionHighlights,
     annotations: sectionAnnotations,
   });
+
+  const decisions = useDecisionLinks(decisionLinks ?? {});
+  const linkedHtml = useMemo(() => (decisionLinks ? wrapDecisionCitationsInHtml(markedHtml) : markedHtml), [decisionLinks, markedHtml]);
+  useCitationLinks(contentRef, { origin: decisionLinks?.origin, decisions: decisionLinks ? decisions.links : undefined });
 
   const handleHighlight = (text: string, color: HighlightColor, startOffset: number) => {
     const already = sectionHighlights.some(
@@ -121,7 +136,7 @@ export function MarkableBrocardiSection({
         <div className="relative">
           <div ref={contentRef} className="text-sm text-slate-700 dark:text-slate-300">
             <SafeHTML
-              html={markedHtml}
+              html={linkedHtml}
               className="p-4 prose prose-sm dark:prose-invert max-w-none prose-slate leading-relaxed"
             />
           </div>
@@ -131,6 +146,7 @@ export function MarkableBrocardiSection({
             onAddNote={handleAddNote}
             onCopy={handleCopy}
           />
+          {decisionLinks && <DecisionPreviewPopup {...decisions.popupProps} />}
         </div>
       )}
     </div>
