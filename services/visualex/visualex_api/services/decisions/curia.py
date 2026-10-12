@@ -97,7 +97,10 @@ def sparql_query(corte: str, numero: int, anno: int, *, by_year: bool = True) ->
     """The query: integers and fixed codes only, nothing a caller wrote."""
     celex_type = COURTS[corte][1]
     year = f'cdm:resource_legal_year "{int(anno)}"^^<http://www.w3.org/2001/XMLSchema#gYear> ;' if by_year else ""
-    needle = str(int(numero)) if by_year else f"{int(numero)}/{int(anno) % 100:02d}"
+    # «634/21» as the source writes a case since 1989, «26-62» before: the code checks the exact
+    # token, the filter only keeps the answer small enough for the limit
+    case = f"{int(numero)}/{int(anno) % 100:02d}"
+    old = f"{int(numero)}-{int(anno) % 100:02d}"
     return (
         "PREFIX cdm: <http://publications.europa.eu/ontology/cdm#> "
         "SELECT DISTINCT ?celex ?ecli ?date ?title ?case WHERE { "
@@ -108,8 +111,8 @@ def sparql_query(corte: str, numero: int, anno: int, *, by_year: bool = True) ->
         "?e cdm:expression_belongs_to_work ?w ; "
         "cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/ITA> ; "
         "cdm:expression_case-law_identifier_case ?case ; cdm:expression_title ?title . "
-        f'FILTER(CONTAINS(STR(?case), "{needle}")) '
-        "} LIMIT 50"
+        f'FILTER(CONTAINS(STR(?case), "{case}") || CONTAINS(STR(?case), "{old}")) '
+        "} LIMIT 200"
     )
 
 

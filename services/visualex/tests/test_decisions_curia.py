@@ -60,7 +60,8 @@ def test_case_label_writes_a_plain_dash_and_a_slash():
 
 def test_the_query_holds_integers_and_fixed_codes_only():
     q = sparql_query("corte_giustizia_ue", 634, 2021)
-    assert '"2021"^^' in q and '"CJ"^^' in q and 'CONTAINS(STR(?case), "634")' in q
+    assert '"2021"^^' in q and '"CJ"^^' in q
+    assert 'CONTAINS(STR(?case), "634/21") || CONTAINS(STR(?case), "634-21")' in q
     q = sparql_query("tribunale_ue", 612, 2017, by_year=False)
     assert "resource_legal_year" not in q and '"TJ"^^' in q and '"612/17"' in q
     with pytest.raises(ValueError):
