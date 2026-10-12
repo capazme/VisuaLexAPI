@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,7 +40,17 @@ const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
  * clips whatever sticks out of it), and the aside is a stacking context (backdrop blur), so a label
  * drawn inside either would be cut or trapped (gotcha 22).
  */
-function SidebarTooltip({ anchor, label }: { anchor: HTMLElement | null; label: string }) {
+function SidebarTooltip({ anchor, label, onDismiss }: { anchor: HTMLElement | null; label: string; onDismiss: () => void }) {
+  // Placed from the rectangle it had when it appeared: the navigation scrolling under it, or the
+  // window being resized, takes it away rather than leaving it where the control no longer is.
+  useEffect(() => {
+    window.addEventListener('scroll', onDismiss, true);
+    window.addEventListener('resize', onDismiss);
+    return () => {
+      window.removeEventListener('scroll', onDismiss, true);
+      window.removeEventListener('resize', onDismiss);
+    };
+  }, [onDismiss]);
   if (!anchor) return null;
   const rect = anchor.getBoundingClientRect();
   return createPortal(
@@ -65,8 +75,36 @@ function SidebarTooltip({ anchor, label }: { anchor: HTMLElement | null; label: 
   );
 }
 
+/**
+ * When a control's label shows: for a mouse pointer over it (not a touch, which would leave it on
+ * screen after a tap, nor a click, which has done its work), and on keyboard focus (`:focus-visible`
+ * only: a click focuses too). Esc, a scroll of the navigation and a resize take it away.
+ */
+function useSidebarLabel() {
+  const [shown, setShown] = useState(false);
+  const hide = useCallback(() => setShown(false), []);
+  const handlers = {
+    onPointerEnter: (e: PointerEvent<HTMLElement>) => {
+      if (e.pointerType === 'mouse') setShown(true);
+    },
+    onPointerLeave: hide,
+    onFocus: (e: FocusEvent<HTMLElement>) => {
+      try {
+        if (e.currentTarget.matches(':focus-visible')) setShown(true);
+      } catch {
+        // A browser without `:focus-visible`: the label stays a pointer's.
+      }
+    },
+    onBlur: hide,
+    onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
+      if (e.key === 'Escape') hide();
+    },
+  };
+  return { shown, hide, handlers };
+}
+
 function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
+  const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
@@ -91,9 +129,11 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProp
         "w-12 h-12 md:w-11 md:h-11",
         isActive && "bg-primary-50 dark:bg-primary-900/10"
       )}
-      onClick={onClick}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      onClick={() => {
+        hide();
+        onClick?.();
+      }}
+      {...handlers}
     >
       {({ isActive }) => (
         <>
@@ -135,7 +175,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProp
 
           {/* Tooltip - hidden on mobile */}
           <AnimatePresence>
-            {showTooltip && <SidebarTooltip anchor={linkEl} label={label} />}
+            {showTooltip && <SidebarTooltip anchor={linkEl} label={label} onDismiss={hide} />}
           </AnimatePresence>
         </>
       )}
@@ -151,16 +191,18 @@ interface ActionButtonProps {
 }
 
 function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
+  const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   const [buttonEl, setButtonEl] = useState<HTMLButtonElement | null>(null);
 
   return (
     <button
       ref={setButtonEl}
       aria-label={label}
-      onClick={onClick}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      onClick={() => {
+        hide();
+        onClick();
+      }}
+      {...handlers}
       className={cn(
         "relative flex items-center justify-center rounded-xl transition-all duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
@@ -188,7 +230,7 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
 
       {/* Tooltip */}
       <AnimatePresence>
-        {showTooltip && <SidebarTooltip anchor={buttonEl} label={label} />}
+        {showTooltip && <SidebarTooltip anchor={buttonEl} label={label} onDismiss={hide} />}
       </AnimatePresence>
     </button>
   );
@@ -283,7 +325,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       {/* The one part that scrolls when the window is low (16 icons are 935 px tall): its labels are
           portalled (`SidebarTooltip`), so the overflow clips nothing. The scrollbar is thin, so a
           very low window shows there is more; the column is 64 px wide. */}
-      <nav
+      {/* `layoutScroll`: the active indicator's shared-layout animation measures against the nav's scroll. */}
+      <motion.nav
+        layoutScroll
         id="tour-sidebar"
         className="min-h-0 flex-1 flex flex-col items-center overflow-y-auto overflow-x-hidden py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
@@ -306,7 +350,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {isMerltEnabled() && isMerltGraphEnabled() && (
           <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} />
         )}
-      </nav>
+      </motion.nav>
 
       {/* System Actions */}
       <div className="flex flex-col items-center py-4 gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50">

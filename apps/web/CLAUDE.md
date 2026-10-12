@@ -1099,7 +1099,9 @@ meant to stay split; add new features as new files, not inside the shells:
     raising the child's value does nothing.
     The sidebar's navigation scrolls on its own in a low window (`overflow-y-auto`, which clips what hangs
     out of it) and the document never scrolls (`Layout`'s root is `h-screen overflow-hidden`), so its
-    hover labels are portalled to the body (`SidebarTooltip`), placed from the control's rectangle.
+    labels are portalled to the body (`SidebarTooltip`), placed from the control's rectangle; they show
+    for a mouse pointer and on keyboard focus-visible (never after a tap or a click), and go with Esc, a scroll
+    or a resize.
 
 
 26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**

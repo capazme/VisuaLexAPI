@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 
 const env = vi.hoisted(() => ({
+  desktop: true,
   lines: [] as unknown[],
   requests: [] as Array<Record<string, unknown>>,
   /** The article a reader's citation link names. */
@@ -15,7 +16,7 @@ const env = vi.hoisted(() => ({
 }));
 vi.mock('../../../config/annexConfig', () => ({ ANNEX_AUTO_SWITCH_CONFIG: env.annex }));
 
-vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true, isDesktopViewport: () => true }));
+vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop, isDesktopViewport: () => env.desktop }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false }) }));
 vi.mock('../workspace/WorkspaceManager', () => ({ WorkspaceManager: () => <div data-testid="old-workspace" /> }));
 vi.mock('../workspace/WorkspaceNavigator', () => ({ WorkspaceNavigator: () => <div data-testid="old-dock" /> }));
@@ -89,6 +90,7 @@ beforeEach(() => {
   vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   window.innerWidth = 1500;
+  env.desktop = true;
   env.lines = [];
   env.requests = [];
   env.jumpTo = '';
@@ -212,14 +214,25 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     expect(s().practiceRows[`${practiceId}/${actId}/${practiceArticleKey(article(L24, '7'))}`]).toBe(true);
   });
 
-  it('the way back floats above the bar of practices, not at the top over the act heading', async () => {
+  it('the way back floats above the bar of practices (its measured height + 24 + 12), not at the top over the act heading', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.id === 'tour-workspace-dock' ? 138 : 0;
+    });
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
     panel();
     const wrapper = (await screen.findByRole('button', { name: 'Torna a art. 5 l. 24/2017' })).parentElement as HTMLElement;
     expect(wrapper).not.toHaveClass('top-4');
-    // No bar measured yet in jsdom: the least offset; with the bar, its height + 24 + 12.
-    expect(wrapper.style.bottom).toMatch(/px$/);
+    await waitFor(() => expect(wrapper.style.bottom).toBe('174px'));
+  });
+
+  it('on a phone it floats above the services pill and the feedback button, which sit under it', async () => {
+    env.desktop = false;
+    const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
+    panel();
+    const wrapper = (await screen.findByRole('button', { name: 'Torna a art. 5 l. 24/2017' })).parentElement as HTMLElement;
+    expect(wrapper.style.bottom).toBe('80px');
   });
 
   it('a decision asked for twice (the palette, then the address) is one window, and the second ask takes focus', async () => {

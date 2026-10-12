@@ -137,6 +137,21 @@ describe('Sidebar — Studia entry', () => {
   });
 });
 
+/** jsdom has no `PointerEvent`: React's enter/leave come from `pointerover`/`pointerout`, given the pointer's kind. */
+const MOUSE = 'mouse';
+const TOUCH = 'touch';
+function pointerOver(el: Element, kind: string) {
+  const event = new MouseEvent('pointerover', { bubbles: true });
+  Object.defineProperty(event, 'pointerType', { value: kind });
+  fireEvent(el, event);
+}
+function pointerOut(el: Element, kind: string) {
+  const event = new MouseEvent('pointerout', { bubbles: true, relatedTarget: document.body });
+  Object.defineProperty(event, 'pointerType', { value: kind });
+  fireEvent(el, event);
+}
+const label = () => document.body.querySelector('[data-sidebar-tooltip]');
+
 // 16 icons are 935 px tall: in a 706 px window the sidebar made the document scroll. The navigation is
 // the part that scrolls, and because that overflow would clip a label hanging out of it, the labels are
 // portalled to the body (gotcha 22). The geometry itself is for the browser pass.
@@ -158,21 +173,77 @@ describe('Sidebar — it fits a low window', () => {
   it('draws a hover label outside the scrolling navigation and the aside, and removes it on leave', async () => {
     renderSidebar();
     const link = screen.getByRole('link', { name: 'Dossier' });
-    fireEvent.mouseEnter(link);
+    pointerOver(link, MOUSE);
     const tooltip = document.body.querySelector('[data-sidebar-tooltip]') as HTMLElement;
     expect(tooltip).toHaveTextContent('Dossier');
     expect(document.getElementById('tour-sidebar')).not.toContainElement(tooltip);
     expect(screen.getByRole('complementary')).not.toContainElement(tooltip);
     expect(tooltip).toHaveClass('fixed', 'z-[1400]');
-    fireEvent.mouseLeave(link);
+    pointerOut(link, MOUSE);
     await waitFor(() => expect(document.body.querySelector('[data-sidebar-tooltip]')).toBeNull());
   });
 
   it('does the same for a button of the bottom group', () => {
     renderSidebar();
-    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Impostazioni' }));
+    pointerOver(screen.getByRole('button', { name: 'Impostazioni' }), MOUSE);
     const tooltip = document.body.querySelector('[data-sidebar-tooltip]') as HTMLElement;
     expect(tooltip).toHaveTextContent('Impostazioni');
     expect(screen.getByRole('complementary')).not.toContainElement(tooltip);
+  });
+});
+
+// A label that stays on screen after a tap, or over a dialog opened by the click, is worse than none.
+describe.each([
+  ['a link', () => screen.getByRole('link', { name: 'Dossier' })],
+  ['a button', () => screen.getByRole('button', { name: 'Impostazioni' })],
+])('Sidebar — when the label of %s shows', (_name, control) => {
+  it('for a mouse pointer over it, not for a touch', () => {
+    renderSidebar();
+    pointerOver(control(), TOUCH);
+    expect(label()).toBeNull();
+    pointerOver(control(), MOUSE);
+    expect(label()).not.toBeNull();
+  });
+
+  it('and not after a click, which has done its work', () => {
+    renderSidebar();
+    pointerOver(control(), MOUSE);
+    expect(label()).not.toBeNull();
+    fireEvent.click(control());
+    return waitFor(() => expect(label()).toBeNull());
+  });
+
+  it('on keyboard focus (`:focus-visible` only), taken away by Esc and by blur', async () => {
+    renderSidebar();
+    // Only `:focus-visible` is answered; every other selector goes to the real `matches` (Testing Library's queries use it).
+    const realMatches = Element.prototype.matches;
+    let focusVisible = true;
+    const matches = vi.spyOn(Element.prototype, 'matches').mockImplementation(function (this: Element, selector: string) {
+      return selector === ':focus-visible' ? focusVisible : realMatches.call(this, selector);
+    });
+    fireEvent.focus(control());
+    expect(label()).not.toBeNull();
+    fireEvent.keyDown(control(), { key: 'Escape' });
+    await waitFor(() => expect(label()).toBeNull());
+    fireEvent.focus(control());
+    expect(label()).not.toBeNull();
+    fireEvent.blur(control());
+    await waitFor(() => expect(label()).toBeNull());
+    // A click focuses too, but not visibly.
+    focusVisible = false;
+    fireEvent.focus(control());
+    expect(label()).toBeNull();
+    matches.mockRestore();
+  });
+
+  it('and goes with a scroll of the navigation, or a resize of the window', async () => {
+    renderSidebar();
+    pointerOver(control(), MOUSE);
+    fireEvent.scroll(document.getElementById('tour-sidebar') as HTMLElement);
+    await waitFor(() => expect(label()).toBeNull());
+    pointerOver(control(), MOUSE);
+    expect(label()).not.toBeNull();
+    fireEvent(window, new Event('resize'));
+    await waitFor(() => expect(label()).toBeNull());
   });
 });
