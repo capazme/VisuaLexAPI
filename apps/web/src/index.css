@@ -336,6 +336,14 @@
   @apply bg-slate-400 dark:bg-slate-600;
 }
 
+/* The page's height: the dynamic viewport where it is supported (a phone browser's `100vh` is taller
+   than what is visible while its toolbars show, and `Layout` clips the document), `100vh` where it is
+   not. Two declarations on purpose: a browser drops the one it does not understand. */
+@utility h-app {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* ═══════════════════════════════════════════════════════════
    READING SURFACE — the structured article text
    Markup from utils/articleRender.ts. Every label here comes from CSS

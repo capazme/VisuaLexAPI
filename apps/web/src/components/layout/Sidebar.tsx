@@ -281,11 +281,11 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
       {/* Navigation */}
       {/* The one part that scrolls when the window is low (16 icons are 935 px tall): its labels are
-          portalled (`SidebarTooltip`), so the overflow clips nothing. The scrollbar is hidden, the
-          column is 64 px wide. */}
+          portalled (`SidebarTooltip`), so the overflow clips nothing. The scrollbar is thin, so a
+          very low window shows there is more; the column is 64 px wide. */}
       <nav
         id="tour-sidebar"
-        className="min-h-0 flex-1 flex flex-col items-center overflow-y-auto overflow-x-hidden py-4 gap-3 md:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="min-h-0 flex-1 flex flex-col items-center overflow-y-auto overflow-x-hidden py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />

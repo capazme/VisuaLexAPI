@@ -59,3 +59,10 @@ describe('the reading surface', () => {
     expect(css).toMatch(/\.dark \.vlx-decision \.vlx-dec-block::?before\s*\{[^}]*\bcolor:\s*var\(--color-slate-400\)/);
   }, 30000);
 });
+
+describe('the page height', () => {
+  it('is the dynamic viewport height with 100vh as the fallback declaration before it', async () => {
+    const css = await compile(['h-app']);
+    expect(css).toMatch(/\.h-app\s*\{\s*height:\s*100vh;\s*height:\s*100dvh;?\s*\}/);
+  }, 30000);
+});

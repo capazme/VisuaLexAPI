@@ -147,6 +147,9 @@ describe('Sidebar — it fits a low window', () => {
     expect(aside).toHaveClass('lg:h-full');
     const nav = document.getElementById('tour-sidebar') as HTMLElement;
     expect(nav).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+    // A thin scrollbar, not a hidden one: a very low window shows there is more.
+    expect(nav).toHaveClass('[scrollbar-width:thin]');
+    expect(nav).not.toHaveClass('[scrollbar-width:none]');
     // The logo, the quick search, the system actions and the user menu keep their own height.
     expect(aside).not.toHaveClass('overflow-y-auto');
     expect(aside.querySelector('nav ~ div')).not.toHaveClass('overflow-y-auto');

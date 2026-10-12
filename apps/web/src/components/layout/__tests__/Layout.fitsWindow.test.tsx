@@ -32,10 +32,11 @@ describe('Layout — the document never scrolls', () => {
   it('is the height of the window and clips, with the content scrolling inside main', () => {
     const { container } = at('/');
     const root = container.firstElementChild as HTMLElement;
-    expect(root).toHaveClass('h-screen', 'overflow-hidden');
-    expect(root).not.toHaveClass('min-h-screen');
+    // `h-app`: the dynamic viewport height, with `100vh` as the fallback (see index.css).
+    expect(root).toHaveClass('h-app', 'overflow-hidden');
+    expect(root).not.toHaveClass('min-h-screen', 'h-screen');
     const main = container.querySelector('main') as HTMLElement;
-    expect(main).toHaveClass('h-screen', 'overflow-hidden');
+    expect(main).toHaveClass('h-full', 'overflow-hidden');
     expect(main.querySelector('.overflow-y-auto')).not.toBeNull();
   });
 });
