@@ -3,7 +3,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { useCitationLinks } from '../../../hooks/useCitationLinks';
+import { useDecisionLinks } from '../../../hooks/useDecisionLinks';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
+import { DecisionPreviewPopup } from '../../ui/DecisionPreviewPopup';
 import { Toast, type ToastProps } from '../../ui/Toast';
 import { ArticleBody } from '../search/ArticleBody';
 import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
@@ -25,7 +27,8 @@ import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../..
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
-import { decisionKey, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
+import { wrapDecisionCitationsInHtml } from '../../../utils/decisionCitationMatcher';
+import { decisionKey, decisionPath, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
 import { decisionProjection, decisionStructure, renderDecisionHtml, unmatchedAnchors } from '../../../utils/decisionRender';
 import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/annotationExport';
 import { selectionAsRead } from '../../../utils/decisionText';
@@ -120,12 +123,19 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const { locatedThreads, textHash, focusedThreadId } = discussion;
 
   // A bare «art. 5» with no act named stays text: a decision has no act of its own to default to.
+  // The decisions it cites are linked after the norms; inside a Cassazione decision a section written
+  // without its court reads as the Cassazione's, and the decision's own name links nowhere.
+  const selfPath = decisionPath(identity);
+  const within = identity.corte === 'cassazione' ? 'cassazione' : undefined;
   const html = useMemo(
-    () => wrapCitationsInHtml(renderDecisionHtml({
-      testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true,
-      threads: locatedThreads, focusedThreadId,
-    })),
-    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId],
+    () => wrapDecisionCitationsInHtml(
+      wrapCitationsInHtml(renderDecisionHtml({
+        testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true,
+        threads: locatedThreads, focusedThreadId,
+      })),
+      { within, selfPath },
+    ),
+    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath],
   );
 
   // What each paragraph's sign counts, for the popover it opens (the renderer derives the signs
@@ -180,7 +190,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     });
   }, [triggerSearch, hostTabId]);
 
-  useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef });
+  const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin });
+  useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
   const {
@@ -323,6 +334,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         {...discussion.panelProps}
       />
       {toast && <Toast message={toast.message} type={toast.type} isVisible onClose={() => setToast(null)} />}
+      <DecisionPreviewPopup {...decisionLinks.popupProps} />
       <CitationPreviewPopup
         isVisible={preview.isVisible}
         isLoading={preview.isLoading}

@@ -51,7 +51,7 @@ holding `conventions/`, and fails when it is not there.
 
 | Suite | Test |
 |---|---|
-| web | `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (today: shape, decided citations, current decision paths and reference paths); `apps/web/src/utils/__tests__/decisionCitationParser.test.ts` (`decision_citations`) |
+| web | `apps/web/src/utils/__tests__/sourcesGolden.test.ts` (today: shape, decided citations, current decision paths and reference paths); `apps/web/src/utils/__tests__/decisionCitationParser.test.ts` (`decision_citations`); `apps/web/src/utils/__tests__/decisionCitationMatcher.test.ts` (`decision_citations_in_text`) |
 | Python API | `services/visualex/tests/test_sources_golden.py` (today: current norm identities, current decision keys); `services/visualex/tests/test_nl_parser_convention.py` (every citation and short label reads back through the parser to its norm); `services/visualex/tests/test_decision_citation.py` (`decision_citations`, through `/parse_decision`) |
 | server, MCP, MERL-T | added by each area's adoption PR (plan `docs/superpowers/plans/2026-10-04-source-convention.md`) |
 
@@ -83,6 +83,33 @@ keystroke in the browser, and the Python API's `/parse_decision`, which the serv
 `POST /dossiers/:id/decisions` calls (Part A of the 12 October design). Each asserts the cases whose status is `decided`, `current` or `proposed` and lists the
 open ones as skipped. `unsupported_court` (the court the API names when it recognises one
 VisuaLex has no reader for) is the API's alone. The section is kept as written (`III`, `U`), as the palette keeps it.
+
+## `decision_citations_in_text`
+
+The decisions a running text cites, with where they are written: the web's scanner
+`apps/web/src/utils/decisionCitationMatcher.ts` (`extractDecisionCitations`) reads a decision's text, an
+article's text or a Brocardi section, and returns the spans of the citations it finds.
+
+```jsonc
+"decision_citations_in_text": {
+  "note": "…", "today": "2026-10-05",
+  "cases": [
+    { "text": "Cass. n. 1234 del 2020; Sez. 1, n. 5 del 2021.", "within": "cassazione",   // within: the court of the text being read
+      "spans": [{ "start": 0, "end": 22, "text": "Cass. n. 1234 del 2020",             // UTF-16 offsets of `text`, and the words between them
+                  "reference": { "corte": "cassazione", "numero": 1234, "anno": 2020 }, "path": "/sentenze/cassazione/1234/2020" },
+                { "start": 24, "end": 45, "text": "Sez. 1, n. 5 del 2021",             // read as the Cassazione's because of `within`
+                  "reference": { "corte": "cassazione", "numero": 5, "anno": 2021, "sezione": "1" }, "path": "/sentenze/cassazione/5/2021?sezione=1" }],
+      "status": "decided" }
+  ]
+}
+```
+
+A citation is linked only when its court is written in it; the one context rule (the owner, 13 October
+2026) is that, inside a Cassazione decision (`within`), a section written without the court reads as the
+Cassazione. A bare number, an act's citation, a court the app cannot open and prose between a court and a
+number give no span (`spans: []`). The words are read by the parser behind `decision_citations`; the scan is
+the web app's alone, there is no Python twin. Asserted by
+`apps/web/src/utils/__tests__/decisionCitationMatcher.test.ts`.
 
 ## `tar-seats.json`
 

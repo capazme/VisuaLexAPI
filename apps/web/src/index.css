@@ -840,9 +840,11 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CITATION HOVER — Subtle recognition of norm references
+   CITATION HOVER — Subtle recognition of norm references and of the
+   decisions a text cites (.decision-cite, utils/decisionCitationMatcher.ts)
    ═══════════════════════════════════════════════════════════ */
-.citation-hover {
+.citation-hover,
+.decision-cite {
   cursor: default;
   text-decoration: none;
   transition: all 0.15s ease;
@@ -851,14 +853,16 @@
   margin: 0 -1px;
 }
 
-.citation-hover:hover {
+.citation-hover:hover,
+.decision-cite:hover {
   text-decoration: underline dotted;
   text-decoration-color: hsl(var(--primary));
   text-underline-offset: 3px;
   background-color: hsl(var(--primary) / 0.08);
 }
 
-.dark .citation-hover:hover {
+.dark .citation-hover:hover,
+.dark .decision-cite:hover {
   background-color: hsl(var(--primary) / 0.15);
 }
 

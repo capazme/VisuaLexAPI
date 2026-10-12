@@ -443,6 +443,28 @@ own line «Dati aperti della Corte costituzionale, licenza CC BY-SA 3.0 — <lic
 address from a small table, no line for an unknown licence); the
 Cassazione's PDF and the page (`DecisionView` footer) carry no licence line (the owner, 8 Oct 2026).
 
+**The decisions a text cites are links** (spec `docs/superpowers/specs/2026-10-13-decision-citations-in-texts-design.md`).
+After `wrapCitationsInHtml`, `wrapDecisionCitationsInHtml` (`utils/decisionCitationMatcher.ts`) wraps each
+decision a text cites in `span.decision-cite` (`data-decision-path` is the one source of truth, `data-cache-key`
+the same address), per text segment and adding no character (root rule 23: a citation cut by a highlight is
+two spans with one key). It reads the visible text with the tags removed and the entities decoded as the browser does
+(soft hyphens ignored), so a mark in the middle of a number does not cut the citation, and never claims a range a `.citation-hover` span holds. Three surfaces use it:
+`DecisionReadingSurface` (with `within: 'cassazione'` when the decision read is the Cassazione's, and its own
+path as `selfPath`, so a decision never links to itself), `ArticleTabContent` (Normattiva's update notes cite
+the Corte costituzionale) and the Ratio and Spiegazione of Brocardi (`MarkableBrocardiSection`, told where it is
+read through `decisionLinks`; Brocardi's massime already link their decision through `DecisionLink` and are not
+wrapped again). `useCitationLinks` takes a `decisions` option (`DecisionLinksOptions`); `useDecisionLinks`
+builds it and the popup's props: a click records the way back from the surface's origin, then
+`openDecision(reference, { fromLink: true, besideId: <host> })` (the reference is rebuilt from the path with
+`decisionReferenceOfPath`; the practice's window rule and the phone's full-screen reader are the store's).
+Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the same frame as the norm popup
+(`ui/PreviewFrame`, `calculatePreviewPosition`): the decision's heading and first lines from
+`fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
+leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
+The scanner never links a court that is not written (D2): a bare «n. 123/2020» stays text everywhere; the one
+context rule is that inside a Cassazione decision a section without its court («Sez. U, n. 9100 del 2015») reads
+as the Cassazione. «decreto n.» of an administrative court is a known conservative miss.
+
 **A past text is a reading** (round "Testo alla data", spec
 `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`). The server
 states, next to `article_text`, the window the source's own page gives
@@ -717,6 +739,15 @@ Duplicating any of these is a defect, not a shortcut.
   administrative court («Cons. Stato, sez. VI, n. 2270/2019», «TAR Lazio, Roma, ord. n. 1234/2020»;
   a parere is left to the API, which names it as a court it cannot read). The Python
   API's `decisions/citation.py` reads the same words; both assert the golden file's `decision_citations`.
+  `readDecisionCitation` returns the reference with where its words are (`headEnd`, `words`), and the
+  parser exports its court-head sources (`COURT_HEAD_SOURCE`, `EU_COURT_HEAD_SOURCE`, …) for the scanner.
+  `utils/decisionCitationMatcher.ts` — the decisions a running text cites: `extractDecisionCitations(text,
+  { within, now })` gives `{ start, end, reference, path }` spans over the text (a court head, a bounded tail
+  of 200 characters cut at the next head, at a sentence end, at «;» and at the Gazzetta Ufficiale, handed to
+  `readDecisionCitation`; the words between the court and the number must be citation words, no number of
+  another; the reference is read again from the span's own words; never inside an act's citation,
+  `allActSpans`), and `wrapDecisionCitationsInHtml` (see «The decisions a text cites are links»). Pinned to
+  the golden file's `decision_citations_in_text` (web only, no Python twin) by `decisionCitationMatcher.test.ts`.
   `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session
   (50 answers, least recently used out; a failure is not kept; `clearDecisionCache` at logout). `utils/workspaceOrigin.ts` — the id of the results area
   (`WORKSPACE_AREA_ID`) and its rectangle, which the find window and the row of windows are placed against.

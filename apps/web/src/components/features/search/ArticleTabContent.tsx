@@ -15,9 +15,12 @@ import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
+import { DecisionPreviewPopup } from '../../ui/DecisionPreviewPopup';
+import { useDecisionLinks } from '../../../hooks/useDecisionLinks';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { useCitationLinks } from '../../../hooks/useCitationLinks';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
+import { wrapDecisionCitationsInHtml } from '../../../utils/decisionCitationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
@@ -734,7 +737,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         [readOnly, allPanelHighlights, blockGroups],
     );
 
-    const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
+    // The norms the text cites are linked first; the decisions (Normattiva's update notes cite the
+    // Corte costituzionale) take what the norm links leave.
+    const processedContent = useMemo(
+        () => wrapDecisionCitationsInHtml(wrapCitationsInHtml(markedHtml, norma_data)),
+        [markedHtml, norma_data],
+    );
 
     // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom
     // fold; an annotation sign opens its block's notes and highlights.
@@ -771,12 +779,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             });
         }
     }, [onCrossReferenceNavigate, norma_data, triggerSearch]);
+    const decisionLinks = useDecisionLinks({ besideId: originTabId ?? tabId, origin: citationOrigin });
     useCitationLinks(contentRef, {
         onOpen: onCrossReferenceNavigate ? openCitation : undefined,
         origin: citationOrigin,
         showPreview,
         hidePreview,
         isHoveringPopupRef,
+        decisions: decisionLinks.links,
     });
 
     const showBrocardi = brocardi_info !== undefined && display.doctrineVisible;
@@ -787,6 +797,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             itemKey={itemKey}
             uniqueArticleId={uniqueArticleId}
             onRequestAddNote={handleBrocardiAddNote}
+            decisionLinks={{ besideId: originTabId ?? tabId, origin: citationOrigin }}
             currentNorma={{
                 tipo_atto: norma_data.tipo_atto,
                 data: norma_data.data,
@@ -1094,6 +1105,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 today={todayInRome()}
                 initialDate={requestedDate}
             />
+
+            <DecisionPreviewPopup {...decisionLinks.popupProps} />
 
             {/* Citation Preview Popup */}
             <CitationPreviewPopup

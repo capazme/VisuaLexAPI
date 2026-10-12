@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { appStore } from '../../../store/useAppStore';
 import type { Annotation, Highlight } from '../../../types';
@@ -148,6 +148,44 @@ describe('DecisionReadingSurface', () => {
     const notPrevented = fireEvent.copy(container.querySelector('.vlx-decision')!, { clipboardData: { setData } });
     expect(notPrevented).toBe(false);
     expect(setData).toHaveBeenCalledWith('text/plain', 'riga seconda');
+  });
+});
+
+describe('DecisionReadingSurface — the decisions the text cites', () => {
+  const CITING: DecisionText = {
+    motivazione: 'Così Cass. civ., sez. III, n. 99999/2024 (questa stessa), Sez. U, n. 9100 del 2015, Corte cost. n. 71/2020 e C-634/21.',
+  };
+  const openDecision = vi.fn(() => ({ practiceId: 'p', decisionId: 'd' }));
+  const originalOpen = appStore.getState().openDecision;
+  beforeEach(() => appStore.setState({ openDecision } as never));
+  afterEach(() => appStore.setState({ openDecision: originalOpen }));
+  const written = (container: HTMLElement) => [...container.querySelectorAll('.decision-cite')].map((e) => e.textContent);
+
+  it('links them, not the decision to itself, and reads a bare section as the Cassazione’s', () => {
+    const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={CITING} attributi={{}} />);
+    expect(written(container)).toEqual(['Sez. U, n. 9100 del 2015', 'Corte cost. n. 71/2020', 'C-634/21']);
+    expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(CITING));
+  });
+
+  it('reads a bare section as a Cassazione citation only inside a Cassazione decision', () => {
+    const { container } = render(
+      <DecisionReadingSurface identity={{ corte: 'corte_costituzionale', numero: 5, anno: 2020 }} testo={CITING} attributi={{}} />,
+    );
+    expect(written(container)).toEqual(['Cass. civ., sez. III, n. 99999/2024', 'Corte cost. n. 71/2020', 'C-634/21']);
+  });
+
+  it('a click records the way back, then opens the decision beside the host', () => {
+    const { container } = render(
+      <DecisionReadingSurface identity={IDENTITY} testo={CITING} attributi={{ sezione: '3' }} hostTabId="practice-1" hostBlockId="decision-1" />,
+    );
+    fireEvent.click(container.querySelector('.decision-cite')!);
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
+      { tabId: 'practice-1', blockId: 'decision-1', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
+    );
+    expect(openDecision).toHaveBeenCalledExactlyOnceWith(
+      { corte: 'cassazione', numero: 9100, anno: 2015, sezione: 'U' },
+      { fromLink: true, besideId: 'practice-1' },
+    );
   });
 });
 
