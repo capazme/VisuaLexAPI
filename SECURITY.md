@@ -10,6 +10,7 @@ is actually enforced today:
 |---|---|
 | `www.normattiva.it` | Normattiva — Istituto Poligrafico e Zecca dello Stato |
 | `eur-lex.europa.eu` | EUR-Lex — Ufficio delle pubblicazioni UE |
+| `publications.europa.eu` | Ufficio delle pubblicazioni UE — archivio CELLAR (EUR-Lex): sentenze della Corte di giustizia e del Tribunale UE |
 | `www.italgiure.giustizia.it` | Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb) |
 | `dati.cortecostituzionale.it` | Corte costituzionale — dati aperti (CC BY-SA 3.0) |
 | `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |

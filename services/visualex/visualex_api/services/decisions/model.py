@@ -11,10 +11,16 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-CORTI: tuple[str, ...] = ("cassazione", "corte_costituzionale")
+# The courts of the Union are named by their case (design 2026-10-12 §3, waiting for the owner's
+# Q10): the Court of Justice since its first cases, the General Court since 1989.
+EU_COURTS: tuple[str, ...] = ("corte_giustizia_ue", "tribunale_ue")
+CORTI: tuple[str, ...] = ("cassazione", "corte_costituzionale", *EU_COURTS)
 ARCHIVI: tuple[str, ...] = ("civile", "penale")
-FIRST_YEAR: dict[str, int] = {"cassazione": 1900, "corte_costituzionale": 1956}
+FIRST_YEAR: dict[str, int] = {"cassazione": 1900, "corte_costituzionale": 1956,
+                              "corte_giustizia_ue": 1953, "tribunale_ue": 1989}
 MAX_NUMERO = 999_999
+#: a case number of the Union's courts: four digits, as the CELEX writes it
+MAX_NUMERO_CAUSA = 9_999
 
 # Section codes as Italgiure indexes them (`szdec`): 1-7, L (lavoro), U (Sezioni Unite),
 # F (feriale). Tributaria is civil section 5 and has no code of its own.
@@ -23,7 +29,8 @@ _NAMED = {"SU": "U", "U": "U", "UNITE": "U", "SEZIONIUNITE": "U", "SSUU": "U",
           "L": "L", "LAV": "L", "LAVORO": "L", "F": "F", "FER": "F", "FERIALE": "F"}
 _TRIBUTARIA = {"T", "TRIB", "TRIBUTARIA"}
 _ATTRIBUTES = ("sezione", "tipo", "data_deposito", "data_decisione", "ecli", "relatore",
-               "presidente", "materia", "testo_assente", "testo_origine")
+               "presidente", "materia", "testo_assente", "testo_origine",
+               "parti", "cause_riunite", "lingua_processuale")
 
 
 @dataclass(frozen=True)
@@ -60,7 +67,7 @@ class Identity:
     def key(self) -> str:
         if self.corte == "cassazione":
             return f"cassazione:{self.archivio}:{self.numero}:{self.anno}"
-        return f"corte_costituzionale:{self.numero}:{self.anno}"
+        return f"{self.corte}:{self.numero}:{self.anno}"
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {"corte": self.corte, "numero": self.numero, "anno": self.anno}
@@ -94,6 +101,11 @@ class Decision:
     # where the Cassazione's text was read: "pdf" (the court's original) or "archivio" (Italgiure's
     # text field, possibly cut short); None for a source with one way to read
     testo_origine: str | None = None
+    # the courts of the Union: the parties as the source names them, every case of a judgment on
+    # joined cases («C-293/12», «C-594/12»), the procedure language
+    parti: str | None = None
+    cause_riunite: list[str] | None = None
+    lingua_processuale: str | None = None
     testo: dict[str, str] = field(default_factory=dict)  # epigrafe?, motivazione, dispositivo?
     fonte: dict[str, str] = field(default_factory=dict)  # nome, licenza?, url?
 
@@ -143,10 +155,11 @@ def parse_reference(body: object, today: date | None = None) -> Reference:
     errors: dict[str, str] = {}
     corte = body.get("corte")
     if corte not in CORTI:
-        errors["corte"] = "atteso cassazione o corte_costituzionale"
+        errors["corte"] = "atteso cassazione, corte_costituzionale, corte_giustizia_ue o tribunale_ue"
     numero = _int_field(body.get("numero"))
-    if numero is None or not 1 <= numero <= MAX_NUMERO:
-        errors["numero"] = "atteso un numero da 1 a 999999"
+    highest = MAX_NUMERO_CAUSA if corte in EU_COURTS else MAX_NUMERO
+    if numero is None or not 1 <= numero <= highest:
+        errors["numero"] = f"atteso un numero da 1 a {highest}"
     first = FIRST_YEAR.get(corte, 1900) if isinstance(corte, str) else 1900
     anno = _int_field(body.get("anno"))
     if anno is None or not first <= anno <= today.year:
@@ -156,8 +169,8 @@ def parse_reference(body: object, today: date | None = None) -> Reference:
         errors["archivio"] = "atteso civile o penale"
     if errors:
         raise InvalidReference(errors)
-    if corte == "corte_costituzionale":
-        return Reference("corte_costituzionale", numero, anno)
+    if corte == "corte_costituzionale" or corte in EU_COURTS:
+        return Reference(corte, numero, anno)
     sezione = normalize_section(body.get("sezione"))
     if archivio is None and sezione.civil_only:
         archivio = "civile"
