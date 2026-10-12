@@ -17,9 +17,9 @@ let seededTexts: TextVersionRow[] = [];
 // The OAuth endpoints' own rate limits are per address, and the whole suite
 // comes from 127.0.0.1: lift them here (the flood test builds its own router
 // with a low one), and give the MCP server's credential a test value.
-// Assigned, never `??=`: importing @prisma/client above loads `apps/server/.env`
-// into process.env when the checkout has one (the main checkout, a worktree
-// start.sh prepared), so the development stack's MCP secret was already set
+// Assigned, never `??=`: `new PrismaClient()` above loads `apps/server/.env` into
+// process.env when the client was generated in a checkout that has one (the main
+// checkout, a worktree start.sh prepared), so the development stack's MCP secret was already set
 // here and won over the value the helpers send: every introspection and token
 // exchange answered `invalid_client` in those checkouts, and passed in a clean
 // worktree (`tests/oauth/testEnv.test.ts`).
