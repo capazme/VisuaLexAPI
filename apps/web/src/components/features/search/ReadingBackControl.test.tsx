@@ -1,37 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { appStore, type WorkspaceTab } from '../../../store/useAppStore';
+import { appStore } from '../../../store/useAppStore';
 import { ReadingBackControl } from './ReadingBackControl';
-
-const articleTab = {
-  id: 'article-tab', label: 'Codice civile', zIndex: 1, isHidden: false, isMinimized: false,
-  content: [{ type: 'norma', id: 'block-1', norma: {}, articles: [] }],
-} as unknown as WorkspaceTab;
-
-beforeEach(() => {
-  const decisionTab = appStore.getState().openDecisionTab({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 });
-  void decisionTab;
-});
-
-// The jump from an article to a decision records its way back like a citation jump, and the one
-// control of the app (desktop and phone alike) names the article and takes the reader there.
-describe('ReadingBackControl after a jump to a decision', () => {
-  it('names the article and walks back to its tab, on the phone through onNavigated', () => {
-    appStore.setState((s) => ({ workspaceTabs: [articleTab, ...s.workspaceTabs], readingBackStack: [] }));
-    appStore.getState().pushReadingBack({ tabId: 'article-tab', blockId: 'block-1', articleId: 'x', label: 'art. 2043 c.c.' });
-    const onNavigated = vi.fn();
-    render(<ReadingBackControl onNavigated={onNavigated} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }));
-    expect(onNavigated).toHaveBeenCalledWith('article-tab');
-    expect(appStore.getState().readingBackStack).toEqual([]);
-  });
-});
 
 describe('ReadingBackControl over the practices (spec §6.3 `table`)', () => {
   it('a citation jump from a row, then back: the practice left is active, the row revealed, onNavigated names it', async () => {
     const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
     const { articleRowKey, practiceArticleKey } = await import('../../../utils/practice');
-    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [], workspaceTabs: [] });
+    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [] });
     const s = appStore.getState;
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
@@ -63,8 +39,7 @@ describe('ReadingBackControl over the practices (spec §6.3 `beside`)', () => {
     const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
     const { besideRefFor, practiceArticleKey } = await import('../../../utils/practice');
     appStore.setState({
-      practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [], workspaceTabs: [],
-      windowFocusRequest: null,
+      practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [],      windowFocusRequest: null,
     });
     const s = appStore.getState;
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
@@ -100,7 +75,7 @@ describe('ReadingBackControl over the practices (spec §6.3 `beside`)', () => {
 
   it('a topic-search window is never offered as a place to go back to', async () => {
     const { s } = await articleWindow();
-    const id = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    const id = s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     s().pushReadingBack({ tabId: id, blockId: id, articleId: '', label: 'Tema: danno' });
     render(<ReadingBackControl />);
     expect(screen.queryByRole('button', { name: /Torna a/ })).not.toBeInTheDocument();
@@ -109,23 +84,13 @@ describe('ReadingBackControl over the practices (spec §6.3 `beside`)', () => {
 });
 
 describe('ReadingBackControl — where it floats', () => {
-  async function withOneEntry() {
-    appStore.setState({ workspaceTabs: [articleTab], readingBackStack: [] });
-    appStore.getState().pushReadingBack({ tabId: 'article-tab', blockId: 'block-1', articleId: 'x', label: 'art. 2043 c.c.' });
-  }
-
-  it('at the top, centred, by default (the old tabs)', async () => {
-    await withOneEntry();
-    render(<ReadingBackControl />);
-    const wrapper = screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }).parentElement as HTMLElement;
-    expect(wrapper).toHaveClass('fixed', 'top-4', 'left-1/2');
-    expect(wrapper.style.bottom).toBe('');
-  });
-
-  it('at the bottom, centred and clear of the bar of practices, when asked: no top-4 over the act heading', async () => {
-    await withOneEntry();
-    render(<ReadingBackControl placement="bottom" bottomOffset={96} />);
-    const wrapper = screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }).parentElement as HTMLElement;
+  it('at the bottom, centred and clear of the bar of practices: no top-4 over the act heading', async () => {
+    const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
+    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [] });
+    const { practiceId, actId } = appStore.getState().addArticlesToPractice(null, L24, [article(L24, '5')]);
+    appStore.getState().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
+    render(<ReadingBackControl bottomOffset={96} />);
+    const wrapper = screen.getByRole('button', { name: 'Torna a art. 5 l. 24/2017' }).parentElement as HTMLElement;
     expect(wrapper).toHaveClass('fixed', 'left-1/2');
     expect(wrapper).not.toHaveClass('top-4');
     expect(wrapper.style.bottom).toBe('96px');

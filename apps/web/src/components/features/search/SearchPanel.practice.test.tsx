@@ -54,7 +54,7 @@ vi.mock('../decisions/DecisionSearchTabView', async () => {
   const { appStore: store } = await import('../../../store/useAppStore');
   return {
     DecisionSearchTabView: ({ tabId }: { tabId: string }) => (
-      <button type="button" data-testid="topic-list" onClick={() => store.getState().openDecisionTab({ corte: 'cassazione', archivio: 'civile', numero: 12345, anno: 2020 }, { besideTabId: tabId })}>
+      <button type="button" data-testid="topic-list" onClick={() => store.getState().openDecision({ corte: 'cassazione', archivio: 'civile', numero: 12345, anno: 2020 }, { fromLink: true, besideId: tabId })}>
         Cass. civ., n. 12345/2020
       </button>
     ),
@@ -101,9 +101,8 @@ beforeEach(() => {
   env.annex.ENABLED = false;
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    practiceNotice: null, workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDecision: null,
+    practiceNotice: null, searchTrigger: null, searchQueue: [], pendingDecision: null,
     readingBackStack: [], commandPaletteOpen: false, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
-    mobileActiveTabId: null,
   });
 });
 afterEach(() => {
@@ -127,14 +126,13 @@ describe.each([
     expect(s().practices[0].acts[0].articles).toHaveLength(1);
     expect(screen.queryByTestId('old-workspace')).toBeNull();
     expect(screen.queryByTestId('old-dock')).toBeNull();
-    expect(s().workspaceTabs).toEqual([]);
   });
 
   it(`a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens ${desktop ? 'beside, once' : 'full screen, once'}`, async () => {
     const p = s().createPractice('Responsabilità');
     panel();
-    act(() => { s().openDecisionTab(REF); });                         // the palette
-    act(() => { s().openDecisionTab(REF, { besideTabId: p }); });     // a massima in a row of the table
+    act(() => { s().openDecision(REF, { fromLink: true }); });                         // the palette
+    act(() => { s().openDecision(REF, { fromLink: true, besideId: p }); });     // a massima in a row of the table
     act(() => { s().requestOpenDecision(REF); });                     // the address
     await waitFor(() => expect(s().pendingDecision).toBeNull());
     expect(await screen.findAllByTestId('decision-reader')).toHaveLength(1);
@@ -159,7 +157,7 @@ describe.each([
     : 'a topic search from the palette opens full screen; a decision opened from its list replaces it there and enters «Giurisprudenza»', async () => {
     s().createPractice('Responsabilità');
     panel();
-    act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
+    act(() => { s().openTopicSearch({ tema: 'danno' }, 'Tema: danno'); });
     const place = await screen.findByRole('region', { name: desktop ? 'Tema: danno' : 'Ricerca per tema' });
     fireEvent.click(within(place).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
     expect(await screen.findByTestId('decision-reader')).toHaveTextContent('n. 12345');
@@ -194,12 +192,12 @@ describe('SearchPanel with the practices: where a search lands (spec §5.1)', ()
     await waitFor(() => expect(readers()).toEqual(['art. 1']));
   });
 
-  it('a dossier\'s search (targetTabId) lands in that practice and opens no row', async () => {
+  it('a dossier\'s search (targetPracticeId) lands in that practice and opens no row', async () => {
     const target = s().createPractice('Dossier', { custom: true });
     s().createPractice('Altra');
     env.lines = [ccArticle('2043')];
     panel();
-    act(() => { s().triggerSearch({ ...params('2043'), targetTabId: target, tabLabel: 'Dossier' }); });
+    act(() => { s().triggerSearch({ ...params('2043'), targetPracticeId: target, tabLabel: 'Dossier' }); });
     await waitFor(() => expect(s().practices.find((p) => p.id === target)?.acts).toHaveLength(1));
     expect(s().practiceRows).toEqual({});
   });
@@ -208,7 +206,6 @@ describe('SearchPanel with the practices: where a search lands (spec §5.1)', ()
     const p = s().createPractice('P');
     act(() => { s().addNormaIndexToTab(p, { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16' }); });
     expect(s().practices[0].acts.map((a) => a.key)).toEqual([actKeyOf({ tipo_atto: 'codice civile' })]);
-    expect(s().workspaceTabs).toEqual([]);
   });
 
   it('a citation jump from a row, then the back control, reveals the row left', async () => {
@@ -334,7 +331,7 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     env.lines = [ccArticle('1'), ccArticle('2'), ccArticle('3')];
     panel();
-    act(() => { s().triggerSearch({ ...params('1-3'), targetTabId: gone }); });
+    act(() => { s().triggerSearch({ ...params('1-3'), targetPracticeId: gone }); });
     await waitFor(() => expect(s().practices[0].acts[0]?.articles).toHaveLength(3));
     expect(warn.mock.calls.filter(([message]) => String(message).includes('is not open'))).toHaveLength(1);
   });
@@ -345,7 +342,7 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
     panel();
     await screen.findByTestId('practice-column');
-    act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
+    act(() => { s().openTopicSearch({ tema: 'danno' }, 'Tema: danno'); });
     const reader = await screen.findByTestId('reading-full-screen');
     expect(within(reader).getByTestId('topic-list')).toBeInTheDocument();
     expect(screen.queryByTestId('practice-column')).toBeNull();
@@ -357,9 +354,9 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
 
   it('a decision opened from practice B\'s topic window enters B, while A holds the same topic', async () => {
     const a = s().createPractice('A');
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     const b = s().createPractice('B');
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     panel();
     const window_ = await screen.findByRole('region', { name: 'Tema: danno' });
     fireEvent.click(within(window_).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
@@ -395,21 +392,15 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     await waitFor(() => expect(screen.queryByText(/Una ricerca per tema non è stata riaperta/)).toBeNull());
   });
 
-  it('going back with the practices writes nothing of the old tabs\' state', async () => {
+  it('going back reveals the row and empties the stack', async () => {
     env.lines = [ccArticle('2043')];
     panel();
     act(() => { s().triggerSearch(params('2043')); });
     await waitFor(() => expect(readers()).toEqual(['art. 2043']));
     const { id: practiceId, acts } = s().practices[0];
-    // a seeded practice keeps its tab's id: a stored tab of that id is still there
-    appStore.setState({ workspaceTabs: [{
-      id: practiceId, label: 'c.c.', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1,
-      isMinimized: false, isHidden: false, content: [], labelIsCustom: false,
-    }] });
     act(() => { s().pushReadingBack({ tabId: practiceId, blockId: acts[0].id, articleId: '2043', label: 'art. 2043 c.c.' }); });
     fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 2043 c.c.' }));
     await waitFor(() => expect(s().readingBackStack).toEqual([]));
-    expect(s().mobileActiveTabId).toBeNull();
   });
 });
 

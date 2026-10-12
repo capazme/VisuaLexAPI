@@ -302,7 +302,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const normaGroups = useMemo<NormaGroup[]>(() => computeNormaGroups(dossier.items), [dossier.items]);
 
   // Queue one search per norma-group (one act's, or the dossier's). The practice is created up front
-  // and its id passed as `targetTabId`, so results never leak into a pre-existing practice with the
+  // and its id passed as `targetPracticeId`, so results never leak into a pre-existing practice with the
   // same label (gotcha 15). One practice holds them all, and `everyGroup` (the whole dossier opened)
   // brings its decisions too (spec §5.1, T17).
   const openGroupsOnDashboard = (groups: NormaGroup[], everyGroup = false) => {

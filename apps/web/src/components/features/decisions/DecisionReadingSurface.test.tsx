@@ -31,13 +31,15 @@ const addHighlight = vi.fn();
 const addAnnotation = vi.fn();
 const removeHighlight = vi.fn();
 const removeAnnotation = vi.fn();
+// What the surface records is the call: the store keeps an entry only when it names a practice's subject.
+const pushReadingBack = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
   appStore.setState({
-    searchTrigger: null, readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [],
+    searchTrigger: null, readingBackStack: [], highlights: [], annotations: [],
     loadHighlightsForArticle: loadHighlights, loadAnnotationsForArticle: loadAnnotations,
-    addHighlight, addAnnotation, removeHighlight, removeAnnotation,
+    addHighlight, addAnnotation, removeHighlight, removeAnnotation, pushReadingBack,
   });
 });
 
@@ -86,18 +88,18 @@ describe('DecisionReadingSurface', () => {
     expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(TESTO));
   });
 
-  it('a click searches the norm beside the host tab and records the way back to the decision', () => {
+  it('a click searches the norm beside the host and records the way back to the decision', () => {
     const { container } = render(
       <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} hostTabId="dec-tab" />,
     );
     fireEvent.click(container.querySelector('.citation-hover')!);
     expect(appStore.getState().searchTrigger).toEqual({
       act_type: 'codice civile', act_number: '', date: '', article: '2043',
-      version: 'vigente', show_brocardi_info: true, besideTabId: 'dec-tab',
+      version: 'vigente', show_brocardi_info: true, besideId: 'dec-tab',
     });
-    expect(appStore.getState().readingBackStack).toEqual([
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
       { tabId: 'dec-tab', blockId: 'dec-tab', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
-    ]);
+    );
   });
 
   it('a host block names the place the way back returns to, inside the host (a decision row of a practice)', () => {
@@ -105,17 +107,17 @@ describe('DecisionReadingSurface', () => {
       <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} hostTabId="practice-1" hostBlockId="decision-1" />,
     );
     fireEvent.click(container.querySelector('.citation-hover')!);
-    expect(appStore.getState().searchTrigger).toMatchObject({ besideTabId: 'practice-1' });
-    expect(appStore.getState().readingBackStack).toEqual([
+    expect(appStore.getState().searchTrigger).toMatchObject({ besideId: 'practice-1' });
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
       { tabId: 'practice-1', blockId: 'decision-1', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
-    ]);
+    );
   });
 
   it('without a host tab the norm opens by the ordinary search and no way back is recorded', () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
     fireEvent.click(container.querySelector('.citation-hover')!);
     expect(appStore.getState().searchTrigger).toMatchObject({ act_type: 'codice civile', article: '2043' });
-    expect(appStore.getState().searchTrigger).not.toHaveProperty('besideTabId');
+    expect(appStore.getState().searchTrigger).not.toHaveProperty('besideId');
     expect(appStore.getState().readingBackStack).toEqual([]);
   });
 
@@ -279,7 +281,7 @@ describe('DecisionView — what has no text or no identity', () => {
 
 describe('DecisionReadingSurface — the find window\'s text root', () => {
   it('registers its text root under the key the scope computes for the decision tab', () => {
-    const tabId = appStore.getState().openDecisionTab(IDENTITY);
+    const tabId = appStore.getState().openDecision(IDENTITY, { fromLink: true }).decisionId;
     const { container, unmount } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} hostTabId={tabId} />);
 
     const roots = findRootsFor(tabId);

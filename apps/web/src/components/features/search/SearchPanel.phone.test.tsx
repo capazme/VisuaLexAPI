@@ -75,7 +75,7 @@ describe('SearchPanel on a phone — with the practices (spec §8, P5)', () => {
     const { practiceId, refs } = withTwoWindows();
     render(<MemoryRouter><SearchPanel /></MemoryRouter>);
     await screen.findByTestId('practice-phone-view');
-    act(() => { appStore.getState().openDecisionTab(REF); });
+    act(() => { appStore.getState().openDecision(REF, { fromLink: true }); });
     const reader = await screen.findByTestId('reading-full-screen');
     expect(reader).toHaveTextContent('n. 99999');
     expect(screen.queryByTestId('practice-phone-view')).toBeNull();

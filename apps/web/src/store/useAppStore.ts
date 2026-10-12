@@ -9,7 +9,6 @@ import { getErrorMessage } from '../utils/errors';
 import {
     appendBackEntry,
     findLiveBackIndex,
-    isPracticeBackEntry,
     type BackStackEntry,
     type PracticeBackEntry,
     type ReadingBackEntry,
@@ -17,7 +16,6 @@ import {
 import { topicKey } from '../utils/decisionSearchNorma';
 import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '../types/decisions';
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
-import { normalizeArticleId } from '../utils/treeUtils';
 import {
     addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
     findPracticeArticle, holdsSubject, labelOr, mergeDecisionEntries, practiceArticleKey,
@@ -28,7 +26,6 @@ import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isDesktopViewport } from '../hooks/useIsDesktop';
-import { workspaceOrigin } from '../utils/workspaceOrigin';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -124,64 +121,6 @@ function customAliasApiToStore(a: CustomAliasApi): CustomAlias {
         usageCount: a.usageCount,
         lastUsedAt: a.lastUsedAt ?? undefined,
     };
-}
-
-// Content types for WorkspaceTab
-interface NormaBlock {
-    type: 'norma';
-    id: string;
-    norma: Norma;
-    articles: ArticleData[];
-    isCollapsed: boolean;
-    /**
-     * Signal for R2 (streaming-ux): when set, the NormaBlockComponent should
-     * switch its local activeArticleId to this value once on mount/update,
-     * then call `consumeAutoFocusArticle` to clear it. Used for single-article
-     * searches that are merged into an existing tab (R3) so the user lands on
-     * the article they actually queried.
-     */
-    autoFocusArticleId?: string;
-}
-
-interface LooseArticle {
-    type: 'loose-article';
-    id: string;
-    article: ArticleData;
-    sourceNorma: Norma;
-    /** Bumped by `focusArticleInTab`: the card opens when it changes (the find window showing a collapsed loose article). */
-    revealSignal?: number;
-}
-
-type TabContent = NormaBlock | LooseArticle;
-
-/** A tab that shows one thing rather than a list of norms (design 2026-10-05 §2.1): a decision,
- *  or a list of decisions. A field of the tab, not a TabContent: 27 places switch over
- *  TabContent, several with an `else` that would draw an unknown item as a loose article. */
-export type TabView =
-    | { kind: 'decision'; reference: DecisionReference }
-    | { kind: 'decision-search'; query: DecisionSearchQuery };
-
-// Renamed from FloatingPanel to WorkspaceTab
-interface WorkspaceTab {
-    id: string;
-    label: string;
-    position: { x: number; y: number };
-    size: { width: number; height: number };
-    zIndex: number;
-    isMinimized: boolean;
-    isHidden: boolean;
-    content: TabContent[]; // Mixed norme and loose articles
-    /**
-     * R3 (streaming-ux): true when the label was set by the user (rename) or
-     * provided explicitly at creation (e.g. from a dossier). Custom tabs are
-     * treated as reserved: subsequent searches for the same norma do NOT merge
-     * into them, they spawn a new tab instead.
-     */
-    labelIsCustom: boolean;
-    /** Set on a decision or decision-search tab, which draws its view and ignores `content`. */
-    view?: TabView;
-    /** The decision key the Cronologia was told about for this tab (an opening is recorded once). */
-    historyRecordedKey?: string;
 }
 
 interface SearchPanelState {
@@ -308,8 +247,6 @@ interface AppState {
     quickNormsManagerOpen: boolean;
     aliasManagerOpen: boolean;
     searchPanelState: SearchPanelState;
-    workspaceTabs: WorkspaceTab[];
-    highestZIndex: number;
 
     /**
      * The practices: the tables of the questions, which replace the tabs (spec
@@ -404,11 +341,13 @@ interface AppState {
      * its row; either makes the practice active. `open: false` (the dossier's «Apri tutto», T17)
      * only adds the entry, closed: no window, no row, no reveal, so nothing is fetched; it wins over
      * `beside`. `reader` (a phone) shows it in the full-screen reader instead (`phoneReader`) and
-     * touches neither `beside` nor the rows.
+     * touches neither `beside` nor the rows. `fromLink` is a read from a link: the practice `besideId`
+     * names (a practice, one of its windows or the phone's reader), else the active one, the window
+     * `besideId` names as the asker on the desktop, the full-screen reader on a phone.
      */
     openDecision: (
         reference: DecisionReference,
-        options?: { practiceId?: string; beside?: boolean; reader?: boolean; open?: boolean; askerId?: string },
+        options?: { practiceId?: string; beside?: boolean; reader?: boolean; open?: boolean; askerId?: string; fromLink?: boolean; besideId?: string },
     ) => { practiceId: string; decisionId: string };
     /**
      * Decisions whose identity is already known (a dossier's, opened with «Apri tutto», T17) into
@@ -465,14 +404,6 @@ interface AppState {
     openPhoneReader: (practiceId: string, ref: BesideRef) => void;
     /** «‹ Pratica»: back to the table. */
     closePhoneReader: () => void;
-
-    /**
-     * The tab the phone's carousel shows (`SearchPanel`, below `md`): the one tab on screen there,
-     * which «Questa scheda» of the find window means on a phone (`utils/findScope.ts`). Null, or an
-     * id no longer open, reads as the first tab. Session-only, absent from `partialize`: before it
-     * lived here it was `SearchPanel`'s own state, and a reload started at the first tab.
-     */
-    mobileActiveTabId: string | null;
 
     /**
      * The floating structure (index) window. A single `blockId` — rather than
@@ -543,40 +474,19 @@ interface AppState {
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
-    // Workspace Tab Actions
-    openDecisionTab: (reference: DecisionReference, options?: { besideTabId?: string }) => string;
-    openDecisionSearchTab: (query: DecisionSearchQuery, label: string, options?: { besideTabId?: string }) => string;
-    setDecisionTabIdentity: (tabId: string, identity: DecisionIdentity, label: string) => void;
-    markDecisionRecorded: (tabId: string, key: string) => void;
-    placeTabsSideBySide: (leftTabId: string, rightTabId: string) => void;
+    // Decision actions
+    /**
+     * A topic search as a light window of a practice (T8): the practice the link reads in (`besideId`
+     * names a practice, one of its windows or the phone's reader), else the active one, created
+     * when there is none. Returns the window's id.
+     */
+    openTopicSearch: (query: DecisionSearchQuery, label: string, options?: { besideId?: string }) => string;
     requestOpenDecision: (reference: DecisionReference) => void;
     drainPendingDecision: () => string | null;
     takeDecisionFocusRequest: (tabId: string) => boolean;
     /** True, and the request cleared in the same step, when the window `id` was asked to take focus. */
     takeWindowFocusRequest: (id: string) => boolean;
-    addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
-    addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
     focusArticleInTab: (tabId: string, articleId: string) => void;
-    consumeAutoFocusArticle: (tabId: string, normaBlockId: string) => void;
-    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: Norma) => void;
-    updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
-    removeTab: (id: string) => void;
-    bringTabToFront: (id: string) => void;
-    /**
-     * The find window's «go to» alone (spec §13.1): raises the tab like `bringTabToFront`, also
-     * restores it when minimised or hidden, and makes it the phone's tab on screen — so its text
-     * actually mounts and its root registers. Not for the panel's or the dock's own clicks: there a
-     * minimised tab stays minimised until its own button restores it.
-     */
-    revealTab: (id: string) => void;
-    setMobileActiveTabId: (id: string | null) => void;
-    toggleTabMinimize: (id: string) => void;
-    toggleTabVisibility: (id: string) => void;
-    toggleNormaCollapse: (tabId: string, normaId: string) => void;
-    setTabLabel: (id: string, label: string) => void;
-    reorderWorkspaceTabs: (fromIndex: number, toIndex: number) => void;
-    arrangeWorkspaceTabs: () => void;
-    closeAllWorkspaceTabs: () => void;
 
     // Structure Window Actions
     /**
@@ -596,26 +506,16 @@ interface AppState {
      * Records a jump. An entry whose `tabId` names a practice is kept as a `table`
      * entry (its `blockId` an act, the row its `articleKey` names, else the one `findPracticeArticle`
      * finds, or a decision) and
-     * one whose `tabId` names a window as a `beside` entry (spec §6.3); any other is kept as given.
+     * one whose `tabId` names a window as a `beside` entry (spec §6.3); any other is not kept.
      */
     pushReadingBack: (entry: ReadingBackEntry) => void;
     /**
-     * Removes and returns the newest entry that still points at a live tab and
-     * block, or at a practice still holding its subject, discarding any dead
+     * Removes and returns the newest entry whose practice still holds its subject, discarding any dead
      * ones above it. A practice's entry is walked back to here, in the same
      * step: its practice made active, its row revealed (`table`) or its window
      * opened (`beside`). Returns null when nothing is left to go back to.
      */
     popReadingBack: () => BackStackEntry | null;
-
-    // Drag & Drop Actions
-    moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => void;
-    extractArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
-    moveLooseArticleBetweenTabs: (articleId: string, sourceTabId: string, targetTabId: string) => void;
-    removeArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
-    removeContentFromTab: (tabId: string, contentId: string) => void;
-    mergeLooseArticleToNorma: (tabId: string, looseArticleId: string, targetNormaId: string) => boolean;
-
 
     addBookmark: (norma: NormaVisitata, tags?: string[]) => void;
     updateBookmarkTags: (normaKey: string, tags: string[]) => void;
@@ -780,7 +680,6 @@ const appStore = createStore<AppState>()(
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
             },
-            workspaceTabs: [],
             practices: [],
             activePracticeId: null,
             practiceRows: {},
@@ -993,10 +892,9 @@ const appStore = createStore<AppState>()(
                         // Its owner is off screen when the target is not the active practice (as closePractice).
                         state.structureWindow.blockId = state.activePracticeId === toPracticeId ? nowId : null;
                     }
-                    // Carry-over rulings 4 and 9: the way back names the act where it now is. A tab-shaped
-                    // entry is a tab's (ruling 14): since P3 a row's entry is always kept as a practice's.
+                    // Carry-over rulings 4 and 9: the way back names the act where it now is.
                     for (const entry of state.readingBackStack) {
-                        if (isPracticeBackEntry(entry) && entry.practiceId === fromPracticeId &&
+                        if (entry.practiceId === fromPracticeId &&
                             entry.subject.kind === 'article' && entry.subject.actId === actId) {
                             entry.practiceId = toPracticeId;
                             entry.subject.actId = nowId;
@@ -1036,7 +934,16 @@ const appStore = createStore<AppState>()(
                 return { rowKey: pending.rowKey };
             },
 
-            openDecision: (reference, options = {}) => {
+            openDecision: (reference, asked = {}) => {
+                // Read from a link (a citation, a chip, the palette, the Cronologia): the practice the
+                // link reads in, else the active one; beside on the desktop, the window the link was
+                // clicked in being the asker, so it is never the one a third window replaces (T16); in
+                // the phone's full-screen reader (spec §8).
+                const options = !asked.fromLink ? asked : {
+                    ...asked,
+                    practiceId: asked.practiceId ?? practiceOfPlace(get(), asked.besideId) ?? undefined,
+                    ...(isDesktopViewport() ? { askerId: asked.askerId ?? windowIdOf(get(), asked.besideId) } : { reader: true }),
+                };
                 const before = get();
                 const landing = landingPractice(before, options.practiceId ?? null, () => DECISIONS_PRACTICE_LABEL, 'openDecision');
                 const practiceId = landing.practice.id;
@@ -1075,7 +982,7 @@ const appStore = createStore<AppState>()(
                     } else if (!entry.identified && !entry.reference.archivio && reference.sezione &&
                         decisionPath(entry.reference) !== decisionPath(reference)) {
                         // an unresolved entry learns the section a later citation adds: it may be what
-                        // settles the homonyms, so it asks again (as `openDecisionTab` does)
+                        // settles the homonyms, so it asks again (as a link to a decision does)
                         entry.reference = { ...reference };
                         entry.label = formatDecisionShort(reference);
                     }
@@ -1210,8 +1117,6 @@ const appStore = createStore<AppState>()(
             decisionFocusRequest: null,
             windowFocusRequest: null,
             phoneReader: null,
-            highestZIndex: 100,
-            mobileActiveTabId: null,
             structureWindow: {
                 blockId: null,
                 position: { x: Math.max(16, window.innerWidth - 400), y: 96 },
@@ -1314,8 +1219,6 @@ const appStore = createStore<AppState>()(
 
                 // Clear workspace tabs to ensure user isolation
                 // Each user should start with a clean workspace
-                state.workspaceTabs = [];
-                state.highestZIndex = 100;
                 // and the practices: a shared browser must not show the last user's table (spec §10).
                 state.practices = [];
                 state.activePracticeId = null;
@@ -1383,26 +1286,13 @@ const appStore = createStore<AppState>()(
             }),
 
             // Decision tabs (design 2026-10-05 §2.1-§2.2).
-            openDecisionTab: (reference, options) => {
-                // An entry of the practice the link reads in, else the active one, opened to be read
-                // (spec §6.1): beside on the desktop, the window the link was clicked in being the
-                // asker, so it is never the one a third window replaces (T16); in the phone's
-                // full-screen reader (spec §8).
-                const practiceId = practiceOfPlace(get(), options?.besideTabId) ?? undefined;
-                const askerId = windowIdOf(get(), options?.besideTabId);
-                return get().openDecision(reference, {
-                    practiceId,
-                    ...(isDesktopViewport() ? { askerId } : { reader: true }),
-                }).decisionId;
-            },
-
-            openDecisionSearchTab: (asked, label, options) => {
+            openTopicSearch: (asked, label, options) => {
                 // the tab keeps the topic as typed, trimmed
                 const query = asked.tema === undefined ? asked : { ...asked, tema: asked.tema.trim() };
-                // With the practices drawn: a topic-search window of the practice the link reads in,
+                // A topic-search window of the practice the link reads in,
                 // else the active one (T8); a phone shows it in the full-screen reader, beside nothing.
                 const before = get();
-                const landing = landingPractice(before, practiceOfPlace(before, options?.besideTabId), () => DECISIONS_PRACTICE_LABEL, 'openDecisionSearchTab');
+                const landing = landingPractice(before, practiceOfPlace(before, options?.besideId), () => DECISIONS_PRACTICE_LABEL, 'openTopicSearch');
                 const ref: BesideRef = { id: topicWindowId(landing.practice.id, query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
                 if (!isDesktopViewport()) {
                     const shown = before.phoneReader;
@@ -1432,34 +1322,6 @@ const appStore = createStore<AppState>()(
                 return shownId;
             },
 
-            setDecisionTabIdentity: (tabId, identity, label) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab || tab.view?.kind !== 'decision') return;
-                // One tab per decision: if another tab already holds this one (a candidate chosen
-                // in this tab), that one comes to the front and this one closes.
-                const other = state.workspaceTabs.find(t =>
-                    t.id !== tabId && t.view?.kind === 'decision' && sameDecision(t.view.reference, identity));
-                if (other) {
-                    other.isHidden = false;
-                    other.isMinimized = false;
-                    other.zIndex = ++state.highestZIndex;
-                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
-                    state.decisionFocusRequest = other.id;
-                    return;
-                }
-                tab.view = { kind: 'decision', reference: identityOf(identity) };
-                tab.label = label;
-            }),
-
-            markDecisionRecorded: (tabId, key) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (tab?.view?.kind === 'decision') tab.historyRecordedKey = key;
-            }),
-
-            placeTabsSideBySide: (leftTabId, rightTabId) => set((state) => {
-                placeSideBySide(state, leftTabId, rightTabId);
-            }),
-
             requestOpenDecision: (reference) => set((state) => {
                 state.pendingDecision = reference;
             }),
@@ -1470,7 +1332,7 @@ const appStore = createStore<AppState>()(
                 const pending = get().pendingDecision;
                 if (!pending) return null;
                 set((state) => { state.pendingDecision = null; });
-                return get().openDecisionTab(pending);
+                return get().openDecision(pending, { fromLink: true }).decisionId;
             },
 
             takeDecisionFocusRequest: (tabId) => {
@@ -1484,246 +1346,6 @@ const appStore = createStore<AppState>()(
                 set((state) => { state.windowFocusRequest = null; });
                 return true;
             },
-
-            // Workspace Tab Actions - Complete refactor
-            addWorkspaceTab: (label, norma, articles, options) => {
-                let tabId = '';
-                set((state) => {
-                    const tabCount = state.workspaceTabs.length;
-                    const cascade = (tabCount % 5) * 40;
-
-                    const newTab: WorkspaceTab = {
-                        id: uuidv4(),
-                        label,
-                        position: { x: 100 + cascade, y: 100 + cascade },
-                        size: { width: 800, height: 650 },
-                        zIndex: ++state.highestZIndex,
-                        isMinimized: false,
-                        isHidden: false,
-                        content: [],
-                        labelIsCustom: options?.isCustom === true,
-                    };
-
-                    if (norma && articles) {
-                        const sortedArticles = [...articles].sort((a, b) => {
-                            // Sort by attachment first, then number
-                            if (a.norma_data.allegato !== b.norma_data.allegato) {
-                                if (!a.norma_data.allegato) return -1;
-                                if (!b.norma_data.allegato) return 1;
-                                return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
-                            }
-                            const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                            const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                            return numA - numB;
-                        });
-
-                        newTab.content.push({
-                            type: 'norma',
-                            id: uuidv4(),
-                            norma,
-                            articles: sortedArticles,
-                            isCollapsed: false
-                        });
-                    }
-
-                    state.workspaceTabs.push(newTab);
-                    tabId = newTab.id;
-                });
-                return tabId;
-            },
-
-            addNormaToTab: (tabId, norma, articles) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'addNormaToTab')) return;
-
-                // Helper to get a unique key for an article within a norma block
-                const getArticleKey = (a: ArticleData) => {
-                    return a.norma_data.allegato
-                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-                        : a.norma_data.numero_articolo;
-                };
-
-                const existingNorma = tab.content.find(
-                    c => c.type === 'norma' &&
-                        c.norma.tipo_atto === norma.tipo_atto &&
-                        c.norma.numero_atto === norma.numero_atto &&
-                        c.norma.data === norma.data
-                ) as NormaBlock | undefined;
-
-                if (existingNorma) {
-                    const existingArticleKeys = new Set(
-                        existingNorma.articles.map(getArticleKey)
-                    );
-
-                    const newArticles = articles.filter(
-                        a => !existingArticleKeys.has(getArticleKey(a))
-                    );
-
-                    // an article stored while Brocardi was down learns what a later copy of it got
-                    for (const incoming of articles) {
-                        if (!incoming.brocardi_info) continue;
-                        const stored = existingNorma.articles.find(a => getArticleKey(a) === getArticleKey(incoming));
-                        if (stored && !stored.brocardi_info) {
-                            stored.brocardi_info = incoming.brocardi_info;
-                            delete stored.brocardi_error;
-                        }
-                    }
-
-                    if (newArticles.length > 0) {
-                        existingNorma.articles = [...existingNorma.articles, ...newArticles];
-                        existingNorma.articles.sort((a, b) => {
-                            // Sort by attachment first, then number
-                            if (a.norma_data.allegato !== b.norma_data.allegato) {
-                                if (!a.norma_data.allegato) return -1;
-                                if (!b.norma_data.allegato) return 1;
-                                return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
-                            }
-                            const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                            const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                            return numA - numB;
-                        });
-                    }
-                } else {
-                    const sortedArticles = [...articles].sort((a, b) => {
-                        if (a.norma_data.allegato !== b.norma_data.allegato) {
-                            if (!a.norma_data.allegato) return -1;
-                            if (!b.norma_data.allegato) return 1;
-                            return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
-                        }
-                        const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                        const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                        return numA - numB;
-                    });
-
-                    tab.content.push({
-                        type: 'norma',
-                        id: uuidv4(),
-                        norma,
-                        articles: sortedArticles,
-                        isCollapsed: false
-                    });
-                }
-
-                tab.zIndex = ++state.highestZIndex;
-            }),
-
-            addLooseArticleToTab: (tabId, article, sourceNorma) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'addLooseArticleToTab')) return;
-
-                tab.content.push({
-                    type: 'loose-article',
-                    id: uuidv4(),
-                    article,
-                    sourceNorma
-                });
-
-                tab.zIndex = ++state.highestZIndex;
-            }),
-
-            updateTab: (id, updates) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    Object.assign(tab, updates);
-                }
-            }),
-
-            removeTab: (id) => set((state) => {
-                const index = state.workspaceTabs.findIndex(t => t.id === id);
-                state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== id);
-                // The phone keeps its place: closing the tab on screen shows the one that took its
-                // index, or the one before it when it was the last (what the carousel's own index did).
-                if (index >= 0 && state.mobileActiveTabId === id) {
-                    const neighbour = state.workspaceTabs[Math.min(index, state.workspaceTabs.length - 1)];
-                    state.mobileActiveTabId = neighbour ? neighbour.id : null;
-                }
-            }),
-
-            bringTabToFront: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.zIndex = ++state.highestZIndex;
-                }
-            }),
-
-            revealTab: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (!tab) return;
-                tab.zIndex = ++state.highestZIndex;
-                tab.isMinimized = false;
-                tab.isHidden = false;
-                state.mobileActiveTabId = id;
-            }),
-
-            setMobileActiveTabId: (id) => set((state) => {
-                state.mobileActiveTabId = id;
-            }),
-
-            toggleTabMinimize: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.isMinimized = !tab.isMinimized;
-                }
-            }),
-
-            toggleTabVisibility: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.isHidden = !tab.isHidden;
-                }
-            }),
-
-            toggleNormaCollapse: (tabId, normaId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
-                if (norma) {
-                    norma.isCollapsed = !norma.isCollapsed;
-                }
-            }),
-
-            setTabLabel: (id, label) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.label = label;
-                    // Manual rename reserves the tab from R3 auto-merge.
-                    tab.labelIsCustom = true;
-                }
-            }),
-
-            // Workspace tabs are UI-only (persisted via localStorage, not the
-            // server), so unlike setDossierItemOrder this is a pure local
-            // splice with no API call.
-            reorderWorkspaceTabs: (fromIndex, toIndex) => set((state) => {
-                if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
-                    fromIndex >= state.workspaceTabs.length || toIndex >= state.workspaceTabs.length) return;
-                const [moved] = state.workspaceTabs.splice(fromIndex, 1);
-                state.workspaceTabs.splice(toIndex, 0, moved);
-            }),
-
-            arrangeWorkspaceTabs: () => set((state) => {
-                const gap = 24;
-                const startX = 32;
-                const startY = 32;
-                const viewportWidth = typeof window === 'undefined' ? 1200 : window.innerWidth;
-                const columns = Math.max(1, Math.floor((viewportWidth - 96) / 420));
-                state.workspaceTabs.forEach((tab, index) => {
-                    tab.position = {
-                        x: startX + (index % columns) * (Math.min(tab.size.width, 400) + gap),
-                        y: startY + Math.floor(index / columns) * 120,
-                    };
-                    tab.isHidden = false;
-                    tab.isMinimized = false;
-                });
-            }),
-
-            closeAllWorkspaceTabs: () => set((state) => {
-                state.workspaceTabs = [];
-                state.mobileActiveTabId = null;
-            }),
 
             // ── Structure window ─────────────────────────────────────────
             addNormaIndexToTab: (tabId, norma) => {
@@ -1747,13 +1369,14 @@ const appStore = createStore<AppState>()(
 
             // ── Reading back-stack ───────────────────────────────────────
             pushReadingBack: (entry) => set((state) => {
-                const kept: BackStackEntry = practiceBackEntry(state, entry) ?? entry;
-                state.readingBackStack = appendBackEntry(state.readingBackStack, kept);
+                // An entry naming nothing the practices hold could never be walked back to.
+                const kept = practiceBackEntry(state, entry);
+                if (kept) state.readingBackStack = appendBackEntry(state.readingBackStack, kept);
             }),
 
             popReadingBack: () => {
-                const { readingBackStack, workspaceTabs, practices } = get();
-                const index = findLiveBackIndex(readingBackStack, workspaceTabs, practices);
+                const { readingBackStack, practices } = get();
+                const index = findLiveBackIndex(readingBackStack, practices);
                 if (index < 0) {
                     // Everything above (and including) the oldest entry is dead;
                     // drop the lot so the control stops offering a dead end.
@@ -1767,7 +1390,7 @@ const appStore = createStore<AppState>()(
                 // they are discarded together with the one being consumed.
                 set((state) => {
                     state.readingBackStack = state.readingBackStack.slice(0, index);
-                    if (isPracticeBackEntry(entry)) walkBackTo(state, entry);
+                    walkBackTo(state, entry);
                 });
                 return entry;
             },
@@ -1784,170 +1407,6 @@ const appStore = createStore<AppState>()(
                     return;
                 }
             }),
-
-            consumeAutoFocusArticle: (tabId, normaBlockId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                const block = tab.content.find(
-                    c => c.type === 'norma' && c.id === normaBlockId
-                ) as NormaBlock | undefined;
-                if (block) {
-                    block.autoFocusArticleId = undefined;
-                }
-            }),
-
-            moveNormaBetweenTabs: (normaId, sourceTabId, targetTabId) => set((state) => {
-                const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
-                const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
-                if (!sourceTab || !targetTab) return;
-                if (refuseViewTab(targetTab, 'moveNormaBetweenTabs')) return;
-
-                const normaIndex = sourceTab.content.findIndex(c => c.type === 'norma' && c.id === normaId);
-                if (normaIndex === -1) return;
-
-                const norma = sourceTab.content[normaIndex];
-                sourceTab.content.splice(normaIndex, 1);
-                targetTab.content.push(norma);
-
-                targetTab.zIndex = ++state.highestZIndex;
-            }),
-
-            extractArticleFromNorma: (tabId, normaId, articleId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
-                if (!norma) return;
-
-                // Helper to get a unique key for comparison
-                const getArticleKey = (a: ArticleData) => {
-                    return a.norma_data.allegato
-                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-                        : a.norma_data.numero_articolo;
-                };
-
-                const article = norma.articles.find(a => getArticleKey(a) === articleId);
-                if (!article) return;
-
-                norma.articles = norma.articles.filter(a => getArticleKey(a) !== articleId);
-
-                if (norma.articles.length === 0) {
-                    tab.content = tab.content.filter(c => c.id !== normaId);
-                }
-
-                tab.content.push({
-                    type: 'loose-article',
-                    id: uuidv4(),
-                    article,
-                    sourceNorma: norma.norma
-                });
-            }),
-
-            moveLooseArticleBetweenTabs: (articleId, sourceTabId, targetTabId) => set((state) => {
-                const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
-                const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
-                if (!sourceTab || !targetTab) return;
-                if (refuseViewTab(targetTab, 'moveLooseArticleBetweenTabs')) return;
-
-                const articleIndex = sourceTab.content.findIndex(c => c.type === 'loose-article' && c.id === articleId);
-                if (articleIndex === -1) return;
-
-                const looseArticle = sourceTab.content[articleIndex];
-                sourceTab.content.splice(articleIndex, 1);
-                targetTab.content.push(looseArticle);
-
-                targetTab.zIndex = ++state.highestZIndex;
-            }),
-
-            removeArticleFromNorma: (tabId, normaId, articleId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
-                if (!norma) return;
-
-                const getArticleKey = (a: ArticleData) => {
-                    return a.norma_data.allegato
-                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-                        : a.norma_data.numero_articolo;
-                };
-
-                norma.articles = norma.articles.filter(a => getArticleKey(a) !== articleId);
-
-                if (norma.articles.length === 0) {
-                    tab.content = tab.content.filter(c => c.id !== normaId);
-                }
-
-                if (tab.content.length === 0) {
-                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
-                }
-            }),
-
-            removeContentFromTab: (tabId, contentId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                tab.content = tab.content.filter(c => c.id !== contentId);
-
-                // Remove tab if empty
-                if (tab.content.length === 0) {
-                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
-                }
-            }),
-
-            mergeLooseArticleToNorma: (tabId, looseArticleId, targetNormaId) => {
-                let success = false;
-                set((state) => {
-                    const tab = state.workspaceTabs.find(t => t.id === tabId);
-                    if (!tab) return;
-
-                    // Find the loose article
-                    const looseIndex = tab.content.findIndex(
-                        c => c.type === 'loose-article' && c.id === looseArticleId
-                    );
-                    if (looseIndex === -1) return;
-
-                    const loose = tab.content[looseIndex] as LooseArticle;
-
-                    // Find the target norma block
-                    const targetNorma = tab.content.find(
-                        c => c.type === 'norma' && c.id === targetNormaId
-                    ) as NormaBlock | undefined;
-                    if (!targetNorma) return;
-
-                    // Verify compatibility: same source norma
-                    const isSameNorma =
-                        loose.sourceNorma.tipo_atto === targetNorma.norma.tipo_atto &&
-                        loose.sourceNorma.numero_atto === targetNorma.norma.numero_atto &&
-                        loose.sourceNorma.data === targetNorma.norma.data;
-
-                    if (!isSameNorma) return;
-
-                    // Check for duplicate article. Normalized comparison:
-                    // the tree API and the scraper disagree on suffix
-                    // formatting ("1-bis" vs "1 bis"), a bare === would
-                    // miss the match (gotcha #9).
-                    const articleNumber = normalizeArticleId(loose.article.norma_data.numero_articolo);
-                    const isDuplicate = targetNorma.articles.some(
-                        a => normalizeArticleId(a.norma_data.numero_articolo) === articleNumber
-                    );
-
-                    if (isDuplicate) return;
-
-                    // Add article to norma block and sort
-                    targetNorma.articles.push(loose.article);
-                    targetNorma.articles.sort((a, b) => {
-                        const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                        const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                        return numA - numB;
-                    });
-
-                    // Remove loose article
-                    tab.content.splice(looseIndex, 1);
-                    success = true;
-                });
-                return success;
-            },
 
             addBookmark: (norma, tags = []) => {
                 const key = generateKey(norma);
@@ -3737,7 +3196,7 @@ function absorbDecision(state: AppState, practice: Practice, absorbedId: string,
         state.phoneReader.ref = besideRefFor({ kind: 'decision', decisionId: survivorId });
     }
     for (const entry of state.readingBackStack) {
-        if (isPracticeBackEntry(entry) && entry.practiceId === practice.id &&
+        if (entry.practiceId === practice.id &&
             entry.subject.kind === 'decision' && entry.subject.decisionId === absorbedId) {
             entry.subject.decisionId = survivorId;
         }
@@ -3745,8 +3204,8 @@ function absorbDecision(state: AppState, practice: Practice, absorbedId: string,
 }
 
 /**
- * A pushed entry as a practice's (spec §6.3), or null to keep it as given: when its `tabId` names
- * neither a practice nor a window; when the practice does not hold what it names.
+ * A pushed entry as a practice's (spec §6.3), or null: when its `tabId` names neither a practice,
+ * nor a window, nor the phone's reader; when the practice does not hold what it names.
  */
 function practiceBackEntry(state: AppState, entry: ReadingBackEntry): PracticeBackEntry | null {
     const { label } = entry;
@@ -3818,7 +3277,7 @@ function windowIdOf(state: Pick<AppState, 'practices'>, placeId: string | undefi
     return placeId && state.practices.some((p) => p.beside.some((b) => b.id === placeId)) ? placeId : undefined;
 }
 
-/** The practice a link's `besideTabId` reads in: a practice (a row of its table), the practice
+/** The practice a link's `besideId` reads in: a practice (a row of its table), the practice
  *  holding the window of that id, or the practice of the phone's reader of that id; null for
  *  anything else (an old tab), which lands in the active one. */
 function practiceOfPlace(state: Pick<AppState, 'practices' | 'phoneReader'>, placeId: string | undefined): string | null {
@@ -3925,53 +3384,5 @@ function stableQueryKey(query: DecisionSearchQuery): string {
     return JSON.stringify(sorted({ ...rest, norma: rest.norma ? sorted(rest.norma) : undefined }));
 }
 
-/** A tab with a `view` draws its view and ignores `content`: anything pushed into it would be kept
- *  and never shown. Every action that writes content into a tab refuses such a tab. */
-function refuseViewTab(tab: WorkspaceTab, action: string): boolean {
-    if (!tab.view) return false;
-    console.warn(`${action}: the tab "${tab.label}" shows a ${tab.view.kind} and takes no content`);
-    return true;
-}
-
-// Layout.tsx: the static sidebar is 64px wide from the `lg` breakpoint (1024px) up; below it the
-// menu button (fixed top-4 left-4) and, from `md`, the focus toggle (fixed top-4 right-4) are each
-// about 40px square at 16px from the edge. The workspace dock is fixed bottom-6, about 44px high
-// collapsed (more when expanded), centred. All of these are viewport pixels.
-const LAYOUT_SIDEBAR_WIDTH = 64;
-const LAYOUT_LG_BREAKPOINT = 1024;
-const SIDE_BY_SIDE_MARGIN = 16;
-const SIDE_BY_SIDE_TOP = 72; // below the two floating buttons
-const SIDE_BY_SIDE_BOTTOM = 88; // above the collapsed dock (24 + ~44) with a gap
-
-/** The left tab on the left half of the free area, the right one on the right half, both as tall
- *  as the free area (design 2026-10-05 §2.2, reading 1). The free area is worked out in viewport
- *  pixels (minus the static sidebar when shown, clear of the floating buttons and the dock), then
- *  each target is turned into tab coordinates by subtracting the workspace origin, because a
- *  tab's x/y are offsets from there (utils/workspaceOrigin.ts). */
-function freeArea(state: AppState) {
-    const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
-    const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
-    const origin = workspaceOrigin();
-    const sidebarShown = vw >= LAYOUT_LG_BREAKPOINT && state.sidebarVisible && !state.settings.focusMode;
-    const x0 = sidebarShown ? LAYOUT_SIDEBAR_WIDTH : 0;
-    const m = SIDE_BY_SIDE_MARGIN;
-    return {
-        origin, x0, m,
-        width: vw - x0 - m * 2,
-        height: Math.max(240, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_BOTTOM),
-        y: SIDE_BY_SIDE_TOP - origin.top,
-    };
-}
-
-function placeSideBySide(state: AppState, leftId: string, rightId: string) {
-    const left = state.workspaceTabs.find(t => t.id === leftId);
-    const right = state.workspaceTabs.find(t => t.id === rightId);
-    if (!left || !right || left.id === right.id) return;
-    const { origin, x0, m, width, height, y } = freeArea(state);
-    const half = Math.floor((width - m) / 2);
-    Object.assign(left, { position: { x: x0 + m - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
-    Object.assign(right, { position: { x: x0 + m * 2 + half - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
-}
-
-export type { WorkspaceTab, NormaBlock, LooseArticle, TabContent, SearchPanelState };
+export type { SearchPanelState };
 

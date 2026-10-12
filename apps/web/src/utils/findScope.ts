@@ -10,7 +10,6 @@
  * text would count twice).
  */
 import type { DecisionIdentity, DecisionReference, DecisionText } from '../types/decisions';
-import { uniqueArticleIdFromNorma } from './normaKeys';
 import { describeVersion } from './versionDisplay';
 import { shortNorm } from './sources';
 import { plainText } from './threadPassages';
@@ -30,10 +29,8 @@ export interface FindTarget {
   label: string;
   /** The projection, when there is text to fall back on; absent while it is still loading. */
   storedText?: string;
-  /** Set for an article alone: the id the article is found by in its act. */
-  articleId?: string;
   /** The row to open to draw the subject (spec §6.7); `tabId` is its practice's id. */
-  reveal?: { kind: 'article'; actId: string; articleKey: string } | { kind: 'decision'; decisionId: string };
+  reveal: { kind: 'article'; actId: string; articleKey: string } | { kind: 'decision'; decisionId: string };
 }
 
 /** The store slice both functions here read — narrow, so each is tested without the whole store. */
@@ -100,7 +97,6 @@ function targetsOfPractice(practice: Practice, withPractice: boolean): FindTarge
         targetKey: articleKey,
         label: named(shortNorm(norma)),
         storedText: textVisible ? plainText(article.article_text || '') : undefined,
-        articleId: uniqueArticleIdFromNorma(norma),
         reveal: { kind: 'article', actId: act.id, articleKey },
       });
     }

@@ -68,7 +68,7 @@ describe('CaseLawSection', () => {
     expect(screen.getByText('Cons. Stato').closest('a')).toBeNull();
     expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
     expect(slotCalls.at(-1)?.props).toMatchObject({
-      articleUrn: NORMA.urn, isHistorical: false, besideTabId: 'tab-1',
+      articleUrn: NORMA.urn, isHistorical: false, besideId: 'tab-1',
       backEntry: { tabId: 'tab-1', label: 'art. 2043 c.c.' },
     });
     expect(screen.getByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeInTheDocument();

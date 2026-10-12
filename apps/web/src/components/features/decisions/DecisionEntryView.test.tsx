@@ -67,7 +67,7 @@ beforeEach(() => {
   for (const ref of [CIVILE, PENALE, AMBIGUA_REF, { ...AMBIGUA_REF, sezione: 'VII' }]) forgetDecision(ref);
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [],
-    workspaceTabs: [], commandPaletteOpen: false, decisionFocusRequest: null, searchTrigger: null,
+    commandPaletteOpen: false, decisionFocusRequest: null, searchTrigger: null,
   });
 });
 
@@ -176,7 +176,7 @@ describe('DecisionEntryView', () => {
     const { container } = render(entryView(e, CIVILE));
     await screen.findByText(/Sez\. III civile/);
     fireEvent.click(container.querySelector('.citation-hover')!);
-    expect(s().searchTrigger).toMatchObject({ article: '2043', besideTabId: e.practiceId });
+    expect(s().searchTrigger).toMatchObject({ article: '2043', besideId: e.practiceId });
     expect(s().readingBackStack).toEqual([{
       practiceId: e.practiceId, subject: { kind: 'decision', decisionId: e.decisionId }, place: 'table',
       label: 'Cass. civ., sez. III, n. 99999/2024',

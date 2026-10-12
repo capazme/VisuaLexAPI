@@ -43,7 +43,7 @@ function requiresDetails(actValue: string): boolean {
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
-    customAliases, trackAliasUsage, openAliasManager, openDecisionTab, openDecisionSearchTab, takeCommandPaletteQuery, commandPaletteQuery
+    customAliases, trackAliasUsage, openAliasManager, openDecision, openTopicSearch, takeCommandPaletteQuery, commandPaletteQuery
   } = useAppStore(useShallow(s => ({
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
@@ -52,8 +52,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     customAliases: s.customAliases,
     trackAliasUsage: s.trackAliasUsage,
     openAliasManager: s.openAliasManager,
-    openDecisionTab: s.openDecisionTab,
-    openDecisionSearchTab: s.openDecisionSearchTab,
+    openDecision: s.openDecision,
+    openTopicSearch: s.openTopicSearch,
     takeCommandPaletteQuery: s.takeCommandPaletteQuery,
     commandPaletteQuery: s.commandPaletteQuery,
   })));
@@ -355,15 +355,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
 
   const handleSearchTopic = useCallback(() => {
     if (!topic) return;
-    openDecisionSearchTab({ tema: topic }, `Tema: ${topic}`);
+    openTopicSearch({ tema: topic }, `Tema: ${topic}`);
     onClose();
-  }, [topic, openDecisionSearchTab, onClose]);
+  }, [topic, openTopicSearch, onClose]);
 
   const handleOpenDecision = useCallback(() => {
     if (!decisionRef) return;
-    openDecisionTab(decisionRef);
+    openDecision(decisionRef, { fromLink: true });
     onClose();
-  }, [decisionRef, openDecisionTab, onClose]);
+  }, [decisionRef, openDecision, onClose]);
 
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;

@@ -22,8 +22,7 @@ const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^
 beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    practiceNotice: null, commandPaletteOpen: false, workspaceTabs: [],
-  });
+    practiceNotice: null, commandPaletteOpen: false,  });
 });
 afterEach(() => {
   vi.unstubAllEnvs();

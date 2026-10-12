@@ -122,7 +122,7 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
                 {massimeState === 'failed' ? (
                   <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non ha risposto: le massime non sono disponibili ora.`}</p>
                 ) : hasMassime ? (
-                  <MassimeSection massime={massime} besideTabId={tabId} backEntry={backEntry} />
+                  <MassimeSection massime={massime} besideId={tabId} backEntry={backEntry} />
                 ) : (
                   <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non riporta massime per questo articolo.`}</p>
                 )}
@@ -135,7 +135,7 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
               <div>
                 <PluginSlot
                   slot="article_case_law"
-                  props={{ articleUrn, isHistorical, besideTabId: tabId, backEntry }}
+                  props={{ articleUrn, isHistorical, besideId: tabId, backEntry }}
                 />
               </div>
             )}
@@ -147,7 +147,7 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
               {searched ? (
                 <DecisionResultList
                   query={{ norma: searchNorma(norma), normaLabel: citeNorm(norma) }}
-                  besideTabId={tabId}
+                  besideId={tabId}
                   backEntry={backEntry}
                 />
               ) : (

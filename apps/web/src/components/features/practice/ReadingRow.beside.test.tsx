@@ -60,7 +60,7 @@ beforeEach(() => {
   vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    readingBackStack: [], workspaceTabs: [], windowFocusRequest: null, phoneReader: null,
+    readingBackStack: [], windowFocusRequest: null, phoneReader: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
 });

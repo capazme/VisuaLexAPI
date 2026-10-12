@@ -18,33 +18,30 @@ const art = (numero: string, extra: Partial<ArticleData['norma_data']> = {}): Ar
 const answer = (body: unknown) => ({ ok: true, json: () => Promise.resolve(body) });
 const sentBody = (call = 0) => JSON.parse(legalFetch.mock.calls[call][1].body as string);
 
-const addNormaToTab = vi.fn();
 const triggerSearch = vi.fn();
-let original: { addNormaToTab: unknown; triggerSearch: unknown };
+let original: { triggerSearch: unknown };
 
 beforeEach(() => {
   legalFetch.mockReset();
-  addNormaToTab.mockReset();
   triggerSearch.mockReset();
   const state = appStore.getState();
-  original = { addNormaToTab: state.addNormaToTab, triggerSearch: state.triggerSearch };
-  appStore.setState({ addNormaToTab, triggerSearch } as never);
+  original = { triggerSearch: state.triggerSearch };
+  appStore.setState({ triggerSearch } as never);
 });
 afterEach(() => {
   appStore.setState(original as never);
 });
 
 describe('useAnnexNavigation with addArticles (the practice, spec §6.4)', () => {
-  it('an article loaded lands through addArticles, never into a tab, even with a tab id', async () => {
+  it('an article loaded lands through addArticles', async () => {
     legalFetch.mockResolvedValue(answer([art('7'), { error: 'not found' }]));
     const addArticles = vi.fn();
     const { result } = renderHook(() =>
-      useAnnexNavigation({ norma: L24, articles: [art('5')], tabId: 'tab-1', addArticles }));
+      useAnnexNavigation({ norma: L24, articles: [art('5')], addArticles }));
     await act(async () => { await result.current.handleLoadArticle('7'); });
     expect(legalFetch).toHaveBeenCalledWith('/fetch_all_data', expect.objectContaining({ method: 'POST' }));
     expect(sentBody()).toEqual(expect.objectContaining({ act_type: 'legge', act_number: '24', article: '7', version: 'vigente' }));
     expect(addArticles).toHaveBeenCalledWith(L24, [art('7')]);
-    expect(addNormaToTab).not.toHaveBeenCalled();
     expect(triggerSearch).not.toHaveBeenCalled();
   });
 
@@ -74,14 +71,13 @@ describe('useAnnexNavigation with addArticles (the practice, spec §6.4)', () =>
     expect(sentBody()).toEqual(expect.objectContaining({ article: '7', annex: 'A' }));
     expect(addArticles).toHaveBeenCalledWith(L24, [art('7', { allegato: 'A' })]);
     expect(found).toBe('7');
-    expect(addNormaToTab).not.toHaveBeenCalled();
   });
 
-  it('without addArticles the old surface is unchanged: the tab receives the article', async () => {
-    legalFetch.mockResolvedValue(answer([art('7')]));
-    const { result } = renderHook(() => useAnnexNavigation({ norma: L24, articles: [art('5')], tabId: 'tab-1' }));
+  it('without addArticles it runs a global search instead', async () => {
+    const { result } = renderHook(() => useAnnexNavigation({ norma: L24, articles: [art('5')] }));
     await act(async () => { await result.current.handleLoadArticle('7'); });
-    expect(addNormaToTab).toHaveBeenCalledWith('tab-1', L24, [art('7')]);
+    expect(legalFetch).not.toHaveBeenCalled();
+    expect(triggerSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'legge', article: '7' }));
   });
 });
 

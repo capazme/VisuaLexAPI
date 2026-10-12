@@ -1,126 +1,94 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { appStore, type WorkspaceTab } from '../useAppStore';
-import type { Norma } from '../../types';
-import type { BackStackEntry, ReadingBackEntry } from '../../utils/readingBackStack';
+import { appStore } from '../useAppStore';
+import type { ReadingBackEntry } from '../../utils/readingBackStack';
+import { practiceArticleKey } from '../../utils/practice';
+import { L24, article } from '../../utils/__fixtures__/savedWorkspaces';
 
-function makeTab(id: string, content: WorkspaceTab['content'] = []): WorkspaceTab {
-    return {
-        id,
-        label: `Tab ${id}`,
-        position: { x: 0, y: 0 },
-        size: { width: 400, height: 300 },
-        zIndex: 1,
-        isMinimized: false,
-        isHidden: false,
-        content,
-        labelIsCustom: false,
-    };
-}
-
-function makeNorma(overrides: Partial<Norma> = {}): Norma {
-    return {
-        tipo_atto: 'codice civile',
-        data: '1942-03-16',
-        numero_atto: '262',
-        urn: 'urn:nir:stato:regio.decreto:1942-03-16;262',
-        ...overrides,
-    };
-}
-
-function normaBlock(id: string, norma: Norma): WorkspaceTab['content'][number] {
-    return { type: 'norma', id, norma, articles: [], isCollapsed: false };
-}
-
-function backEntry(overrides: Partial<ReadingBackEntry> = {}): ReadingBackEntry {
-    return {
-        tabId: 'tab-a',
-        blockId: 'block-a',
-        articleId: '2043',
-        label: 'Art. 2043 — codice civile',
-        ...overrides,
-    };
-}
+const s = () => appStore.getState();
 
 describe('structure window ownership', () => {
     beforeEach(() => {
         appStore.setState({
-            workspaceTabs: [makeTab('tab-a')],
             structureWindow: { blockId: null, position: { x: 100, y: 100 } },
         });
     });
 
     it('opens on the given block', () => {
-        appStore.getState().openStructureWindow('block-1');
-        expect(appStore.getState().structureWindow.blockId).toBe('block-1');
+        s().openStructureWindow('block-1');
+        expect(s().structureWindow.blockId).toBe('block-1');
     });
 
     it('hands ownership over instead of stacking a second window', () => {
-        appStore.getState().openStructureWindow('block-1');
-        appStore.getState().openStructureWindow('block-2');
+        s().openStructureWindow('block-1');
+        s().openStructureWindow('block-2');
 
         // Single `blockId`, so "only one window" is structural, not enforced.
-        expect(appStore.getState().structureWindow.blockId).toBe('block-2');
+        expect(s().structureWindow.blockId).toBe('block-2');
     });
 
     it('closing clears the owner but keeps the parked position', () => {
-        appStore.getState().setStructureWindowPosition({ x: 42, y: 24 });
-        appStore.getState().openStructureWindow('block-1');
-        appStore.getState().closeStructureWindow();
+        s().setStructureWindowPosition({ x: 42, y: 24 });
+        s().openStructureWindow('block-1');
+        s().closeStructureWindow();
 
-        expect(appStore.getState().structureWindow.blockId).toBeNull();
-        expect(appStore.getState().structureWindow.position).toEqual({ x: 42, y: 24 });
+        expect(s().structureWindow.blockId).toBeNull();
+        expect(s().structureWindow.position).toEqual({ x: 42, y: 24 });
     });
 });
 
-/** The article a pop returns to: these entries are all of a tab, the shape this file pushes. */
-function poppedArticleId(): string | undefined {
-    const entry: BackStackEntry | null = appStore.getState().popReadingBack();
-    return entry && 'articleId' in entry ? entry.articleId : undefined;
-}
-
 describe('reading back-stack', () => {
+    let practiceId: string;
+    let actId: string;
+
+    /** A jump from the row of art. `n` of the practice, as the reading surface pushes it. */
+    const from = (n: string, overrides: Partial<ReadingBackEntry> = {}): ReadingBackEntry => ({
+        tabId: practiceId, blockId: actId, articleId: n, label: `Art. ${n}`, ...overrides,
+    });
+    /** The label of the entry a pop returns to. */
+    const popped = (): string | undefined => s().popReadingBack()?.label;
+
     beforeEach(() => {
-        appStore.setState({
-            workspaceTabs: [makeTab('tab-a', [normaBlock('block-a', makeNorma())])],
-            readingBackStack: [],
-        });
+        appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [] });
+        ({ practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5'), article(L24, '7'), article(L24, '9')]));
     });
 
     it('pops entries newest first', () => {
-        appStore.getState().pushReadingBack(backEntry({ articleId: '2043' }));
-        appStore.getState().pushReadingBack(backEntry({ articleId: '2050' }));
+        s().pushReadingBack(from('5'));
+        s().pushReadingBack(from('7'));
 
-        expect(poppedArticleId()).toBe('2050');
-        expect(poppedArticleId()).toBe('2043');
-        expect(appStore.getState().popReadingBack()).toBeNull();
+        expect(popped()).toBe('Art. 7');
+        expect(popped()).toBe('Art. 5');
+        expect(s().popReadingBack()).toBeNull();
     });
 
     it('returns null on an empty stack', () => {
-        expect(appStore.getState().popReadingBack()).toBeNull();
+        expect(s().popReadingBack()).toBeNull();
     });
 
-    it('skips entries pointing at a closed tab and discards them', () => {
-        appStore.getState().pushReadingBack(backEntry({ articleId: 'live' }));
-        appStore.getState().pushReadingBack(backEntry({ articleId: 'dead', tabId: 'tab-gone' }));
+    it('keeps no entry that names nothing the practices hold', () => {
+        s().pushReadingBack(from('5', { tabId: 'practice-gone' }));
+        s().pushReadingBack(from('5', { blockId: 'act-gone' }));
+        s().pushReadingBack(from('1000'));
 
-        expect(poppedArticleId()).toBe('live');
-        // The dead entry above it is dropped with the one consumed, not left
-        // behind to offer the same dead end again.
-        expect(appStore.getState().readingBackStack).toHaveLength(0);
+        expect(s().readingBackStack).toHaveLength(0);
     });
 
-    it('skips entries whose block was removed from a live tab', () => {
-        appStore.getState().pushReadingBack(backEntry({ articleId: 'live' }));
-        appStore.getState().pushReadingBack(backEntry({ articleId: 'dead', blockId: 'block-gone' }));
+    it('skips entries whose subject was removed since, and discards them', () => {
+        s().pushReadingBack(from('5'));
+        s().pushReadingBack(from('7'));
+        s().removePracticeArticle(practiceId, actId, practiceArticleKey(article(L24, '7')));
 
-        expect(poppedArticleId()).toBe('live');
+        expect(popped()).toBe('Art. 5');
+        // Nothing is left behind to offer the same dead end again.
+        expect(s().readingBackStack).toHaveLength(0);
     });
 
     it('clears the stack when every entry is unreachable', () => {
-        appStore.getState().pushReadingBack(backEntry({ tabId: 'tab-gone' }));
-        appStore.getState().pushReadingBack(backEntry({ tabId: 'tab-gone' }));
+        s().pushReadingBack(from('5'));
+        s().pushReadingBack(from('7'));
+        s().closePractice(practiceId);
 
-        expect(appStore.getState().popReadingBack()).toBeNull();
-        expect(appStore.getState().readingBackStack).toHaveLength(0);
+        expect(s().popReadingBack()).toBeNull();
+        expect(s().readingBackStack).toHaveLength(0);
     });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { appStore, type WorkspaceTab } from '../useAppStore';
+import { appStore } from '../useAppStore';
 import {
   articleRowKey, articleWindowId, decisionRowKey, decisionWindowId, practiceArticleKey, type BesideRef, type Practice,
 } from '../../utils/practice';
@@ -44,7 +44,7 @@ beforeEach(() => {
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     practiceNotice: null, structureWindow: { blockId: null, position: { x: 0, y: 0 } }, readingBackStack: [],
-    workspaceTabs: [], decisionFocusRequest: null,
+    decisionFocusRequest: null,
   });
 });
 afterEach(() => {
@@ -285,18 +285,11 @@ describe('the way back over practices (§6.3)', () => {
     ]);
   });
 
-  it('an entry naming a practice is the practice\'s even while a tab of the same id lives (P3 dropped the live-tab rule)', () => {
-    const { practiceId, actId, key5 } = withArticles();
-    const tab = {
-      id: practiceId, label: 'Tab', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1,
-      isMinimized: false, isHidden: false, labelIsCustom: false,
-      content: [{ type: 'norma', id: actId, norma: L24, articles: [article(L24, '5')], isCollapsed: false }],
-    } as WorkspaceTab;
-    appStore.setState({ workspaceTabs: [tab] });
-    s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5' });
-    expect(s().readingBackStack).toEqual([
-      { practiceId, subject: { kind: 'article', actId, articleKey: key5 }, place: 'table', label: 'art. 5' },
-    ]);
+  it('an entry that names nothing the practices hold is not kept', () => {
+    withArticles();
+    s().pushReadingBack({ tabId: 'tab-a', blockId: 'block-a', articleId: '2043', label: 'art. 2043' });
+    expect(s().readingBackStack).toEqual([]);
+    expect(s().popReadingBack()).toBeNull();
   });
 
   it('a table entry makes its practice active and reveals the row', () => {
@@ -345,19 +338,6 @@ describe('the way back over practices (§6.3)', () => {
     const popped = s().popReadingBack();
     expect(popped && popped.label).toBe('art. 5');
     expect(s().readingBackStack).toEqual([]);
-  });
-
-  it('the old tab entries still work while both shapes exist', () => {
-    withArticles();
-    const tab = {
-      id: 'tab-a', label: 'Tab', position: { x: 0, y: 0 }, size: { width: 1, height: 1 }, zIndex: 1,
-      isMinimized: false, isHidden: false, labelIsCustom: false,
-      content: [{ type: 'norma', id: 'block-a', norma: L24, articles: [], isCollapsed: false }],
-    } as WorkspaceTab;
-    appStore.setState({ workspaceTabs: [tab] });
-    const old = { tabId: 'tab-a', blockId: 'block-a', articleId: '2043', label: 'art. 2043' };
-    s().pushReadingBack(old);
-    expect(s().popReadingBack()).toEqual(old);
   });
 
   it('moving an act carries its table entries to the other practice, under the act\'s new id', () => {

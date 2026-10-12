@@ -54,7 +54,7 @@ vi.mock('../decisions/DecisionEntryView', async () => {
         n. {reference.numero}
         <button type="button" onClick={() => store.getState().triggerSearch({
           ...(env.citation ?? { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente', show_brocardi_info: false }),
-          besideTabId: hostId,
+          besideId: hostId,
         } as never)}>
           Cita l'art. 2043 c.c.
         </button>
@@ -99,9 +99,9 @@ beforeEach(() => {
   env.annex.ENABLED = false;
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    practiceNotice: null, workspaceTabs: [], searchTrigger: null, searchQueue: [], pendingDecision: null,
+    practiceNotice: null, searchTrigger: null, searchQueue: [], pendingDecision: null,
     readingBackStack: [], commandPaletteOpen: false, structureWindow: { blockId: null, position: { x: 0, y: 0 } },
-    mobileActiveTabId: null, windowFocusRequest: null,
+    windowFocusRequest: null,
   });
 });
 afterEach(() => {
@@ -132,7 +132,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
       decisionWindowId(decisionId), articleWindowId(practice.acts[0].id, articleKey),
     ]));
     // The search carried the window as its asker; the row did not open in the table.
-    expect(env.requests[0]).toMatchObject({ besideTabId: decisionWindowId(decisionId) });
+    expect(env.requests[0]).toMatchObject({ besideId: decisionWindowId(decisionId) });
     expect(Object.values(s().practiceRows).some(Boolean)).toBe(false);
     expect(s().pendingReveal).toBeNull();
     await waitFor(() => expect(screen.getAllByTestId('reader').map((r) => r.getAttribute('data-variant'))).toEqual(['beside']));
@@ -191,7 +191,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     fireEvent.click(await screen.findByRole('button', { name: "Cita l'art. 2043 c.c." }));
     await waitFor(() => expect(env.requests.some((r) => r.annex === '2')).toBe(true));
     // The annex search carries the window that asked.
-    expect(env.requests.find((r) => r.annex === '2')).toMatchObject({ besideTabId: decisionWindowId(decisionId) });
+    expect(env.requests.find((r) => r.annex === '2')).toMatchObject({ besideId: decisionWindowId(decisionId) });
     await waitFor(() => {
       const practice = s().practices[0];
       const articles = practice.acts.flatMap((a) => a.articles.map((x) => `${x.norma_data.allegato ?? ''}:${x.norma_data.numero_articolo}`));
@@ -237,7 +237,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
   it('a decision asked for twice (the palette, then the address) is one window, and the second ask takes focus', async () => {
     s().createPractice('P');
     panel();
-    act(() => { s().openDecisionTab(REF); });
+    act(() => { s().openDecision(REF, { fromLink: true }); });
     await screen.findByTestId('decision-reader');
     act(() => { s().requestOpenDecision(REF); });
     await waitFor(() => expect(s().pendingDecision).toBeNull());

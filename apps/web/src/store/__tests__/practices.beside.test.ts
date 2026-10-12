@@ -24,7 +24,7 @@ beforeEach(() => {
   savedMatchMedia = window.matchMedia;
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    practiceNotice: null, readingBackStack: [], workspaceTabs: [], windowFocusRequest: null,
+    practiceNotice: null, readingBackStack: [], windowFocusRequest: null,
   });
 });
 afterEach(() => {
@@ -36,7 +36,7 @@ describe('a decision opened from a link: beside on the desktop, in place on a ph
   it('desktop: the entry joins «Giurisprudenza» and its window opens; its row is not opened', () => {
     viewport(true);
     const p = s().createPractice('P');
-    const id = s().openDecisionTab(REF_A);
+    const id = s().openDecision(REF_A, { fromLink: true }).decisionId;
     expect(practice(p).decisions.map((d) => d.id)).toEqual([id]);
     expect(practice(p).beside.map((b) => b.id)).toEqual([decisionWindowId(id)]);
     expect(s().pendingReveal).toBeNull();
@@ -46,7 +46,7 @@ describe('a decision opened from a link: beside on the desktop, in place on a ph
   it('phone: read in the full-screen reader, no window and no row opened (T19)', () => {
     viewport(false);
     const p = s().createPractice('P');
-    const id = s().openDecisionTab(REF_A);
+    const id = s().openDecision(REF_A, { fromLink: true }).decisionId;
     expect(practice(p).beside).toEqual([]);
     expect(s().pendingReveal).toBeNull();
     expect(s().practiceRows).toEqual({});
@@ -58,13 +58,13 @@ describe('a decision opened from a link: beside on the desktop, in place on a ph
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     const asker = besideRefFor({ kind: 'article', actId, articleKey: practiceArticleKey(article(L24, '5')) });
     s().openBeside(practiceId, asker);
-    const a = s().openDecisionTab(REF_A, { besideTabId: asker.id });
+    const a = s().openDecision(REF_A, { fromLink: true, besideId: asker.id }).decisionId;
     expect(practice(practiceId).beside.map((b) => b.id)).toEqual([asker.id, decisionWindowId(a)]);
     // The asker is the oldest window, and the one that asks: the other goes.
-    const b = s().openDecisionTab(REF_B, { besideTabId: asker.id });
+    const b = s().openDecision(REF_B, { fromLink: true, besideId: asker.id }).decisionId;
     expect(practice(practiceId).beside.map((w) => w.id)).toEqual([asker.id, decisionWindowId(b)]);
     // Asked from a row of the table, the oldest goes.
-    const c = s().openDecisionTab(REF_A, { besideTabId: practiceId });
+    const c = s().openDecision(REF_A, { fromLink: true, besideId: practiceId }).decisionId;
     expect(practice(practiceId).beside.map((w) => w.id)).toEqual([decisionWindowId(b), decisionWindowId(c)]);
     // The replaced subjects stay in the table.
     expect(practice(practiceId).acts[0].articles).toHaveLength(1);
@@ -74,9 +74,9 @@ describe('a decision opened from a link: beside on the desktop, in place on a ph
   it('the same decision again keeps one entry and one window, and asks that window to take focus', () => {
     viewport(true);
     const p = s().createPractice('P');
-    const id = s().openDecisionTab(REF_A);
+    const id = s().openDecision(REF_A, { fromLink: true }).decisionId;
     expect(s().windowFocusRequest).toBeNull();
-    s().openDecisionTab(REF_A);
+    s().openDecision(REF_A, { fromLink: true });
     expect(practice(p).decisions).toHaveLength(1);
     expect(practice(p).beside).toHaveLength(1);
     expect(s().windowFocusRequest).toBe(decisionWindowId(id));
@@ -100,9 +100,9 @@ describe('a window asked for again takes focus, once (carry-over 11, gotcha 14)'
   it('a topic search asked again', () => {
     viewport(true);
     s().createPractice('P');
-    const id = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    const id = s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     expect(s().windowFocusRequest).toBeNull();
-    expect(s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno')).toBe(id);
+    expect(s().openTopicSearch({ tema: 'danno' }, 'Tema: danno')).toBe(id);
     expect(s().windowFocusRequest).toBe(id);
   });
 });
@@ -141,9 +141,9 @@ describe('the way back to a window (spec §6.3, carry-over 11)', () => {
   it('a topic-search window is never a target', () => {
     viewport(true);
     const p = s().createPractice('P');
-    const id = s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    const id = s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     s().pushReadingBack({ tabId: id, blockId: id, articleId: '', label: 'Tema: danno' });
-    expect(peekReadingBack(s().readingBackStack, s().workspaceTabs, s().practices)).toBeNull();
+    expect(peekReadingBack(s().readingBackStack, s().practices)).toBeNull();
     expect(practice(p).beside).toHaveLength(1);
   });
 });
@@ -196,8 +196,8 @@ describe('a reveal that targets a row folded by its window focuses the window (s
   it('phone: a topic search asked again writes no focus request (there is no window)', () => {
     viewport(false);
     s().createPractice('P');
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
+    s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
+    s().openTopicSearch({ tema: 'danno' }, 'Tema: danno');
     expect(s().windowFocusRequest).toBeNull();
   });
 });

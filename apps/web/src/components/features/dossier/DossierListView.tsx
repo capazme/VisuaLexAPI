@@ -127,7 +127,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     const tabLabel = tabLabelForGroup(dossier.title, group);
     const tabId = appStore.getState().createPractice(dossier.title, { custom: true, activate: true });
     navigate('/');
-    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
+    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetPracticeId: tabId });
   };
 
   const openAllGroupsOnDashboard = (dossier: Dossier, groups: NormaGroup[]) => {

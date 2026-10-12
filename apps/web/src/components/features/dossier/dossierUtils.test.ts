@@ -285,7 +285,7 @@ describe('searchesForGroups', () => {
   it('shares one tab among the texts in force and gives a past group a tab of its own', () => {
     const { created, searches } = run([g({}), g({ numero_atto: '1', articles: ['2'] }), g(PAST)]);
     expect(created).toEqual(['Pratica', 'Pratica — testo al 29/12/2007']);
-    expect(searches.map((s) => s.targetTabId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
+    expect(searches.map((s) => s.targetPracticeId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
     expect(searches.map((s) => s.tabLabel)).toEqual(['Pratica', 'Pratica', 'Pratica — testo al 29/12/2007']);
     expect(searches[2]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
     expect(searches[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
@@ -294,7 +294,7 @@ describe('searchesForGroups', () => {
   it('still routes the texts in force of two annexes to the one shared tab', () => {
     const { created, searches } = run([g({ allegato: 'A' }), g({ allegato: 'B' })]);
     expect(created).toEqual(['Pratica']);
-    expect(searches.map((x) => x.targetTabId)).toEqual(['tab-1', 'tab-1']);
+    expect(searches.map((x) => x.targetPracticeId)).toEqual(['tab-1', 'tab-1']);
     expect(searches.map((x) => x.annex)).toEqual(['A', 'B']);
   });
 

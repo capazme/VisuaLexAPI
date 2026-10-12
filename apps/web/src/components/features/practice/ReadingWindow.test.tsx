@@ -26,7 +26,7 @@ vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../search/BrocardiDisplay', () => ({ BrocardiDisplay: () => null }));
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 vi.mock('../decisions/DecisionResultList', () => ({
-  DecisionResultList: ({ besideTabId }: { besideTabId?: string }) => <div data-testid="topic-list" data-beside={besideTabId} />,
+  DecisionResultList: ({ besideId }: { besideId?: string }) => <div data-testid="topic-list" data-beside={besideId} />,
 }));
 
 import { appStore } from '../../../store/useAppStore';
@@ -83,7 +83,7 @@ beforeEach(() => {
   fetchDecision.mockResolvedValue(FOUND_ANSWER);
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [], bookmarks: [],
+    readingBackStack: [], highlights: [], annotations: [], bookmarks: [],
     loadAnnotationsForArticle: vi.fn(), loadHighlightsForArticle: vi.fn(),
   });
   registry = new Map();

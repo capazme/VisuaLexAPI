@@ -107,14 +107,14 @@ export function searchesForGroups(
   let sharedTabId: string | undefined;
   return groups.map((group) => {
     const tabLabel = tabLabelForGroup(dossierTitle, group);
-    let targetTabId: string;
+    let targetPracticeId: string;
     if (requestIsHistorical(group)) {
-      targetTabId = createTab(tabLabel);
+      targetPracticeId = createTab(tabLabel);
     } else {
       sharedTabId ??= createTab(tabLabel);
-      targetTabId = sharedTabId;
+      targetPracticeId = sharedTabId;
     }
-    return { ...searchParamsFromGroup(group), tabLabel, targetTabId };
+    return { ...searchParamsFromGroup(group), tabLabel, targetPracticeId };
   });
 }
 

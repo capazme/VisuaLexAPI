@@ -180,7 +180,7 @@ export function SearchPanel() {
   // state, otherwise a queued multi-search (see triggerMultiSearch) closes
   // over a stale label captured when the memoized callback was created. See
   // the drain effect below for the flow.
-  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false, tabLabel?: string, targetTabId?: string, filters?: SearchParams['filters'], version?: SearchParams['version']) => {
+  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false, tabLabel?: string, targetPracticeId?: string, filters?: SearchParams['filters'], version?: SearchParams['version']) => {
     if (result.error) {
       console.error("Backend Error for item:", result.error);
       const article = result.norma_data?.numero_articolo || 'richiesto';
@@ -225,7 +225,7 @@ export function SearchPanel() {
       const allegato = result.norma_data.allegato;
       const articleUniqueId = allegato ? `all${allegato}:${numero}` : numero;
 
-      // The practice (spec §5.1, T11): the dossier's practice (`targetTabId`, gotcha 15), else the
+      // The practice (spec §5.1, T11): the dossier's practice (`targetPracticeId`, gotcha 15), else the
       // one this search already landed in, else the active one, created when there is none. Which
       // rows open (§3.2): the one article a one-article search asked for (R2), the first article of
       // an act new to the practice in a range (R1), the article a deep link names; never on the
@@ -233,14 +233,14 @@ export function SearchPanel() {
       const store = appStore.getState();
       // Once the first article has landed, the rest follow it: a closed target is warned once per search.
       const asker = askerRef.current;
-      const wanted = streamingPracticeRef.current ?? targetTabId ?? asker?.practiceId ?? null;
+      const wanted = streamingPracticeRef.current ?? targetPracticeId ?? asker?.practiceId ?? null;
       const landingId = wanted && store.practices.some((p) => p.id === wanted) ? wanted : store.activePracticeId;
       const heldAct = store.practices.find((p) => p.id === landingId)?.acts.find((a) => a.key === actKeyOf(norma));
       const articleKey = practiceArticleKey(result);
       const isNewRow = !heldAct?.articles.some((a) => practiceArticleKey(a) === articleKey);
       const isDeepLinkTarget = deepLinkFocusRef.current === articleUniqueId;
       // A norm cited in a window opens beside it, not in the table.
-      const reveal = isDeepLinkTarget || (!targetTabId && !asker && (expectedTotalRef.current === 1 || !heldAct));
+      const reveal = isDeepLinkTarget || (!targetPracticeId && !asker && (expectedTotalRef.current === 1 || !heldAct));
       const landed = store.addArticlesToPractice(wanted, norma, [result], {
         ...(reveal ? { reveal: 'first' as const } : {}),
         ...(tabLabel ? { label: tabLabel } : {}),
@@ -305,9 +305,9 @@ export function SearchPanel() {
     setResultsBuffer({}); // Clear buffer before new search
     streamingPracticeRef.current = null;
     setStreamingPracticeId(null);
-    const askerPractice = askerPracticeOf(params.besideTabId);
-    askerRef.current = askerPractice && params.besideTabId
-      ? { practiceId: askerPractice.id, windowId: params.besideTabId, opened: false }
+    const askerPractice = askerPracticeOf(params.besideId);
+    askerRef.current = askerPractice && params.besideId
+      ? { practiceId: askerPractice.id, windowId: params.besideId, opened: false }
       : null;
     createdRowsRef.current = { search: params, rows: [] };
     // Only the annex search the auto-switch asked for takes the stray rows over.
@@ -355,7 +355,7 @@ export function SearchPanel() {
           if (line.trim()) {
             try {
               const result = JSON.parse(line);
-              processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters, params.version);
+              processResult(result, params.version_date, true, params.tabLabel, params.targetPracticeId, params.filters, params.version);
             } catch (e) {
               parseFailures += 1;
               console.error("Error parsing line", line, e);
@@ -368,7 +368,7 @@ export function SearchPanel() {
       if (buffer.trim()) {
         try {
           const result = JSON.parse(buffer);
-          processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters, params.version);
+          processResult(result, params.version_date, true, params.tabLabel, params.targetPracticeId, params.filters, params.version);
         } catch (e) {
           parseFailures += 1;
           console.error("Error parsing final buffer", e);
@@ -503,7 +503,7 @@ export function SearchPanel() {
   // item when: nothing is loading, no trigger is pending, and the results
   // buffer has been drained by the effect above. That way each queued search
   // runs end-to-end before the next starts — critical because they share the
-  // dossier's practice (`targetTabId`), which must hold the earlier searches'
+  // dossier's practice (`targetPracticeId`), which must hold the earlier searches'
   // articles when the 2nd through Nth resolve.
   useEffect(() => {
     if (searchQueue.length === 0) return;
@@ -576,7 +576,7 @@ export function SearchPanel() {
         if (revealPracticeRow(practice.id, act.id, practiceArticleKey(inForce))) return;
       }
     }
-    handleSearch(askerId ? { ...params, besideTabId: askerId } : params);
+    handleSearch(askerId ? { ...params, besideId: askerId } : params);
   }, [handleSearch]);
 
 
@@ -652,7 +652,6 @@ export function SearchPanel() {
         // It floats above the bar, clear of the act's heading and the windows' headers. Going back
         // already made the practice active and, on a phone, opened the reader on a subject read beside
         // or closed it for a row of the table (`walkBackTo`, in one update).
-        placement="bottom"
         bottomOffset={isDesktop ? (practiceBarHeight ?? BAR_MIN_HEIGHT) + BAR_OFFSET + 12 : PHONE_BACK_OFFSET}
       />
 

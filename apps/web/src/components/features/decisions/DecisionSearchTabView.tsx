@@ -42,7 +42,7 @@ export function DecisionSearchTabView({ tabId, query }: { tabId: string; query: 
           Solo il tema
         </button>
       )}
-      <DecisionResultList query={shown} besideTabId={tabId} />
+      <DecisionResultList query={shown} besideId={tabId} />
     </div>
   );
 }

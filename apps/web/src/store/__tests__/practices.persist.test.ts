@@ -27,7 +27,7 @@ const SLICE_EMPTY = {
 let initial: AppState;
 
 beforeEach(() => {
-  appStore.setState({ ...SLICE_EMPTY, workspaceTabs: [], lastSyncError: null });
+  appStore.setState({ ...SLICE_EMPTY, lastSyncError: null });
   initial = appStore.getState();
 });
 afterEach(() => {
@@ -227,7 +227,6 @@ describe('partialize', () => {
     appStore.setState({
       practices: [practice('p1', 'Uno')], activePracticeId: 'p1',
       practiceRows: { 'p1/d1': true }, pendingReveal: { practiceId: 'p1', rowKey: 'p1/d1' }, practiceNotice: 'avviso',
-      workspaceTabs: twoTabs as unknown as AppState['workspaceTabs'],
     });
     const saved = options().partialize(appStore.getState());
     expect(saved).toMatchObject({ practices: [practice('p1', 'Uno')], activePracticeId: 'p1' });

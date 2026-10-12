@@ -21,7 +21,7 @@ type Problem = Exclude<SearchDecisionsAnswer, { esito: 'risultati' }>;
 interface DecisionResultListProps {
   query: DecisionSearchQuery;
   /** The workspace tab the list sits in: a decision opens beside it. */
-  besideTabId?: string;
+  besideId?: string;
   /** Where the reader stands in the article: the way back from an opened decision. */
   backEntry?: ReadingBackEntry;
 }
@@ -61,7 +61,7 @@ function Fragment({ testo, evidenziati }: NonNullable<DecisionSearchHit['frammen
   return <p className="text-sm text-slate-600 dark:text-slate-300">…{parts}…</p>;
 }
 
-function Row({ hit, besideTabId, backEntry }: { hit: DecisionSearchHit; besideTabId?: string; backEntry?: ReadingBackEntry }) {
+function Row({ hit, besideId, backEntry }: { hit: DecisionSearchHit; besideId?: string; backEntry?: ReadingBackEntry }) {
   const { identita, attributi } = hit;
   const deposit = formatDecisionDeposit(attributi);
   return (
@@ -69,7 +69,7 @@ function Row({ hit, besideTabId, backEntry }: { hit: DecisionSearchHit; besideTa
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <DecisionLink
           to={{ ...identita, sezione: attributi.sezione }}
-          besideTabId={besideTabId}
+          besideId={besideId}
           backEntry={backEntry}
           className={`font-medium text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE} inline-flex items-center`}
         >
@@ -125,7 +125,7 @@ type ArchiveChoice = DecisionArchive | 'entrambi';
  * count of the public archive (last five years), never of "all" decisions. The archive is the
  * list's own state: it starts from what the route chooses and is not kept in the tab's query.
  */
-export function DecisionResultList({ query, besideTabId, backEntry }: DecisionResultListProps) {
+export function DecisionResultList({ query, besideId, backEntry }: DecisionResultListProps) {
   const refusedNoteId = useId();
   const [archivio, setArchivio] = useState<DecisionArchive | undefined>(undefined);
   const [modo, setModo] = useState<'indice' | 'testo'>('indice');
@@ -263,7 +263,7 @@ export function DecisionResultList({ query, besideTabId, backEntry }: DecisionRe
       {hits.length > 0 && (
         <ul>
           {hits.map((hit) => (
-            <Row key={`${hit.identita.archivio ?? ''}:${hit.identita.numero}:${hit.identita.anno}`} hit={hit} besideTabId={besideTabId} backEntry={backEntry} />
+            <Row key={`${hit.identita.archivio ?? ''}:${hit.identita.numero}:${hit.identita.anno}`} hit={hit} besideId={besideId} backEntry={backEntry} />
           ))}
         </ul>
       )}

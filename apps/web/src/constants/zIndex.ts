@@ -8,14 +8,10 @@
  *
  * The gap (120-999) is intentionally unused: it isolates the base band from
  * the overlay band so modals cannot be hidden by dynamic counters used for
- * floating windows (workspace tabs, search panel). Study Mode's own layers
+ * floating windows (search panel). Study Mode's own layers
  * (backdrop 120, window 130) sit in that gap, over the find window; while an
  * overlay covers the workspace (`aria-modal="true"` or `data-find-overlay`,
  * `isWorkspaceCovered`) Cmd/Ctrl+F does not open the find window at all.
- *
- * The workspace tab dynamic counter is clamped in WorkspaceTabPanel.tsx to
- * stay below Z_INDEX_VALUES.dock, so stack ordering among tabs works but
- * never leaks into the overlay band.
  *
  * IMPORTANT: Import and use these constants instead of hardcoding z-index.
  */

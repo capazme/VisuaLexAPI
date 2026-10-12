@@ -83,9 +83,8 @@ interface FlatMatch {
   tabId: string;
   targetKey: string;
   label: string;
-  articleId?: string;
-  /** A practice's subject: the row to open to draw it (spec §6.7). */
-  reveal?: FindTarget['reveal'];
+  /** The row to open to draw the subject (spec §6.7). */
+  reveal: FindTarget['reveal'];
   onScreen: boolean;
   /** Its position among its own target's matches alone — the ordinal a pending «go to» resolves
    *  by, since the drawn and the stored count of the same text can differ (spec §13.1). */
@@ -154,8 +153,8 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
  *   article, it only scrolls to a drawn match in the front tab;
  * - a recompute keeps the same match (same target, its position carried through the edit by
  *   `mapThroughEdit`), else the next one in scope order — never back to the first;
- * - only `next`/`previous` (Enter, Shift+Enter, the arrows) go to an undrawn match: its tab is
- *   revealed (`revealTab`) and its article shown (`focusArticleInTab`), and once a root registers for
+ * - only `next`/`previous` (Enter, Shift+Enter, the arrows) go to an undrawn match: its practice
+ *   is made active and its row opened (`revealPracticeRow`, `revealPracticeDecision`), and once a root registers for
  *   it the match at the same ordinal there becomes current (the last drawn one when fewer are drawn;
  *   with none drawn, the next match in the direction of travel). With no root after three seconds
  *   the target is given up for this query: navigation skips it, and the window moves once to the
@@ -169,8 +168,6 @@ function sameState(a: FindWindowState, b: FindWindowState): boolean {
  */
 export function useFindWindow({ query, scope, open, prefer = null }: UseFindWindowOptions): UseFindWindow {
   const ownerId = `find-window-${useId()}`;
-  const revealTab = useAppStore((s) => s.revealTab);
-  const focusArticleInTab = useAppStore((s) => s.focusArticleInTab);
   // The practices (spec §6.6-§6.7): what is searched, the one on screen, its open rows.
   const practices = useAppStore((s) => s.practices);
   const activePracticeId = useAppStore((s) => s.activePracticeId);
@@ -201,8 +198,6 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
   const appliedRef = useRef('');
   const queryRef = useRef(query);
   const scopeRef = useRef(scope);
-  const revealTabRef = useRef(revealTab);
-  const focusArticleInTabRef = useRef(focusArticleInTab);
   const practicesRef = useRef(practices);
   const activePracticeIdRef = useRef(activePracticeId);
   const revealPracticeRowRef = useRef(revealPracticeRow);
@@ -218,8 +213,6 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
     }
     queryRef.current = query;
     scopeRef.current = scope;
-    revealTabRef.current = revealTab;
-    focusArticleInTabRef.current = focusArticleInTab;
     practicesRef.current = practices;
     activePracticeIdRef.current = activePracticeId;
     revealPracticeRowRef.current = revealPracticeRow;
@@ -286,7 +279,6 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
           tabId: target.tabId,
           targetKey: target.targetKey,
           label: target.label,
-          articleId: target.articleId,
           reveal: target.reveal,
           onScreen: target.onScreen,
           ordinal,
@@ -428,16 +420,11 @@ export function useFindWindow({ query, scope, open, prefer = null }: UseFindWind
       const match = index >= 0 ? all[index] : undefined;
       if (!match || match.onScreen) return location;
       pendingRef.current = { id: match.id, ordinal: match.ordinal, direction };
-      if (match.reveal) {
-        // A practice's subject: its practice made active and its row opened, in one step (§6.7), which
-        // also takes the phone's full-screen reader off so the row is on screen; a match in the
-        // reader's own subject is drawn and never gets here.
-        if (match.reveal.kind === 'article') revealPracticeRowRef.current(match.tabId, match.reveal.actId, match.reveal.articleKey);
-        else revealPracticeDecisionRef.current(match.tabId, match.reveal.decisionId);
-      } else {
-        revealTabRef.current(match.tabId);
-        if (match.articleId) focusArticleInTabRef.current(match.tabId, match.articleId);
-      }
+      // The subject's practice made active and its row opened, in one step (§6.7), which also takes
+      // the phone's full-screen reader off so the row is on screen; a match in the reader's own
+      // subject is drawn and never gets here.
+      if (match.reveal.kind === 'article') revealPracticeRowRef.current(match.tabId, match.reveal.actId, match.reveal.articleKey);
+      else revealPracticeDecisionRef.current(match.tabId, match.reveal.decisionId);
       pendingTimerRef.current = setTimeout(onPendingTimeout, PENDING_TIMEOUT_MS);
       return location;
     },

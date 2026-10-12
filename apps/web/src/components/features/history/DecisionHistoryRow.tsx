@@ -19,13 +19,13 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
   id?: string;
 }) {
   const navigate = useNavigate();
-  const openDecisionTab = useAppStore((s) => s.openDecisionTab);
+  const openDecision = useAppStore((s) => s.openDecision);
   const key = item.decision_key ?? '';
   const identity = identityFromKey(key);
 
   const open = () => {
     if (!identity) return;
-    openDecisionTab(identity);
+    openDecision(identity, { fromLink: true });
     navigate('/');
   };
   const when = item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: it }) : null;

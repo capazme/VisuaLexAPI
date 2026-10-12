@@ -8,7 +8,7 @@ import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 interface DecisionLinkProps {
   to: LooseDecisionRef;
   /** The workspace tab the link sits in: on the search page the decision opens beside it. */
-  besideTabId?: string;
+  besideId?: string;
   /** Where the reader stands in the article: recorded as the way back when the tab opens beside it. */
   backEntry?: ReadingBackEntry;
   className?: string;
@@ -24,15 +24,15 @@ function pathParams(path: string): { corte?: string; numero?: string; anno?: str
 
 /**
  * A decision named by other data. The address stays the contract (it is a real `href`, so a
- * new tab or a copied link works); a plain click on the search page opens the decision's tab
+ * new tab or a copied link works); a plain click on the search page opens the decision
  * beside the article, anywhere else it goes to the address, which queues the decision.
  * Data that cannot make an address (no year, another court) is a plain label.
  */
-export function DecisionLink({ to, besideTabId, backEntry, className, title, children }: DecisionLinkProps) {
+export function DecisionLink({ to, besideId, backEntry, className, title, children }: DecisionLinkProps) {
   const path = linkableDecisionPath(to);
   const navigate = useNavigate();
   const onSearchPage = useLocation().pathname === '/';
-  const openDecisionTab = useAppStore((s) => s.openDecisionTab);
+  const openDecision = useAppStore((s) => s.openDecision);
   const pushReadingBack = useAppStore((s) => s.pushReadingBack);
   if (!path) return <span className={className} title={title}>{children}</span>;
 
@@ -48,7 +48,7 @@ export function DecisionLink({ to, besideTabId, backEntry, className, title, chi
     if (parsed.ok) {
       // «‹ Torna a art. 2043 c.c.» (the reading back-stack), as for a citation jump
       if (backEntry) pushReadingBack(backEntry);
-      openDecisionTab(parsed.reference, { besideTabId });
+      openDecision(parsed.reference, { fromLink: true, besideId });
     } else {
       navigate(path);
     }

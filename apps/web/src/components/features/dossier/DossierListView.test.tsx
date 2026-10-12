@@ -32,7 +32,7 @@ describe('DossierListView — the quick-open of a card', () => {
       tabLabel: 'Pratica Rossi — testo al 29/12/2007',
     });
     expect(practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
-    expect(searchQueue[0].targetTabId).toBe(practices[0].id);
+    expect(searchQueue[0].targetPracticeId).toBe(practices[0].id);
   });
 
   it('opens a single group in force as it always did', () => {
@@ -50,7 +50,7 @@ describe('DossierListView — the quick-open of a card', () => {
     expect(searchQueue[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
     expect(searchQueue[1]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
     expect(practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
-    expect(searchQueue.map((q) => q.targetTabId)).toEqual([practices[0].id, practices[0].id]);
+    expect(searchQueue.map((q) => q.targetPracticeId)).toEqual([practices[0].id, practices[0].id]);
   });
 
   it('through the picker: when every group asks for a past text there is still one practice, not one per group', () => {

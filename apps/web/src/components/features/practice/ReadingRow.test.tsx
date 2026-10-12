@@ -149,8 +149,7 @@ beforeEach(() => {
   sessionStorage.clear();
   appStore.setState({
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
-    readingBackStack: [], workspaceTabs: [],
-  });
+    readingBackStack: [],  });
 });
 
 afterEach(() => {
@@ -183,7 +182,7 @@ describe('ReadingRow — the table and its windows (spec §4.2-§4.3)', () => {
 
   it('a topic window renders the topic search', () => {
     const { practiceId } = practiceWithWindows(0);
-    s().openDecisionSearchTab({ tema: 'danno' }, 'Danno', { besideTabId: practiceId });
+    s().openTopicSearch({ tema: 'danno' }, 'Danno', { besideId: practiceId });
     render(row());
     expect(screen.getByTestId('topic-list')).toHaveAttribute('data-tab', s().practices[0].beside[0].id);
   });
