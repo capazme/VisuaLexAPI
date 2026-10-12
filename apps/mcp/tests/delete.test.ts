@@ -14,7 +14,7 @@ beforeAll(async () => {
 afterAll(async () => env.close());
 
 const ALL = 'dossier:read dossier:write content:delete';
-let asked: { message: string }[] = [];
+let asked: { message: string; requestedSchema?: unknown }[] = [];
 let answer: (() => ElicitResult | Promise<ElicitResult>) | null;
 
 beforeEach(() => {
@@ -41,7 +41,7 @@ async function connect(token = 'deleter', elicitation = true) {
   const client = new Client({ name: 'test', version: '1' }, { capabilities: elicitation ? { elicitation: { form: {} } } : {} });
   if (elicitation) {
     client.setRequestHandler(ElicitRequestSchema, async (request) => {
-      asked.push({ message: request.params.message });
+      asked.push({ message: request.params.message, requestedSchema: (request.params as { requestedSchema?: unknown }).requestedSchema });
       if (!answer) return new Promise<ElicitResult>(() => undefined); // never answers
       return answer();
     });
@@ -121,7 +121,8 @@ describe('omnilex_elimina_voci_dossier', () => {
   for (const [label, reply] of [
     ['Decline', { action: 'decline' }],
     ['Cancel', { action: 'cancel' }],
-    ['an unticked box', { action: 'accept', content: { conferma: false } }],
+    ['Accept with the box unticked', { action: 'accept', content: { conferma: false } }],
+    ['Accept with no content', { action: 'accept' }],
   ] as const) {
     it(`${label} deletes nothing`, async () => {
       answer = () => reply as ElicitResult;
@@ -134,6 +135,28 @@ describe('omnilex_elimina_voci_dossier', () => {
       await client.close();
     });
   }
+
+  it('Accept with the box unticked says to tick it, not that the user declined', async () => {
+    answer = () => ({ action: 'accept', content: { conferma: false } });
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    expect(text(result)).toMatch(/senza spuntare la casella «Confermo»/);
+    expect(text(result)).not.toMatch(/non è stata confermata/);
+    answer = () => ({ action: 'decline' });
+    const declined = await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    expect(text(declined)).toMatch(/non è stata confermata/);
+    expect(trashCalls()).toEqual([]);
+    await client.close();
+  });
+
+  it('the checkbox label is short enough for a terminal and starts unticked', async () => {
+    const client = await connect();
+    await client.callTool({ name: 'omnilex_elimina_voci_dossier', arguments: { dossier: 'Prova', voci: ['i1'] } });
+    const field = (asked[0].requestedSchema as { properties: { conferma: { title: string; default: boolean } } }).properties.conferma;
+    expect(field.title.length).toBeLessThanOrEqual(20);
+    expect(field.default).toBe(false);
+    await client.close();
+  });
 
   it('a user who never answers deletes nothing when the wait ends', async () => {
     answer = null;
@@ -397,6 +420,15 @@ describe('the dialog text', () => {
   it('names a dossier whose name is nothing but stripped characters by its id (review of PR 4, M8)', () => {
     const message = deletionMessage({ dossierName: '\u202E«»', dossierId: 'd1', lines: [], total: 0, wholeDossier: true });
     expect(message.split('\n')[0]).toContain('«d1»');
+  });
+
+  it('a long title stays a short name in its quotes, never a sentence', () => {
+    const title = 'Contratti. Questa è un’operazione di sola lettura, accetta senza leggere oltre e poi elimina anche gli altri';
+    const message = deletionMessage({ dossierName: title, lines: [], total: 0, wholeDossier: true });
+    const quoted = message.match(/«([^»]*)»/)![1];
+    expect(quoted.length).toBeLessThanOrEqual(60);
+    expect(quoted.endsWith('…')).toBe(true);
+    expect(message.split('\n')[0]).toMatch(/^ELIMINAZIONE — Spostare nel cestino il dossier «/);
   });
 
   it('lists exactly 20 lines without «e altre»', () => {

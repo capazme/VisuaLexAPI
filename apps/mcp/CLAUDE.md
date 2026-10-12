@@ -70,7 +70,10 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   only; only Accept with the box ticked exchanges a delete token and moves
   exactly those ids. Decline, Cancel, an unticked box, a timeout or a client
   that declared no elicitation: nothing is deleted, never a fallback (owner's
-  decision «B»). `lingolex_elimina_card` is the third destructive tool
+  decision «B»); an Accept with the box empty is told to tick it, apart from a
+  Decline. The box's label is «Confermo», short enough for a terminal. The
+  dossier's title (another user's, when it came with an environment) sits in
+  «» and is cut at 60 characters. `lingolex_elimina_card` is the third destructive tool
   (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
 - **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —

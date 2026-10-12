@@ -188,4 +188,13 @@ describe('lingolex_elimina_card', () => {
     expect(env.stub.apiCalls.some((c) => c.path === '/lingo/cards/trash')).toBe(false);
     await client.close();
   });
+
+  it('an Accept with the box unticked deletes nothing and says to tick it', async () => {
+    answer = () => ({ action: 'accept', content: { conferma: false } });
+    const client = await connect();
+    const result = await client.callTool({ name: 'lingolex_elimina_card', arguments: { schede: ['k1a2b3c4-0000-4000-8000-000000000001'] } });
+    expect(text(result)).toMatch(/Nulla è stato eliminato: hai accettato senza spuntare la casella «Confermo»/);
+    expect(env.stub.apiCalls.some((c) => c.path === '/lingo/cards/trash')).toBe(false);
+    await client.close();
+  });
 });
