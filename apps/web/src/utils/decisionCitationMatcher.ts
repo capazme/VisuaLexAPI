@@ -50,7 +50,21 @@ const CASE_HEADS = new RegExp(
   'giu',
 );
 const SECTION_HEADS = new RegExp(`${LEFT}(?:${SECTION_HEAD_SOURCE}|${SEZIONI_UNITE_HEAD_SOURCE})`, 'giu');
-const UPPERCASE_CASE_LETTER = /[CT](?=\s*[-‐-—]?\s*\d)/;
+const UPPERCASE_CASE_LETTER = new RegExp(`[CT](?=\\s*${EU_DASH}?\\s*\\d)`);
+// Courts the app cannot open. They are never linked, but a section written after one belongs to it and
+// not to the Cassazione (the context rule reads a section only when no court is written before it).
+// The Tribunale of the Union and the administrative tribunals are courts the app opens: they start at the
+// same place as a supported head, which wins.
+const UNSUPPORTED_HEADS = new RegExp(
+  `${LEFT}(?:corte\\s+d(?:i\\s+|['’]\\s*)appello|c\\.\\s*app(?:ello)?\\.?|app\\.|tribunale|trib\\.|corte\\s+edu|cedu|c\\.\\s*e\\.\\s*d\\.\\s*u\\.?` +
+    `|corte\\s+europea\\s+dei\\s+diritti\\s+dell['’]\\s*uomo|comm(?:issione)?\\.?\\s*trib(?:utaria)?\\.?|giudice\\s+di\\s+pace|g\\.\\s*d\\.\\s*p\\.)(?![\\p{L}\\p{N}])`,
+  'giu',
+);
+// «Corte di cassazione», «Suprema Corte di Cassazione»: the span starts at the first of these words.
+const CORTE_DI = /(?<![\p{L}\p{N}])(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+$/u;
+const CORTE_DI_REACH = 30;
+// A publication date is not the decision's: the tail ends where the Gazzetta Ufficiale begins.
+const GAZZETTA = /\(\s*in\s+g\.\s*u\b|(?<![\p{L}\p{N}])g\.\s*u\.|(?<![\p{L}\p{N}])gazzetta\s+ufficiale/u;
 const UNITED_SECTIONS = /^s\.?\s*u\.?$/i;
 
 interface Head {
@@ -60,12 +74,19 @@ interface Head {
   court: boolean;
   /** A section standing without its court: read as if «Cass.» were written before it. */
   section: boolean;
+  /** A court the app cannot open: it links nothing and covers what follows it. */
+  unsupported?: boolean;
 }
 
 function findHeads(text: string, folded: string, within: boolean): Head[] {
   const heads: Head[] = [];
   for (const m of folded.matchAll(COURT_HEADS)) {
     heads.push({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, court: true, section: false });
+  }
+  const supported = new Set(heads.map((h) => h.start));
+  for (const m of folded.matchAll(UNSUPPORTED_HEADS)) {
+    const start = m.index ?? 0;
+    if (!supported.has(start)) heads.push({ start, end: start + m[0].length, court: true, section: false, unsupported: true });
   }
   for (const m of folded.matchAll(CASE_HEADS)) {
     const start = m.index ?? 0;
@@ -100,17 +121,19 @@ function firstAtOrAfter(starts: readonly number[], position: number): number {
 
 // A full stop closes the sentence when a capital follows and the word before it is not an abbreviation
 // («Sez.», «n.», «civ.», «sent.»…) or an initial («T.A.R. Lazio»). A question or exclamation mark, or a
-// blank line, closes it always. The patterns have no unbounded run to backtrack over.
-const SENTENCE_BREAK = /[!?]\s+(?=\p{Lu})|\.\s+(?=\p{Lu})|\n[ \t\r]*\n/gu;
+// blank line or a semicolon (a list of precedents), closes it always. The patterns have no unbounded run to backtrack over.
+const SENTENCE_BREAK = /[!?]\s+(?=\p{Lu})|\.\s+(?=\p{Lu})|\n[ \t\r]*\n|;/gu;
 const ABBREVIATIONS = new Set([
   'sez', 'n', 'nr', 'num', 'civ', 'pen', 'sent', 'ord', 'lav', 'fer', 'un', 'cass', 'cost', 'cons', 'st', 'ad', 'plen', 'dep',
-  'art', 'artt', 'giust', 'trib', 'amm', 'decr', 'par', 'cd', 'ss', 'uu', 'aut', 'lett', 'co', 'cfr',
+  'art', 'artt', 'giust', 'trib', 'amm', 'decr', 'par', 'cd', 'ss', 'uu', 'aut', 'lett', 'co', 'cfr', 'app', 'comm', 'reg',
 ]);
 const MAX_ABBREVIATION = 6;
 
-/** Where the tail of `[start, limit)` ends: at the first sentence end inside it, or at `limit`. */
-function sentenceEnd(text: string, start: number, limit: number): number {
+/** Where the tail of `[start, limit)` ends: at the first sentence end or Gazzetta Ufficiale inside it, or at `limit`. */
+function sentenceEnd(text: string, folded: string, start: number, limit: number): number {
   const piece = text.slice(start, limit);
+  const gazzetta = GAZZETTA.exec(folded.slice(start, limit));
+  if (gazzetta) limit = start + gazzetta.index;
   for (const m of piece.matchAll(SENTENCE_BREAK)) {
     const at = m.index ?? 0;
     if (m[0][0] === '.') {
@@ -119,7 +142,8 @@ function sentenceEnd(text: string, start: number, limit: number): number {
       const word = foldForSearch(piece.slice(from, at));
       if (word.length === 1 || ABBREVIATIONS.has(word)) continue;
     }
-    return start + at;
+    if (start + at < limit) return start + at;
+    break;
   }
   return limit;
 }
@@ -138,10 +162,24 @@ const CITATION_WORDS = new Set([
 ]);
 const ROMAN = /^[ivx]+$/;
 
-function onlyCitationWords(written: string, properNames: boolean): boolean {
-  for (const m of written.matchAll(/\p{L}+/gu)) {
+// Between two pieces of one citation (the number, its date, its deposit) only the words that join them.
+const JOINING_WORDS = new Set(['del', 'dell', 'il', 'dep', 'depositata', 'depositato', 'deposito']);
+const MONTHS = 'gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre';
+// A date, or a range of days («18-25 luglio 1997»), is the citation's own when it stands between its pieces.
+const DATES = new RegExp(
+  `\\d{1,2}(?:\\s*[-\u2013]\\s*\\d{1,2})?[°º]?\\s+(?:${MONTHS})\\s+\\d{4}|\\d{1,2}\\s*[/.-]\\s*\\d{1,2}\\s*[/.-]\\s*\\d{4}`,
+  'giu',
+);
+// A number the parser did not use belongs to something else: another citation, an act, a later date.
+const STRAY_NUMBER = /(?<![\p{L}\p{N}])n(?:r|um(?:ero)?)?\.?\s*\d|\d\s*\/\s*\d|\d{4}/iu;
+
+/** Whether the words written in a gap of a citation are the citation's: no prose, no number of another. */
+function citationGap(written: string, words: ReadonlySet<string>, properNames: boolean): boolean {
+  const plain = written.replace(DATES, ' ');
+  if (STRAY_NUMBER.test(plain)) return false;
+  for (const m of plain.matchAll(/\p{L}+/gu)) {
     const word = foldForSearch(m[0]);
-    if (word.length <= 1 || ROMAN.test(word) || CITATION_WORDS.has(word)) continue;
+    if (word.length <= 1 || ROMAN.test(word) || words.has(word)) continue;
     if (properNames && /^\p{Lu}/u.test(m[0])) continue;
     return false;
   }
@@ -172,14 +210,19 @@ export function extractDecisionCitations(
   const found: DecisionCitationSpan[] = [];
   let acts: Array<[number, number]> | null = null;
   let consumed = 0;
+  // A section written after a court belongs to that court: the context rule covers only a bare section.
+  let covered = 0;
 
   for (const head of heads) {
     if (head.start < consumed) continue;
+    if (head.section && head.start < covered) continue;
     consumed = head.end;
     const cut = head.court ? courtStarts : starts;
     const next = firstAtOrAfter(cut, head.end);
     const limit = Math.min(head.start + MAX_TAIL, next < cut.length ? cut[next] : folded.length);
-    const tailEnd = sentenceEnd(text, head.start, limit);
+    const tailEnd = sentenceEnd(text, folded, head.start, limit);
+    if (head.court) covered = tailEnd;
+    if (head.unsupported) continue;
     const prefix = head.section ? SYNTHETIC_COURT : '';
     const read = readDecisionCitation(prefix + folded.slice(head.start, tailEnd), { aliasTriggers: [], now });
     if (!read || read.words.length === 0) continue;
@@ -189,10 +232,10 @@ export function extractDecisionCitations(
     const properNames = read.reference.corte === 'tar';
     let cursor = at(Math.max(read.headEnd, prefix.length));
     let clean = true;
-    for (const [from, to] of pieces) {
-      if (at(from) > cursor && !onlyCitationWords(text.slice(cursor, at(from)), properNames)) clean = false;
+    pieces.forEach(([from, to], i) => {
+      if (at(from) > cursor && !citationGap(text.slice(cursor, at(from)), i === 0 ? CITATION_WORDS : JOINING_WORDS, properNames)) clean = false;
       cursor = Math.max(cursor, at(to));
-    }
+    });
     if (!clean) continue;
 
     // «(dep. 3 gennaio 2000)»: the parenthesis opened inside the span closes with it
@@ -200,15 +243,27 @@ export function extractDecisionCitations(
     const written = text.slice(head.start, end);
     if (text[end] === ')' && written.split('(').length > written.split(')').length) end += 1;
 
+    // The reference comes from the span's own words: an archive, a section or a kind written after it is another's.
+    const own = readDecisionCitation(prefix + folded.slice(head.start, end), { aliasTriggers: [], now });
+    if (!own || own.reference.numero !== read.reference.numero || own.reference.anno !== read.reference.anno) continue;
+    const { reference } = own;
+
     acts ??= allActSpans(folded);
     const act = firstEndingAfter(acts, head.start);
     if (act < acts.length && acts[act][0] < end) continue;
 
-    const { reference } = read;
     const openable = linkableDecisionPath(reference, now) !== null || (reference.corte === 'tar' && Boolean(reference.regione));
     if (!openable) continue;
-    found.push({ start: head.start, end, reference, path: decisionPath(reference) });
+    // «Corte di cassazione»: the span starts at the court's own first word
+    let start = head.start;
+    if (/^cassazione/.test(folded.slice(start, start + 11))) {
+      const lead = CORTE_DI.exec(folded.slice(Math.max(0, start - CORTE_DI_REACH), start));
+      const from = lead ? start - lead[0].length : start;
+      if (from >= (found.length > 0 ? found[found.length - 1].end : 0)) start = from;
+    }
+    found.push({ start, end, reference, path: decisionPath(reference) });
     consumed = end;
+    if (head.court) covered = end;
   }
   return found;
 }

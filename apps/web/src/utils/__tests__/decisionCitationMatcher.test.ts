@@ -205,6 +205,8 @@ const HOSTILE: Array<[string, string]> = [
   ['a Union court', hostile('Corte giust. UE, ')],
   ['acts with numbers', hostile('legge n. 1 del 12 marzo regio decreto-legge ')],
   ['one court and many case numbers', 'Cass. ' + hostile('C-1/2 ')],
+  ['courts the app cannot open', hostile("Trib. Milano, sez. 3, Corte d'appello ")],
+  ['lists of precedents', hostile('Cass. n. 1/2020; Sez. 3, n. 2/2021 (in G.U. ')],
 ];
 
 describe('extractDecisionCitations, hostile text', () => {
