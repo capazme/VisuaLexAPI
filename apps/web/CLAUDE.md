@@ -656,7 +656,9 @@ Duplicating any of these is a defect, not a shortcut.
   work as before. `/version` and `/health` are the two that stay open.
 - `utils/decisionCitationParser.ts` — `parseDecisionCitation(input, { aliasTriggers })`: a decision as
   typed in the palette; it reads only an input that starts with a court and needs number and year,
-  or a case of the Union («C-634/21», «causa T-612/17»: the letter names the court). The Python
+  or a case of the Union («C-634/21», «causa T-612/17»: the letter names the court), or an
+  administrative court («Cons. Stato, sez. VI, n. 2270/2019», «TAR Lazio, Roma, ord. n. 1234/2020»;
+  a parere is left to the API, which names it as a court it cannot read). The Python
   API's `decisions/citation.py` reads the same words; both assert the golden file's `decision_citations`.
   `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session
   (50 answers, least recently used out; a failure is not kept; `clearDecisionCache` at logout). `utils/workspaceOrigin.ts` — where a
@@ -668,7 +670,14 @@ Duplicating any of these is a defect, not a shortcut.
   `conventions/sources/golden.json`). The courts of the Union (`corte_giustizia_ue`,
   `tribunale_ue`) are named by their case (`/sentenze/corte-giustizia-ue/634/2021`, «Corte giust.
   UE, sez. I, sent. 7 dicembre 2023, causa C-634/21»); their closed values and labels live in
-  `utils/euCourts.ts`, the twin of the server's `norms/euCourts.ts`; `brocardiDecisionRef` reads the court a Brocardi
+  `utils/euCourts.ts`, the twin of the server's `norms/euCourts.ts`. The administrative courts
+  (`consiglio_di_stato`, `cgars`, `tar`; design `docs/superpowers/specs/2026-10-12-administrative-courts-design.md`)
+  carry the kind (`provvedimento`) and a TAR its seat in the identity
+  (`tar:roma:ocau:1234:2020`, `/sentenze/tar-roma/1234/2020?provvedimento=ocau`; a sentenza's path
+  names no kind); a reference the words left open is keyed `/sentenze/tar/…?regione=Lazio` and
+  `?tipo=ordinanza`, never taken for an identity. Their seats, names and closed values live in
+  `utils/adminCourts.ts`, the twin of the server's `norms/adminCourts.ts`, its `SEATS` pinned to
+  `conventions/sources/tar-seats.json`; `brocardiDecisionRef` reads the court a Brocardi
   massima is headed with. Never write a decision's label inline. The paths
   `/sentenze/<corte>/<numero>/<anno>` are a contract with LibreLex and the MERL-T graph: never
   rename them (spec `docs/superpowers/specs/2026-10-01-sentenze-design.md`). Its first block is

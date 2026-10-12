@@ -22,7 +22,8 @@ export interface LeftOut {
  * shape) is still a decision's: its anchors are left out, never taken for an article's.
  */
 const inDecisionKeySpace = (key: string) =>
-  ['cassazione:', 'corte_costituzionale:', 'corte_giustizia_ue:', 'tribunale_ue:'].some((prefix) => key.startsWith(prefix));
+  ['cassazione:', 'corte_costituzionale:', 'corte_giustizia_ue:', 'tribunale_ue:', 'consiglio_di_stato:', 'cgars:', 'tar:']
+    .some((prefix) => key.startsWith(prefix));
 
 /** Runs `task` over `items`, at most `limit` at a time: a cold decision lookup is many source requests. */
 async function mapLimited<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {

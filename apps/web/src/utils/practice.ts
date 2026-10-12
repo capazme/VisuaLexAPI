@@ -3,6 +3,7 @@ import type { DecisionCourt, DecisionReference, DecisionSearchQuery } from '../t
 import { actKeyOf, compareArticles, shownAnnex } from '../components/features/dossier/dossierLayout';
 import { findArticleByNormalizedId } from './articleIds';
 import { formatDecisionShort } from './decisionLinks';
+import { PROVVEDIMENTO, SEATS, isAdminCourt, isSeat } from './adminCourts';
 import { buildItemKey } from './normaKeys';
 import { requestIsHistorical, versionKey } from './versionDisplay';
 
@@ -343,7 +344,9 @@ export function storedNorma(value: unknown): Norma | null {
   return norma;
 }
 
-const COURTS: readonly DecisionCourt[] = ['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue'];
+const COURTS: readonly DecisionCourt[] = [
+  'cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue', 'consiglio_di_stato', 'cgars', 'tar',
+];
 
 /** A decision's reference that passes `isValidView`, of a court VisuaLex reads, with its known
  *  fields only. The migration and `sanitizePractices` both keep this, so it is a fixed point. */
@@ -354,6 +357,14 @@ export function storedReference(value: unknown): DecisionReference | null {
   const reference = { corte: value.corte, numero: value.numero, anno: value.anno } as DecisionReference;
   if (value.archivio !== undefined) reference.archivio = value.archivio as DecisionReference['archivio'];
   if (isText(value.sezione)) reference.sezione = value.sezione;
+  // the administrative courts (design 2026-10-12-administrative-courts §2): closed values only
+  if (isAdminCourt(value.corte)) {
+    if (isSeat(value.sede)) reference.sede = value.sede;
+    if (isText(value.provvedimento) && PROVVEDIMENTO.test(value.provvedimento)) reference.provvedimento = value.provvedimento;
+    if (isText(value.regione) && Object.values(SEATS).some((s) => s[1] === value.regione)) reference.regione = value.regione;
+    if (value.tipo === 'sentenza' || value.tipo === 'ordinanza' || value.tipo === 'decreto') reference.tipo = value.tipo;
+    if (value.corte === 'tar' && !reference.sede && !reference.regione) return null;
+  }
   return reference;
 }
 

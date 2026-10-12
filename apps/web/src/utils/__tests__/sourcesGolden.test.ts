@@ -66,7 +66,8 @@ describe('the golden file of legal sources', () => {
       expect(c.note.length, c.id).toBeGreaterThan(0);
     }
     for (const c of golden.decisions) {
-      expect(['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue'], c.id).toContain(c.input.reference.corte);
+      expect(['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue', 'consiglio_di_stato', 'cgars', 'tar'], c.id)
+        .toContain(c.input.reference.corte);
       expect(Number.isInteger(c.input.reference.numero), c.id).toBe(true);
     }
   });
@@ -119,6 +120,11 @@ describe('the golden file of legal sources', () => {
       if (r.corte === 'cassazione' && (r.archivio === 'civile' || r.archivio === 'penale')) {
         return { corte: r.corte, archivio: r.archivio, numero: r.numero, anno: r.anno };
       }
+      // the administrative courts: the kind, and a TAR's seat (design 2026-10-12-administrative-courts §2)
+      if ((r.corte === 'consiglio_di_stato' || r.corte === 'cgars' || r.corte === 'tar') && r.provvedimento) {
+        if (r.corte === 'tar' && !r.sede) return null;
+        return { corte: r.corte, numero: r.numero, anno: r.anno, provvedimento: r.provvedimento, ...(r.sede ? { sede: r.sede } : {}) };
+      }
       return null;
     };
     const keyed = golden.decisions.filter((c) => ['current', 'decided'].includes(c.identity.key?.status) && typeof c.identity.key.value === 'string');
@@ -133,7 +139,7 @@ describe('the golden file of legal sources', () => {
       expect(keyed.length).toBeGreaterThan(4);
       expect(identities.map((i) => i.c.id)).toEqual(keyed.map((c) => c.id));
       for (const { c, identity } of identities) {
-        if (c.identity.fields?.status === 'current') expect(c.identity.fields.value, c.id).toEqual(identity);
+        if (['current', 'decided'].includes(c.identity.fields?.status)) expect(c.identity.fields.value, c.id).toEqual(identity);
       }
       expect(unkeyed.length).toBeGreaterThan(0);
       for (const c of unkeyed) expect(identityOfReference(c.input.reference), c.id).toBeNull();
