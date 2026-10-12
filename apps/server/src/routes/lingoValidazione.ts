@@ -78,7 +78,10 @@ router.post('/:cardId', async (req, res) => {
       await tx.lingoValidazioneCard.create({ data: { cardId, utenteId: me, giudizio, motivazione: motivazione || null } });
       const votes = await tx.lingoValidazioneCard.findMany({ where: { cardId }, select: { giudizio: true } });
       const next = stateAfterVotes(votes.map((v) => v.giudizio));
-      if (next !== card.stato) await tx.lingoCard.update({ where: { id: cardId }, data: { stato: next } });
+      // An archived card belongs to its author alone (PERSONAL_STATES): with the author's
+      // account gone nobody could see or delete it, so it goes now, with its votes and anchors.
+      if (next === 'ARCHIVIATA' && card.autore_id === null) await tx.lingoCard.delete({ where: { id: cardId } });
+      else if (next !== card.stato) await tx.lingoCard.update({ where: { id: cardId }, data: { stato: next } });
       return next;
     });
     res.json({ stato });
