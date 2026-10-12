@@ -158,7 +158,7 @@ area:
 
 | Field | Values |
 |---|---|
-| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); decided on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue`, `consiglio_di_stato`, `tar`, and (proposed) `cgars` |
+| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); decided on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue`, `consiglio_di_stato`, `tar`, `cgars` |
 | `numero` | integer 1–999999, no leading zeros |
 | `anno` | the year of the number (for the penal Cassazione, the year of deposit) |
 | `archivio` | `civile`, `penale`; the Cassazione only, and always there |

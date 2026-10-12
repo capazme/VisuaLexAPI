@@ -10,9 +10,9 @@ orchestrator, with the Consiglio di Stato's pareri left out. What the note did n
 kind, number and year, a TAR by its seat too, the section an attribute (D1); a reference with no
 kind is a sentenza, and a year without one is ambiguous, never an ordinanza chosen for the reader
 (D2); a TAR named by its region is read at its main seat with a notice, ambiguous when another
-seat holds the number too (D3); the citation in the Cassazione's style (D4); no pareri (D5). One
-deviation, proposed: the C.G.A.R.S. is a court of its own (`cgars`), not a seat of the Consiglio
-di Stato as D1 put it, because it numbers and is cited apart.
+seat holds the number too (D3); the citation in the Cassazione's style (D4); no pareri (D5); the
+C.G.A.R.S. a court of its own (`cgars`), not a seat of the Consiglio di Stato as D1 first put it,
+because it numbers and is cited apart (D6: «corte a sé», 12 October 2026).
 **Follows:** `2026-10-12-decisions-mcp-and-eu-courts-design.md` (the courts of the Union: same
 shape of work), `2026-10-04-source-convention-design.md` §2.4 («the court's own qualifiers in
 place of `archivio` when its numbering needs them»).
@@ -36,7 +36,7 @@ On giustizia-amministrativa.it, 12 October 2026, seven requests three seconds ap
 | `corte` | Court | Qualifiers in the key |
 |---|---|---|
 | `consiglio_di_stato` | Consiglio di Stato | the kind |
-| `cgars` | Consiglio di giustizia amministrativa per la Regione siciliana (proposed: D1 made it a seat of the Consiglio di Stato) | the kind |
+| `cgars` | Consiglio di giustizia amministrativa per la Regione siciliana (D6) | the kind |
 | `tar` | a Tribunale amministrativo regionale | the seat, then the kind |
 
 - **The kind** is the ECLI's suffix in lower case: `sent` (sentenza), `senb` (sentenza in forma
