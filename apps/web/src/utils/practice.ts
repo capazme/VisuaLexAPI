@@ -223,9 +223,10 @@ function sameAdminDecision(entry: DecisionReference, wanted: DecisionReference):
     if (entry.provvedimento !== undefined ? entry.provvedimento !== wanted.provvedimento
       : familyAsked(entry) !== kindFamily(wanted.provvedimento)) return false;
   } else if (familyAsked(entry) !== familyAsked(wanted)) return false;
-  const regionOf = (sede: string | undefined) => (isSeat(sede) ? SEATS[sede][1] : undefined);
-  if (wanted.sede !== undefined) return entry.sede === wanted.sede || (entry.sede === undefined && entry.regione === regionOf(wanted.sede));
-  if (wanted.regione !== undefined) return entry.sede !== undefined ? regionOf(entry.sede) === wanted.regione : entry.regione === wanted.regione;
+  // A seat and a region are never taken for each other: a region with several seats is the source's
+  // to resolve (D3), so a citation by region opens its own entry until the source names the seat.
+  if (wanted.sede !== undefined) return entry.sede === wanted.sede;
+  if (wanted.regione !== undefined) return entry.sede === undefined && entry.regione === wanted.regione;
   return true;
 }
 

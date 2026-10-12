@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { SEATS, adminCourtFullName, adminCourtName } from '../adminCourts';
+import { FAMILY, SEATS, adminCourtFullName, adminCourtName } from '../adminCourts';
 import {
   decisionKey,
   decisionPath,
@@ -31,6 +31,31 @@ function seatsFile(): { seats: Array<{ slug: string; sede: string; regione: stri
     if (dirname(dir) === dir) throw new Error('conventions/sources/tar-seats.json not found');
   }
 }
+
+
+// The reader's families (services/visualex/.../decisions/model.py, FAMIGLIE): a kind it reads with a
+// family must carry the same one here, or the citation loses its «ord.» or «decr.».
+function readerFamilies(root: string): Record<string, string> {
+  const python = readFileSync(join(root, 'services', 'visualex', 'visualex_api', 'services', 'decisions', 'model.py'), 'utf8');
+  const start = python.indexOf('FAMIGLIE');
+  const block = python.slice(start, python.indexOf('\n}', start));
+  return Object.fromEntries([...block.matchAll(/"(\w+)":\s*\(([^)]*)\)/g)]
+    .flatMap((m) => [...m[2].matchAll(/"(\w+)"/g)].map((k) => [k[1], m[1]])));
+}
+function repoRoot(): string {
+  for (let dir = __dirname; ; dir = dirname(dir)) {
+    if (existsSync(join(dir, 'conventions', 'sources', 'tar-seats.json'))) return dir;
+    if (dirname(dir) === dir) throw new Error('repository root not found');
+  }
+}
+
+describe('the kinds\' families', () => {
+  it('are the reader\'s', () => {
+    const families = readerFamilies(repoRoot());
+    expect(Object.keys(families).length).toBeGreaterThan(5);
+    expect(FAMILY).toEqual(families);
+  });
+});
 
 describe('the TAR seats', () => {
   it('are the convention\'s', () => {

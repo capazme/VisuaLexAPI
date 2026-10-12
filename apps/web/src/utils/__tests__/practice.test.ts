@@ -122,13 +122,13 @@ describe('sameDecision', () => {
     // no kind named is a sentenza (D2): never the ordinanza
     expect(sameDecision(ocau, { corte: 'tar', sede: 'roma', numero: 1234, anno: 2020 })).toBe(false);
     expect(sameDecision(ocau, { corte: 'tar', sede: 'roma', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(true);
-    expect(sameDecision(ocau, { corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(true);
-    expect(sameDecision(ocau, { corte: 'tar', regione: 'Lombardia', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(false);
+    // a region with two seats is the source's to resolve (D3): never taken for the seat already open
+    expect(sameDecision(ocau, { corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(false);
+    expect(sameDecision({ corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 },
+      { corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 })).toBe(true);
     const sent = { corte: 'consiglio_di_stato' as const, provvedimento: 'senb', numero: 2270, anno: 2019 };
     expect(sameDecision(sent, { corte: 'consiglio_di_stato', numero: 2270, anno: 2019 })).toBe(true);
-    // an entry not resolved yet, asked as «TAR Lazio, ord.», is the ordinanza cautelare of Rome
-    expect(sameDecision({ corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 }, ocau)).toBe(true);
-    expect(sameDecision({ corte: 'tar', regione: 'Lazio', numero: 1234, anno: 2020 }, ocau)).toBe(false);
+    expect(sameDecision({ corte: 'tar', regione: 'Lazio', tipo: 'ordinanza', numero: 1234, anno: 2020 }, ocau)).toBe(false);
   });
 
   it('keeps two entries apart unless every field of their identity agrees', () => {

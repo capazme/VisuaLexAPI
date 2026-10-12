@@ -36,10 +36,12 @@ export const isSeat = (sede: unknown): sede is string => typeof sede === 'string
 
 /** The kind of a measure: the ECLI's suffix in lower case (sent, ocau, …). */
 export const PROVVEDIMENTO = /^[a-z]{3,6}$/;
-/** The family of the kinds the design names (§2): `sent`/`senb` a sentenza, `ocau`/`ocol` an
- *  ordinanza, `dcau`/`ddec` a decreto; another kind belongs to none. */
-const FAMILY: Record<string, 'sentenza' | 'ordinanza' | 'decreto'> = {
-  sent: 'sentenza', senb: 'sentenza', ocau: 'ordinanza', ocol: 'ordinanza', dcau: 'decreto', ddec: 'decreto',
+/** The family of each kind, as the reader's `FAMIGLIE` (decisions/model.py) has it, pinned by the
+ *  adminCourts tests: the design's six (§2) and the portal's `ord` and `dpres`; another kind
+ *  belongs to none. */
+export const FAMILY: Record<string, 'sentenza' | 'ordinanza' | 'decreto'> = {
+  sent: 'sentenza', senb: 'sentenza', ocau: 'ordinanza', ocol: 'ordinanza', ord: 'ordinanza',
+  dcau: 'decreto', ddec: 'decreto', dpres: 'decreto',
 };
 export const kindFamily = (provvedimento: string | null | undefined): 'sentenza' | 'ordinanza' | 'decreto' | null =>
   provvedimento && Object.hasOwn(FAMILY, provvedimento) ? FAMILY[provvedimento] : null;

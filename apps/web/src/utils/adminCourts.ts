@@ -41,9 +41,12 @@ export const PROVVEDIMENTO = /^[a-z]{3,6}$/;
 /** The section: I…X, with -bis, -ter or -quater (TAR of Rome), or the Adunanza plenaria. */
 export const ADMIN_SECTION = /^(?:(?:I|II|III|IV|V|VI|VII|VIII|IX|X)(?:-(?:bis|ter|quater))?|plenaria)$/;
 
-/** The family of the kinds the design names (§2); another kind belongs to none. */
-const FAMILY: Record<string, 'sentenza' | 'ordinanza' | 'decreto'> = {
-  sent: 'sentenza', senb: 'sentenza', ocau: 'ordinanza', ocol: 'ordinanza', dcau: 'decreto', ddec: 'decreto',
+/** The family of each kind, as the reader's `FAMIGLIE` (decisions/model.py) has it, pinned by the
+ *  adminCourts tests: the design's six (§2) and the portal's `ord` and `dpres`; another kind
+ *  belongs to none. */
+export const FAMILY: Record<string, 'sentenza' | 'ordinanza' | 'decreto'> = {
+  sent: 'sentenza', senb: 'sentenza', ocau: 'ordinanza', ocol: 'ordinanza', ord: 'ordinanza',
+  dcau: 'decreto', ddec: 'decreto', dpres: 'decreto',
 };
 export const kindFamily = (provvedimento: string | null | undefined): 'sentenza' | 'ordinanza' | 'decreto' | null =>
   provvedimento && Object.hasOwn(FAMILY, provvedimento) ? FAMILY[provvedimento] : null;
@@ -60,7 +63,8 @@ export const SENTENZA_KINDS: readonly string[] = ['sent', 'senb'];
 /** The kinds the design names, as the decision's tab spells them; another kind has no name. */
 export const KIND_NAME: Record<string, string> = {
   sent: 'Sentenza', senb: 'Sentenza in forma semplificata', ocau: 'Ordinanza cautelare',
-  ocol: 'Ordinanza collegiale', dcau: 'Decreto cautelare', ddec: 'Decreto decisorio',
+  ocol: 'Ordinanza collegiale', ord: 'Ordinanza', dcau: 'Decreto cautelare', ddec: 'Decreto decisorio',
+  dpres: 'Decreto presidenziale',
 };
 
 const several = (region: string) => Object.values(SEATS).filter((s) => s[1] === region).length > 1;
