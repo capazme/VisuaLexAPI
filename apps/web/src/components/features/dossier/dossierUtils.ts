@@ -341,7 +341,7 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
 const SHARE_PREFIX = 'u8.';
 
 export function encodeDossierShare(dossier: Dossier): string {
-  // TextEncoder never throws: a lone surrogate becomes U+FFFD.
+  // Never throws on text: JSON.stringify writes a lone surrogate as `\ud800`, and TextEncoder takes any string.
   const bytes = new TextEncoder().encode(JSON.stringify(dossier));
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
