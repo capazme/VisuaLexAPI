@@ -84,8 +84,8 @@ const SHARED_YEAR = new RegExp(`(?<![\\p{L}\\p{N}])(${NUMBER_MARK}(?:\\s*(?:,|e|
 const NUMBER_MARKS = new RegExp(`(?<![\\p{L}\\p{N}])${NUMBER_MARK}`, 'giu');
 // After a plural kind: «, e n. 12 del 2010» is the next decision of the list.
 const LIST_NEXT = /\s*(?:,|e|ed)\s*(n(?:r|um(?:ero)?)?\.?\s*\d{1,6}\s*(?:\/\s*\d{4}|del\s+\d{4}))/y;
-// A court named right after a citation is its court: «sentenza n. 1234 del 2015 della Corte di cassazione».
-const AFTER_CITATION = /^[\s,]*(?:(?:della|del|dello|dell['’]|dalla|dal|di|emessa|pronunciata|resa|adottata)\s*)+/u;
+// A court named right after a citation is its court: «sentenza n. 1234 del 2015 della Corte di cassazione», «… (Corte di cassazione)», «…, Cass., sez. un.».
+const AFTER_CITATION = /^[\s,(\u2013\u2014-]*(?:(?:della|del|dello|dell['’]|dalla|dal|di|emessa|pronunciata|resa|adottata)\s*)*/u;
 const CORTE_COSTITUZIONALE = /^(?:corte\s+cost|c\.\s*cost)/i;
 const CORTE_DI_AFTER = /^(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+/u;
 
