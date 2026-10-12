@@ -252,7 +252,14 @@ session-only) and «Tutte le schede». A phone leaves out loose articles: its co
 norm blocks only. Behind `VITE_FEATURE_PRACTICE_TABLE` the scopes are «Questa pratica» (the active
 practice, on both breakpoints: every article of every act, its row open or closed, then its decisions
 newest first) and «Tutte le pratiche» (the bar's order, each place named with its practice); a row's
-root registers under its practice's id with the same keys; a decision never read counts nothing (it
+root registers under its practice's id with the same keys, and so does a light window's (the
+surface's `findHostId` prop, which also names the practice for the magnifier's pressed state and
+request; the window's own id stays the way back's and the focus's); `setFindWindowDefaultPlace` lets a
+layout give the window its opening place (`ReadingRow`, in every case: right-aligned in the table's
+column, or the first window's body with the rail, under the stack pinned at its top — the practice header,
+the first act's heading, an open row's toolbar, each marked `data-pinned-head` — and every window's
+header, so never over a control; a dragged place wins; a tool held over the table carries
+`data-floating-tool`, which the rail's overlay does not read as a click away); a decision never read counts nothing (it
 is not in the session's cache); reaching an undrawn match opens its row with its practice made active
 (`revealPracticeRow`, `revealPracticeDecision`), and the window recomputes on a practice switched, a
 row opened or closed, a subject added or removed. `CompareView` then lists the practices' articles. Under «Tutte le schede» the place of the match is one label: a decision tab's own label
@@ -490,14 +497,18 @@ opposite arrow; recording those would fill the stack with stops nobody wants.
 `ReadingBackControl` renders once for the whole app — the stack is global, so a
 per-tab copy would sit inside the very tab an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
-combination for "back" already belongs to the browser. Behind `VITE_FEATURE_PRACTICE_TABLE` the
+combination for "back" already belongs to the browser. With the practices it floats centred above the bar of practices on the desktop (`placement="bottom"`,
+`bottomOffset` from the bar's measured height) and, on a phone, a fixed 80 px up, clear of the services
+pill and the feedback button; the bottom is the one edge the table's sticky headings and the windows' headers leave free;
+the old tabs keep it at the top. Behind `VITE_FEATURE_PRACTICE_TABLE` the
 stack holds two shapes (`BackStackEntry`): `pushReadingBack` keeps an entry whose `tabId` names a
 practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject, place }`, spec §6.3),
 the row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
 so a past text comes back as itself), else found through `findPracticeArticle`,
 live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
-practice made active, the row revealed or the window reopened; `ReadingBackControl` tells its
-`onNavigated` the practice's id); any other entry is kept as given. An entry naming a practice is the
+practice made active, the row revealed or the window reopened, or an open window asked to take focus
+through `windowFocusRequest`, a one-shot signal the window takes atomically; `ReadingBackControl` tells
+its `onNavigated` the practice's id and the entry; a topic-search window is never a target); any other entry is kept as given. An entry naming a practice is the
 practice's even while a tab of the same id is still stored (a seeded practice keeps its tab's id):
 with the flag on the practices are what is drawn, and `moveActToPractice` rewrites only practice entries.
 
@@ -974,18 +985,29 @@ meant to stay split; add new features as new files, not inside the shells:
   workspace is persisted).
 - `features/practice/` — the norm-tab redesign, behind `VITE_FEATURE_PRACTICE_TABLE` (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
-  header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, the topic
-  searches' band `PracticeTopicSearches`, then `PracticeColumn`); `PracticeColumn` (the acts, dragged
+  header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, then
+  `PracticeColumn`; the topic searches are windows beside it on the desktop, and `PracticeTopicSearches`
+  is the band of the phone's table, `PracticePhoneView`); `PracticeColumn` (the acts, dragged
   into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act: its sticky
   heading with Studio, Struttura, PDF and «⋯», the index line of its rows, the rows; the structure
   window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
   only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
-  `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»);
+  `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
+  and on the desktop «Apri accanto»: a row whose subject a window shows folds and says «Aperto accanto ·
+  Chiudi la finestra», so one subject has one mounted reading surface, T5; a phone draws neither);
   `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place, a «⋯» per chip);
   `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column);
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
-  component files). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
+  component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
+  from the pure `besideLayout`: half and half, thirds from 420 px a column, else a 48 px rail that opens
+  the table as an overlay closed by Esc or a click outside; `SearchPanel` mounts it on the desktop in
+  place of the bare table, and with a window beside it reaches past the search page's `ReaderLayout` cap (`max-w-5xl`, about 960 px) to the scroller's
+  width, measured, for that row only) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
+  the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
+  `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`
+  (notes, highlights, discussions, the magnifier and copy), Brocardi in a `ClosedSection`, and no Studio,
+  Studia row, MERL-T entry or graph rail; the `row` variant is today's). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
   (pure: the items in table order, each article from its own `norma_data`, a code's search and index
   copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
   wait for the items to settle and count them; one save at a time per practice, `usePracticeSaving`),
@@ -1000,7 +1022,10 @@ meant to stay split; add new features as new files, not inside the shells:
   height, set by `SearchPanel` on the workspace area: the column's bottom padding keeps its last row
   clear of the bar).
   `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with
-  the flag off none of it is loaded; with it on, searches, the index, decisions, topic searches and
+  the flag off none of it is loaded; with it on, a decision opened from any link lands in its practice
+  and opens beside on the desktop (the window a link was clicked in is never the one a third window
+  replaces) or in place on a phone (`isDesktopViewport`), a norm cited in a window enters its act and
+  opens beside that window (`SearchPanel`: `besideTabId` naming a window), and searches, the index, topic searches and
   the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread, identified
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
@@ -1087,6 +1112,11 @@ meant to stay split; add new features as new files, not inside the shells:
     element is positioned and that no ancestor sets `backdrop-filter`, `filter`,
     `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
     raising the child's value does nothing.
+    The sidebar's navigation scrolls on its own in a low window (`overflow-y-auto`, which clips what hangs
+    out of it) and the document never scrolls (`Layout`'s root is `h-app overflow-hidden`: `index.css`'s utility, `100dvh` with a `100vh` fallback; the practice row's columns are `h-app-row`, that less the content area's 4 rem of padding), so its
+    labels are portalled to the body (`SidebarTooltip`), placed from the control's rectangle; they show
+    for a mouse pointer and on keyboard focus-visible (never after a tap or a click), and go with Esc, a scroll
+    or a resize.
 
 
 26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**

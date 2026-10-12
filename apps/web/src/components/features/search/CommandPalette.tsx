@@ -263,8 +263,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     }
   }, [isOpen]);
 
-  // Handle Escape key
+  // Handle Escape key. Only while open: a closed palette that took every Escape and called
+  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay).
   useEffect(() => {
+    if (!isOpen) return undefined;
     const down = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -274,7 +276,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
 
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [onClose]);
+  }, [isOpen, onClose]);
 
   const handleSelectAct = useCallback((actValue: string) => {
     setSelectedAct(actValue);

@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
   annexes: [{ number: null, label: 'Dispositivo', article_numbers: ['1', '5', '7', '9'] }] as Array<Record<string, unknown>>,
   onViewPdf: vi.fn(),
 }));
-vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => h.desktop }));
+vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => h.desktop, isDesktopViewport: () => h.desktop }));
 vi.mock('../../../services/legalFetch', () => ({ legalFetch: h.legalFetch }));
 vi.mock('../../../utils/actStructureCache', () => ({
   fetchActTree: () => Promise.resolve({ articles: [], metadata: { annexes: h.annexes } }),

@@ -32,14 +32,15 @@ import { shortAct } from '../../../utils/sources';
 import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 import { isPracticeTableEnabled } from '../../../features/practice/featureFlag';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import { findPracticeArticle, practiceArticleKey } from '../../../utils/practice';
+import { besideRefFor, findPracticeArticle, practiceArticleKey } from '../../../utils/practice';
 import { actKeyOf } from '../dossier/dossierLayout';
 import type { PracticeStreaming } from '../practice/PracticeParts';
 
 // The practice's table (spec 2026-10-08-norm-tab-container-design.md, behind
 // VITE_FEATURE_PRACTICE_TABLE): loaded only when the flag draws it, so the old
 // workspace's bundle carries none of it.
-const PracticeTable = lazy(() => import('../practice/PracticeTable').then(m => ({ default: m.PracticeTable })));
+// The desktop's row: the table and the windows beside it (P4).
+const ReadingRow = lazy(() => import('../practice/ReadingRow').then(m => ({ default: m.ReadingRow })));
 const PracticeBar = lazy(() => import('../practice/PracticeBar').then(m => ({ default: m.PracticeBar })));
 const PracticePhoneView = lazy(() => import('../practice/PracticePhoneView').then(m => ({ default: m.PracticePhoneView })));
 const PracticeNotice = lazy(() => import('../practice/PracticeParts').then(m => ({ default: m.PracticeNotice })));
@@ -47,6 +48,14 @@ const PracticeNotice = lazy(() => import('../practice/PracticeParts').then(m => 
 /** A row a search added to a practice (it was not there before): the annex auto-switch removes
  *  the stray rows of the first search, and only those (spec §5.2). */
 interface CreatedRow { practiceId: string; actId: string; articleKey: string }
+/** The bar of practices floats `bottom-6`: 24 px. */
+const BAR_OFFSET = 24;
+/** Where the way back floats on a phone, flag on: above the services pill (`bottom-3`, a line tall) and
+ *  the feedback button (`bottom-6`, 48 px), which sit under it. */
+const PHONE_BACK_OFFSET = 80;
+/** On the desktop before the bar is measured: its least height (`--practice-bar-height`'s 3.75rem). */
+const BAR_MIN_HEIGHT = 60;
+
 /** The rows one search created, named by the search's own params (the object `handleSearch` got). */
 interface CreatedRows { search: SearchParams | null; rows: CreatedRow[] }
 
@@ -131,6 +140,9 @@ export function SearchPanel() {
   const streamingPracticeRef = useRef<string | null>(null);
   const [streamingPracticeId, setStreamingPracticeId] = useState<string | null>(null);
   const createdRowsRef = useRef<CreatedRows>({ search: null, rows: [] });
+  // A search started from a light window (a norm cited in its text): the window that asked and its
+  // practice. The search lands there, and its first article opens beside the window, once.
+  const askerRef = useRef<{ practiceId: string; windowId: string; opened: boolean } | null>(null);
   // The annex auto-switch (§5.2): the first search's stray rows, taken off once the annex search has
   // landed an article (`pendingStrayRef` until that search starts, then `strayRowsRef`); a failed
   // annex search leaves the act as it was.
@@ -257,13 +269,15 @@ export function SearchPanel() {
       if (isPracticeTableEnabled()) {
         const store = appStore.getState();
         // Once the first article has landed, the rest follow it: a closed target is warned once per search.
-        const wanted = streamingPracticeRef.current ?? targetTabId ?? null;
+        const asker = askerRef.current;
+        const wanted = streamingPracticeRef.current ?? targetTabId ?? asker?.practiceId ?? null;
         const landingId = wanted && store.practices.some((p) => p.id === wanted) ? wanted : store.activePracticeId;
         const heldAct = store.practices.find((p) => p.id === landingId)?.acts.find((a) => a.key === actKeyOf(norma));
         const articleKey = practiceArticleKey(result);
         const isNewRow = !heldAct?.articles.some((a) => practiceArticleKey(a) === articleKey);
         const isDeepLinkTarget = deepLinkFocusRef.current === articleUniqueId;
-        const reveal = isDeepLinkTarget || (!targetTabId && (expectedTotalRef.current === 1 || !heldAct));
+        // A norm cited in a window opens beside it, not in the table.
+        const reveal = isDeepLinkTarget || (!targetTabId && !asker && (expectedTotalRef.current === 1 || !heldAct));
         const landed = store.addArticlesToPractice(wanted, norma, [result], {
           ...(reveal ? { reveal: 'first' as const } : {}),
           ...(tabLabel ? { label: tabLabel } : {}),
@@ -273,6 +287,10 @@ export function SearchPanel() {
           setStreamingPracticeId(landed.practiceId);
         }
         if (isNewRow) createdRowsRef.current.rows.push({ practiceId: landed.practiceId, actId: landed.actId, articleKey });
+        if (asker && !asker.opened) {
+          asker.opened = true;
+          store.openBeside(landed.practiceId, besideRefFor({ kind: 'article', actId: landed.actId, articleKey }), asker.windowId);
+        }
         if (strayRowsRef.current.length > 0) {
           // The annex's article is on the table: the main text's stray rows go (never the one just landed).
           const strays = strayRowsRef.current.filter((row) => row.articleKey !== articleKey || row.actId !== landed.actId);
@@ -395,6 +413,12 @@ export function SearchPanel() {
     streamingTabRef.current = null; // Reset streaming tab tracker
     streamingPracticeRef.current = null;
     setStreamingPracticeId(null);
+    const askerPractice = isPracticeTableEnabled() && params.besideTabId
+      ? appStore.getState().practices.find((p) => p.beside.some((b) => b.id === params.besideTabId))
+      : undefined;
+    askerRef.current = askerPractice && params.besideTabId
+      ? { practiceId: askerPractice.id, windowId: params.besideTabId, opened: false }
+      : null;
     createdRowsRef.current = { search: params, rows: [] };
     // Only the annex search the auto-switch asked for takes the stray rows over.
     strayRowsRef.current = params.annex ? pendingStrayRef.current : [];
@@ -729,7 +753,7 @@ export function SearchPanel() {
     }
   }, [searchTrigger, registerSearch]);
 
-  const handleCrossReferenceNavigate = useCallback((articleNumber: string, normaData: ArticleData['norma_data']) => {
+  const handleCrossReferenceNavigate = useCallback((articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => {
     const params: SearchParams = {
       act_type: normaData.tipo_atto,
       act_number: normaData.numero_atto || '',
@@ -743,16 +767,25 @@ export function SearchPanel() {
     // The practices: the text in force of an article of the same act already on the table is revealed,
     // not searched again (T2); a past text of it never stands in for it, so without its row the text
     // in force is loaded as a new row. A past text's jump asks for its own version, so it searches.
+    // Cited from a light window (`askerId`), the row opens beside that window instead of being
+    // revealed in the table (spec §4.5), and a search it needs starts from the window.
     if (isPracticeTableEnabled() && !requestIsHistorical(normaData)) {
-      const { practices, activePracticeId, revealPracticeRow } = appStore.getState();
-      const practice = practices.find((p) => p.id === activePracticeId);
+      const { practices, activePracticeId, revealPracticeRow, openBeside } = appStore.getState();
+      const askerPractice = askerId ? practices.find((p) => p.beside.some((b) => b.id === askerId)) : undefined;
+      const practice = askerPractice ?? practices.find((p) => p.id === activePracticeId);
       const act = practice?.acts.find((a) => a.key === actKeyOf(normaData));
       const articleId = normaData.allegato ? `all${normaData.allegato}:${articleNumber}` : articleNumber;
       const inForce = act && findPracticeArticle(
         { ...act, articles: act.articles.filter((a) => !requestIsHistorical(a.norma_data)) }, articleId);
-      if (practice && act && inForce && revealPracticeRow(practice.id, act.id, practiceArticleKey(inForce))) return;
+      if (practice && act && inForce) {
+        if (askerPractice) {
+          openBeside(practice.id, besideRefFor({ kind: 'article', actId: act.id, articleKey: practiceArticleKey(inForce) }), askerId);
+          return;
+        }
+        if (revealPracticeRow(practice.id, act.id, practiceArticleKey(inForce))) return;
+      }
     }
-    handleSearch(params);
+    handleSearch(askerId ? { ...params, besideTabId: askerId } : params);
   }, [handleSearch]);
 
 
@@ -842,6 +875,9 @@ export function SearchPanel() {
       {/* One global control: the back-stack is global, so a per-tab copy would
           sit inside the very tab an entry points at. */}
       <ReadingBackControl
+        // With the practices it floats above the bar, clear of the act's heading and the windows' headers.
+        placement={practiceTable ? 'bottom' : 'top'}
+        bottomOffset={isDesktop ? (practiceBarHeight ?? BAR_MIN_HEIGHT) + BAR_OFFSET + 12 : PHONE_BACK_OFFSET}
         onNavigated={(tabId) => {
           // The practices: going back already made the practice active, which both breakpoints draw.
           if (!practiceTable && workspaceTabs.some(t => t.id === tabId)) setMobileActiveTabId(tabId);
@@ -862,7 +898,7 @@ export function SearchPanel() {
                 // The column's bottom padding reads it (§3.4); without the bar, its fallback.
                 style={practiceBarHeight === null ? undefined : { ['--practice-bar-height' as string]: `${practiceBarHeight}px` }}
               >
-                <PracticeTable onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
+                <ReadingRow onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
               </div>
               <PracticeBar onHeightChange={setPracticeBarHeight} />
             </>

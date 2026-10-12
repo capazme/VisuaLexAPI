@@ -7,7 +7,7 @@ vi.mock('./useActDetails', () => ({ useActDetails: () => ({ title: null, rubrica
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: { getSnapshots: vi.fn(async () => []) } }));
 vi.mock('../../../services/decisionService', () => ({ fetchDecision }));
-vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
+vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true, isDesktopViewport: () => true }));
 
 import { appStore } from '../../../store/useAppStore';
 import { DossierDetailView } from './DossierDetailView';

@@ -1,8 +1,9 @@
 import { useId, useMemo } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { formatDecisionDeposit } from '../../../utils/decisionLinks';
-import { decisionOrder, decisionRowKey, type PracticeDecision } from '../../../utils/practice';
-import { PracticeRowShell } from './PracticeRowShell';
+import { besideRefFor, decisionOrder, decisionRowKey, decisionWindowId, type PracticeDecision } from '../../../utils/practice';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
 import { DecisionEntryView } from '../decisions/DecisionEntryView';
 
 /**
@@ -37,6 +38,16 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeDecision = useAppStore((s) => s.removePracticeDecision);
+  const openBeside = useAppStore((s) => s.openBeside);
+  const closeBeside = useAppStore((s) => s.closeBeside);
+  const windowId = decisionWindowId(entry.id);
+  const shownBeside = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === windowId) === true);
+  const isDesktop = useIsDesktop();
+  const beside = useMemo<RowBeside | undefined>(() => isDesktop ? {
+    shown: shownBeside,
+    onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'decision', decisionId: entry.id })),
+    onClose: () => closeBeside(practiceId, windowId),
+  } : undefined, [isDesktop, shownBeside, openBeside, closeBeside, practiceId, entry.id, windowId]);
   // «Sentenza depositata il …», once the decision was found: beside the label, never guessed.
   const deposit = formatDecisionDeposit({ tipo: entry.tipo, data_deposito: entry.depositDate });
 
@@ -49,6 +60,7 @@ function PracticeDecisionRow({ practiceId, entry }: { practiceId: string; entry:
       name={entry.label + (deposit ? `, ${deposit}` : '')}
       removeName={entry.label}
       onRemove={() => removePracticeDecision(practiceId, entry.id)}
+      beside={beside}
       header={(
         <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">
           <span className="font-medium text-slate-900 dark:text-white">{entry.label}</span>

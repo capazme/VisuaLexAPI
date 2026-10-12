@@ -1,9 +1,19 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, PanelRightOpen, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 const ICON_BUTTON =
   'flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20';
+
+/** A row that can be read in a window beside the table (desktop only, spec §4.2, T5). */
+export interface RowBeside {
+  /** A window shows this subject: the row folds and says so. */
+  shown: boolean;
+  /** «Apri accanto»; asked of a window already open, it takes focus instead. */
+  onOpen: () => void;
+  /** «Chiudi la finestra»: the subject stays in the table. */
+  onClose: () => void;
+}
 
 export interface PracticeRowShellProps {
   rowKey: string;
@@ -18,7 +28,9 @@ export interface PracticeRowShellProps {
   header: ReactNode;
   /** Set on the open region (e.g. the reading toolbar's pin). */
   regionStyle?: CSSProperties;
-  /** Mounted only while the row is open. */
+  /** Desktop only: «Apri accanto», and the fold of a row whose subject a window shows. */
+  beside?: RowBeside;
+  /** Mounted only while the row is open (and not shown beside). */
   children: ReactNode;
 }
 
@@ -28,9 +40,13 @@ export interface PracticeRowShellProps {
  * the header's: hovering the open text does not wash it. A closed row renders no children.
  */
 export function PracticeRowShell({
-  rowKey, isOpen, onToggle, name, removeName, onRemove, header, regionStyle, children,
+  rowKey, isOpen: open, onToggle, name, removeName, onRemove, header, regionStyle, beside, children,
 }: PracticeRowShellProps) {
   const regionId = `practice-row-${rowKey}`;
+  // One subject, one mounted reading surface (T5): a row shown in a window folds, whatever its stored
+  // state, and comes back as it was when the window closes. Its header then points at the window.
+  const folded = beside?.shown === true;
+  const isOpen = open && !folded;
   return (
     <div
       data-practice-row={rowKey}
@@ -42,15 +58,16 @@ export function PracticeRowShell({
         <div
           role="button"
           tabIndex={0}
-          aria-label={`${isOpen ? 'Comprimi' : 'Espandi'} ${name}`}
-          aria-expanded={isOpen}
+          // Folded because a window shows the subject, the header does not expand: it goes to the window.
+          aria-label={folded ? `Vai alla finestra su ${name}` : `${isOpen ? 'Comprimi' : 'Espandi'} ${name}`}
+          aria-expanded={folded ? undefined : isOpen}
           aria-controls={isOpen ? regionId : undefined}
-          onClick={onToggle}
+          onClick={folded ? beside.onOpen : onToggle}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              onToggle();
+              (folded ? beside.onOpen : onToggle)();
             }
           }}
           className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
@@ -62,6 +79,29 @@ export function PracticeRowShell({
           />
           {header}
         </div>
+        {beside && (folded ? (
+          <span className="flex flex-shrink-0 items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+            Aperto accanto ·
+            <button
+              type="button"
+              onClick={beside.onClose}
+              aria-label={`Chiudi la finestra su ${removeName}`}
+              className="rounded px-1 font-medium text-primary-600 underline hover:text-primary-700 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              Chiudi la finestra
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={beside.onOpen}
+            aria-label={`Apri accanto ${removeName}`}
+            className="flex flex-shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            <PanelRightOpen size={14} aria-hidden />
+            Apri accanto
+          </button>
+        ))}
         <button
           type="button"
           onClick={onRemove}

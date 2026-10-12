@@ -227,3 +227,37 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
         expect(phone).toHaveClass('min-h-[44px]', 'min-w-[44px]');
     });
 });
+
+describe('ReadingToolbar — the compact form of a light window (spec §4.1)', () => {
+    const find = { isOpen: false, onToggle: vi.fn() };
+    // Both rows are mounted, one hidden by CSS: the desktop row is the one with the notes button.
+    const titles = (container: HTMLElement, selector: string) =>
+        [...container.querySelectorAll(`${selector} button, ${selector} a`)].map((b) => b.getAttribute('aria-label') ?? b.getAttribute('title'));
+
+    it('the desktop row holds notes, highlights, discussions, the magnifier and copy, and no «⋯»', () => {
+        const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
+        const row = container.querySelector('div.hidden.md\\:flex') as HTMLElement;
+        expect(titles(row, '')).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Discussioni sull’articolo', 'Cerca nel testo', 'Copia']);
+        expect(screen.queryByTitle('Altre azioni')).not.toBeInTheDocument();
+    });
+
+    it('the phone row holds discussions, the magnifier and copy: no quick norm, dossier, Study Mode or source link', () => {
+        const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
+        const row = container.querySelector('div.flex.md\\:hidden') as HTMLElement;
+        expect(titles(row, '')).toEqual(['Discussioni sull’articolo', 'Cerca nel testo', 'Copia testo']);
+    });
+
+    it('keeps the version chip and the annex badge, which say which text this is', () => {
+        setup({ compact: true, versionChip: HISTORICAL_CHIP, normaData: { tipo_atto: 'legge', data: '1990-08-07', numero_articolo: '1', allegato: 'A' } });
+        expect(screen.getByRole('button', { name: HISTORICAL_CHIP.label })).toBeInTheDocument();
+        expect(screen.getByText('Allegato A')).toBeInTheDocument();
+    });
+
+    it('the row (default) keeps every tool it had', () => {
+        const { container } = setup({ find, url: 'https://example.org/x' });
+        const desktop = container.querySelector('div.hidden.md\\:flex') as HTMLElement;
+        expect(titles(desktop, '')).toEqual(expect.arrayContaining(['Aggiungi a norme rapide', 'Aggiungi a dossier', 'Altre azioni', 'Copia']));
+        const phone = container.querySelector('div.flex.md\\:hidden') as HTMLElement;
+        expect(titles(phone, '')).toEqual(expect.arrayContaining(['Modalità studio', 'Aggiungi a dossier', 'Apri fonte']));
+    });
+});

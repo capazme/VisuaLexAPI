@@ -16,7 +16,7 @@ const env = vi.hoisted(() => ({
   annex: { MAX_MAIN_ARTICLES: 50, MIN_ANNEX_ARTICLES: 10, TOAST_DURATION: 3000, ENABLED: false, AUTO_CONFIRM: true },
 }));
 
-vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop }));
+vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop, isDesktopViewport: () => env.desktop }));
 vi.mock('../workspace/WorkspaceManager', () => ({ WorkspaceManager: () => <div data-testid="old-workspace" /> }));
 vi.mock('../workspace/WorkspaceNavigator', () => ({ WorkspaceNavigator: () => <div data-testid="old-dock" /> }));
 vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
@@ -131,7 +131,7 @@ describe.each([
     expect(s().workspaceTabs).toEqual([]);
   });
 
-  it('a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens in place', async () => {
+  it(`a decision from the palette, a massima or the address enters «Giurisprudenza» once and opens ${desktop ? 'beside, once' : 'in place'}`, async () => {
     const p = s().createPractice('Responsabilità');
     panel();
     act(() => { s().openDecisionTab(REF); });                         // the palette
@@ -141,17 +141,24 @@ describe.each([
     expect(await screen.findAllByTestId('decision-reader')).toHaveLength(1);
     expect(s().practices[0].decisions).toHaveLength(1);
     expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
+    // On the desktop a window shows it and its row folds; on a phone its row is open in place.
+    expect(s().practices[0].beside).toHaveLength(desktop ? 1 : 0);
+    expect(screen.queryAllByTestId('reading-window')).toHaveLength(desktop ? 1 : 0);
   });
 
-  it('a topic search from the palette shows in the band; a decision opened from it enters «Giurisprudenza»', async () => {
+  it(desktop
+    ? 'a topic search from the palette opens a window; a decision opened from it enters «Giurisprudenza» beside it'
+    : 'a topic search from the palette shows in the band; a decision opened from it enters «Giurisprudenza»', async () => {
     s().createPractice('Responsabilità');
     panel();
     act(() => { s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno'); });
-    const band = await screen.findByRole('region', { name: 'Ricerca per tema: danno' });
-    fireEvent.click(within(band).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
+    const place = await screen.findByRole('region', { name: desktop ? 'Tema: danno' : 'Ricerca per tema: danno' });
+    fireEvent.click(within(place).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
     expect(await screen.findByTestId('decision-reader')).toHaveTextContent('n. 12345');
     expect(s().practices[0].decisions.map((d) => d.reference.numero)).toEqual([12345]);
-    expect(s().practices[0].beside).toHaveLength(1); // the search is not a source: it stays a search
+    // The search is not a source: it stays a search. On the desktop the decision is a window beside
+    // it (the search asked, so it is not the one replaced); on a phone it is read in place.
+    expect(s().practices[0].beside.map((b) => b.kind)).toEqual(desktop ? ['decision-search', 'decision'] : ['decision-search']);
   });
 });
 
@@ -319,7 +326,8 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     expect(warn.mock.calls.filter(([message]) => String(message).includes('is not open'))).toHaveLength(1);
   });
 
-  it('a new topic search scrolls its band into view', async () => {
+  it('a new topic search scrolls its band into view (a phone)', async () => {
+    env.desktop = false;
     const p = s().createPractice('P');
     s().addArticlesToPractice(p, CC, [ccArticle('2043')]);
     panel();
@@ -329,14 +337,14 @@ describe('SearchPanel with the practices: the rest of the review (round 1)', () 
     expect(scrolled.mock.contexts).toContain(band);
   });
 
-  it('a decision opened from practice B\'s band enters B, while A holds the same topic', async () => {
+  it('a decision opened from practice B\'s topic window enters B, while A holds the same topic', async () => {
     const a = s().createPractice('A');
     s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
     const b = s().createPractice('B');
     s().openDecisionSearchTab({ tema: 'danno' }, 'Tema: danno');
     panel();
-    const band = await screen.findByRole('region', { name: 'Ricerca per tema: danno' });
-    fireEvent.click(within(band).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
+    const window_ = await screen.findByRole('region', { name: 'Tema: danno' });
+    fireEvent.click(within(window_).getByRole('button', { name: 'Cass. civ., n. 12345/2020' }));
     expect(s().practices.find((p) => p.id === b)?.decisions).toHaveLength(1);
     expect(s().practices.find((p) => p.id === a)?.decisions).toEqual([]);
     expect(s().activePracticeId).toBe(b);
