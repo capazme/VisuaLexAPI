@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from .model import FIRST_YEAR, MAX_NUMERO
+from .model import FIRST_YEAR, MAX_NUMERO, MAX_NUMERO_CAUSA
 
 MAX_SCANNED = 600
 _F = re.IGNORECASE | re.ASCII
@@ -46,11 +46,10 @@ _DATE_YEAR = re.compile(
     r"|\b\d{1,2}[/.-]\d{1,2}[/.-](\d{4})\b",
     _F)
 
-# Courts recognised by name for which VisuaLex has no reader yet: the answer names them. Checked in
-# order: the Italian tax courts are «Corte di giustizia tributaria» since l. 130/2022, so they come
-# before the Court of Justice; a case number's letter names the EU court (T: the General Court).
+# Courts recognised by name for which VisuaLex has no reader yet: the answer names them. The Italian
+# tax courts are «Corte di giustizia tributaria» since l. 130/2022: they are checked before the Court
+# of Justice of the Union, whose name they share.
 _DASH = "[-\u2010\u2011\u2012\u2013\u2014]"
-_EU_CASE = r"(?:causa\s+)?{letter}\s*" + _DASH + r"?\s*\d{{1,4}}\s*/\s*\d{{2,4}}"
 _UNSUPPORTED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(r"^\s*(?:" + pattern + r")(?=[\s,.;:(]|$)", _F), name) for pattern, name in (
         (r"cons(?:iglio)?\.?\s*(?:di\s+)?st(?:ato)?\.?|c\.\s*d\.\s*s\.?|cds",
@@ -63,14 +62,37 @@ _UNSUPPORTED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
          "Corte europea dei diritti dell'uomo"),
         (r"(?:corte|c\.)\s*(?:di\s+)?giust(?:izia)?\.?\s*trib\w*\.?",
          "Corte di giustizia tributaria"),
-        (r"trib(?:unale)?\.?\s+(?:ue|dell['’]\s*unione\s+europea|i\s+grado|di\s+primo\s+grado)|" + _EU_CASE.format(letter="T"),
-         "Tribunale dell'Unione europea"),
-        (r"cgue|c\.\s*g\.\s*u\.\s*e\.?|cgce|corte\s+giust(?:izia)?\.?|c\.\s*giust\.?|corte\s+di\s+giustizia|"
-         + _EU_CASE.format(letter="C"),
-         "Corte di giustizia dell'Unione europea"),
     ))
-# «CGUE, T-612/17» is the General Court: the case number's letter wins over the court's name.
-_GENERAL_COURT_CASE = re.compile(r"\bT\s*" + _DASH + r"?\s*\d{1,4}\s*/\s*\d{2,4}\b", _F)
+# The courts of the Union (design 2026-10-12 §3.4, Q13 decided): a court's name, a case number, or
+# both; the case's letter names the court (C: the Court of Justice, T: the General Court), whatever
+# name precedes it. A case before 1989 has no letter and is read only after the court's name and «causa».
+_TAX_COURT = re.compile(r"^\s*(?:corte|c\.)\s*(?:di\s+)?giust(?:izia)?\.?\s*trib", _F)
+_EU_COURT = re.compile(
+    r"^\s*(?:cgue|c\.\s*g\.\s*u\.\s*e\.?|cgce|corte\s+giust(?:izia)?\.?|c\.\s*giust\.?|corte\s+di\s+giustizia"
+    r"|trib(?:unale)?\.?\s+(?:ue|dell['’]\s*unione\s+europea|i\s+grado|di\s+primo\s+grado))(?=[\s,.;:(]|$)", _F)
+_EU_CASE = re.compile(r"(?<![\w/])([CT])\s*" + _DASH + r"?\s*(\d{1,4})\s*/\s*(\d{4}|\d{2})(?![\d/])", _F)
+_EU_CASE_FIRST = re.compile(r"^\s*(?:causa\s+|cause\s+riunite\s+)?[CT]\s*" + _DASH + r"?\s*\d", _F)
+_OLD_CASE = re.compile(r"\bcausa\s+(\d{1,4})\s*[-/]\s*(\d{2})(?![\d/])", _F)
+
+
+def _eu_reference(scanned: str, today: date) -> dict[str, Any] | None | bool:
+    """The reference to the Court of Justice or the General Court the words name; None when they
+    name one of those courts but not a case they can read; False when they name neither."""
+    court = _EU_COURT.match(scanned)
+    case = _EU_CASE.search(scanned)
+    if court is None and not _EU_CASE_FIRST.match(scanned):
+        return False
+    if case:
+        corte = "corte_giustizia_ue" if case.group(1).upper() == "C" else "tribunale_ue"
+        numero, anno = int(case.group(2)), expand_two_digit_year(case.group(3))
+    else:
+        old = _OLD_CASE.search(scanned) if court else None
+        if old is None or court.group(0).strip().lower().startswith("trib"):
+            return None
+        corte, numero, anno = "corte_giustizia_ue", int(old.group(1)), expand_two_digit_year(old.group(2))
+    if not 1 <= numero <= MAX_NUMERO_CAUSA or not FIRST_YEAR[corte] <= anno <= today.year:
+        return None
+    return {"corte": corte, "numero": numero, "anno": anno}
 
 
 def expand_two_digit_year(raw: str) -> int:
@@ -115,10 +137,12 @@ def read_decision_citation(text: object, today: date | None = None) -> Reading:
     scanned = re.sub(r"\s", " ", text.strip()[:MAX_SCANNED])
     court = _COURT.search(scanned)
     if not court:
+        if not _TAX_COURT.match(scanned):
+            eu = _eu_reference(scanned, today)
+            if eu is not False:
+                return Reading(riferimento=eu) if eu else Reading()
         for pattern, name in _UNSUPPORTED:
             if pattern.search(scanned):
-                if name.startswith("Corte di giustizia dell") and _GENERAL_COURT_CASE.search(scanned):
-                    name = "Tribunale dell'Unione europea"
                 return Reading(corte_non_supportata=name)
         return Reading()
     corte = "corte_costituzionale" if court.group(1) else "cassazione"

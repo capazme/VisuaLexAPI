@@ -6,6 +6,12 @@ const SENTENZA = {
   data_deposito: '2024-03-12', etichetta: 'Cass. pen., sez. VII, sent. dep. 12 marzo 2024, n. 10787',
 };
 
+// A judgment of the Court of Justice as the dossier keeps it (golden file, cgue-c-634-21).
+const CGUE = {
+  corte: 'corte_giustizia_ue', numero: 634, anno: 2021, sezione: 'I', tipo: 'sentenza',
+  data_decisione: '2023-12-07', etichetta: 'Corte giust. UE, C-634/21',
+};
+
 describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
   let owner: TestUser;
   let dossierId: string;
@@ -32,7 +38,7 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     ['number zero', { ...SENTENZA, numero: 0 }],
     ['a year in the future', { ...SENTENZA, anno: new Date().getFullYear() + 1 }],
     ['an unknown key', { ...SENTENZA, testo: 'il testo intero' }],
-    ['a label too long', { ...SENTENZA, etichetta: 'x'.repeat(201) }],
+    ['a label too long', { ...SENTENZA, etichetta: 'x'.repeat(601) }],
     ['a date with no such month', { ...SENTENZA, data_deposito: '2024-13-05' }],
     ['a Corte costituzionale decision with a section',
       { corte: 'corte_costituzionale', numero: 1, anno: 2014, sezione: '3', etichetta: 'Corte cost. n. 1/2014' }],
@@ -41,10 +47,26 @@ describe('dossier items of type sentenza (design 2026-10-01 §6)', () => {
     ['a Corte costituzionale decision with an archive',
       { corte: 'corte_costituzionale', numero: 1, anno: 2014, archivio: 'civile', etichetta: 'Corte cost. n. 1/2014' }],
     ['a star that is not a boolean', { ...SENTENZA, _dossierMeta: { important: 'x' } }],
+    ['a Cassazione decision with a formation of the Union', { ...SENTENZA, sezione: 'grande' }],
+    ['a Cassazione decision with joined cases', { ...SENTENZA, cause_riunite: ['C-1/20', 'C-2/20'] }],
+    ['a case of the Union over four digits', { ...CGUE, numero: 10000 }],
+    ['a case of the General Court before 1989', { ...CGUE, corte: 'tribunale_ue', anno: 1988 }],
+    ['a case of the Union with an archive', { ...CGUE, archivio: 'civile' }],
+    ['a case of the Union with a Cassazione section', { ...CGUE, sezione: 'U' }],
+    ['a joined case written otherwise', { ...CGUE, cause_riunite: ['C-634/21', 'causa X'] }],
   ])('refuses %s', async (_label, content) => {
     const res = await add({ itemType: 'sentenza', title: 'x', content });
     expect(res.status).toBe(400);
     expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(0);
+  });
+
+  it('keeps a judgment of the Court of Justice, cited by its case (design 2026-10-12 §3.2)', async () => {
+    const res = await add({ itemType: 'sentenza', title: 'x', content: {
+      ...CGUE, numero: 293, anno: 2012, sezione: 'grande', data_decisione: '2014-04-08',
+      cause_riunite: ['C-293/12', 'C-594/12'], etichetta: 'qualunque' } });
+    expect(res.status).toBe(201);
+    expect(res.body.citation).toBe('Corte giust. UE, grande sez., sent. 8 aprile 2014, cause riunite C-293/12 e C-594/12');
+    expect(res.body.title).toBe(res.body.citation);
   });
 
   it('stores its own citation as the label, whatever the client sent (D9: «A ogni scrittura»)', async () => {

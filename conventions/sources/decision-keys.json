@@ -1,6 +1,6 @@
 {
  "version": 1,
- "note": "Decision keys read back to their identity (null = refused). {currentYear} and {nextYear} are replaced by the year of the reader's clock.",
+ "note": "Decision keys read back to their identity (null = refused). {currentYear} and {nextYear} are replaced by the year of the reader's clock. The courts of the Union are named by their case (design 2026-10-12 §3.1, Q10): a number of at most four digits, from 1953 (Court of Justice) and 1989 (General Court).",
  "cases": [
   {
    "key": "cassazione:civile:99999:2024",
@@ -168,6 +168,94 @@
   },
   {
    "key": "Cassazione:civile:99999:2024",
+   "identity": null
+  },
+  {
+   "key": "corte_giustizia_ue:634:2021",
+   "identity": {
+    "corte": "corte_giustizia_ue",
+    "numero": 634,
+    "anno": 2021
+   }
+  },
+  {
+   "key": "corte_giustizia_ue:26:1962",
+   "identity": {
+    "corte": "corte_giustizia_ue",
+    "numero": 26,
+    "anno": 1962
+   }
+  },
+  {
+   "key": "corte_giustizia_ue:9999:1953",
+   "identity": {
+    "corte": "corte_giustizia_ue",
+    "numero": 9999,
+    "anno": 1953
+   }
+  },
+  {
+   "key": "tribunale_ue:612:2017",
+   "identity": {
+    "corte": "tribunale_ue",
+    "numero": 612,
+    "anno": 2017
+   }
+  },
+  {
+   "key": "tribunale_ue:1:1989",
+   "identity": {
+    "corte": "tribunale_ue",
+    "numero": 1,
+    "anno": 1989
+   }
+  },
+  {
+   "key": "tribunale_ue:1:{currentYear}",
+   "identity": {
+    "corte": "tribunale_ue",
+    "numero": 1,
+    "anno": "{currentYear}"
+   }
+  },
+  {
+   "key": "corte_giustizia_ue:1:1952",
+   "identity": null
+  },
+  {
+   "key": "tribunale_ue:1:1988",
+   "identity": null
+  },
+  {
+   "key": "corte_giustizia_ue:10000:2021",
+   "identity": null
+  },
+  {
+   "key": "corte_giustizia_ue:0634:2021",
+   "identity": null
+  },
+  {
+   "key": "corte_giustizia_ue:0:2021",
+   "identity": null
+  },
+  {
+   "key": "tribunale_ue:1:{nextYear}",
+   "identity": null
+  },
+  {
+   "key": "corte_giustizia_ue:civile:634:2021",
+   "identity": null
+  },
+  {
+   "key": "corte_giustizia_ue:C-634/21",
+   "identity": null
+  },
+  {
+   "key": "cgue:634:2021",
+   "identity": null
+  },
+  {
+   "key": "tribunale_ue:612:2017 ",
    "identity": null
   }
  ]

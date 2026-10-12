@@ -306,10 +306,19 @@ def _section(code: Optional[str]) -> Optional[str]:
     return f"sez. {_ROMAN.get(head, head)}{dash}{tail}"
 
 
+_EU_COURT_NAMES = {"corte_giustizia_ue": "Corte giust. UE", "tribunale_ue": "Trib. UE"}
+
+
 def decision_short(corte: str, numero: int, anno: Optional[int], archivio: Optional[str] = None,
                    sezione: Optional[str] = None, rv: Optional[list[str]] = None) -> str:
     """"Cass. civ., sez. un., n. 31310/2024", "Corte cost., n. 71/2020"; with the massime,
     "… · Rv. 673165-01" (D2 of 4 October 2026)."""
+    if corte in _EU_COURT_NAMES:
+        # by the case (design 2026-10-12 §3.2): «Corte giust. UE, C-634/21», «Trib. UE, T-612/17»,
+        # a Court of Justice case before 1989 with no letter («26/62»)
+        letter = "T" if corte == "tribunale_ue" else ("C" if anno and anno >= 1989 else "")
+        case = f"{letter}-{numero}" if letter else f"{numero}"
+        return f"{_EU_COURT_NAMES[corte]}, {case}/{anno % 100:02d}" if anno else f"{_EU_COURT_NAMES[corte]}, {numero}"
     number = f"n. {numero}/{anno}" if anno else f"n. {numero}"
     if corte == "corte_costituzionale":
         head = ["Corte cost."]

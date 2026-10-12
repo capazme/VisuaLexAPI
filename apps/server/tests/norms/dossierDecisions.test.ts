@@ -22,6 +22,7 @@ const READINGS: Record<string, unknown> = {
   'Cass. civ. 77/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 77, anno: 2024 } },
   'Cass. civ. 88/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 88, anno: 2024 } },
   'Cons. Stato, sez. VI, n. 2270/2019': { corte_non_supportata: 'Consiglio di Stato' },
+  'CGUE, C-594/12': { riferimento: { corte: 'corte_giustizia_ue', numero: 594, anno: 2012 } },
   'Cass. civ. 66/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 66, anno: 2024 } },
   'Cass. civ. 55/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 55, anno: 2024 } },
 };
@@ -57,6 +58,14 @@ function stubPythonApi(fetchDelayMs = 0) {
     fetchBodies.push(body);
     const { corte, numero, archivio } = body;
     if (corte === 'corte_costituzionale' && numero === 71) return found(COST_71);
+    // a joined case: the judgment is filed under the first case
+    if (corte === 'corte_giustizia_ue' && numero === 594) {
+      return found({
+        identita: { corte: 'corte_giustizia_ue', numero: 293, anno: 2012 },
+        attributi: { tipo: 'sentenza', sezione: 'grande', data_decisione: '2014-04-08', ecli: 'ECLI:EU:C:2014:238',
+          parti: 'non conservate', cause_riunite: ['C-293/12', 'C-594/12'], lingua_processuale: "l'inglese" },
+      });
+    }
     if (numero === 31310) return found(SU_31310);
     if (numero === 10787 && !archivio) {
       return [200, { esito: 'ambigua', candidati: [
@@ -129,6 +138,18 @@ describe('POST /api/dossiers/:id/decisions', () => {
     const read = await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice));
     expect(read.body.items.map((i: { citation: string }) => i.citation)).toEqual([
       'Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310', 'Corte cost., sent. 24 aprile 2020, n. 71']);
+  });
+
+  it('adds a judgment of the Court of Justice cited by a joined case, under the first case', async () => {
+    const response = await addDecisions(alice, dossierId, ['CGUE, C-594/12']);
+    expect(response.body.results).toEqual([expect.objectContaining({
+      outcome: 'added', citation: 'Corte giust. UE, grande sez., sent. 8 aprile 2014, cause riunite C-293/12 e C-594/12' })]);
+    const [item] = await prisma.dossierItem.findMany({ where: { dossierId } });
+    expect(item.content).toEqual({
+      corte: 'corte_giustizia_ue', numero: 293, anno: 2012, sezione: 'grande', tipo: 'sentenza',
+      data_decisione: '2014-04-08', cause_riunite: ['C-293/12', 'C-594/12'],
+      etichetta: 'Corte giust. UE, grande sez., sent. 8 aprile 2014, cause riunite C-293/12 e C-594/12',
+    });
   });
 
   it('adds a decision once, by its key: in the dossier already, or twice in the call', async () => {
