@@ -503,8 +503,9 @@ practice or a window beside it as a `PracticeBackEntry` (`{ practiceId, subject,
 the row named by the entry's `articleKey` when a practice's row gave one (its `readingOrigin.articleKey`,
 so a past text comes back as itself), else found through `findPracticeArticle`,
 live while its practice holds the subject, and `popReadingBack` walks back to it itself (the
-practice made active, the row revealed or the window reopened; `ReadingBackControl` tells its
-`onNavigated` the practice's id); any other entry is kept as given. An entry naming a practice is the
+practice made active, the row revealed or the window reopened, or an open window asked to take focus
+through `windowFocusRequest`, a one-shot signal the window takes atomically; `ReadingBackControl` tells
+its `onNavigated` the practice's id and the entry; a topic-search window is never a target); any other entry is kept as given. An entry naming a practice is the
 practice's even while a tab of the same id is still stored (a seeded practice keeps its tab's id):
 with the flag on the practices are what is drawn, and `moveActToPractice` rewrites only practice entries.
 
@@ -967,21 +968,25 @@ meant to stay split; add new features as new files, not inside the shells:
   workspace is persisted).
 - `features/practice/` — the norm-tab redesign, behind `VITE_FEATURE_PRACTICE_TABLE` (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
-  header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, the topic
-  searches' band `PracticeTopicSearches`, then `PracticeColumn`); `PracticeColumn` (the acts, dragged
+  header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, then
+  `PracticeColumn`; the topic searches are windows beside it on the desktop, and `PracticeTopicSearches`
+  is the band of the phone's table, `PracticePhoneView`); `PracticeColumn` (the acts, dragged
   into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act: its sticky
   heading with Studio, Struttura, PDF and «⋯», the index line of its rows, the rows; the structure
   window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
   only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
-  `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»);
+  `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
+  and on the desktop «Apri accanto»: a row whose subject a window shows folds and says «Aperto accanto ·
+  Chiudi la finestra», so one subject has one mounted reading surface, T5; a phone draws neither);
   `PracticeBar` + `PracticeChip` (the bar of practices in the dock's place, a «⋯» per chip);
   `PracticePhoneView` (the phone's table: chevrons, name and dots over the same column);
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths
   from the pure `besideLayout`: half and half, thirds from 420 px a column, else a 48 px rail that opens
-  the table as an overlay closed by Esc or a click outside; not yet mounted by `SearchPanel` before the
-  routing of «Apri accanto») and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
+  the table as an overlay closed by Esc or a click outside; `SearchPanel` mounts it on the desktop in
+  place of the bare table, and with a window beside it reaches past Layout's `max-w-7xl` to the scroller's
+  width, measured, for that row only) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
   the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
   `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`
   (notes, highlights, discussions, the magnifier and copy), Brocardi in a `ClosedSection`, and no Studio,
@@ -1000,7 +1005,10 @@ meant to stay split; add new features as new files, not inside the shells:
   height, set by `SearchPanel` on the workspace area: the column's bottom padding keeps its last row
   clear of the bar).
   `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`), so with
-  the flag off none of it is loaded; with it on, searches, the index, decisions, topic searches and
+  the flag off none of it is loaded; with it on, a decision opened from any link lands in its practice
+  and opens beside on the desktop (the window a link was clicked in is never the one a third window
+  replaces) or in place on a phone (`isDesktopViewport`), a norm cited in a window enters its act and
+  opens beside that window (`SearchPanel`: `besideTabId` naming a window), and searches, the index, topic searches and
   the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread, identified
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.

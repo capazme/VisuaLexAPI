@@ -4,6 +4,17 @@ import { useState, useEffect } from 'react';
 const DESKTOP_QUERY = '(min-width: 768px)';
 
 /**
+ * Whether the viewport is desktop-sized, read once: for a store action, which has no component to
+ * hold `useIsDesktop`. Without `matchMedia` (a test environment) the desktop is assumed, as the
+ * hook's own initial state does outside a window.
+ */
+export function isDesktopViewport(): boolean {
+  return typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+    ? true
+    : window.matchMedia(DESKTOP_QUERY).matches;
+}
+
+/**
  * `true` when the viewport is desktop-sized.
  *
  * Deliberately minimal — no SSR handling, no configurable breakpoint. Use it

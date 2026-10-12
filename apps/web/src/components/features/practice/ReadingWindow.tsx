@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ComponentProps } from 'react';
 import { X } from 'lucide-react';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
@@ -16,7 +16,8 @@ import { DecisionSearchTabView } from '../decisions/DecisionSearchTabView';
  *  keeps the same bottom padding as the column (spec §3.4). */
 const BODY_PADDING_BOTTOM = 'pb-[calc(var(--practice-bar-height,3.75rem)+2.25rem)]';
 
-type OnCrossReference = (articleNumber: string, normaData: ArticleData['norma_data']) => void;
+/** A norm cited in a window's text: `askerId` is the window, which the cited article opens beside. */
+type OnCrossReference = (articleNumber: string, normaData: ArticleData['norma_data'], askerId?: string) => void;
 
 /** What a window shows, found again in its practice: an article of an act, a decision entry, or a
  *  topic search (which holds its own query). Null when the practice no longer holds the subject. */
@@ -64,12 +65,23 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference }: Readi
   const subject = subjectOf(practice, besideRef);
   const title = titleOf(subject);
 
+  // Asked for again (a link, the way back), the window takes focus: one request, taken atomically
+  // (gotcha 14), so a second invocation finds nothing.
+  const sectionRef = useRef<HTMLElement>(null);
+  const focusRequested = useAppStore((s) => s.windowFocusRequest === besideRef.id);
+  const takeFocusRequest = useAppStore((s) => s.takeWindowFocusRequest);
+  useEffect(() => {
+    if (focusRequested && takeFocusRequest(besideRef.id)) sectionRef.current?.focus();
+  }, [focusRequested, takeFocusRequest, besideRef.id]);
+
   return (
     <section
+      ref={sectionRef}
+      tabIndex={-1}
       aria-label={title}
       data-testid="reading-window"
       data-window-id={besideRef.id}
-      className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+      className="flex h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
     >
       <header
         data-reading-window-header
@@ -112,6 +124,12 @@ function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }:
     [besideRef.id, actId, articleKey],
   );
 
+  // A norm cited in this window's text opens beside it: the window asks.
+  const onCited = useCallback<NonNullable<ComponentProps<typeof ArticleTabContent>['onCrossReferenceNavigate']>>(
+    (articleNumber, normaData) => onCrossReference(articleNumber, normaData, besideRef.id),
+    [onCrossReference, besideRef.id],
+  );
+
   if (!subject) {
     return <p className="text-sm text-slate-500 dark:text-slate-400">Questo testo non è più sul tavolo della pratica.</p>;
   }
@@ -119,7 +137,7 @@ function ReadingWindowBody({ practiceId, besideRef, subject, onCrossReference }:
     return (
       <ArticleTabContent
         data={subject.article}
-        onCrossReferenceNavigate={onCrossReference}
+        onCrossReferenceNavigate={onCited}
         readingOrigin={readingOrigin}
         findHostId={practiceId}
         variant="beside"

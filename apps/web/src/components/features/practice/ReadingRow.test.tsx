@@ -71,6 +71,7 @@ const pxOf = (el: Element | null) => parseFloat((el as HTMLElement | null)?.styl
 function fakeRect(this: Element): DOMRect {
   const id = this.getAttribute('data-testid');
   if (id === 'reading-row') return box(AREA_LEFT, AREA_TOP, areaWidth, 800);
+  if (id === 'results-area') return box(AREA_LEFT, AREA_TOP, 1216, 800);
   const columnLeft = (column: Element) => {
     let left = AREA_LEFT;
     for (let sibling = column.previousElementSibling; sibling; sibling = sibling.previousElementSibling) left += pxOf(sibling);
@@ -224,6 +225,49 @@ describe('ReadingRow — widths (besideLayout)', () => {
     resizeTo(1400);
     expect(screen.getByTestId('practice-table')).toBeInTheDocument();
     expect(screen.queryByTestId('practice-rail')).not.toBeInTheDocument();
+  });
+});
+
+describe('ReadingRow — past the page\'s width cap while a window is beside', () => {
+  /** Layout's shape: a scroller, a padded `max-w-7xl` container, the results area, the row. */
+  function inPage() {
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    Object.defineProperty(scroller, 'clientWidth', { value: 1500 });
+    const container = document.createElement('div');
+    container.style.paddingLeft = '32px';
+    const area = document.createElement('div');
+    area.setAttribute('data-testid', 'results-area');
+    scroller.appendChild(container);
+    container.appendChild(area);
+    document.body.appendChild(scroller);
+    return area;
+  }
+  const root = () => screen.getByTestId('reading-row');
+
+  it('takes the scroller\'s width less the gutter, centred: 1500 - 64 against the area\'s 1216', () => {
+    areaWidth = 1436;
+    practiceWithWindows(2);
+    render(row(), { container: inPage() });
+    expect(root().style.marginInline).toBe('-110px');
+    expect(root().style.width).toBe('calc(100% + 220px)');
+  });
+
+  it('with no window the row keeps the page\'s measure', () => {
+    areaWidth = 1216;
+    practiceWithWindows(0);
+    render(row(), { container: inPage() });
+    expect(root().style.marginInline).toBe('');
+    expect(root().style.width).toBe('');
+  });
+
+  it('goes back to the page\'s measure when the last window closes', () => {
+    areaWidth = 1436;
+    const { practiceId, refs } = practiceWithWindows(1);
+    render(row(), { container: inPage() });
+    expect(root().style.marginInline).toBe('-110px');
+    act(() => s().closeBeside(practiceId, refs[0].id));
+    expect(root().style.marginInline).toBe('');
   });
 });
 

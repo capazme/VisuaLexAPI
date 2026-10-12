@@ -21,16 +21,40 @@ const OVERLAY_ID = 'reading-row-overlay';
  *  place while the table beside it scrolls (the windows are in-flow columns, spec §4). */
 const COLUMN_FRAME = 'sticky top-4 h-[calc(100vh-2rem)] flex-none';
 
-/** The width of `ref`'s element, kept current by a `ResizeObserver`. Before it is measured, the
- *  results area's. */
-function useElementWidth(ref: RefObject<HTMLElement | null>): number {
+/** The nearest ancestor that scrolls: the page's content scroller, which the results area sits in. */
+function scrollParentOf(el: HTMLElement): HTMLElement | null {
+  for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === 'auto' || overflowY === 'scroll') return node;
+  }
+  return null;
+}
+
+/**
+ * The row's width, kept current by a `ResizeObserver`, and — when `wide` — how far past its parent
+ * it may reach on each side. Layout caps the results area at `max-w-7xl`, under the 1260 px that
+ * three columns need; with a window beside, the row takes the scroller's full width (less the
+ * gutter the page keeps), measured here rather than assumed, and only for this row: Layout and the
+ * other routes are untouched. Before it is measured, the results area's width.
+ */
+function useRowWidth(ref: RefObject<HTMLElement | null>, wide: boolean): { width: number; overshoot: number } {
   const [width, setWidth] = useState(() => workspaceOrigin().width);
+  const [overshoot, setOvershoot] = useState(0);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const parent = el.parentElement;
+    const scroller = wide ? scrollParentOf(el) : null;
     const measure = () => {
       const measured = el.getBoundingClientRect().width;
       if (measured > 0) setWidth(measured);
+      if (!wide || !parent || !scroller) {
+        setOvershoot(0);
+        return;
+      }
+      const gutter = parseFloat(getComputedStyle(scroller.firstElementChild ?? scroller).paddingLeft) || 0;
+      const usable = scroller.clientWidth - 2 * gutter;
+      setOvershoot(Math.max(0, Math.round(usable - parent.getBoundingClientRect().width)));
     };
     measure();
     if (typeof ResizeObserver === 'undefined') {
@@ -39,9 +63,11 @@ function useElementWidth(ref: RefObject<HTMLElement | null>): number {
     }
     const observer = new ResizeObserver(measure);
     observer.observe(el);
+    if (parent) observer.observe(parent);
+    if (scroller) observer.observe(scroller);
     return () => observer.disconnect();
-  }, [ref]);
-  return width;
+  }, [ref, wide]);
+  return { width, overshoot };
 }
 
 /**
@@ -61,7 +87,7 @@ export function ReadingRow(props: PracticeTableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   const railButtonRef = useRef<HTMLButtonElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const width = useElementWidth(rootRef);
+  const { width, overshoot } = useRowWidth(rootRef, count > 0);
   const layout = besideLayout(width, count);
   const isRail = layout.table === 'rail';
 
@@ -145,7 +171,13 @@ export function ReadingRow(props: PracticeTableProps) {
   const tableWidth = layout.table === 'rail' ? undefined : layout.table;
 
   return (
-    <div ref={rootRef} data-testid="reading-row" className="relative flex w-full items-start">
+    <div
+      ref={rootRef}
+      data-testid="reading-row"
+      className="relative flex w-full items-start"
+      // Past the page's cap on both sides, centred, while a window is beside.
+      style={overshoot > 0 ? { marginInline: -overshoot / 2, width: `calc(100% + ${overshoot}px)` } : undefined}
+    >
       {isRail ? (
         practice && (
           <div data-testid="reading-row-rail" className={COLUMN_FRAME} style={{ width: RAIL_WIDTH }}>

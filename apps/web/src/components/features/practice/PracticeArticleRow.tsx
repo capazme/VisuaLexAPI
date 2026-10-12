@@ -6,8 +6,9 @@ import { articleLabel } from '../dossier/dossierLayout';
 import { getRubricText, parseArticleStructure } from '../../../utils/articleStructure';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
 import { shortNorm } from '../../../utils/sources';
-import { PracticeRowShell } from './PracticeRowShell';
-import { articleRowKey, practiceArticleKey } from '../../../utils/practice';
+import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
+import { articleRowKey, articleWindowId, besideRefFor, practiceArticleKey } from '../../../utils/practice';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
 export interface PracticeArticleRowProps {
   practiceId: string;
@@ -33,6 +34,17 @@ export function PracticeArticleRow({
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
+  const openBeside = useAppStore((s) => s.openBeside);
+  const closeBeside = useAppStore((s) => s.closeBeside);
+  const windowId = articleWindowId(actId, articleKey);
+  const shownBeside = useAppStore((s) => s.practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === windowId) === true);
+  // Windows exist on the desktop only (P5 gives the phone its full-screen reader).
+  const isDesktop = useIsDesktop();
+  const beside = useMemo<RowBeside | undefined>(() => isDesktop ? {
+    shown: shownBeside,
+    onOpen: () => openBeside(practiceId, besideRefFor({ kind: 'article', actId, articleKey })),
+    onClose: () => closeBeside(practiceId, windowId),
+  } : undefined, [isDesktop, shownBeside, openBeside, closeBeside, practiceId, actId, articleKey, windowId]);
 
   const { norma_data: norma } = article;
   const text = article.article_text || '';
@@ -60,6 +72,7 @@ export function PracticeArticleRow({
       name={named}
       removeName={named}
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
+      beside={beside}
       header={(
         <>
           <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">

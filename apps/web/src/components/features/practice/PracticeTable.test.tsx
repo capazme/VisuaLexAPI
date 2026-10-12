@@ -108,15 +108,13 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(screen.queryByTestId('practice-streaming')).toBeNull();
   });
 
-  it('draws the topic searches in a band at the top of the column, closed by its ×', () => {
+  it('draws no band for the topic searches: on the desktop they are windows beside the table', () => {
     vi.stubEnv('VITE_FEATURE_PRACTICE_TABLE', 'true');
     s().addArticlesToPractice(null, L24, [article(L24, '5')]);
-    const id = s().openDecisionSearchTab({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
+    s().openDecisionSearchTab({ tema: 'perdita di chance' }, 'Tema: perdita di chance');
     render(table());
-    const band = screen.getByRole('region', { name: 'Ricerca per tema: perdita di chance' });
-    expect(within(band).getByTestId('topic-list')).toHaveAttribute('data-tab', id);
-    fireEvent.click(screen.getByRole('button', { name: 'Chiudi la ricerca per tema «perdita di chance»' }));
     expect(screen.queryByRole('region', { name: /Ricerca per tema/ })).toBeNull();
+    expect(screen.queryByTestId('topic-list')).toBeNull();
   });
 
   it('the migration\'s notice: shown once, as an info toast that stays until closed, in the toast band over the bar', () => {

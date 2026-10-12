@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { isPracticeBackEntry, peekReadingBack } from '../../../utils/readingBackStack';
+import { isPracticeBackEntry, peekReadingBack, type PracticeBackEntry } from '../../../utils/readingBackStack';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 
@@ -18,11 +18,13 @@ import { Z_INDEX } from '../../../constants/zIndex';
  */
 interface ReadingBackControlProps {
   /**
-   * Fired with the tab that was returned to, or the practice (flag on). The mobile layout tracks the
-   * visible tab in its own index rather than through the store's front-tab
-   * ordering, so it needs telling; on desktop nothing has to listen.
+   * Fired with the tab that was returned to, or the practice (flag on) and, for a practice, the entry
+   * walked back to: its subject and whether it was read in the table or beside it (spec §6.3), for
+   * a view that must follow (the phone's reader, P5). The mobile layout tracks the visible tab in
+   * its own index rather than through the store's front-tab ordering, so it needs telling; on
+   * desktop nothing has to listen.
    */
-  onNavigated?: (tabId: string) => void;
+  onNavigated?: (tabId: string, entry?: PracticeBackEntry) => void;
 }
 
 export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
@@ -46,7 +48,7 @@ export function ReadingBackControl({ onNavigated }: ReadingBackControlProps) {
     // A practice's entry is walked back to by the store itself (spec §6.3: its practice made active,
     // its row revealed); only the flag pushes one. The listener learns which practice.
     if (isPracticeBackEntry(entry)) {
-      onNavigated?.(entry.practiceId);
+      onNavigated?.(entry.practiceId, entry);
       return;
     }
     bringTabToFront(entry.tabId);

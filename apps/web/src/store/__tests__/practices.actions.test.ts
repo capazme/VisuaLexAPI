@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { appStore } from '../useAppStore';
-import { articleRowKey, decisionRowKey, practiceArticleKey, MAX_PRACTICE_LABEL, type Practice } from '../../utils/practice';
+import { articleRowKey, decisionRowKey, decisionWindowId, practiceArticleKey, MAX_PRACTICE_LABEL, type Practice } from '../../utils/practice';
 import { shortAct } from '../../utils/sources';
 import { CC_BARE, CC_RD, L24, L241, article } from '../../utils/__fixtures__/savedWorkspaces';
 
@@ -544,9 +544,21 @@ describe('an action that would change nothing returns before set (review M1)', (
     const { practiceId } = seeded();
     return () => { s().reorderPractices(0, 0); s().reorderPractices(0, 5); s().reorderActs(practiceId, 0, 0); s().reorderActs('nope', 0, 1); };
   });
-  quietly('openDecision on an entry whose window is already open', () => {
+  it('openDecision on an entry whose window is already open asks that window to take focus, once, and writes nothing else', () => {
+    const { decisionId } = s().openDecision(WIDE);
+    const practices = s().practices;
+    expect(s().windowFocusRequest).toBeNull();
     s().openDecision(WIDE);
-    return () => { s().openDecision(WIDE); };
+    expect(s().practices).toBe(practices);
+    expect(s().windowFocusRequest).toBe(decisionWindowId(decisionId));
+    // Asked again while the request is pending: nothing to write.
+    const setItem = vi.spyOn(localStorage, 'setItem');
+    s().openDecision(WIDE);
+    expect(setItem).not.toHaveBeenCalled();
+    // The window takes the request atomically, once.
+    expect(s().takeWindowFocusRequest(decisionWindowId(decisionId))).toBe(true);
+    expect(s().takeWindowFocusRequest(decisionWindowId(decisionId))).toBe(false);
+    expect(s().windowFocusRequest).toBeNull();
   });
   it('setDecisionEntryIdentity with the same identity keeps the practices reference and writes nothing', () => {
     const { practiceId, decisionId } = s().openDecision(WIDE);
