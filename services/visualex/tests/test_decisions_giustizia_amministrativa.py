@@ -58,10 +58,17 @@ def test_every_measure_is_listed_with_its_kind_and_link_on_the_document_host():
     assert document_format(results[1].url) == "html"
 
 
-def test_an_answer_with_no_list_is_a_changed_source_and_an_empty_one_is_none():
+def test_an_answer_with_no_count_is_a_changed_source_and_a_count_of_zero_is_none():
     with pytest.raises(SourceChanged):
         read_results("<html><body>errore</body></html>")
-    assert read_results("<html><body>Nessun risultato trovato</body></html>") == []
+    with pytest.raises(SourceChanged):
+        read_results("<html><body>Nessun risultato trovato</body></html>")
+    assert read_results("<html><body><h2>Trovati <strong>0</strong> risultati</h2></body></html>") == []
+
+
+def test_results_announced_and_not_read_are_a_changed_source():
+    with pytest.raises(SourceChanged):
+        read_results("<html><body><section>Trovati 2 risultati</section><div>altro</div></body></html>")
 
 
 def test_the_document_is_read_into_three_blocks_without_metadata_or_german():
@@ -108,7 +115,8 @@ async def test_a_lookup_is_the_page_the_search_and_the_document(monkeypatch):
     reader = GiustiziaAmministrativaReader()
     results = await reader.search("Consiglio di Stato", 42, 2099)
     sentenza = next(r for r in results if r.kind == "SENTENZA")
-    assert (await reader.text(sentenza))["dispositivo"].startswith("P.Q.M.")
+    testo, published = await reader.text(sentenza)
+    assert testo["dispositivo"].startswith("P.Q.M.") and published == "2099-02-01"
     assert [c[0] for c in client.calls] == ["GET", "POST", "GET"]
     assert client.calls[1][1].endswith("p_auth=tok3n")
 
@@ -119,6 +127,41 @@ async def test_a_pdf_or_a_foreign_link_is_not_fetched(monkeypatch):
     pdf = ga.Result("SENTENZA", "CONSIGLIO DI STATO", None, 2026, 1, None, None,
                     "https://mdp.giustizia-amministrativa.it/visualizza/?nomeFile=202600001_11.pdf")
     foreign = ga.Result("SENTENZA", "x", None, 2026, 1, None, None, "https://example.org/?nomeFile=a.html")
-    assert await GiustiziaAmministrativaReader().text(pdf) == {}
-    assert await GiustiziaAmministrativaReader().text(foreign) == {}
+    assert await GiustiziaAmministrativaReader().text(pdf) == ({}, None)
+    assert await GiustiziaAmministrativaReader().text(foreign) == ({}, None)
     assert client.calls == []
+
+
+# --- from a result to a decision ---------------------------------------------------------------
+
+def test_the_kind_is_the_eclis_suffix_and_a_parere_is_left_out():
+    sentenza, ordinanza = read_results(RESULTS)[1], read_results(RESULTS)[0]
+    assert ga.kind_of(sentenza) == "sent" and ga.kind_of(ordinanza) == "ocau"
+    assert ga.family_of("senb") == "sentenza" and ga.family_of("ocol") == "ordinanza" and ga.family_of("xyz") is None
+    parere = ga.Result("PARERE", "CONSIGLIO DI STATO", None, 2099, 42, None, "ECLI:IT:CDS:2099:42PINTE", sentenza.url)
+    assert ga.to_decision(parere, "consiglio_di_stato", None) is None
+    assert ga.to_decision(ga.Result("SENTENZA", "x", None, 2099, 42, None, None, sentenza.url), "consiglio_di_stato", None) is None
+
+
+@pytest.mark.parametrize("raw,section", [
+    ("SEZIONE 6", "VI"), ("SEZIONE 1", "I"), ("SEZIONE 2Q", "II-quater"), ("SEZIONE 3B", "III-bis"),
+    ("SEZIONE 1T", "I-ter"), ("ADUNANZA PLENARIA", "plenaria"), ("SEZIONE 2X", None), ("altro", None), (None, None),
+])
+def test_a_section_is_written_as_the_convention_writes_it(raw, section):
+    assert ga.section_of(raw) == section
+
+
+def test_a_result_becomes_a_decision_with_its_kind_section_family_and_source():
+    sentenza = read_results(RESULTS)[1]
+    decision = ga.to_decision(sentenza, "consiglio_di_stato", None, {"motivazione": "x"}, "2099-02-01")
+    assert decision.identita.key() == "consiglio_di_stato:sent:42:2099"
+    assert (decision.sezione, decision.tipo, decision.data_deposito) == ("VI", "sentenza", "2099-02-01")
+    assert decision.fonte["url"].startswith("https://mdp.giustizia-amministrativa.it/")
+    tar = ga.to_decision(sentenza, "tar", "roma")
+    assert tar.identita.key() == "tar:roma:sent:42:2099"
+
+
+def test_the_portal_names_each_seat_its_own_way():
+    assert ga.portal_seat("consiglio_di_stato", None) == "Consiglio di Stato"
+    assert ga.portal_seat("cgars", None) == "C.G.A.R.S"
+    assert ga.portal_seat("tar", "reggio-calabria") == "Reggio Calabria"

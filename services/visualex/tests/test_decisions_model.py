@@ -60,7 +60,8 @@ def test_the_corte_costituzionale_ignores_archive_and_section():
 
 
 @pytest.mark.parametrize("body,field", [
-    ({"corte": "tar", "numero": 1, "anno": 2024}, "corte"),
+    ({"corte": "tribunale", "numero": 1, "anno": 2024}, "corte"),
+    ({"corte": "tar", "numero": 1, "anno": 2024}, "sede"),
     ({"numero": 1, "anno": 2024}, "corte"),
     ({"corte": "cassazione", "numero": 0, "anno": 2024}, "numero"),
     ({"corte": "cassazione", "numero": "12a", "anno": 2024}, "numero"),

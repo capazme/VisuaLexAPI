@@ -71,7 +71,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     costituzionale open data, range bundles on disk), `curia.py` (the Court of Justice and the
     General Court from the Publications Office's repository, CELLAR: a SPARQL query finds the
     case's judgment, joined cases included, then its Italian XHTML or, before about 2009, the
-    former HTML; design 2026-10-12 §4), `resolver.py` (one outcome, lookups
+    former HTML; design 2026-10-12 §4), `giustizia_amministrativa.py` and `tar_seats.py` (the
+    Consiglio di Stato, the C.G.A.R.S. and the TAR from giustizia-amministrativa.it: the portal's
+    search form, read from the page each time, then the court's XML document; the 29 seats, a copy
+    of `conventions/sources/tar-seats.json`; design 2026-10-12-administrative-courts), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
     User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
     (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`.
@@ -199,7 +202,11 @@ POST unless noted, JSON bodies.
 - `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale |
   corte_giustizia_ue | tribunale_ue, numero, anno, archivio?, sezione?}` (the two courts of the Union
   by their case, C-634/21 as 634 and 2021, decided by the owner, Q10 of the 2026-10-12 design; a joined case answers the first case's judgment with the notice `causa_riunita`, two
-  judgments of one case are `ambigua`) → `esito` trovata (identity, attributes, whole text,
+  judgments of one case are `ambigua`; `consiglio_di_stato | cgars | tar` with `provvedimento?` (the
+  kind, the ECLI's suffix: `sent`, `ocau`…), `tipo?` (`sentenza | ordinanza | decreto`), and for a TAR
+  `sede` (a slug of `tar_seats.py`) or `regione`: no kind named is a sentenza, and a year holding
+  none is `ambigua` with what it holds; a region is searched at each of its seats, the seat found
+  told by the notice `sede_dedotta`; pareri left out) → `esito` trovata (identity, attributes, whole text,
   source) and ambigua 200, non_trovata 404 (with the reason and the archive's start),
   fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a fixed
   body). That is every answer the handler writes; the others carry no `esito`: the per-IP
@@ -566,7 +573,8 @@ Breaking one of these breaks the product. Read before editing.
     lines, so without it a block is one paragraph. Both add line breaks and nothing else.
     Whatever changes the shape of what a reader returns must raise the version in its cache
     key (`italgiure:v4:…`, `corte_cost:v2:…`, `curia:v1:…`, one answer per case: the list of its
-    judgments), or the entries cached before are served for up to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
+    judgments; `ga:v1:…`, a measure's text by its key, and `ga:v1:search:…`, what a seat lists for a
+    number and year, kept a day), or the entries cached before are served for up to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.
     The characters of a decision's text are to be frozen like an article's (root rule 23): the readers
     may add or move `\n` and move a boundary between blocks, never change another character, and a

@@ -1,8 +1,9 @@
 """Decisions of the Consiglio di Stato, the C.G.A.R.S. and the TAR from giustizia-amministrativa.it:
 the search and the text only (design note of 12 October 2026, waiting for the owner's D1–D5).
 
-Nothing here is an identity or a route yet: the identity of these decisions (kind, number, year,
-and the seat for a TAR) waits for the owner's answers, and no route reads them.
+The identity of a measure is its court, its kind (the ECLI's suffix), number and year, and a
+TAR's seat (design 2026-10-12-administrative-courts §2, D1); the resolver chooses among what a
+search lists (§5) and reads the text of the one it chose.
 
 - **The search** is the portal's «Decisioni e pareri» form (a Liferay portlet). A server can post
   it: one `GET` of the page gives the session cookie and the form, with its anti-forgery token in
@@ -31,6 +32,8 @@ from bs4 import BeautifulSoup
 from lxml import etree
 
 from .http import decisions_http_client, http_headers
+from .model import Decision, FAMIGLIE, Identity
+from .tar_seats import BY_SLUG
 
 SEARCH_PAGE = "https://www.giustizia-amministrativa.it/web/guest/dcsnprr"
 _SEARCH_HOST = "www.giustizia-amministrativa.it"
@@ -39,6 +42,8 @@ _TIMEOUT = 20
 
 _FIELD = re.compile(r'name="(_decisioni_pareri_web_DecisioniPareriWebPortlet_INSTANCE_[A-Za-z0-9]{1,40}_)numeroProvvedimenti"')
 _NUMBER = re.compile(r"^(\d{4})(\d{5})$")
+# «Trovati <strong>3</strong> risultati»
+_COUNT = re.compile(r"Trovati\s*(?:<strong>)?\s*(\d+)\s*(?:</strong>)?\s*risultat", re.IGNORECASE)
 _HTML_NS = "http://www.w3.org/HTML/1998/html4"
 _WS = re.compile(r"[ \t\r\n\f\v]+")
 
@@ -103,8 +108,13 @@ def _bold(text: str, label: str) -> str | None:
 
 def read_results(page: str) -> list[Result]:
     """Every measure the answer lists. A page with no result list at all is a changed source."""
-    if "ricerca--item" not in page and "Nessun risultato" not in page and "nessun risultato" not in page:
+    # the answer counts what it found («Trovati 3 risultati», «Trovati 0 risultati»): without the
+    # count it is not the page the reader knows, and never «nothing found»
+    count = _COUNT.search(page)
+    if count is None:
         raise SourceChanged("giustizia-amministrativa: pagina dei risultati non riconosciuta")
+    if count.group(1) == "0":
+        return []
     results = []
     for article in BeautifulSoup(page, "lxml").find_all("article", class_="ricerca--item"):
         link = next((a["href"] for a in article.find_all("a", href=True)
@@ -126,6 +136,8 @@ def read_results(page: str) -> list[Result]:
             ecli=ecli,
             url=html.unescape(link),
         ))
+    if not results:
+        raise SourceChanged("giustizia-amministrativa: risultati annunciati ma non leggibili")
     return results
 
 
@@ -172,6 +184,7 @@ class GiustiziaAmministrativaReader:
     """Three requests a lookup: the search page, the search, the document."""
 
     async def search(self, sede: str, numero: int, anno: int) -> list[Result]:
+        """Every measure the portal lists for that seat (as it names it), number and year."""
         page = await decisions_http_client.request(
             "GET", SEARCH_PAGE, source="giustizia_amministrativa", timeout=_TIMEOUT, max_retries=1,
             headers=http_headers())
@@ -181,11 +194,84 @@ class GiustiziaAmministrativaReader:
             data=search_fields(form, sede, numero, anno), headers=http_headers())
         return read_results(answer.text)
 
-    async def text(self, result: Result) -> dict[str, str]:
-        """The decision's text; {} for a document that is not HTML (the newest are PDFs)."""
+    async def text(self, result: Result) -> tuple[dict[str, str], str | None]:
+        """The decision's text and its day of publication; ({}, None) for a document that is not
+        HTML (the newest are PDFs, not read yet)."""
         if urlparse(result.url).hostname != _DOCUMENT_HOST or document_format(result.url) != "html":
-            return {}
+            return {}, None
         answer = await decisions_http_client.request(
             "GET", result.url, source="giustizia_amministrativa", timeout=_TIMEOUT, max_retries=1,
             headers=http_headers({"Accept": "text/xml, application/xml"}))
-        return text_from_document(answer.text)
+        return text_from_document(answer.text), published_on(answer.text)
+
+
+# --- from a result to a decision ---------------------------------------------------------------
+
+_PORTAL_COURT = {"consiglio_di_stato": "Consiglio di Stato", "cgars": "C.G.A.R.S"}
+_ECLI_KIND = re.compile(r":\d+([A-Z]{3,6})$")
+_SECTION = re.compile(r"^SEZIONE\s+(\d{1,2})([A-Z]{0,2})$")
+_ROMAN = ("", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X")
+_SUFFIX = {"B": "bis", "T": "ter", "Q": "quater"}
+_SOURCE_NAME = {"consiglio_di_stato": "Consiglio di Stato", "cgars": "Consiglio di giustizia amministrativa per la Regione siciliana",
+                "tar": "Tribunale amministrativo regionale"}
+
+
+def portal_seat(corte: str, sede: str | None) -> str:
+    """The seat as the portal's search names it."""
+    return BY_SLUG[sede].sede if corte == "tar" and sede else _PORTAL_COURT[corte]
+
+
+def kind_of(result: Result) -> str | None:
+    """«ECLI:IT:CDS:2019:2270SENT» → «sent»; None without an ECLI the reader can read."""
+    m = _ECLI_KIND.search(result.ecli or "")
+    return m.group(1).lower() if m else None
+
+
+def is_parere(kind: str) -> bool:
+    """The Consiglio di Stato's advisory measures (PINTE, PARE, …): left out (D5)."""
+    return kind.startswith("p")
+
+
+def family_of(kind: str) -> str | None:
+    return next((family for family, kinds in FAMIGLIE.items() if kind in kinds), None)
+
+
+def section_of(raw: str | None) -> str | None:
+    """«SEZIONE 6» → «VI», «SEZIONE 2Q» → «II-quater», «ADUNANZA PLENARIA» → «plenaria»; None otherwise."""
+    text = (raw or "").strip().upper()
+    if "PLENARIA" in text:
+        return "plenaria"
+    m = _SECTION.match(text)
+    if not m or not 1 <= int(m.group(1)) <= 10:
+        return None
+    suffix = m.group(2)
+    if suffix and suffix not in _SUFFIX:
+        return None
+    return _ROMAN[int(m.group(1))] + (f"-{_SUFFIX[suffix]}" if suffix else "")
+
+
+def published_on(document: bytes | str) -> str | None:
+    """The day of publication the document's metadata gives («08/04/2019» → «2019-04-08»)."""
+    data = document.encode("utf-8") if isinstance(document, str) else document
+    root = etree.fromstring(data, etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, recover=True))
+    found = root.find(".//dataPubblicazione") if root is not None else None
+    m = re.fullmatch(r"(\d{2})/(\d{2})/(\d{4})", (found.text or "").strip()) if found is not None else None
+    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
+
+
+def to_decision(result: Result, corte: str, sede: str | None, testo: dict[str, str] | None = None,
+                published: str | None = None) -> Decision | None:
+    """The measure a result lists, as a decision; None for one the reader cannot identify (no ECLI
+    it reads) or a parere."""
+    kind = kind_of(result)
+    if kind is None or is_parere(kind):
+        return None
+    return Decision(
+        identita=Identity(corte, result.numero, result.anno, sede=sede if corte == "tar" else None, provvedimento=kind),
+        sezione=section_of(result.sezione),
+        tipo=family_of(kind),
+        data_deposito=published,
+        ecli=result.ecli,
+        testo=dict(testo or {}),
+        fonte={"nome": f"{_SOURCE_NAME[corte]} — giustizia-amministrativa.it", "url": result.url},
+    )

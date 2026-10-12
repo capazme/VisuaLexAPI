@@ -18,6 +18,7 @@ async def test_a_number_of_the_consiglio_di_stato_lists_each_kind_and_reads_the_
     assert all((r.anno, r.numero) == (2019, 2270) for r in results)
     sentenza = next(r for r in results if r.kind == "SENTENZA")
     assert sentenza.ecli == "ECLI:IT:CDS:2019:2270SENT"
-    testo = await reader.text(sentenza)
+    testo, published = await reader.text(sentenza)
     assert testo["epigrafe"].startswith("Il Consiglio di Stato")
     assert testo["dispositivo"].startswith("P.Q.M.")
+    assert published == "2019-04-08"
