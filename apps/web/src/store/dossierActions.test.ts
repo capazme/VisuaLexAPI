@@ -420,6 +420,25 @@ describe('refreshDossier', () => {
     await appStore.getState().refreshDossier('d1');
     expect(appStore.getState().dossiers.map((d) => d.id)).toEqual(['d1']);
   });
+  it('quietly drops an answer older than an edit made meanwhile, and only logs a failure', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [{ id: 'a', type: 'note', data: 'a', addedAt: '' }] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    let answer!: (value: ReturnType<typeof api>) => void;
+    vi.mocked(dossierService.getById).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const pending = appStore.getState().refreshDossier('d1', { quiet: true });
+    // The user removes «a» while the read travels; the server's answer still holds it.
+    appStore.setState((state) => ({ dossiers: state.dossiers.map((d) => ({ ...d, items: [] })) }));
+    answer(api(['a', 'b']));
+    await pending;
+    expect(appStore.getState().dossiers[0].items).toEqual([]);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const pushSyncError = vi.spyOn(appStore.getState(), 'pushSyncError');
+    vi.mocked(dossierService.getById).mockRejectedValueOnce(new Error('down'));
+    await appStore.getState().refreshDossier('d1', { quiet: true });
+    expect(errors).toHaveBeenCalled();
+    expect(pushSyncError).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
   it('only adds what came back while an edit is on its way', async () => {
     appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
       { id: 'tmp', type: 'note', data: 'nuova', addedAt: '' }, { id: 'a', type: 'note', data: 'a', addedAt: '' },
@@ -440,5 +459,43 @@ describe('refreshDossier', () => {
       id: 's', type: 'sentenza', status: 'important',
       data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'Corte cost., sent. n. 1/2014' },
     })]);
+  });
+});
+
+describe('refreshDossiers', () => {
+  const api = (id: string, items: string[]) => ({
+    id, name: id, is_pinned: false, created_at: '', updated_at: '', tags: [],
+    items: items.map((item) => ({ id: item, item_type: 'note' as const, title: 'Nota', content: item, position: 0, status: 'unread' as const, created_at: '' })),
+  });
+  const local = (id: string, items: string[]) => ({ id, title: id, createdAt: '', tags: [], items: items.map((item) => ({ id: item, type: 'note' as const, data: item, addedAt: '' })) });
+
+  it("takes the server's list: new dossiers and entries in, deleted ones out", async () => {
+    appStore.setState({ dossiers: [local('d1', ['a']), local('gone', [])], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.getAll).mockResolvedValueOnce([api('d1', ['a', 'b']), api('d2', [])]);
+    await appStore.getState().refreshDossiers();
+    expect(appStore.getState().dossiers.map((d) => [d.id, d.items.map((i) => i.id)])).toEqual([['d1', ['a', 'b']], ['d2', []]]);
+  });
+
+  it('keeps a dossier with an edit on its way as it is here', async () => {
+    appStore.setState({ dossiers: [local('d1', ['tmp'])], pendingDossierItemIds: { tmp: true }, pendingDossierOrders: {} });
+    vi.mocked(dossierService.getAll).mockResolvedValueOnce([]);
+    await appStore.getState().refreshDossiers();
+    expect(appStore.getState().dossiers.map((d) => [d.id, d.items.map((i) => i.id)])).toEqual([['d1', ['tmp']]]);
+  });
+
+  it('drops the answer when the list changed here meanwhile, and only logs a failure', async () => {
+    appStore.setState({ dossiers: [local('d1', ['a'])], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    let answer!: (value: ReturnType<typeof api>[]) => void;
+    vi.mocked(dossierService.getAll).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const pending = appStore.getState().refreshDossiers();
+    appStore.setState({ dossiers: [] });
+    answer([api('d1', ['a'])]);
+    await pending;
+    expect(appStore.getState().dossiers).toEqual([]);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(dossierService.getAll).mockRejectedValueOnce(new Error('down'));
+    await appStore.getState().refreshDossiers();
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
   });
 });

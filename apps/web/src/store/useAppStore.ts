@@ -639,8 +639,15 @@ interface AppState {
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     setDossierItemOrder: (dossierId: string, itemIds: string[]) => void;
-    /** Reads one dossier again from the server (after a restore from the trash): replaces it, or adds it when it came back whole. */
-    refreshDossier: (dossierId: string) => Promise<void>;
+    /**
+     * Reads one dossier again from the server (after a restore from the trash): replaces it, or adds it
+     * when it came back whole. `quiet` is the page's background refresh (what a connected application
+     * added meanwhile): a failure is only logged, and an answer is dropped if the dossier changed here
+     * while it travelled.
+     */
+    refreshDossier: (dossierId: string, options?: { quiet?: boolean }) => Promise<void>;
+    /** The dossier list's background refresh, `refreshDossier`'s quiet rules for every dossier. */
+    refreshDossiers: () => Promise<void>;
     /** A note through the notes route, about one article when `aboutItemId` is given; true once the server has it. */
     addNoteToDossier: (dossierId: string, text: string, aboutItemId?: string) => Promise<boolean>;
     /** Saves a dossier's waiting order once none of its items is pending (see `pendingDossierOrders`). */
@@ -2517,9 +2524,14 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            refreshDossier: async (dossierId) => {
+            refreshDossier: async (dossierId, options) => {
+                const quiet = options?.quiet === true;
+                const before = get().dossiers.find(d => d.id === dossierId);
                 try {
                     const fresh = dossierFromApi(await dossierService.getById(dossierId));
+                    // Immer gives a dossier a new object on any change: a different one means an
+                    // edit (or a deletion) happened here meanwhile, and the answer may predate it.
+                    if (quiet && get().dossiers.find(d => d.id === dossierId) !== before) return;
                     set((state) => {
                         const index = state.dossiers.findIndex(d => d.id === dossierId);
                         if (index < 0) {
@@ -2541,8 +2553,34 @@ const appStore = createStore<AppState>()(
                     });
                 } catch (err) {
                     console.error('Failed to reload the dossier:', dossierId, err);
-                    get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
+                    if (!quiet) get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
                 }
+            },
+
+            refreshDossiers: async () => {
+                const before = get().dossiers;
+                let fresh: Dossier[];
+                try {
+                    fresh = (await dossierService.getAll()).map(dossierFromApi);
+                } catch (err) {
+                    console.error('Failed to reload the dossiers:', err);
+                    return;
+                }
+                if (get().dossiers !== before) return; // something changed here meanwhile: the next refresh
+                set((state) => {
+                    // A dossier with an add, an undo or an order on its way stays as it is here.
+                    const busy = (d: Dossier) => !!state.pendingDossierOrders[d.id]
+                        || d.items.some(i => state.pendingDossierItemIds[i.id]);
+                    const local = new Map(state.dossiers.map(d => [d.id, d]));
+                    const onServer = new Set(fresh.map(d => d.id));
+                    state.dossiers = [
+                        ...fresh.map(d => {
+                            const mine = local.get(d.id);
+                            return mine && busy(mine) ? mine : d;
+                        }),
+                        ...state.dossiers.filter(d => !onServer.has(d.id) && busy(d)),
+                    ];
+                });
             },
 
             // Server first (gotcha 17): a note has no optimistic window to undo.
