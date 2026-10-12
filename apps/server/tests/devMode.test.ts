@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { Request, Response } from 'express';
+import { setDevMode } from '../src/controllers/authController';
 import { request, app, createTestUser, authHeader, prisma, type TestUser } from './helpers';
 
 const fresh = (id: string) => prisma.user.findUniqueOrThrow({ where: { id } });
@@ -104,7 +106,7 @@ describe('PUT /api/auth/dev-mode, the user’s own switch', () => {
   it('refuses to turn the mode on without the permission, and writes nothing', async () => {
     const response = await put(dave, { enabled: true });
     expect(response.status).toBe(403);
-    expect(response.body.detail ?? response.body.message ?? JSON.stringify(response.body)).toContain('Modalità sviluppo non abilitata per questo account');
+    expect(response.body.detail).toBe('Modalità sviluppo non abilitata per questo account');
     const row = await fresh(dave.id);
     expect(row.devMode).toBe(false);
     expect(row.devModeAllowed).toBe(false);
@@ -126,6 +128,19 @@ describe('PUT /api/auth/dev-mode, the user’s own switch', () => {
     expect(off.body.dev_mode_allowed).toBe(true);
     expect(off.body.dev_mode).toBe(false);
     expect((await fresh(dave.id)).devMode).toBe(false);
+  });
+
+  it('checks the permission in the write, so a revocation after authentication leaves the mode off', async () => {
+    // `authenticate` read dave while he was still allowed; the administrator revokes right after.
+    await prisma.user.update({ where: { id: dave.id }, data: { devModeAllowed: true } });
+    const stale = await fresh(dave.id);
+    await prisma.user.update({ where: { id: dave.id }, data: { devModeAllowed: false, devMode: false } });
+
+    const res = { json: () => undefined } as unknown as Response;
+    await expect(setDevMode({ user: stale, body: { enabled: true } } as unknown as Request, res)).rejects.toMatchObject({ statusCode: 403 });
+    const row = await fresh(dave.id);
+    expect(row.devModeAllowed).toBe(false);
+    expect(row.devMode).toBe(false);
   });
 
   it('lets a user without the permission turn the mode off (a no-op)', async () => {
