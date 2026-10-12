@@ -38,7 +38,7 @@ describe('StudiaPage', () => {
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toBeInTheDocument();
   });
 
-  it('lets the heading start to the right of the layout’s menu button, and adds no padding of its own', () => {
+  it('leaves the menu button to the layout, and adds no padding of its own', () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/studia/schede']}>
         <Routes>
@@ -48,7 +48,8 @@ describe('StudiaPage', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex Studia' })).toHaveClass('pl-12', 'lg:pl-0');
+    // The layout starts the page under its menu button: the heading needs no step aside.
+    expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex Studia' }).className).not.toMatch(/\bpl-/);
     expect(container.firstElementChild?.className).not.toMatch(/\bp[xy]?-\d|md:p-\d/);
     expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ripasso', 'Le mie schede']);
     expect(screen.getByText('vista')).toBeInTheDocument();
