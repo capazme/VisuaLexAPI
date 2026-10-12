@@ -391,7 +391,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   The vote locks the card row, refuses one's own card (403), a second vote (409) and a card that
   is no longer proposed (404), stores the vote and lets `lingo/validationRule.ts` decide the
   state: **provisional** (to confirm with the other developer), 2 approvals and no «errata»
-  validate, one «errata» archives, in two named constants. `GET /api/lingo/testi/:chiave` gives
+  validate, one «errata» archives, in two named constants. An archived card is its author's
+  alone (`PERSONAL_STATES`), so one whose author's account is gone is deleted in the vote's
+  transaction instead of archived (nobody could see or delete it); the answer still says
+  `ARCHIVIATA`. `GET /api/lingo/testi/:chiave` gives
   the current text to accept and whether the caller accepted it; `routes/adminStudiaTesti.ts`
   (`GET`/`POST /api/admin/studia/testi[/:chiave]`, administrators only) lists every version and
   saves a new one numbered above the highest (two at once: the unique index refuses the second,
