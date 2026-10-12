@@ -1,180 +1,209 @@
 {
  "version": 1,
- "note": "The 29 seats of the Tribunali amministrativi regionali, as the portal of giustizia-amministrativa.it names them in its decisions search (sedeProvvedimenti, read on 12 October 2026), with their region and whether each is the region's main seat. A TAR named by its region alone is read as the main seat, the others searched too (design 2026-10-12-administrative-courts §5, D3). The citation names the seat only where the region has more than one (§3). Every suite that names a TAR reads this table.",
+ "note": "The 29 seats of the Tribunali amministrativi regionali, as the portal of giustizia-amministrativa.it names them in its decisions search (sedeProvvedimenti, read on 12 October 2026), with their region and whether each is the region's main seat. A TAR named by its region alone is read as the main seat, the others searched too (design 2026-10-12-administrative-courts §5, D3). The citation names the seat only where the region has more than one (§3). Every suite that names a TAR reads this table. Trentino-Alto Adige has no TAR: its court is the Tribunale regionale di giustizia amministrativa, at Trento with the autonomous section of Bolzano (organo TRGA), cited «T.R.G.A. Trento», «T.R.G.A. Bolzano».",
  "seats": [
   {
    "slug": "ancona",
    "sede": "Ancona",
    "regione": "Marche",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "aosta",
    "sede": "Aosta",
    "regione": "Valle d'Aosta",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "bari",
    "sede": "Bari",
    "regione": "Puglia",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "lecce",
    "sede": "Lecce",
    "regione": "Puglia",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "bologna",
    "sede": "Bologna",
    "regione": "Emilia-Romagna",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "parma",
    "sede": "Parma",
    "regione": "Emilia-Romagna",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "trento",
    "sede": "Trento",
    "regione": "Trentino-Alto Adige",
-   "principale": true
+   "principale": true,
+   "organo": "TRGA"
   },
   {
    "slug": "bolzano",
    "sede": "Bolzano",
    "regione": "Trentino-Alto Adige",
-   "principale": false
+   "principale": false,
+   "organo": "TRGA"
   },
   {
    "slug": "milano",
    "sede": "Milano",
    "regione": "Lombardia",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "brescia",
    "sede": "Brescia",
    "regione": "Lombardia",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "cagliari",
    "sede": "Cagliari",
    "regione": "Sardegna",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "campobasso",
    "sede": "Campobasso",
    "regione": "Molise",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "palermo",
    "sede": "Palermo",
    "regione": "Sicilia",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "catania",
    "sede": "Catania",
    "regione": "Sicilia",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "catanzaro",
    "sede": "Catanzaro",
    "regione": "Calabria",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "reggio-calabria",
    "sede": "Reggio Calabria",
    "regione": "Calabria",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "firenze",
    "sede": "Firenze",
    "regione": "Toscana",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "genova",
    "sede": "Genova",
    "regione": "Liguria",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "l-aquila",
    "sede": "L'Aquila",
    "regione": "Abruzzo",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "pescara",
    "sede": "Pescara",
    "regione": "Abruzzo",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "roma",
    "sede": "Roma",
    "regione": "Lazio",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "latina",
    "sede": "Latina",
    "regione": "Lazio",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "napoli",
    "sede": "Napoli",
    "regione": "Campania",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "salerno",
    "sede": "Salerno",
    "regione": "Campania",
-   "principale": false
+   "principale": false,
+   "organo": "TAR"
   },
   {
    "slug": "perugia",
    "sede": "Perugia",
    "regione": "Umbria",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "potenza",
    "sede": "Potenza",
    "regione": "Basilicata",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "torino",
    "sede": "Torino",
    "regione": "Piemonte",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "trieste",
    "sede": "Trieste",
    "regione": "Friuli Venezia Giulia",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   },
   {
    "slug": "venezia",
    "sede": "Venezia",
    "regione": "Veneto",
-   "principale": true
+   "principale": true,
+   "organo": "TAR"
   }
  ]
 }
