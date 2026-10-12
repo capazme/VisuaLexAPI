@@ -22,7 +22,7 @@ export interface PracticeArticleRowProps {
 
 /**
  * One article of its act on the practice's table (spec §3.2): «art. 2043 — rubrica», a past text's
- * «Testo al …», «Togli dal tavolo». Open, it reads the article in place on the tab's own reading
+ * «Testo al …», «Togli dal tavolo». Open, it reads the article in place on the reading
  * surface, untouched (root rule 23); closed, it mounts nothing. Whether it is open is the store's
  * (`practiceRows`, T15), so a reveal opens it from anywhere.
  */

@@ -23,7 +23,7 @@ function renderPopup(opts?: { enabled?: boolean; onNerFeedback?: Mock<OnNerFeedb
       article={null}
       position={{ top: 0, left: 0 }}
       onClose={vi.fn()}
-      onOpenInTab={vi.fn()}
+      onOpenCitation={vi.fn()}
       nerFeedbackEnabled={opts?.enabled ?? true}
       onNerFeedback={onNerFeedback}
     />,
@@ -82,9 +82,9 @@ describe('CitationPreviewPopup — NER feedback bar (surface: article_xref)', ()
     expect(screen.queryByRole('button', { name: /conferma la citazione/i })).toBeNull();
   });
 
-  it('renders the NER row BELOW the primary "Apri in nuova tab" action (design §3.7)', () => {
+  it('renders the NER row BELOW the primary "Apri nella pratica" action (design §3.7)', () => {
     renderPopup();
-    const primary = screen.getByRole('button', { name: /apri in nuova tab/i });
+    const primary = screen.getByRole('button', { name: /apri nella pratica/i });
     const nerRow = screen.getByText(/citazione corretta\?/i);
     // primary action must precede the feedback row in document order
     expect(primary.compareDocumentPosition(nerRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

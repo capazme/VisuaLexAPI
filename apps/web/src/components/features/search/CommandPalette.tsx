@@ -763,7 +763,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                 )}
 
                 {/* QuickNorms Section */}
-                <Command.Group className="mb-4">
+                <Command.Group id="command-palette-quick-norms" className="mb-4">
                   <div className="flex items-center justify-between px-3 mb-3">
                     <div className="flex items-center gap-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
                       <Star size={12} fill="currentColor" strokeWidth={3} />
@@ -1010,7 +1010,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
           {/* Premium Footer */}
           <div className="px-6 py-5 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
             {/* Quick Settings - Brocardi Toggle */}
-            <div className="flex items-center justify-between mb-5">
+            <div id="command-palette-brocardi-toggle" className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-4">
                 <div className={cn(
                   "p-2 rounded-xl border transition-all",

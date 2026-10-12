@@ -27,14 +27,10 @@ import { WORKSPACE_AREA_ID } from '../../../utils/workspaceOrigin';
 import { isDesktopViewport, useIsDesktop } from '../../../hooks/useIsDesktop';
 import { besideRefFor, findPracticeArticle, practiceArticleKey } from '../../../utils/practice';
 import { actKeyOf } from '../dossier/dossierLayout';
-import type { PracticeStreaming } from '../practice/PracticeParts';
-
-// The practice's table (spec 2026-10-08-norm-tab-container-design.md), loaded lazily.
-// The desktop's row: the table and the windows beside it (P4).
-const ReadingRow = lazy(() => import('../practice/ReadingRow').then(m => ({ default: m.ReadingRow })));
-const PracticeBar = lazy(() => import('../practice/PracticeBar').then(m => ({ default: m.PracticeBar })));
-const PracticePhoneView = lazy(() => import('../practice/PracticePhoneView').then(m => ({ default: m.PracticePhoneView })));
-const PracticeNotice = lazy(() => import('../practice/PracticeParts').then(m => ({ default: m.PracticeNotice })));
+import { PracticeNotice, type PracticeStreaming } from '../practice/PracticeParts';
+import { ReadingRow } from '../practice/ReadingRow';
+import { PracticeBar } from '../practice/PracticeBar';
+import { PracticePhoneView } from '../practice/PracticePhoneView';
 
 /** The practice whose light window or, on a phone, full-screen reader `askerId` names: where a norm
  *  cited in its text is searched and opened. */
@@ -490,7 +486,7 @@ export function SearchPanel() {
   // Listen for programmatic search triggers
   useEffect(() => {
     if (searchTrigger) {
-      // Capture custom tab label before search
+      // Capture the label that names the practice (a dossier's) before search
       if (searchTrigger.tabLabel) {
         setCustomTabLabel(searchTrigger.tabLabel);
       }
@@ -646,8 +642,8 @@ export function SearchPanel() {
         onBrowseStructure={handleBrowseStructure}
       />
 
-      {/* One global control: the back-stack is global, so a per-tab copy would
-          sit inside the very tab an entry points at. */}
+      {/* One global control: the back-stack is global, so a per-practice copy would
+          sit inside the very place an entry points at. */}
       <ReadingBackControl
         // It floats above the bar, clear of the act's heading and the windows' headers. Going back
         // already made the practice active and, on a phone, opened the reader on a subject read beside
@@ -657,25 +653,23 @@ export function SearchPanel() {
 
       {/* The table and the bar on the desktop, the phone's table below md; one layout mounted (T4,
           gotcha 26). */}
-      <Suspense fallback={null}>
-        {/* Mounted over both layouts: a notice not yet closed survives a change of breakpoint. */}
-        <PracticeNotice />
-        {isDesktop ? (
-          <>
-            <div
-              id={WORKSPACE_AREA_ID}
-              className="w-full"
-              // The column's bottom padding reads it (§3.4); without the bar, its fallback.
-              style={practiceBarHeight === null ? undefined : { ['--practice-bar-height' as string]: `${practiceBarHeight}px` }}
-            >
-              <ReadingRow onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
-            </div>
-            <PracticeBar onHeightChange={setPracticeBarHeight} />
-          </>
-        ) : (
-          <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
-        )}
-      </Suspense>
+      {/* Mounted over both layouts: a notice not yet closed survives a change of breakpoint. */}
+      <PracticeNotice />
+      {isDesktop ? (
+        <>
+          <div
+            id={WORKSPACE_AREA_ID}
+            className="w-full"
+            // The column's bottom padding reads it (§3.4); without the bar, its fallback.
+            style={practiceBarHeight === null ? undefined : { ['--practice-bar-height' as string]: `${practiceBarHeight}px` }}
+          >
+            <ReadingRow onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
+          </div>
+          <PracticeBar onHeightChange={setPracticeBarHeight} />
+        </>
+      ) : (
+        <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
+      )}
 
       {/* QuickNorms Manager Modal */}
       <QuickNormsManager

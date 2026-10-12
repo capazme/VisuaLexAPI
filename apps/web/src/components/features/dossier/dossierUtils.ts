@@ -136,7 +136,7 @@ export function searchParamsFromNorma(norma: NormaVisitata): SearchParams {
   };
 }
 
-// What the window header's "Aggiungi a dossier" stores for one article of a tab.
+// What a practice's "Salva come dossier" stores for one article of an act.
 // It rebuilds the item from the block's norma and the article, and used to drop
 // the version: a historical text was saved under the same label as the current
 // one and reopened as the text in force.
@@ -148,7 +148,7 @@ export function normaForDossier(norma: Norma, article: ArticleData): NormaVisita
     data: norma.data,
     numero_articolo: article.norma_data.numero_articolo,
     urn: norma.urn,
-    // The annex is part of the item's key and id: without it the item is not the article the tab shows.
+    // The annex is part of the item's key and id: without it the item is not the article the row shows.
     ...(article.norma_data.allegato ? { allegato: article.norma_data.allegato } : {}),
     ...(versione ? { versione } : {}),
     ...(data_versione ? { data_versione } : {}),

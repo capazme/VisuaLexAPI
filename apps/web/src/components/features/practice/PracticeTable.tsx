@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FolderPlus, MoreHorizontal, Pencil, X } from 'lucide-react';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import type { ArticleData } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
@@ -26,7 +26,11 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming }: Practi
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
   const theme = useAppStore((s) => s.settings.theme);
   // The tour of the table, once; when it is done the act's follows (`PracticeActBlock`).
-  const { tryStartTour } = useTour({ theme: theme as 'light' | 'dark', onComplete: (type) => { if (type === 'practice') tryStartTour('practiceAct'); } });
+  const { tryStartTour } = useTour({ theme: theme as 'light' | 'dark', onComplete: (type) => {
+    // the act's tour follows, when the practice has an act to show
+    const held = appStore.getState().practices.find((p) => p.id === appStore.getState().activePracticeId);
+    if (type === 'practice' && held && held.acts.length > 0) tryStartTour('practiceAct');
+  } });
   // Asked once: `tryStartTour` is a new function on every render, so the effect cannot key on it.
   const tourAsked = useRef(false);
   const drawn = practice !== undefined;

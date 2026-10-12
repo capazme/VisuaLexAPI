@@ -636,6 +636,9 @@ const generateKey = (n: NormaVisitata) => {
 /** The key `persist` saves the workspace under. */
 const STORAGE_NAME = 'visualex-storage';
 
+/** The most characters of a version-0 value that is copied: past it the copy would eat the browser's space. */
+const V0_BACKUP_MAX_CHARS = 1_000_000;
+
 /** Where a browser's version-0 value is copied before it is migrated, so its tabs can be recovered
  *  by hand should the conversion ever go wrong. Written once, never overwritten. */
 const V0_BACKUP_KEY = 'visualex-storage.v0-backup';
@@ -1215,33 +1218,37 @@ const appStore = createStore<AppState>()(
                 }
             },
 
-            clearUserData: () => set((state) => {
-                // Clear all user-specific data
-                state.bookmarks = [];
-                state.dossiers = [];
-                state.annotations = [];
-                state.highlights = [];
-                state.loadedHighlightKeys = {};
-                state.loadedAnnotationKeys = {};
-                state.quickNorms = [];
-                state.customAliases = [];
-                state.environments = [];
-                state.isDataLoaded = false;
-                state.dataError = null;
+            clearUserData: () => {
+                // The backup of the last user's saved tabs (`backupV0`) goes too: a shared browser keeps nothing of them.
+                removeV0Backup();
+                set((state) => {
+                    // Clear all user-specific data
+                    state.bookmarks = [];
+                    state.dossiers = [];
+                    state.annotations = [];
+                    state.highlights = [];
+                    state.loadedHighlightKeys = {};
+                    state.loadedAnnotationKeys = {};
+                    state.quickNorms = [];
+                    state.customAliases = [];
+                    state.environments = [];
+                    state.isDataLoaded = false;
+                    state.dataError = null;
 
-                // The practices: a shared browser must not show the last user's table (spec §10).
-                state.practices = [];
-                state.activePracticeId = null;
-                state.practiceRows = {};
-                state.pendingReveal = null;
-                state.practiceNotice = null;
-                // a decision asked for, a focus asked for, a citation waiting for the palette
-                state.pendingDecision = null;
-                state.decisionFocusRequest = null;
-                state.windowFocusRequest = null;
-                state.phoneReader = null;
-                state.commandPaletteQuery = null;
-            }),
+                    // The practices: a shared browser must not show the last user's table (spec §10).
+                    state.practices = [];
+                    state.activePracticeId = null;
+                    state.practiceRows = {};
+                    state.pendingReveal = null;
+                    state.practiceNotice = null;
+                    // a decision asked for, a focus asked for, a citation waiting for the palette
+                    state.pendingDecision = null;
+                    state.decisionFocusRequest = null;
+                    state.windowFocusRequest = null;
+                    state.phoneReader = null;
+                    state.commandPaletteQuery = null;
+                });
+            },
 
             // UI Actions
             toggleSidebar: () => set((state) => {
@@ -3339,6 +3346,15 @@ function warnDropped(dropped: string[]): void {
     }
 }
 
+/** Takes the backup away (logout, `clearUserData`). Never throws. */
+function removeV0Backup(): void {
+    try {
+        if (typeof localStorage !== 'undefined') localStorage.removeItem(V0_BACKUP_KEY);
+    } catch (error) {
+        console.error(`persist: "${V0_BACKUP_KEY}" could not be removed`, error);
+    }
+}
+
 /** Copies the raw value `persist` is about to migrate to `V0_BACKUP_KEY`, when none is there yet.
  *  Never throws: a browser that refuses the copy (a full `localStorage`) is logged, and the migration
  *  goes on (gotcha 18). */
@@ -3347,6 +3363,11 @@ function backupV0(name: string): void {
         if (typeof localStorage === 'undefined') return;
         const raw = localStorage.getItem(name);
         if (raw === null || localStorage.getItem(V0_BACKUP_KEY) !== null) return;
+        // a second copy of a huge workspace could fill the browser's space for good
+        if (raw.length > V0_BACKUP_MAX_CHARS) {
+            console.warn(`persist: saved workspace too large to back up (${raw.length} characters); converted without a copy`);
+            return;
+        }
         localStorage.setItem(V0_BACKUP_KEY, raw);
         console.warn(`persist: the saved workspace was copied to "${V0_BACKUP_KEY}" before it is converted to practices`);
     } catch (error) {

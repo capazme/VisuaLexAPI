@@ -8,7 +8,7 @@
 
 1. [Architettura Generale](#1-architettura-generale)
 2. [Componenti di Ricerca](#2-componenti-di-ricerca)
-3. [Componenti Workspace](#3-componenti-workspace)
+3. [Componenti Workspace (la pratica)](#3-componenti-workspace)
 4. [Study Mode](#4-study-mode)
 5. [Componenti UI Condivisi](#5-componenti-ui-condivisi)
 6. [Struttura Dati](#6-struttura-dati)
@@ -31,16 +31,14 @@
 ┌────────────────────────────────────────────────────────┐
 │  Sidebar (collapsible)  │     Main Content Area        │
 │  ┌──────────────────┐   │  ┌────────────────────────┐  │
-│  │ Logo             │   │  │                        │  │
-│  │ ──────────────── │   │  │   Workspace Tabs       │  │
-│  │ 🔍 Ricerca       │   │  │   (floating windows)   │  │
-│  │ 📋 Workspace     │   │  │                        │  │
-│  │ 📜 Cronologia    │   │  │   ┌─────────┐          │  │
-│  │ ⭐ Preferiti     │   │  │   │  Tab 1  │          │  │
-│  │ 📁 Dossier       │   │  │   └─────────┘          │  │
-│  │ ──────────────── │   │  │        ┌─────────┐     │  │
-│  │ ⚙️ Impostazioni  │   │  │        │  Tab 2  │     │  │
-│  │ 🌙 Tema          │   │  │        └─────────┘     │  │
+│  │ Logo             │   │  │ Pratica attiva         │  │
+│  │ ──────────────── │   │  │ ┌────────────────────┐ │  │
+│  │ 🔍 Ricerca       │   │  │ │ Atto               │ │  │
+│  │ 📁 Dossier       │   │  │ │  art. 1 · art. 2   │ │  │
+│  │ 🎓 Studia        │   │  │ │ Giurisprudenza     │ │  │
+│  │ 📜 Cronologia    │   │  │ └────────────────────┘ │  │
+│  │ ──────────────── │   │  │ [finestre accanto]     │  │
+│  │ ⚙️ Menu utente   │   │  │ [barra delle pratiche] │  │
 │  └──────────────────┘   │  └────────────────────────┘  │
 └────────────────────────────────────────────────────────┘
 ```
@@ -317,41 +315,42 @@ Legenda:
 
 ## 3. Componenti Workspace
 
-### 3.1 WorkspaceTabPanel
-**File:** `components/features/workspace/WorkspaceTabPanel.tsx`
-**Scopo:** Finestra flottante draggable/resizable che contiene contenuti
+### 3.1 La pratica (`PracticeTable`, `ReadingRow`, `ReadingWindow`)
+**File:** `components/features/practice/`
+**Scopo:** Il tavolo di lavoro di una domanda. Sostituisce le finestre flottanti (le «tab» del
+workspace), che non esistono più.
 
-**Struttura:**
+**Struttura (desktop):**
 ```
 ┌─────────────────────────────────────────────────────┐
-│ [🔴 🟡 🟢]  Codice Civile - Art. 2043    [📌] [−] │  ← Title bar (draggable)
+│ Nome della pratica · 3 atti, 7 articoli  [Salva come dossier] [⋯] │
 ├─────────────────────────────────────────────────────┤
-│                                                     │
-│              Contenuto Tab                          │
-│     (NormaBlock / LooseArticle / Collection)        │
-│                                                     │
-├─────────────────────────────────────────────────────┤
-│ [+ Aggiungi a Dossier ▼]                           │  ← Footer actions
+│ Atto (intestazione fissa: Studio, Struttura, PDF, ⋯)│
+│   art. 2043 — rubrica            [Apri accanto] [✕] │  ← riga, si apre sul posto
+│   art. 2059 — rubrica                               │
+│ Giurisprudenza                                      │
+│   Cass. civ., n. 10787/2024                         │
 └─────────────────────────────────────────────────────┘
-     ↖ Resize handles (8 direzioni)
-
-Bottoni macOS-style:
-🔴 = Chiudi tab
-🟡 = Minimizza
-🟢 = Espandi/Ripristina
-📌 = Pin (rimane sempre in primo piano)
+      [ Pratica 1 ] [ Pratica 2 ] [ + ]               ← barra delle pratiche
 ```
+
+- Ogni ricerca, indice, sentenza o «Apri tutto» del dossier finisce nella pratica attiva
+  (creata se manca): una sentenza è una voce della pratica, mai una scheda.
+- «Apri accanto» apre una finestra leggera accanto al tavolo (mezzi o terzi di larghezza,
+  altrimenti una colonna stretta che apre il tavolo); le finestre non si trascinano.
+- Su telefono la pratica è una colonna con frecce e punti per cambiare pratica; «Apri accanto»
+  apre il lettore a schermo intero, con «‹ Pratica» per tornare.
+- «Salva come dossier» / «Aggiungi a un dossier…» salvano gli atti nell'ordine del tavolo.
 
 **Tipi di Contenuto:**
 
-1. **NormaBlock** - Intera norma con articoli
-2. **LooseArticle** - Articolo singolo estratto
-3. **ArticleCollection** - Raccolta custom di articoli
+1. **Atto** - una norma con i suoi articoli (anche senza articoli: l'indice)
+2. **Giurisprudenza** - le sentenze della pratica, la più recente prima
+3. **Ricerca per tema** - una finestra accanto, con le sentenze della Cassazione
 
-**Drag & Drop:**
-- Drag header → sposta finestra
-- Drag articolo → estrai o sposta in altro tab
-- Drop zone compatibilità → merge solo se stesso tipo atto
+**Trascinamento:**
+- Gli atti si riordinano trascinandoli; gli articoli no
+- Una norma citata in una finestra si apre accanto a quella finestra
 
 ---
 
@@ -374,8 +373,8 @@ Stati:
 
 ---
 
-### 3.3 WorkspaceView (Dossier)
-**File:** `components/features/workspace/WorkspaceView.tsx`
+### 3.3 Dossier
+**File:** `components/features/dossier/`
 **Scopo:** Gestione raccolte di ricerca
 
 ```
@@ -670,7 +669,7 @@ Norma (documento legale)
 2. Digita "art 2043 cc"
 3. Sistema parsa automaticamente
 4. Click "Cerca" o Enter
-5. Risultato appare in nuovo WorkspaceTab
+5. Il risultato entra nel suo atto, sul tavolo della pratica attiva
 6. Utente può:
    - Leggere testo
    - Aprire Study Mode
@@ -683,7 +682,7 @@ Norma (documento legale)
 1. Utente cerca più articoli
 2. Click "Aggiungi a Dossier" su ogni articolo
 3. Seleziona dossier esistente o crea nuovo
-4. Va su Workspace → Dossier
+4. Va su Dossier
 5. Visualizza tutti gli articoli raccolti
 6. Imposta stati (unread/reading/important/done)
 7. Esporta PDF finale
@@ -707,7 +706,7 @@ Norma (documento legale)
 1. Utente legge spiegazione in BrocardiDisplay
 2. Vede link "v. art. 1175"
 3. Click sul link
-4. Nuovo articolo si carica nella stessa tab
+4. L'articolo citato entra nel suo atto, sul tavolo della pratica (o accanto, se la citazione è in una finestra)
 5. Può tornare indietro con navigazione
 ```
 
@@ -752,9 +751,10 @@ Norma (documento legale)
 - `frontend/src/components/features/search/FootnoteTooltip.tsx`
 
 ### Componenti Workspace
-- `frontend/src/components/features/workspace/WorkspaceManager.tsx`
-- `frontend/src/components/features/workspace/WorkspaceView.tsx`
-- `frontend/src/components/features/workspace/WorkspaceTabPanel.tsx`
+- `frontend/src/components/features/practice/PracticeTable.tsx`
+- `frontend/src/components/features/practice/ReadingRow.tsx`
+- `frontend/src/components/features/practice/ReadingWindow.tsx`
+- `frontend/src/components/features/practice/PracticeBar.tsx`
 - `frontend/src/components/features/workspace/ArticleNavigation.tsx`
 
 ### Study Mode

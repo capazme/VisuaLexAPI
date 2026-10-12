@@ -125,6 +125,11 @@ could not reopen are told once (`practiceNotice`). `merge` sanitizes the practic
 (`sanitizePractices`). `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
 `set`. `clearUserData` empties the practices.
+Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
+browser's old tabs can be recovered by hand should the conversion go wrong (never overwritten; skipped,
+with a logged warning «saved workspace too large to back up», when the value is over 1 000 000
+characters, so the copy cannot fill the browser's space). The key holds a user's saved norms and
+searches: `clearUserData` (logout) removes it, and nothing reads it back in the app.
 
 The partialize deliberately holds UI state only. **Every user-owned slice is
 server-backed** — see gotcha 17, which is the rule any new slice must follow.
@@ -509,7 +514,7 @@ opening one block's index hands the window over rather than stacking a second.
 The floating mechanism belongs to the *tool*, not the content — the owner's own
 framing, and the correction that shaped round 2a.
 
-**Opening an act without an article.** `fetchActUrn` (`utils/actUrn.ts`) resolves
+**Opening an act without an article.** `resolveAct` (`utils/actUrn.ts`) resolves
 an act's URN structurally, with no text fetched; `addActIndexToPractice` then drops
 an article-less act on the active practice (created when there is none) and points the
 window at it atomically. The
@@ -533,8 +538,7 @@ row named by the entry's `articleKey` when a practice's row gave one (its `readi
 so a past text comes back as itself), else found through `findPracticeArticle`. An entry that names nothing the
 practices hold is not kept. The entry is live while its practice holds the subject, and `popReadingBack` walks back to
 it itself (the practice made active, the row revealed or the window reopened, or an open window asked to take focus
-through `windowFocusRequest`, a one-shot signal the window takes atomically; `ReadingBackControl` tells
-its `onNavigated` the practice's id and the entry; a topic-search window is never a target; on a phone the same step opens the full-screen reader on a subject read beside, or closes it for a row of the table, since a phone has no windows).
+through `windowFocusRequest`, a one-shot signal the window takes atomically; a topic-search window is never a target; on a phone the same step opens the full-screen reader on a subject read beside, or closes it for a row of the table, since a phone has no windows).
 `moveActToPractice` rewrites the entries that name the moved act.
 
 **The practice.** A practice is the table of one question (spec `2026-10-08-norm-tab-container-design.md`):
@@ -698,7 +702,7 @@ Duplicating any of these is a defect, not a shortcut.
   kept across a redraw, re-search when the text changes). Read-only over the DOM. `features/search/findBarParts.ts` (`counterText`, `ICON_BUTTON`) is the counter and icon button of the window; `features/search/toolbarToggle.ts`
   (`toolbarToggleClass`) is the look shared by the toolbar toggles (`DiscussionButton`,
   `FindInTextButton`): add a toggle with it, not with a copy of the classes.
-- `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
+- `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.
 - `services/legalFetch.ts` — `legalFetch(path, init)`: `fetch` for the Python routes
@@ -831,8 +835,8 @@ Duplicating any of these is a defect, not a shortcut.
   unknown keys dropped — or refused with an Italian reason. `validateImportedDossier` runs it on
   every imported norm and counts what it leaves out. A copy of the server's, both pinned to
   `conventions/sources/norm-entries.json`.
-- `utils/normaMeta.ts` — `formatNormaTitle(norma)` (the act heading) and
-  `formatNormaMeta(norma, articleCount?)`, the line under it: only
+- `utils/normaMeta.ts` — `formatNormaMeta(norma, articleCount?)`, the line under an act's
+  heading (`actHeading`, `utils/sources/`): only
   what the title does not say (a code's decree, an aliased code's name, «Estremi
   non disponibili»), often empty.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
@@ -1087,8 +1091,13 @@ meant to stay split; add new features as new files, not inside the shells:
   table's has been seen (`config/tourConfig.ts`; their targets are `#tour-practice-bar`, `#tour-practice-header`,
   `#tour-practice-save`, `.practice-act`, `.practice-act-head`, `.practice-act-index`, `.practice-row-beside`,
   `.practice-act-study`, `.practice-act-structure`, plus the reading bar's `.glass-toolbar` and Brocardi's
-  `.brocardi-display`; `tourConfig.practice.test.tsx` fails when one is missing).
-  `SearchPanel` mounts them with `React.lazy`, one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
+  `.brocardi-display`; `tourConfig.practice.test.tsx` fails when one is missing). Tours never overlap: `useTour` keeps one driver on screen
+  module-wide, so a tour asked while another shows is not started (it is asked again the next time its
+  surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
+  `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
+  target is written nowhere in the sources, and checks the search tour against the search page.
+  `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
+  `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window
   replaces) or in the full-screen reader on a phone (`isDesktopViewport`), a norm cited in a window (or
   in the reader) enters its act and opens beside that window (in the reader, on a phone; `SearchPanel`:

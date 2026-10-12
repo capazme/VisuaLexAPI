@@ -87,6 +87,14 @@ describe('who starts the practice tours', () => {
     expect(tour.tryStartTour).toHaveBeenCalledTimes(2);
   });
 
+  it('a practice with no act does not hand over to the act\'s tour: there is nothing to explore', () => {
+    appStore.setState({ practices: [], activePracticeId: null, practiceRows: {} });
+    appStore.getState().createPractice('Vuota');
+    render(table());
+    act(() => tour.onComplete?.('practice'));
+    expect(tour.tryStartTour.mock.calls).toEqual([['practice']]);
+  });
+
   it('the first act asks for its tour only once the table\'s has been seen; the second act never does', () => {
     appStore.getState().addArticlesToPractice(null, { tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08' }, [
       article({ tipo_atto: 'legge', numero_atto: '24', data: '2017-03-08' }, '5'),

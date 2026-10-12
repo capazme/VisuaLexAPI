@@ -544,8 +544,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    // Handler for opening citation in new tab
-    const handleOpenCitationInTab = useCallback((citation: ParsedCitationData) => {
+    // Opens the previewed citation in the practice
+    const handleOpenCitation = useCallback((citation: ParsedCitationData) => {
         // MERLT-1.9: emit citation_click for the bus tracker. The target URN
         // is null at click time (resolution happens later via triggerSearch);
         // the BFF accepts null target and forwards it as such.
@@ -565,7 +565,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             },
         });
         // Loop β #2: the 'implicit' NER capture surface — clicking a citation
-        // chip through to a tab is a low-weight automatic CONFIRMATION that the
+        // chip through to its article is a low-weight automatic CONFIRMATION that the
         // detected reference was real. Full-consent only, fire-and-forget.
         if (canContribute) {
             const implicitPayload = buildArticleXrefNerPayload({
@@ -797,7 +797,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 if (tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase() && onCrossReferenceNavigate) {
                     onCrossReferenceNavigate(articleNumber, norma_data);
                 } else {
-                    // Altrimenti apri nuova tab
+                    // Altrimenti cerca l'articolo nella pratica
                     const isSameActType = tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase();
                     triggerSearch({
                         act_type: tipoAtto,
@@ -1104,7 +1104,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 article={citationPreviewState.article}
                 position={citationPreviewState.position}
                 onClose={hidePreview}
-                onOpenInTab={handleOpenCitationInTab}
+                onOpenCitation={handleOpenCitation}
                 nerFeedbackEnabled={canContribute}
                 onNerFeedback={handleCitationNerFeedback}
                 onMouseEnter={() => { isHoveringPopupRef.current = true; }}

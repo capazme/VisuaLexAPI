@@ -2,7 +2,7 @@
  * Tour Configuration
  *
  * Configurazione centralizzata per il sistema di onboarding/tour.
- * 13 tour totali: 6 per pagina + 7 contestuali per feature.
+ * 12 tour totali: 6 per pagina + 6 contestuali per feature.
  */
 import type { DriveStep } from 'driver.js';
 
@@ -27,7 +27,6 @@ export const TOUR_KEYS = {
     commandPalette: 'commandPalette',
     studyMode: 'studyMode',
     treeView: 'treeView',
-    citationPreview: 'citationPreview',
     practice: 'practice',
     practiceAct: 'practiceAct',
     quickNorms: 'quickNorms',
@@ -70,51 +69,19 @@ export const WELCOME_STEPS: DriveStep[] = [
 ];
 
 /**
- * Search Page Tour - Panoramica ricerca (10 step)
+ * Search Page Tour - Panoramica ricerca (4 step)
+ *
+ * Parte sulla pagina di ricerca, che alla prima visita è vuota: i passi puntano a ciò che la
+ * pagina mostra allora (l'invito a cercare, la voce Ricerca, le norme preferite). Il tavolo di
+ * lavoro ha i suoi tour (`practice`, `practiceAct`).
  */
 export const SEARCH_STEPS: DriveStep[] = [
     {
-        element: '#tour-search-form',
+        element: '#tour-main-content',
         popover: {
-            title: 'Pannello di Ricerca',
-            description: 'Da qui puoi cercare qualsiasi norma italiana o europea. Compila i campi e premi Cerca.',
-            side: 'right',
-            align: 'start',
-        }
-    },
-    {
-        element: '#tour-act-type',
-        popover: {
-            title: 'Tipo di Atto',
-            description: 'Seleziona il tipo: Codice Civile, Costituzione, Legge, Decreto Legislativo, norme UE e molto altro.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
-        element: '#tour-article-input',
-        popover: {
-            title: 'Numero Articolo',
-            description: 'Inserisci l\'articolo. Supporta formati multipli: "1", "1,2,3", "1-5" oppure "1 bis".',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
-        element: '#tour-version-select',
-        popover: {
-            title: 'Versione della Norma',
-            description: 'Scegli "Vigente" per il testo attuale o seleziona una data per versioni storiche.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
-        element: '#tour-brocardi-toggle',
-        popover: {
-            title: 'Dottrina',
-            description: 'Attiva per ottenere spiegazioni, ratio legis e massime giurisprudenziali insieme al testo.',
-            side: 'bottom',
+            title: 'Cerca una Norma',
+            description: 'Scrivi una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024": non serve compilare dei campi. Ogni risultato finisce sul tavolo di una pratica.',
+            side: 'top',
             align: 'center',
         }
     },
@@ -122,7 +89,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Ricerca e Cmd+K',
-            description: 'Preferisci digitare? Usa Ricerca (o Cmd+K) per inserire citazioni naturali come "art. 2043 cc".',
+            description: 'Preferisci la tastiera? Usa Ricerca (o Cmd+K) per aprire la ricerca da qualsiasi punto.',
             side: 'right',
             align: 'start',
         }
@@ -131,26 +98,8 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-quick-norms',
         popover: {
             title: 'Norme Preferite',
-            description: 'Le norme che consulti spesso vengono salvate qui per un accesso rapido con un solo click.',
+            description: 'Le ricerche che ripeti spesso vengono salvate qui per un accesso rapido con un solo click.',
             side: 'top',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-results-area',
-        popover: {
-            title: 'Area Risultati',
-            description: 'I risultati della ricerca appaiono qui, sul tavolo della pratica attiva: ogni norma diventa un atto con i suoi articoli.',
-            side: 'left',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-tree-view-btn',
-        popover: {
-            title: 'Struttura Documento',
-            description: 'Visualizza l\'indice completo della norma con titoli, capi e sezioni. Clicca un articolo per caricarlo.',
-            side: 'left',
             align: 'center',
         }
     },
@@ -465,7 +414,7 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
 ];
 
 /**
- * Study Mode Tour - Lettura immersiva (8 step)
+ * Study Mode Tour - Lettura immersiva (7 step)
  */
 export const STUDY_MODE_STEPS: DriveStep[] = [
     {
@@ -504,7 +453,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-study-content',
+        element: '#study-mode-article-body',
         popover: {
             title: 'Area di Lettura',
             description: 'Il testo dell\'articolo in formato ottimizzato. Seleziona per evidenziare o aggiungere note.',
@@ -516,16 +465,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
         element: '#tour-study-notes',
         popover: {
             title: 'Pannello Note',
-            description: 'Aggiungi annotazioni personali che vengono salvate automaticamente. Le ritrovi anche fuori dalla modalità studio.',
-            side: 'left',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-study-highlights',
-        popover: {
-            title: 'Evidenziazioni',
-            description: 'Seleziona il testo e scegli un colore per evidenziare i passaggi importanti. 4 colori disponibili.',
+            description: 'Note ed evidenziazioni: seleziona il testo e scegli un colore, o aggiungi un\'annotazione personale. Vengono salvate automaticamente e le ritrovi anche fuori dalla modalità studio.',
             side: 'left',
             align: 'center',
         }
@@ -542,7 +482,7 @@ export const STUDY_MODE_STEPS: DriveStep[] = [
 ];
 
 /**
- * Tree View Tour - Struttura documento (4 step)
+ * Tree View Tour - Struttura documento (3 step)
  */
 export const TREE_VIEW_STEPS: DriveStep[] = [
     {
@@ -555,19 +495,10 @@ export const TREE_VIEW_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-tree-content',
+        element: '#tour-tree-structure',
         popover: {
             title: 'Navigazione Gerarchica',
             description: 'Espandi le sezioni per vedere i contenuti. La struttura riflette l\'organizzazione ufficiale della norma.',
-            side: 'right',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-tree-article',
-        popover: {
-            title: 'Carica Articolo',
-            description: 'Clicca su un articolo per caricarlo direttamente. Puoi selezionarne più di uno.',
             side: 'right',
             align: 'center',
         }
@@ -579,39 +510,6 @@ export const TREE_VIEW_STEPS: DriveStep[] = [
             description: 'Vedi il numero totale di articoli della norma e quanti ne hai già caricati.',
             side: 'right',
             align: 'end',
-        }
-    }
-];
-
-/**
- * Citation Preview Tour - Anteprima citazioni (3 step)
- */
-export const CITATION_PREVIEW_STEPS: DriveStep[] = [
-    {
-        element: '.citation-hover',
-        popover: {
-            title: 'Citazioni nel Testo',
-            description: 'Le citazioni normative sono sottolineate. Passa il mouse sopra per un\'anteprima.',
-            side: 'top',
-            align: 'center',
-        }
-    },
-    {
-        element: '.citation-preview-popup',
-        popover: {
-            title: 'Anteprima Articolo',
-            description: 'Leggi il contenuto dell\'articolo citato senza lasciare la pagina corrente.',
-            side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '.citation-preview-open',
-        popover: {
-            title: 'Apri sul Tavolo',
-            description: 'Clicca il pulsante per portare l\'articolo completo sul tavolo della pratica.',
-            side: 'bottom',
-            align: 'center',
         }
     }
 ];
@@ -662,7 +560,7 @@ export const PRACTICE_STEPS: DriveStep[] = [
 ];
 
 /**
- * Practice Act Tour - Esplorazione di un atto (6 step)
+ * Practice Act Tour - Esplorazione di un atto (7 step)
  */
 export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
@@ -731,7 +629,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
 ];
 
 /**
- * Quick Norms Tour - Norme preferite (4 step)
+ * Quick Norms Tour - Norme preferite (3 step)
  */
 export const QUICK_NORMS_STEPS: DriveStep[] = [
     {
@@ -744,10 +642,10 @@ export const QUICK_NORMS_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-quicknorms-add',
+        element: '#tour-qn-add',
         popover: {
             title: 'Aggiungi Norma',
-            description: 'Dalla barra strumenti di un articolo, clicca il fulmine per salvarlo qui.',
+            description: 'Parti da una ricerca o compila i campi a mano, dai un nome e salva: la ricerca resta a un click.',
             side: 'bottom',
             align: 'center',
         }
@@ -761,15 +659,6 @@ export const QUICK_NORMS_STEPS: DriveStep[] = [
             align: 'center',
         }
     },
-    {
-        element: '#tour-quicknorms-manage',
-        popover: {
-            title: 'Gestisci',
-            description: 'Apri il pannello di gestione per rinominare, riordinare o eliminare le norme salvate.',
-            side: 'left',
-            align: 'center',
-        }
-    }
 ];
 
 // ==================== STEPS MAP ====================
@@ -785,7 +674,6 @@ export const TOUR_STEPS_MAP: Record<TourType, DriveStep[]> = {
     commandPalette: COMMAND_PALETTE_STEPS,
     studyMode: STUDY_MODE_STEPS,
     treeView: TREE_VIEW_STEPS,
-    citationPreview: CITATION_PREVIEW_STEPS,
     practice: PRACTICE_STEPS,
     practiceAct: PRACTICE_ACT_STEPS,
     quickNorms: QUICK_NORMS_STEPS,

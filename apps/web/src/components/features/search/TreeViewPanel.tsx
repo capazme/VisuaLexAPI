@@ -501,7 +501,7 @@ export function TreeViewPanel({
                 isWindow && "cursor-grab active:cursor-grabbing select-none touch-none",
               )}
             >
-              <div className="flex justify-between items-center mb-4">
+              <div id="tour-tree-header" className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
                   {isWindow && (
                     <GripHorizontal

@@ -109,7 +109,7 @@ apps/web/src/
 │   │
 │   ├── features/              # Feature-specific components
 │   │   ├── search/            # Search form, results, article display
-│   │   ├── workspace/         # Multi-tab workspace environment
+│   │   ├── workspace/         # Study Mode, article navigation (the reading tables are in features/practice/)
 │   │   │   └── StudyMode/     # Distraction-free study mode
 │   │   ├── history/           # Search history
 │   │   ├── dossier/           # Research collections
@@ -258,8 +258,8 @@ environments: Environment[]
 sidebarVisible: boolean
 commandPaletteOpen: boolean
 searchPanelState: { isCollapsed, position, zIndex }
-workspaceTabs: WorkspaceTab[]
-highestZIndex: number
+practices: Practice[]          // the tables of the questions (persisted)
+activePracticeId: string | null
 
 // Search
 searchTrigger: SearchParams | null
@@ -273,11 +273,12 @@ toggleSidebar()
 openCommandPalette()
 updateSettings(settings)
 
-// Workspace
-addWorkspaceTab(tab)
-removeTab(tabId)
-updateTab(tabId, updates)
-bringTabToFront(tabId)
+// Practices
+createPractice(label)
+setActivePractice(id)
+addArticlesToPractice(practiceId, norma, articles)
+closeBeside(practiceId, refId)
+closePractice(id)
 
 // Data
 addBookmark(bookmark)

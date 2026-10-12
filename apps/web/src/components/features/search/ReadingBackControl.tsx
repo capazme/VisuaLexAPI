@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { peekReadingBack, type PracticeBackEntry } from '../../../utils/readingBackStack';
+import { peekReadingBack } from '../../../utils/readingBackStack';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 
@@ -18,18 +18,13 @@ import { Z_INDEX } from '../../../constants/zIndex';
  */
 interface ReadingBackControlProps {
   /**
-   * Fired with the practice returned to and the entry walked back to: its subject and whether it was
-   * read in the table or beside it (spec §6.3), for a view that must follow (the phone's reader).
-   */
-  onNavigated?: (practiceId: string, entry: PracticeBackEntry) => void;
-  /**
    * `bottomOffset` px from the viewport's bottom: centred above the bar of practices, the one edge the
    * table, its headings and its windows leave free.
    */
   bottomOffset?: number;
 }
 
-export function ReadingBackControl({ onNavigated, bottomOffset = 16 }: ReadingBackControlProps) {
+export function ReadingBackControl({ bottomOffset = 16 }: ReadingBackControlProps) {
   const { readingBackStack, practices, popReadingBack } =
     useAppStore(useShallow(s => ({
       readingBackStack: s.readingBackStack,
@@ -43,9 +38,8 @@ export function ReadingBackControl({ onNavigated, bottomOffset = 16 }: ReadingBa
 
   const handleBack = () => {
     // The store walks back to the entry itself (spec §6.3: its practice made active, its row
-    // revealed or its window reopened); the listener learns which practice.
-    const entry = popReadingBack();
-    if (entry) onNavigated?.(entry.practiceId, entry);
+    // revealed or its window reopened, the phone's reader opened or closed).
+    popReadingBack();
   };
 
   return (

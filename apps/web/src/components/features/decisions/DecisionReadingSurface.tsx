@@ -331,7 +331,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         article={preview.article}
         position={preview.position}
         onClose={hidePreview}
-        onOpenInTab={(citation) => {
+        onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);
           openCitation(citation);

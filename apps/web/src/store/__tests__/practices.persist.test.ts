@@ -231,6 +231,25 @@ describe('persist version 1: the saved tabs become practices, once', () => {
     localStorage.removeItem(options().name);
   });
 
+  it('does not copy a workspace over a million characters, and says so', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(options().name, 'x'.repeat(1_000_001));
+    expect(loadV0({ workspaceTabs: twoTabs }).practices).toHaveLength(2);
+    expect(localStorage.getItem(BACKUP_KEY)).toBeNull();
+    expect(warn.mock.calls.map((c) => c.join(' ')).join('\n')).toContain('saved workspace too large to back up');
+    localStorage.removeItem(options().name);
+  });
+
+  it('logout takes the backup away, whoever made it', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(options().name, JSON.stringify({ state: { workspaceTabs: twoTabs }, version: 0 }));
+    loadV0({ workspaceTabs: twoTabs });
+    expect(localStorage.getItem(BACKUP_KEY)).not.toBeNull();
+    appStore.getState().clearUserData();
+    expect(localStorage.getItem(BACKUP_KEY)).toBeNull();
+    localStorage.removeItem(options().name);
+  });
+
   it('logs the practices saved without the marker that the tabs replace', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     loadV0({ workspaceTabs: twoTabs, practices: [practice('stale', 'Vecchia')] });

@@ -91,6 +91,7 @@ export function StudyModeHeader({
             {/* Left: Close, Drag handle & Title */}
             <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
               <button
+                id="tour-study-close"
                 onClick={onClose}
                 className={cn("p-1.5 sm:p-2 rounded-md transition-colors", styles.button)}
                 title="Chiudi (ESC)"
@@ -124,7 +125,7 @@ export function StudyModeHeader({
             </div>
 
             {/* Center: Navigation */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div id="tour-study-navigation" className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => onNavigate('prev')}
                 disabled={!hasPrev}

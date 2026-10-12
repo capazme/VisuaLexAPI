@@ -4,7 +4,7 @@ import { appStore } from '../../../store/useAppStore';
 import { ReadingBackControl } from './ReadingBackControl';
 
 describe('ReadingBackControl over the practices (spec §6.3 `table`)', () => {
-  it('a citation jump from a row, then back: the practice left is active, the row revealed, onNavigated names it', async () => {
+  it('a citation jump from a row, then back: the practice left is active, the row revealed', async () => {
     const { L24, article } = await import('../../../utils/__fixtures__/savedWorkspaces');
     const { articleRowKey, practiceArticleKey } = await import('../../../utils/practice');
     appStore.setState({ practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null, readingBackStack: [] });
@@ -12,14 +12,10 @@ describe('ReadingBackControl over the practices (spec §6.3 `table`)', () => {
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });
     s().createPractice('Altra');
-    const onNavigated = vi.fn();
-    render(<ReadingBackControl onNavigated={onNavigated} />);
+    render(<ReadingBackControl />);
     fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 5 l. 24/2017' }));
     expect(s().activePracticeId).toBe(practiceId);
     expect(s().pendingReveal).toEqual({ practiceId, rowKey: articleRowKey(practiceId, actId, practiceArticleKey(article(L24, '5'))) });
-    expect(onNavigated).toHaveBeenCalledWith(practiceId, expect.objectContaining({
-      practiceId, place: 'table', subject: expect.objectContaining({ kind: 'article', actId }),
-    }));
     vi.unstubAllEnvs();
   });
 });
@@ -48,18 +44,16 @@ describe('ReadingBackControl over the practices (spec §6.3 `beside`)', () => {
     return { s, practiceId, actId, ref };
   }
 
-  it('after a jump from a window whose window was closed meanwhile: the practice active, the window reopened, onNavigated told', async () => {
+  it('after a jump from a window whose window was closed meanwhile: the practice active, the window reopened', async () => {
     desktop();
     const { s, practiceId, ref } = await articleWindow();
     s().pushReadingBack({ tabId: ref.id, blockId: 'act', articleId: '5', label: 'art. 5 l. 24/2017' });
     s().closeBeside(practiceId, ref.id);
     s().createPractice('Altra');
-    const onNavigated = vi.fn();
-    render(<ReadingBackControl onNavigated={onNavigated} />);
+    render(<ReadingBackControl />);
     fireEvent.click(screen.getByRole('button', { name: 'Torna a art. 5 l. 24/2017' }));
     expect(s().activePracticeId).toBe(practiceId);
     expect(s().practices.find((p) => p.id === practiceId)?.beside.map((b) => b.id)).toEqual([ref.id]);
-    expect(onNavigated).toHaveBeenCalledWith(practiceId, expect.objectContaining({ place: 'beside', practiceId }));
   });
 
   it('with the window still open, it takes focus instead of being opened twice', async () => {

@@ -6,6 +6,7 @@ import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { DOCTRINE_ATTRIBUTION, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLabel';
 import { httpsUrl } from '../../../utils/decisionLinks';
 import { citeNorm } from '../../../utils/sources';
+import { isEuropeanAct } from '../../../utils/versionDisplay';
 import { searchNorma } from '../../../utils/decisionSearchNorma';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { PluginSlot } from '../../../plugins/PluginSlot';
@@ -59,7 +60,9 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
  * «Giurisprudenza» under the article text: Brocardi's massime (their decisions as links), the
  * Massimario's reviews (a plugin panel in the `article_case_law` slot) and, on request, the
  * decisions of the Cassazione that mention the article. Closed by default; its state is kept
- * per tab for the session. Nothing is asked of the Cassazione's archive until the button is pressed.
+ * per host for the session. Nothing is asked of the Cassazione's archive until the button is pressed,
+ * and an act of the Union is not offered the archive at all (its search cannot read an EU act;
+ * case-law section spec, D2).
  *
  * The archive the reader picks in the list is not remembered: the list learns whether the route
  * can search both archives only from a request sent without one (Task 15), so each opening of
@@ -69,7 +72,7 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
   const panelId = useId();
   const [open, setOpen] = useState(() => readOpen(tabId));
   const [searched, setSearched] = useState(false);
-  // Another article in the same tab: the search starts again from the button
+  // Another article in the same host: the search starts again from the button
   const [shownKey, setShownKey] = useState(articleUrn);
   if (shownKey !== articleUrn) {
     setShownKey(articleUrn);
@@ -85,6 +88,7 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
   const hasMassime = Boolean(massime && massime.length > 0);
   const sourceLink = httpsUrl(brocardiLink);
   const hasMassimario = getSlotComponents('article_case_law').length > 0;
+  const offersCassazione = !isEuropeanAct(norma.tipo_atto);
 
   return (
     <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
@@ -140,7 +144,7 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
               </div>
             )}
 
-            <section aria-labelledby={`${panelId}-cassazione`} className="space-y-3">
+            {offersCassazione && <section aria-labelledby={`${panelId}-cassazione`} className="space-y-3">
               <h4 id={`${panelId}-cassazione`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Cassazione — menzionano l’articolo
               </h4>
@@ -162,7 +166,7 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
                   Cerca nell’archivio della Cassazione
                 </button>
               )}
-            </section>
+            </section>}
           </>
         )}
       </div>

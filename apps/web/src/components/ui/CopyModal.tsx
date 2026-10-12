@@ -9,7 +9,6 @@ interface CopyModalProps {
   onCopy: (options: CopyOptions) => void;
   hasNotes: boolean;
   hasHighlights: boolean;
-  canCopyTab?: boolean;
   canCopyNorma?: boolean;
 }
 
@@ -18,7 +17,7 @@ export interface CopyOptions {
   includeCitation: boolean;
   includeNotes: boolean;
   includeHighlights: boolean;
-  scope: 'article' | 'norma' | 'tab';
+  scope: 'article' | 'norma';
 }
 
 export function CopyModal({
@@ -27,7 +26,6 @@ export function CopyModal({
   onCopy,
   hasNotes,
   hasHighlights,
-  canCopyTab = false,
   canCopyNorma = false,
 }: CopyModalProps) {
   const [options, setOptions] = useState<CopyOptions>({
@@ -117,7 +115,7 @@ export function CopyModal({
           </div>
         </div>
 
-        {(canCopyNorma || canCopyTab) && (
+        {canCopyNorma && (
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase mb-3">Ambito</p>
             <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-1 space-y-1">
@@ -127,22 +125,12 @@ export function CopyModal({
                 onChange={() => setOptions({ ...options, scope: 'article' })}
                 label="Solo questo articolo"
               />
-              {canCopyNorma && (
-                <RadioRow
-                  name="scope"
-                  checked={options.scope === 'norma'}
-                  onChange={() => setOptions({ ...options, scope: 'norma' })}
-                  label="Tutti gli articoli della norma"
-                />
-              )}
-              {canCopyTab && (
-                <RadioRow
-                  name="scope"
-                  checked={options.scope === 'tab'}
-                  onChange={() => setOptions({ ...options, scope: 'tab' })}
-                  label="Tutta la tab"
-                />
-              )}
+              <RadioRow
+                name="scope"
+                checked={options.scope === 'norma'}
+                onChange={() => setOptions({ ...options, scope: 'norma' })}
+                label="Tutti gli articoli della norma"
+              />
             </div>
           </div>
         )}
