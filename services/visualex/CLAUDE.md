@@ -498,7 +498,10 @@ Breaking one of these breaks the product. Read before editing.
     article, the refusal names the annex it looked in and adds where the article is
     («Articolo 29 non presente nell'allegato 1 di …: su Normattiva l'art. 29 si trova
     nell'allegato 2»), from the tree just read (`_where_else_in_tree`). Never for a
-    code's default annex: another annex of a code is another code.
+    code's default annex: another annex of a code is another code. A request that asks
+    for the dispositivo explicitly (`annex: ""`) is checked against the dispositivo alone,
+    and its refusal reads «non presente nel testo di …» with the same hint: before, an
+    article found only in an annex passed and came back as the act's art. 1.
 
 30. **A path built from the URN is untrusted.** The guard on `/export_pdf` checks the
     host (`normattiva.it`), so everything after it is the caller's: `;../../x` used to

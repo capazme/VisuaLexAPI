@@ -360,6 +360,37 @@ class TestWhereElseInTheAct:
         assert str(refused.value).endswith(": su Normattiva l'art. 29 si trova nell'allegato 2")
 
     @pytest.mark.asyncio
+    async def test_the_dispositivo_asked_explicitly_refuses_an_article_only_in_an_annex(self):
+        """`annex: ""` asks for the decree's own text: art. 29 is only in the c.p.a. (annex 2),
+        and Normattiva would answer the dispositivo's art. 29 with its art. 1."""
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)), \
+                pytest.raises(ResourceNotFoundError) as refused:
+            await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29", "annex": ""})
+        assert str(refused.value).startswith("Articolo 29 non presente nel testo di decreto legislativo")
+        assert str(refused.value).endswith(": su Normattiva l'art. 29 si trova nell'allegato 2")
+
+    @pytest.mark.asyncio
+    async def test_the_dispositivo_asked_explicitly_keeps_its_own_articles(self):
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            found = await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "3", "annex": ""})
+        assert [(nv.numero_articolo, nv.allegato) for nv in found] == [("3", None)]
+
+    @pytest.mark.asyncio
+    async def test_no_part_named_still_accepts_an_article_anywhere_in_the_act(self):
+        """Unchanged: with no preference (and no annex metadata to move to) the check reads the whole act."""
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            found = await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29"})
+        assert [nv.numero_articolo for nv in found] == ["29"]
+
+    @pytest.mark.asyncio
     async def test_a_codes_default_annex_gets_no_hint(self):
         """Another annex of a code is another code: art. 40 of the preleggi is not
         art. 40 of the codice civile, so its refusal points nowhere."""

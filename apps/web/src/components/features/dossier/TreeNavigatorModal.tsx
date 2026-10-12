@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Search, CheckSquare, Square, Loader2, TreeDeciduous } from 'lucide-react';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { resolveAct } from '../../../utils/actUrn';
+import { isEuropeanAct } from '../../../utils/versionDisplay';
 import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { legalFetch } from '../../../services/legalFetch';
@@ -31,6 +32,9 @@ const ACT_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: 'decreto legislativo', label: 'Decreto Legislativo' },
   { value: 'decreto legge', label: 'Decreto Legge' },
   { value: 'd.p.r.', label: 'D.P.R.' },
+  // The Union's acts by year and number (2016 and 679 for the GDPR), read from EUR-Lex.
+  { value: 'regolamento ue', label: 'Regolamento UE' },
+  { value: 'direttiva ue', label: 'Direttiva UE' },
 ];
 
 type TreeEntry = string | Record<string, string>;
@@ -70,9 +74,12 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
         act_number: actNumber || undefined,
         date: actDate ? parseItalianDate(actDate) : undefined,
       });
+      const data = norma?.data || parseItalianDate(actDate);
       const identity = {
         tipo_atto: actType,
-        data: norma?.data || parseItalianDate(actDate),
+        // An act of the Union is the year and the number (the source's own answer, and what a
+        // search stores): a full day typed here would make it a second act with other keys.
+        data: isEuropeanAct(actType) ? data.slice(0, 4) : data,
         numero_atto: norma?.numero_atto || actNumber,
       };
 

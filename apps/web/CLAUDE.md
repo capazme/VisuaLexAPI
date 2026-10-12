@@ -68,7 +68,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
   menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
-  backdrop closes; entries are 44 px high on a phone. There is no «Ricerca Veloce», no
+  backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
+  at the top left, and `Layout` starts every page's content under it (`pt-[4.5rem]`, repeated at `md`)
+  except the search page, whose phone headers sit beside it (`pl-[4.5rem]`); the practice row's
+  `h-app-row` is drawn only there, so its height is unchanged. There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.
 - `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and
@@ -613,6 +616,16 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   Only study cards go through it: «Elimina» on a draft or an archived card in
   «Le mie schede» (`studiaService.trash`).
   A decision in the trash is named by the server's citation.
+- **What another application changes shows without a reload** (`useDossierRefresh`, mounted by
+  `DossierPage`): the open dossier (`refreshDossier(id, { quiet: true })`) or the list
+  (`refreshDossiers`) is read again when the window comes back into focus or into view, and every
+  minute while visible, at most once in 15 s; the trash joins the focus and the poll. Quiet reads
+  only log a failure; they are skipped, or their answer dropped, while any dossier write is on its
+  way (`dossierService.writesInFlight()`, counted around every write the service makes) or when the
+  dossier (or the list) changed here while they travelled (Immer's new object); a dossier with an
+  add, an undo or an order pending is kept as it is, never merged. The pushes a read may have
+  beaten (`createDossier`, `importDossier`, `addNoteToDossier`) replace an entry with the same id
+  instead of adding it twice. No websockets.
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's reading surface
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under

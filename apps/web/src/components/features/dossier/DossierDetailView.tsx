@@ -44,7 +44,7 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, decisionCitationOf, searchParamsFromNorma, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { DossierActBlock } from './DossierActBlock';
@@ -344,8 +344,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   const copyShareLink = async () => {
-    const data = btoa(JSON.stringify(dossier));
-    const shareUrl = `${window.location.origin}/dossier?import=${encodeURIComponent(data)}`;
+    let shareUrl: string;
+    try {
+      shareUrl = `${window.location.origin}/dossier?import=${encodeDossierShare(dossier)}`;
+    } catch (e) {
+      console.error('Failed to build share link:', e);
+      showToast('Impossibile creare il link di condivisione di questo dossier. Puoi esportarlo in JSON.', 'error');
+      return;
+    }
     try {
       await navigator.clipboard.writeText(shareUrl);
       showToast('Link di condivisione copiato negli appunti', 'success');

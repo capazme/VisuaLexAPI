@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { LingoCardStato } from '@prisma/client';
 import { request, app, createTestUser, authHeader, prisma, type TestUser } from './helpers';
 import { createLingoCard } from '../src/lingo/cards';
+import { deleteUserAccount } from '../src/lingo/deleteUserAccount';
 
 const FINGERPRINT = 'c'.repeat(64);
 
@@ -284,5 +285,23 @@ describe('exporting an account', () => {
     const carol = await createTestUser('export-carol');
     const response = await request(app).get('/api/auth/export').set(authHeader(carol));
     expect(response.body.data.lingoCards).toEqual([]);
+  });
+});
+
+describe('an account deleted while a vote archives one of its cards', () => {
+  it('takes the card that the vote archived, instead of leaving it with no author', async () => {
+    const carla = await createTestUser('erasure-carla');
+    const card = await cardIn(carla, 'PROPOSTA_COMMUNITY');
+    let deleting: Promise<void> | undefined;
+    // The vote's transaction: the card row locked, then archived after a while.
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id = ${card.id} FOR UPDATE`;
+      deleting = deleteUserAccount(carla.id);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await tx.lingoCard.update({ where: { id: card.id }, data: { stato: 'ARCHIVIATA' } });
+    });
+    await deleting;
+    expect(await prisma.lingoCard.findUnique({ where: { id: card.id } })).toBeNull();
+    expect(await prisma.user.findUnique({ where: { id: carla.id } })).toBeNull();
   });
 });

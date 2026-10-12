@@ -263,6 +263,31 @@ describe('voting', () => {
     expect(await state(card.id)).toBe('ARCHIVIATA');
   });
 
+  it('deletes an author-less card that one «errata» archives, with its votes, anchors and review state', async () => {
+    const card = await makeCard(null, 'PROPOSTA_COMMUNITY');
+    await vote(dave, card.id, { giudizio: 'APPROVATA' });
+    await prisma.lingoStatoRipasso.create({
+      data: { utenteId: carol.id, cardId: card.id, stability: 1, difficulty: 5, reps: 1, lapses: 0, lastReviewAt: new Date(), dueAt: new Date() },
+    });
+    const response = await vote(carol, card.id, { giudizio: 'ERRATA', motivazione: 'La norma citata è abrogata.' });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ stato: 'ARCHIVIATA' });
+    expect(await prisma.lingoCard.findUnique({ where: { id: card.id } })).toBeNull();
+    expect(await prisma.lingoValidazioneCard.count({ where: { cardId: card.id } })).toBe(0);
+    expect(await prisma.lingoCardAncora.count({ where: { cardId: card.id } })).toBe(0);
+    expect(await prisma.lingoStatoRipasso.count({ where: { cardId: card.id } })).toBe(0);
+  });
+
+  it('keeps an author-less card that is validated, or left proposed', async () => {
+    const validated = await makeCard(null, 'PROPOSTA_COMMUNITY');
+    await vote(carol, validated.id, { giudizio: 'APPROVATA' });
+    await vote(dave, validated.id, { giudizio: 'APPROVATA' });
+    expect(await state(validated.id)).toBe('VALIDATA');
+    const improvable = await makeCard(null, 'PROPOSTA_COMMUNITY');
+    await vote(carol, improvable.id, { giudizio: 'MIGLIORABILE', motivazione: 'Aggiungi un esempio.' });
+    expect(await state(improvable.id)).toBe('PROPOSTA_COMMUNITY');
+  });
+
   it('leaves the card proposed on a «migliorabile»', async () => {
     const card = await makeCard(alice.id, 'PROPOSTA_COMMUNITY');
     expect((await vote(carol, card.id, { giudizio: 'MIGLIORABILE', motivazione: 'Aggiungi un esempio.' })).body).toEqual({ stato: 'PROPOSTA_COMMUNITY' });

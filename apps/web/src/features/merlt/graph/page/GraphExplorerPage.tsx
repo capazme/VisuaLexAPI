@@ -1056,7 +1056,9 @@ export function GraphExplorerPage(): React.ReactElement {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    // The window less the layout's padding: below lg it starts the page under the menu
+    // button (4.5rem on top, then 1rem, or 2rem from md, at the bottom); from lg, 2rem each side.
+    <div className="flex h-[calc(100dvh-5.5rem)] flex-col md:h-[calc(100dvh-6.5rem)] lg:h-[calc(100dvh-4rem)]">
       <header className="flex flex-col flex-wrap gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
           <Network className="h-5 w-5 text-primary-600" />
