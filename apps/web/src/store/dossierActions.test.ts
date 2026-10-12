@@ -12,6 +12,7 @@ vi.mock('../services/dossierService', () => ({
     deleteItem: vi.fn(async () => {}),
     reorderItems: vi.fn(async () => {}),
     addNote: vi.fn(async () => ({})),
+    writesInFlight: vi.fn(() => 0),
   },
 }));
 
@@ -439,6 +440,34 @@ describe('refreshDossier', () => {
     errors.mockRestore();
   });
 
+  it('quietly skips the read while a dossier write is on its way', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.writesInFlight).mockReturnValueOnce(1);
+    vi.mocked(dossierService.getById).mockClear();
+    await appStore.getState().refreshDossier('d1', { quiet: true });
+    expect(dossierService.getById).not.toHaveBeenCalled();
+  });
+
+  it('quietly drops the answer when a write sent before the read is still travelling as it arrives', async () => {
+    // The delete went out (the store already shows it gone) before the read; the server answers
+    // the read first, still holding the item.
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [] }], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.writesInFlight).mockReturnValueOnce(0).mockReturnValueOnce(1);
+    vi.mocked(dossierService.getById).mockResolvedValueOnce(api(['a']));
+    await appStore.getState().refreshDossier('d1', { quiet: true });
+    expect(appStore.getState().dossiers[0].items).toEqual([]);
+  });
+
+  it('never merges quietly into a dossier with an add on its way', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
+      { id: 'tmp', type: 'note', data: 'nuova', addedAt: '' },
+    ] }], pendingDossierItemIds: { tmp: true }, pendingDossierOrders: {} });
+    // The server already created «tmp» as «srv»: a merge would show it twice.
+    vi.mocked(dossierService.getById).mockResolvedValueOnce(api(['srv']));
+    await appStore.getState().refreshDossier('d1', { quiet: true });
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['tmp']);
+  });
+
   it('only adds what came back while an edit is on its way', async () => {
     appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [
       { id: 'tmp', type: 'note', data: 'nuova', addedAt: '' }, { id: 'a', type: 'note', data: 'a', addedAt: '' },
@@ -476,6 +505,18 @@ describe('refreshDossiers', () => {
     expect(appStore.getState().dossiers.map((d) => [d.id, d.items.map((i) => i.id)])).toEqual([['d1', ['a', 'b']], ['d2', []]]);
   });
 
+  it('skips the read, or drops its answer, while a dossier write is on its way', async () => {
+    appStore.setState({ dossiers: [local('d1', [])], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    vi.mocked(dossierService.getAll).mockClear();
+    vi.mocked(dossierService.writesInFlight).mockReturnValueOnce(1);
+    await appStore.getState().refreshDossiers();
+    expect(dossierService.getAll).not.toHaveBeenCalled();
+    vi.mocked(dossierService.writesInFlight).mockReturnValueOnce(0).mockReturnValueOnce(1);
+    vi.mocked(dossierService.getAll).mockResolvedValueOnce([api('d1', ['a']), api('d2', [])]);
+    await appStore.getState().refreshDossiers();
+    expect(appStore.getState().dossiers.map((d) => [d.id, d.items.map((i) => i.id)])).toEqual([['d1', []]]);
+  });
+
   it('keeps a dossier with an edit on its way as it is here', async () => {
     appStore.setState({ dossiers: [local('d1', ['tmp'])], pendingDossierItemIds: { tmp: true }, pendingDossierOrders: {} });
     vi.mocked(dossierService.getAll).mockResolvedValueOnce([]);
@@ -497,5 +538,20 @@ describe('refreshDossiers', () => {
     await appStore.getState().refreshDossiers();
     expect(errors).toHaveBeenCalled();
     errors.mockRestore();
+  });
+});
+
+describe('pushes that a background read may have beaten', () => {
+  it('a note the list already holds is not added twice', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', tags: [], items: [{ id: 'n1', type: 'note', data: 'Sul danno.', addedAt: '' }] }] });
+    vi.mocked(dossierService.addNote).mockResolvedValueOnce({ id: 'n1', item_type: 'note', title: 'Nota', content: 'Sul danno.', position: 0, status: 'unread', created_at: '' } as never);
+    await appStore.getState().addNoteToDossier('d1', 'Sul danno.');
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['n1']);
+  });
+
+  it('a dossier the list already holds is not added twice', async () => {
+    appStore.setState({ dossiers: [{ id: 'srv-1', title: 'Pratica', createdAt: '', tags: [], items: [] }] });
+    await appStore.getState().createDossier('Pratica');
+    expect(appStore.getState().dossiers.map((d) => d.id)).toEqual(['srv-1']);
   });
 });

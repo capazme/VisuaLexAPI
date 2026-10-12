@@ -617,8 +617,12 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `DossierPage`): the open dossier (`refreshDossier(id, { quiet: true })`) or the list
   (`refreshDossiers`) is read again when the window comes back into focus or into view, and every
   minute while visible, at most once in 15 s; the trash joins the focus and the poll. Quiet reads
-  only log a failure, keep a dossier with an add, an undo or an order on its way, and drop an answer
-  when the dossier (or the list) changed here while it travelled (Immer's new object). No websockets.
+  only log a failure; they are skipped, or their answer dropped, while any dossier write is on its
+  way (`dossierService.writesInFlight()`, counted around every write the service makes) or when the
+  dossier (or the list) changed here while they travelled (Immer's new object); a dossier with an
+  add, an undo or an order pending is kept as it is, never merged. The pushes a read may have
+  beaten (`createDossier`, `importDossier`, `addNoteToDossier`) replace an entry with the same id
+  instead of adding it twice. No websockets.
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's tab
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under

@@ -128,7 +128,15 @@ function customAliasApiToStore(a: CustomAliasApi): CustomAlias {
     };
 }
 
+/** Puts an entity in a list once: replaced when its id is already there (a background read may have brought it first). */
+function upsertById<T extends { id: string }>(list: T[], entity: T): void {
+    const at = list.findIndex(e => e.id === entity.id);
+    if (at >= 0) list[at] = entity;
+    else list.push(entity);
+}
+
 // Content types for WorkspaceTab
+
 interface NormaBlock {
     type: 'norma';
     id: string;
@@ -2199,7 +2207,7 @@ const appStore = createStore<AppState>()(
                         description,
                     });
                     set((state) => {
-                        state.dossiers.push({
+                        upsertById(state.dossiers, {
                             id: created.id,
                             title,
                             description,
@@ -2526,12 +2534,16 @@ const appStore = createStore<AppState>()(
 
             refreshDossier: async (dossierId, options) => {
                 const quiet = options?.quiet === true;
+                // A write on its way, before or after the read starts, may be missing from the
+                // answer: a quiet read waits for the next turn rather than undo it.
+                if (quiet && dossierService.writesInFlight() > 0) return;
                 const before = get().dossiers.find(d => d.id === dossierId);
                 try {
                     const fresh = dossierFromApi(await dossierService.getById(dossierId));
                     // Immer gives a dossier a new object on any change: a different one means an
                     // edit (or a deletion) happened here meanwhile, and the answer may predate it.
-                    if (quiet && get().dossiers.find(d => d.id === dossierId) !== before) return;
+                    if (quiet && (dossierService.writesInFlight() > 0
+                        || get().dossiers.find(d => d.id === dossierId) !== before)) return;
                     set((state) => {
                         const index = state.dossiers.findIndex(d => d.id === dossierId);
                         if (index < 0) {
@@ -2548,6 +2560,9 @@ const appStore = createStore<AppState>()(
                             state.dossiers[index] = fresh;
                             return;
                         }
+                        // A quiet read never merges: the server may already hold a pending item
+                        // under its own id, which the merge would add a second time.
+                        if (quiet) return;
                         const known = new Set(local.items.map(i => i.id));
                         local.items.push(...fresh.items.filter(i => !known.has(i.id)));
                     });
@@ -2558,6 +2573,7 @@ const appStore = createStore<AppState>()(
             },
 
             refreshDossiers: async () => {
+                if (dossierService.writesInFlight() > 0) return;
                 const before = get().dossiers;
                 let fresh: Dossier[];
                 try {
@@ -2566,7 +2582,8 @@ const appStore = createStore<AppState>()(
                     console.error('Failed to reload the dossiers:', err);
                     return;
                 }
-                if (get().dossiers !== before) return; // something changed here meanwhile: the next refresh
+                // A write on its way, or a change here meanwhile: the answer may predate it.
+                if (dossierService.writesInFlight() > 0 || get().dossiers !== before) return;
                 set((state) => {
                     // A dossier with an add, an undo or an order on its way stays as it is here.
                     const busy = (d: Dossier) => !!state.pendingDossierOrders[d.id]
@@ -2588,7 +2605,8 @@ const appStore = createStore<AppState>()(
                 try {
                     const created = await dossierService.addNote(dossierId, { text, ...(aboutItemId ? { aboutItemId } : {}) });
                     set((state) => {
-                        state.dossiers.find(d => d.id === dossierId)?.items.push(dossierItemFromApi(created));
+                        const target = state.dossiers.find(d => d.id === dossierId);
+                        if (target) upsertById(target.items, dossierItemFromApi(created));
                     });
                     return true;
                 } catch (err) {
@@ -2762,7 +2780,7 @@ const appStore = createStore<AppState>()(
                     }
 
                     set((state) => {
-                        state.dossiers.push({
+                        upsertById(state.dossiers, {
                             id: created.id,
                             title: dossier.title,
                             description: dossier.description,
