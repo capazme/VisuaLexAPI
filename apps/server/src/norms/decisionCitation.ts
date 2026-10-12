@@ -9,6 +9,7 @@
  */
 import { citationDate, citeStoredNorm } from './citation';
 import { EU_CASE, EU_COURT_NAME, EU_SECTION, euCaseLabel, euSectionLabel, isEuCourt, joinCases } from './euCourts';
+import { ADMIN_SECTION, PROVVEDIMENTO, adminCourtName, adminSectionLabel, isAdminCourt, isSeat, kindAbbreviation } from './adminCourts';
 
 export interface CitableDecision {
   corte: string;
@@ -22,6 +23,9 @@ export interface CitableDecision {
   data_decisione?: string | null;
   /** Every case of a judgment on joined cases, as the convention writes them («C-293/12»). */
   cause_riunite?: readonly string[] | null;
+  /** The administrative courts: a TAR's seat, and the kind of measure (which is in the key). */
+  sede?: string | null;
+  provvedimento?: string | null;
 }
 
 const ROMAN: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V', '6': 'VI', '7': 'VII' };
@@ -50,6 +54,15 @@ function court(decision: CitableDecision): string {
  */
 export function citeDecision(decision: CitableDecision): string {
   if (isEuCourt(decision.corte)) return citeEuDecision(decision);
+  if (isAdminCourt(decision.corte)) {
+    // design 2026-10-12-administrative-courts §3 (D4): «Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270»,
+    // the kind's abbreviation read from the kind, which the key holds, never from `tipo`
+    const tipo = kindAbbreviation(decision.provvedimento);
+    const date = decision.data_deposito ? citationDate(decision.data_deposito) : null;
+    const numero = date || !decision.anno ? `n. ${decision.numero}` : `n. ${decision.numero}/${decision.anno}`;
+    return [adminCourtName(decision.corte, decision.sede), adminSectionLabel(decision.sezione),
+      [tipo, date].filter(Boolean).join(' ') || null, numero].filter(Boolean).join(', ');
+  }
   const tipo = decision.tipo && Object.hasOwn(TIPO_ABBR, decision.tipo) ? TIPO_ABBR[decision.tipo] : null;
   const date = decision.data_deposito ? citationDate(decision.data_deposito) : null;
   const numero = date || !decision.anno ? `n. ${decision.numero}` : `n. ${decision.numero}/${decision.anno}`;
@@ -64,6 +77,10 @@ export function citeDecision(decision: CitableDecision): string {
 
 /** In little room (D2): "Cass. civ., sez. un., n. 31310/2024"; with the massime "… · Rv. 673165-01". */
 export function shortDecision(decision: CitableDecision, rv?: readonly string[] | null): string {
+  if (isAdminCourt(decision.corte)) {
+    const numero = decision.anno ? `n. ${decision.numero}/${decision.anno}` : `n. ${decision.numero}`;
+    return [adminCourtName(decision.corte, decision.sede), adminSectionLabel(decision.sezione), numero].filter(Boolean).join(', ');
+  }
   if (isEuCourt(decision.corte)) {
     return decision.anno
       ? `${EU_COURT_NAME[decision.corte]}, ${euCaseLabel(decision.corte, decision.numero, decision.anno)}`
@@ -103,6 +120,21 @@ export function citeStoredDecision(itemType: string, content: unknown): string |
   const str = (k: string): string | null => (typeof raw[k] === 'string' ? (raw[k] as string) : null);
   const corte = str('corte');
   const numero = raw.numero;
+  if (isAdminCourt(corte)) {
+    // The kind, and a TAR's seat, are part of the identity: without them no decision is named.
+    const sezioneAmm = str('sezione');
+    const provvedimento = str('provvedimento');
+    if (typeof numero !== 'number' || !Number.isInteger(numero) || !provvedimento || !PROVVEDIMENTO.test(provvedimento)
+      || (corte === 'tar' && !isSeat(raw.sede))) return null;
+    return citeDecision({
+      corte, numero, anno: typeof raw.anno === 'number' && Number.isInteger(raw.anno) ? raw.anno : null,
+      sede: corte === 'tar' ? (raw.sede as string) : null,
+      provvedimento,
+      sezione: sezioneAmm && ADMIN_SECTION.test(sezioneAmm) ? sezioneAmm : null,
+      tipo: str('tipo'),
+      data_deposito: str('data_deposito'),
+    });
+  }
   if ((corte !== 'cassazione' && corte !== 'corte_costituzionale' && !isEuCourt(corte))
     || typeof numero !== 'number' || !Number.isInteger(numero)) return null;
   const anno = typeof raw.anno === 'number' && Number.isInteger(raw.anno) ? raw.anno : null;

@@ -11,6 +11,7 @@ import type { DecisionArchive, DecisionReference } from '../types/decisions';
 import { FIRST_YEAR, MAX_NUMERO } from './decisionLinks';
 import { expandTwoDigitYear } from './dateUtils';
 import { EU_MAX_NUMERO } from './euCourts';
+import { ADMIN_MAX_NUMERO, SEATS } from './adminCourts';
 
 const MAX_SCANNED = 600;
 
@@ -67,6 +68,77 @@ function euReference(text: string, now: Date): DecisionReference | null | undefi
   return ref;
 }
 
+// The administrative courts (design 2026-10-12-administrative-courts §4): the Consiglio di Stato, the
+// C.G.A.R.S., a TAR named by its region and perhaps its seat, the T.R.G.A. by its seat. The Python
+// API's citation.py reads the same words; a parere is its alone to name (the palette leaves it).
+const ADMIN_COURT = new RegExp(
+  '^\\s*(?:(cons(?:iglio)?\\.?\\s*(?:di\\s+)?st(?:ato)?\\.?|c\\.\\s*d\\.\\s*s\\.?|cds)'
+  + '|(c\\.\\s*g\\.\\s*a\\.\\s*r\\.\\s*s\\.?|c\\.\\s*g\\.\\s*a\\.?|cgars|consiglio\\s+di\\s+giustizia\\s+amministrativa(?:\\s+per\\s+la\\s+regione\\s+siciliana)?)'
+  + '|(t\\.\\s*r\\.\\s*g\\.\\s*a\\.?|trga|tribunale\\s+regionale\\s+di\\s+giustizia\\s+amministrativa)'
+  + '|(t\\.\\s*a\\.\\s*r\\.?|tar|tribunale\\s+amministrativo(?:\\s+regionale)?))(?=[\\s,.;:(]|$)', 'i');
+const ADMIN_SECTION =
+  /\bsez(?:ione)?\.?\s*(?:(i{1,3}|iv|v|vi{0,3}|ix|x|[1-9]|10)(?:\s*-?\s*(bis|ter|quater))?(?=[\s,.;]|$))|\b(ad(?:unanza)?\.?\s*plen(?:aria)?\.?)/i;
+const ADMIN_KIND = /\b(sent(?:enza)?|ord(?:inanza)?|decr(?:eto)?|par(?:ere)?)\b\.?/i;
+const KIND_FAMILY: ReadonlyArray<readonly [string, string]> = [['sent', 'sentenza'], ['ord', 'ordinanza'], ['decr', 'decreto'], ['par', 'parere']];
+const ARABIC_ROMAN: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V', '6': 'VI', '7': 'VII', '8': 'VIII', '9': 'IX', '10': 'X' };
+
+/** «Valle d’Aosta» → «valle d aosta», as tar_seats.fold writes it: no case, accents or punctuation. */
+function fold(name: string): string {
+  return name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, ' ').trim();
+}
+const SEAT_BY_FOLD = new Map(Object.entries(SEATS).map(([slug, [sede]]) => [fold(sede), slug]));
+const REGION_BY_FOLD = new Map(Object.values(SEATS).map(([, regione]) => [fold(regione), regione]));
+
+/** The first name of `names` that `head` holds as whole words. */
+function namedIn<T>(head: string, names: Map<string, T>): T | undefined {
+  const words = ` ${fold(head)} `;
+  for (const [folded, value] of names) if (words.includes(` ${folded} `)) return value;
+  return undefined;
+}
+
+/** The reference to an administrative court; null when the words name one but nothing the palette
+ *  can read (a parere among them), undefined when they name none. */
+function adminReference(text: string, now: Date): DecisionReference | null | undefined {
+  const court = ADMIN_COURT.exec(text);
+  if (!court) return undefined;
+  const rest = text.slice(court[0].length);
+  const corte = court[1] ? 'consiglio_di_stato' : court[2] ? 'cgars' : 'tar';
+  const ref: Partial<DecisionReference> = { corte };
+  if (corte === 'tar') {
+    const head = rest.slice(0, 80);
+    const seat = namedIn(head, SEAT_BY_FOLD);
+    const region = namedIn(head, REGION_BY_FOLD);
+    const seatsOfRegion = region ? Object.entries(SEATS).filter(([, s]) => s[1] === region) : [];
+    if (seat !== undefined && (region === undefined || SEATS[seat][1] === region)) ref.sede = seat;
+    else if (court[3] || region === undefined) return null; // a T.R.G.A. with no seat, a TAR with no region known
+    else if (seatsOfRegion.length === 1) ref.sede = seatsOfRegion[0][0]; // a region with one seat names it
+    else ref.regione = region;
+  }
+  const kind = ADMIN_KIND.exec(rest);
+  const word = kind ? kind[1].toLowerCase() : '';
+  const family = word ? KIND_FAMILY.find(([prefix]) => word.startsWith(prefix))?.[1] : undefined;
+  if (family === 'parere') return null;
+  const pair = NUMBER_YEAR.exec(rest);
+  const dated = DATE_YEAR.exec(rest);
+  const only = pair ? null : NUMBER_ONLY.exec(rest);
+  const numeroRaw = pair ? pair[1] ?? pair[5] : only?.[1];
+  const yearRaw = (pair ? pair[2] ?? pair[3] ?? pair[4] ?? pair[6] : undefined) ?? dated?.[1] ?? dated?.[2];
+  if (numeroRaw === undefined || yearRaw === undefined) return null;
+  const numero = Number(numeroRaw);
+  const anno = Number(expandTwoDigitYear(yearRaw));
+  if (numero < 1 || numero > ADMIN_MAX_NUMERO || anno < FIRST_YEAR[corte] || anno > now.getFullYear()) return null;
+  ref.numero = numero;
+  ref.anno = anno;
+  const section = ADMIN_SECTION.exec(rest);
+  if (section?.[3]) ref.sezione = 'plenaria';
+  else if (section?.[1]) {
+    const head = section[1].toUpperCase();
+    ref.sezione = (ARABIC_ROMAN[head] ?? head) + (section[2] ? `-${section[2].toLowerCase()}` : '');
+  }
+  if (family) ref.tipo = family;
+  return ref as DecisionReference;
+}
+
 function sectionCode(raw: string): string {
   const s = raw.replace(/\./g, '').toLowerCase().split('-')[0];
   if (s.startsWith('un')) return 'U';
@@ -86,7 +158,12 @@ export function parseDecisionCitation(
   const first = text.split(/[\s.,]+/, 1)[0]?.toLowerCase() ?? '';
   if (options.aliasTriggers?.some((t) => stripDots(t) === first)) return null;
   const court = COURT.exec(text);
-  if (!court) return euReference(text.replace(/\s/g, ' '), now) ?? null;
+  if (!court) {
+    const spaced = text.replace(/\s/g, ' ');
+    if (TAX_COURT.test(spaced)) return null;
+    const eu = euReference(spaced, now);
+    return eu !== undefined ? eu : adminReference(spaced, now) ?? null;
+  }
   const corte = court[1] ? 'corte_costituzionale' : 'cassazione';
   const rest = text.slice(court[0].length);
 

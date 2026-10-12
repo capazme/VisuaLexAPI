@@ -41,7 +41,9 @@ On giustizia-amministrativa.it, 12 October 2026, seven requests three seconds ap
 
 - **The kind** is the ECLI's suffix in lower case: `sent` (sentenza), `senb` (sentenza in forma
   semplificata), `ocau` (ordinanza cautelare), `ocol` (ordinanza collegiale), `dcau` (decreto
-  cautelare), `ddec` (decreto decisorio). Another suffix the source gives is kept as it is
+  cautelare), `ddec` (decreto decisorio); the portal also gives `ord` (an ordinanza) and `dpres` (a
+  decreto presidenziale), which join those families (the reader's `FAMIGLIE`, which every suite's
+  copy is pinned to). Another suffix the source gives is kept as it is
   (lower case, letters only), belongs to no family and carries no abbreviation in the citation;
   the Consiglio di Stato's advisory measures (suffixes in `P`: `PINTE`, `PARE`) are left out (D5).
 - **The seat** is one of the 29 in `conventions/sources/tar-seats.json` (`roma`, `latina`,

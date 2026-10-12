@@ -4,7 +4,10 @@ import type { NormaVisitata } from './index';
  *  POST /fetch_decision answers them (docs/backend/python_api_reference.md). */
 /** The courts of the Union are named by their case (design 2026-10-12 §3.1): `numero` and `anno`
  *  are the case's (C-634/21 → 634, 2021). */
-export type DecisionCourt = 'cassazione' | 'corte_costituzionale' | 'corte_giustizia_ue' | 'tribunale_ue';
+/** The administrative courts are named by kind, number and year, a TAR by its seat too (design
+ *  2026-10-12-administrative-courts §2). */
+export type DecisionCourt =
+  | 'cassazione' | 'corte_costituzionale' | 'corte_giustizia_ue' | 'tribunale_ue' | 'consiglio_di_stato' | 'cgars' | 'tar';
 export type DecisionArchive = 'civile' | 'penale';
 
 /** What VisuaLex resolved: unique. `archivio` is always set for the Cassazione. */
@@ -13,11 +16,19 @@ export interface DecisionIdentity {
   numero: number;
   anno: number;
   archivio?: DecisionArchive;
+  /** The administrative courts: a TAR's seat (`roma`, one of tar-seats.json), the kind of measure
+   *  (`sent`, `ocau`: the ECLI's suffix in lower case). */
+  sede?: string;
+  provvedimento?: string;
 }
 
 /** What a citation says: it may lack the archive and carry a section as written. */
 export interface DecisionReference extends DecisionIdentity {
   sezione?: string;
+  /** A TAR named by its region alone (D3): the route searches its seats. */
+  regione?: string;
+  /** The family the words name (`sentenza`, `ordinanza`, `decreto`) when they name no kind. */
+  tipo?: string;
 }
 
 /** The norm a decision search is anchored to: the four fields `/search_decisions` reads
@@ -77,7 +88,9 @@ export type DecisionNotice =
   | { tipo: 'testo_non_disponibile' }
   | { tipo: 'testo_da_archivio' }
   /** A joined case: the judgment is filed under the first case, whose number and year these are. */
-  | { tipo: 'causa_riunita'; numero: string; anno: string };
+  | { tipo: 'causa_riunita'; numero: string; anno: string }
+  /** A TAR named by its region alone: the seat the route read it at (D3). */
+  | { tipo: 'sede_dedotta'; sede: string };
 
 export interface DecisionCandidate {
   identita: DecisionIdentity;

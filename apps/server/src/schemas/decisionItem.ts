@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { citeDecision } from '../norms/decisionCitation';
 import { EU_CASE, EU_COURTS, EU_FIRST_YEAR, EU_MAX_NUMERO, EU_SECTION, isEuCourt } from '../norms/euCourts';
+import { ADMIN_COURTS, ADMIN_FIRST_YEAR, ADMIN_MAX_NUMERO, ADMIN_SECTION, PROVVEDIMENTO, isAdminCourt, isSeat, kindFamily } from '../norms/adminCourts';
 
 const SEZIONI = new Set(['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F']);
 const ISO_DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
@@ -20,7 +21,7 @@ const TIPI = ['sentenza', 'ordinanza', 'ordinanza interlocutoria', 'decreto'] as
 
 export const decisionItemContentSchema = z
   .object({
-    corte: z.enum(['cassazione', 'corte_costituzionale', ...EU_COURTS]),
+    corte: z.enum(['cassazione', 'corte_costituzionale', ...EU_COURTS, ...ADMIN_COURTS]),
     numero: z.number().int().min(1).max(999_999),
     anno: z.number().int().min(1900),
     archivio: z.enum(['civile', 'penale']).optional(),
@@ -32,6 +33,9 @@ export const decisionItemContentSchema = z
     // The courts of the Union: the day the judgment was delivered, and the joined cases.
     data_decisione: z.string().regex(ISO_DAY).optional(),
     cause_riunite: z.array(z.string().regex(EU_CASE)).min(2).max(30).optional(),
+    // The administrative courts: a TAR's seat, and the kind of measure (part of the key).
+    sede: z.string().max(40).optional(),
+    provvedimento: z.string().regex(PROVVEDIMENTO).optional(),
     // room for a judgment of the Union on up to 30 joined cases, named one by one
     etichetta: z.string().trim().min(1).max(600),
     _dossierMeta: z.object({ important: z.boolean() }).strict().optional(),
@@ -44,11 +48,36 @@ export const decisionItemContentSchema = z
     if (value.corte === 'cassazione' && !value.archivio) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['archivio'], message: "per la Cassazione serve l'archivio" });
     }
-    if (value.sezione !== undefined && !(isEuCourt(value.corte) ? EU_SECTION.test(value.sezione) : SEZIONI.has(value.sezione))) {
+    const sectionOk = (sezione: string) => (isEuCourt(value.corte) ? EU_SECTION.test(sezione)
+      : isAdminCourt(value.corte) ? ADMIN_SECTION.test(sezione) : SEZIONI.has(sezione));
+    if (value.sezione !== undefined && !sectionOk(value.sezione)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sezione'], message: 'sezione non valida' });
     }
     if (!isEuCourt(value.corte) && (value.data_decisione !== undefined || value.cause_riunite !== undefined)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['corte'], message: 'data della decisione e cause riunite solo per le corti UE' });
+    }
+    if (isAdminCourt(value.corte)) {
+      if (value.archivio) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['archivio'], message: 'le corti amministrative non hanno archivio' });
+      }
+      if (!value.provvedimento) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['provvedimento'], message: 'serve il tipo di provvedimento' });
+      }
+      if ((value.corte === 'tar') !== (value.sede !== undefined) || (value.sede !== undefined && !isSeat(value.sede))) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sede'], message: 'la sede serve solo a un TAR, ed è una delle 29' });
+      }
+      // `tipo` is the kind's family, or absent: never a sentenza's word on an ordinanza's key
+      if (value.tipo !== undefined && value.tipo !== kindFamily(value.provvedimento)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tipo'], message: 'il tipo non è quello del provvedimento' });
+      }
+      if (value.numero > ADMIN_MAX_NUMERO) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['numero'], message: `numero da 1 a ${ADMIN_MAX_NUMERO}` });
+      }
+      if (value.anno < ADMIN_FIRST_YEAR) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['anno'], message: `anno dal ${ADMIN_FIRST_YEAR}` });
+      }
+    } else if (value.sede !== undefined || value.provvedimento !== undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sede'], message: 'sede e tipo di provvedimento solo per le corti amministrative' });
     }
     if (isEuCourt(value.corte)) {
       if (value.archivio || value.data_deposito !== undefined) {

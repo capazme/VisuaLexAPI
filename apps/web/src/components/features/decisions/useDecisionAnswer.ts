@@ -3,7 +3,7 @@ import type { DecisionNotice, DecisionReference, FetchDecisionAnswer, FoundDecis
 import { forgetDecision, fetchDecisionCached, rememberDecision } from '../../../utils/decisionFetchCache';
 import { decisionPath, identityOf } from '../../../utils/decisionLinks';
 
-/** Notices about what was cited (its section, the archive deduced from it), not about the decision:
+/** Notices about what was cited (its section, the archive or a TAR's seat deduced from it), not about the decision:
  *  the place that cited keeps them, the answer seeded for the bare identity does not carry them. */
 const ABOUT_THE_CITATION = {
   sezione_diversa: true,
@@ -12,6 +12,7 @@ const ABOUT_THE_CITATION = {
   testo_non_disponibile: false,
   testo_da_archivio: false,
   causa_riunita: true,
+  sede_dedotta: true,
 } satisfies Record<DecisionNotice['tipo'], boolean>;
 function withoutCitationNotices(answer: FoundDecision): FoundDecision {
   return { ...answer, avvisi: answer.avvisi.filter((n) => !ABOUT_THE_CITATION[n.tipo]) };

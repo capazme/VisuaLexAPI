@@ -21,7 +21,11 @@ const READINGS: Record<string, unknown> = {
   'Cass. civ. 5/1990': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 5, anno: 1990 } },
   'Cass. civ. 77/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 77, anno: 2024 } },
   'Cass. civ. 88/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 88, anno: 2024 } },
-  'Cons. Stato, sez. VI, n. 2270/2019': { corte_non_supportata: 'Consiglio di Stato' },
+  'Corte EDU, n. 1/2020': { corte_non_supportata: "Corte europea dei diritti dell'uomo" },
+  'Cons. Stato, sez. VI, n. 2270/2019': { riferimento: { corte: 'consiglio_di_stato', sezione: 'VI', numero: 2270, anno: 2019 } },
+  'TAR Lazio, n. 1234/2020': { riferimento: { corte: 'tar', regione: 'Lazio', numero: 1234, anno: 2020, tipo: 'ordinanza' } },
+  'Cons. Stato, ord. n. 3000/2019': { riferimento: { corte: 'consiglio_di_stato', numero: 3000, anno: 2019, tipo: 'ordinanza' } },
+  'TAR Lombardia, n. 4000/2020': { riferimento: { corte: 'tar', regione: 'Lombardia', numero: 4000, anno: 2020 } },
   'CGUE, C-594/12': { riferimento: { corte: 'corte_giustizia_ue', numero: 594, anno: 2012 } },
   'Cass. civ. 66/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 66, anno: 2024 } },
   'Cass. civ. 55/2024': { riferimento: { corte: 'cassazione', archivio: 'civile', numero: 55, anno: 2024 } },
@@ -67,6 +71,24 @@ function stubPythonApi(fetchDelayMs = 0) {
       });
     }
     if (numero === 31310) return found(SU_31310);
+    // The administrative courts (golden file, cds-sent-2270-2019 and tar-roma-ocau-1234-2020).
+    if (corte === 'consiglio_di_stato' && numero === 2270) {
+      return found({ identita: { corte, provvedimento: 'sent', numero, anno: 2019 },
+        attributi: { tipo: 'sentenza', sezione: 'VI', data_deposito: '2019-04-08', ecli: 'ECLI:IT:CDS:2019:2270SENT' } });
+    }
+    if (corte === 'tar' && numero === 1234) {
+      const [status, answer] = found({ identita: { corte, sede: 'roma', provvedimento: 'ocau', numero, anno: 2020 },
+        attributi: { tipo: 'ordinanza', sezione: 'I' } });
+      return [status, { ...(answer as object), avvisi: [{ tipo: 'sede_dedotta', sede: '<b>altrove</b>' }] }];
+    }
+    if (corte === 'consiglio_di_stato' && numero === 3000) {
+      return [200, { esito: 'ambigua', candidati: ['ocau', 'ocol'].map((provvedimento) => (
+        { identita: { corte, provvedimento, numero, anno: 2019 }, attributi: { tipo: 'ordinanza', sezione: 'IV' } })) }];
+    }
+    if (corte === 'tar' && numero === 4000) {
+      return [200, { esito: 'ambigua', candidati: ['milano', 'brescia'].map((sede) => (
+        { identita: { corte, sede, provvedimento: 'sent', numero, anno: 2020 }, attributi: { tipo: 'sentenza' } })) }];
+    }
     if (numero === 10787 && !archivio) {
       return [200, { esito: 'ambigua', candidati: [
         { identita: { corte: 'cassazione', archivio: 'civile', numero: 10787, anno: 2024 }, attributi: { sezione: '3', tipo: 'ordinanza', data_deposito: '2024-04-22' } },
@@ -152,6 +174,39 @@ describe('POST /api/dossiers/:id/decisions', () => {
     });
   });
 
+  it('adds a decision of the Consiglio di Stato and of a TAR, and names a seat it deduced (D3)', async () => {
+    const response = await addDecisions(alice, dossierId, ['Cons. Stato, sez. VI, n. 2270/2019', 'TAR Lazio, n. 1234/2020']);
+    expect(response.body.results).toEqual([
+      expect.objectContaining({ outcome: 'added', citation: 'Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270' }),
+      // the seat named from the identity, not from the notice's words
+      expect.objectContaining({ outcome: 'added', citation: 'TAR Lazio, Roma, sez. I, ord., n. 1234/2020',
+        detail: 'Sede dedotta dalla regione: Roma.' }),
+    ]);
+    expect(response.body.results[0].detail).toBeUndefined();
+    const items = await prisma.dossierItem.findMany({ where: { dossierId }, orderBy: { position: 'asc' } });
+    expect(items.map((i) => i.content)).toEqual([
+      { corte: 'consiglio_di_stato', provvedimento: 'sent', numero: 2270, anno: 2019, sezione: 'VI', tipo: 'sentenza',
+        data_deposito: '2019-04-08', etichetta: 'Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270' },
+      { corte: 'tar', sede: 'roma', provvedimento: 'ocau', numero: 1234, anno: 2020, sezione: 'I', tipo: 'ordinanza',
+        etichetta: 'TAR Lazio, Roma, sez. I, ord., n. 1234/2020' },
+    ]);
+    expect(fetchBodies[1]).toEqual({ corte: 'tar', regione: 'Lazio', numero: 1234, anno: 2020, tipo: 'ordinanza' });
+    const again = await addDecisions(alice, dossierId, ['TAR Lazio, n. 1234/2020']);
+    expect(outcomes(again)).toEqual(['already_present']);
+  });
+
+  it('asks for the kind or the seat when an administrative reference names several decisions', async () => {
+    const response = await addDecisions(alice, dossierId, ['Cons. Stato, ord. n. 3000/2019', 'TAR Lombardia, n. 4000/2020']);
+    expect(outcomes(response)).toEqual(['ambiguous', 'ambiguous']);
+    const [kinds, seats] = response.body.results;
+    // an ordinanza cautelare and a collegiale: «ord.» cannot tell them apart, so the words are not asked again
+    expect(kinds.detail).toContain('Sono provvedimenti dello stesso tipo');
+    expect(seats.detail).toContain('TAR Lombardia, Milano, sent., n. 4000/2020');
+    expect(seats.detail).toContain('TAR Lombardia, Brescia');
+    expect(seats.detail).toContain('Indica la sede del TAR.');
+    expect(await prisma.dossierItem.count()).toBe(0);
+  });
+
   it('adds a decision once, by its key: in the dossier already, or twice in the call', async () => {
     await request(app).post(`/api/dossiers/${dossierId}/items`).set(authHeader(alice)).send({
       itemType: 'sentenza', title: 'x', content: { corte: 'corte_costituzionale', numero: 71, anno: 2020, etichetta: 'x' },
@@ -164,7 +219,7 @@ describe('POST /api/dossiers/:id/decisions', () => {
 
   it('reports each reference it does not store, and the others go on', async () => {
     const response = await addDecisions(alice, dossierId, [
-      'Cons. Stato, sez. VI, n. 2270/2019', 'una sentenza qualunque', 'Cass. 10787/2024', 'Cass. civ. 99999/2024',
+      'Corte EDU, n. 1/2020', 'una sentenza qualunque', 'Cass. 10787/2024', 'Cass. civ. 99999/2024',
       'Cass. pen. 1399/1999', 'Cass. civ. 5/1990', 'Cass. civ. 77/2024', 'Cass. civ. 88/2024', 'Corte cost. n. 71/2020',
     ]);
     expect(response.status).toBe(200);
@@ -172,8 +227,8 @@ describe('POST /api/dossiers/:id/decisions', () => {
       'court_not_supported', 'not_recognised', 'ambiguous', 'does_not_exist', 'does_not_exist', 'unavailable', 'unavailable', 'unavailable', 'added',
     ]);
     const [court, words, ambiguous, missing, penal, outside] = response.body.results;
-    expect(court.court).toBe('Consiglio di Stato');
-    expect(court.detail).toContain('Consiglio di Stato');
+    expect(court.court).toBe("Corte europea dei diritti dell'uomo");
+    expect(court.detail).toContain('Corte europea');
     expect(words.detail).toMatch(/corte, il numero e l'anno/);
     expect(ambiguous.detail).toContain('Cass. civ., sez. III, ord. 22 aprile 2024, n. 10787');
     expect(ambiguous.detail).toContain('Cass. pen., sez. VII, ord. dep. 14 marzo 2024, n. 10787');
@@ -243,7 +298,7 @@ describe('POST /api/dossiers/:id/decisions', () => {
     const bearer = { Authorization: `Bearer ${apiToken}` };
     const before = (await request(app).get('/api/oauth/quota').set(bearer)).body.points.remaining;
     await request(app).post(`/api/dossiers/${dossierId}/decisions`).set(bearer)
-      .send({ references: ['Corte cost. n. 71/2020', 'Cass. civ. 77/2024', 'Cons. Stato, sez. VI, n. 2270/2019'] });
+      .send({ references: ['Corte cost. n. 71/2020', 'Cass. civ. 77/2024', 'Corte EDU, n. 1/2020'] });
     const after = (await request(app).get('/api/oauth/quota').set(bearer)).body.points.remaining;
     expect(before - after).toBe(4);
   });

@@ -1,6 +1,6 @@
 {
  "version": 1,
- "note": "Decision keys read back to their identity (null = refused). {currentYear} and {nextYear} are replaced by the year of the reader's clock. The courts of the Union are named by their case (design 2026-10-12 §3.1, Q10): a number of at most four digits, from 1953 (Court of Justice) and 1989 (General Court).",
+ "note": "Decision keys read back to their identity (null = refused). {currentYear} and {nextYear} are replaced by the year of the reader's clock. The courts of the Union are named by their case (design 2026-10-12 §3.1, Q10): a number of at most four digits, from 1953 (Court of Justice) and 1989 (General Court). The administrative courts carry the kind and, for a TAR, the seat (design 2026-10-12-administrative-courts §2, D1): a number of at most five digits, from 1990, a seat among the 29 of tar-seats.json.",
  "cases": [
   {
    "key": "cassazione:civile:99999:2024",
@@ -256,6 +256,97 @@
   },
   {
    "key": "tribunale_ue:612:2017 ",
+   "identity": null
+  },
+  {
+   "key": "consiglio_di_stato:sent:2270:2019",
+   "identity": {
+    "corte": "consiglio_di_stato",
+    "provvedimento": "sent",
+    "numero": 2270,
+    "anno": 2019
+   }
+  },
+  {
+   "key": "consiglio_di_stato:ocau:99999:1990",
+   "identity": {
+    "corte": "consiglio_di_stato",
+    "provvedimento": "ocau",
+    "numero": 99999,
+    "anno": 1990
+   }
+  },
+  {
+   "key": "cgars:sent:5:2020",
+   "identity": {
+    "corte": "cgars",
+    "provvedimento": "sent",
+    "numero": 5,
+    "anno": 2020
+   }
+  },
+  {
+   "key": "tar:roma:ocau:1234:2020",
+   "identity": {
+    "corte": "tar",
+    "sede": "roma",
+    "provvedimento": "ocau",
+    "numero": 1234,
+    "anno": 2020
+   }
+  },
+  {
+   "key": "tar:l-aquila:sent:1:{currentYear}",
+   "identity": {
+    "corte": "tar",
+    "sede": "l-aquila",
+    "provvedimento": "sent",
+    "numero": 1,
+    "anno": "{currentYear}"
+   }
+  },
+  {
+   "key": "consiglio_di_stato:sent:2270:1989",
+   "identity": null
+  },
+  {
+   "key": "consiglio_di_stato:sent:2270:{nextYear}",
+   "identity": null
+  },
+  {
+   "key": "consiglio_di_stato:sent:100000:2019",
+   "identity": null
+  },
+  {
+   "key": "consiglio_di_stato:sent:0:2019",
+   "identity": null
+  },
+  {
+   "key": "consiglio_di_stato:sent:02270:2019",
+   "identity": null
+  },
+  {
+   "key": "consiglio_di_stato:2270:2019",
+   "identity": null
+  },
+  {
+   "key": "consiglio_di_stato:SENT:2270:2019",
+   "identity": null
+  },
+  {
+   "key": "cgars:roma:sent:5:2020",
+   "identity": null
+  },
+  {
+   "key": "tar:sent:1234:2020",
+   "identity": null
+  },
+  {
+   "key": "tar:atlantide:sent:1234:2020",
+   "identity": null
+  },
+  {
+   "key": "tar:roma:sent:1234:2020:x",
    "identity": null
   }
  ]

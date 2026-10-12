@@ -8,6 +8,7 @@ import type { DossierApi, DossierItemApi } from '../../../services/dossierServic
 import type { DecisionArchive, DecisionAttributes, DecisionCourt, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
 import { decisionKey, FIRST_YEAR, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
 import { EU_CASE, EU_MAX_NUMERO, EU_SECTION, isEuCourt } from '../../../utils/euCourts';
+import { ADMIN_MAX_NUMERO, ADMIN_SECTION, PROVVEDIMENTO, isAdminCourt, isSeat, kindFamily } from '../../../utils/adminCourts';
 import { rebuildNormEntry } from '../../../utils/sources';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
@@ -192,7 +193,9 @@ export function assertNever(value: never): never {
   throw new Error(`Unexpected dossier item: ${JSON.stringify(value)}`);
 }
 
-const SENTENZA_KEYS = new Set(['corte', 'numero', 'anno', 'archivio', 'sezione', 'tipo', 'data_deposito', 'data_decisione', 'cause_riunite', 'etichetta']);
+const SENTENZA_KEYS = new Set([
+  'corte', 'numero', 'anno', 'archivio', 'sezione', 'tipo', 'data_deposito', 'data_decisione', 'cause_riunite', 'sede', 'provvedimento', 'etichetta',
+]);
 const ISO_DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 const SEZIONI = new Set(['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F']);
 const TIPI = new Set(['sentenza', 'ordinanza', 'ordinanza interlocutoria', 'decreto']);
@@ -203,10 +206,12 @@ export function parseSentenzaContent(data: unknown, now: Date = new Date()): Dos
   if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
   const d = data as Record<string, unknown>;
   if (Object.keys(d).some((k) => !SENTENZA_KEYS.has(k))) return null;
-  const { corte, numero, anno, archivio, sezione, tipo, data_deposito, data_decisione, cause_riunite, etichetta } = d;
+  const { corte, numero, anno, archivio, sezione, tipo, data_deposito, data_decisione, cause_riunite, sede, provvedimento, etichetta } = d;
   const eu = isEuCourt(corte);
-  if (corte !== 'cassazione' && corte !== 'corte_costituzionale' && !eu) return null;
-  if (typeof numero !== 'number' || !Number.isInteger(numero) || numero < 1 || numero > (eu ? EU_MAX_NUMERO : 999_999)) return null;
+  const admin = isAdminCourt(corte);
+  if (corte !== 'cassazione' && corte !== 'corte_costituzionale' && !eu && !admin) return null;
+  const highest = eu ? EU_MAX_NUMERO : admin ? ADMIN_MAX_NUMERO : 999_999;
+  if (typeof numero !== 'number' || !Number.isInteger(numero) || numero < 1 || numero > highest) return null;
   const first = FIRST_YEAR[corte as DecisionCourt];
   if (typeof anno !== 'number' || !Number.isInteger(anno) || anno < first || anno > now.getFullYear()) return null;
   if (typeof etichetta !== 'string' || !etichetta.trim() || etichetta.length > 600) return null;
@@ -214,7 +219,15 @@ export function parseSentenzaContent(data: unknown, now: Date = new Date()): Dos
   if (corte === 'corte_costituzionale' && (archivio !== undefined || sezione !== undefined)) return null;
   if (eu && (archivio !== undefined || data_deposito !== undefined)) return null;
   if (!eu && (data_decisione !== undefined || cause_riunite !== undefined)) return null;
-  if (sezione !== undefined && !(typeof sezione === 'string' && (eu ? EU_SECTION.test(sezione) : SEZIONI.has(sezione)))) return null;
+  if (admin) {
+    // the kind is part of the key, a TAR's seat too (design 2026-10-12-administrative-courts §2)
+    if (archivio !== undefined || typeof provvedimento !== 'string' || !PROVVEDIMENTO.test(provvedimento)) return null;
+    if (corte === 'tar' ? !isSeat(sede) : sede !== undefined) return null;
+    // `tipo` is the kind's family, or absent (the server's rule)
+    if (tipo !== undefined && tipo !== kindFamily(provvedimento)) return null;
+  } else if (sede !== undefined || provvedimento !== undefined) return null;
+  const sectionOk = (value: string) => (eu ? EU_SECTION.test(value) : admin ? ADMIN_SECTION.test(value) : SEZIONI.has(value));
+  if (sezione !== undefined && !(typeof sezione === 'string' && sectionOk(sezione))) return null;
   if (tipo !== undefined && !(typeof tipo === 'string' && TIPI.has(tipo))) return null;
   if (data_deposito !== undefined && !(typeof data_deposito === 'string' && ISO_DAY.test(data_deposito))) return null;
   if (data_decisione !== undefined && !(typeof data_decisione === 'string' && ISO_DAY.test(data_decisione))) return null;
@@ -230,6 +243,8 @@ export function parseSentenzaContent(data: unknown, now: Date = new Date()): Dos
     ...(data_deposito ? { data_deposito: data_deposito as string } : {}),
     ...(data_decisione ? { data_decisione: data_decisione as string } : {}),
     ...(cause_riunite ? { cause_riunite: [...(cause_riunite as string[])] } : {}),
+    ...(sede ? { sede: sede as string } : {}),
+    ...(provvedimento ? { provvedimento: provvedimento as string } : {}),
     etichetta,
   };
 }
@@ -257,9 +272,13 @@ export function sentenzaFromDecision(identity: DecisionIdentity, attrs: Decision
     numero: identity.numero,
     anno: identity.anno,
     ...(identity.archivio ? { archivio: identity.archivio } : {}),
+    ...(isAdminCourt(identity.corte) && identity.sede ? { sede: identity.sede } : {}),
+    ...(isAdminCourt(identity.corte) && identity.provvedimento ? { provvedimento: identity.provvedimento } : {}),
     ...(attrs.sezione && SEZIONI.has(attrs.sezione) && identity.corte === 'cassazione' ? { sezione: attrs.sezione } : {}),
+    ...(attrs.sezione && isAdminCourt(identity.corte) && ADMIN_SECTION.test(attrs.sezione) ? { sezione: attrs.sezione } : {}),
     ...(attrs.sezione && isEuCourt(identity.corte) && EU_SECTION.test(attrs.sezione) ? { sezione: attrs.sezione } : {}),
-    ...(attrs.tipo && TIPI.has(attrs.tipo) ? { tipo: attrs.tipo } : {}),
+    ...(attrs.tipo && TIPI.has(attrs.tipo) && (!isAdminCourt(identity.corte) || attrs.tipo === kindFamily(identity.provvedimento))
+      ? { tipo: attrs.tipo } : {}),
     ...(attrs.data_deposito && !isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
     ...(attrs.data_decisione && isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_decisione) ? { data_decisione: attrs.data_decisione } : {}),
     // more than 30 joined cases: the citation names the case alone, as the item schema keeps at most 30

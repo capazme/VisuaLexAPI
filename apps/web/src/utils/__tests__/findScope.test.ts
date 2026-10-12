@@ -137,6 +137,19 @@ describe('findTargetsInScope', () => {
     expect(findTargetsInScope(state, 'all', null)).toEqual([]);
   });
 
+  it('keys an administrative decision by its whole identity, and skips one whose kind or seat is not known yet', () => {
+    const tar = { corte: 'tar' as const, sede: 'roma', provvedimento: 'ocau', numero: 1234, anno: 2020 };
+    const targets = findTargetsInScope({ workspaceTabs: [tab({ id: 'a', view: { kind: 'decision', reference: tar } })] }, 'all', null);
+    expect(targets).toEqual([{ tabId: 'a', targetKey: 'tar:roma:ocau:1234:2020', label: 'TAR Lazio, Roma, n. 1234/2020', storedText: undefined }]);
+    for (const reference of [
+      { corte: 'tar' as const, regione: 'Lazio', numero: 1234, anno: 2020 },
+      { corte: 'tar' as const, sede: 'roma', numero: 1234, anno: 2020 },
+      { corte: 'consiglio_di_stato' as const, numero: 2270, anno: 2019 },
+    ]) {
+      expect(findTargetsInScope({ workspaceTabs: [tab({ id: 'a', view: { kind: 'decision', reference } })] }, 'all', null)).toEqual([]);
+    }
+  });
+
   it('reads a cached decision\'s projection as its stored text', () => {
     const identity = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 10787, anno: 2024 };
     const answer: FoundDecision = {

@@ -3,6 +3,7 @@ import type { DecisionCourt, DecisionReference, DecisionSearchQuery } from '../t
 import { actKeyOf, compareArticles, shownAnnex } from '../components/features/dossier/dossierLayout';
 import { findArticleByNormalizedId } from './articleIds';
 import { formatDecisionShort } from './decisionLinks';
+import { PROVVEDIMENTO, SEATS, isAdminCourt, isSeat, kindFamily } from './adminCourts';
 import { buildItemKey } from './normaKeys';
 import { requestIsHistorical, versionKey } from './versionDisplay';
 
@@ -203,10 +204,30 @@ export function addArticles(
 
 /** Does the entry's reference (`entry`) show the decision a citation (`wanted`) names? Same court,
  *  number and year; a citation with an archive matches only an entry of that archive (civil and
- *  penal numbers run in separate series), one without matches an entry of either. */
+ *  penal numbers run in separate series), one without matches an entry of either. An administrative
+ *  court numbers each kind apart and a TAR each seat (design 2026-10-12-administrative-courts §1). */
 export function sameDecision(entry: DecisionReference, wanted: DecisionReference): boolean {
   return entry.corte === wanted.corte && entry.numero === wanted.numero && entry.anno === wanted.anno &&
-    (wanted.archivio === undefined || entry.archivio === wanted.archivio);
+    (wanted.archivio === undefined || entry.archivio === wanted.archivio) &&
+    (!isAdminCourt(wanted.corte) || sameAdminDecision(entry, wanted));
+}
+
+/** The family a reference asks for: its kind's, else the one the words named, else a sentenza (D2). */
+const familyAsked = (ref: DecisionReference): string | null =>
+  ref.provvedimento ? kindFamily(ref.provvedimento) : ref.tipo ?? 'sentenza';
+
+/** A kind named must be the entry's (an entry not resolved yet must ask for that kind's family);
+ *  none named, the families agree. A seat named must be the entry's; a region, the entry's seat in it. */
+function sameAdminDecision(entry: DecisionReference, wanted: DecisionReference): boolean {
+  if (wanted.provvedimento !== undefined) {
+    if (entry.provvedimento !== undefined ? entry.provvedimento !== wanted.provvedimento
+      : familyAsked(entry) !== kindFamily(wanted.provvedimento)) return false;
+  } else if (familyAsked(entry) !== familyAsked(wanted)) return false;
+  // A seat and a region are never taken for each other: a region with several seats is the source's
+  // to resolve (D3), so a citation by region opens its own entry until the source names the seat.
+  if (wanted.sede !== undefined) return entry.sede === wanted.sede;
+  if (wanted.regione !== undefined) return entry.sede === undefined && entry.regione === wanted.regione;
+  return true;
 }
 
 // The day of deposit when known, else the year: as strings, so a year sorts with its days.
@@ -343,7 +364,9 @@ export function storedNorma(value: unknown): Norma | null {
   return norma;
 }
 
-const COURTS: readonly DecisionCourt[] = ['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue'];
+const COURTS: readonly DecisionCourt[] = [
+  'cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue', 'consiglio_di_stato', 'cgars', 'tar',
+];
 
 /** A decision's reference that passes `isValidView`, of a court VisuaLex reads, with its known
  *  fields only. The migration and `sanitizePractices` both keep this, so it is a fixed point. */
@@ -354,6 +377,14 @@ export function storedReference(value: unknown): DecisionReference | null {
   const reference = { corte: value.corte, numero: value.numero, anno: value.anno } as DecisionReference;
   if (value.archivio !== undefined) reference.archivio = value.archivio as DecisionReference['archivio'];
   if (isText(value.sezione)) reference.sezione = value.sezione;
+  // the administrative courts (design 2026-10-12-administrative-courts §2): closed values only
+  if (isAdminCourt(value.corte)) {
+    if (isSeat(value.sede)) reference.sede = value.sede;
+    if (isText(value.provvedimento) && PROVVEDIMENTO.test(value.provvedimento)) reference.provvedimento = value.provvedimento;
+    if (isText(value.regione) && Object.values(SEATS).some((s) => s[1] === value.regione)) reference.regione = value.regione;
+    if (value.tipo === 'sentenza' || value.tipo === 'ordinanza' || value.tipo === 'decreto') reference.tipo = value.tipo;
+    if (value.corte === 'tar' && !reference.sede && !reference.regione) return null;
+  }
   return reference;
 }
 
@@ -431,7 +462,8 @@ function sanitizeBeside(raw: unknown, practice: Practice, ids: SavedIds): Beside
 /** Two entries show one decision when every field of their identity is equal (as the migration
  *  reads two tabs). */
 export const sameEntry = (a: DecisionReference, b: DecisionReference): boolean =>
-  a.corte === b.corte && a.numero === b.numero && a.anno === b.anno && a.archivio === b.archivio;
+  a.corte === b.corte && a.numero === b.numero && a.anno === b.anno && a.archivio === b.archivio &&
+  a.sede === b.sede && a.provvedimento === b.provvedimento && a.regione === b.regione && a.tipo === b.tipo;
 
 /**
  * One entry from two entries of one decision (`sameEntry`): the first one's id, and what either
