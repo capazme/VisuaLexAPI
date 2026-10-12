@@ -15,8 +15,8 @@ export interface StudiaOutletContext {
 
 /**
  * VisuaLex Studia: the area's heading, the links to its views, and the view itself. The layout
- * already pads the page; below `lg` its fixed menu button sits over the top-left corner, so the
- * heading starts to its right. «Da validare» is offered to validators only.
+ * pads the page and, below `lg`, starts it under its floating menu button. «Da validare» is
+ * offered to validators only.
  */
 export function StudiaPage() {
   const { isValidator, loading } = useAuth();
@@ -24,7 +24,7 @@ export function StudiaPage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4">
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h1 className="pl-12 text-xl font-bold text-slate-900 lg:pl-0 md:text-2xl dark:text-white">VisuaLex Studia</h1>
+        <h1 className="text-xl font-bold text-slate-900 md:text-2xl dark:text-white">VisuaLex Studia</h1>
         <nav aria-label="Studia" className="mt-3 flex gap-1">
           {views.map((view) => (
             <NavLink
