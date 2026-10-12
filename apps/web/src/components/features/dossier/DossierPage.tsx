@@ -8,6 +8,7 @@ import { DossierDetailView } from './DossierDetailView';
 import { ImportDossierModal } from './ImportDossierModal';
 import { TrashPage } from './TrashPage';
 import { useTrash } from './useTrash';
+import { useDossierRefresh } from './useDossierRefresh';
 import { decodeDossierShare, importReport, importToastType, validateImportedDossier, type ImportCheck } from './dossierUtils';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
@@ -28,6 +29,9 @@ export function DossierPage() {
   // selectedDossierId lives in the URL so browser back/forward restores the
   // list vs detail view naturally. `?dossier=<id>` opens detail, absent shows list.
   const selectedDossierId = searchParams.get('dossier');
+  // What a connected application changed meanwhile shows without a reload; the trash keeps its own
+  // read on coming into view, and joins the poll here.
+  useDossierRefresh(selectedDossierId, trash.reload);
   const setSelectedDossierId = (id: string | null) => {
     const next = new URLSearchParams(searchParams);
     if (id) next.set('dossier', id);

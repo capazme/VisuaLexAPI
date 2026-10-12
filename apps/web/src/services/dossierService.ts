@@ -72,7 +72,27 @@ export interface DossierSnapshotApi {
   unchanged?: boolean;
 }
 
+/**
+ * Dossier writes still on their way. The page's background reads (`refreshDossier` quiet,
+ * `refreshDossiers`) skip while one is: the server may answer the read before it has the
+ * write, and an older answer would bring back what was just removed, or add twice what was
+ * just added. Every write below goes through `tracked`.
+ */
+let writesInFlight = 0;
+async function tracked<T>(write: () => Promise<T>): Promise<T> {
+  writesInFlight += 1;
+  try {
+    return await write();
+  } finally {
+    writesInFlight -= 1;
+  }
+}
+
 export const dossierService = {
+  writesInFlight(): number {
+    return writesInFlight;
+  },
+
   // Get all dossiers
   async getAll(): Promise<DossierApi[]> {
     const response = await apiClient.get('/dossiers');
@@ -87,55 +107,49 @@ export const dossierService = {
 
   // Create dossier
   async create(data: DossierCreate): Promise<DossierApi> {
-    const response = await apiClient.post('/dossiers', data);
-    return response.data;
+    return tracked(async () => (await apiClient.post('/dossiers', data)).data);
   },
 
   // Update dossier
   async update(id: string, data: DossierUpdate): Promise<DossierApi> {
-    const response = await apiClient.put(`/dossiers/${id}`, data);
-    return response.data;
+    return tracked(async () => (await apiClient.put(`/dossiers/${id}`, data)).data);
   },
 
   // Delete dossier
   async delete(id: string): Promise<void> {
-    await apiClient.delete(`/dossiers/${id}`);
+    await tracked(() => apiClient.delete(`/dossiers/${id}`));
   },
 
   // Add item to dossier
   async addItem(dossierId: string, data: DossierItemCreate): Promise<DossierItemApi> {
-    const response = await apiClient.post(`/dossiers/${dossierId}/items`, data);
-    return response.data;
+    return tracked(async () => (await apiClient.post(`/dossiers/${dossierId}/items`, data)).data);
   },
 
   // Update dossier item
   async updateItem(dossierId: string, itemId: string, data: DossierItemUpdate): Promise<DossierItemApi> {
-    const response = await apiClient.put(`/dossiers/${dossierId}/items/${itemId}`, data);
-    return response.data;
+    return tracked(async () => (await apiClient.put(`/dossiers/${dossierId}/items/${itemId}`, data)).data);
   },
 
   // Delete dossier item
   async deleteItem(dossierId: string, itemId: string): Promise<void> {
-    await apiClient.delete(`/dossiers/${dossierId}/items/${itemId}`);
+    await tracked(() => apiClient.delete(`/dossiers/${dossierId}/items/${itemId}`));
+  },
+
+  // A note, in the dossier or about one of its articles (the route Claude's notes take too).
+  async addNote(dossierId: string, data: { text: string; aboutItemId?: string }): Promise<DossierItemApi> {
+    return tracked(async () => (await apiClient.post(`/dossiers/${dossierId}/notes`, data)).data);
   },
 
   // Move an item to another dossier. The server moves the row itself, so the id
   // the store holds stays valid, and the item keeps its added-at date and its
   // content (the _dossierMeta envelope that carries the star).
-  // A note, in the dossier or about one of its articles (the route Claude's notes take too).
-  async addNote(dossierId: string, data: { text: string; aboutItemId?: string }): Promise<DossierItemApi> {
-    const response = await apiClient.post(`/dossiers/${dossierId}/notes`, data);
-    return response.data;
-  },
-
   async moveItem(dossierId: string, itemId: string, targetDossierId: string): Promise<DossierItemApi> {
-    const response = await apiClient.post(`/dossiers/${dossierId}/items/${itemId}/move`, { targetDossierId });
-    return response.data;
+    return tracked(async () => (await apiClient.post(`/dossiers/${dossierId}/items/${itemId}/move`, { targetDossierId })).data);
   },
 
   // Reorder dossier items
   async reorderItems(dossierId: string, itemIds: string[]): Promise<void> {
-    await apiClient.post(`/dossiers/${dossierId}/reorder`, { itemIds });
+    await tracked(() => apiClient.post(`/dossiers/${dossierId}/reorder`, { itemIds }));
   },
 
   async createSnapshot(dossierId: string, label?: string): Promise<DossierSnapshotApi> {
