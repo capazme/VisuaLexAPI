@@ -53,7 +53,15 @@ export function Layout() {
   }, [onSearchPage]);
 
   // Onboarding Tour
-  const { startTour, hasSeenTour, resetAndStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+  // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
+  // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
+  // address is read when the welcome ends, not when this callback was made.
+  const { startTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+    theme: settings.theme as 'light' | 'dark',
+    onComplete: (type) => {
+      if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
+    },
+  });
 
   // Auto-start welcome tour on first visit
   useEffect(() => {
