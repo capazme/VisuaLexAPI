@@ -69,7 +69,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
   menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
-  backdrop closes; entries are 44 px high on a phone. There is no «Ricerca Veloce», no
+  backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
+  at the top left, and `Layout` starts every page's content under it (`pt-[4.5rem]`, repeated at `md`)
+  except the search page, whose phone headers sit beside it (`pl-[4.5rem]`); the practice row's
+  `h-app-row` is drawn only there, so its height is unchanged. There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.
 - `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and
