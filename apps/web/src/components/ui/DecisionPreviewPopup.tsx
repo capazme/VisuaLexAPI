@@ -1,6 +1,6 @@
 /**
- * DecisionPreviewPopup - il popup hover su una decisione citata nel testo (design 2026-10-13 D5): la
- * sua intestazione e le prime righe, o che cosa dice la fonte. La cornice è quella delle norme.
+ * DecisionPreviewPopup - the hover popup on a decision a text cites (design 2026-10-13 D5): its heading
+ * and first lines, or what the source says. The frame is the norm popup's.
  */
 
 import { useCallback } from 'react';

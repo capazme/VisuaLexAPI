@@ -57,7 +57,7 @@ const UPPERCASE_CASE_LETTER = new RegExp(`[CT](?=\\s*${EU_DASH}?\\s*\\d)`);
 // same place as a supported head, which wins.
 const UNSUPPORTED_HEADS = new RegExp(
   `${LEFT}(?:corte\\s+d(?:i\\s+|['’]\\s*)appello|c\\.\\s*app(?:ello)?\\.?|app\\.|tribunale|(?<!sez(?:ione)?\\.?\\s*|\\(\\s*)trib\\.|corte\\s+edu|cedu|c\\.\\s*e\\.\\s*d\\.\\s*u\\.?` +
-    `|corte\\s+europea\\s+dei\\s+diritti\\s+dell['’]\\s*uomo|comm(?:issione)?\\.?\\s*trib(?:utaria)?\\.?|giudice\\s+di\\s+pace|g\\.\\s*d\\.\\s*p\\.)(?![\\p{L}\\p{N}])`,
+    `|corte\\s+europea\\s+dei\\s+diritti\\s+dell['’]\\s*uomo|comm(?:issione)?\\.?\\s*trib(?:utaria)?\\.?|giudice\\s+di\\s+pace|g\\.\\s*d\\.\\s*p\\.|c\\.\\s*t\\.\\s*[pr]\\.?|ct[pr])(?![\\p{L}\\p{N}])`,
   'giu',
 );
 // «Corte di cassazione», «Suprema Corte di Cassazione»: the span starts at the first of these words.
@@ -125,7 +125,7 @@ function firstAtOrAfter(starts: readonly number[], position: number): number {
 const SENTENCE_BREAK = /[!?]\s+(?=\p{Lu})|\.\s+(?=\p{Lu})|\n[ \t\r]*\n|;/gu;
 const ABBREVIATIONS = new Set([
   'sez', 'n', 'nr', 'num', 'civ', 'pen', 'sent', 'ord', 'lav', 'fer', 'un', 'cass', 'cost', 'cons', 'st', 'ad', 'plen', 'dep',
-  'art', 'artt', 'giust', 'trib', 'amm', 'decr', 'par', 'cd', 'ss', 'uu', 'aut', 'lett', 'co', 'cfr', 'app', 'comm', 'reg',
+  'art', 'artt', 'giust', 'trib', 'amm', 'decr', 'par', 'cd', 'ss', 'uu', 'aut', 'lett', 'co', 'cfr', 'app', 'comm', 'reg', 'prov', 'min', 'sorv',
 ]);
 const MAX_ABBREVIATION = 6;
 
@@ -163,7 +163,11 @@ const CITATION_WORDS = new Set([
 const ROMAN = /^[ivx]+$/;
 
 // Between two pieces of one citation (the number, its date, its deposit) only the words that join them.
-const JOINING_WORDS = new Set(['del', 'dell', 'il', 'in', 'data', 'dep', 'depositata', 'depositato', 'deposito']);
+const JOINING_WORDS = new Set([
+  'del', 'dell', 'il', 'in', 'data', 'dep', 'depositata', 'depositato', 'deposito',
+  // the kind of decision between its date and its number: «15 aprile 2020, ord. n. 7890»
+  'sent', 'sentenza', 'ord', 'ordinanza', 'decr', 'decreto',
+]);
 const MONTHS = 'gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre';
 // A date, or a range of days («18-25 luglio 1997»), is the citation's own when it stands between its pieces.
 const DATES = new RegExp(
@@ -188,7 +192,10 @@ function citationGap(written: string, words: ReadonlySet<string>, properNames: b
 }
 
 // What may stand between a court's name and its own section: a seat, the court's kind («reg.», «prov.»).
-const COVER_WORDS = new Set([...CITATION_WORDS, 'reg', 'regionale', 'prov', 'provinciale', 'pace', 'appello']);
+const COVER_WORDS = new Set([
+  ...CITATION_WORDS, 'reg', 'regionale', 'prov', 'provinciale', 'pace', 'appello', 'secondo',
+  'min', 'minorenni', 'sorv', 'sorveglianza',
+]);
 const MAX_COVER_GAP = 60;
 
 /** Whether a section at `to` stands in the citation of the court whose name ends at `from`, not in prose after it. */
@@ -280,16 +287,26 @@ export function extractDecisionCitations(
 
 // --- The links in a rendered text ---
 
-const NAMED_ENTITIES: Record<string, string> = { nbsp: '\u00a0', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 // A tag that ends a line of text: the scanner must not read a citation across it.
 const BLOCK_TAG = /^<\/?(?:div|p|br|li|ul|ol|h[1-6]|blockquote|tr|td|th|table|section|article)\b/i;
 
+const decodedEntities = new Map<string, string>();
+const MAX_DECODED_ENTITIES = 2000;
+let decoder: HTMLTextAreaElement | null = null;
+
+/** An entity as the browser reads it («&rsquo;» is «’»; one it does not know stays as written). */
 function decodeEntity(entity: string): string {
-  const body = entity.slice(1, -1);
-  if (body[0] !== '#') return NAMED_ENTITIES[body.toLowerCase()] ?? ' ';
-  const code = body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
-  return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ' ';
+  const known = decodedEntities.get(entity);
+  if (known !== undefined) return known;
+  decoder ??= document.createElement('textarea');
+  decoder.innerHTML = entity;
+  const value = decoder.value;
+  if (decodedEntities.size < MAX_DECODED_ENTITIES) decodedEntities.set(entity, value);
+  return value;
 }
+
+// The reader does not see these, and a word or a number they cut is still one: findInText ignores them too.
+const INVISIBLE = /[\u00ad\u200b]/g;
 
 /** The text a reader sees, and for each of its characters where it sits in the HTML. */
 interface VisibleText {
@@ -310,7 +327,8 @@ function visibleText(html: string): VisibleText {
   let text = '';
   const from: number[] = [];
   const to: number[] = [];
-  const push = (chars: string, start: number, end: number): void => {
+  const push = (raw: string, start: number, end: number): void => {
+    const chars = raw.replace(INVISIBLE, '');
     text += chars;
     for (let i = 0; i < chars.length; i += 1) {
       from.push(start);
@@ -326,6 +344,7 @@ function visibleText(html: string): VisibleText {
       push(decodeEntity(piece), start, start + piece.length);
     } else {
       for (let i = 0; i < piece.length; i += 1) {
+        if (piece[i] === '\u00ad' || piece[i] === '\u200b') continue;
         text += piece[i];
         from.push(start + i);
         to.push(start + i + 1);

@@ -1,7 +1,7 @@
 /**
- * PreviewFrame - la cornice dei popup hover sulle citazioni: portale, animazione, intestazione con
- * chiusura, corpo e piede. Il corpo lo scrive chi la usa (una norma: `CitationPreviewPopup`; una
- * decisione: `DecisionPreviewPopup`); la posizione la calcola l'hook dell'anteprima.
+ * PreviewFrame - the frame of the hover popups on citations: portal, animation, header with its close
+ * button, body and footer. Whoever uses it writes the body (a norm: `CitationPreviewPopup`; a decision:
+ * `DecisionPreviewPopup`); the position is computed by the preview's hook.
  */
 
 import { useEffect, type ReactNode } from 'react';
@@ -25,7 +25,7 @@ interface PreviewFrameProps {
 }
 
 export function PreviewFrame({ visible, position, title, badge, onClose, onMouseEnter, onMouseLeave, children, footer }: PreviewFrameProps) {
-  // Chiudi con Escape
+  // Escape closes it
   useEffect(() => {
     if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {

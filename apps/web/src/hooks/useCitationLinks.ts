@@ -79,7 +79,11 @@ export function useCitationLinks(containerRef: RefObject<HTMLElement | null>, op
       decisions.hidePreview();
     };
 
+    // The hide a leave scheduled: coming back to a citation before it fires keeps the preview.
+    let decisionHide: ReturnType<typeof setTimeout> | undefined;
+
     const hoverDecision = (element: HTMLElement) => {
+      clearTimeout(decisionHide);
       const path = element.getAttribute('data-decision-path') ?? '';
       const reference = decisionReferenceOfPath(path);
       if (reference) latest.current.decisions?.showPreview(element, reference, path);
@@ -88,7 +92,8 @@ export function useCitationLinks(containerRef: RefObject<HTMLElement | null>, op
     const leaveDecision = (element: Element, to: EventTarget | null) => {
       if (isSameDecisionTarget(element, to)) return;
       latest.current.decisions?.cancelPending();
-      setTimeout(() => {
+      clearTimeout(decisionHide);
+      decisionHide = setTimeout(() => {
         const decisions = latest.current.decisions;
         if (decisions && !decisions.isHoveringPopupRef.current) decisions.hidePreview();
       }, 100);
@@ -129,6 +134,7 @@ export function useCitationLinks(containerRef: RefObject<HTMLElement | null>, op
         container.removeEventListener('click', handleClick);
         container.removeEventListener('mouseenter', handleMouseEnter, true);
         container.removeEventListener('mouseleave', handleMouseLeave, true);
+        clearTimeout(decisionHide);
       },
     };
   });

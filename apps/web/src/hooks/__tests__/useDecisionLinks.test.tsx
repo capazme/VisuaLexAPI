@@ -225,3 +225,39 @@ describe('the decision opens by the store’s own rules', () => {
     });
   });
 });
+
+describe('leaving a decision link and coming back (the hide delay)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  function Spy({ spies }: { spies: { showPreview: () => void; hidePreview: () => void } }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const hovering = useRef(false);
+    useCitationLinks(ref, {
+      decisions: {
+        onOpen: vi.fn(), showPreview: spies.showPreview, hidePreview: spies.hidePreview, cancelPending: vi.fn(), isHoveringPopupRef: hovering,
+      },
+    });
+    return <div ref={ref} data-testid="host" dangerouslySetInnerHTML={{ __html: HTML }} />;
+  }
+
+  it('keeps the preview when the pointer returns to the citation before the hide fires', () => {
+    const spies = { showPreview: vi.fn(), hidePreview: vi.fn() };
+    render(<Spy spies={spies} />);
+    fireEvent.mouseEnter(parts()[0]);
+    fireEvent.mouseLeave(parts()[0], { relatedTarget: document.body });
+    vi.advanceTimersByTime(50);
+    fireEvent.mouseEnter(parts()[0]);
+    vi.advanceTimersByTime(500);
+    expect(spies.hidePreview).not.toHaveBeenCalled();
+  });
+
+  it('hides it when the pointer stays away', () => {
+    const spies = { showPreview: vi.fn(), hidePreview: vi.fn() };
+    render(<Spy spies={spies} />);
+    fireEvent.mouseEnter(parts()[0]);
+    fireEvent.mouseLeave(parts()[0], { relatedTarget: document.body });
+    vi.advanceTimersByTime(150);
+    expect(spies.hidePreview).toHaveBeenCalledTimes(1);
+  });
+});

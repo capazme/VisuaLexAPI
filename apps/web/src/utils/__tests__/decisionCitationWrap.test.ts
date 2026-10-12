@@ -88,6 +88,18 @@ describe('wrapDecisionCitationsInHtml', () => {
     expect(mount(out).textContent).toBe(mount('<p>Cass.&#160;civ., sez.&nbsp;III, n.&#xA0;12789/2022 &amp; Corte&nbsp;cost. n. 71/2020</p>').textContent);
   });
 
+  it('decodes every entity as the browser does, never as a space', () => {
+    // «Corte d&rsquo;appello» is a court whatever its apostrophe is written as
+    expect(cites(wrap('<p>La Corte d&rsquo;appello di Roma, sez. lav., n. 1/2020</p>', { within: 'cassazione' }))).toHaveLength(0);
+    expect(cites(wrap('<p>La Corte d&#x2019;appello di Roma, sez. lav., n. 1/2020</p>', { within: 'cassazione' }))).toHaveLength(0);
+    // a named entity inside a citation keeps the span, and a soft hyphen cuts nothing
+    const html = '<p>T.A.R. Valle d&rsquo;Aosta, n. 5/2020 e Cass. n. 6/20&shy;20, cos&igrave; &agrave; Corte cost. n. 71/2020</p>';
+    const out = wrap(html);
+    expect(cites(out).map((e) => e.textContent)).toEqual(['T.A.R. Valle d’Aosta, n. 5/2020', 'Cass. n. 6/20\u00ad20', 'Corte cost. n. 71/2020']);
+    expect(mount(out).textContent).toBe(mount(html).textContent);
+    expect(cites(out)[1].getAttribute('data-decision-path')).toBe('/sentenze/cassazione/6/2020');
+  });
+
   it('does not read a citation across two blocks', () => {
     expect(wrap('<div>Cass. civ.</div><div>n. 12789/2022</div>')).toBe('<div>Cass. civ.</div><div>n. 12789/2022</div>');
     // a line break inside a paragraph is not a paragraph break

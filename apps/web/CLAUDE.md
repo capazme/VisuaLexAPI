@@ -447,8 +447,8 @@ Cassazione's PDF and the page (`DecisionView` footer) carry no licence line (the
 After `wrapCitationsInHtml`, `wrapDecisionCitationsInHtml` (`utils/decisionCitationMatcher.ts`) wraps each
 decision a text cites in `span.decision-cite` (`data-decision-path` is the one source of truth, `data-cache-key`
 the same address), per text segment and adding no character (root rule 23: a citation cut by a highlight is
-two spans with one key). It reads the visible text with the tags removed, so a mark in the middle of a number
-does not cut the citation, and never claims a range a `.citation-hover` span holds. Three surfaces use it:
+two spans with one key). It reads the visible text with the tags removed and the entities decoded as the browser does
+(soft hyphens ignored), so a mark in the middle of a number does not cut the citation, and never claims a range a `.citation-hover` span holds. Three surfaces use it:
 `DecisionReadingSurface` (with `within: 'cassazione'` when the decision read is the Cassazione's, and its own
 path as `selfPath`, so a decision never links to itself), `ArticleTabContent` (Normattiva's update notes cite
 the Corte costituzionale) and the Ratio and Spiegazione of Brocardi (`MarkableBrocardiSection`, told where it is
