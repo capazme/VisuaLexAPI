@@ -123,6 +123,7 @@ router is mounted with `prefix="/api/v1"` plus its own prefix:
 | `ner_router` | `/ner` |
 | `ingestion_mechanical_router` | `/ingestion/mechanical` |
 | `rassegne_router` | `/rassegne` (`GET /by-norma`: the review paragraphs citing a norm, by year) |
+| `user_data_router` | `/user-data` (`GET` and `DELETE /{user_id}`: a person's data, for the BFF only; see Personal data) |
 
 **Auth.** `app.py` sets `app.dependency_overrides[verify_api_key] = optional_api_key`,
 so a route that declares only `verify_api_key` accepts requests without a key.
@@ -153,6 +154,7 @@ Each step is failure-isolated: if one fails, it logs and the boot goes on.
 6. Replay-buffer rehydration, when no buffer file was loaded.
 7. The Libro IV seed (`MERLT_SKIP_SEED`).
 8. The hygiene loop, when `MERLT_HYGIENE_INTERVAL_HOURS > 0`.
+9. The retention loop, always (see Personal data).
 
 **The live stack never runs Alembic.** A column added to a model must also go
 into `storage/enrichment/schema_additions.py`, and into a SQL file under
@@ -161,6 +163,29 @@ selects a column that Postgres does not have.
 
 The RQ worker has no lifespan: every task that touches the enrichment DB calls
 `await init_db()` first.
+
+## Personal data
+
+MERL-T keeps the VisuaLex user id in clear, next to what the person did and
+wrote: it is personal data, collected only with the user's consent, which the
+BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
+
+- `user_data.py`: `USER_COLUMNS`, the one inventory of the columns that hold a
+  user id, and `export_user_data` / `erase_user_data` over it, plus the stores
+  outside Postgres (the uploaded files, the graph's `contributed_by`, the RLCF
+  replay buffer). Private data is deleted; what the community took up (approved
+  proposals, votes, issue reports) stays with the link to the person cut. Every
+  step is idempotent, and a failed store makes the answer 503 so the BFF retries.
+  Errors report the exception's class only: a message can carry the user id.
+- `retention.py`: `tracking_events` expire after `MERLT_TRACKING_RETENTION_DAYS`
+  (default 365); the lifespan loop purges every `MERLT_RETENTION_INTERVAL_HOURS`
+  (default 24), first a few minutes after boot.
+- `api/user_data_router.py`: `GET`/`DELETE /api/v1/user-data/{user_id}`, admin
+  key only (`require_role("admin")`).
+
+Never call the user id «anonymous», «opaque» or «pseudonymous», and never log
+it next to a payload. The research export (`export_router`) pseudonymises with a
+salted hash, which is still personal data for whoever holds the salt.
 
 ## Critical files: read before editing
 
@@ -270,8 +295,11 @@ that stack's own database, and the tests write rows. The Dockerfile copies
 
 - Async everywhere (FastAPI, SQLAlchemy async, FalkorDB client). Log with
   `structlog`.
-- `user_id` is an opaque `varchar(100)` string (the VisuaLex user id), never a
-  foreign key.
+- `user_id` is the VisuaLex user id, a `varchar(100)` string in clear, never a
+  foreign key. It is personal data, not an anonymous or pseudonymous id: every
+  table, column or store that keeps it is listed in `privacy/user_data.py`
+  (`USER_COLUMNS`), which the per-user export and erasure walk. A new one goes
+  there in the same change.
 - RQ job ids use `-`, never `:`, and every enqueue sets an explicit
   `job_timeout`: RQ's 180 s default kills with SIGALRM and skips the task's
   `except`.

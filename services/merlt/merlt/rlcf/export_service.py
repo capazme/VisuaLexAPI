@@ -2,11 +2,13 @@
 Dataset Export Service
 ======================
 
-GDPR-compliant export of feedback, traces, and aggregation data
+Export of feedback, traces, and aggregation data, with pseudonymised user ids,
 for academic analysis.
 
 Features:
-- Anonymization: SHA-256 hash of user_id with salt, query text removal
+- Pseudonymisation, not anonymisation: the user id becomes a salted SHA-256
+  (whoever holds EXPORT_ANON_SALT can link it back to a person), and the query
+  and comment texts are removed. The parameter is still called ``anonymize``.
 - GDPR: skips consent_level='anonymous' records
 - Formats: JSON and CSV (via csv.DictWriter → io.StringIO)
 
@@ -34,22 +36,23 @@ log = structlog.get_logger()
 
 
 def _get_anon_salt() -> str:
-    """Get anonymization salt from environment. Fails loudly if missing."""
+    """Get the pseudonymisation salt from environment. Fails loudly if missing."""
     salt = os.getenv("EXPORT_ANON_SALT")
     if not salt:
         raise RuntimeError(
-            "EXPORT_ANON_SALT environment variable is required for anonymized exports. "
+            "EXPORT_ANON_SALT environment variable is required for pseudonymised exports. "
             "Set it to a random secret string."
         )
     return salt
 
 
 class DatasetExportService:
-    """Export datasets for academic analysis with GDPR compliance."""
+    """Export datasets for academic analysis, user ids pseudonymised."""
 
     @staticmethod
     def _anonymize_user_id(user_id: str) -> str:
-        """Deterministic SHA-256 hash with salt from env."""
+        """Deterministic SHA-256 hash with salt from env: a pseudonym, linkable
+        back to the person by whoever holds the salt."""
         salt = _get_anon_salt()
         return hashlib.sha256(
             f"{salt}:{user_id}".encode()

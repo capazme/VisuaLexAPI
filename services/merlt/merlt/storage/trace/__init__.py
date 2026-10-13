@@ -11,7 +11,7 @@ Components:
 Features:
 - Consent-based data filtering (anonymous, basic, full)
 - Query-type filtering and pagination
-- Archival and GDPR deletion support
+- Archival and per-trace deletion (a person's data as a whole: merlt.privacy.user_data)
 - Source resolution via bridge_table
 
 Usage:

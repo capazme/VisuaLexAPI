@@ -70,6 +70,7 @@ from merlt.api.quarantine_router import router as quarantine_router
 from merlt.api.api_keys_router import router as api_keys_router
 from merlt.api.ingestion_mechanical_router import router as ingestion_mechanical_router
 from merlt.api.rassegne_router import router as rassegne_router
+from merlt.api.user_data_router import router as user_data_router
 
 __all__ = [
     "feedback_router",
@@ -102,4 +103,5 @@ __all__ = [
     "api_keys_router",
     "ingestion_mechanical_router",
     "rassegne_router",
+    "user_data_router",
 ]

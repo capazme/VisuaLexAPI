@@ -414,6 +414,15 @@ class TrainingScheduler:
 
         return exp_id
 
+    def drop_experiences(self, predicate: Callable[[Any], bool]) -> int:
+        """Remove the experiences the predicate matches and save the buffer at
+        once, so the file on disk no longer holds them either (a person's data
+        being erased). Returns how many were removed."""
+        removed = self.buffer.remove_where(predicate)
+        if removed:
+            self._try_save_buffer()
+        return removed
+
     def get_buffer_stats(self) -> BufferStats:
         """Restituisce statistiche del buffer."""
         return self.buffer.get_stats()

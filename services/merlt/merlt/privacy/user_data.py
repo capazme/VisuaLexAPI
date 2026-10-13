@@ -1,0 +1,408 @@
+"""A person's data in MERL-T: what is kept under their VisuaLex user id, the
+copy they can download, and its erasure.
+
+MERL-T stores the VisuaLex user id in clear (a ``varchar``, never a foreign
+key). It is personal data: neither anonymous nor pseudonymous. This module is
+the one inventory of where it lives, so that the export and the erasure cannot
+drift apart. A new table, column or store that keeps a user id belongs here.
+
+What the erasure does, by kind of data:
+
+- **private** (the person's activity, questions, feedback, profile, authority,
+  uploaded documents and their files): deleted;
+- **proposals the community has not approved** (entities, relations,
+  amendments): deleted, with the votes cast on them;
+- **what the community took up** (approved proposals, votes, issue reports, the
+  graph nodes and relations written from them): kept, with the link to the
+  person cut. A column that may be null is set to null; one that may not gets a
+  random value per row (``erased:<uuid>``), which names nobody and keeps the
+  unique constraints on votes;
+- **another person's events that name this one** (a Forum event's
+  ``target_author_id``): the key is removed from the payload;
+- the RLCF replay buffer, in memory and on disk: the person's experiences are
+  removed.
+
+Left as they are, on purpose: ``audit_log`` (an append-only hash chain whose
+``actor_hash`` is a hash of the user id: removing a row breaks the chain);
+``api_keys`` (service keys, never a VisuaLex user's); the per-process rate-limit
+history of ``enrichment_router`` (minutes, in memory).
+
+Every step is idempotent: running the erasure again finishes what a failed run
+left, so the caller retries until it reports ``complete``.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, AsyncContextManager, Callable, Dict, List, Mapping, Optional, Sequence
+
+import structlog
+from fastapi.encoders import jsonable_encoder
+from sqlalchemy import text
+
+log = structlog.get_logger()
+
+# Stores: the enrichment database and the RLCF database (two engines; the same
+# Postgres in the live stack, but the code never assumes it).
+ENRICHMENT = "enrichment"
+RLCF = "rlcf"
+
+# Actions on a row that names the person.
+DELETE = "delete"                     # the row goes
+DETACH = "detach"                     # the row stays, the column no longer names the person
+DELETE_UNLESS_APPROVED = "delete_unless_approved"  # proposals: approved ones are detached
+
+# A value that names nobody, one per row, for a NOT NULL column being detached.
+_ERASED_VALUE = "'erased:' || gen_random_uuid()::text"
+
+
+@dataclass(frozen=True)
+class UserColumn:
+    """One column that holds a VisuaLex user id."""
+
+    store: str
+    table: str
+    column: str
+    action: str
+    nullable: bool = True
+    # Columns left out of the export: internal machinery, not the person's data.
+    export_exclude: Sequence[str] = ()
+
+
+# Order matters for the erasure: children before the rows they reference.
+USER_COLUMNS: List[UserColumn] = [
+    # --- enrichment: activity and private data -------------------------------
+    UserColumn(ENRICHMENT, "tracking_events", "user_id", DELETE),
+    UserColumn(ENRICHMENT, "ner_feedback", "user_id", DELETE),
+    UserColumn(ENRICHMENT, "user_domain_authority", "user_id", DELETE),
+    UserColumn(ENRICHMENT, "merlt_users", "user_id", DELETE),
+    UserColumn(ENRICHMENT, "extraction_candidates", "contributor_id", DELETE),
+    # user_documents goes after its candidates; the files on disk go with it.
+    UserColumn(ENRICHMENT, "user_documents", "uploaded_by", DELETE,
+               export_exclude=("storage_path",)),
+    # --- enrichment: what the community took up ------------------------------
+    UserColumn(ENRICHMENT, "entity_votes", "user_id", DETACH, nullable=False),
+    UserColumn(ENRICHMENT, "relation_votes", "user_id", DETACH, nullable=False),
+    UserColumn(ENRICHMENT, "amendment_votes", "user_id", DETACH, nullable=False),
+    UserColumn(ENRICHMENT, "entity_issue_votes", "user_id", DETACH, nullable=False),
+    UserColumn(ENRICHMENT, "relation_issue_votes", "user_id", DETACH, nullable=False),
+    UserColumn(ENRICHMENT, "entity_issue_reports", "reported_by", DETACH, nullable=False),
+    UserColumn(ENRICHMENT, "entity_issue_reports", "resolved_by", DETACH),
+    UserColumn(ENRICHMENT, "relation_issue_reports", "reported_by", DETACH, nullable=False),
+    UserColumn(ENRICHMENT, "relation_issue_reports", "resolved_by", DETACH),
+    UserColumn(ENRICHMENT, "pending_entities", "contributed_by", DELETE_UNLESS_APPROVED),
+    UserColumn(ENRICHMENT, "pending_relations", "contributed_by", DELETE_UNLESS_APPROVED),
+    UserColumn(ENRICHMENT, "pending_amendments", "contributed_by", DELETE_UNLESS_APPROVED,
+               nullable=False),
+    UserColumn(ENRICHMENT, "merlt_ingestion_batches", "created_by", DETACH),
+    UserColumn(ENRICHMENT, "merlt_ingestion_batches", "reviewed_by", DETACH),
+    # --- RLCF: questions to the assistant and their feedback -----------------
+    UserColumn(RLCF, "qa_feedback", "user_id", DELETE),
+    UserColumn(RLCF, "qa_feedback", "flagged_by", DETACH),
+    UserColumn(RLCF, "qa_feedback", "reviewed_by", DETACH),
+    # The execution trace is the engine's working, not the person's data.
+    UserColumn(RLCF, "qa_traces", "user_id", DELETE, export_exclude=("full_trace",)),
+    UserColumn(RLCF, "rlcf_feedback", "user_id", DELETE),
+]
+
+# The legacy RLCF ``users`` table names the person by ``username`` and its
+# children by the integer ``users.id``.
+_LEGACY_USER_CHILDREN = (
+    "credentials",
+    "bias_reports",
+    "devils_advocate_assignments",
+    "task_assignments",
+)
+
+
+def _upload_dir() -> Path:
+    return Path(os.getenv("UPLOAD_DIR", "./uploads/user_documents"))
+
+
+async def _table_exists(session, table: str) -> bool:
+    result = await session.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{table}"})
+    return bool(result.scalar())
+
+
+# A store's session factory; tests pass their own, bound to a disposable database.
+Sessions = Mapping[str, Callable[[], AsyncContextManager[Any]]]
+
+
+def _session_for(store: str, sessions: Optional[Sessions] = None):
+    if sessions is not None and store in sessions:
+        return sessions[store]()
+    if store == ENRICHMENT:
+        from merlt.storage.enrichment.database import get_db_session
+
+        return get_db_session()
+    from merlt.rlcf.database import get_async_session
+
+    return get_async_session()
+
+
+def _rows(result) -> List[Dict[str, Any]]:
+    return [dict(row) for row in result.mappings().all()]
+
+
+# =============================================================================
+# Export
+# =============================================================================
+
+
+async def export_user_data(user_id: str, sessions: Optional[Sessions] = None) -> Dict[str, Any]:
+    """Every row that names the person, table by table, as JSON-ready dicts.
+
+    A table missing from this database is skipped. The graph and the replay
+    buffer hold copies of rows exported here, so they add nothing.
+    """
+    tables: Dict[str, List[Dict[str, Any]]] = {}
+    for store in (ENRICHMENT, RLCF):
+        async with _session_for(store, sessions) as session:
+            for col in (c for c in USER_COLUMNS if c.store == store):
+                if not await _table_exists(session, col.table):
+                    continue
+                result = await session.execute(
+                    text(f"SELECT * FROM {col.table} WHERE {col.column} = :u"), {"u": user_id}
+                )
+                rows = _rows(result)
+                for row in rows:
+                    for excluded in col.export_exclude:
+                        row.pop(excluded, None)
+                if rows:
+                    key = col.table if col.column in ("user_id", "uploaded_by") else f"{col.table}.{col.column}"
+                    tables.setdefault(key, []).extend(rows)
+            if store == RLCF and await _table_exists(session, "users"):
+                result = await session.execute(
+                    text("SELECT * FROM users WHERE username = :u"), {"u": user_id}
+                )
+                rows = _rows(result)
+                if rows:
+                    tables["users"] = rows
+    return {"user_id": user_id, "tables": jsonable_encoder(tables)}
+
+
+# =============================================================================
+# Erasure
+# =============================================================================
+
+
+async def _erase_column(session, col: UserColumn, user_id: str) -> Dict[str, int]:
+    """Apply one column's action. Returns {"deleted": n} or {"detached": n}."""
+    detach_value = "NULL" if col.nullable else _ERASED_VALUE
+    if col.action == DELETE:
+        result = await session.execute(
+            text(f"DELETE FROM {col.table} WHERE {col.column} = :u"), {"u": user_id}
+        )
+        return {"deleted": result.rowcount or 0}
+    if col.action == DETACH:
+        result = await session.execute(
+            text(f"UPDATE {col.table} SET {col.column} = {detach_value} WHERE {col.column} = :u"),
+            {"u": user_id},
+        )
+        return {"detached": result.rowcount or 0}
+    # DELETE_UNLESS_APPROVED: a proposal the community approved stays, unnamed.
+    deleted = await session.execute(
+        text(
+            f"DELETE FROM {col.table} WHERE {col.column} = :u "
+            "AND validation_status IS DISTINCT FROM 'approved'"
+        ),
+        {"u": user_id},
+    )
+    detached = await session.execute(
+        text(f"UPDATE {col.table} SET {col.column} = {detach_value} WHERE {col.column} = :u"),
+        {"u": user_id},
+    )
+    return {"deleted": deleted.rowcount or 0, "detached": detached.rowcount or 0}
+
+
+async def _erase_enrichment(
+    user_id: str, counts: Dict[str, Dict[str, int]], sessions: Optional[Sessions]
+) -> List[str]:
+    """The enrichment database. Returns the storage paths of the person's files."""
+    files: List[str] = []
+    async with _session_for(ENRICHMENT, sessions) as session:
+        if await _table_exists(session, "user_documents"):
+            result = await session.execute(
+                text("SELECT storage_path FROM user_documents WHERE uploaded_by = :u"), {"u": user_id}
+            )
+            files = [row[0] for row in result.all() if row[0]]
+        for col in (c for c in USER_COLUMNS if c.store == ENRICHMENT):
+            if not await _table_exists(session, col.table):
+                continue
+            counts[f"{col.table}.{col.column}"] = await _erase_column(session, col, user_id)
+        # Another person's Forum event that names this one: drop the key.
+        if await _table_exists(session, "tracking_events"):
+            result = await session.execute(
+                text(
+                    "UPDATE tracking_events "
+                    "SET payload = (payload::jsonb - 'target_author_id')::json "
+                    "WHERE payload->>'target_author_id' = :u"
+                ),
+                {"u": user_id},
+            )
+            counts["tracking_events.payload.target_author_id"] = {"detached": result.rowcount or 0}
+    return files
+
+
+async def _erase_rlcf(
+    user_id: str, counts: Dict[str, Dict[str, int]], sessions: Optional[Sessions]
+) -> List[str]:
+    """The RLCF database. Returns the ids of the person's feedback rows, for the
+    replay buffer."""
+    feedback_ids: List[str] = []
+    async with _session_for(RLCF, sessions) as session:
+        trace_ids: List[str] = []
+        if await _table_exists(session, "qa_traces"):
+            result = await session.execute(
+                text("SELECT trace_id FROM qa_traces WHERE user_id = :u"), {"u": user_id}
+            )
+            trace_ids = [row[0] for row in result.all()]
+        if await _table_exists(session, "qa_feedback"):
+            result = await session.execute(
+                text(
+                    "SELECT id FROM qa_feedback WHERE user_id = :u "
+                    "OR trace_id IN (SELECT trace_id FROM qa_traces WHERE user_id = :u)"
+                ),
+                {"u": user_id},
+            )
+            feedback_ids = [str(row[0]) for row in result.all()]
+        # The Devil's Advocate log names no one, but holds feedback on the person's traces.
+        if trace_ids and await _table_exists(session, "devils_advocate_log"):
+            result = await session.execute(
+                text("DELETE FROM devils_advocate_log WHERE trace_id = ANY(:ids)"), {"ids": trace_ids}
+            )
+            counts["devils_advocate_log.trace_id"] = {"deleted": result.rowcount or 0}
+        for col in (c for c in USER_COLUMNS if c.store == RLCF):
+            if not await _table_exists(session, col.table):
+                continue
+            counts[f"{col.table}.{col.column}"] = await _erase_column(session, col, user_id)
+        if await _table_exists(session, "users"):
+            result = await session.execute(
+                text("SELECT id FROM users WHERE username = :u"), {"u": user_id}
+            )
+            legacy_ids = [row[0] for row in result.all()]
+            if legacy_ids:
+                deleted = 0
+                if await _table_exists(session, "feedback_ratings"):
+                    ratings_on_own = (
+                        " OR feedback_id IN (SELECT id FROM feedback WHERE user_id = ANY(:ids))"
+                        if await _table_exists(session, "feedback")
+                        else ""
+                    )
+                    r = await session.execute(
+                        text(f"DELETE FROM feedback_ratings WHERE user_id = ANY(:ids){ratings_on_own}"),
+                        {"ids": legacy_ids},
+                    )
+                    deleted += r.rowcount or 0
+                for child in ("feedback", *_LEGACY_USER_CHILDREN):
+                    if await _table_exists(session, child):
+                        r = await session.execute(
+                            text(f"DELETE FROM {child} WHERE user_id = ANY(:ids)"), {"ids": legacy_ids}
+                        )
+                        deleted += r.rowcount or 0
+                r = await session.execute(text("DELETE FROM users WHERE id = ANY(:ids)"), {"ids": legacy_ids})
+                counts["users.username"] = {"deleted": (r.rowcount or 0) + deleted}
+    return feedback_ids
+
+
+def _erase_files(paths: Sequence[str], counts: Dict[str, Dict[str, int]]) -> None:
+    """Delete the person's uploaded files. Only paths inside UPLOAD_DIR: a row
+    never makes this delete anything else."""
+    root = _upload_dir().resolve()
+    deleted = 0
+    for raw in paths:
+        path = Path(raw).resolve()
+        if root not in path.parents:
+            log.warning("user_data: refusing to delete a file outside UPLOAD_DIR", path=str(path))
+            continue
+        try:
+            path.unlink()
+            deleted += 1
+        except FileNotFoundError:
+            pass
+    counts["files.user_documents"] = {"deleted": deleted}
+
+
+async def _erase_graph(user_id: str, counts: Dict[str, Dict[str, int]], graph_client=None) -> None:
+    """Approved community entities and relations keep their content; the graph
+    stops naming who proposed them (the writer stores an empty string when there
+    is no contributor, and so does this)."""
+    from merlt.pipeline.provisional_writer import _get_graph_client
+
+    gc = await _get_graph_client(graph_client)
+    nodes = await gc.query(
+        "MATCH (n) WHERE n.contributed_by = $u "
+        "SET n.contributed_by = '', n.contributor_authority = 0.0 RETURN count(n) AS c",
+        {"u": user_id},
+    )
+    rels = await gc.query(
+        "MATCH ()-[r]->() WHERE r.contributed_by = $u SET r.contributed_by = '' RETURN count(r) AS c",
+        {"u": user_id},
+    )
+    counts["graph.contributed_by"] = {
+        "detached": int((nodes[0].get("c") if nodes else 0) or 0) + int((rels[0].get("c") if rels else 0) or 0)
+    }
+
+
+def _erase_replay_buffer(user_id: str, feedback_ids: Sequence[str], counts: Dict[str, Dict[str, int]]) -> None:
+    from merlt.rlcf.training_scheduler import get_scheduler
+
+    wanted = set(feedback_ids)
+
+    def is_theirs(exp) -> bool:
+        feedback = exp.feedback_data if isinstance(exp.feedback_data, dict) else {}
+        metadata = exp.metadata if isinstance(exp.metadata, dict) else {}
+        return feedback.get("user_id") == user_id or str(metadata.get("feedback_id")) in wanted
+
+    counts["replay_buffer"] = {"deleted": get_scheduler().drop_experiences(is_theirs)}
+
+
+def _failure(e: Exception) -> str:
+    """What a failed step reports: the exception's class only. Its message can
+    carry the SQL parameters, the person's id among them, and the answer and
+    the logs must not."""
+    return type(e).__name__
+
+
+async def erase_user_data(
+    user_id: str, graph_client=None, sessions: Optional[Sessions] = None
+) -> Dict[str, Any]:
+    """Erase the person's data from every store. Each store is attempted even
+    when another fails; ``complete`` is true only when all of them succeeded.
+    """
+    counts: Dict[str, Dict[str, int]] = {}
+    errors: Dict[str, str] = {}
+    files: List[str] = []
+    feedback_ids: List[str] = []
+
+    try:
+        files = await _erase_enrichment(user_id, counts, sessions)
+    except Exception as e:  # noqa: BLE001
+        errors[ENRICHMENT] = _failure(e)
+    try:
+        _erase_files(files, counts)
+    except Exception as e:  # noqa: BLE001
+        errors["files"] = _failure(e)
+    try:
+        feedback_ids = await _erase_rlcf(user_id, counts, sessions)
+    except Exception as e:  # noqa: BLE001
+        errors[RLCF] = _failure(e)
+    try:
+        await _erase_graph(user_id, counts, graph_client)
+    except Exception as e:  # noqa: BLE001
+        errors["graph"] = _failure(e)
+    if RLCF not in errors:
+        # Only once the feedback rows are gone, or a rehydration could bring them back.
+        try:
+            _erase_replay_buffer(user_id, feedback_ids, counts)
+        except Exception as e:  # noqa: BLE001
+            errors["replay_buffer"] = _failure(e)
+
+    complete = not errors
+    log.info("user_data: erasure", complete=complete, stores_failed=sorted(errors))
+    return {"complete": complete, "counts": counts, "errors": errors}
+
+
+__all__ = ["USER_COLUMNS", "UserColumn", "export_user_data", "erase_user_data"]
