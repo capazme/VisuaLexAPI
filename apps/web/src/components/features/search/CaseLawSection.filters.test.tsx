@@ -60,7 +60,13 @@ beforeEach(() => {
     media: query, onchange: null, addListener: () => {}, removeListener: () => {},
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
-  vi.mocked(searchDecisions).mockReset().mockResolvedValue(PAGE);
+  // the archive keeps the years asked for, as the route does
+  vi.mocked(searchDecisions).mockReset().mockImplementation(async (_query, _pagina, _modo, anni) => {
+    const decisioni = PAGE.esito === 'risultati'
+      ? PAGE.decisioni.filter((h) => (anni?.dal === undefined || h.identita.anno >= anni.dal) && (anni?.al === undefined || h.identita.anno <= anni.al))
+      : [];
+    return { ...PAGE, totale: decisioni.length, decisioni } as SearchDecisionsAnswer;
+  });
   fetchRassegne.mockReset().mockResolvedValue(RASSEGNE);
   _clearRassegneCacheForTests();
   window.sessionStorage.clear();
@@ -103,9 +109,10 @@ describe('CaseLawSection — one control for every source', () => {
     expect(chip).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
     expect(massimeLabels()).toEqual(['Cass. civ., n. 100/2019']);
-    expect(screen.getByText('1 di 2 decisioni caricate')).toBeInTheDocument();
+    // the Cassazione is asked again for that year, from the first page; its hits are the archive's
+    await screen.findByText('Cass. civ., n. 500/2019');
+    expect(vi.mocked(searchDecisions)).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 2019, al: 2019 });
     expect(screen.queryByText('Cass. civ., n. 24908/2026')).toBeNull();
-    expect(screen.getByText('Cass. civ., n. 500/2019')).toBeInTheDocument();
     // the passages are narrowed by the years of the decisions they cite (2024 and 2016), not by the review's
     expect(screen.queryByText('Passo sulla responsabilità aquiliana.')).toBeNull();
     expect(screen.queryByText('Passo sul risarcimento.')).toBeNull();
@@ -122,8 +129,38 @@ describe('CaseLawSection — one control for every source', () => {
     expect(screen.getByRole('button', { name: '2 di 3 massime' })).toBeInTheDocument();
     expect(screen.getByText('Passo sulla responsabilità aquiliana.')).toBeInTheDocument();
     expect(screen.queryByText('Passo sul risarcimento.')).toBeNull();
-    expect(screen.getByText('1 di 2 decisioni caricate')).toBeInTheDocument();
+    expect(await screen.findByText('1 decisione dal 2020 al 2026 nell’archivio pubblico della Cassazione (dal 4 gennaio 2021)')).toBeInTheDocument();
     expect(screen.getByText('Cass. civ., n. 24908/2026')).toBeInTheDocument();
+    expect(screen.queryByText('Cass. civ., n. 500/2019')).toBeNull();
+    expect(vi.mocked(searchDecisions)).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 2020, al: 2026 });
+  });
+
+  it('a range set before the Cassazione is searched asks nothing until the button is pressed', async () => {
+    render(<MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
+    await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Dall’anno' }), '2019');
+    await userEvent.type(screen.getByRole('textbox', { name: 'All’anno' }), '2019');
+    expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
+    expect(vi.mocked(searchDecisions)).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' }));
+    expect(await screen.findByText('Cass. civ., n. 500/2019')).toBeInTheDocument();
+    expect(vi.mocked(searchDecisions)).toHaveBeenCalledExactlyOnceWith(expect.anything(), 1, 'indice', { dal: 2019, al: 2019 });
+  });
+
+  it('counts the Cassazione\'s years from the archive, «circa» in index mode and exact in the text', async () => {
+    const withCounts = (modo: 'indice' | 'testo'): SearchDecisionsAnswer => ({ ...(PAGE as Extract<SearchDecisionsAnswer, { esito: 'risultati' }>), modo, anni: [{ anno: 2026, n: 1200 }, { anno: 2019, n: 800 }] });
+    vi.mocked(searchDecisions).mockReset().mockResolvedValue(withCounts('indice'));
+    await openAll();
+    expect(screen.getByRole('button', { name: /^2026 \(circa 1200\)/ })).toBeInTheDocument();
+    // a year the archive counts and no hit loaded shows too, with the massime's own rows added
+    expect(screen.getByRole('button', { name: /^2019 \(circa 801\)/ })).toBeInTheDocument();
+  });
+
+  it('counts the text search exactly', async () => {
+    const page = { ...(PAGE as Extract<SearchDecisionsAnswer, { esito: 'risultati' }>), modo: 'testo' as const, anni: [{ anno: 2026, n: 12 }] };
+    vi.mocked(searchDecisions).mockReset().mockResolvedValue(page);
+    await openAll();
+    expect(screen.getByRole('button', { name: '2026 (12)' })).toBeInTheDocument();
   });
 
   it('a half-typed year narrows nothing yet', async () => {

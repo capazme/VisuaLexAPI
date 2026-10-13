@@ -619,7 +619,7 @@ A page is cached for 24 hours per query and page. Design:
 
 | `esito` | Status | Content |
 |---------|--------|---------|
-| `risultati` | 200 | `totale`, `pagina`, `modo`, `archivio`, `archivio_dal` (first deposit covered: the archive's, or the earlier of the two when both are searched; `null` if unknown, and such an answer is not cached), `anni` (`[{anno, n}]`, the matches per decision year, newest first, counted in the same request and over every year whatever the range; the key is absent when the archive sent no usable facet; in index mode it counts like `totale`, before the re-check of the citation), `decisioni` |
+| `risultati` | 200 | `totale`, `pagina`, `modo`, `archivio`, `archivio_dal` (first deposit covered: the archive's, or the earlier of the two when both are searched; `null` if unknown, and such an answer is not cached), `anni` (`[{anno, n}]`, the matches per year of the decision's number (its deposit year), newest first, counted in the same request and over every year whatever the range; the key is absent when the archive sent no usable facet; in index mode it counts like `totale`, before the re-check of the citation), `decisioni` |
 | `non_supportata` | 200 | nothing else: an act the search cannot phrase (an EU act, for one) |
 | `richiesta_non_valida` | 400 | `errori`: each bad field, with what was expected |
 | `fonte_non_raggiungibile` | 503 | `fonte`: `cassazione`. A source that does not answer is never an empty page |

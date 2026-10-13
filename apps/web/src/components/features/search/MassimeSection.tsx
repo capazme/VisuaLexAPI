@@ -7,7 +7,7 @@ import { brocardiDecisionRef } from '../../../utils/decisionLinks';
 import { CaseLawRow } from './caseLaw/CaseLawRow';
 import { useCaseLawFilters, useReportCaseLawYears } from './caseLaw/caseLawFiltersContext';
 import { applyCaseLawFilters } from './caseLaw/caseLawFilter';
-import { rowYear, yearList, type YearsOf } from './caseLaw/caseLawYears';
+import { rowYear, yearCounts, type YearsOf } from './caseLaw/caseLawYears';
 
 interface MassimeSectionProps {
   massime: (string | MassimaStructured)[] | null;
@@ -57,7 +57,7 @@ export function MassimeSection({ massime, besideId, backEntry }: MassimeSectionP
     return massime.map((m, i) => normalizeMassima(m, i));
   }, [massime]);
 
-  const years = useMemo(() => yearList(normalizedMassime, yearsOfMassima), [normalizedMassime]);
+  const years = useMemo(() => yearCounts(normalizedMassime, yearsOfMassima), [normalizedMassime]);
   useReportCaseLawYears('massime', years);
 
   const filteredMassime = useMemo(

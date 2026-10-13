@@ -229,8 +229,8 @@ POST unless noted, JSON bodies.
 - `/search_decisions` — the Cassazione decisions that mention an article or a topic:
   `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?, anno_dal?, anno_al?}`
   → `esito` risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, `anni` (`[{anno, n}]`,
-  the matches per year, newest first, over every year whatever the range; absent when the archive
-  sent no facet), and per decision its identity, attributes, `trovata` and `frammento`; cached a
+  the matches per year of the decision's number (its deposit year), newest first, over every year
+  whatever the range; absent when the archive sent no facet), and per decision its identity, attributes, `trovata` and `frammento`; cached a
   day; the range bounds the deposit year as a filter query, 1900 to this year, one bound alone is
   open), non_supportata, richiesta_non_valida
   400, fonte_non_raggiungibile 503, errore_interno 500 (a bug: a fixed body). Italgiure only,

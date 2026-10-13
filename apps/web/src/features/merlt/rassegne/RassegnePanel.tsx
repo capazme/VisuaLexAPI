@@ -6,7 +6,7 @@ import { RassegnaPassage } from './RassegnaPassage';
 import { textOfPassage, yearsOfPassage } from './rassegnaFilters';
 import { useCaseLawFilters, useReportCaseLawYears } from '../../../components/features/search/caseLaw/caseLawFiltersContext';
 import { applyCaseLawFilters, isNarrowing } from '../../../components/features/search/caseLaw/caseLawFilter';
-import { yearList } from '../../../components/features/search/caseLaw/caseLawYears';
+import { yearCounts } from '../../../components/features/search/caseLaw/caseLawYears';
 import { loadRassegne, useRassegneSummary } from './useRassegne';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import type { RassegnePasso } from './types';
@@ -41,7 +41,7 @@ function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry 
   // narrowed by the section's controls (the cited decisions' years, the text); the year of the
   // review is this block's own, whose passages load as it opens
   const filters = useCaseLawFilters();
-  const years = useMemo(() => yearList(items, yearsOfPassage), [items]);
+  const years = useMemo(() => yearCounts(items, yearsOfPassage), [items]);
   useReportCaseLawYears(`rassegne-${archivio ?? 'tutte'}-${anno}`, years);
   const shown = useMemo(
     () => applyCaseLawFilters(items, { yearsOf: yearsOfPassage, textOf: textOfPassage }, filters),

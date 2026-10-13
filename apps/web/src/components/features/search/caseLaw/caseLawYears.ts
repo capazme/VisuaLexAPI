@@ -24,6 +24,8 @@ export type YearOrder = 'desc' | 'asc';
 export interface YearCount {
   year: number;
   n: number;
+  /** The source's own count, not the loaded rows', and not exact (the Cassazione's index, before its re-check). */
+  approx?: boolean;
 }
 
 /** How a source reads one of its rows. */
@@ -77,6 +79,21 @@ export function countByYear(years: readonly number[], order: YearOrder = 'desc')
   return [...counts.entries()]
     .map(([year, n]) => ({ year, n }))
     .sort((a, b) => (order === 'desc' ? b.year - a.year : a.year - b.year));
+}
+
+/** The years of the rows a source has loaded, counted: what it reports when it has no counts of its own. */
+export function yearCounts<T>(rows: readonly T[], yearsOf: YearsOf<T>): YearCount[] {
+  return countByYear(yearList(rows, yearsOf));
+}
+
+/** The counts of every block together, a year once, in the order asked. A year is approximate when any block says so. */
+export function mergeYearCounts(blocks: readonly (readonly YearCount[])[], order: YearOrder = 'desc'): YearCount[] {
+  const merged = new Map<number, YearCount>();
+  for (const { year, n, approx } of blocks.flat()) {
+    const held = merged.get(year);
+    merged.set(year, { year, n: (held?.n ?? 0) + n, ...(approx || held?.approx ? { approx: true } : {}) });
+  }
+  return [...merged.values()].sort((a, b) => (order === 'desc' ? b.year - a.year : a.year - b.year));
 }
 
 /**

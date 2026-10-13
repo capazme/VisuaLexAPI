@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  countByYear, filterByRange, inRange, isRangeSet, normalizeRange, parseYear, rowYear, sortByYear, yearList, type YearsOf,
+  countByYear, filterByRange, inRange, isRangeSet, mergeYearCounts, normalizeRange, parseYear, rowYear, sortByYear, yearCounts, yearList, type YearsOf,
 } from './caseLawYears';
 
 interface Row { id: string; years: Array<{ year?: string | number | null; date?: string | null }> }
@@ -80,5 +80,23 @@ describe('the order', () => {
     const same: Row[] = [1, 2, 3].map((n) => ({ id: String(n), years: [{ year: 2020 }] }));
     expect(ids(sortByYear(same, yearsOf, 'asc'))).toEqual(['1', '2', '3']);
     expect(ids(sortByYear(same, yearsOf, 'desc'))).toEqual(['1', '2', '3']);
+  });
+});
+
+describe('the counts of several blocks', () => {
+  it('counts a source\'s loaded rows', () => {
+    expect(yearCounts(rows, yearsOf)).toEqual([{ year: 2024, n: 3 }, { year: 2019, n: 1 }, { year: 2016, n: 1 }]);
+  });
+
+  it('adds the blocks year by year, in the order asked', () => {
+    const merged = mergeYearCounts([[{ year: 2024, n: 2 }, { year: 2019, n: 1 }], [{ year: 2024, n: 5 }, { year: 2010, n: 4 }]]);
+    expect(merged).toEqual([{ year: 2024, n: 7 }, { year: 2019, n: 1 }, { year: 2010, n: 4 }]);
+    expect(mergeYearCounts([[{ year: 2024, n: 2 }, { year: 2019, n: 1 }]], 'asc').map((c) => c.year)).toEqual([2019, 2024]);
+  });
+
+  it('calls a year approximate as soon as one block says its count is', () => {
+    const merged = mergeYearCounts([[{ year: 2024, n: 2 }], [{ year: 2024, n: 5, approx: true }, { year: 2019, n: 1 }]]);
+    expect(merged).toEqual([{ year: 2024, n: 7, approx: true }, { year: 2019, n: 1 }]);
+    expect(mergeYearCounts([[{ year: 2024, n: 5, approx: true }], [{ year: 2024, n: 2 }]])[0].approx).toBe(true);
   });
 });

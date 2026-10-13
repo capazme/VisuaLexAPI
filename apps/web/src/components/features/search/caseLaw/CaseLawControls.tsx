@@ -104,7 +104,7 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
 
       {counts.length > 0 && (
         <div role="group" aria-label="Anni delle decisioni" className="flex flex-wrap items-center gap-1.5">
-          {shownCounts.map(({ year, n }) => {
+          {shownCounts.map(({ year, n, approx }) => {
             const pressed = range.from === year && range.to === year;
             return (
               <button
@@ -120,7 +120,7 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
                     : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
                 )}
               >
-                {`${year} (${n})`}
+                {approx ? `${year} (circa ${n.toLocaleString('it-IT')})` : `${year} (${n})`}
               </button>
             );
           })}

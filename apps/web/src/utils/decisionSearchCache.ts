@@ -4,28 +4,29 @@
  *  Tests: `src/test/setup.ts` clears it after each test; within one test, call `clearDecisionSearchCache()`
  *  before rendering the same query a second time, or the first answer comes back. */
 import { searchDecisions } from '../services/decisionSearchService';
-import type { DecisionSearchQuery, SearchDecisionsAnswer } from '../types/decisions';
+import type { DecisionSearchQuery, DecisionSearchYears, SearchDecisionsAnswer } from '../types/decisions';
 import { topicKey } from './decisionSearchNorma';
 
 /** Pages kept, least recently used out. */
 const MAX_KEPT_PAGES = 50;
 const pages = new Map<string, Promise<SearchDecisionsAnswer>>();
 
-function keyOf(query: DecisionSearchQuery, pagina: number, modo?: 'indice' | 'testo'): string {
+function keyOf(query: DecisionSearchQuery, pagina: number, modo?: 'indice' | 'testo', anni?: DecisionSearchYears): string {
   const { norma, tema, archivio } = query;
   const sortedNorma = norma ? Object.fromEntries(Object.entries(norma).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b))) : undefined;
-  return JSON.stringify([sortedNorma, tema === undefined ? undefined : topicKey(tema), archivio, pagina, modo]);
+  return JSON.stringify([sortedNorma, tema === undefined ? undefined : topicKey(tema), archivio, pagina, modo, anni?.dal, anni?.al]);
 }
 
-export function searchDecisionsCached(query: DecisionSearchQuery, pagina: number, modo?: 'indice' | 'testo'): Promise<SearchDecisionsAnswer> {
-  const key = keyOf(query, pagina, modo);
+export function searchDecisionsCached(query: DecisionSearchQuery, pagina: number, modo?: 'indice' | 'testo', anni?: DecisionSearchYears): Promise<SearchDecisionsAnswer> {
+  const key = keyOf(query, pagina, modo, anni);
   const held = pages.get(key);
   if (held) {
     pages.delete(key); // a hit is the most recent use
     pages.set(key, held);
     return held;
   }
-  const pending = searchDecisions(query, pagina, modo).then(
+  // without a range the call is the one it always was
+  const pending = (anni ? searchDecisions(query, pagina, modo, anni) : searchDecisions(query, pagina, modo)).then(
     (answer) => {
       if (answer.esito !== 'risultati' && pages.get(key) === pending) pages.delete(key);
       return answer;
