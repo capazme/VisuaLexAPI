@@ -232,8 +232,22 @@ in whitespace, so those older highlights show again.
 doctrine is shown — gotcha 32), the Massimario's panel (the plugin slot
 `article_case_law`, which takes `articleUrn`, `isHistorical`, `besideId`,
 `backEntry`) and the Cassazione's decisions that mention the article, searched
-only when the reader presses the button (`DecisionResultList`). On a past text the
-section stays; the massime do not. A decision opens beside the article with the way back.
+only when the reader presses the button (`DecisionResultList`; not offered on an act of the Union,
+`isEuropeanAct`). On a past text the section stays; the massime do not. A decision opens beside the
+article with the way back. Every block draws its rows with the one `CaseLawRow`
+(`components/features/search/caseLaw/`: the estremi as a `DecisionLink`, the exact date else the year,
+the text cut at three lines with «Mostra tutto», the source as a small label; `authorityColor` is the
+one colour key) and the section's header holds the one set of controls (`CaseLawControls`): a range of
+years «dal / al», a chip per year with the count of the rows loaded, the order (newest first, reversible)
+and one text filter; on a phone they sit behind «Filtri». The blocks do not own a filter and no block
+scrolls inside itself. The controls reach them through `CaseLawFiltersContext` (`useCaseLawFilters`;
+the Massimario's panel is a plugin whose slot props are a contract, so it reads the same context) and
+each block reports the years it has loaded back with `useReportCaseLawYears` — memoise that array. What
+a row answers to is the source's to say (`YearsOf`: Brocardi's `anno`, a hit's deposit date else its
+number's year, a passage's cited decisions' years — the review's year is its provenance); a row with
+no year is kept only while no range is set. The year range and the text filter narrow what is *loaded*:
+the Cassazione's block applies the range to its hits in one place (`DecisionResultList`'s `yearRange`),
+where the archive's own year filter will go. Filters reset with the article.
 A topic opens a topic-search window of the practice (`openTopicSearch`; `ReadingWindow` draws
 `DecisionSearchTabView`: heading «Tema: …», the article when the query has one, «Solo il tema» to
 drop it, the limits line, the list; a decision opened from it sits beside that window, with no way
@@ -728,6 +742,10 @@ Duplicating any of these is a defect, not a shortcut.
   kept across a redraw, re-search when the text changes). Read-only over the DOM. `features/search/findBarParts.ts` (`counterText`, `ICON_BUTTON`) is the counter and icon button of the window; `features/search/toolbarToggle.ts`
   (`toolbarToggleClass`) is the look shared by the toolbar toggles (`DiscussionButton`,
   `FindInTextButton`): add a toggle with it, not with a copy of the classes.
+- `components/features/search/caseLaw/` — case law under an article: `CaseLawRow` (the one row),
+  `caseLawYears.ts` (a row's years, the counts, the range, the order — pure), `caseLawFilter.ts` (the text
+  filter, folded as the find window folds: `findMatches`), `authorityColor`, `CaseLawFiltersContext`. A new
+  source of case law draws `CaseLawRow` and reads `useCaseLawFilters`, it does not bring its own filter.
 - `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.

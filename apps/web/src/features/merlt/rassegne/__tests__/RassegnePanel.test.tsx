@@ -103,6 +103,20 @@ describe('RassegnePanel', () => {
     expect(chip.closest('a')).toBeNull();
   });
 
+  it('draws a passage as the section’s row: its source, the text cut at three lines, «Mostra tutto» when it is long', async () => {
+    const long = `Secondo l'art. 2043 c.c. ${'il danno deve essere ingiusto '.repeat(20)}`;
+    fetchRassegne.mockResolvedValue({ ...SUMMARY, items: [passo('a', 2024, long)] });
+    renderPanel();
+    await openPanel();
+    expect(await screen.findByText('Massimario')).toBeInTheDocument();
+    const more = screen.getByRole('button', { name: 'Mostra tutto' });
+    const text = document.getElementById(more.getAttribute('aria-controls')!)!;
+    expect(text).toHaveClass('line-clamp-3');
+    fireEvent.click(more);
+    expect(text).not.toHaveClass('line-clamp-3');
+    expect(screen.getByRole('button', { name: 'Mostra meno' })).toBeInTheDocument();
+  });
+
   it('credits the source and links the portal', async () => {
     fetchRassegne.mockResolvedValue(SUMMARY);
     renderPanel();

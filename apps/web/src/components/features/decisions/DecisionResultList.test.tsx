@@ -257,4 +257,30 @@ describe('DecisionResultList', () => {
   });
 });
 
+describe('DecisionResultList — the section’s year control', () => {
+  const OLD: DecisionSearchHit = { ...HIT, identita: { ...HIT.identita, numero: 500, anno: 2019 }, attributi: { data_deposito: '2019-02-02' } };
+
+  it('keeps the hits loaded whose deposit year is in the range, and says how many', async () => {
+    mockSearch({ ...PAGE, totale: 2, decisioni: [HIT, OLD] });
+    render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2019, to: 2019 }} /></Wrapper>);
+    expect(await screen.findByRole('link', { name: /n\. 500\/2019/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /n\. 24908\/2026/ })).toBeNull();
+    expect(screen.getByText('1 di 2 decisioni caricate')).toBeInTheDocument();
+  });
+
+  it('says when none of the hits loaded is in the range, and still offers the next page', async () => {
+    mockSearch({ ...PAGE, totale: 40, decisioni: [HIT] });
+    render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2010, to: 2012 }} /></Wrapper>);
+    expect(await screen.findByText('Nessuna delle 1 decisioni caricate corrisponde ai filtri.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Altri risultati' })).toBeInTheDocument();
+  });
+
+  it('lists the hits newest first by deposit, whatever the order of the page', async () => {
+    mockSearch({ ...PAGE, totale: 2, decisioni: [OLD, HIT] });
+    render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 500\/2019/ });
+    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('24908/2026'), expect.stringContaining('500/2019')]);
+  });
+});
+
 beforeEach(() => clearDecisionSearchCache());

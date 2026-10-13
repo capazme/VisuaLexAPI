@@ -78,3 +78,33 @@ describe('MassimeSection — its own toggle', () => {
     expect(screen.getByRole('button', { name: '1 di 1 massima' })).toBeInTheDocument();
   });
 });
+
+describe('MassimeSection — the section’s controls, not its own', () => {
+  const MASSIME = [
+    { autorita: 'Cass. civ.', numero: '1', anno: '2019', massima: 'Il nesso causale.' },
+    { autorita: 'Cass. civ.', numero: '2', anno: '2025', massima: 'La responsabilità del custode.' },
+    { autorita: 'Cons. Stato', numero: '10', anno: '2020', massima: 'Il provvedimento.' },
+    { autorita: null, numero: null, anno: null, massima: 'Senza estremi.' },
+  ];
+
+  it('draws no filter, no year select and no scrolling box of its own', () => {
+    const { container } = show(MASSIME);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(container.querySelector('[class*="overflow-y-"]')).toBeNull();
+    expect(container.querySelector('[class*="max-h-"]')).toBeNull();
+  });
+
+  it('lists the massime newest first, the one with no year last, each with its year and its source', () => {
+    show(MASSIME);
+    const texts = screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
+    expect(texts).toHaveLength(4);
+    expect(texts[0]).toContain('La responsabilità del custode.');
+    expect(texts[1]).toContain('Il provvedimento.');
+    expect(texts[2]).toContain('Il nesso causale.');
+    expect(texts[3]).toContain('Senza estremi.');
+    expect(screen.getAllByText('Brocardi')).toHaveLength(4);
+    expect(screen.getByText('2025').tagName).toBe('TIME');
+  });
+});
