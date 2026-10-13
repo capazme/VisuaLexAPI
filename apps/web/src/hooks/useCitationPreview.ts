@@ -81,10 +81,10 @@ function getFromCache(key: string): ArticleData | null {
 /**
  * Calcola la posizione del popup rispetto all'elemento target (condivisa con l'anteprima delle decisioni)
  */
-export function calculatePreviewPosition(element: HTMLElement): { top: number; left: number } {
+/** Where a popup goes under (else over) `element`; `popupHeight` is the popup's measured height when known. */
+export function calculatePreviewPosition(element: HTMLElement, popupHeight = 300): { top: number; left: number } {
   const rect = element.getBoundingClientRect();
   const popupWidth = 400;
-  const popupHeight = 300;
   const padding = 12;
 
   let left = rect.left + rect.width / 2 - popupWidth / 2;
@@ -103,6 +103,9 @@ export function calculatePreviewPosition(element: HTMLElement): { top: number; l
   // Se non c'è spazio sotto, mostra sopra
   if (top + popupHeight > window.innerHeight - padding) {
     top = rect.top - popupHeight - padding;
+    // Neither below nor above has room: as low as the window allows, never over its top edge
+    // (an anchor scrolled out over the top keeps its popup with it, under it)
+    if (top < padding) top = Math.max(padding, window.innerHeight - popupHeight - padding);
   }
 
   return { top, left };
