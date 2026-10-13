@@ -5,19 +5,21 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
+import { readProgress } from '../lingo/progress';
 import { previewIntervals, reviewScope } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
 import { computeStreak } from '../lingo/streak';
 import { countedDays, markQueueFinished, recordGradeDay, recountToday } from '../lingo/studyDays';
 import { answerPreferences, readPreferences } from '../lingo/studyPreferences';
 import { daysBetween, romeDay, startOfRomeDay } from '../lingo/studyDay';
-import { dueWhere, introducedToday, newCardsWhere } from '../lingo/todayQueue';
+import { dueWhere, introducedToday, newCardsWhere, queueFinished } from '../lingo/todayQueue';
 import { review } from '../srs/fsrsEngine';
 
 /**
  * The review of study cards (Studia PR C, spec §5): today's session, a grade,
- * and the study preferences. For the user's session only: nothing here is in
- * the delegated table, so an exchanged token answers 403.
+ * the study preferences, and the progress dashboard's read (Studia progress
+ * spec §5). For the user's session only: nothing here is in the delegated
+ * table, so an exchanged token answers 403.
  *
  * Time is the Europe/Rome calendar day (`lingo/studyDay.ts`), read from the
  * server's clock and never from the browser's. `LingoStatoRipasso.dueAt` is 00:00
@@ -79,7 +81,9 @@ router.get('/sessione', async (req, res) => {
         take: newSlots,
       });
   // Nothing left in the whole queue (not just in one subject): today counts (Studia progress spec D7).
-  if (!materia && dovute === 0 && newCards.length === 0) await markQueueFinished(prisma, userId, today);
+  if (!materia && dovute === 0 && newCards.length === 0 && (await queueFinished(prisma, userId, today))) {
+    await markQueueFinished(prisma, userId, today);
+  }
 
   const cards = [
     ...dueRows.map(({ card, ...state }) => {
@@ -159,6 +163,12 @@ router.post('/revisioni', async (req, res) => {
     // What the session needs to celebrate the goal at the grade that closes it (Studia progress spec §5.3).
     oggi: { ripassi: day.ripassi, obiettivo: day.obiettivo, raggiunto: day.after, appenaRaggiunto: day.after && !day.before, serie },
   });
+});
+
+// Everything the Studia dashboard draws, in one read (Studia progress spec §5.2).
+router.get('/progressi', async (req, res) => {
+  const { materia } = sessionSchema.parse(req.query);
+  res.json(await readProgress(req.user!.id, materia));
 });
 
 router.get('/preferenze', async (req, res) => {

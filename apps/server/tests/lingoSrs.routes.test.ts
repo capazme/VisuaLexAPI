@@ -533,10 +533,19 @@ describe('the review routes', () => {
 
     it('counts a day with nothing to review once the session is read, once', async () => {
       setClock(MONDAY_MORNING);
+      // One card, reviewed before and due next week: nothing to do today.
+      const c = await card(alice);
+      await stateDueOn(alice, c.id, '2026-10-25', new Date('2026-10-18T08:00:00Z'));
       await session(a);
       await session(a);
       expect(await prisma.lingoGiornataStudio.count({ where: { utenteId: alice.id } })).toBe(1);
       expect(await storedDay(alice, '2026-10-19')).toEqual({ ripassi: 0, nuove: 0, sbagliate: 0, codaFinita: true, valido: true });
+    });
+
+    it('never counts a day for someone with no card to study', async () => {
+      setClock(MONDAY_MORNING);
+      await session(a);
+      expect(await prisma.lingoGiornataStudio.count()).toBe(0);
     });
 
     it('writes nothing on a session read while cards are left, or narrowed to one subject', async () => {

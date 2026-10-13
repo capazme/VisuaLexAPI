@@ -27,10 +27,14 @@ export function newCardsWhere(userId: string, scope: Prisma.LingoCardWhereInput)
 /**
  * Whether the whole day's queue is finished, in every subject: nothing in scope due by the end of today,
  * and no new card left to introduce today (the daily number of new cards reached, or none left in scope).
+ * Someone who has never reviewed a card in scope has no queue to finish: an empty account never makes a
+ * day count.
  */
 export async function queueFinished(db: Prisma.TransactionClient, userId: string, today: string): Promise<boolean> {
   const { nuoveAlGiorno, materieComunita } = await readPreferences(db, userId);
   const scope = reviewScope(userId, materieComunita);
+  const studied = await db.lingoStatoRipasso.findFirst({ where: { utenteId: userId, card: scope }, select: { cardId: true } });
+  if (studied === null) return false;
   const due = await db.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) });
   if (due > 0) return false;
   if (nuoveAlGiorno - (await introducedToday(db, userId, today)) <= 0) return true;
