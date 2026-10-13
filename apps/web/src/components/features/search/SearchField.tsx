@@ -54,8 +54,9 @@ export function SearchField() {
       setPendingQuery(value);
       return;
     } else if (parsedCitation) {
-      if (parsedCitation.fromAlias && parsedCitation.aliasId) trackAliasUsage(parsedCitation.aliasId);
       if (citationReady) {
+        // Counted when the alias runs; a norm handed to the palette is counted there.
+        if (parsedCitation.fromAlias && parsedCitation.aliasId) trackAliasUsage(parsedCitation.aliasId);
         actions.search(citationSearchParams(parsedCitation, { showBrocardi: true, filters: defaultSearchFilters() }));
       } else {
         // The act is named, its number, date or article is not: the palette asks for them.
@@ -123,7 +124,11 @@ export function SearchField() {
             autoComplete="off"
             spellCheck={false}
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => {
+              setValue(event.target.value);
+              // A wait belongs to the words Enter was pressed on: new words need a new Enter.
+              setPendingQuery(null);
+            }}
             onKeyDown={onKeyDown}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}

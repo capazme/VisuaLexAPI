@@ -213,7 +213,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
   // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
   const handleSearchClick = () => {
-    focusSearchField();
+    focusSearchField({}, { wait: true });
     closeMobile();
   };
 

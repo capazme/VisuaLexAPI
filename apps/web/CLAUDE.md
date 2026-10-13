@@ -88,13 +88,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
   lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
   the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
-  closed. `utils/searchFieldControl.ts` (`focusSearchField({ text? })`) reaches it from the sidebar's «Ricerca», the
-  empty page's button and examples and the empty practice; a request made before it mounts waits 2 s.
+  closed. `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
+  the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
+  palette with the same words when no field is on screen (Focus mode).
   **The palette is global**: `GlobalSearch` (the palette, `QuickNormsManager`, `AliasManager`) is mounted by
   `Layout`, so ⌘K opens it on every page at once; what it opens lands in the practices through
   `hooks/useSearchActions` (`search`, `browse`, `openDecision`, `openTopic`), which bring the reader to `/` from
-  any other page. A typed search (palette, field) is marked (`isTypedSearch`) and `SearchPanel` does not run the
-  annex auto-switch on it, as when the palette called the panel directly.
+  any other page. A typed search (palette, field) is marked (`isTypedSearch`, on a copy of its params, never on a
+  quick norm's own) and `SearchPanel` does not run the annex auto-switch on it, as when the palette called the panel
+  directly; a quick norm used from its manager is a plain trigger (`trigger`), checked as before.
 - `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and
   `DevRoute` (a route element: without the mode, `<Navigate to="/" replace />`; while `useAuth` is
   still loading it draws nothing, so a reload on a development address is not mistaken for the mode

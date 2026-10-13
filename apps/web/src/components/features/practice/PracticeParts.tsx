@@ -5,7 +5,7 @@ import { Toast } from '../../ui/Toast';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { practiceLabel } from '../../../utils/practice';
-import { focusSearchField } from '../../../utils/searchFieldControl';
+import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
 
 /** What a search streaming into a practice has brought so far (`SearchPanel`'s progress). */
 export interface PracticeStreaming {
@@ -50,7 +50,7 @@ export function PracticeEmpty() {
       <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Pratica vuota</p>
       <button
         type="button"
-        onClick={() => focusSearchField()}
+        onClick={() => focusSearchFieldOrPalette()}
         className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-700 md:min-h-0 md:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
       >
         <Search size={16} aria-hidden />

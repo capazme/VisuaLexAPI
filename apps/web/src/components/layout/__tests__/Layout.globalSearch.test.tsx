@@ -31,6 +31,7 @@ import { appStore } from '../../../store/useAppStore';
 import { Layout } from '../Layout';
 import { DecisionAddress } from '../../features/decisions/DecisionAddress';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
+import { isTypedSearch } from '../../../hooks/useSearchActions';
 
 const PALETTE_BOX = "Es. 'art 2043 cc' o 'Cass. civ. 10787/2024'";
 
@@ -137,6 +138,39 @@ describe('Layout — ⌘K opens the palette on every page', () => {
     await user.click(screen.getByRole('button', { name: /Apri l'indice e sfoglia/ }));
     await waitFor(() => expect(addActIndexToPractice).toHaveBeenCalledWith(null, norma));
     expect(screen.getByText('Pagina di ricerca')).toBeInTheDocument();
+  });
+
+  it('a quick norm used from its manager on another page lands on the search page, as a trigger checked for an annex', async () => {
+    const params = { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' as const, version_date: '', show_brocardi_info: true };
+    appStore.setState({
+      quickNorms: [{ id: 'q1', label: 'Danno ingiusto', searchParams: params, createdAt: '', usageCount: 0 }],
+      quickNormsManagerOpen: true,
+      selectQuickNorm: vi.fn(),
+    });
+    const user = userEvent.setup();
+    at('/dossier');
+    await user.click(screen.getByText('Danno ingiusto'));
+    expect(triggerSearch).toHaveBeenCalledWith(params);
+    expect(isTypedSearch(triggerSearch.mock.calls[0][0])).toBe(false);
+    expect(await screen.findByText('Pagina di ricerca')).toBeInTheDocument();
+    appStore.setState({ quickNorms: [], quickNormsManagerOpen: false, selectQuickNorm: original.selectQuickNorm });
+  });
+
+  it('a quick norm picked in the palette runs as a typed search, and its saved params stay unmarked', async () => {
+    const params = { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' as const, version_date: '', show_brocardi_info: true };
+    appStore.setState({
+      quickNorms: [{ id: 'q1', label: 'Danno ingiusto', searchParams: params, createdAt: '', usageCount: 0 }],
+      selectQuickNorm: () => appStore.getState().quickNorms[0],
+    });
+    const user = userEvent.setup();
+    at('/history');
+    pressCmdK();
+    await user.click(screen.getByRole('option', { name: /Danno ingiusto/ }));
+    const sent = triggerSearch.mock.calls[0][0];
+    expect(sent).toEqual(params);
+    expect(isTypedSearch(sent)).toBe(true);
+    expect(isTypedSearch(params)).toBe(false);
+    appStore.setState({ quickNorms: [], selectQuickNorm: original.selectQuickNorm });
   });
 
   it('is reached with the words handed over, from another page («Cerca nella barra di ricerca»)', () => {

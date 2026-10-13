@@ -136,10 +136,43 @@ describe('SearchField — the search page\'s field', () => {
     expect(field()).toHaveFocus();
   });
 
-  it('takes a request made before it was mounted (the sidebar\'s «Ricerca» navigates, then focuses)', () => {
-    focusSearchField();
+  it('takes a request made before it was mounted, when asked to wait (the sidebar\'s «Ricerca» navigates, then focuses)', () => {
+    expect(focusSearchField({}, { wait: true })).toBe(false);
     renderField();
     expect(field()).toHaveFocus();
+  });
+
+  it('says it took a request, and a request that did not wait is not kept', () => {
+    expect(focusSearchField({ text: 'gdpr' })).toBe(false);
+    renderField();
+    expect(field()).toHaveValue('');
+    expect(focusSearchField({ text: 'gdpr' })).toBe(true);
+  });
+
+  it('a new Enter is needed once the words changed while it waited for the server', async () => {
+    const user = userEvent.setup();
+    renderField();
+    await user.type(field(), 'art 18 statuto dei lavoratori{Enter}');
+    await user.type(field(), 'x');
+    await user.type(field(), '{Backspace}');
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(triggerSearch).not.toHaveBeenCalled();
+  });
+
+  it('counts an alias once, when it runs: a norm handed to the palette is counted there', async () => {
+    appStore.setState({ customAliases: [
+      { id: 'a1', trigger: 'mioatto', expandTo: 'legge 241/1990', type: 'reference', searchParams: { act_type: 'legge', act_number: '241', date: '1990-08-07' }, usageCount: 0, createdAt: '' },
+    ] });
+    const trackAliasUsage = vi.fn();
+    appStore.setState({ trackAliasUsage });
+    const user = userEvent.setup();
+    renderField();
+    await user.type(field(), 'mioatto');
+    await waitFor(() => expect(screen.getByTestId('search-field-hint')).toHaveTextContent('Invio completa'));
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(openCommandPaletteWith).toHaveBeenCalled());
+    expect(trackAliasUsage).not.toHaveBeenCalled();
+    appStore.setState({ trackAliasUsage: original.trackAliasUsage });
   });
 
   it('Escape empties it', async () => {

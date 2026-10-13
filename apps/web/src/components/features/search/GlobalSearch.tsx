@@ -28,7 +28,9 @@ export function GlobalSearch() {
         onBrowseStructure={(params) => void actions.browse(params)}
         onShowSearch={actions.goToSearch}
       />
-      <QuickNormsManager isOpen={quickNormsManagerOpen} onClose={closeQuickNormsManager} onSearch={actions.search} />
+      {/* A quick norm used from the manager runs as it always did (a trigger, checked for an annex), and
+          from another page brings the reader to the search page. */}
+      <QuickNormsManager isOpen={quickNormsManagerOpen} onClose={closeQuickNormsManager} onSearch={actions.trigger} />
       <AliasManager />
     </>
   );

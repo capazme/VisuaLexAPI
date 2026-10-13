@@ -25,8 +25,8 @@ when the reader came back to `/`, not at once.
 | F4 | **No practice is closed** to start a search: the result lands in the active practice, as from the palette. |
 | F5 | **«Opzioni» (⌘K)** beside the field opens the palette, with the words typed when there are some: its filters, aliases, quick norms and grid of acts stay there. |
 | F6 | **⌘K on every page, at once**: the palette and the two managers it opens (quick norms, aliases) are mounted by `Layout`. What it opens — a norm, «Apri l'indice e sfoglia», a decision, a topic, a quick norm, an alias — lands in the practices and brings the reader to `/`. «Cerca nella barra di ricerca» (a decision not found) and the address `/sentenze` still open it. Its root keeps `data-find-overlay`: Cmd/Ctrl+F is the browser's while it is open. |
-| F7 | **The doors to the field**: the sidebar's «Ricerca» goes to `/` with the cursor in the field; the empty page's «Inizia una ricerca» focuses it; its examples fill it (Enter searches); an empty practice's «Cerca una norma o una sentenza» focuses it. None of them opens the palette any more. |
-| F8 | **Nothing else changes in a search**: a typed search (palette or field) runs as the palette ran it, without the annex auto-switch that programmatic searches (a dossier's «Apri», a quick norm on the empty page) get. |
+| F7 | **The doors to the field**: the sidebar's «Ricerca» goes to `/` with the cursor in the field; the empty page's «Inizia una ricerca» focuses it; its examples fill it (Enter searches); an empty practice's «Cerca una norma o una sentenza» focuses it. None of them opens the palette any more — except in Focus mode, where no field is drawn and they open the palette with the same words. |
+| F8 | **Nothing else changes in a search**: a typed search (palette or field) runs as the palette ran it, without the annex auto-switch that programmatic searches (a dossier's «Apri», a quick norm on the empty page or used from its manager) get. |
 
 ## Shape
 

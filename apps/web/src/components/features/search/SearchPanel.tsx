@@ -17,7 +17,7 @@ import { buildNormaKey } from '../../../utils/normaKeys';
 import { ReadingBackControl } from './ReadingBackControl';
 import { matchesSearchFilters } from '../../../utils/searchFilters';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
-import { focusSearchField } from '../../../utils/searchFieldControl';
+import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
 import { deriveVersionInfo, requestIsHistorical } from '../../../utils/versionDisplay';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
@@ -647,7 +647,7 @@ export function SearchPanel() {
               </div>
             </div>
             <button
-              onClick={() => focusSearchField()}
+              onClick={() => focusSearchFieldOrPalette()}
               className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all focus-ring"
             >
               <Search size={16} />
@@ -668,7 +668,7 @@ export function SearchPanel() {
                 <button
                   key={example}
                   // The example goes into the field, ready to search with Enter or to be changed.
-                  onClick={() => focusSearchField({ text: example })}
+                  onClick={() => focusSearchFieldOrPalette(example)}
                   className="px-3 py-1.5 rounded-full border border-primary-200 dark:border-primary-800 bg-primary-50/70 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 text-xs font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-colors focus-ring"
                 >
                   {example}

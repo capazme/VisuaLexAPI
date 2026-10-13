@@ -19,8 +19,10 @@ export function isTypedSearch(params: SearchParams): boolean {
 }
 
 export interface SearchActions {
-  /** A norm search: it lands in the active practice. */
+  /** A norm search the user typed (the palette, the field): it lands in the active practice. */
   search: (params: SearchParams) => void;
+  /** A programmatic search (a quick norm used from its manager): checked for an annex like any trigger. */
+  trigger: (params: SearchParams) => void;
   /** An act's index without an article («Apri l'indice e sfoglia»). */
   browse: (params: SearchParams) => Promise<void>;
   /** A decision, read from a link: beside the table on the desktop, the full-screen reader on a phone. */
@@ -44,7 +46,15 @@ export function useSearchActions(): SearchActions {
   }, [navigate, pathname]);
 
   const search = useCallback((params: SearchParams) => {
-    typedSearches.add(params);
+    // A copy is marked, never the object passed in: a quick norm's own `searchParams` (the store's)
+    // would stay marked, and the same norm opened later from the empty page would skip the annex check.
+    const typed = { ...params };
+    typedSearches.add(typed);
+    appStore.getState().triggerSearch(typed);
+    goToSearch();
+  }, [goToSearch]);
+
+  const trigger = useCallback((params: SearchParams) => {
     appStore.getState().triggerSearch(params);
     goToSearch();
   }, [goToSearch]);
@@ -83,7 +93,7 @@ export function useSearchActions(): SearchActions {
   }, [goToSearch]);
 
   return useMemo(
-    () => ({ search, browse, openDecision, openTopic, goToSearch }),
-    [search, browse, openDecision, openTopic, goToSearch],
+    () => ({ search, trigger, browse, openDecision, openTopic, goToSearch }),
+    [search, trigger, browse, openDecision, openTopic, goToSearch],
   );
 }
