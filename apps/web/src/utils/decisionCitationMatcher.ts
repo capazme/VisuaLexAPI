@@ -21,6 +21,7 @@ import {
   EU_DASH,
   SECTION_HEAD_SOURCE,
   SEZIONI_UNITE_HEAD_SOURCE,
+  isCodiceDellaStrada,
   readDecisionCitation,
 } from './decisionCitationParser';
 import { decisionPath, linkableDecisionPath, parseDecisionPath } from './decisionLinks';
@@ -129,6 +130,8 @@ interface Head {
 function findHeads(text: string, folded: string, within: DecisionContext | undefined): Head[] {
   const heads: Head[] = [];
   for (const m of folded.matchAll(COURT_HEADS)) {
+    // «art. 142 c.d.s.», «in violazione del C.d.S.»: the codice della strada, not the Consiglio di Stato.
+    if (isCodiceDellaStrada(folded, m.index ?? 0, (m.index ?? 0) + m[0].length)) continue;
     heads.push({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, court: true, section: false });
   }
   const supported = new Set(heads.map((h) => h.start));

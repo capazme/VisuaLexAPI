@@ -15,7 +15,7 @@ import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 import { extractCitations, type CitationMatch } from './citationMatcher';
 import { NUMBERED_ACT_SPELLINGS, toApiArticleNumber } from './citationParser';
 import { expandTwoDigitYear } from './dateUtils';
-import { ADMIN_COURT_HEAD_SOURCE } from './decisionCitationParser';
+import { ADMIN_COURT_HEAD_SOURCE, isCodiceDellaStrada } from './decisionCitationParser';
 import { foldForSearch } from './findInText';
 import { ACT_TYPES } from './sources/actTypes';
 
@@ -466,9 +466,13 @@ const OFFICE_AFTER = '(?!\\s*,?\\s+(?:del|della|dello|dell\')\\s*(?:sindaco|comu
  * between it and `start`.
  */
 function followsDecisionMarker(folded: string, start: number): boolean {
-  const window = folded.slice(Math.max(0, start - MARKER_REACH), start);
+  const from = Math.max(0, start - MARKER_REACH);
+  const window = folded.slice(from, start);
   let head: RegExpExecArray | undefined;
-  for (const m of window.matchAll(DECISION_HEAD_ANYWHERE)) head = m;
+  // «c.d.s.» after an article or «del» is the codice della strada, not the Consiglio di Stato.
+  for (const m of window.matchAll(DECISION_HEAD_ANYWHERE)) {
+    if (!isCodiceDellaStrada(folded, from + m.index, from + m.index + m[0].length)) head = m;
+  }
   if (!head) return false;
   const since = window.slice(head.index);
   return !since.includes(';') && !SENTENCE_END.test(since) && !new RegExp(ACT_WORD, 'u').test(window.slice(head.index + head[0].length));

@@ -437,6 +437,27 @@ describe('findCitationSpans', () => {
     }
   });
 
+  it('«c.d.s.» after an article or a preposition is the codice della strada, never a Consiglio di Stato marker', () => {
+    const q = 'Cons. Stato n. 5/2018';
+    const none = [
+      'verbale ex art. 126-bis c.d.s. 12 aprile 2018, n. 5',
+      'art. 142 c.d.s. 12 aprile 2018, n. 5',
+      'violazione del c.d.s. del 12 aprile 2018, n. 5',
+      'art. 142, comma 8, C.d.S. 12 aprile 2018, n. 5',
+      'art. 142 del cds 12 aprile 2018, n. 5',
+      'artt. 142 e 143 c.d.s. 12 aprile 2018, n. 5',
+    ];
+    for (const text of none) expect(cited(text, q), text).toEqual([]);
+    const found5: string[] = [
+      'C.d.S. 12 aprile 2018, n. 5',
+      'CdS, sez. IV, 12 aprile 2018, n. 5',
+      'sentenza del C.d.S. 12 aprile 2018, n. 5',
+      'art. 142 c.d.s.; C.d.S. 12 aprile 2018, n. 5',
+      'Cons. Stato, sez. IV, 12 aprile 2018, n. 5',
+    ];
+    for (const text of found5) expect(cited(text, q), text).toEqual(['12 aprile 2018, n. 5']);
+  });
+
   it('a sentence that ends on a short abbreviation is not seen as an end (a known ambiguity)', () => {
     const q = 'Cass. n. 8980/2018';
     expect(cited("Cass. n. 5/2017 sull'art. 3 Cost. Il 12 aprile 2018, n. 8980 il Comune", q)).toEqual(['12 aprile 2018, n. 8980']);

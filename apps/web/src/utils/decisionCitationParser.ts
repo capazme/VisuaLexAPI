@@ -9,6 +9,7 @@
  */
 import type { DecisionArchive, DecisionReference } from '../types/decisions';
 import { FIRST_YEAR, MAX_NUMERO } from './decisionLinks';
+import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 import { expandTwoDigitYear } from './dateUtils';
 import { EU_MAX_NUMERO } from './euCourts';
 import { ADMIN_MAX_NUMERO, SEATS } from './adminCourts';
@@ -114,6 +115,32 @@ const ADMIN_COURT_SOURCE =
   + '|(t\\.\\s*a\\.\\s*r\\.?|tar|tribunale\\s+amministrativo(?:\\s+regionale)?))(?=[\\s,.;:(]|$)';
 /** The Consiglio di Stato, the C.G.A.R.S., the TAR and the T.R.G.A., as a head. */
 export const ADMIN_COURT_HEAD_SOURCE = ADMIN_COURT_SOURCE;
+
+// «C.d.S.» and «CdS» are also the codice della strada. After an article citation or a preposition it is
+// the code: «art. 142 c.d.s.», «art. 142, comma 8, C.d.S.», «art. 142 del c.d.s.», «in violazione del C.d.S.».
+const ABBREVIATED_CDS = /^(?:c\.\s*d\.\s*s\.?|cds)$/;
+const ARTICLE_NUMBER = `\\d+(?:\\s*(?:-\\s*)?(?:${ARTICLE_SUFFIX_ALTERNATION})\\b)?`;
+const AFTER_ARTICLE = new RegExp(
+  `(?<![\\p{L}\\p{N}])art(?:t|icol[oi])?\\.?\\s*${ARTICLE_NUMBER}(?:\\s*(?:,|\\be\\b)\\s*${ARTICLE_NUMBER})*` +
+    `(?:\\s*(?:,\\s*)?(?:comm[ai]|co\\.)\\s*${ARTICLE_NUMBER}(?:\\s*(?:,|\\be\\b)\\s*${ARTICLE_NUMBER})*)*` +
+    `(?:\\s*,)?(?:\\s+del)?\\s*$`,
+  'u',
+);
+const AFTER_PREPOSITION = /(?<![\p{L}\p{N}])(?:del|al|dal|nel)\s*$/u;
+/** How far before a head the article or the preposition may stand. */
+const CDS_REACH = 80;
+
+/**
+ * Whether the head at `[start, end)` of `folded` (lower case, as `foldForSearch` makes it) is the
+ * codice della strada and not the Consiglio di Stato: «c.d.s.» or «cds» right after an article
+ * citation («art. N[-suffix][, comma M][,] [del]») or after «del», «al», «dal», «nel». The one rule of
+ * both readers of a text (`decisionCitationMatcher`, the find window's `followsDecisionMarker`).
+ */
+export function isCodiceDellaStrada(folded: string, start: number, end: number): boolean {
+  if (!ABBREVIATED_CDS.test(folded.slice(start, end).trim().replace(/[\s.,;:(]+$/, ''))) return false;
+  const before = folded.slice(Math.max(0, start - CDS_REACH), start);
+  return AFTER_PREPOSITION.test(before) || AFTER_ARTICLE.test(before);
+}
 const ADMIN_COURT = new RegExp(`^\\s*${ADMIN_COURT_SOURCE}`, 'i');
 const ADMIN_SECTION =
   /\bsez(?:ione)?\.?\s*(?:(i{1,3}|iv|v|vi{0,3}|ix|x|[1-9]|10)(?:\s*-?\s*(bis|ter|quater))?(?=[\s,.;]|$))|\b(ad(?:unanza)?\.?\s*plen(?:aria)?\.?)/i;

@@ -279,3 +279,27 @@ describe('extractDecisionCitations, administrative acts and administrative court
     expect(writtenIn('La nota del T.A.R. Lazio n. 1234/2018.')).toEqual([]);
   });
 });
+
+describe('extractDecisionCitations, «C.d.S.» as the codice della strada', () => {
+  it('does not link the code cited after an article or a preposition', () => {
+    for (const text of [
+      'Il verbale ex art. 142 c.d.s. n. 5/2018 è nullo.',
+      "Si applica l'art. 142 del c.d.s. n. 5/2018.",
+      'Il conducente, in violazione del C.d.S. n. 5/2018, è sanzionato.',
+      "Vale l'art. 142, comma 8, C.d.S., n. 5/2018 per la velocità.",
+      "Vale l'art. 186 cds n. 5/2018 per la guida.",
+      'Vale art. 126-bis c.d.s. n. 5/2018.',
+      'Valgono artt. 142 e 143 C.d.S. n. 5/2018.',
+    ]) {
+      expect(writtenIn(text), text).toEqual([]);
+      expect(writtenIn(text, 'cassazione'), text).toEqual([]);
+    }
+  });
+
+  it('still links the Consiglio di Stato written C.d.S.', () => {
+    expect(writtenIn('Come in C.d.S., sez. IV, n. 5/2018 e nulla più.')).toEqual(['C.d.S., sez. IV, n. 5/2018']);
+    expect(writtenIn('Come affermato (C.d.S. n. 5/2018) in tema di appalti.')).toEqual(['C.d.S. n. 5/2018']);
+    expect(writtenIn('Cfr. art. 142 c.d.s. e C.d.S., sez. IV, n. 5/2018.')).toEqual(['C.d.S., sez. IV, n. 5/2018']);
+    expect(writtenIn('Si veda art. 5. C.d.S. n. 5/2018 ha deciso.')).toEqual(['C.d.S. n. 5/2018']);
+  });
+});

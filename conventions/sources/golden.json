@@ -638,7 +638,15 @@
       {"text": "Corte EDU, 4 dicembre 2008, X c. Italia, n. 30562/04.", "spans": [], "status": "decided"},
       {"text": "Corte di giustizia tributaria di primo grado di Roma, sent. n. 100/2021.", "spans": [], "status": "decided"},
       {"text": "Il punto C 634/21 dell'allegato non è una causa; né lo è su 12/2020.", "within": "cassazione", "spans": [], "status": "proposed"},
-      {"text": "Cass. civ. e Cass. 99999 senza anno, Cass. 0/2024, Cass. 99999/2030, Corte cost. 1/1950.", "spans": [], "status": "decided"}
+      {"text": "Cass. civ. e Cass. 99999 senza anno, Cass. 0/2024, Cass. 99999/2030, Corte cost. 1/1950.", "spans": [], "status": "decided"},
+      {"text": "Il verbale ex art. 142 c.d.s. n. 5/2018 è nullo.", "spans": [], "status": "decided"},
+      {"text": "Si applica l'art. 142 del c.d.s. n. 5/2018.", "spans": [], "status": "decided"},
+      {"text": "Il conducente, in violazione del C.d.S. n. 5/2018, è sanzionato.", "spans": [], "status": "decided"},
+      {"text": "Vale l'art. 142, comma 8, C.d.S., n. 5/2018 per la velocità.", "spans": [], "status": "decided"},
+      {"text": "Vale l'art. 186 cds n. 5/2018 per la guida.", "spans": [], "status": "decided"},
+      {"text": "Come in C.d.S., sez. IV, n. 5/2018 e nulla più.", "spans": [{"start": 8, "end": 34, "text": "C.d.S., sez. IV, n. 5/2018", "reference": {"corte": "consiglio_di_stato", "numero": 5, "anno": 2018, "sezione": "IV"}, "path": "/sentenze/consiglio-di-stato/5/2018"}], "status": "decided"},
+      {"text": "Come affermato (C.d.S. n. 5/2018) in tema di appalti.", "spans": [{"start": 16, "end": 32, "text": "C.d.S. n. 5/2018", "reference": {"corte": "consiglio_di_stato", "numero": 5, "anno": 2018}, "path": "/sentenze/consiglio-di-stato/5/2018"}], "status": "decided"},
+      {"text": "Cfr. art. 142 c.d.s. e C.d.S., sez. IV, n. 5/2018.", "spans": [{"start": 23, "end": 49, "text": "C.d.S., sez. IV, n. 5/2018", "reference": {"corte": "consiglio_di_stato", "numero": 5, "anno": 2018, "sezione": "IV"}, "path": "/sentenze/consiglio-di-stato/5/2018"}], "status": "decided"}
     ]
   }
 }
