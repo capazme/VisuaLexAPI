@@ -6,8 +6,7 @@ import {
   createTestUser,
   authHeader,
   prisma,
-  type TestUser,
-} from '../../../helpers';
+  type TestUser, merltNoticeId } from '../../../helpers';
 import {
   _resetGraphClientForTests,
   _resetSubgraphCacheForTests,
@@ -72,7 +71,7 @@ describe('subgraph cache — route integration (P1.12)', () => {
 
   beforeEach(async () => {
     user = await createTestUser('subgraph-cache');
-    await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'basic' });
+    await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'basic', noticeId: await merltNoticeId() });
   });
 
   it('serves the second identical request from cache (single upstream call)', async () => {

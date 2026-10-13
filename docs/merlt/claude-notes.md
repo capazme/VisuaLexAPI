@@ -226,12 +226,28 @@ Slice 1 wires 5 user-action signals into MERL-T.
 
 **BFF (`apps/server/src/`).**
 
-- `routes/merlt/consent.ts`: GET, POST and DELETE on `/consent`, with body
-  `{ level, reason? }`. Each change runs in a Prisma transaction that upserts
-  `MerltUserPreference` and appends a `MerltConsentAudit` row. The enum is
-  `MerltConsentLevel` (none|basic|full), and `preferencesForLevel()` in
-  `schemas/merlt/consent.ts` derives the 3 toggles. The audit is write-only:
-  no route lists it.
+- `routes/merlt/consent.ts`: GET, POST and DELETE on `/consent`. POST takes
+  `{ level, noticeId, reason? }`: the id of the MERL-T notice version the person
+  chose under, which must be the current one (409 `notice_changed` with the
+  current one otherwise). DELETE takes `{ reason?, deleteData? }` and records a
+  «none» under the current notice. Each change runs in a Prisma transaction that
+  upserts `MerltUserPreference` (with `informativaTestoId`) and appends a
+  `MerltConsentAudit` row (with the notice version). GET answers `level` — what
+  may be collected now, `services/merlt/effectiveConsent.ts`: `none` until the
+  current notice is answered — `storedLevel`, `noticeAnswered` and `notice`
+  (the current version, plain text). The enum is `MerltConsentLevel`
+  (none|basic|full), and `preferencesForLevel()` in `schemas/merlt/consent.ts`
+  derives the 3 toggles. Every guard and route reads the level through
+  `effectiveConsent`, never the column. The audit is in the account export.
+- `routes/merlt/data.ts` and `services/merlt/userData.ts`: the person's MERL-T
+  data. `GET /data/export` (this server's MERL-T rows and MERL-T's
+  `GET /api/v1/user-data/{id}`; 503 when MERL-T cannot answer), `DELETE /data`
+  (this server's rows at once, MERL-T's through `merlt_erasure_requests`). A
+  request is written in the transaction that asks for it (an account deletion
+  when the person ever consented, the person's own request, a revocation with
+  `deleteData`), tried once at once (a few seconds), then by the worker
+  `index.ts` starts (every five minutes, waiting five minutes after a failure,
+  doubling, at most a day) until MERL-T answers 200; then deleted.
 - `routes/merlt/events.ts`: 5 endpoints (`article-viewed`,
   `highlight-annotation`, `dossier-bookmark`, `citation-clicked`,
   `forum-signal`). Each one runs `authenticate → consentGuard → Zod →

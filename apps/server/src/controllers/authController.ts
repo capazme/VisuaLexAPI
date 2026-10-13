@@ -236,7 +236,7 @@ export const changePassword = async (req: Request, res: Response) => {
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, merltConsenso, merltConsensoStorico] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -266,6 +266,17 @@ export const exportAccountData = async (req: Request, res: Response) => {
       orderBy: [{ dataRevisione: 'asc' }, { id: 'asc' }],
     }),
     prisma.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId }, select: { nuoveAlGiorno: true, materieComunita: true } }),
+    // The MERL-T consent and its history, with the notice version each choice was made under.
+    // What MERL-T itself collected is downloaded from Impostazioni › Dati MERL-T (`GET /api/merlt/data/export`).
+    prisma.merltUserPreference.findUnique({
+      where: { userId },
+      select: { consentLevel: true, createdAt: true, updatedAt: true, informativa: { select: { versione: true } } },
+    }),
+    prisma.merltConsentAudit.findMany({
+      where: { userId },
+      select: { previousLevel: true, nextLevel: true, source: true, reason: true, createdAt: true, informativa: { select: { versione: true } } },
+      orderBy: { createdAt: 'asc' },
+    }),
   ]);
 
   res.json({
@@ -280,6 +291,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
       // The review log (the scheduling state is derived from it and not exported) and the daily goal.
       lingoRipassi, lingoPreferenze,
+      merltConsenso, merltConsensoStorico,
     },
   });
 };

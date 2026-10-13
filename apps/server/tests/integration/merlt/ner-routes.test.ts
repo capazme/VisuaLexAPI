@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import nock from 'nock';
-import { request, app, createTestUser, authHeader, prisma, type TestUser } from '../../helpers';
+import { request, app, createTestUser, authHeader, prisma, type TestUser, merltNoticeId } from '../../helpers';
 import { _resetNerClientForTests } from '../../../src/services/merlt/nerClient';
 
 const TEST_MERLT_BASE = 'http://ner-routes-test.local:8000';
@@ -22,7 +22,7 @@ afterAll(() => {
 });
 
 async function grantFull(user: TestUser): Promise<void> {
-  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full' });
+  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full', noticeId: await merltNoticeId() });
 }
 
 const FEEDBACK_OK = { received: true, feedback_id: 'ner-deadbeef', sample_weight: 1.0 };

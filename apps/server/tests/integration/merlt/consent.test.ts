@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { request, app, createTestUser, authHeader, prisma, type TestUser } from '../../helpers';
+import { request, app, createTestUser, authHeader, prisma, type TestUser, merltNoticeId } from '../../helpers';
 
 describe('MERL-T consent API (MERLT-1.4)', () => {
   let user: TestUser;
@@ -36,7 +36,7 @@ describe('MERL-T consent API (MERLT-1.4)', () => {
       const res = await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'basic' });
+        .send({ level: 'basic', noticeId: await merltNoticeId() });
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
@@ -66,7 +66,7 @@ describe('MERL-T consent API (MERLT-1.4)', () => {
       const res = await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'full', reason: 'training mode opt-in' });
+        .send({ level: 'full', noticeId: await merltNoticeId(), reason: 'training mode opt-in' });
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
@@ -86,12 +86,12 @@ describe('MERL-T consent API (MERLT-1.4)', () => {
       await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'basic' });
+        .send({ level: 'basic', noticeId: await merltNoticeId() });
 
       await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'full' });
+        .send({ level: 'full', noticeId: await merltNoticeId() });
 
       const audits = await prisma.merltConsentAudit.findMany({
         where: { userId: user.id },
@@ -124,7 +124,7 @@ describe('MERL-T consent API (MERLT-1.4)', () => {
     it('rejects unauthenticated requests', async () => {
       const res = await request(app)
         .post('/api/merlt/consent')
-        .send({ level: 'basic' });
+        .send({ level: 'basic', noticeId: await merltNoticeId() });
       expect(res.status).toBe(401);
     });
   });
@@ -135,7 +135,7 @@ describe('MERL-T consent API (MERLT-1.4)', () => {
       await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'full' });
+        .send({ level: 'full', noticeId: await merltNoticeId() });
 
       const res = await request(app)
         .delete('/api/merlt/consent')
@@ -166,7 +166,7 @@ describe('MERL-T consent API (MERLT-1.4)', () => {
       await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'basic' });
+        .send({ level: 'basic', noticeId: await merltNoticeId() });
 
       const res = await request(app)
         .delete('/api/merlt/consent')
@@ -194,13 +194,13 @@ describe('MERL-T consent API (MERLT-1.4)', () => {
       await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'basic' });
+        .send({ level: 'basic', noticeId: await merltNoticeId() });
 
       // 3. POST full
       await request(app)
         .post('/api/merlt/consent')
         .set(authHeader(user))
-        .send({ level: 'full' });
+        .send({ level: 'full', noticeId: await merltNoticeId() });
 
       // 4. DELETE
       await request(app)

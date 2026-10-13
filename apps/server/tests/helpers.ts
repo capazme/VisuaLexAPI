@@ -66,4 +66,14 @@ export async function createSharedEnv(owner: TestUser, overrides: Partial<{ titl
   });
 }
 
+/** The id of the current MERL-T notice: a consent is given under it (`POST /api/merlt/consent`). */
+export async function merltNoticeId(): Promise<string> {
+  const notice = await prisma.lingoTestoVersione.findFirstOrThrow({
+    where: { chiave: 'INFORMATIVA_MERLT' },
+    orderBy: { versione: 'desc' },
+    select: { id: true },
+  });
+  return notice.id;
+}
+
 export { request, app, prisma };

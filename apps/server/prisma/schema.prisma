@@ -113,10 +113,14 @@ model MerltUserPreference {
   contributionEnabled Boolean           @default(false) @map("contribution_enabled")
   validationEnabled   Boolean           @default(false) @map("validation_enabled")
   graphEnabled        Boolean           @default(true) @map("graph_enabled")
+  // The version of the MERL-T notice (`INFORMATIVA_MERLT`) the level was chosen under. A level
+  // given under an older version, or none, collects nothing until the person answers the current one.
+  informativaTestoId  String?           @map("informativa_testo_id")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  informativa LingoTestoVersione? @relation("MerltPreferenceNotice", fields: [informativaTestoId], references: [id], onDelete: Restrict)
 
   @@index([consentLevel])
   @@map("merlt_user_preferences")
@@ -129,12 +133,32 @@ model MerltConsentAudit {
   nextLevel     MerltConsentLevel  @map("next_level")
   source        String             @default("user") @db.VarChar(50)
   reason        String?            @db.VarChar(500)
+  // The notice version the person had before them when they chose; null for rows from before it existed.
+  informativaTestoId String?       @map("informativa_testo_id")
   createdAt     DateTime           @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  informativa LingoTestoVersione? @relation("MerltAuditNotice", fields: [informativaTestoId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt])
   @@map("merlt_consent_audits")
+}
+
+// A person's MERL-T data to erase (an account deleted, or the person asked). No relation to
+// `users`: the account may be gone. The worker (`services/merlt/erasure.ts`) sends it to MERL-T
+// until MERL-T answers that every store is done, then deletes the row, so the id is kept no
+// longer than the erasure takes.
+model MerltErasureRequest {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  reason        String    @db.VarChar(30) // account_deleted | user_request | consent_revoked
+  requestedAt   DateTime  @default(now()) @map("requested_at")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at")
+  lastError     String?   @map("last_error") @db.VarChar(100)
+
+  @@index([nextAttemptAt])
+  @@map("merlt_erasure_requests")
 }
 
 // MERL-T user authority cache (synced from MERL-T backend via HTTP).
@@ -1108,6 +1132,7 @@ model LingoValidazioneCard {
 
 enum LingoTestoChiave {
   PROPOSTA_SCHEDA
+  INFORMATIVA_MERLT
 }
 
 // A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
@@ -1126,6 +1151,8 @@ model LingoTestoVersione {
   autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
   accettazioni LingoAccettazioneTesto[]
   carte        LingoCard[]
+  merltPreferenze MerltUserPreference[] @relation("MerltPreferenceNotice")
+  merltConsensi   MerltConsentAudit[]   @relation("MerltAuditNotice")
 
   @@unique([chiave, versione])
   @@map("lingo_testi_versioni")
