@@ -521,8 +521,9 @@ Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it sha
 MERL-T (`MERLT_INTERNAL_SECRET`, `MERLT_API_KEY`) come from `infra/.env`, not from
 `apps/server/.env`, whose `DATABASE_URL` points at localhost for the development flow;
 `apps/server/.env` keeps the server's own (the JWT secret, the admin seed). The MERL-T
-dead-letter log (`MERLT_DEAD_LETTER_DIR`, default `./logs`) is a volume and the root
-filesystem is read-only.
+dead-letter log (`MERLT_DEAD_LETTER_DIR`, default `./logs`; a file a day, deleted after
+`MERLT_DEAD_LETTER_RETENTION_DAYS`, no personal data: `docs/merlt/claude-notes.md`) is a
+volume and the root filesystem is read-only.
 
 ## Environment Variables
 

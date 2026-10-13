@@ -82,7 +82,8 @@ services:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
     volumes:
-      # The MERL-T dead-letter log (NDJSON, capped at 50 MB): tracking events.
+      # The MERL-T dead-letter log (NDJSON, a file a day, kept 7 days, 50 MB at
+      # most): the failed tracking events' identifiers, no personal data.
       - server_logs:/app/logs
     read_only: true
     tmpfs:
