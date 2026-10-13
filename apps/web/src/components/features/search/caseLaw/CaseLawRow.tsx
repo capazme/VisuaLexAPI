@@ -30,6 +30,10 @@ interface CaseLawRowProps {
   badges?: string[];
   /** A line under the estremi: where the text comes from (a review's provenance). */
   context?: ReactNode;
+  /** A page outside VisuaLex the estremi open (a new tab), when no reader of ours holds the decision. */
+  externalHref?: string;
+  /** Said beside an external link, so the reader knows where it goes («su EUR-Lex»). */
+  externalNote?: string;
   /** Where the decision opens beside (a practice or one of its windows) and the way back. */
   besideId?: string;
   backEntry?: ReadingBackEntry;
@@ -93,7 +97,7 @@ function ClampedText({ children }: { children: ReactNode }) {
  * hits all draw it, so the three read alike. Draws an `<li>`: the caller owns the `<ul>`.
  */
 export function CaseLawRow({
-  decision, label, detail, authority, date, year, whenLabel, source, badges, context, besideId, backEntry, children, footer,
+  decision, label, detail, authority, date, year, whenLabel, source, badges, context, externalHref, externalNote, besideId, backEntry, children, footer,
 }: CaseLawRowProps) {
   const estremi = label ?? (decision ? formatDecisionShort(decision) : undefined);
   const chip = cn('rounded px-2 py-0.5 text-xs font-medium', authorityColor(authority ?? estremi));
@@ -112,6 +116,16 @@ export function CaseLawRow({
           >
             {estremi}
           </DecisionLink>
+        ) : externalHref ? (
+          <a
+            href={externalHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(chip, 'inline-flex items-center gap-1 hover:underline', TOUCH_TARGET_RESPONSIVE)}
+          >
+            {estremi}
+            {externalNote && <span className="font-normal">· {externalNote}</span>}
+          </a>
         ) : (
           <span className={chip}>{estremi}</span>
         ))}

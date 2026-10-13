@@ -5,15 +5,15 @@ import { DECISION_PAGE_SIZE } from '../../../services/decisionSearchService';
 import { searchDecisionsCached } from '../../../utils/decisionSearchCache';
 import { decisionPath, formatDecisionDeposit, formatDecisionShort } from '../../../utils/decisionLinks';
 import { codePointRangesToUtf16 } from '../../../utils/decisionText';
-import { formatDateItalianLong, withPreposition } from '../../../utils/dateUtils';
+import { formatDateItalianLong, todayInRome, withPreposition } from '../../../utils/dateUtils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import type { DecisionArchive, DecisionSearchHit, DecisionSearchQuery, SearchDecisionsAnswer } from '../../../types/decisions';
 import { Button } from '../../ui/Button';
 import { CaseLawRow } from '../search/caseLaw/CaseLawRow';
 import { useCaseLawFilters, useReportCaseLawYears } from '../search/caseLaw/caseLawFiltersContext';
-import { applyCaseLawFilters, isNarrowing } from '../search/caseLaw/caseLawFilter';
-import { rowYear, yearList, type YearRange, type YearsOf } from '../search/caseLaw/caseLawYears';
+import { applyCaseLawFilters } from '../search/caseLaw/caseLawFilter';
+import { archiveYears as clampYears, normalizeRange, rowYear, yearCounts, type YearCount, type YearRange, type YearsOf } from '../search/caseLaw/caseLawYears';
 
 /** The server pages by 20 and stops at the tenth page. */
 const MAX_PAGE = 10;
@@ -28,11 +28,18 @@ interface DecisionResultListProps {
   /** Where the reader stands in the article: the way back from an opened decision. */
   backEntry?: ReadingBackEntry;
   /**
-   * The years to keep, from the section's control by default. Applied here to the hits loaded;
-   * the archive's search takes it later (case-law section plan, PR b), and this is the one place to change.
+   * The deposit years to keep, from the section's control by default. The archive does the filtering
+   * (`anno_dal`/`anno_al`): a new range starts the search again from the first page.
    */
   yearRange?: YearRange;
 }
+
+/** What the archive's counts of years are of: the query, the archive asked and the mode answered. */
+const countsOf = (queryKey: string, archivio: DecisionArchive | undefined, modo: 'indice' | 'testo'): string =>
+  `${queryKey}|${archivio ?? ''}|${modo}`;
+
+const phraseOfYears = (dal: number | undefined, al: number | undefined): string =>
+  dal === undefined ? `fino al ${al}` : al === undefined ? `dal ${dal}` : dal === al ? `nel ${dal}` : `dal ${dal} al ${al}`;
 
 const INDEX_REFUSED = 'L’indice della Cassazione non esprime questo atto';
 
@@ -46,7 +53,10 @@ const problemMessage = (problem: Problem): string => {
     case 'non_supportata':
       return 'La ricerca nelle sentenze non è disponibile per questo atto.';
     case 'richiesta_non_valida':
-      return 'La ricerca non è valida: controllala e riprova.';
+      // the route keeps the years from 1900 to the current one
+      return problem.errori.anno_dal || problem.errori.anno_al
+        ? 'Gli anni indicati non sono validi: vanno dal 1900 all’anno in corso.'
+        : 'La ricerca non è valida: controllala e riprova.';
     case 'errore_interno':
       return 'La ricerca non è riuscita per un errore dell’applicazione.';
     case 'fonte_non_raggiungibile':
@@ -144,10 +154,16 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
     () => (yearRange ? { ...sectionFilters, range: yearRange } : sectionFilters),
     [sectionFilters, yearRange],
   );
+  // the years go to the archive, as it takes them (1900 to this year); a range wholly outside them asks nothing
+  const { dal, al, outside } = clampYears(filters.range, Number(todayInRome().slice(0, 4)));
+  const { from: shownFrom, to: shownTo } = normalizeRange(filters.range);
   const [archivio, setArchivio] = useState<DecisionArchive | undefined>(undefined);
   const [modo, setModo] = useState<'indice' | 'testo'>('indice');
   const [hits, setHits] = useState<DecisionSearchHit[]>([]);
   const [last, setLast] = useState<Page | null>(null);
+  // the archive's counts per year, with what they count: kept while a new range loads so the chips do not
+  // flicker, but not for another archive or mode (a search that failed must not show the last one's counts)
+  const [archiveYears, setArchiveYears] = useState<{ counts: YearCount[]; of: string } | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
   // what the route said about this query, each tied to the query it was learned for:
@@ -171,7 +187,7 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
     setProblem(null);
     const asked = { norma: query.norma, tema: query.tema, archivio };
     const sentModo = hasNorma ? (refusedRef.current ? 'testo' : modo) : undefined;
-    searchDecisionsCached(asked, pagina, sentModo)
+    searchDecisionsCached(asked, pagina, sentModo, dal === undefined && al === undefined ? undefined : { dal, al })
       .catch((error): SearchDecisionsAnswer => {
         console.error('search_decisions: no answer', error);
         return { esito: 'fonte_non_raggiungibile', fonte: 'rete' };
@@ -181,6 +197,10 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
         setLoading(false);
         if (answer.esito === 'risultati') {
           setLast(answer);
+          // in index mode the counts are those of the index, before the citation re-check: approximate
+          setArchiveYears(answer.anni
+            ? { of: countsOf(queryKey, archivio, answer.modo), counts: answer.anni.map(({ anno, n }) => ({ year: anno, n, ...(answer.modo === 'indice' ? { approx: true } : {}) })) }
+            : null);
           // new deposits shift the pages: a decision seen already is not listed twice
           setHits((previous) => {
             if (pagina === 1) return answer.decisioni;
@@ -204,25 +224,31 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
       });
     // query.norma and query.tema are tracked through queryKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, archivio, modo, hasNorma]);
+  }, [queryKey, archivio, modo, hasNorma, dal, al]);
 
-  // a new query, archive or mode starts again from the first page
+  // a new query, archive, mode or range of years starts again from the first page
   useEffect(() => {
     setHits([]);
     setLast(null);
-    load(1);
+    if (!outside) load(1);
     return dropPending;
-  }, [load, dropPending]);
+  }, [load, dropPending, outside]);
 
-  const years = useMemo(() => yearList(hits, yearsOfHit), [hits]);
+  // The chips: the archive's own counts per year when it sent them (all years, whatever the range),
+  // else the years of the hits loaded
+  const countsKey = countsOf(queryKey, archivio, last?.modo ?? modo);
+  const years = useMemo<YearCount[]>(
+    () => (archiveYears && archiveYears.of === countsKey ? archiveYears.counts : yearCounts(hits, yearsOfHit)),
+    [archiveYears, countsKey, hits],
+  );
   useReportCaseLawYears('cassazione', years);
-  // the year range, the text and the order narrow the hits loaded; the archive is asked for no year yet
+  // the text and the order narrow the hits loaded; the years are the archive's
   // The archive pages newest first, so the oldest first is the pages loaded reversed, not the archive's:
   // the order the reader asks for applies once every decision is loaded, and until then the archive's stands.
   const complete = last !== null && last.pagina * DECISION_PAGE_SIZE >= last.totale;
   const orderHeld = filters.order === 'asc' && !complete;
   const shownHits = useMemo(
-    () => applyCaseLawFilters(hits, { yearsOf: yearsOfHit, textOf: textOfHit }, orderHeld ? { ...filters, order: 'desc' } : filters),
+    () => applyCaseLawFilters(hits, { yearsOf: yearsOfHit, textOf: textOfHit }, { ...filters, range: {}, order: orderHeld ? 'desc' : filters.order }),
     [hits, filters, orderHeld],
   );
 
@@ -243,14 +269,31 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
 
   const total = last?.totale ?? 0;
   const since = last?.archivio_dal ? ` (${withPreposition('dal', formatDateItalianLong(last.archivio_dal))})` : '';
+  const ranged = dal !== undefined || al !== undefined;
+  const yearsPhrase = phraseOfYears(dal, al);
   const countLine = last
     ? total === 0
-      ? 'Nessuna decisione negli ultimi cinque anni dell’archivio pubblico della Cassazione.'
-      : `${total.toLocaleString('it-IT', { useGrouping: 'always' } as unknown as Intl.NumberFormatOptions)} ${total === 1 ? 'decisione' : 'decisioni'} nell’archivio pubblico della Cassazione${since}`
+      ? ranged
+        ? `Nessuna decisione ${yearsPhrase} nell’archivio pubblico della Cassazione.`
+        : 'Nessuna decisione negli ultimi cinque anni dell’archivio pubblico della Cassazione.'
+      : `${total.toLocaleString('it-IT', { useGrouping: 'always' } as unknown as Intl.NumberFormatOptions)} ${total === 1 ? 'decisione' : 'decisioni'}${ranged ? ` ${yearsPhrase}` : ''} nell’archivio pubblico della Cassazione${since}`
     : null;
+  // the text filter works on the hits loaded; the years were the archive's
+  const textFiltered = filters.text.trim() !== '';
   // the route may return fewer records than `totale` counts, so the end is the count, not the rows
   const atEnd = last !== null && (last.pagina >= MAX_PAGE || last.pagina * DECISION_PAGE_SIZE >= total);
   const capped = last !== null && last.pagina >= MAX_PAGE && total > MAX_PAGE * DECISION_PAGE_SIZE;
+
+  // no year of the range can be in the archive: the answer is none, and the route is not asked
+  if (outside) {
+    return (
+      <section aria-label="Sentenze" className="space-y-3">
+        <p className="text-sm text-slate-700 dark:text-slate-200">
+          {`Nessuna decisione ${phraseOfYears(shownFrom, shownTo)} nell’archivio pubblico della Cassazione.`}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section aria-label="Sentenze" className="space-y-3">
@@ -288,7 +331,7 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
       )}
 
       {countLine && <p className="text-sm text-slate-700 dark:text-slate-200">{countLine}</p>}
-      {isNarrowing(filters) && hits.length > 0 && (
+      {textFiltered && hits.length > 0 && (
         <p className="text-sm text-slate-700 dark:text-slate-200">
           {shownHits.length === 0
             ? `Nessuna delle ${hits.length} decisioni caricate corrisponde ai filtri.`

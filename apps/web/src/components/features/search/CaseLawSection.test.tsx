@@ -10,6 +10,9 @@ vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/decisionSearchService')>()),
   searchDecisions: vi.fn(),
 }));
+vi.mock('../../../services/euCaseLawService', () => ({
+  searchEuCaseLaw: vi.fn(async () => ({ esito: 'risultati', celex: '', articolo: '', totale: 0, troncato: false, decisioni: [] })),
+}));
 vi.mock('../../../plugins/PluginSlot', () => ({
   PluginSlot: ({ slot, props }: { slot: string; props: Record<string, unknown> }) => {
     slotCalls.push({ slot, props });
@@ -114,6 +117,25 @@ describe('CaseLawSection', () => {
       window.sessionStorage.clear();
     }
     expect(searchMock).not.toHaveBeenCalled();
+  });
+
+  it('gives an act of the Union the Court of Justice\'s block, asked for when the section opens and not before', async () => {
+    const { searchEuCaseLaw } = await import('../../../services/euCaseLawService');
+    const eu = vi.mocked(searchEuCaseLaw);
+    eu.mockClear();
+    show({ norma: { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6' } });
+    expect(eu).not.toHaveBeenCalled();
+    await userEvent.click(toggle());
+    expect(screen.getByRole('heading', { name: 'Corte di giustizia UE — citano l’articolo' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeNull();
+    expect(await screen.findByText('Nessuna decisione indicizzata cita questo articolo.')).toBeInTheDocument();
+    expect(eu).toHaveBeenCalledExactlyOnceWith({ celex: '32016R0679', articolo: '6' });
+  });
+
+  it('gives no Court of Justice block to a national act', async () => {
+    show();
+    await userEvent.click(toggle());
+    expect(screen.queryByRole('heading', { name: /Corte di giustizia UE/ })).toBeNull();
   });
 
   it('says so when Brocardi gave no massime for the text in force', async () => {

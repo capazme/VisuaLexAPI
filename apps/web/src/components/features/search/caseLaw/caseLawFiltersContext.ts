@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect } from 'react';
 import { NO_FILTERS, type CaseLawFilters } from './caseLawFilter';
+import type { YearCount } from './caseLawYears';
 
 export interface CaseLawFiltersValue {
   filters: CaseLawFilters;
-  /** A source tells the section the years of the rows it has loaded (`null`: it has none now). */
-  reportYears: (source: string, years: number[] | null) => void;
+  /** A source tells the section its years with how many rows each has (`null`: it has none now). */
+  reportYears: (source: string, counts: YearCount[] | null) => void;
 }
 
 const noop = () => {};
@@ -21,13 +22,14 @@ export function useCaseLawFilters(): CaseLawFilters {
 }
 
 /**
- * Report the years of the rows a block has loaded, for the section's chips. `years` must keep its
- * identity until the rows change (memoise it): the report is repeated whenever it changes.
+ * Report the years of a block, with how many rows each has, for the section's chips: those of the
+ * rows loaded, or the source's own counts. `counts` must keep its identity until the rows change
+ * (memoise it): the report is repeated whenever it changes.
  */
-export function useReportCaseLawYears(source: string, years: number[]): void {
+export function useReportCaseLawYears(source: string, counts: YearCount[]): void {
   const { reportYears } = useContext(CaseLawFiltersContext);
   useEffect(() => {
-    reportYears(source, years);
+    reportYears(source, counts);
     return () => reportYears(source, null);
-  }, [reportYears, source, years]);
+  }, [reportYears, source, counts]);
 }

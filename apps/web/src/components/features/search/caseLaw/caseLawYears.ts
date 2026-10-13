@@ -24,6 +24,8 @@ export type YearOrder = 'desc' | 'asc';
 export interface YearCount {
   year: number;
   n: number;
+  /** The source's own count, not the loaded rows', and not exact (the Cassazione's index, before its re-check). */
+  approx?: boolean;
 }
 
 /** How a source reads one of its rows. */
@@ -55,6 +57,24 @@ export function normalizeRange({ from, to }: YearRange): YearRange {
   return from !== undefined && to !== undefined && from > to ? { from: to, to: from } : { from, to };
 }
 
+/** The years the Cassazione's archive takes: 1900 to the current year (in Rome), as `/search_decisions` validates them. */
+export const ARCHIVE_FIRST_YEAR = 1900;
+
+/**
+ * A range as the archive takes it: the wrong way round read the right way round, `dal` raised to 1900 and
+ * `al` lowered to `currentYear`. `outside` when no year of the range is one the archive can hold («dal 2030»,
+ * «al 1850»): the answer is none, and no request is worth sending.
+ */
+export function archiveYears(range: YearRange, currentYear: number): { dal?: number; al?: number; outside: boolean } {
+  const { from, to } = normalizeRange(range);
+  if ((from !== undefined && from > currentYear) || (to !== undefined && to < ARCHIVE_FIRST_YEAR)) return { outside: true };
+  return {
+    dal: from === undefined ? undefined : Math.max(from, ARCHIVE_FIRST_YEAR),
+    al: to === undefined ? undefined : Math.min(to, currentYear),
+    outside: false,
+  };
+}
+
 export function inRange(years: readonly RowYear[], range: YearRange): boolean {
   if (!isRangeSet(range)) return true;
   const { from, to } = normalizeRange(range);
@@ -77,6 +97,21 @@ export function countByYear(years: readonly number[], order: YearOrder = 'desc')
   return [...counts.entries()]
     .map(([year, n]) => ({ year, n }))
     .sort((a, b) => (order === 'desc' ? b.year - a.year : a.year - b.year));
+}
+
+/** The years of the rows a source has loaded, counted: what it reports when it has no counts of its own. */
+export function yearCounts<T>(rows: readonly T[], yearsOf: YearsOf<T>): YearCount[] {
+  return countByYear(yearList(rows, yearsOf));
+}
+
+/** The counts of every block together, a year once, in the order asked. A year is approximate when any block says so. */
+export function mergeYearCounts(blocks: readonly (readonly YearCount[])[], order: YearOrder = 'desc'): YearCount[] {
+  const merged = new Map<number, YearCount>();
+  for (const { year, n, approx } of blocks.flat()) {
+    const held = merged.get(year);
+    merged.set(year, { year, n: (held?.n ?? 0) + n, ...(approx || held?.approx ? { approx: true } : {}) });
+  }
+  return [...merged.values()].sort((a, b) => (order === 'desc' ? b.year - a.year : a.year - b.year));
 }
 
 /**

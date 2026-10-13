@@ -8,6 +8,7 @@ vi.mock('../../../services/decisionSearchService');
 import { searchDecisions } from '../../../services/decisionSearchService';
 import { DecisionResultList } from './DecisionResultList';
 import { clearDecisionSearchCache } from '../../../utils/decisionSearchCache';
+import { todayInRome } from '../../../utils/dateUtils';
 import { CaseLawFiltersContext } from '../search/caseLaw/caseLawFiltersContext';
 import { NO_FILTERS } from '../search/caseLaw/caseLawFilter';
 
@@ -262,19 +263,138 @@ describe('DecisionResultList', () => {
 describe('DecisionResultList — the section’s year control', () => {
   const OLD: DecisionSearchHit = { ...HIT, identita: { ...HIT.identita, numero: 500, anno: 2019 }, attributi: { data_deposito: '2019-02-02' } };
 
-  it('keeps the hits loaded whose deposit year is in the range, and says how many', async () => {
-    mockSearch({ ...PAGE, totale: 2, decisioni: [HIT, OLD] });
+  it('asks the archive for the years, and lists what it answers', async () => {
+    mockSearch({ ...PAGE, totale: 1, decisioni: [OLD] });
     render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2019, to: 2019 }} /></Wrapper>);
     expect(await screen.findByRole('link', { name: /n\. 500\/2019/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /n\. 24908\/2026/ })).toBeNull();
-    expect(screen.getByText('1 di 2 decisioni caricate')).toBeInTheDocument();
+    expect(searchMock).toHaveBeenCalledWith(expect.anything(), 1, 'indice', { dal: 2019, al: 2019 });
+    expect(screen.getByText('1 decisione nel 2019 nell’archivio pubblico della Cassazione (dal 4 gennaio 2021)')).toBeInTheDocument();
   });
 
-  it('says when none of the hits loaded is in the range, and still offers the next page', async () => {
+  it('asks without a range as it always did, and with one bound alone for an open range', async () => {
+    mockSearch(PAGE);
+    const { unmount } = render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+    expect(searchMock).toHaveBeenCalledWith(expect.anything(), 1, 'indice');
+    unmount();
+    mockSearch(PAGE);
+    render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2022 }} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+    expect(searchMock).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 2022, al: undefined });
+    expect(screen.getByText(/1 decisione dal 2022 nell’archivio/)).toBeInTheDocument();
+  });
+
+  it('reads a range typed the wrong way round the right way round', async () => {
+    mockSearch(PAGE);
+    render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2026, to: 2022 }} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+    expect(searchMock).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 2022, al: 2026 });
+  });
+
+  it('starts again from the first page when the range changes, and drops the pages of the old one', async () => {
     mockSearch({ ...PAGE, totale: 40, decisioni: [HIT] });
-    render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2010, to: 2012 }} /></Wrapper>);
-    expect(await screen.findByText('Nessuna delle 1 decisioni caricate corrisponde ai filtri.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Altri risultati' })).toBeInTheDocument();
+    mockSearch({ ...PAGE, totale: 1, decisioni: [OLD] });
+    const view = render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+    view.rerender(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2019, to: 2019 }} /></Wrapper>);
+    await screen.findByRole('link', { name: /n\. 500\/2019/ });
+    expect(screen.queryByRole('link', { name: /n\. 24908\/2026/ })).toBeNull();
+    expect(searchMock).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 2019, al: 2019 });
+    expect(searchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('says so when no decision falls in the years, and when the route refuses them', async () => {
+    mockSearch({ ...PAGE, totale: 0, decisioni: [] });
+    const first = render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2022, to: 2023 }} /></Wrapper>);
+    expect(await screen.findByText('Nessuna decisione dal 2022 al 2023 nell’archivio pubblico della Cassazione.')).toBeInTheDocument();
+    first.unmount();
+    mockSearch({ esito: 'richiesta_non_valida', errori: { anno_dal: 'Atteso un anno da 1900 a 2026' } });
+    render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 1850 }} /></Wrapper>);
+    expect(await screen.findByText('Gli anni indicati non sono validi: vanno dal 1900 all’anno in corso.')).toBeInTheDocument();
+  });
+
+  describe('the years the archive can hold', () => {
+    const thisYear = Number(todayInRome().slice(0, 4));
+
+    it('lowers «al» to the current year and raises «dal» to 1900 before asking', async () => {
+      mockSearch(PAGE);
+      render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 1850, to: thisYear + 1 }} /></Wrapper>);
+      await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+      expect(searchMock).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 1900, al: thisYear });
+    });
+
+    it('answers «none» without asking when the range is wholly outside them, and asks again when it comes back', async () => {
+      const view = render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: thisYear + 4 }} /></Wrapper>);
+      expect(await screen.findByText(`Nessuna decisione dal ${thisYear + 4} nell’archivio pubblico della Cassazione.`)).toBeInTheDocument();
+      expect(searchMock).not.toHaveBeenCalled();
+      expect(screen.queryByRole('status')).toBeNull();
+      mockSearch(PAGE);
+      view.rerender(<Wrapper><DecisionResultList query={QUERY} yearRange={{ from: 2026, to: 2026 }} /></Wrapper>);
+      await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+      expect(searchMock).toHaveBeenCalledTimes(1);
+      expect(searchMock).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 2026, al: 2026 });
+    });
+
+    it('says none for a range that ends before 1900, without asking', async () => {
+      render(<Wrapper><DecisionResultList query={QUERY} yearRange={{ to: 1850 }} /></Wrapper>);
+      expect(await screen.findByText('Nessuna decisione fino al 1850 nell’archivio pubblico della Cassazione.')).toBeInTheDocument();
+      expect(searchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the chips', () => {
+    const report = vi.fn();
+    const wrap = (children: React.ReactNode) => (
+      <CaseLawFiltersContext.Provider value={{ filters: NO_FILTERS, reportYears: report }}><Wrapper>{children}</Wrapper></CaseLawFiltersContext.Provider>
+    );
+    const lastReport = () => report.mock.calls.filter(([, counts]) => counts !== null).at(-1)?.[1];
+    beforeEach(() => report.mockReset());
+
+    it('take the archive\'s counts for every year, approximate in index mode', async () => {
+      mockSearch({ ...PAGE, totale: 40, anni: [{ anno: 2026, n: 30 }, { anno: 2019, n: 10 }], decisioni: [HIT] });
+      render(wrap(<DecisionResultList query={QUERY} />));
+      await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+      expect(lastReport()).toEqual([{ year: 2026, n: 30, approx: true }, { year: 2019, n: 10, approx: true }]);
+      expect(report).toHaveBeenCalledWith('cassazione', expect.anything());
+    });
+
+    it('are not the last search\'s when the next one, for another mode, fails', async () => {
+      mockSearch({ ...PAGE, totale: 40, anni: [{ anno: 2026, n: 30 }, { anno: 2019, n: 10 }], decisioni: [HIT] });
+      mockSearch({ esito: 'fonte_non_raggiungibile', fonte: 'cassazione' });
+      render(wrap(<DecisionResultList query={QUERY} />));
+      await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+      expect(lastReport()).toEqual([{ year: 2026, n: 30, approx: true }, { year: 2019, n: 10, approx: true }]);
+      await userEvent.click(screen.getByRole('button', { name: 'Nel testo' }));
+      await screen.findByText('L’archivio della Cassazione non risponde in questo momento.');
+      expect(lastReport()).toEqual([]);
+    });
+
+    it('stay while only the range changes, so they do not flicker', async () => {
+      mockSearch({ ...PAGE, totale: 40, anni: [{ anno: 2026, n: 30 }], decisioni: [HIT] });
+      let release: (answer: SearchDecisionsAnswer) => void = () => {};
+      searchMock.mockImplementationOnce(() => new Promise<SearchDecisionsAnswer>((resolve) => { release = resolve; }));
+      const view = render(wrap(<DecisionResultList query={QUERY} />));
+      await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+      view.rerender(wrap(<DecisionResultList query={QUERY} yearRange={{ from: 2026, to: 2026 }} />));
+      await screen.findByRole('status');
+      expect(lastReport()).toEqual([{ year: 2026, n: 30, approx: true }]);
+      release({ ...PAGE, totale: 1, anni: [{ anno: 2026, n: 30 }], decisioni: [HIT] });
+      await screen.findByRole('link', { name: /n\. 24908\/2026/ });
+    });
+
+    it('are exact when the text was searched', async () => {
+      mockSearch({ ...PAGE_TEXT, anni: [{ anno: 2026, n: 312 }] });
+      render(wrap(<DecisionResultList query={QUERY} />));
+      await screen.findByText('menzionato nel testo');
+      expect(lastReport()).toEqual([{ year: 2026, n: 312 }]);
+    });
+
+    it('count the hits loaded when the archive sent no counts', async () => {
+      mockSearch({ ...PAGE, totale: 2, decisioni: [HIT, OLD] });
+      render(wrap(<DecisionResultList query={QUERY} />));
+      await screen.findByRole('link', { name: /n\. 500\/2019/ });
+      expect(lastReport()).toEqual([{ year: 2026, n: 1 }, { year: 2019, n: 1 }]);
+    });
   });
 
   it('lists the hits newest first by deposit, whatever the order of the page', async () => {

@@ -64,7 +64,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
-  article or a topic, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
+  article or a topic, `EuCaseLawBlock`, the Union's courts' decisions that cite an article of a regulation or a directive, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
   (a link to `/` that also opens the palette; its hover label carries ⌘K; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Cronologia, Ambienti,
@@ -242,12 +242,35 @@ years «dal / al», a chip per year with the count of the rows loaded, the order
 and one text filter; on a phone they sit behind «Filtri». The blocks do not own a filter and no block
 scrolls inside itself. The controls reach them through `CaseLawFiltersContext` (`useCaseLawFilters`;
 the Massimario's panel is a plugin whose slot props are a contract, so it reads the same context) and
-each block reports the years it has loaded back with `useReportCaseLawYears` — memoise that array. What
-a row answers to is the source's to say (`YearsOf`: Brocardi's `anno`, a hit's deposit date else its
-number's year, a passage's cited decisions' years — the review's year is its provenance); a row with
-no year is kept only while no range is set. The year range and the text filter narrow what is *loaded*:
-the Cassazione's block applies the range to its hits in one place (`DecisionResultList`'s `yearRange`),
-where the archive's own year filter will go. Filters reset with the article.
+each block reports its years back with `useReportCaseLawYears(source, counts)` — `YearCount[]`, memoised;
+the section adds them up into the chips (`mergeYearCounts`; a year is «circa» when any block's count is
+approximate). What a row answers to is the source's to say (`YearsOf`: Brocardi's `anno`, a passage's
+cited decisions' years — the review's year is its provenance, a Court of Justice decision's day); a row
+with no year is kept only while no range is set. The year range and the text filter narrow what is
+*loaded* — except for the Cassazione: its block sends the range to the archive (`anno_dal`/`anno_al`,
+`DecisionResultList`'s `yearRange`; a new range starts the search again from page one, nothing is asked
+before the reader presses the button) and reports the archive's own `anni` counts for every year — approximate
+(«circa») in index mode, which counts before the citation re-check, exact in the text search — or, when the
+archive sent none, the years of the hits loaded (the counts are kept for the query, archive and mode they
+count, not for the next one if that fails; the range is clamped to 1900 – this year in Rome, and a range wholly outside
+that answers «none» without a request). On the Cassazione the reversed order applies once every
+decision is loaded; until then the archive's order (newest first) stands and a line says so. Filters reset
+with the article.
+**An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
+regulation or a directive: `utils/euCaseLaw.ts` derives the act's CELEX from the norm
+(`3` + the year + `R`/`L` + the number on four digits, as the API's `sources.eu_identity` does — the norm
+carries none; a pair written in `numero_atto` is not guessed at) and the plain-number article; a Treaty, or an article that is not a plain number, has no query
+and the block says the list is for regulations and directives (for a regulation or a directive whose article is not
+a plain number, that it is searched by simple numbers). It asks `/search_eu_case_law`
+(`services/euCaseLawService.ts`, `legalFetch`) when it appears, once per act and article for the session
+(`utils/euCaseLawCache.ts`, cleared at logout; only an answer is kept, so «Riprova» asks again). A row is
+`CaseLawRow`: a judgment is a `DecisionLink` from its `identita` (our reader, beside, the way back, the phone's
+full screen); an order or an Advocate General's opinion, which that reader does not hold, is a link to EUR-Lex by
+its CELEX (`eurLexDecisionUrl`, new tab, «su EUR-Lex»; no link from a CELEX that is not a decision's). The
+opinions («Conclusioni AG») are hidden, and out of the counts, until the toggle; the block says the list may be
+incomplete with a link to InfoCuria's search page (its search by cited provision has no address to rely on),
+credits «EUR-Lex / Ufficio delle pubblicazioni dell'UE», and holds the archive's order when the query stopped at
+its 500 rows.
 A topic opens a topic-search window of the practice (`openTopicSearch`; `ReadingWindow` draws
 `DecisionSearchTabView`: heading «Tema: …», the article when the query has one, «Solo il tema» to
 drop it, the limits line, the list; a decision opened from it sits beside that window, with no way
@@ -751,7 +774,7 @@ Duplicating any of these is a defect, not a shortcut.
   `FindInTextButton`): add a toggle with it, not with a copy of the classes.
 - `components/features/search/caseLaw/` — case law under an article: `CaseLawRow` (the one row),
   `caseLawYears.ts` (a row's years, the counts, the range, the order — pure), `caseLawFilter.ts` (the text
-  filter, folded as the find window folds: `findMatches`), `authorityColor`, `CaseLawFiltersContext`. A new
+  filter, folded as the find window folds: `findMatches`), `authorityColor`, `caseLawFiltersContext`. A new
   source of case law draws `CaseLawRow` and reads `useCaseLawFilters`, it does not bring its own filter.
 - `utils/actUrn.ts` — `resolveAct(params)`: an act's URN and identity with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
