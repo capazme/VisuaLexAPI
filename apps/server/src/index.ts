@@ -2,6 +2,7 @@ import { config } from './config';
 import app from './app';
 import { prisma } from './lib/prisma';
 import { startNormaWatcher } from './utils/normaWatcher';
+import { startMerltErasureWorker } from './services/merlt/userData';
 import {
   scheduleStuckJobSweeper,
   DEFAULT_EXTRACT_STALE_AFTER_MS,
@@ -41,6 +42,9 @@ if (config.nodeEnv !== 'test') {
 }
 
 let normaWatcherInterval: NodeJS.Timeout | null = null;
+// Erasures MERL-T has not confirmed yet are retried (services/merlt/userData.ts).
+const merltErasureWorker: NodeJS.Timeout | null =
+  config.nodeEnv !== 'test' ? startMerltErasureWorker() : null;
 
 const server = app.listen(config.port, () => {
   normaWatcherInterval = startNormaWatcher();
@@ -80,6 +84,7 @@ function shutdown(signal: NodeJS.Signals): void {
   console.log(`[shutdown] received ${signal}, closing server...`);
   if (watchdogInterval) clearInterval(watchdogInterval);
   if (normaWatcherInterval) clearInterval(normaWatcherInterval);
+  if (merltErasureWorker) clearInterval(merltErasureWorker);
   server.close(() => {
     prisma
       .$disconnect()

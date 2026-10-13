@@ -6,6 +6,7 @@ import { authenticate } from '../../middleware/auth';
 import { internalAuth } from '../../middleware/internalAuth';
 import { consentGuard } from '../../services/merlt/consentGuard';
 import { contributionGuard } from '../../services/merlt/contributionGuard';
+import { effectiveConsent } from '../../services/merlt/effectiveConsent';
 import {
   expertQueryRequestSchema,
   expertQueryAsyncRequestSchema,
@@ -260,10 +261,7 @@ router.post('/experts/query', authenticate, consentGuard, async (req: Request, r
     res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
     return;
   }
-  const pref = await prisma.merltUserPreference.findUnique({
-    where: { userId: req.user.id },
-    select: { consentLevel: true },
-  });
+  const pref = await effectiveConsent(req.user.id);
   // The context basket → MERL-T `context.entities`, the channel the orchestrator
   // actually consumes (norm_references seed graph exploration + the expert prompt;
   // legal_concepts feed the prompt). `mode` and the legacy `context_urn` ride in
@@ -306,10 +304,7 @@ router.post('/experts/query/async', authenticate, consentGuard, async (req: Requ
     res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
     return;
   }
-  const pref = await prisma.merltUserPreference.findUnique({
-    where: { userId: req.user.id },
-    select: { consentLevel: true },
-  });
+  const pref = await effectiveConsent(req.user.id);
   const job = await prisma.merltQaJob.create({
     data: {
       userId: req.user.id,
@@ -423,10 +418,7 @@ router.get('/experts/trace/:traceId', authenticate, consentGuard, async (req: Re
   }
   // Redaction follows the CURRENT consent level (a downgrade after the ask
   // must redact), mirroring the /query consent mapping.
-  const pref = await prisma.merltUserPreference.findUnique({
-    where: { userId: req.user.id },
-    select: { consentLevel: true },
-  });
+  const pref = await effectiveConsent(req.user.id);
   try {
     let trace: Record<string, unknown> | null;
     try {

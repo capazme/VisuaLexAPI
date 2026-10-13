@@ -407,7 +407,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   saves a new one numbered above the highest (two at once: the unique index refuses the second,
   409). A version is never updated or deleted: acceptances and cards point at it with
   `RESTRICT`. Version 1 of each key is written by the migration that creates the key
-  (`20261019100000_lingo_validation` for `PROPOSTA_SCHEDA`). `GET /auth/me` and the login answer
+  (`20261019100000_lingo_validation` for `PROPOSTA_SCHEDA`, `20261021100001_merlt_privacy_notice` for
+  `INFORMATIVA_MERLT`, the MERL-T notice: a key added to the enum cannot be used in the transaction
+  that added it, hence the second migration). The MERL-T notice is accepted through the consent
+  route, not `LingoAccettazioneTesto`: a person answers it with a level. `GET /auth/me` and the login answer
   carry `lingo_validatore`.
 - **Card review** (`routes/lingoSrs.ts`, `/api/lingo/srs`, session only — not in the
   delegated table, so every path is a 403 for an exchanged token; Studia spec decisions
@@ -476,10 +479,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   one shape (`toMeResponse`) carrying `dev_mode_allowed` and `dev_mode`;
   `tests/devMode.test.ts`.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
-  tokens) and `DELETE /auth/account` (password re-checked; every relation to
+  tokens; the MERL-T consent and its history as `data.merltConsenso` and
+  `data.merltConsensoStorico`, with the notice version of each choice) and
+  `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades, except the community's study cards, which stay without an
   author, and the validators' votes and the text versions an administrator wrote,
-  which stay anonymous: see LingoLex cards). Reached from the Settings modal. The export's
+  which stay anonymous: see LingoLex cards). A person who ever gave MERL-T a
+  consent also gets an erasure request in MERL-T, written in the deletion's
+  transaction and retried until MERL-T confirms (`services/merlt/userData.ts`,
+  `docs/merlt/claude-notes.md`). Reached from the Settings modal. The export's
   history rows include `decisionKey` (raw Prisma fields, as the rest of the export); its
   discussion threads keep a release's time but not the releasing admin's id.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health

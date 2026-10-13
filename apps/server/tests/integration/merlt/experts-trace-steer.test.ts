@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import nock from 'nock';
-import { request, app, createTestUser, authHeader, prisma, type TestUser } from '../../helpers';
+import { request, app, createTestUser, authHeader, prisma, type TestUser, merltNoticeId } from '../../helpers';
 import { _resetExpertsClientForTests } from '../../../src/services/merlt/expertsClient';
 import { _resetSteerDedupeForTests } from '../../../src/routes/merlt/experts';
 
@@ -29,11 +29,11 @@ afterAll(() => {
 });
 
 async function grantFull(user: TestUser): Promise<void> {
-  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full' });
+  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full', noticeId: await merltNoticeId() });
 }
 
 async function grantBasic(user: TestUser): Promise<void> {
-  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'basic' });
+  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'basic', noticeId: await merltNoticeId() });
 }
 
 const TRACE_OK = {

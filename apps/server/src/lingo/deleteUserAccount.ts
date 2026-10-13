@@ -1,5 +1,6 @@
 import type { LingoCardStato } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { attemptMerltErasureNow, everConsented, requestMerltErasure } from '../services/merlt/userData';
 
 /**
  * The states in which a card belongs to its author alone. A draft was never
@@ -17,11 +18,21 @@ export const PERSONAL_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'ARCHIVIATA
  * and the administrator's); deleting the user row by hand would leave their
  * drafts behind, anonymous and of no use to anyone.
  *
+ * MERL-T keeps its own copy of what a consenting person did there: when the person ever gave
+ * MERL-T a consent, the same transaction records an erasure request, which outlives the user
+ * row and is sent to MERL-T until it confirms (`services/merlt/userData.ts`). One attempt is
+ * made at once, briefly; the worker does the rest.
+ *
  * Rejects like `prisma.user.delete` when the user does not exist (P2025, a 404
  * for the error handler), rolling the card deletion back with it.
  */
 export async function deleteUserAccount(userId: string): Promise<void> {
+  let merltErasure = false;
   await prisma.$transaction(async (tx) => {
+    if (await everConsented(tx, userId)) {
+      await requestMerltErasure(tx, userId, 'account_deleted');
+      merltErasure = true;
+    }
     // The person's cards are locked first: a validator's vote in flight finishes before the
     // states are read, so a card it has just archived goes with the account instead of
     // staying archived with no author, where nobody could see or delete it.
@@ -29,4 +40,5 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     await tx.lingoCard.deleteMany({ where: { autoreId: userId, stato: { in: PERSONAL_STATES } } });
     await tx.user.delete({ where: { id: userId } });
   });
+  if (merltErasure) await attemptMerltErasureNow(userId);
 }

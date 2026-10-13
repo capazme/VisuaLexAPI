@@ -59,9 +59,9 @@ describe('the administrator’s texts', () => {
     await save(admin, NEW_VERSION);
     const response = await list(admin);
     expect(response.status).toBe(200);
-    expect(response.body.testi).toHaveLength(1);
-    const { chiave, versioni } = response.body.testi[0];
-    expect(chiave).toBe('PROPOSTA_SCHEDA');
+    // Every key, each with its versions: the card proposal's and the MERL-T notice.
+    expect(response.body.testi.map((t: { chiave: string }) => t.chiave).sort()).toEqual(['INFORMATIVA_MERLT', 'PROPOSTA_SCHEDA']);
+    const { versioni } = response.body.testi.find((t: { chiave: string }) => t.chiave === 'PROPOSTA_SCHEDA');
     expect(versioni.map((v: { versione: number }) => v.versione)).toEqual([2, 1]);
     expect(versioni[0]).toMatchObject({ ...NEW_VERSION, autore: 'tx-admin' });
     expect(versioni[0]).toHaveProperty('createdAt');
@@ -113,7 +113,7 @@ describe('the administrator’s texts', () => {
   it('answers 403 to a non-admin on both routes, and writes nothing', async () => {
     expect((await list(alice)).status).toBe(403);
     expect((await save(alice, NEW_VERSION)).status).toBe(403);
-    expect(await prisma.lingoTestoVersione.count()).toBe(1);
+    expect(await prisma.lingoTestoVersione.count({ where: { versione: { gt: 1 } } })).toBe(0);
   });
 
   it('answers 404 for an unknown key and 400 for a bad body', async () => {
@@ -147,6 +147,6 @@ describe('the administrator’s texts', () => {
     expect((await request(app).get('/api/lingo/testi/PROPOSTA_SCHEDA').set(token)).status).toBe(403);
     expect((await request(app).get('/api/admin/studia/testi').set(token)).status).toBe(403);
     expect((await request(app).post('/api/admin/studia/testi/PROPOSTA_SCHEDA').set(token).send(NEW_VERSION)).status).toBe(403);
-    expect(await prisma.lingoTestoVersione.count()).toBe(1);
+    expect(await prisma.lingoTestoVersione.count({ where: { versione: { gt: 1 } } })).toBe(0);
   });
 });
