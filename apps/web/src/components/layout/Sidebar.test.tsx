@@ -99,7 +99,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar();
     openUserMenu();
     const entries = screen.getAllByRole('menuitem');
-    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', "Collega un'app AI", 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
     for (const entry of entries) expect(entry).toHaveAccessibleName();
   });
 
@@ -155,11 +155,11 @@ describe('Sidebar — the development mode (spec D1–D3)', () => {
 });
 
 describe('Sidebar — the user menu (spec D2)', () => {
-  it('holds Impostazioni, the theme, Scorciatoie and Esci; «Pannello Admin» only for an admin', () => {
+  it("holds Impostazioni, «Collega un'app AI», the theme, Scorciatoie and Esci; «Pannello Admin» only for an admin", () => {
     renderSidebar();
     openUserMenu();
     expect(screen.getByRole('menu', { name: 'Menu utente' })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', "Collega un'app AI", 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
     expect(screen.queryByRole('menuitem', { name: /Pannello Admin/ })).toBeNull();
   });
 
@@ -187,6 +187,15 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menuitem', { name: /Impostazioni/ })).toBeNull();
   });
 
+  it("opens «Collega un'app AI» and closes the menu (and the phone's menu)", () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /Collega un'app AI/ }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/collega-app');
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
   it('opens the shortcuts', () => {
     renderSidebar();
     openUserMenu();
@@ -212,7 +221,7 @@ describe('Sidebar — the user menu by keyboard', () => {
     fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
-    expect(screen.getByRole('menuitem', { name: /Tema scuro/ })).toHaveFocus();
+    expect(screen.getByRole('menuitem', { name: /Collega un'app AI/ })).toHaveFocus();
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowUp' });
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
     // Enter on a focused button is its click.

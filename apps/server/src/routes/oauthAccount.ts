@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
-import { DELETE_SCOPE, oauthConfig } from '../oauth/config';
-import { decideAuthorizationRequest, readAuthorizationRequest } from '../oauth/consent';
+import { DELETE_SCOPE, SCOPES, oauthConfig } from '../oauth/config';
+import { SCOPE_LABELS, decideAuthorizationRequest, readAuthorizationRequest } from '../oauth/consent';
 import { revokeGrant } from '../oauth/tokens';
 import { delegatedQuotaStatus } from '../middleware/delegated';
 
@@ -71,6 +71,28 @@ router.delete('/grants/:id', async (req, res) => {
   if (!grant) throw new AppError(404, 'Applicazione collegata non trovata.');
   await revokeGrant(grant.id);
   res.status(204).end();
+});
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * The MCP server's address as a client is given it, or null when this server has none to give: in
+ * production a loopback resource is the compose default of a stack started without MCP_PUBLIC_URL,
+ * whose MCP module is not running. Read at each call, so tests can switch NODE_ENV.
+ */
+function publicMcpUrl(): string | null {
+  const host = new URL(oauthConfig.resource).hostname;
+  return process.env.NODE_ENV === 'production' && LOOPBACK_HOSTS.has(host) ? null : oauthConfig.resource;
+}
+
+// What the «Collega un'app AI» page shows: the MCP server's address a client is given, and what each
+// scope lets an application do, worded as the consent page words it. User session only: this route is
+// outside the delegated table, so an exchanged token gets a 403.
+router.get('/connection', (_req, res) => {
+  res.json({
+    mcpUrl: publicMcpUrl(),
+    scopes: SCOPES.map((scope) => ({ scope, label: SCOPE_LABELS[scope] ?? scope })),
+  });
 });
 
 // What is left of the day's allowance for connected applications. Reachable by

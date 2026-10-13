@@ -31,7 +31,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
   (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
-  `/history`, `/environments`, `/forum`, `/documents`, then `/sentenze` and
+  `/history`, `/environments`, `/forum`, `/documents`, `/collega-app` («Collega un'app AI»,
+  `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
+  «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
+  the clients our server refuses listed apart and why —, what a connected app can do, and
+  `ConnectedAppsSection`, the same list Impostazioni shows; reached from the user menu), then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open in a practice; `/sentenze` alone and an
   address that does not parse both open the palette, and only the address that does not parse
@@ -65,7 +69,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a link to `/` that also opens the palette; its hover label carries ⌘K; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Cronologia, Ambienti,
   Forum, «Analizza documento»; and at the bottom only the user menu, whose dropdown holds Impostazioni,
-  the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
+  «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
   menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
   backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
