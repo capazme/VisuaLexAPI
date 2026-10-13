@@ -93,7 +93,8 @@ route. The frontend copy is only a cache.
     - anchored notes: the note text and the selected text;
     - bookmark and dossier additions: URN and dossier id;
     - citation clicks: the citation text;
-    - forum signals: shared-environment id and author ids.
+    - forum signals: the shared environment's id (never its author's, since
+      October 2026).
   - Q&A questions (sync, async and follow-ups), with the user id. MERL-T
     stores every question verbatim in `qa_traces`; the consent level only
     redacts it when a trace is read back. MERL-T sends each question to
