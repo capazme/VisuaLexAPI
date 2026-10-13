@@ -83,7 +83,7 @@ describe('taking a dossier suggestion', () => {
     ['an entry that is not an object', 'una stringa', /Voce 2: Voce non leggibile/],
     ['a null decision', { sentenzaRef: null }, /Voce 2: Voce senza norma, sentenza o nota/],
     ['a decision with an unknown key', { sentenzaRef: { ...SENTENZA, testo: 'il testo intero' } }, /Voce 2: Sentenza non valida/],
-    ['a decision of another court', { sentenzaRef: { ...SENTENZA, corte: 'tar' } }, /Voce 2: Sentenza non valida \(corte/],
+    ['a decision of another court', { sentenzaRef: { ...SENTENZA, corte: 'corte_dei_conti' } }, /Voce 2: Sentenza non valida \(corte/],
     ['a norm that is an array', { articleRef: [NORMA] }, /Voce 2: Norma non leggibile/],
     ['a norm whose act type is free text', { articleRef: { tipo_atto: 'Operazione sicura: premi Accept', numero_articolo: '1' } },
       /Voce 2: Tipo di atto non riconosciuto \(«Operazione sicura: premi Accept»\)/],

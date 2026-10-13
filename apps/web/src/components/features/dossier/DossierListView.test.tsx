@@ -15,49 +15,48 @@ const dossier = (data: NormaVisitata[]): Dossier => ({
 });
 
 function open(items: NormaVisitata[]) {
-  appStore.setState({ dossiers: [dossier(items)], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+  appStore.setState({ dossiers: [dossier(items)], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
   render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
   fireEvent.click(screen.getByRole('button', { name: 'Apri Pratica Rossi su Dashboard' }));
 }
 
-beforeEach(() => { appStore.setState({ workspaceTabs: [], searchTrigger: null, searchQueue: [] }); });
+beforeEach(() => { appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] }); });
 
 describe('DossierListView — the quick-open of a card', () => {
-  it('opens a single past group as that text, without doctrine, in a tab named for it', () => {
+  it('opens a single past group as that text, without doctrine, in the dossier\'s practice', () => {
     open([PAST]);
-    const { searchTrigger, workspaceTabs } = appStore.getState();
-    expect(searchTrigger).toMatchObject({
+    const { searchQueue, practices } = appStore.getState();
+    expect(searchQueue).toHaveLength(1);
+    expect(searchQueue[0]).toMatchObject({
       article: '1284', version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false,
       tabLabel: 'Pratica Rossi — testo al 29/12/2007',
     });
-    expect(workspaceTabs.map((t) => t.label)).toEqual(['Pratica Rossi — testo al 29/12/2007']);
-    expect(searchTrigger?.targetTabId).toBe(workspaceTabs[0].id);
+    expect(practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
+    expect(searchQueue[0].targetPracticeId).toBe(practices[0].id);
   });
 
   it('opens a single group in force as it always did', () => {
     open([CIVIL]);
-    expect(appStore.getState().searchTrigger).toMatchObject({
+    expect(appStore.getState().searchQueue[0]).toMatchObject({
       version: 'vigente', version_date: '', show_brocardi_info: true, tabLabel: 'Pratica Rossi',
     });
   });
 
-  it('through the picker: "open all" keeps each version, and a past group has a tab of its own', () => {
+  it('through the picker: "open all" keeps each version, and every group goes to the one practice', () => {
     open([CIVIL, PAST]);
     fireEvent.click(screen.getByRole('button', { name: /Apri tutto/ }));
-    const { searchQueue, workspaceTabs } = appStore.getState();
+    const { searchQueue, practices } = appStore.getState();
     expect(searchQueue).toHaveLength(2);
     expect(searchQueue[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
     expect(searchQueue[1]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
-    expect(workspaceTabs.map((t) => t.label)).toEqual(['Pratica Rossi', 'Pratica Rossi — testo al 29/12/2007']);
-    expect(searchQueue.map((s) => s.targetTabId)).toEqual(workspaceTabs.map((t) => t.id));
+    expect(practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
+    expect(searchQueue.map((q) => q.targetPracticeId)).toEqual([practices[0].id, practices[0].id]);
   });
 
-  it('through the picker: no empty shared tab when every group asks for a past text', () => {
+  it('through the picker: when every group asks for a past text there is still one practice, not one per group', () => {
     open([PAST, { ...PENAL, versione: 'originale' }]);
     fireEvent.click(screen.getByRole('button', { name: /Apri tutto/ }));
-    expect(appStore.getState().workspaceTabs.map((t) => t.label)).toEqual([
-      'Pratica Rossi — testo al 29/12/2007', 'Pratica Rossi — testo originale',
-    ]);
+    expect(appStore.getState().practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
   });
 
   it('through the picker: one group on its own keeps its version', () => {
@@ -72,7 +71,7 @@ describe('DossierListView — the quick-open of a card', () => {
 describe('DossierListView — the menu of a card', () => {
   it('opens, closes on Escape, and never opens the dossier', () => {
     const onSelect = vi.fn();
-    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     render(<MemoryRouter><DossierListView onSelect={onSelect} showToast={() => {}} /></MemoryRouter>);
     const trigger = screen.getByRole('button', { name: 'Azioni su Pratica Rossi' });
     fireEvent.click(trigger);
@@ -84,7 +83,7 @@ describe('DossierListView — the menu of a card', () => {
   });
 
   it('deletes through the confirmation', () => {
-    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Azioni su Pratica Rossi' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
@@ -101,7 +100,7 @@ describe('DossierListView — a card names its acts', () => {
         { id: 'b', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z', data: CIVIL },
         { id: 'n', type: 'note', addedAt: '2026-08-01T10:00:00.000Z', data: 'appunto' },
       ],
-    }], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    }], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     expect(screen.getByText('l. 31 dicembre 2012, n. 247 · Codice civile')).toBeInTheDocument();
     expect(screen.getByText('1 nota')).toBeInTheDocument();
@@ -116,7 +115,7 @@ describe('DossierListView — a card counts its decisions', () => {
         { id: 'n', type: 'note', addedAt: '2026-08-01T10:00:00.000Z', data: 'appunto' },
         { id: 's', type: 'sentenza', addedAt: '2026-08-01T10:00:00.000Z', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' } },
       ],
-    }], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    }], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     expect(screen.getByText('1 nota')).toBeInTheDocument();
     expect(screen.getByText('1 sentenza')).toBeInTheDocument();
@@ -126,7 +125,7 @@ describe('DossierListView — a card counts its decisions', () => {
     appStore.setState({ dossiers: [{
       id: 'd1', title: 'Pratica Rossi', createdAt: '2026-08-01T10:00:00.000Z',
       items: [{ id: 's', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' } }],
-    }], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    }], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     fireEvent.change(screen.getByPlaceholderText(/cerca/i), { target: { value: 'corte cost.' } });
     expect(screen.getByText('Pratica Rossi')).toBeInTheDocument();
@@ -136,7 +135,7 @@ describe('DossierListView — a card counts its decisions', () => {
 describe('DossierListView — the trash', () => {
   it('shows «Cestino (n)» only when the trash holds something', () => {
     const onOpenTrash = vi.fn();
-    appStore.setState({ dossiers: [dossier([CIVIL])], workspaceTabs: [], searchTrigger: null, searchQueue: [] });
+    appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     const { rerender } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={0} onOpenTrash={onOpenTrash} /></MemoryRouter>);
     expect(screen.queryByRole('button', { name: /Cestino/ })).toBeNull();
     rerender(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={2} onOpenTrash={onOpenTrash} /></MemoryRouter>);

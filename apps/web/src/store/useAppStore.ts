@@ -1,6 +1,6 @@
 import { useStore } from 'zustand/react';
 import { createStore } from 'zustand/vanilla';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
@@ -9,14 +9,23 @@ import { getErrorMessage } from '../utils/errors';
 import {
     appendBackEntry,
     findLiveBackIndex,
+    type BackStackEntry,
+    type PracticeBackEntry,
     type ReadingBackEntry,
 } from '../utils/readingBackStack';
 import { topicKey } from '../utils/decisionSearchNorma';
 import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '../types/decisions';
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
-import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
-import { normalizeArticleId } from '../utils/treeUtils';
-import { workspaceOrigin } from '../utils/workspaceOrigin';
+import {
+    addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
+    findPracticeArticle, holdsSubject, labelOr, mergeDecisionEntries, practiceArticleKey,
+    practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
+    type PracticeDecision, type PracticeSubject,
+} from '../utils/practice';
+import { shortAct } from '../utils/sources';
+import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
+import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
+import { isDesktopViewport } from '../hooks/useIsDesktop';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -114,72 +123,11 @@ function customAliasApiToStore(a: CustomAliasApi): CustomAlias {
     };
 }
 
-// Content types for WorkspaceTab
-interface NormaBlock {
-    type: 'norma';
-    id: string;
-    norma: Norma;
-    articles: ArticleData[];
-    isCollapsed: boolean;
-    /**
-     * Signal for R2 (streaming-ux): when set, the NormaBlockComponent should
-     * switch its local activeArticleId to this value once on mount/update,
-     * then call `consumeAutoFocusArticle` to clear it. Used for single-article
-     * searches that are merged into an existing tab (R3) so the user lands on
-     * the article they actually queried.
-     */
-    autoFocusArticleId?: string;
-}
-
-interface LooseArticle {
-    type: 'loose-article';
-    id: string;
-    article: ArticleData;
-    sourceNorma: Norma;
-}
-
-interface CollectionArticle {
-    article: ArticleData;
-    sourceNorma: Norma;
-}
-
-interface ArticleCollection {
-    type: 'collection';
-    id: string;
-    label: string;
-    articles: CollectionArticle[];
-    isCollapsed: boolean;
-    color?: 'purple' | 'indigo';
-}
-
-type TabContent = NormaBlock | LooseArticle | ArticleCollection;
-
-/** A tab that shows one thing rather than a list of norms (design 2026-10-05 §2.1): a decision,
- *  or a list of decisions. A field of the tab, not a TabContent: 27 places switch over
- *  TabContent, several with an `else` that would draw an unknown item as a loose article. */
-export type TabView =
-    | { kind: 'decision'; reference: DecisionReference }
-    | { kind: 'decision-search'; query: DecisionSearchQuery };
-
-// Renamed from FloatingPanel to WorkspaceTab
-interface WorkspaceTab {
-    id: string;
-    label: string;
-    position: { x: number; y: number };
-    size: { width: number; height: number };
-    zIndex: number;
-    isMinimized: boolean;
-    isHidden: boolean;
-    content: TabContent[]; // Mixed norme and loose articles
-    /**
-     * R3 (streaming-ux): true when the label was set by the user (rename) or
-     * provided explicitly at creation (e.g. from a dossier). Custom tabs are
-     * treated as reserved: subsequent searches for the same norma do NOT merge
-     * into them, they spawn a new tab instead.
-     */
-    labelIsCustom: boolean;
-    /** Set on a decision or decision-search tab, which draws its view and ignores `content`. */
-    view?: TabView;
+/** Puts an entity in a list once: replaced when its id is already there (a background read may have brought it first). */
+function upsertById<T extends { id: string }>(list: T[], entity: T): void {
+    const at = list.findIndex(e => e.id === entity.id);
+    if (at >= 0) list[at] = entity;
+    else list.push(entity);
 }
 
 interface SearchPanelState {
@@ -306,8 +254,163 @@ interface AppState {
     quickNormsManagerOpen: boolean;
     aliasManagerOpen: boolean;
     searchPanelState: SearchPanelState;
-    workspaceTabs: WorkspaceTab[];
-    highestZIndex: number;
+
+    /**
+     * The practices: the tables of the questions, which replaced the tabs (spec
+     * `2026-10-08-norm-tab-container-design.md` §2). UI state saved in the browser (D6), checked by
+     * `sanitizePractices` on every load. A browser that saved tabs (persist version 0) gets its
+     * practices from them once, in `migrate` (spec §9).
+     */
+    practices: Practice[];
+    /** The practice on screen; null with none. Persisted. */
+    activePracticeId: string | null;
+    /** The open rows (T15), keyed `practiceId/actId/articleKey` or `practiceId/decisionId`.
+     *  Session-only, absent from `partialize`: after a reload every row is closed. */
+    practiceRows: Record<string, true>;
+    /** One row to open and scroll to: its practice and its `practiceRows` key; taken once by
+     *  `takeReveal` (gotcha 14). Session-only. */
+    pendingReveal: { practiceId: string; rowKey: string } | null;
+    /** The topic searches the migration did not reopen, told once (`practiceNoticeText`); taken by
+     *  `takePracticeNotice`. Session-only. */
+    practiceNotice: string | null;
+    /** The notice, once: returns it and clears it in one step; null after. */
+    takePracticeNotice: () => string | null;
+
+    // Practice actions (spec §2-§5). Each is one `set`.
+    /** A new practice at the end of the bar: its label trimmed and capped (`practiceLabel`,
+     *  «Pratica» when empty), `custom` marks a name the user gave (default false). It becomes the
+     *  active one unless `activate: false`, which still activates it when no practice is active. */
+    createPractice: (label: string, options?: { custom?: boolean; activate?: boolean }) => string;
+    /** Trimmed and capped at 120 characters; sets `labelIsCustom`. A name empty once trimmed is ignored. */
+    renamePractice: (id: string, label: string) => void;
+    /** Closes it with its open rows, its reveal and the structure window one of its acts owned; the
+     *  active one hands over to its neighbour, the next, else the previous. */
+    closePractice: (id: string) => void;
+    /** Empties the table; a reload shows no practice (§5). */
+    closeAllPractices: () => void;
+    /** Ignored for an id that names no practice. */
+    setActivePractice: (id: string) => void;
+    reorderPractices: (fromIndex: number, toIndex: number) => void;
+    /**
+     * A search's articles into a practice (T11, §5.1): `null` is the active practice, created when
+     * there is none (named `options.label ?? shortAct(norma)`) and made active; an id that names no
+     * practice (closed meanwhile) falls back to the same, with a `console.warn` naming it. The
+     * articles join their act (`addArticles`, T2). `reveal`, `'first'` (the first article given) or
+     * an article id (found through `findPracticeArticle`), opens that row and sets `pendingReveal`.
+     */
+    addArticlesToPractice: (
+        practiceId: string | null,
+        norma: Norma,
+        articles: ArticleData[],
+        options?: { reveal?: 'first' | string; label?: string },
+    ) => { practiceId: string; actId: string };
+    /** An article-less act, or the act already there (its URN backfilled), and the structure window
+     *  pointed at it, in one step («Apri l'indice e sfoglia»). The
+     *  practice is resolved as `addArticlesToPractice` does and made active, so the window's owner is
+     *  on screen. Returns the act's id. */
+    addActIndexToPractice: (practiceId: string | null, norma: Norma) => string;
+    /** The row of `act` holding `articleId` (`findPracticeArticle`): when found, opens and reveals it
+     *  and returns true. The index pick, the arrows and a citation jump call it before fetching. */
+    revealPracticeArticle: (practiceId: string, actId: string, articleId: string) => boolean;
+    /** The row `articleKey` names exactly (an index chip, a past text included): opens and reveals it,
+     *  its practice made active, in one step, and returns true; false, writing nothing, when the act
+     *  holds no such row. */
+    revealPracticeRow: (practiceId: string, actId: string, articleKey: string) => boolean;
+    /** The decision's row in «Giurisprudenza»: opens and reveals it, its practice made active, in one
+     *  step, and returns true; false, writing nothing, when the practice holds no such entry. */
+    revealPracticeDecision: (practiceId: string, decisionId: string) => boolean;
+    /** Takes the row off the table (the act stays, even empty), with its open row, its reveal and a
+     *  window showing it. */
+    removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
+    /** Takes the act off the table with its rows, its reveal, its windows and the structure window it owned. */
+    removePracticeAct: (practiceId: string, actId: string) => void;
+    /**
+     * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
+     * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
+     * the open rows and the structure window follow. The windows of `from` that showed it close: their
+     * subject is now on the other table. `to` as `{ newLabel }` creates that practice (not activated)
+     * and moves the act into it in the same write (gotcha 14): nothing is created if the move no-ops.
+     */
+    moveActToPractice: (actId: string, fromPracticeId: string, to: string | { newLabel: string }) => void;
+    reorderActs: (practiceId: string, fromIndex: number, toIndex: number) => void;
+    toggleActCollapse: (practiceId: string, actId: string) => void;
+    /** Opens or closes a row (`articleRowKey`, `decisionRowKey`). */
+    setRowOpen: (rowKey: string, open: boolean) => void;
+    /** The row to reveal in this practice, once: returns it and clears it in one step; null after,
+     *  and null when the reveal belongs to another practice (gotcha 14). */
+    takeReveal: (practiceId: string) => { rowKey: string } | null;
+    /**
+     * A decision into a practice (D7, §6.1): `practiceId`, else the active practice, else a new one
+     * («Sentenze»), as `addArticlesToPractice` lands. One entry per decision: an entry `sameDecision`
+     * matches is reused (an unresolved one learns the section a later citation adds), else a new one,
+     * not identified. Opened to be read: `beside` (the default) opens its window (`besideAfterOpen`:
+     * the window `askerId` names is never the one replaced, T16); `beside: false` opens and reveals
+     * its row; either makes the practice active. `open: false` (the dossier's «Apri tutto», T17)
+     * only adds the entry, closed: no window, no row, no reveal, so nothing is fetched; it wins over
+     * `beside`. `reader` (a phone) shows it in the full-screen reader instead (`phoneReader`) and
+     * touches neither `beside` nor the rows. `fromLink` is a read from a link: the practice `besideId`
+     * names (a practice, one of its windows or the phone's reader), else the active one, the window
+     * `besideId` names as the asker on the desktop, the full-screen reader on a phone.
+     */
+    openDecision: (
+        reference: DecisionReference,
+        options?: { practiceId?: string; beside?: boolean; reader?: boolean; open?: boolean; askerId?: string; fromLink?: boolean; besideId?: string },
+    ) => { practiceId: string; decisionId: string };
+    /**
+     * Decisions whose identity is already known (a dossier's, opened with «Apri tutto», T17) into
+     * the practice `practiceId` names, in one write: identified, with the section, type and date of
+     * deposit the dossier kept, so «Salva come dossier» saves them back; closed and unread, as
+     * `open: false` adds them (nothing is fetched until one is opened). One entry per decision: one
+     * already there takes what the new one knows (`mergeDecisionEntries`). Nothing for a practice
+     * that is not open.
+     */
+    addKnownDecisions: (
+        practiceId: string,
+        decisions: Array<DecisionIdentity & { sezione?: string; tipo?: string; data_deposito?: string }>,
+    ) => void;
+    /**
+     * The entry's decision was found: its identity, label, date of deposit, type and section, and
+     * `identified`. When another entry of the practice already holds that decision (a candidate chosen
+     * here), this one merges into it (`mergeDecisionEntries`): its window, its row, its reveal and the
+     * way back name the survivor (carry-over rulings 2, 7), which is asked to take focus
+     * (`decisionFocusRequest`).
+     */
+    setDecisionEntryIdentity: (
+        practiceId: string,
+        decisionId: string,
+        identity: DecisionIdentity,
+        attrs: { sezione?: string; tipo?: string; data_deposito?: string },
+        label: string,
+    ) => void;
+    /** Takes the decision off «Giurisprudenza» with its window, its row and its reveal. */
+    removePracticeDecision: (practiceId: string, decisionId: string) => void;
+    /**
+     * The entry's reading told the Cronologia `key` (PR 5's once per opening, carry-over ruling 13):
+     * kept on the entry and persisted with it, so a remount or a reload never records again, while a
+     * new entry of the decision does. The same key again writes nothing.
+     */
+    markDecisionEntryRecorded: (practiceId: string, decisionId: string, key: string) => void;
+    /**
+     * «Apri accanto» (§4.2): a window on `ref` beside the practice's table, which is made active.
+     * Nothing moves when a window already shows that subject; with two, the oldest that is not the
+     * asker goes and its subject stays in the table (D10, T16). A ref to something the practice does
+     * not hold, or a practice that is not open, opens nothing and is warned.
+     */
+    openBeside: (practiceId: string, ref: BesideRef, askerId?: string) => void;
+    /** Closes the window; its subject stays in the table (D7). */
+    closeBeside: (practiceId: string, refId: string) => void;
+    /**
+     * What the phone's full-screen reader shows (spec §8, T19): one subject of a practice, or a topic
+     * search, or nothing. The phone's own session state, never the desktop's `beside`: a reload, or a
+     * window narrowed below 768 px, lands on the table. Session-only, absent from `partialize`.
+     */
+    phoneReader: { practiceId: string; ref: BesideRef } | null;
+    /** «Apri accanto» on a phone: the reader on `ref`, its practice made active, in one update. A ref
+     *  to something the practice does not hold, or a practice that is not open, opens nothing and is
+     *  warned. */
+    openPhoneReader: (practiceId: string, ref: BesideRef) => void;
+    /** «‹ Pratica»: back to the table. */
+    closePhoneReader: () => void;
 
     /**
      * The floating structure (index) window. A single `blockId` — rather than
@@ -320,10 +423,10 @@ interface AppState {
     /**
      * Undo stack for citation jumps. See `utils/readingBackStack.ts` for what
      * goes in it and why nothing else does. Session-scoped: its entries point
-     * at tab and block ids that mean nothing after a reload, so it is
-     * deliberately absent from `partialize`.
+     * at practice and subject ids, that mean nothing
+     * after a reload, so it is deliberately absent from `partialize`.
      */
-    readingBackStack: ReadingBackEntry[];
+    readingBackStack: BackStackEntry[];
 
     /**
      * A decision some other page asked the workspace to open; drained once by
@@ -331,11 +434,17 @@ interface AppState {
      */
     pendingDecision: DecisionReference | null;
     /**
-     * The decision tab that should take keyboard focus: set when a tab closes because the decision
-     * it resolved to was already open in another (that one survives). Taken once by the tab's view.
-     * Session-only, absent from `partialize`.
+     * The decision entry that should take keyboard focus: the id of the entry another one merged into
+     * when the decision it resolved to was already there (`setDecisionEntryIdentity`; that one
+     * survives). Taken once by the entry's view. Session-only, absent from `partialize`.
      */
     decisionFocusRequest: string | null;
+    /**
+     * The id of a light window that should take keyboard focus: set when a subject already shown in
+     * a window is asked for again (a link, the way back), so the reader sees which one it is. Taken
+     * once by the window (`takeWindowFocusRequest`). Session-only, absent from `partialize`.
+     */
+    windowFocusRequest: string | null;
 
     // Search State
     searchTrigger: SearchParams | null;
@@ -371,67 +480,39 @@ interface AppState {
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
-    // Workspace Tab Actions
-    openDecisionTab: (reference: DecisionReference, options?: { besideTabId?: string }) => string;
-    openDecisionSearchTab: (query: DecisionSearchQuery, label: string, options?: { besideTabId?: string }) => string;
-    setDecisionTabIdentity: (tabId: string, identity: DecisionIdentity, label: string) => void;
-    placeTabsSideBySide: (leftTabId: string, rightTabId: string) => void;
+    // Decision actions
+    /**
+     * A topic search as a light window of a practice (T8): the practice the link reads in (`besideId`
+     * names a practice, one of its windows or the phone's reader), else the active one, created
+     * when there is none. Returns the window's id.
+     */
+    openTopicSearch: (query: DecisionSearchQuery, label: string, options?: { besideId?: string }) => string;
     requestOpenDecision: (reference: DecisionReference) => void;
     drainPendingDecision: () => string | null;
-    takeDecisionFocusRequest: (tabId: string) => boolean;
-    addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
-    addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
-    focusArticleInTab: (tabId: string, articleId: string) => void;
-    consumeAutoFocusArticle: (tabId: string, normaBlockId: string) => void;
-    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: Norma) => void;
-    updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
-    removeTab: (id: string) => void;
-    bringTabToFront: (id: string) => void;
-    toggleTabMinimize: (id: string) => void;
-    toggleTabVisibility: (id: string) => void;
-    toggleNormaCollapse: (tabId: string, normaId: string) => void;
-    setTabLabel: (id: string, label: string) => void;
-    reorderWorkspaceTabs: (fromIndex: number, toIndex: number) => void;
-    arrangeWorkspaceTabs: () => void;
-    closeAllWorkspaceTabs: () => void;
+    takeDecisionFocusRequest: (id: string) => boolean;
+    /** True, and the request cleared in the same step, when the window `id` was asked to take focus. */
+    takeWindowFocusRequest: (id: string) => boolean;
 
     // Structure Window Actions
-    /**
-     * Drops an article-less norma block on a tab and points the structure
-     * window at it — the "open a code and browse" entry point. Atomic on
-     * purpose: the window can never end up pointing at a block that was not
-     * created. Reuses a block already holding the same act instead of adding
-     * a duplicate. Returns the block id, or null if the tab is gone.
-     */
-    addNormaIndexToTab: (tabId: string, norma: Norma) => string | null;
     openStructureWindow: (blockId: string) => void;
     closeStructureWindow: () => void;
     setStructureWindowPosition: (position: { x: number; y: number }) => void;
 
     // Reading Back-Stack Actions
+    /**
+     * Records a jump. An entry whose `tabId` names a practice is kept as a `table`
+     * entry (its `blockId` an act, the row its `articleKey` names, else the one `findPracticeArticle`
+     * finds, or a decision) and
+     * one whose `tabId` names a window as a `beside` entry (spec §6.3); any other is not kept.
+     */
     pushReadingBack: (entry: ReadingBackEntry) => void;
     /**
-     * Removes and returns the newest entry that still points at a live tab and
-     * block, discarding any dead ones above it. Returns null when nothing is
-     * left to go back to.
+     * Removes and returns the newest entry whose practice still holds its subject, discarding any dead
+     * ones above it. A practice's entry is walked back to here, in the same
+     * step: its practice made active, its row revealed (`table`) or its window
+     * opened (`beside`). Returns null when nothing is left to go back to.
      */
-    popReadingBack: () => ReadingBackEntry | null;
-
-    // Drag & Drop Actions
-    moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => void;
-    extractArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
-    moveLooseArticleBetweenTabs: (articleId: string, sourceTabId: string, targetTabId: string) => void;
-    removeArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
-    removeContentFromTab: (tabId: string, contentId: string) => void;
-    mergeLooseArticleToNorma: (tabId: string, looseArticleId: string, targetNormaId: string) => boolean;
-
-    // Collection Actions
-    createCollection: (tabId: string, label?: string) => string;
-    renameCollection: (tabId: string, collectionId: string, newLabel: string) => void;
-    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: Norma) => void;
-    removeArticleFromCollection: (tabId: string, collectionId: string, articleKey: string) => void;
-    toggleCollectionCollapse: (tabId: string, collectionId: string) => void;
-    moveLooseArticleToCollection: (tabId: string, looseArticleId: string, collectionId: string) => void;
+    popReadingBack: () => BackStackEntry | null;
 
     addBookmark: (norma: NormaVisitata, tags?: string[]) => void;
     updateBookmarkTags: (normaKey: string, tags: string[]) => void;
@@ -446,8 +527,15 @@ interface AppState {
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     setDossierItemOrder: (dossierId: string, itemIds: string[]) => void;
-    /** Reads one dossier again from the server (after a restore from the trash): replaces it, or adds it when it came back whole. */
-    refreshDossier: (dossierId: string) => Promise<void>;
+    /**
+     * Reads one dossier again from the server (after a restore from the trash): replaces it, or adds it
+     * when it came back whole. `quiet` is the page's background refresh (what a connected application
+     * added meanwhile): a failure is only logged, and an answer is dropped if the dossier changed here
+     * while it travelled.
+     */
+    refreshDossier: (dossierId: string, options?: { quiet?: boolean }) => Promise<void>;
+    /** The dossier list's background refresh, `refreshDossier`'s quiet rules for every dossier. */
+    refreshDossiers: () => Promise<void>;
     /** A note through the notes route, about one article when `aboutItemId` is given; true once the server has it. */
     addNoteToDossier: (dossierId: string, text: string, aboutItemId?: string) => Promise<boolean>;
     /** Saves a dossier's waiting order once none of its items is pending (see `pendingDossierOrders`). */
@@ -470,7 +558,7 @@ interface AppState {
     triggerSearch: (params: SearchParams) => void;
     clearSearchTrigger: () => void;
     // Queue N searches that all share the same tabLabel so they merge into one
-    // workspace tab (see SearchPanel drain effect). Replaces any pending queue.
+    // practice (see SearchPanel drain effect). Replaces any pending queue.
     triggerMultiSearch: (paramsList: SearchParams[]) => void;
     dequeueNextSearch: () => void;
     // Atomic: if no trigger is pending and the queue is non-empty, move the
@@ -545,6 +633,23 @@ const generateKey = (n: NormaVisitata) => {
     return parts.map(part => sanitize(part || '')).join('--');
 };
 
+/** The key `persist` saves the workspace under. */
+const STORAGE_NAME = 'visualex-storage';
+
+/** The most characters of a version-0 value that is copied: past it the copy would eat the browser's space. */
+const V0_BACKUP_MAX_CHARS = 1_000_000;
+
+/** Where a browser's version-0 value is copied before it is migrated, so its tabs can be recovered
+ *  by hand should the conversion ever go wrong. Written once, never overwritten. */
+const V0_BACKUP_KEY = 'visualex-storage.v0-backup';
+
+// The constants above and these are declared before the store: its hydration runs while it is created,
+// and a migration may save or report a failure (a `const` after it would still be in its dead zone).
+let saveFailureReported = false;
+// Set by `migratePersisted` when it made the practices from saved tabs, taken by the `merge` that
+// follows in the same hydration (`practicesOnLoad`): the notice is session-only, so it travels here.
+let migrationNotice: string | null = null;
+
 const appStore = createStore<AppState>()(
     persist(
         immer((set, get) => ({
@@ -590,10 +695,443 @@ const appStore = createStore<AppState>()(
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
             },
-            workspaceTabs: [],
+            practices: [],
+            activePracticeId: null,
+            practiceRows: {},
+            pendingReveal: null,
+            practiceNotice: null,
+            takePracticeNotice: () => {
+                const notice = get().practiceNotice;
+                if (notice !== null) set((state) => { state.practiceNotice = null; });
+                return notice;
+            },
+
+            // ── Practices (spec §2-§5) ───────────────────────────────────
+            // Each action computes from the plain state and writes it in one `set` (gotcha 14).
+            createPractice: (label, options = {}) => {
+                const created = newPractice(label, options.custom === true);
+                set((state) => {
+                    state.practices.push(created);
+                    if (options.activate !== false || !state.practices.some((p) => p.id === state.activePracticeId)) {
+                        activate(state, created.id);
+                    }
+                });
+                return created.id;
+            },
+
+            renamePractice: (id, label) => {
+                // A write that changes nothing would still serialise the whole store.
+                const kept = practiceLabel(label);
+                if (!kept || !get().practices.some((p) => p.id === id)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === id) as Practice;
+                    practice.label = kept;
+                    practice.labelIsCustom = true;
+                });
+            },
+
+            closePractice: (id) => {
+                if (!get().practices.some((p) => p.id === id)) return;
+                set((state) => {
+                const index = state.practices.findIndex((p) => p.id === id);
+                if (index < 0) return;
+                const closed = state.practices[index];
+                if (state.activePracticeId === id) {
+                    state.activePracticeId = (state.practices[index + 1] ?? state.practices[index - 1])?.id ?? null;
+                }
+                if (closed.acts.some((a) => a.id === state.structureWindow.blockId)) state.structureWindow.blockId = null;
+                state.practices.splice(index, 1);
+                dropRows(state, `${id}/`);
+                if (state.phoneReader?.practiceId === id) state.phoneReader = null;
+                });
+            },
+
+            closeAllPractices: () => set((state) => {
+                if (state.practices.some((p) => p.acts.some((a) => a.id === state.structureWindow.blockId))) {
+                    state.structureWindow.blockId = null;
+                }
+                state.practices = [];
+                state.activePracticeId = null;
+                state.practiceRows = {};
+                state.pendingReveal = null;
+                state.phoneReader = null;
+            }),
+
+            setActivePractice: (id) => {
+                const { practices, activePracticeId } = get();
+                if (activePracticeId === id || !practices.some((p) => p.id === id)) return;
+                set((state) => { activate(state, id); });
+            },
+
+            reorderPractices: (fromIndex, toIndex) => {
+                if (!movable(get().practices.length, fromIndex, toIndex)) return;
+                set((state) => {
+                    const [moved] = state.practices.splice(fromIndex, 1);
+                    state.practices.splice(toIndex, 0, moved);
+                });
+            },
+
+            addArticlesToPractice: (practiceId, norma, articles, options = {}) => {
+                const landing = landingPractice(get(), practiceId, () => labelOr(options.label, shortAct(norma)), 'addArticlesToPractice');
+                const id = landing.practice.id;
+                const { acts, actId } = addArticles(landing.practice.acts, norma, articles, uuidv4);
+                const act = acts.find((a) => a.id === actId);
+                let shown: ArticleData | undefined;
+                if (act && options.reveal === 'first') {
+                    const first = articles[0] && practiceArticleKey(articles[0]);
+                    shown = act.articles.find((a) => practiceArticleKey(a) === first);
+                } else if (act && options.reveal) {
+                    // The asked article is first one of those this call brought in (a past text
+                    // search keeps its own row, D15), else any row of the act.
+                    const brought = findPracticeArticle({ ...act, articles }, options.reveal);
+                    const key = brought && practiceArticleKey(brought);
+                    shown = act.articles.find((a) => practiceArticleKey(a) === key) ?? findPracticeArticle(act, options.reveal);
+                }
+                set((state) => {
+                    state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
+                    if (landing.activePracticeId !== null) activate(state, landing.activePracticeId);
+                    else state.activePracticeId = null;
+                    if (shown) revealRow(state, id, actId, practiceArticleKey(shown));
+                });
+                return { practiceId: id, actId };
+            },
+
+            addActIndexToPractice: (practiceId, norma) => {
+                const landing = landingPractice(get(), practiceId, () => shortAct(norma), 'addActIndexToPractice');
+                const id = landing.practice.id;
+                const { acts, actId } = addArticles(landing.practice.acts, norma, [], uuidv4);
+                set((state) => {
+                    state.practices = landing.practices.map((p) => (p.id === id ? { ...p, acts } : p));
+                    activate(state, id);
+                    // The index is the act's drawer, in the column: the phone's reader gives way to it.
+                    state.phoneReader = null;
+                    state.structureWindow.blockId = actId;
+                });
+                return actId;
+            },
+
+            revealPracticeArticle: (practiceId, actId, articleId) => {
+                const act = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                const hit = act ? findPracticeArticle(act, articleId) : undefined;
+                if (!hit) return false;
+                // Its practice comes on screen in the same step (carry-over ruling 9: the way back, a find match).
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    revealRow(state, practiceId, actId, practiceArticleKey(hit));
+                });
+                return true;
+            },
+
+            revealPracticeRow: (practiceId, actId, articleKey) => {
+                const act = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (!act || !act.articles.some((a) => practiceArticleKey(a) === articleKey)) return false;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    revealRow(state, practiceId, actId, articleKey);
+                });
+                return true;
+            },
+
+            revealPracticeDecision: (practiceId, decisionId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return false;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    revealDecisionRow(state, practiceId, decisionId);
+                });
+                return true;
+            },
+
+            removePracticeArticle: (practiceId, actId, articleKey) => {
+                const held = get().practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (!held || !held.articles.some((a) => practiceArticleKey(a) === articleKey)) return;
+                set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                const act = practice?.acts.find((a) => a.id === actId);
+                const at = act ? act.articles.findIndex((a) => practiceArticleKey(a) === articleKey) : -1;
+                if (!practice || !act || at < 0) return;
+                act.articles.splice(at, 1);
+                practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId && b.articleKey === articleKey));
+                dropRows(state, articleRowKey(practiceId, actId, articleKey), true);
+                });
+            },
+
+            removePracticeAct: (practiceId, actId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.acts.some((a) => a.id === actId)) return;
+                set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice || !practice.acts.some((a) => a.id === actId)) return;
+                practice.acts = practice.acts.filter((a) => a.id !== actId);
+                practice.beside = practice.beside.filter((b) => !(b.kind === 'article' && b.actId === actId));
+                if (state.structureWindow.blockId === actId) state.structureWindow.blockId = null;
+                dropRows(state, `${practiceId}/${actId}/`);
+                });
+            },
+
+            moveActToPractice: (actId, fromPracticeId, to) => {
+                const created = typeof to === 'string' ? null : newPractice(to.newLabel, false);
+                const toPracticeId = typeof to === 'string' ? to : (created as Practice).id;
+                if (fromPracticeId === toPracticeId) return;
+                const practices = created ? [...get().practices, created] : get().practices;
+                const source = practices.find((p) => p.id === fromPracticeId);
+                const target = practices.find((p) => p.id === toPracticeId);
+                const act = source?.acts.find((a) => a.id === actId);
+                if (!source || !target || !act) return;
+                // Into a practice holding the same act, it joins that act and takes its id.
+                const merged = addArticles(target.acts, act.norma, act.articles, () => act.id);
+                const nowId = merged.actId;
+                const targetActs = nowId === act.id
+                    ? merged.acts.map((a) => (a.id === act.id ? { ...a, isCollapsed: act.isCollapsed } : a))
+                    : merged.acts;
+                const oldPrefix = `${fromPracticeId}/${actId}/`;
+                const newPrefix = `${toPracticeId}/${nowId}/`;
+                set((state) => {
+                    state.practices = practices.map((p) => {
+                        if (p.id === fromPracticeId) {
+                            return {
+                                ...p,
+                                acts: p.acts.filter((a) => a.id !== actId),
+                                beside: p.beside.filter((b) => !(b.kind === 'article' && b.actId === actId)),
+                            };
+                        }
+                        return p.id === toPracticeId ? { ...p, acts: targetActs } : p;
+                    });
+                    for (const key of Object.keys(state.practiceRows)) {
+                        if (!key.startsWith(oldPrefix)) continue;
+                        delete state.practiceRows[key];
+                        state.practiceRows[newPrefix + key.slice(oldPrefix.length)] = true;
+                    }
+                    if (state.pendingReveal?.rowKey.startsWith(oldPrefix)) {
+                        state.pendingReveal = { practiceId: toPracticeId, rowKey: newPrefix + state.pendingReveal.rowKey.slice(oldPrefix.length) };
+                    }
+                    if (state.structureWindow.blockId === actId) {
+                        // Its owner is off screen when the target is not the active practice (as closePractice).
+                        state.structureWindow.blockId = state.activePracticeId === toPracticeId ? nowId : null;
+                    }
+                    // Carry-over rulings 4 and 9: the way back names the act where it now is.
+                    for (const entry of state.readingBackStack) {
+                        if (entry.practiceId === fromPracticeId &&
+                            entry.subject.kind === 'article' && entry.subject.actId === actId) {
+                            entry.practiceId = toPracticeId;
+                            entry.subject.actId = nowId;
+                        }
+                    }
+                });
+            },
+
+            reorderActs: (practiceId, fromIndex, toIndex) => {
+                const held = get().practices.find((p) => p.id === practiceId);
+                if (!held || !movable(held.acts.length, fromIndex, toIndex)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    const [moved] = practice.acts.splice(fromIndex, 1);
+                    practice.acts.splice(toIndex, 0, moved);
+                });
+            },
+
+            toggleActCollapse: (practiceId, actId) => set((state) => {
+                const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+                if (act) act.isCollapsed = !act.isCollapsed;
+            }),
+
+            setRowOpen: (rowKey, open) => {
+                // A write that changes nothing would still serialise the whole store.
+                if ((get().practiceRows[rowKey] === true) === open) return;
+                set((state) => {
+                    if (open) state.practiceRows[rowKey] = true;
+                    else delete state.practiceRows[rowKey];
+                });
+            },
+
+            takeReveal: (practiceId) => {
+                const pending = get().pendingReveal;
+                if (pending?.practiceId !== practiceId) return null;
+                set((state) => { state.pendingReveal = null; });
+                return { rowKey: pending.rowKey };
+            },
+
+            openDecision: (reference, asked = {}) => {
+                // Read from a link (a citation, a chip, the palette, the Cronologia): the practice the
+                // link reads in, else the active one; beside on the desktop, the window the link was
+                // clicked in being the asker, so it is never the one a third window replaces (T16); in
+                // the phone's full-screen reader (spec §8).
+                const options = !asked.fromLink ? asked : {
+                    ...asked,
+                    practiceId: asked.practiceId ?? practiceOfPlace(get(), asked.besideId) ?? undefined,
+                    ...(isDesktopViewport() ? { askerId: asked.askerId ?? windowIdOf(get(), asked.besideId) } : { reader: true }),
+                };
+                const before = get();
+                const landing = landingPractice(before, options.practiceId ?? null, () => DECISIONS_PRACTICE_LABEL, 'openDecision');
+                const practiceId = landing.practice.id;
+                const existing = landing.practice.decisions.find((d) => sameDecision(d.reference, reference));
+                const decisionId = existing?.id ?? uuidv4();
+                const readerRef = besideRefFor({ kind: 'decision', decisionId });
+                // The window already showing it, if any: asked again, it takes focus (carry-over 11).
+                const shownId = landing.practice.beside.find((b) => b.kind === 'decision' && b.decisionId === decisionId)?.id;
+                // Already there and already in the phone's reader: nothing to write.
+                if (existing && options.reader && options.open !== false && landing.practices === before.practices &&
+                    before.activePracticeId === practiceId && before.phoneReader?.ref.id === readerRef.id &&
+                    before.phoneReader.practiceId === practiceId &&
+                    (existing.identified || existing.reference.archivio || !reference.sezione ||
+                        decisionPath(existing.reference) === decisionPath(reference))) {
+                    return { practiceId, decisionId };
+                }
+                // Already there, its window already open, in the active practice: nothing to write
+                // but the request for that window to take focus.
+                if (existing && !options.reader && landing.practices === before.practices && options.open !== false && options.beside !== false &&
+                    before.activePracticeId === practiceId &&
+                    besideWith(landing.practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId) === landing.practice.beside &&
+                    (existing.identified || existing.reference.archivio || !reference.sezione ||
+                        decisionPath(existing.reference) === decisionPath(reference))) {
+                    if (shownId && before.windowFocusRequest !== shownId) set((state) => { state.windowFocusRequest = shownId; });
+                    return { practiceId, decisionId };
+                }
+                set((state) => {
+                    // a practice landingPractice created is new and unfrozen: pushed, never one already stored
+                    if (landing.practices !== before.practices) state.practices.push(landing.practice);
+                    if (landing.activePracticeId !== null) activate(state, landing.activePracticeId);
+                    else state.activePracticeId = null;
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    const entry = practice.decisions.find((d) => d.id === decisionId);
+                    if (!entry) {
+                        practice.decisions.push({ id: decisionId, reference: { ...reference }, label: formatDecisionShort(reference), identified: false });
+                    } else if (!entry.identified && !entry.reference.archivio && reference.sezione &&
+                        decisionPath(entry.reference) !== decisionPath(reference)) {
+                        // an unresolved entry learns the section a later citation adds: it may be what
+                        // settles the homonyms, so it asks again (as a link to a decision does)
+                        entry.reference = { ...reference };
+                        entry.label = formatDecisionShort(reference);
+                    }
+                    if (options.open === false) return;
+                    activate(state, practiceId);
+                    if (options.reader) {
+                        state.phoneReader = { practiceId, ref: readerRef };
+                    } else if (options.beside === false) {
+                        const rowKey = decisionRowKey(practiceId, decisionId);
+                        state.practiceRows[rowKey] = true;
+                        state.pendingReveal = { practiceId, rowKey };
+                    } else {
+                        practice.beside = besideWith(practice.beside, besideRefFor({ kind: 'decision', decisionId }), options.askerId);
+                        if (shownId) state.windowFocusRequest = shownId;
+                    }
+                });
+                return { practiceId, decisionId };
+            },
+
+            addKnownDecisions: (practiceId, decisions) => {
+                if (decisions.length === 0 || !get().practices.some((p) => p.id === practiceId)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    for (const known of decisions) {
+                        const reference = identityOf(known);
+                        const entry: PracticeDecision = {
+                            id: uuidv4(), reference, label: formatDecisionShort({ ...reference, sezione: known.sezione }), identified: true,
+                        };
+                        if (known.data_deposito) entry.depositDate = known.data_deposito;
+                        if (known.tipo) entry.tipo = known.tipo;
+                        if (known.sezione) entry.sezione = known.sezione;
+                        const at = practice.decisions.findIndex((d) => sameDecision(d.reference, reference));
+                        if (at < 0) practice.decisions.push(entry);
+                        else practice.decisions[at] = mergeDecisionEntries(practice.decisions[at], entry);
+                    }
+                });
+            },
+
+            setDecisionEntryIdentity: (practiceId, decisionId, identity, attrs, label) => {
+                const practice = get().practices.find((p) => p.id === practiceId);
+                const entry = practice?.decisions.find((d) => d.id === decisionId);
+                if (!practice || !entry) return;
+                const found: PracticeDecision = { ...entry, reference: identityOf(identity), label, identified: true };
+                if (attrs.data_deposito) found.depositDate = attrs.data_deposito;
+                if (attrs.tipo) found.tipo = attrs.tipo;
+                if (attrs.sezione) found.sezione = attrs.sezione;
+                // One entry per decision: one already holding it (a candidate chosen here) absorbs this one.
+                const survivor = practice.decisions.find((d) => d.id !== decisionId && sameDecision(d.reference, identity));
+                // The same identity again (every found answer, cache hits included): keep the reference.
+                if (!survivor && entry.identified && entry.label === label && sameDecision(entry.reference, identity) &&
+                    JSON.stringify(found) === JSON.stringify(entry)) return;
+                set((state) => {
+                    const target = state.practices.find((p) => p.id === practiceId) as Practice;
+                    if (!survivor) {
+                        target.decisions = target.decisions.map((d) => (d.id === decisionId ? found : d));
+                        return;
+                    }
+                    target.decisions = target.decisions
+                        .filter((d) => d.id !== decisionId)
+                        .map((d) => (d.id === survivor.id ? mergeDecisionEntries(survivor, found) : d));
+                    absorbDecision(state, target, decisionId, survivor.id);
+                    state.decisionFocusRequest = survivor.id;
+                });
+            },
+
+            removePracticeDecision: (practiceId, decisionId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.decisions.some((d) => d.id === decisionId)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId);
+                    if (!practice || !practice.decisions.some((d) => d.id === decisionId)) return;
+                    practice.decisions = practice.decisions.filter((d) => d.id !== decisionId);
+                    practice.beside = practice.beside.filter((b) => !(b.kind === 'decision' && b.decisionId === decisionId));
+                    dropRows(state, decisionRowKey(practiceId, decisionId), true);
+                });
+            },
+
+            markDecisionEntryRecorded: (practiceId, decisionId, key) => {
+                const entry = get().practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === decisionId);
+                if (!entry || entry.historyRecordedKey === key) return;
+                set((state) => {
+                    const held = state.practices.find((p) => p.id === practiceId)?.decisions.find((d) => d.id === decisionId);
+                    if (held) held.historyRecordedKey = key;
+                });
+            },
+
+            openBeside: (practiceId, ref, askerId) => {
+                const practice = get().practices.find((p) => p.id === practiceId);
+                const subject = subjectOfRef(ref);
+                if (!practice || (subject && !holdsSubject(practice, subject))) {
+                    console.warn(`openBeside: ${practice ? `the practice ${JSON.stringify(practiceId)} does not hold the ${ref.kind} of the window ${JSON.stringify(ref.id)}` : `the practice ${JSON.stringify(practiceId)} is not open`}; no window opened`);
+                    return;
+                }
+                const beside = besideWith(practice.beside, ref, askerId);
+                // Already shown: asked again, that window takes focus (carry-over 11).
+                const shownId = beside === practice.beside && isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
+                if (beside === practice.beside && get().activePracticeId === practiceId && (!shownId || get().windowFocusRequest === shownId)) return;
+                set((state) => {
+                    activate(state, practiceId);
+                    (state.practices.find((p) => p.id === practiceId) as Practice).beside = beside;
+                    if (shownId) state.windowFocusRequest = shownId;
+                });
+            },
+
+            closeBeside: (practiceId, refId) => {
+                if (!get().practices.find((p) => p.id === practiceId)?.beside.some((b) => b.id === refId)) return;
+                set((state) => {
+                    const practice = state.practices.find((p) => p.id === practiceId) as Practice;
+                    practice.beside = practice.beside.filter((b) => b.id !== refId);
+                });
+            },
+
+            openPhoneReader: (practiceId, ref) => {
+                const practice = get().practices.find((p) => p.id === practiceId);
+                const subject = subjectOfRef(ref);
+                if (!practice || (subject && !holdsSubject(practice, subject))) {
+                    console.warn(`openPhoneReader: ${practice ? `the practice ${JSON.stringify(practiceId)} does not hold the ${ref.kind} of ${JSON.stringify(ref.id)}` : `the practice ${JSON.stringify(practiceId)} is not open`}; the reader stays as it is`);
+                    return;
+                }
+                const shown = get().phoneReader;
+                if (get().activePracticeId === practiceId && shown?.practiceId === practiceId && shown.ref.id === ref.id) return;
+                set((state) => {
+                    state.activePracticeId = practiceId;
+                    state.phoneReader = { practiceId, ref };
+                });
+            },
+
+            closePhoneReader: () => {
+                if (!get().phoneReader) return;
+                set((state) => { state.phoneReader = null; });
+            },
             pendingDecision: null,
             decisionFocusRequest: null,
-            highestZIndex: 100,
+            windowFocusRequest: null,
+            phoneReader: null,
             structureWindow: {
                 blockId: null,
                 position: { x: Math.max(16, window.innerWidth - 400), y: 96 },
@@ -680,29 +1218,37 @@ const appStore = createStore<AppState>()(
                 }
             },
 
-            clearUserData: () => set((state) => {
-                // Clear all user-specific data
-                state.bookmarks = [];
-                state.dossiers = [];
-                state.annotations = [];
-                state.highlights = [];
-                state.loadedHighlightKeys = {};
-                state.loadedAnnotationKeys = {};
-                state.quickNorms = [];
-                state.customAliases = [];
-                state.environments = [];
-                state.isDataLoaded = false;
-                state.dataError = null;
+            clearUserData: () => {
+                // The backup of the last user's saved tabs (`backupV0`) goes too: a shared browser keeps nothing of them.
+                removeV0Backup();
+                set((state) => {
+                    // Clear all user-specific data
+                    state.bookmarks = [];
+                    state.dossiers = [];
+                    state.annotations = [];
+                    state.highlights = [];
+                    state.loadedHighlightKeys = {};
+                    state.loadedAnnotationKeys = {};
+                    state.quickNorms = [];
+                    state.customAliases = [];
+                    state.environments = [];
+                    state.isDataLoaded = false;
+                    state.dataError = null;
 
-                // Clear workspace tabs to ensure user isolation
-                // Each user should start with a clean workspace
-                state.workspaceTabs = [];
-                state.highestZIndex = 100;
-                // a decision asked for, a focus asked for, a citation waiting for the palette
-                state.pendingDecision = null;
-                state.decisionFocusRequest = null;
-                state.commandPaletteQuery = null;
-            }),
+                    // The practices: a shared browser must not show the last user's table (spec §10).
+                    state.practices = [];
+                    state.activePracticeId = null;
+                    state.practiceRows = {};
+                    state.pendingReveal = null;
+                    state.practiceNotice = null;
+                    // a decision asked for, a focus asked for, a citation waiting for the palette
+                    state.pendingDecision = null;
+                    state.decisionFocusRequest = null;
+                    state.windowFocusRequest = null;
+                    state.phoneReader = null;
+                    state.commandPaletteQuery = null;
+                });
+            },
 
             // UI Actions
             toggleSidebar: () => set((state) => {
@@ -756,362 +1302,69 @@ const appStore = createStore<AppState>()(
                 state.searchPanelState.position = position;
             }),
 
-            // Decision tabs (design 2026-10-05 §2.1-§2.2). Live here, not in workspaceTabActions.ts (gotcha 25).
-            openDecisionTab: (reference, options) => {
-                let tabId = '';
-                set((state) => {
-                    const existing = state.workspaceTabs.find(t =>
-                        t.view?.kind === 'decision' && sameDecision(t.view.reference, reference));
-                    const nothingOnScreen = !state.workspaceTabs.some(t => !t.isHidden && !t.isMinimized);
-                    const tab = existing ?? newViewTab(state, formatDecisionShort(reference), { kind: 'decision', reference });
-                    tab.isHidden = false;
-                    tab.isMinimized = false;
-                    if (existing) {
-                        tab.zIndex = ++state.highestZIndex;
-                        // an unresolved tab (no archive yet) learns the section a later citation adds:
-                        // it may be what settles the homonyms, so it asks again (a citation with an
-                        // archive never reaches here: it matches only a tab of its archive)
-                        const known = existing.view?.kind === 'decision' ? existing.view.reference : null;
-                        if (known && !known.archivio && reference.sezione &&
-                            decisionPath(known) !== decisionPath(reference)) {
-                            existing.view = { kind: 'decision', reference };
-                            existing.label = formatDecisionShort(reference);
-                        }
-                    }
-                    if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
-                    // with nothing else on screen a new decision takes the free area (design §2.2)
-                    else if (!existing && nothingOnScreen) fillFreeArea(state, tab.id);
-                    tabId = tab.id;
-                });
-                return tabId;
-            },
-
-            openDecisionSearchTab: (asked, label, options) => {
-                let tabId = '';
-                // the tab keeps the topic as typed, trimmed
+            // Decisions and topic searches read in a practice (spec §6.1, T8).
+            openTopicSearch: (asked, label, options) => {
+                // the window keeps the topic as typed, trimmed
                 const query = asked.tema === undefined ? asked : { ...asked, tema: asked.tema.trim() };
-                set((state) => {
-                    const wanted = stableQueryKey(query);
-                    const nothingOnScreen = !state.workspaceTabs.some(t => !t.isHidden && !t.isMinimized);
-                    const existing = state.workspaceTabs.find(t =>
-                        t.view?.kind === 'decision-search' && stableQueryKey(t.view.query) === wanted);
-                    const tab = existing ?? newViewTab(state, label, { kind: 'decision-search', query });
-                    tab.isHidden = false;
-                    tab.isMinimized = false;
-                    if (existing) tab.zIndex = ++state.highestZIndex;
-                    if (options?.besideTabId) placeSideBySide(state, options.besideTabId, tab.id);
-                    // with nothing else on screen a new search takes the free area, like a decision
-                    else if (!existing && nothingOnScreen) fillFreeArea(state, tab.id);
-                    tabId = tab.id;
-                });
-                return tabId;
-            },
-
-            setDecisionTabIdentity: (tabId, identity, label) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab || tab.view?.kind !== 'decision') return;
-                // One tab per decision: if another tab already holds this one (a candidate chosen
-                // in this tab), that one comes to the front and this one closes.
-                const other = state.workspaceTabs.find(t =>
-                    t.id !== tabId && t.view?.kind === 'decision' && sameDecision(t.view.reference, identity));
-                if (other) {
-                    other.isHidden = false;
-                    other.isMinimized = false;
-                    other.zIndex = ++state.highestZIndex;
-                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
-                    state.decisionFocusRequest = other.id;
-                    return;
+                // A topic-search window of the practice the link reads in,
+                // else the active one (T8); a phone shows it in the full-screen reader, beside nothing.
+                const before = get();
+                const landing = landingPractice(before, practiceOfPlace(before, options?.besideId), () => DECISIONS_PRACTICE_LABEL, 'openTopicSearch');
+                const ref: BesideRef = { id: topicWindowId(landing.practice.id, query), kind: 'decision-search', query, label: labelOr(label, DEFAULT_SEARCH_LABEL) };
+                if (!isDesktopViewport()) {
+                    const shown = before.phoneReader;
+                    if (landing.practices === before.practices && before.activePracticeId === landing.practice.id &&
+                        shown?.practiceId === landing.practice.id && shown.ref.id === ref.id) return ref.id;
+                    set((state) => {
+                        if (landing.practices !== before.practices) state.practices.push(landing.practice);
+                        activate(state, landing.practice.id);
+                        state.phoneReader = { practiceId: landing.practice.id, ref };
+                    });
+                    return ref.id;
                 }
-                tab.view = { kind: 'decision', reference: identityOf(identity) };
-                tab.label = label;
-            }),
-
-            placeTabsSideBySide: (leftTabId, rightTabId) => set((state) => {
-                placeSideBySide(state, leftTabId, rightTabId);
-            }),
+                const beside = besideWith(landing.practice.beside, ref);
+                const shownId = beside.find((b) => b.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(query))?.id ?? ref.id;
+                const alreadyShown = beside === landing.practice.beside;
+                if (alreadyShown && landing.practices === before.practices && before.activePracticeId === landing.practice.id &&
+                    before.windowFocusRequest === shownId) {
+                    return shownId;
+                }
+                set((state) => {
+                    if (landing.practices !== before.practices) state.practices.push(landing.practice);
+                    activate(state, landing.practice.id);
+                    (state.practices.find((p) => p.id === landing.practice.id) as Practice).beside = beside;
+                    // Asked again, the window already showing the topic takes focus.
+                    if (alreadyShown) state.windowFocusRequest = shownId;
+                });
+                return shownId;
+            },
 
             requestOpenDecision: (reference) => set((state) => {
                 state.pendingDecision = reference;
             }),
 
             drainPendingDecision: () => {
-                // Atomic enough for StrictMode: the request is cleared before the tab opens,
+                // Atomic enough for StrictMode: the request is cleared before the decision opens,
                 // so the second call finds null (gotcha 14).
                 const pending = get().pendingDecision;
                 if (!pending) return null;
                 set((state) => { state.pendingDecision = null; });
-                return get().openDecisionTab(pending);
+                return get().openDecision(pending, { fromLink: true }).decisionId;
             },
 
-            takeDecisionFocusRequest: (tabId) => {
-                if (get().decisionFocusRequest !== tabId) return false;
+            takeDecisionFocusRequest: (id) => {
+                if (get().decisionFocusRequest !== id) return false;
                 set((state) => { state.decisionFocusRequest = null; });
                 return true;
             },
 
-            // Workspace Tab Actions - Complete refactor
-            addWorkspaceTab: (label, norma, articles, options) => {
-                let tabId = '';
-                set((state) => {
-                    const tabCount = state.workspaceTabs.length;
-                    const cascade = (tabCount % 5) * 40;
-
-                    const newTab: WorkspaceTab = {
-                        id: uuidv4(),
-                        label,
-                        position: { x: 100 + cascade, y: 100 + cascade },
-                        size: { width: 800, height: 650 },
-                        zIndex: ++state.highestZIndex,
-                        isMinimized: false,
-                        isHidden: false,
-                        content: [],
-                        labelIsCustom: options?.isCustom === true,
-                    };
-
-                    if (norma && articles) {
-                        const sortedArticles = [...articles].sort((a, b) => {
-                            // Sort by attachment first, then number
-                            if (a.norma_data.allegato !== b.norma_data.allegato) {
-                                if (!a.norma_data.allegato) return -1;
-                                if (!b.norma_data.allegato) return 1;
-                                return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
-                            }
-                            const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                            const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                            return numA - numB;
-                        });
-
-                        newTab.content.push({
-                            type: 'norma',
-                            id: uuidv4(),
-                            norma,
-                            articles: sortedArticles,
-                            isCollapsed: false
-                        });
-                    }
-
-                    state.workspaceTabs.push(newTab);
-                    tabId = newTab.id;
-                });
-                return tabId;
+            takeWindowFocusRequest: (id) => {
+                if (get().windowFocusRequest !== id) return false;
+                set((state) => { state.windowFocusRequest = null; });
+                return true;
             },
-
-            addNormaToTab: (tabId, norma, articles) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'addNormaToTab')) return;
-
-                // Helper to get a unique key for an article within a norma block
-                const getArticleKey = (a: ArticleData) => {
-                    return a.norma_data.allegato
-                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-                        : a.norma_data.numero_articolo;
-                };
-
-                const existingNorma = tab.content.find(
-                    c => c.type === 'norma' &&
-                        c.norma.tipo_atto === norma.tipo_atto &&
-                        c.norma.numero_atto === norma.numero_atto &&
-                        c.norma.data === norma.data
-                ) as NormaBlock | undefined;
-
-                if (existingNorma) {
-                    const existingArticleKeys = new Set(
-                        existingNorma.articles.map(getArticleKey)
-                    );
-
-                    const newArticles = articles.filter(
-                        a => !existingArticleKeys.has(getArticleKey(a))
-                    );
-
-                    // an article stored while Brocardi was down learns what a later copy of it got
-                    for (const incoming of articles) {
-                        if (!incoming.brocardi_info) continue;
-                        const stored = existingNorma.articles.find(a => getArticleKey(a) === getArticleKey(incoming));
-                        if (stored && !stored.brocardi_info) {
-                            stored.brocardi_info = incoming.brocardi_info;
-                            delete stored.brocardi_error;
-                        }
-                    }
-
-                    if (newArticles.length > 0) {
-                        existingNorma.articles = [...existingNorma.articles, ...newArticles];
-                        existingNorma.articles.sort((a, b) => {
-                            // Sort by attachment first, then number
-                            if (a.norma_data.allegato !== b.norma_data.allegato) {
-                                if (!a.norma_data.allegato) return -1;
-                                if (!b.norma_data.allegato) return 1;
-                                return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
-                            }
-                            const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                            const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                            return numA - numB;
-                        });
-                    }
-                } else {
-                    const sortedArticles = [...articles].sort((a, b) => {
-                        if (a.norma_data.allegato !== b.norma_data.allegato) {
-                            if (!a.norma_data.allegato) return -1;
-                            if (!b.norma_data.allegato) return 1;
-                            return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
-                        }
-                        const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                        const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                        return numA - numB;
-                    });
-
-                    tab.content.push({
-                        type: 'norma',
-                        id: uuidv4(),
-                        norma,
-                        articles: sortedArticles,
-                        isCollapsed: false
-                    });
-                }
-
-                tab.zIndex = ++state.highestZIndex;
-            }),
-
-            addLooseArticleToTab: (tabId, article, sourceNorma) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'addLooseArticleToTab')) return;
-
-                tab.content.push({
-                    type: 'loose-article',
-                    id: uuidv4(),
-                    article,
-                    sourceNorma
-                });
-
-                tab.zIndex = ++state.highestZIndex;
-            }),
-
-            updateTab: (id, updates) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    Object.assign(tab, updates);
-                }
-            }),
-
-            removeTab: (id) => set((state) => {
-                state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== id);
-            }),
-
-            bringTabToFront: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.zIndex = ++state.highestZIndex;
-                }
-            }),
-
-            toggleTabMinimize: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.isMinimized = !tab.isMinimized;
-                }
-            }),
-
-            toggleTabVisibility: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.isHidden = !tab.isHidden;
-                }
-            }),
-
-            toggleNormaCollapse: (tabId, normaId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
-                if (norma) {
-                    norma.isCollapsed = !norma.isCollapsed;
-                }
-            }),
-
-            setTabLabel: (id, label) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab) {
-                    tab.label = label;
-                    // Manual rename reserves the tab from R3 auto-merge.
-                    tab.labelIsCustom = true;
-                }
-            }),
-
-            // Workspace tabs are UI-only (persisted via localStorage, not the
-            // server), so unlike setDossierItemOrder this is a pure local
-            // splice with no API call.
-            reorderWorkspaceTabs: (fromIndex, toIndex) => set((state) => {
-                if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
-                    fromIndex >= state.workspaceTabs.length || toIndex >= state.workspaceTabs.length) return;
-                const [moved] = state.workspaceTabs.splice(fromIndex, 1);
-                state.workspaceTabs.splice(toIndex, 0, moved);
-            }),
-
-            arrangeWorkspaceTabs: () => set((state) => {
-                const gap = 24;
-                const startX = 32;
-                const startY = 32;
-                const viewportWidth = typeof window === 'undefined' ? 1200 : window.innerWidth;
-                const columns = Math.max(1, Math.floor((viewportWidth - 96) / 420));
-                state.workspaceTabs.forEach((tab, index) => {
-                    tab.position = {
-                        x: startX + (index % columns) * (Math.min(tab.size.width, 400) + gap),
-                        y: startY + Math.floor(index / columns) * 120,
-                    };
-                    tab.isHidden = false;
-                    tab.isMinimized = false;
-                });
-            }),
-
-            closeAllWorkspaceTabs: () => set((state) => {
-                state.workspaceTabs = [];
-            }),
 
             // ── Structure window ─────────────────────────────────────────
-            addNormaIndexToTab: (tabId, norma) => {
-                const tab = get().workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return null;
-                if (refuseViewTab(tab, 'addNormaIndexToTab')) return null;
-
-                const existing = tab.content.find(
-                    (c): c is NormaBlock => c.type === 'norma' &&
-                        c.norma.tipo_atto === norma.tipo_atto &&
-                        c.norma.numero_atto === norma.numero_atto &&
-                        c.norma.data === norma.data
-                );
-                const blockId = existing ? existing.id : uuidv4();
-
-                set((state) => {
-                    const target = state.workspaceTabs.find(t => t.id === tabId);
-                    if (!target) return;
-
-                    if (existing) {
-                        // The act is already on the table: point the window at
-                        // it rather than adding a second copy. Backfill the URN
-                        // if that block arrived without one, since the tree
-                        // endpoint needs it.
-                        const block = target.content.find(c => c.id === blockId);
-                        if (block?.type === 'norma' && !block.norma.urn) {
-                            block.norma.urn = norma.urn;
-                        }
-                    } else {
-                        target.content.push({
-                            type: 'norma',
-                            id: blockId,
-                            norma,
-                            articles: [],
-                            isCollapsed: false,
-                        });
-                    }
-
-                    target.zIndex = ++state.highestZIndex;
-                    state.structureWindow.blockId = blockId;
-                });
-
-                return blockId;
-            },
-
             // Assigning `blockId` is the whole mechanism: a second open hands
             // ownership over rather than adding a window.
             openStructureWindow: (blockId) => set((state) => {
@@ -1128,12 +1381,14 @@ const appStore = createStore<AppState>()(
 
             // ── Reading back-stack ───────────────────────────────────────
             pushReadingBack: (entry) => set((state) => {
-                state.readingBackStack = appendBackEntry(state.readingBackStack, entry);
+                // An entry naming nothing the practices hold could never be walked back to.
+                const kept = practiceBackEntry(state, entry);
+                if (kept) state.readingBackStack = appendBackEntry(state.readingBackStack, kept);
             }),
 
             popReadingBack: () => {
-                const { readingBackStack, workspaceTabs } = get();
-                const index = findLiveBackIndex(readingBackStack, workspaceTabs);
+                const { readingBackStack, practices } = get();
+                const index = findLiveBackIndex(readingBackStack, practices);
                 if (index < 0) {
                     // Everything above (and including) the oldest entry is dead;
                     // drop the lot so the control stops offering a dead end.
@@ -1143,328 +1398,14 @@ const appStore = createStore<AppState>()(
                     return null;
                 }
                 const entry = readingBackStack[index];
-                // Entries newer than the live one point at closed tabs/blocks:
+                // Entries newer than the live one point at subjects that are gone:
                 // they are discarded together with the one being consumed.
-                set((state) => { state.readingBackStack = state.readingBackStack.slice(0, index); });
+                set((state) => {
+                    state.readingBackStack = state.readingBackStack.slice(0, index);
+                    walkBackTo(state, entry);
+                });
                 return entry;
             },
-
-            focusArticleInTab: (tabId, articleId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                // Find the NormaBlock that actually contains this article so
-                // callers don't need to track normaBlockId themselves.
-                // Matched through the shared encoder and a normalized compare:
-                // the incoming id may come from the tree API ("1-bis") while
-                // the loaded article stores the scraper's form ("1 bis"), and a
-                // strict === would silently focus nothing (gotcha 9).
-                const wanted = normalizeArticleId(articleId);
-                const block = tab.content.find(c => {
-                    if (c.type !== 'norma') return false;
-                    return c.articles.some(
-                        a => normalizeArticleId(uniqueArticleIdFromNorma(a.norma_data)) === wanted
-                    );
-                }) as NormaBlock | undefined;
-                if (!block) return;
-                block.autoFocusArticleId = articleId;
-                // Surface the tab if it was minimized/hidden so the focus signal
-                // is actually visible (R3 + R2 edge case).
-                tab.isMinimized = false;
-                tab.isHidden = false;
-                tab.zIndex = ++state.highestZIndex;
-            }),
-
-            consumeAutoFocusArticle: (tabId, normaBlockId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                const block = tab.content.find(
-                    c => c.type === 'norma' && c.id === normaBlockId
-                ) as NormaBlock | undefined;
-                if (block) {
-                    block.autoFocusArticleId = undefined;
-                }
-            }),
-
-            moveNormaBetweenTabs: (normaId, sourceTabId, targetTabId) => set((state) => {
-                const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
-                const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
-                if (!sourceTab || !targetTab) return;
-                if (refuseViewTab(targetTab, 'moveNormaBetweenTabs')) return;
-
-                const normaIndex = sourceTab.content.findIndex(c => c.type === 'norma' && c.id === normaId);
-                if (normaIndex === -1) return;
-
-                const norma = sourceTab.content[normaIndex];
-                sourceTab.content.splice(normaIndex, 1);
-                targetTab.content.push(norma);
-
-                targetTab.zIndex = ++state.highestZIndex;
-            }),
-
-            extractArticleFromNorma: (tabId, normaId, articleId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
-                if (!norma) return;
-
-                // Helper to get a unique key for comparison
-                const getArticleKey = (a: ArticleData) => {
-                    return a.norma_data.allegato
-                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-                        : a.norma_data.numero_articolo;
-                };
-
-                const article = norma.articles.find(a => getArticleKey(a) === articleId);
-                if (!article) return;
-
-                norma.articles = norma.articles.filter(a => getArticleKey(a) !== articleId);
-
-                if (norma.articles.length === 0) {
-                    tab.content = tab.content.filter(c => c.id !== normaId);
-                }
-
-                tab.content.push({
-                    type: 'loose-article',
-                    id: uuidv4(),
-                    article,
-                    sourceNorma: norma.norma
-                });
-            }),
-
-            moveLooseArticleBetweenTabs: (articleId, sourceTabId, targetTabId) => set((state) => {
-                const sourceTab = state.workspaceTabs.find(t => t.id === sourceTabId);
-                const targetTab = state.workspaceTabs.find(t => t.id === targetTabId);
-                if (!sourceTab || !targetTab) return;
-                if (refuseViewTab(targetTab, 'moveLooseArticleBetweenTabs')) return;
-
-                const articleIndex = sourceTab.content.findIndex(c => c.type === 'loose-article' && c.id === articleId);
-                if (articleIndex === -1) return;
-
-                const looseArticle = sourceTab.content[articleIndex];
-                sourceTab.content.splice(articleIndex, 1);
-                targetTab.content.push(looseArticle);
-
-                targetTab.zIndex = ++state.highestZIndex;
-            }),
-
-            removeArticleFromNorma: (tabId, normaId, articleId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
-                if (!norma) return;
-
-                const getArticleKey = (a: ArticleData) => {
-                    return a.norma_data.allegato
-                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-                        : a.norma_data.numero_articolo;
-                };
-
-                norma.articles = norma.articles.filter(a => getArticleKey(a) !== articleId);
-
-                if (norma.articles.length === 0) {
-                    tab.content = tab.content.filter(c => c.id !== normaId);
-                }
-
-                if (tab.content.length === 0) {
-                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
-                }
-            }),
-
-            removeContentFromTab: (tabId, contentId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                tab.content = tab.content.filter(c => c.id !== contentId);
-
-                // Remove tab if empty
-                if (tab.content.length === 0) {
-                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
-                }
-            }),
-
-            mergeLooseArticleToNorma: (tabId, looseArticleId, targetNormaId) => {
-                let success = false;
-                set((state) => {
-                    const tab = state.workspaceTabs.find(t => t.id === tabId);
-                    if (!tab) return;
-
-                    // Find the loose article
-                    const looseIndex = tab.content.findIndex(
-                        c => c.type === 'loose-article' && c.id === looseArticleId
-                    );
-                    if (looseIndex === -1) return;
-
-                    const loose = tab.content[looseIndex] as LooseArticle;
-
-                    // Find the target norma block
-                    const targetNorma = tab.content.find(
-                        c => c.type === 'norma' && c.id === targetNormaId
-                    ) as NormaBlock | undefined;
-                    if (!targetNorma) return;
-
-                    // Verify compatibility: same source norma
-                    const isSameNorma =
-                        loose.sourceNorma.tipo_atto === targetNorma.norma.tipo_atto &&
-                        loose.sourceNorma.numero_atto === targetNorma.norma.numero_atto &&
-                        loose.sourceNorma.data === targetNorma.norma.data;
-
-                    if (!isSameNorma) return;
-
-                    // Check for duplicate article. Normalized comparison:
-                    // the tree API and the scraper disagree on suffix
-                    // formatting ("1-bis" vs "1 bis"), a bare === would
-                    // miss the match (gotcha #9).
-                    const articleNumber = normalizeArticleId(loose.article.norma_data.numero_articolo);
-                    const isDuplicate = targetNorma.articles.some(
-                        a => normalizeArticleId(a.norma_data.numero_articolo) === articleNumber
-                    );
-
-                    if (isDuplicate) return;
-
-                    // Add article to norma block and sort
-                    targetNorma.articles.push(loose.article);
-                    targetNorma.articles.sort((a, b) => {
-                        const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                        const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                        return numA - numB;
-                    });
-
-                    // Remove loose article
-                    tab.content.splice(looseIndex, 1);
-                    success = true;
-                });
-                return success;
-            },
-
-            // Collection Actions
-            createCollection: (tabId, label) => {
-                let collectionId = '';
-                set((state) => {
-                    const tab = state.workspaceTabs.find(t => t.id === tabId);
-                    if (!tab) return;
-                    if (refuseViewTab(tab, 'createCollection')) return;
-
-                    const newCollection: ArticleCollection = {
-                        type: 'collection',
-                        id: uuidv4(),
-                        label: label || 'Nuova Raccolta',
-                        articles: [],
-                        isCollapsed: false,
-                        color: 'purple'
-                    };
-
-                    tab.content.push(newCollection);
-                    collectionId = newCollection.id;
-                });
-                return collectionId;
-            },
-
-            renameCollection: (tabId, collectionId, newLabel) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (collection) {
-                    collection.label = newLabel;
-                }
-            }),
-
-            addArticleToCollection: (tabId, collectionId, article, sourceNorma) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'addArticleToCollection')) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (!collection) return;
-
-                // Check for duplicates
-                const articleKey = `${sourceNorma.tipo_atto}-${sourceNorma.numero_atto}-${article.norma_data.numero_articolo}`;
-                const exists = collection.articles.some(
-                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` === articleKey
-                );
-
-                if (!exists) {
-                    collection.articles.push({ article, sourceNorma });
-                }
-            }),
-
-            removeArticleFromCollection: (tabId, collectionId, articleKey) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (!collection) return;
-
-                collection.articles = collection.articles.filter(
-                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` !== articleKey
-                );
-
-                // Remove empty collection
-                if (collection.articles.length === 0) {
-                    tab.content = tab.content.filter(c => c.id !== collectionId);
-                }
-            }),
-
-            toggleCollectionCollapse: (tabId, collectionId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (collection) {
-                    collection.isCollapsed = !collection.isCollapsed;
-                }
-            }),
-
-            moveLooseArticleToCollection: (tabId, looseArticleId, collectionId) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === tabId);
-                if (!tab) return;
-                if (refuseViewTab(tab, 'moveLooseArticleToCollection')) return;
-
-                // Find and remove loose article
-                const looseIndex = tab.content.findIndex(
-                    c => c.type === 'loose-article' && c.id === looseArticleId
-                );
-                if (looseIndex === -1) return;
-
-                const loose = tab.content[looseIndex] as LooseArticle;
-
-                // Find target collection
-                const collection = tab.content.find(
-                    c => c.type === 'collection' && c.id === collectionId
-                ) as ArticleCollection | undefined;
-
-                if (!collection) return;
-
-                // Check for duplicates
-                const articleKey = `${loose.sourceNorma.tipo_atto}-${loose.sourceNorma.numero_atto}-${loose.article.norma_data.numero_articolo}`;
-                const exists = collection.articles.some(
-                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` === articleKey
-                );
-
-                if (!exists) {
-                    collection.articles.push({
-                        article: loose.article,
-                        sourceNorma: loose.sourceNorma
-                    });
-                }
-
-                // Remove loose article
-                tab.content.splice(looseIndex, 1);
-            }),
 
             addBookmark: (norma, tags = []) => {
                 const key = generateKey(norma);
@@ -1570,7 +1511,7 @@ const appStore = createStore<AppState>()(
                         description,
                     });
                     set((state) => {
-                        state.dossiers.push({
+                        upsertById(state.dossiers, {
                             id: created.id,
                             title,
                             description,
@@ -1895,9 +1836,18 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            refreshDossier: async (dossierId) => {
+            refreshDossier: async (dossierId, options) => {
+                const quiet = options?.quiet === true;
+                // A write on its way, before or after the read starts, may be missing from the
+                // answer: a quiet read waits for the next turn rather than undo it.
+                if (quiet && dossierService.writesInFlight() > 0) return;
+                const before = get().dossiers.find(d => d.id === dossierId);
                 try {
                     const fresh = dossierFromApi(await dossierService.getById(dossierId));
+                    // Immer gives a dossier a new object on any change: a different one means an
+                    // edit (or a deletion) happened here meanwhile, and the answer may predate it.
+                    if (quiet && (dossierService.writesInFlight() > 0
+                        || get().dossiers.find(d => d.id === dossierId) !== before)) return;
                     set((state) => {
                         const index = state.dossiers.findIndex(d => d.id === dossierId);
                         if (index < 0) {
@@ -1914,13 +1864,44 @@ const appStore = createStore<AppState>()(
                             state.dossiers[index] = fresh;
                             return;
                         }
+                        // A quiet read never merges: the server may already hold a pending item
+                        // under its own id, which the merge would add a second time.
+                        if (quiet) return;
                         const known = new Set(local.items.map(i => i.id));
                         local.items.push(...fresh.items.filter(i => !known.has(i.id)));
                     });
                 } catch (err) {
                     console.error('Failed to reload the dossier:', dossierId, err);
-                    get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
+                    if (!quiet) get().pushSyncError('Ripristinato, ma non riesco a ricaricare il dossier: aggiorna la pagina.');
                 }
+            },
+
+            refreshDossiers: async () => {
+                if (dossierService.writesInFlight() > 0) return;
+                const before = get().dossiers;
+                let fresh: Dossier[];
+                try {
+                    fresh = (await dossierService.getAll()).map(dossierFromApi);
+                } catch (err) {
+                    console.error('Failed to reload the dossiers:', err);
+                    return;
+                }
+                // A write on its way, or a change here meanwhile: the answer may predate it.
+                if (dossierService.writesInFlight() > 0 || get().dossiers !== before) return;
+                set((state) => {
+                    // A dossier with an add, an undo or an order on its way stays as it is here.
+                    const busy = (d: Dossier) => !!state.pendingDossierOrders[d.id]
+                        || d.items.some(i => state.pendingDossierItemIds[i.id]);
+                    const local = new Map(state.dossiers.map(d => [d.id, d]));
+                    const onServer = new Set(fresh.map(d => d.id));
+                    state.dossiers = [
+                        ...fresh.map(d => {
+                            const mine = local.get(d.id);
+                            return mine && busy(mine) ? mine : d;
+                        }),
+                        ...state.dossiers.filter(d => !onServer.has(d.id) && busy(d)),
+                    ];
+                });
             },
 
             // Server first (gotcha 17): a note has no optimistic window to undo.
@@ -1928,7 +1909,8 @@ const appStore = createStore<AppState>()(
                 try {
                     const created = await dossierService.addNote(dossierId, { text, ...(aboutItemId ? { aboutItemId } : {}) });
                     set((state) => {
-                        state.dossiers.find(d => d.id === dossierId)?.items.push(dossierItemFromApi(created));
+                        const target = state.dossiers.find(d => d.id === dossierId);
+                        if (target) upsertById(target.items, dossierItemFromApi(created));
                     });
                     return true;
                 } catch (err) {
@@ -2102,7 +2084,7 @@ const appStore = createStore<AppState>()(
                     }
 
                     set((state) => {
-                        state.dossiers.push({
+                        upsertById(state.dossiers, {
                             id: created.id,
                             title: dossier.title,
                             description: dossier.description,
@@ -3087,7 +3069,9 @@ const appStore = createStore<AppState>()(
             }
         })),
         {
-            name: 'visualex-storage',
+            name: STORAGE_NAME,
+            // A write the browser refuses (a full localStorage) is caught, never thrown out of `set` (T20).
+            storage: createJSONStorage<Partial<AppState>>(() => guardedStorage(localStorage, reportSaveFailure)),
             // Only persist UI state and settings, NOT user data. Bookmarks,
             // dossiers, environments, quickNorms, customAliases, annotations,
             // highlights are now all server-backed and hydrated by
@@ -3096,19 +3080,27 @@ const appStore = createStore<AppState>()(
             partialize: (state) => ({
                 settings: state.settings,
                 searchPanelState: state.searchPanelState,
-                workspaceTabs: state.workspaceTabs,
-                highestZIndex: state.highestZIndex,
                 // Narrowed on purpose: the parked position is worth keeping,
                 // the owning block id is not — it would rehydrate a window
                 // belonging to a block that no longer exists.
                 structureWindow: { position: state.structureWindow.position, blockId: null },
-                // Every user-data slice is now server-backed and hydrated by
-                // fetchUserData. Nothing user-owned survives in localStorage
-                // anymore — persisting would cause drift with the server.
+                // The practices are UI state too (spec D6); the open rows, the pending reveal and
+                // the notice are the session's.
+                practices: state.practices,
+                activePracticeId: state.activePracticeId,
+                // Every other user-data slice is server-backed and hydrated by
+                // fetchUserData, so it does not survive in localStorage —
+                // persisting would cause drift with the server. The practices
+                // above are the deliberate exception (browser-only, spec D6).
                 // Excluded on purpose:
                 //   bookmarks, dossiers, environments, quickNorms,
                 //   customAliases, annotations, highlights
             }),
+            // Version 1: the practices are the workspace. A browser that saved tabs (version 0)
+            // gets its practices from them, once (spec §9); the zustand write-back then stores the
+            // migrated state as version 1.
+            version: 1,
+            migrate: (persisted, from) => migratePersisted(persisted, from) as unknown as AppState,
             // Rehydrated state from older versions may not have the
             // `studyMode` slice we just added. Splice in defaults here so
             // components can safely read `settings.studyMode.*` without
@@ -3118,7 +3110,7 @@ const appStore = createStore<AppState>()(
                 return {
                     ...current,
                     ...p,
-                    ...(p.workspaceTabs !== undefined ? { workspaceTabs: sanitizeViews(p.workspaceTabs) ?? current.workspaceTabs } : {}),
+                    ...practicesOnLoad(persisted),
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
@@ -3147,42 +3139,317 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 export { appStore };
 
 // Export types
-/** Does the tab's reference (`tab`) show the decision a citation (`wanted`) names? Same court,
- *  number and year; a citation with an archive matches only a tab of that archive (civil and
- *  penal numbers run in separate series), one without matches a tab of either. */
-function sameDecision(tab: DecisionReference, wanted: DecisionReference): boolean {
-    return tab.corte === wanted.corte && tab.numero === wanted.numero && tab.anno === wanted.anno &&
-        (wanted.archivio === undefined || tab.archivio === wanted.archivio);
+/** A new, empty practice: the label trimmed and capped, «Pratica» when nothing is left of it. */
+function newPractice(label: string, custom: boolean): Practice {
+    return { id: uuidv4(), label: labelOr(label, DEFAULT_PRACTICE_LABEL), labelIsCustom: custom, acts: [], decisions: [], beside: [] };
 }
 
-function isValidView(view: unknown): boolean {
-    if (!view || typeof view !== 'object') return false;
-    const v = view as { kind?: unknown; reference?: Record<string, unknown>; query?: unknown };
-    if (v.kind === 'decision') {
-        const r = v.reference;
-        return !!r && typeof r.corte === 'string' && r.corte !== '' &&
-            Number.isInteger(r.numero) && (r.numero as number) > 0 &&
-            Number.isInteger(r.anno) && (r.anno as number) > 0;
+/**
+ * Where a search or the index lands (T11, §5.1): the practice `wanted` names; `null`, or an id that
+ * names no practice (closed meanwhile, warned with its id), means the active practice, created when
+ * there is none (named `label()`) and then made active. Pure over the plain state.
+ */
+function landingPractice(
+    state: Pick<AppState, 'practices' | 'activePracticeId'>,
+    wanted: string | null,
+    label: () => string,
+    caller: string,
+): { practices: Practice[]; practice: Practice; activePracticeId: string | null } {
+    const { practices, activePracticeId } = state;
+    if (wanted !== null) {
+        const named = practices.find((p) => p.id === wanted);
+        if (named) return { practices, practice: named, activePracticeId };
+        console.warn(`${caller}: the practice ${JSON.stringify(wanted)} is not open (closed meanwhile?); landing in the active practice`);
     }
-    if (v.kind === 'decision-search') {
-        const q = v.query as { tema?: unknown; norma?: unknown } | null | undefined;
-        if (!q || typeof q !== 'object') return false;
-        if (q.tema !== undefined && typeof q.tema !== 'string') return false;
-        const n = q.norma as Record<string, unknown> | null | undefined;
-        if (n !== undefined && (!n || typeof n !== 'object' || typeof n.tipo_atto !== 'string' || typeof n.numero_articolo !== 'string')) return false;
-        return q.tema !== undefined || n !== undefined;
-    }
-    return false;
+    const active = practices.find((p) => p.id === activePracticeId);
+    if (active) return { practices, practice: active, activePracticeId };
+    const created = newPractice(label(), false);
+    return { practices: [...practices, created], practice: created, activePracticeId: created.id };
 }
 
-/** Drops a persisted tab's malformed `view`; a tab left without content goes with it. */
-function sanitizeViews(tabs: unknown): WorkspaceTab[] | undefined {
-    if (!Array.isArray(tabs)) return undefined;
-    return (tabs as WorkspaceTab[]).flatMap((tab) => {
-        if (!tab || tab.view === undefined || isValidView(tab.view)) return [tab];
-        const { view: _view, ...rest } = tab;
-        void _view;
-        return Array.isArray(rest.content) && rest.content.length > 0 ? [rest as WorkspaceTab] : [];
+/** The window of `practiceId` showing `subject` while its row is folded because of it (desktop only:
+ *  a phone draws no window and folds no row), else undefined. */
+function foldedBy(state: AppState, practiceId: string, subject: PracticeSubject): string | undefined {
+    if (!isDesktopViewport()) return undefined;
+    const practice = state.practices.find((p) => p.id === practiceId);
+    return practice ? shownWindowId(practice.beside, besideRefFor(subject)) : undefined;
+}
+
+/** Makes a practice the one on screen. The phone's reader belongs to one practice: another one
+ *  coming on screen takes the reader off, in the same update (T19). */
+function activate(state: AppState, practiceId: string): void {
+    if (state.phoneReader && state.phoneReader.practiceId !== practiceId) state.phoneReader = null;
+    state.activePracticeId = practiceId;
+}
+
+/** Opens a row and asks for it to be revealed; unfolds its act, which would hide it. The row moves
+ *  to the end of `practiceRows`, open already or not: the act's last row there is the one its block
+ *  reads from (Studio, the arrows). A row folded because a window shows its article is not scrolled
+ *  to: the window is focused instead (spec §4.2, «a subject already shown beside is focused»). */
+function revealRow(state: AppState, practiceId: string, actId: string, articleKey: string): void {
+    const rowKey = articleRowKey(practiceId, actId, articleKey);
+    const act = state.practices.find((p) => p.id === practiceId)?.acts.find((a) => a.id === actId);
+    if (act) act.isCollapsed = false;
+    delete state.practiceRows[rowKey];
+    state.practiceRows[rowKey] = true;
+    // A row is revealed in the table: the phone's reader, which replaces the column, gives way.
+    state.phoneReader = null;
+    const window_ = foldedBy(state, practiceId, { kind: 'article', actId, articleKey });
+    if (window_) state.windowFocusRequest = window_;
+    else state.pendingReveal = { practiceId, rowKey };
+}
+
+/** Closes the open rows under `key` (a prefix, or exactly that key) and drops a reveal of one. */
+function dropRows(state: AppState, key: string, exact = false): void {
+    const hit = (rowKey: string) => (exact ? rowKey === key : rowKey.startsWith(key));
+    for (const rowKey of Object.keys(state.practiceRows)) {
+        if (hit(rowKey)) delete state.practiceRows[rowKey];
+    }
+    if (state.pendingReveal && hit(state.pendingReveal.rowKey)) state.pendingReveal = null;
+}
+
+/** The windows after `ref` opens beside (`besideAfterOpen`): the same array, unchanged, when a
+ *  window already shows that subject, whatever its id (a topic search by its query's key). */
+function besideWith(beside: BesideRef[], ref: BesideRef, askerId?: string): BesideRef[] {
+    const shown = beside.some((b) => b.id === ref.id || sameBesideSubject(b, ref) ||
+        (b.kind === 'decision-search' && ref.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(ref.query)));
+    return shown ? beside : besideAfterOpen(beside, ref, askerId);
+}
+
+/** A decision entry merged into `survivorId`: what named the absorbed one names the survivor — its
+ *  window (one window per subject), its open row and reveal, the way back (carry-over ruling 7). */
+function absorbDecision(state: AppState, practice: Practice, absorbedId: string, survivorId: string): void {
+    const onSurvivor = practice.beside.some((b) => b.kind === 'decision' && b.decisionId === survivorId);
+    practice.beside = practice.beside.flatMap((b): BesideRef[] => {
+        if (b.kind !== 'decision' || b.decisionId !== absorbedId) return [b];
+        return onSurvivor ? [] : [besideRefFor({ kind: 'decision', decisionId: survivorId })];
+    });
+    const absorbedRow = decisionRowKey(practice.id, absorbedId);
+    const survivorRow = decisionRowKey(practice.id, survivorId);
+    if (state.practiceRows[absorbedRow]) {
+        delete state.practiceRows[absorbedRow];
+        state.practiceRows[survivorRow] = true;
+    }
+    if (state.pendingReveal?.rowKey === absorbedRow) state.pendingReveal = { practiceId: practice.id, rowKey: survivorRow };
+    if (state.phoneReader?.practiceId === practice.id && state.phoneReader.ref.kind === 'decision' &&
+        state.phoneReader.ref.decisionId === absorbedId) {
+        state.phoneReader.ref = besideRefFor({ kind: 'decision', decisionId: survivorId });
+    }
+    for (const entry of state.readingBackStack) {
+        if (entry.practiceId === practice.id &&
+            entry.subject.kind === 'decision' && entry.subject.decisionId === absorbedId) {
+            entry.subject.decisionId = survivorId;
+        }
+    }
+}
+
+/**
+ * A pushed entry as a practice's (spec §6.3), or null: when its `tabId` names neither a practice,
+ * nor a window, nor the phone's reader; when the practice does not hold what it names.
+ */
+function practiceBackEntry(state: AppState, entry: ReadingBackEntry): PracticeBackEntry | null {
+    const { label } = entry;
+    const practice = state.practices.find((p) => p.id === entry.tabId);
+    if (practice) {
+        const act = practice.acts.find((a) => a.id === entry.blockId);
+        // The row the entry names by its key (a past text, ruling 12), else the one its id names.
+        const hit = act && ((entry.articleKey && act.articles.find((a) => practiceArticleKey(a) === entry.articleKey)) ||
+            findPracticeArticle(act, entry.articleId));
+        if (act && hit) {
+            return { practiceId: practice.id, subject: { kind: 'article', actId: act.id, articleKey: practiceArticleKey(hit) }, place: 'table', label };
+        }
+        const decision = practice.decisions.find((d) => d.id === entry.blockId);
+        return decision ? { practiceId: practice.id, subject: { kind: 'decision', decisionId: decision.id }, place: 'table', label } : null;
+    }
+    // The reader on a phone reads under its subject's window id, though no window holds it (T19).
+    const reader = state.phoneReader?.ref.id === entry.tabId ? state.phoneReader : null;
+    for (const holder of state.practices) {
+        const ref = holder.beside.find((b) => b.id === entry.tabId) ?? (reader?.practiceId === holder.id ? reader.ref : undefined);
+        const subject: PracticeSubject | null = ref ? subjectOfRef(ref) : null;
+        if (subject) return { practiceId: holder.id, subject, place: 'beside', label };
+    }
+    return null;
+}
+
+/** Back to a practice's entry: the practice on screen, then its row revealed or its window opened. */
+function walkBackTo(state: AppState, entry: PracticeBackEntry): void {
+    const practice = state.practices.find((p) => p.id === entry.practiceId);
+    if (!practice) return;
+    state.activePracticeId = practice.id;
+    const { subject } = entry;
+    if (!isDesktopViewport()) {
+        // A phone has no windows: a subject read beside is read in the full-screen reader, and a row of
+        // the table is revealed with the reader closed (T19).
+        state.phoneReader = entry.place === 'beside' ? { practiceId: practice.id, ref: besideRefFor(subject) } : null;
+        if (entry.place === 'beside') return;
+    }
+    if (entry.place === 'beside') {
+        const ref = besideRefFor(subject);
+        const shownId = isDesktopViewport() ? shownWindowId(practice.beside, ref) : undefined;
+        practice.beside = besideWith(practice.beside, ref);
+        if (shownId) state.windowFocusRequest = shownId;
+    } else if (subject.kind === 'article') {
+        revealRow(state, practice.id, subject.actId, subject.articleKey);
+    } else {
+        revealDecisionRow(state, practice.id, subject.decisionId);
+    }
+}
+
+/** Opens a decision's row in «Giurisprudenza» and asks for it to be revealed. */
+function revealDecisionRow(state: AppState, practiceId: string, decisionId: string): void {
+    const rowKey = decisionRowKey(practiceId, decisionId);
+    state.practiceRows[rowKey] = true;
+    state.phoneReader = null;
+    const window_ = foldedBy(state, practiceId, { kind: 'decision', decisionId });
+    if (window_) state.windowFocusRequest = window_;
+    else state.pendingReveal = { practiceId, rowKey };
+}
+
+/** The id of the window of `beside` already showing `ref`'s subject, whatever its id; undefined when none. */
+function shownWindowId(beside: BesideRef[], ref: BesideRef): string | undefined {
+    return beside.find((b) => b.id === ref.id || sameBesideSubject(b, ref) ||
+        (b.kind === 'decision-search' && ref.kind === 'decision-search' && stableQueryKey(b.query) === stableQueryKey(ref.query)))?.id;
+}
+
+/** `placeId` when it names a light window of some practice (the asker of a link, T16); else undefined:
+ *  a practice (a row of the table) asks nothing of the windows. */
+function windowIdOf(state: Pick<AppState, 'practices'>, placeId: string | undefined): string | undefined {
+    return placeId && state.practices.some((p) => p.beside.some((b) => b.id === placeId)) ? placeId : undefined;
+}
+
+/** The practice a link's `besideId` reads in: a practice (a row of its table), the practice
+ *  holding the window of that id, or the practice of the phone's reader of that id; null for
+ *  anything else, which lands in the active one. */
+function practiceOfPlace(state: Pick<AppState, 'practices' | 'phoneReader'>, placeId: string | undefined): string | null {
+    if (!placeId) return null;
+    if (state.phoneReader?.ref.id === placeId && state.practices.some((p) => p.id === state.phoneReader?.practiceId)) {
+        return state.phoneReader.practiceId;
+    }
+    const holder = state.practices.find((p) => p.id === placeId || p.beside.some((b) => b.id === placeId));
+    return holder ? holder.id : null;
+}
+
+/** A topic-search window's id: stable for its practice and query, so asking again finds it (spec §2);
+ *  the practice is part of it, so the same topic in two practices is two windows and a decision opened
+ *  from one lands in that one (`practiceOfPlace`). */
+function topicWindowId(practiceId: string, query: DecisionSearchQuery): string {
+    return `search:${practiceId}:${stableQueryKey(query)}`;
+}
+
+const movable = (length: number, from: number, to: number): boolean =>
+    from !== to && from >= 0 && to >= 0 && from < length && to < length;
+
+/** Logs what a load could not restore as it was, once, naming each item (gotcha 18). */
+function warnDropped(dropped: string[]): void {
+    if (dropped.length > 0) {
+        console.warn(`practices: ${dropped.length} saved item(s) could not be restored as they were:\n- ${dropped.join('\n- ')}`);
+    }
+}
+
+/** Takes the backup away (logout, `clearUserData`). Never throws. */
+function removeV0Backup(): void {
+    try {
+        if (typeof localStorage !== 'undefined') localStorage.removeItem(V0_BACKUP_KEY);
+    } catch (error) {
+        console.error(`persist: "${V0_BACKUP_KEY}" could not be removed`, error);
+    }
+}
+
+/** Copies the raw value `persist` is about to migrate to `V0_BACKUP_KEY`, when none is there yet.
+ *  Never throws: a browser that refuses the copy (a full `localStorage`) is logged, and the migration
+ *  goes on (gotcha 18). */
+function backupV0(name: string): void {
+    try {
+        if (typeof localStorage === 'undefined') return;
+        const raw = localStorage.getItem(name);
+        if (raw === null || localStorage.getItem(V0_BACKUP_KEY) !== null) return;
+        // a second copy of a huge workspace could fill the browser's space for good
+        if (raw.length > V0_BACKUP_MAX_CHARS) {
+            console.warn(`persist: saved workspace too large to back up (${raw.length} characters); converted without a copy`);
+            return;
+        }
+        localStorage.setItem(V0_BACKUP_KEY, raw);
+        console.warn(`persist: the saved workspace was copied to "${V0_BACKUP_KEY}" before it is converted to practices`);
+    } catch (error) {
+        console.error(`persist: the saved workspace could not be copied to "${V0_BACKUP_KEY}" before it is converted`, error);
+    }
+}
+
+/** What persist version 1 makes of a state saved before it (spec §9, §10): from version 0, the
+ *  sanitized `practices` when `practicesSeeded` is `true` (a session of the redesign built
+ *  them; an empty list is the user's «Chiudi tutte»), else `practicesFromTabs` over `workspaceTabs`
+ *  (a browser that never drew the practices); `workspaceTabs`, `highestZIndex` and the marker are
+ *  dropped either way. The topic searches not reopened are told once, through `migrationNotice`.
+ *  The raw value is copied to `V0_BACKUP_KEY` first. Never throwing: a throw here would leave the
+ *  store at its defaults and the next save would overwrite what the browser holds, so a failure is
+ *  logged with its context and loses the practices only, keeping the settings and the rest (gotcha 18). */
+function migratePersisted(persisted: unknown, from: number): Record<string, unknown> {
+    migrationNotice = null;
+    let saved: Record<string, unknown> = {};
+    try {
+        if (persisted !== null && typeof persisted === 'object' && !Array.isArray(persisted)) saved = { ...(persisted as Record<string, unknown>) };
+    } catch (error) {
+        console.error(`persist: the saved workspace (version ${from}) could not be read; starting with none`, error);
+    }
+    if (from >= 1) return saved;
+    backupV0(STORAGE_NAME);
+    const { workspaceTabs, highestZIndex: _z, practicesSeeded, ...rest } = saved;
+    void _z;
+    try {
+        if (practicesSeeded === true) {
+            const sanitized = sanitizePractices(rest.practices);
+            warnDropped(sanitized.dropped);
+            return { ...rest, practices: sanitized.practices };
+        }
+        const dropped: string[] = [];
+        const replaced = Array.isArray(rest.practices) ? rest.practices.length : 0;
+        const seeded = practicesFromTabs(workspaceTabs, uuidv4);
+        if (replaced > 0) {
+            dropped.push(`practices: ${replaced} saved without the seeding marker, replaced by the ones seeded from the tabs`);
+        }
+        warnDropped([...dropped, ...seeded.dropped]);
+        migrationNotice = practiceNoticeText(seeded.droppedSearches);
+        return { ...rest, practices: seeded.practices, activePracticeId: seeded.activePracticeId };
+    } catch (error) {
+        console.error(`persist: the saved workspace (version ${from}) could not be migrated to practices; starting with none (the original is in "${V0_BACKUP_KEY}")`, error);
+        return { ...rest, practices: [], activePracticeId: null };
+    }
+}
+
+/** The practices as a load finds them (spec §10): the saved ones sanitized. What could not be read is
+ *  logged once (gotcha 18); nothing is thrown, since a throw in `merge` would reset the store. The
+ *  session-only fields start empty, whatever the storage holds, except the migration's notice. */
+function practicesOnLoad(persisted: unknown): Pick<AppState,
+    'practices' | 'activePracticeId' | 'practiceRows' | 'pendingReveal' | 'practiceNotice'> {
+    const p = (persisted ?? {}) as { practices?: unknown; activePracticeId?: unknown };
+    const sanitized = sanitizePractices(p.practices);
+    const dropped = [...sanitized.dropped];
+    const practices = sanitized.practices;
+    let activePracticeId: string | null = null;
+    if (typeof p.activePracticeId === 'string' && practices.some((x) => x.id === p.activePracticeId)) {
+        activePracticeId = p.activePracticeId;
+    } else {
+        if (p.activePracticeId !== null && p.activePracticeId !== undefined) {
+            dropped.push(`activePracticeId: ${JSON.stringify(p.activePracticeId)} names no practice`);
+        }
+        activePracticeId = practices[0]?.id ?? null;
+    }
+    warnDropped(dropped);
+    const practiceNotice = migrationNotice;
+    migrationNotice = null;
+    return { practices, activePracticeId, practiceRows: {}, pendingReveal: null, practiceNotice };
+}
+
+/** A save the browser refused (T20): logged once a session with the key, the size and the error's
+ *  name (gotcha 18), and told once as a sync error, in a microtask so it does not run inside the
+ *  `set` whose save failed. The state stays in memory; the next saves fail quietly. */
+function reportSaveFailure({ name, bytes, error }: StorageFailure): void {
+    if (saveFailureReported) return;
+    saveFailureReported = true;
+    const errorName = (error as { name?: unknown } | null)?.name;
+    console.error(`persist: the browser refused to save "${name}" (${bytes} bytes): ${typeof errorName === 'string' ? errorName : String(error)}`, error);
+    queueMicrotask(() => {
+        appStore.getState().pushSyncError('Lo spazio del browser è esaurito: il tavolo di lavoro potrebbe non essere salvato. Chiudi qualche pratica.');
     });
 }
 
@@ -3197,74 +3464,5 @@ function stableQueryKey(query: DecisionSearchQuery): string {
     return JSON.stringify(sorted({ ...rest, norma: rest.norma ? sorted(rest.norma) : undefined }));
 }
 
-/** A tab with a `view` draws its view and ignores `content`: anything pushed into it would be kept
- *  and never shown. Every action that writes content into a tab refuses such a tab. */
-function refuseViewTab(tab: WorkspaceTab, action: string): boolean {
-    if (!tab.view) return false;
-    console.warn(`${action}: the tab "${tab.label}" shows a ${tab.view.kind} and takes no content`);
-    return true;
-}
-
-function newViewTab(state: AppState, label: string, view: TabView): WorkspaceTab {
-    const cascade = (state.workspaceTabs.length % 5) * 40;
-    state.workspaceTabs.push({
-        id: uuidv4(), label, position: { x: 100 + cascade, y: 100 + cascade }, size: { width: 800, height: 650 },
-        zIndex: ++state.highestZIndex, isMinimized: false, isHidden: false, content: [],
-        // keeps a norm search from merging into a decision tab (R3 of streaming-ux)
-        labelIsCustom: true, view,
-    });
-    return state.workspaceTabs[state.workspaceTabs.length - 1];
-}
-
-// Layout.tsx: the static sidebar is 64px wide from the `lg` breakpoint (1024px) up; below it the
-// menu button (fixed top-4 left-4) and, from `md`, the focus toggle (fixed top-4 right-4) are each
-// about 40px square at 16px from the edge. The workspace dock is fixed bottom-6, about 44px high
-// collapsed (more when expanded), centred. All of these are viewport pixels.
-const LAYOUT_SIDEBAR_WIDTH = 64;
-const LAYOUT_LG_BREAKPOINT = 1024;
-const LAYOUT_MD_BREAKPOINT = 768; // the phone view takes over below it
-const SIDE_BY_SIDE_MARGIN = 16;
-const SIDE_BY_SIDE_TOP = 72; // below the two floating buttons
-const SIDE_BY_SIDE_BOTTOM = 88; // above the collapsed dock (24 + ~44) with a gap
-
-/** The left tab on the left half of the free area, the right one on the right half, both as tall
- *  as the free area (design 2026-10-05 §2.2, reading 1). The free area is worked out in viewport
- *  pixels (minus the static sidebar when shown, clear of the floating buttons and the dock), then
- *  each target is turned into tab coordinates by subtracting the workspace origin, because a
- *  tab's x/y are offsets from there (utils/workspaceOrigin.ts). */
-function freeArea(state: AppState) {
-    const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
-    const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
-    const origin = workspaceOrigin();
-    const sidebarShown = vw >= LAYOUT_LG_BREAKPOINT && state.sidebarVisible && !state.settings.focusMode;
-    const x0 = sidebarShown ? LAYOUT_SIDEBAR_WIDTH : 0;
-    const m = SIDE_BY_SIDE_MARGIN;
-    return {
-        origin, x0, m,
-        width: vw - x0 - m * 2,
-        height: Math.max(240, vh - SIDE_BY_SIDE_TOP - SIDE_BY_SIDE_BOTTOM),
-        y: SIDE_BY_SIDE_TOP - origin.top,
-    };
-}
-
-function placeSideBySide(state: AppState, leftId: string, rightId: string) {
-    const left = state.workspaceTabs.find(t => t.id === leftId);
-    const right = state.workspaceTabs.find(t => t.id === rightId);
-    if (!left || !right || left.id === right.id) return;
-    const { origin, x0, m, width, height, y } = freeArea(state);
-    const half = Math.floor((width - m) / 2);
-    Object.assign(left, { position: { x: x0 + m - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
-    Object.assign(right, { position: { x: x0 + m * 2 + half - origin.left, y }, size: { width: half, height }, isHidden: false, isMinimized: false });
-}
-
-/** One tab on the whole free area (same clearances as `placeSideBySide`). */
-function fillFreeArea(state: AppState, tabId: string) {
-    const tab = state.workspaceTabs.find(t => t.id === tabId);
-    // only where the desktop workspace is laid out: a phone's geometry would be saved with the tab
-    if (!tab || (typeof window !== 'undefined' && window.innerWidth < LAYOUT_MD_BREAKPOINT)) return;
-    const { origin, x0, m, width, height, y } = freeArea(state);
-    Object.assign(tab, { position: { x: x0 + m - origin.left, y }, size: { width, height }, isHidden: false, isMinimized: false });
-}
-
-export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };
+export type { SearchPanelState };
 

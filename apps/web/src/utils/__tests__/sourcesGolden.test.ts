@@ -38,7 +38,8 @@ interface DecisionCase {
 const golden = JSON.parse(readFileSync(findGolden(__dirname), 'utf8')) as {
   version: number; norms: NormCase[]; decisions: DecisionCase[];
 };
-const QUESTIONS = new Set(['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8']); // the spec's §9
+// Q1–Q8: the convention spec's §9; Q10–Q13: the courts of the Union (design 2026-10-12, §8)
+const QUESTIONS = new Set(['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q10', 'Q11', 'Q12', 'Q13']);
 const cases = [...golden.norms, ...golden.decisions];
 const expectations = cases.flatMap((c) => [...Object.entries(c.identity), ...Object.entries(c.labels)]
   .map(([field, expected]) => ({ id: c.id, field, expected })));
@@ -65,7 +66,8 @@ describe('the golden file of legal sources', () => {
       expect(c.note.length, c.id).toBeGreaterThan(0);
     }
     for (const c of golden.decisions) {
-      expect(['cassazione', 'corte_costituzionale'], c.id).toContain(c.input.reference.corte);
+      expect(['cassazione', 'corte_costituzionale', 'corte_giustizia_ue', 'tribunale_ue', 'consiglio_di_stato', 'cgars', 'tar'], c.id)
+        .toContain(c.input.reference.corte);
       expect(Number.isInteger(c.input.reference.numero), c.id).toBe(true);
     }
   });
@@ -101,7 +103,7 @@ describe('the golden file of legal sources', () => {
     // An identity's path, or a reference's (no archive: the route resolves it).
     for (const c of golden.decisions) {
       const path = c.identity.path ?? c.identity.reference_path;
-      if (path?.status !== 'current') continue;
+      if (path?.status !== 'current' && path?.status !== 'decided') continue;
       it(c.id, () => expect(linkableDecisionPath(c.input.reference, now)).toBe(path.value));
     }
   });
@@ -112,14 +114,21 @@ describe('the golden file of legal sources', () => {
     // (two cases of nine), must say the same.
     const identityOfReference = (r: LooseDecisionRef): DecisionIdentity | null => {
       if (r.anno == null) return null;
-      if (r.corte === 'corte_costituzionale') return { corte: r.corte, numero: r.numero, anno: r.anno };
+      if (r.corte === 'corte_costituzionale' || r.corte === 'corte_giustizia_ue' || r.corte === 'tribunale_ue') {
+        return { corte: r.corte, numero: r.numero, anno: r.anno };
+      }
       if (r.corte === 'cassazione' && (r.archivio === 'civile' || r.archivio === 'penale')) {
         return { corte: r.corte, archivio: r.archivio, numero: r.numero, anno: r.anno };
       }
+      // the administrative courts: the kind, and a TAR's seat (design 2026-10-12-administrative-courts §2)
+      if ((r.corte === 'consiglio_di_stato' || r.corte === 'cgars' || r.corte === 'tar') && r.provvedimento) {
+        if (r.corte === 'tar' && !r.sede) return null;
+        return { corte: r.corte, numero: r.numero, anno: r.anno, provvedimento: r.provvedimento, ...(r.sede ? { sede: r.sede } : {}) };
+      }
       return null;
     };
-    const keyed = golden.decisions.filter((c) => c.identity.key?.status === 'current' && typeof c.identity.key.value === 'string');
-    const unkeyed = golden.decisions.filter((c) => c.identity.key?.status === 'current' && c.identity.key.value === null);
+    const keyed = golden.decisions.filter((c) => ['current', 'decided'].includes(c.identity.key?.status) && typeof c.identity.key.value === 'string');
+    const unkeyed = golden.decisions.filter((c) => ['current', 'decided'].includes(c.identity.key?.status) && c.identity.key.value === null);
     const identities = keyed.flatMap((c) => {
       const identity = identityOfReference(c.input.reference);
       // the file's attributes are a decision's, plus fields the model has not got yet (data_udienza)
@@ -130,7 +139,7 @@ describe('the golden file of legal sources', () => {
       expect(keyed.length).toBeGreaterThan(4);
       expect(identities.map((i) => i.c.id)).toEqual(keyed.map((c) => c.id));
       for (const { c, identity } of identities) {
-        if (c.identity.fields?.status === 'current') expect(c.identity.fields.value, c.id).toEqual(identity);
+        if (['current', 'decided'].includes(c.identity.fields?.status)) expect(c.identity.fields.value, c.id).toEqual(identity);
       }
       expect(unkeyed.length).toBeGreaterThan(0);
       for (const c of unkeyed) expect(identityOfReference(c.input.reference), c.id).toBeNull();

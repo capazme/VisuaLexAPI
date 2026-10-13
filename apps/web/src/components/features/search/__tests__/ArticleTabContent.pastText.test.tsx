@@ -21,8 +21,12 @@ vi.mock('../../../../services/articleDiscussionService', () => ({
     voteComment: vi.fn(),
   },
 }));
+// The cards row reads the study cards of the article; they are not under test.
+vi.mock('../../../../services/studiaService', () => ({ studiaService: { forArticle: () => Promise.resolve([]) } }));
 vi.mock('../../../../services/authService', () => ({ isAuthenticated: () => true }));
 vi.mock('../../../../services/notificationService', () => ({ notificationService: { checkNorma } }));
+// The entry that asks MERL-T is drawn in the development mode only; this suite is about the text in force.
+vi.mock('../../../../features/devMode/useDevMode', () => ({ useDevMode: () => true }));
 vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true }),
 }));

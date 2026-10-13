@@ -3,10 +3,13 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { useCitationLinks } from '../../../hooks/useCitationLinks';
+import { useDecisionLinks } from '../../../hooks/useDecisionLinks';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
+import { DecisionPreviewPopup } from '../../ui/DecisionPreviewPopup';
 import { Toast, type ToastProps } from '../../ui/Toast';
 import { ArticleBody } from '../search/ArticleBody';
-import { FindInTextBox } from '../search/FindInTextBox';
+import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
+import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
 import { NotesPeekPanel } from '../search/NotesPeekPanel';
 import { HighlightsActionsPicker } from '../search/HighlightsActionsPicker';
 import { InlineNotePopover } from '../search/InlineNotePopover';
@@ -19,11 +22,13 @@ import { UnmatchedAnchors } from './UnmatchedAnchors';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
-import { decisionKey, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
+import { wrapDecisionCitationsInHtml } from '../../../utils/decisionCitationMatcher';
+import { decisionKey, decisionPath, formatDecisionCitation, formatDecisionShort } from '../../../utils/decisionLinks';
 import { decisionProjection, decisionStructure, renderDecisionHtml, unmatchedAnchors } from '../../../utils/decisionRender';
 import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/annotationExport';
 import { selectionAsRead } from '../../../utils/decisionText';
@@ -37,11 +42,22 @@ export interface DecisionReadingSurfaceProps {
   testo: DecisionText;
   attributi: DecisionAttributes;
   /**
-   * The workspace tab this decision is read in. With it, a norm opened from a citation is placed
-   * beside that tab and the way back names it; without it (a host with no tab, such as a light
-   * window) the norm opens through the ordinary search and nothing is recorded.
+   * The host this decision is read in: a practice (its row) or a window. With it, a norm opened from
+   * a citation is placed beside that host and the way back names it; without it the norm opens
+   * through the ordinary search and nothing is recorded.
    */
   hostTabId?: string;
+  /**
+   * The place inside the host the way back returns to; the host itself when absent. A decision read
+   * in a row of a practice's table names its entry, so going back reveals that row.
+   */
+  hostBlockId?: string;
+  /**
+   * The id the find window knows this decision's reading place by, when it is not `hostTabId`: a
+   * light window reads under its own id (its way back) and is found under its practice's (spec
+   * §6.6). Only the find window's registration, pressed state and opener read it.
+   */
+  findHostId?: string;
 }
 
 /**
@@ -50,7 +66,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle,
@@ -107,12 +123,19 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const { locatedThreads, textHash, focusedThreadId } = discussion;
 
   // A bare «art. 5» with no act named stays text: a decision has no act of its own to default to.
+  // The decisions it cites are linked after the norms; inside a Cassazione decision a section written
+  // without its court reads as the Cassazione's, and the decision's own name links nowhere.
+  const selfPath = decisionPath(identity);
+  const within = identity.corte === 'cassazione' ? 'cassazione' : undefined;
   const html = useMemo(
-    () => wrapCitationsInHtml(renderDecisionHtml({
-      testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true,
-      threads: locatedThreads, focusedThreadId,
-    })),
-    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId],
+    () => wrapDecisionCitationsInHtml(
+      wrapCitationsInHtml(renderDecisionHtml({
+        testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true,
+        threads: locatedThreads, focusedThreadId,
+      })),
+      { within, selfPath },
+    ),
+    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath],
   );
 
   // What each paragraph's sign counts, for the popover it opens (the renderer derives the signs
@@ -135,18 +158,24 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
   const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
   const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
   const [highlightsHidden, setHighlightsHidden] = useState(false);
-  const [isFindOpen, setIsFindOpen] = useState(false);
   const findButtonRef = useRef<HTMLButtonElement>(null);
   const textRootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
+
+  // The find window's target for this decision (spec §13.1): one text, keyed by its own
+  // `decisionKey`, the key the scope computes for a decision tab. No `hostTabId` (a host with no
+  // tab) registers nothing.
+  const findHost = findHostId ?? hostTabId;
+  useRegisterFindRoot(findHost, key, label, textRootRef);
+  const isFindOpen = useFindWindowScopedTo(findHost, key);
 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
   }, [highlightsHidden]);
 
   const origin = useMemo<ReadingBackEntry | undefined>(
-    () => hostTabId ? { tabId: hostTabId, blockId: hostTabId, articleId: '', label } : undefined,
-    [hostTabId, label],
+    () => hostTabId ? { tabId: hostTabId, blockId: hostBlockId ?? hostTabId, articleId: '', label } : undefined,
+    [hostTabId, hostBlockId, label],
   );
 
   const openCitation = useCallback((citation: ParsedCitationData) => {
@@ -157,11 +186,12 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
       article: citation.article,
       version: 'vigente',
       show_brocardi_info: true,
-      ...(hostTabId ? { besideTabId: hostTabId } : {}),
+      ...(hostTabId ? { besideId: hostTabId } : {}),
     });
   }, [triggerSearch, hostTabId]);
 
-  useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef });
+  const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin });
+  useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
   const {
@@ -213,9 +243,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
-        onToggleFind={() => setIsFindOpen((v) => !v)}
+        onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: findHost, targetKey: key, returnFocus: findButtonRef.current }))}
         findButtonRef={findButtonRef}
-        findBar={<FindInTextBox rootRef={textRootRef} returnFocusRef={findButtonRef} label="della decisione" onClose={() => setIsFindOpen(false)} />}
       />
       <NotesPeekPanel
         isOpen={isNotesOpen}
@@ -305,6 +334,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         {...discussion.panelProps}
       />
       {toast && <Toast message={toast.message} type={toast.type} isVisible onClose={() => setToast(null)} />}
+      <DecisionPreviewPopup {...decisionLinks.popupProps} />
       <CitationPreviewPopup
         isVisible={preview.isVisible}
         isLoading={preview.isLoading}
@@ -313,7 +343,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId }
         article={preview.article}
         position={preview.position}
         onClose={hidePreview}
-        onOpenInTab={(citation) => {
+        onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);
           openCitation(citation);

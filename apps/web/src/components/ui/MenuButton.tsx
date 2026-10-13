@@ -20,6 +20,9 @@ export interface MenuButtonProps {
   children: ReactNode;
   triggerClassName?: string;
   align?: 'left' | 'right';
+  /** Where the list opens: under the trigger (default), or over it for a trigger at the bottom of
+   *  the screen (the bar of practices). */
+  placement?: 'below' | 'above';
 }
 
 /**
@@ -27,7 +30,7 @@ export interface MenuButtonProps {
  * and End move, Escape and Tab close, focus returns to the trigger, a click
  * outside closes. Clicks never reach the card it sits in. The dossier's menus.
  */
-export function MenuButton({ label, items, children, triggerClassName, align = 'right' }: MenuButtonProps) {
+export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below' }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
@@ -119,7 +122,8 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
           onKeyDown={onMenuKey}
           className={cn(
             Z_INDEX.dropdown,
-            'absolute mt-1 w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800',
+            'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800',
+            placement === 'above' ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >

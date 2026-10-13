@@ -501,7 +501,7 @@ export function TreeViewPanel({
                 isWindow && "cursor-grab active:cursor-grabbing select-none touch-none",
               )}
             >
-              <div className="flex justify-between items-center mb-4">
+              <div id="tour-tree-header" className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
                   {isWindow && (
                     <GripHorizontal
@@ -720,7 +720,7 @@ export function TreeViewPanel({
   );
 
   if (isWindow) {
-    // Rendered on the viewport, not in place: the workspace tab panel this
+    // Rendered on the viewport, not in place: a window this
     // component lives under is transform-driven, and a transformed ancestor
     // becomes the containing block for `fixed` descendants — a window
     // positioned inside it would be placed against the panel rather than the
@@ -750,6 +750,8 @@ export function TreeViewPanel({
             exit={{ opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
             aria-label={`${title} — finestra`}
+            // A tool held over the table: a press in it is not a click away from the rail's overlay.
+            data-floating-tool
             className={cn(
               "fixed top-0 left-0 max-h-[76vh] rounded-2xl overflow-hidden",
               "bg-white dark:bg-slate-900 shadow-2xl flex flex-col",

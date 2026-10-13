@@ -6,6 +6,7 @@ import {
   dossierItemFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
   validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importReasonsText, importToastType,
+  encodeDossierShare, decodeDossierShare,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -285,7 +286,7 @@ describe('searchesForGroups', () => {
   it('shares one tab among the texts in force and gives a past group a tab of its own', () => {
     const { created, searches } = run([g({}), g({ numero_atto: '1', articles: ['2'] }), g(PAST)]);
     expect(created).toEqual(['Pratica', 'Pratica — testo al 29/12/2007']);
-    expect(searches.map((s) => s.targetTabId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
+    expect(searches.map((s) => s.targetPracticeId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
     expect(searches.map((s) => s.tabLabel)).toEqual(['Pratica', 'Pratica', 'Pratica — testo al 29/12/2007']);
     expect(searches[2]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
     expect(searches[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
@@ -294,7 +295,7 @@ describe('searchesForGroups', () => {
   it('still routes the texts in force of two annexes to the one shared tab', () => {
     const { created, searches } = run([g({ allegato: 'A' }), g({ allegato: 'B' })]);
     expect(created).toEqual(['Pratica']);
-    expect(searches.map((x) => x.targetTabId)).toEqual(['tab-1', 'tab-1']);
+    expect(searches.map((x) => x.targetPracticeId)).toEqual(['tab-1', 'tab-1']);
     expect(searches.map((x) => x.annex)).toEqual(['A', 'B']);
   });
 
@@ -358,7 +359,7 @@ describe('decision items', () => {
       { ...SENTENZA, tipo: 'x' },                      // not a known type
       { ...SENTENZA, data_deposito: '12/03/2024' },    // not an ISO date
       { ...SENTENZA, data_deposito: '2024-13-05' },    // no such month: the server refuses it too
-      { ...SENTENZA, etichetta: 'x'.repeat(201) },     // label too long
+      { ...SENTENZA, etichetta: 'x'.repeat(601) },     // label too long
       { ...COST, archivio: 'civile' },                 // the Corte costituzionale has no archive
     ]) {
       expect(parseSentenzaContent(bad)).toBeNull();
@@ -367,7 +368,7 @@ describe('decision items', () => {
     expect(parseSentenzaContent({ ...COST, anno: 1956 })).not.toBeNull();
     expect(parseSentenzaContent({ ...SENTENZA, anno: 1900 })).not.toBeNull();
     expect(parseSentenzaContent({ ...SENTENZA, numero: 999_999 })).not.toBeNull();
-    expect(parseSentenzaContent({ ...SENTENZA, etichetta: 'x'.repeat(200) })).not.toBeNull();
+    expect(parseSentenzaContent({ ...SENTENZA, etichetta: 'x'.repeat(600) })).not.toBeNull();
   });
 
   it('parseSentenzaContent takes the year bound from the clock it is given', () => {
@@ -536,5 +537,38 @@ describe('an imported dossier is rebuilt from what was checked', () => {
     expect(importToastType(0, 0)).toBe('success');
     expect(importToastType(2, 1)).toBe('info');
     expect(importToastType(0, 2)).toBe('warning');
+  });
+});
+
+describe('dossier share links', () => {
+  const dossier = (title: string, note: string): Dossier => ({
+    id: 'd1', title, createdAt: '2026-10-01T10:00:00.000Z',
+    items: [{ id: 'n1', type: 'note', data: note, addedAt: '2026-10-01T10:00:00.000Z' } as DossierItem],
+  } as Dossier);
+
+  it('carries a typographic apostrophe, accents, emoji and CJK there and back', () => {
+    const d = dossier('L’azione revocatoria — è «nulla»?', 'Cass. n. 1/2024 ✓ 😀 判例');
+    const value = encodeDossierShare(d);
+    expect(value).toMatch(/^u8\.[A-Za-z0-9_-]+$/);
+    expect(JSON.parse(decodeDossierShare(value))).toEqual(d);
+  });
+
+  it('survives the URL without further encoding', () => {
+    const value = encodeDossierShare(dossier('Città’s', 'x'.repeat(5000)));
+    expect(encodeURIComponent(value)).toBe(value);
+    expect(new URLSearchParams(`import=${value}`).get('import')).toBe(value);
+  });
+
+  it('never throws on a lone surrogate', () => {
+    expect(() => encodeDossierShare(dossier('\uD800', ''))).not.toThrow();
+  });
+
+  it('still reads a link made the old way, Latin-1 accents included', () => {
+    const d = dossier('Perché è così', 'àèìòù');
+    expect(JSON.parse(decodeDossierShare(btoa(JSON.stringify(d))))).toEqual(d);
+  });
+
+  it('refuses a new link whose bytes are not UTF-8', () => {
+    expect(() => decodeDossierShare(`u8.${btoa('\xff\xfe')}`)).toThrow();
   });
 });

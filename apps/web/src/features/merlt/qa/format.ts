@@ -2,7 +2,8 @@
 
 import type { QaRetrievedSource } from './types';
 import { normFromUrn, shortNorm } from '../../../utils/sources';
-import { formatDecisionShort } from '../../../utils/decisionLinks';
+import { formatDecisionShort, identityFromKey } from '../../../utils/decisionLinks';
+import { isAdminCourt } from '../../../utils/adminCourts';
 
 export const CANON_LABEL: Record<string, string> = {
   literal: 'Letterale',
@@ -51,6 +52,11 @@ export function formatRetrievedUrn(urn: string): string {
   if (keyed) return formatDecisionShort({ corte: 'cassazione', archivio: keyed[1], numero: Number(keyed[2]), anno: Number(keyed[3]) });
   const court = urn.match(/^corte_costituzionale:(\d+):(\d{4})$/);
   if (court) return formatDecisionShort({ corte: 'corte_costituzionale', numero: Number(court[1]), anno: Number(court[2]) });
+  const eu = urn.match(/^(corte_giustizia_ue|tribunale_ue):(\d+):(\d{4})$/);
+  if (eu) return formatDecisionShort({ corte: eu[1], numero: Number(eu[2]), anno: Number(eu[3]) });
+  // an administrative court's key carries the kind, and a TAR's the seat
+  const admin = identityFromKey(urn);
+  if (admin && isAdminCourt(admin.corte)) return formatDecisionShort(admin);
   const massima = urn.match(/massima_(?:cassazione_)?(?:(civile|penale)_)?(\d+)_(\d{4})/i);
   if (massima) {
     return formatDecisionShort({ corte: 'cassazione', archivio: massima[1]?.toLowerCase(), numero: Number(massima[2]), anno: Number(massima[3]) });

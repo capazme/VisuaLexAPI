@@ -42,20 +42,23 @@ describe('MassimeSection — the decision a Brocardi massima is headed with', ()
 describe('MassimeSection — a decision opened from the article', () => {
   it('opens beside the article and records the way back to it', () => {
     const open = vi.fn(() => 'tab');
-    appStore.setState({ openDecisionTab: open, readingBackStack: [] } as never);
+    const push = vi.fn();
+    const original = appStore.getState().pushReadingBack;
+    appStore.setState({ openDecision: open, pushReadingBack: push, readingBackStack: [] } as never);
     const back = { tabId: 't1', blockId: 'b1', articleId: 'a1', label: 'art. 2043 c.c.' };
     render(
       <MemoryRouter initialEntries={['/']}>
         <MassimeSection
           massime={[{ autorita: 'Cass. civ.', numero: '31191', anno: '2025', massima: 'Il danno ingiusto.' }]}
-          besideTabId="t1"
+          besideId="t1"
           backEntry={back}
         />
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByText('Cass. civ., n. 31191/2025'));
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({ numero: 31191 }), { besideTabId: 't1' });
-    expect(appStore.getState().readingBackStack).toEqual([back]);
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ numero: 31191 }), { fromLink: true, besideId: 't1' });
+    expect(push).toHaveBeenCalledExactlyOnceWith(back);
+    appStore.setState({ pushReadingBack: original } as never);
   });
 });
 

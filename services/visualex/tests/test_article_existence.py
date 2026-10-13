@@ -304,3 +304,100 @@ class TestHttpStatusAndBody:
             })
         assert response.status_code == 500
         assert "Normattiva is down" in (await response.get_json())["error"]
+
+
+# D.lgs. 104/2010 as Normattiva's tree gives it: the c.p.a. is its annex 2 (the act calls it
+# «Allegato 1»), the decree's own text has five articles.
+CPA_TREE = (
+    [*({"numero": str(n), "allegato": None} for n in range(1, 6)),
+     *({"numero": str(n), "allegato": 2} for n in range(1, 41))],
+    45,
+    {},
+)
+
+
+class TestWhereElseInTheAct:
+    """An annex named the way the act names it can miss Normattiva's positional number
+    (owner, 11 October 2026: Normattiva's number stays the identity). The refusal then
+    says where the article is, from the tree the existence check has just read."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article,annex,hint", [
+        ("29", "1", ": su Normattiva l'art. 29 si trova nell'allegato 2"),
+        ("3", "2", ": su Normattiva l'art. 3 si trova nel testo dell'atto"),
+        ("3", "1", ": su Normattiva l'art. 3 si trova nel testo dell'atto e nell'allegato 2"),
+        ("99", "1", ""),
+    ])
+    async def test_the_hint_names_the_other_parts(self, article, annex, hint):
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            assert await _controller()._where_else_in_tree("https://x", article, annex) == hint
+
+    @pytest.mark.asyncio
+    async def test_the_cached_shape_and_string_annexes_read_alike(self):
+        """The tree's annexes are strings (treextractor), and a cache hit gives a list."""
+        cached = [[{"numero": "1", "allegato": None}, {"numero": "29", "allegato": "2"}], 2, {}]
+        with patch("app.get_tree", new=AsyncMock(return_value=cached)):
+            assert await _controller()._where_else_in_tree("https://x", "29", 1) == \
+                ": su Normattiva l'art. 29 si trova nell'allegato 2"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tree", ["Errore di rete", [], RuntimeError("down")])
+    async def test_an_unreadable_tree_gives_no_hint(self, tree):
+        mock = AsyncMock(side_effect=tree) if isinstance(tree, Exception) else AsyncMock(return_value=tree)
+        with patch("app.get_tree", new=mock):
+            assert await _controller()._where_else_in_tree("https://x", "29", "1") == ""
+
+    @pytest.mark.asyncio
+    async def test_the_refusal_carries_the_hint_for_an_annex_the_caller_named(self):
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)), \
+                pytest.raises(ResourceNotFoundError) as refused:
+            await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29", "annex": "1"})
+        assert str(refused.value).startswith("Articolo 29 non presente nell'allegato 1 di decreto legislativo")
+        assert str(refused.value).endswith(": su Normattiva l'art. 29 si trova nell'allegato 2")
+
+    @pytest.mark.asyncio
+    async def test_the_dispositivo_asked_explicitly_refuses_an_article_only_in_an_annex(self):
+        """`annex: ""` asks for the decree's own text: art. 29 is only in the c.p.a. (annex 2),
+        and Normattiva would answer the dispositivo's art. 29 with its art. 1."""
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)), \
+                pytest.raises(ResourceNotFoundError) as refused:
+            await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29", "annex": ""})
+        assert str(refused.value).startswith("Articolo 29 non presente nel testo di decreto legislativo")
+        assert str(refused.value).endswith(": su Normattiva l'art. 29 si trova nell'allegato 2")
+
+    @pytest.mark.asyncio
+    async def test_the_dispositivo_asked_explicitly_keeps_its_own_articles(self):
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            found = await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "3", "annex": ""})
+        assert [(nv.numero_articolo, nv.allegato) for nv in found] == [("3", None)]
+
+    @pytest.mark.asyncio
+    async def test_no_part_named_still_accepts_an_article_anywhere_in_the_act(self):
+        """Unchanged: with no preference (and no annex metadata to move to) the check reads the whole act."""
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            found = await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29"})
+        assert [nv.numero_articolo for nv in found] == ["29"]
+
+    @pytest.mark.asyncio
+    async def test_a_codes_default_annex_gets_no_hint(self):
+        """Another annex of a code is another code: art. 40 of the preleggi is not
+        art. 40 of the codice civile, so its refusal points nowhere."""
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        tree = ([{"numero": "1", "allegato": 1}, *({"numero": str(n), "allegato": 2} for n in range(1, 60))], 60, {})
+        with patch("app.get_tree", new=AsyncMock(return_value=tree)), \
+                pytest.raises(ResourceNotFoundError) as refused:
+            await _controller().create_norma_visitata_from_data({"act_type": "preleggi", "article": "40"})
+        assert "si trova" not in str(refused.value)

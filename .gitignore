@@ -53,3 +53,6 @@ coverage/
 
 # Local legal archive output (python -m archivio_normativo build)
 archivio_out/
+
+# Local-only real decision texts for the find tests (personal data)
+apps/web/src/utils/__fixtures__/private/

@@ -59,6 +59,8 @@ describe('the labels of decisions are the golden file\'s', () => {
       sezione: c.input.reference.sezione ?? str('sezione'),
       tipo: str('tipo'),
       data_deposito: str('data_deposito'),
+      data_decisione: str('data_decisione'),
+      cause_riunite: Array.isArray(attrs.cause_riunite) ? (attrs.cause_riunite as string[]) : null,
     };
   };
   // Decided and not written yet anywhere: the hearing date, which Italgiure does not give.

@@ -10,8 +10,7 @@ interface DossierModalProps {
 }
 
 // Create-only: picking an existing dossier to add an item to is now handled
-// by AddToDossierPopover (two-click collection from the reading toolbar /
-// LooseArticleCard). This modal is reached from "+ Nuovo dossier" CTAs on
+// by AddToDossierPopover (two-click collection from the reading toolbar). This modal is reached from "+ Nuovo dossier" CTAs on
 // the dossier list pages, so it only needs the creation form.
 export function DossierModal({ isOpen, onClose }: DossierModalProps) {
   const { createDossier } = useAppStore();

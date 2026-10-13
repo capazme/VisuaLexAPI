@@ -43,7 +43,7 @@ function requiresDetails(actValue: string): boolean {
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
-    customAliases, trackAliasUsage, openAliasManager, openDecisionTab, openDecisionSearchTab, takeCommandPaletteQuery, commandPaletteQuery
+    customAliases, trackAliasUsage, openAliasManager, openDecision, openTopicSearch, takeCommandPaletteQuery, commandPaletteQuery
   } = useAppStore(useShallow(s => ({
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
@@ -52,8 +52,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     customAliases: s.customAliases,
     trackAliasUsage: s.trackAliasUsage,
     openAliasManager: s.openAliasManager,
-    openDecisionTab: s.openDecisionTab,
-    openDecisionSearchTab: s.openDecisionSearchTab,
+    openDecision: s.openDecision,
+    openTopicSearch: s.openTopicSearch,
     takeCommandPaletteQuery: s.takeCommandPaletteQuery,
     commandPaletteQuery: s.commandPaletteQuery,
   })));
@@ -209,6 +209,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                   act_number: parsed.act_number || undefined,
                   date: parsed.date || undefined,
                   article: parsed.article || undefined,
+                  annex: parsed.annex || undefined,
                   // Named by the server's curated tables, not guessed.
                   confidence: 0.9,
                 }
@@ -262,8 +263,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     }
   }, [isOpen]);
 
-  // Handle Escape key
+  // Handle Escape key. Only while open: a closed palette that took every Escape and called
+  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay).
   useEffect(() => {
+    if (!isOpen) return undefined;
     const down = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -273,7 +276,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
 
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [onClose]);
+  }, [isOpen, onClose]);
 
   const handleSelectAct = useCallback((actValue: string) => {
     setSelectedAct(actValue);
@@ -352,15 +355,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
 
   const handleSearchTopic = useCallback(() => {
     if (!topic) return;
-    openDecisionSearchTab({ tema: topic }, `Tema: ${topic}`);
+    openTopicSearch({ tema: topic }, `Tema: ${topic}`);
     onClose();
-  }, [topic, openDecisionSearchTab, onClose]);
+  }, [topic, openTopicSearch, onClose]);
 
   const handleOpenDecision = useCallback(() => {
     if (!decisionRef) return;
-    openDecisionTab(decisionRef);
+    openDecision(decisionRef, { fromLink: true });
     onClose();
-  }, [decisionRef, openDecisionTab, onClose]);
+  }, [decisionRef, openDecision, onClose]);
 
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
@@ -464,7 +467,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   if (!isOpen) return null;
 
   return (
-    <div className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
+    // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+    <div data-find-overlay="" className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
       {/* Premium Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -759,7 +763,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                 )}
 
                 {/* QuickNorms Section */}
-                <Command.Group className="mb-4">
+                <Command.Group id="command-palette-quick-norms" className="mb-4">
                   <div className="flex items-center justify-between px-3 mb-3">
                     <div className="flex items-center gap-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
                       <Star size={12} fill="currentColor" strokeWidth={3} />
@@ -1006,7 +1010,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
           {/* Premium Footer */}
           <div className="px-6 py-5 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
             {/* Quick Settings - Brocardi Toggle */}
-            <div className="flex items-center justify-between mb-5">
+            <div id="command-palette-brocardi-toggle" className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-4">
                 <div className={cn(
                   "p-2 rounded-xl border transition-all",

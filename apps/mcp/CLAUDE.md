@@ -44,13 +44,19 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
   `omnilex_leggi_dossier`, `omnilex_crea_dossier`,
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
-  checked by `apps/server`), `omnilex_aggiungi_nota_dossier` (one plain-text
+  checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
+  words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
+  the Cassazione, the Corte costituzionale, the Court of Justice and the General Court of the
+  Union (by their case), the Consiglio di Stato, the C.G.A.R.S. and the TAR (by kind, and a TAR by
+  its seat, design `docs/superpowers/specs/2026-10-12-administrative-courts-design.md`); a court VisuaLex cannot read yet is answered `court_not_supported` with its name, and its
+  description tells the model not to fall back to a note; design
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2), `omnilex_aggiungi_nota_dossier` (one plain-text
   note up to 4,000 characters, in a dossier or about one of its articles with
   `voce`; add-only), `omnilex_stato_account`. `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
   `created_by`) and which article a note is about (`nota_su`). A norm or a decision is named by the
   server's citation (`citation` on dossier items, `display` on the norms
-  route's results: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
+  route's results, `citation` on the decisions route's: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
   dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read
   apart; `tests/sourcesGolden.test.ts` passes every decided citation of
   `conventions/sources/golden.json` through the tools byte for byte. Results are data (JSON
@@ -64,7 +70,10 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   only; only Accept with the box ticked exchanges a delete token and moves
   exactly those ids. Decline, Cancel, an unticked box, a timeout or a client
   that declared no elicitation: nothing is deleted, never a fallback (owner's
-  decision «B»). `lingolex_elimina_card` is the third destructive tool
+  decision «B»); an Accept with the box empty is told to tick it, apart from a
+  Decline. The box's label is «Confermo», short enough for a terminal. The
+  dossier's title (another user's, when it came with an environment) sits in
+  «» and is cut at 60 characters. `lingolex_elimina_card` is the third destructive tool
   (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
 - **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —

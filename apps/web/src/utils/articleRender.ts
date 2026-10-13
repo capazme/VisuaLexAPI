@@ -9,7 +9,7 @@
  * let the HTML parser swallow one (the source text is escaped).
  *
  * How: every mark — structure decoration, printed enumerator, highlight, note
- * anchor, search hit — is a raw range. The text is cut at every block edge and
+ * anchor, thread — is a raw range. The text is cut at every block edge and
  * every mark edge, and each run is emitted inside the marks that cover it,
  * opened in a fixed nesting order with a stack that keeps the common prefix
  * open from one run to the next. The result is always well-formed: a mark that
@@ -37,9 +37,8 @@ export interface RenderArticleInput {
   structure: ArticleStructure | null;
   highlights: Highlight[];
   annotations: Annotation[];
-  searchQuery?: string | null;
   /**
-   * Draw each annotated block's sign (round B): the tab and the dossier
+   * Draw each annotated block's sign (round B): the practice's row and the dossier
    * reader. Study Mode has its own summary and leaves it off; flat mode has
    * no blocks and ignores it.
    */
@@ -50,7 +49,7 @@ export interface RenderArticleInput {
   focusedThreadId?: string | null;
 }
 
-export type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread' | 'search';
+export type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread';
 
 /**
  * Nesting order, outermost first. The printed enumerator is outermost and so
@@ -68,7 +67,6 @@ const RANK: Record<MarkKind, number> = {
   note: 4,
   highlight: 5,
   thread: 6,
-  search: 7,
   'mod-paren': 8,
   'rubric-paren': 8,
   hidden: 9,
@@ -131,7 +129,6 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   const rawAt: number[] = [];
   for (let i = 0; i < raw.length; i++) if (raw.charCodeAt(i) !== 10) rawAt.push(i);
   const plain = raw.replace(/\n/g, '');
-  const plainLower = plain.toLowerCase();
 
   const marks: Mark[] = [];
   let seq = 0;
@@ -168,15 +165,6 @@ export function renderArticleHtml(input: RenderArticleInput): string {
         threadFocusOpen(focused.thread.id),
         '</span>',
       );
-    }
-  }
-
-  const query = input.searchQuery;
-  if (query && query.length >= 2) {
-    const needle = query.toLowerCase();
-    let ordinal = 0;
-    for (let at = plainLower.indexOf(needle); at !== -1; at = plainLower.indexOf(needle, at + 1)) {
-      pushPlain(at, at + needle.length, 'search', `<mark class="search-match" data-search-idx="${ordinal++}">`, '</mark>');
     }
   }
 

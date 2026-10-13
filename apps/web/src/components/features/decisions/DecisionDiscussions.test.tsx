@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createHash } from 'node:crypto';
@@ -8,7 +9,7 @@ import { decisionProjection } from '../../../utils/decisionRender';
 import { articleDiscussionService } from '../../../services/articleDiscussionService';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
-import { DecisionTabView } from './DecisionTabView';
+import { DecisionEntryView } from './DecisionEntryView';
 import { forgetDecision } from '../../../utils/decisionFetchCache';
 
 vi.mock('../../../services/articleDiscussionService', () => ({
@@ -41,6 +42,11 @@ const fullThread = (over: Partial<ArticleDiscussionThread> = {}): ArticleDiscuss
   createdAt: '2026-10-08T10:00:00Z', updatedAt: '2026-10-08T10:00:00Z', voteCount: 0, userVoted: false, isOwner: true,
   ...over,
 });
+/** The decision read in its row, as an entry of a practice. */
+function InTab() {
+  const [entry] = useState(() => appStore.getState().openDecision(IDENTITY, { open: false }));
+  return <DecisionEntryView practiceId={entry.practiceId} decisionId={entry.decisionId} reference={IDENTITY} hostId={entry.practiceId} />;
+}
 const HASH = createHash('sha256').update(PLAIN, 'utf8').digest('hex');
 
 const textOf = (root: Element) => {
@@ -80,7 +86,8 @@ beforeEach(() => {
   forgetDecision(IDENTITY);
   forgetDecision({ corte: 'cassazione', numero: 99999, anno: 2024 });
   appStore.setState({
-    searchTrigger: null, readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [],
+    searchTrigger: null, readingBackStack: [], practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
+    highlights: [], annotations: [],
     loadHighlightsForArticle: vi.fn(), loadAnnotationsForArticle: vi.fn(),
   });
   vi.mocked(articleDiscussionService.listPassages).mockResolvedValue([]);
@@ -103,7 +110,7 @@ describe('discussions on a decision — what shows them', () => {
 
   it('a found decision shows the button and «Discuti»', async () => {
     fetchDecision.mockResolvedValue(found(TESTO));
-    const { container } = render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    const { container } = render(<InTab />);
     expect(await screen.findByRole('button', { name: 'Discussioni sulla decisione' })).toBeInTheDocument();
     await waitFor(() => expect(container.querySelector('.vlx-dec-line')).not.toBeNull());
     await selectText(container, 0, 3, 10);
@@ -114,7 +121,7 @@ describe('discussions on a decision — what shows them', () => {
   it('while loading, ambiguous or not found: no button, no «Discuti», no passage request', async () => {
     let answer!: (value: unknown) => void;
     fetchDecision.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
-    const { unmount } = render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    const { unmount } = render(<InTab />);
     expect(screen.getByRole('status')).toHaveTextContent('Caricamento della decisione');
     expect(screen.queryByRole('button', { name: 'Discussioni sulla decisione' })).toBeNull();
     unmount();
@@ -126,7 +133,7 @@ describe('discussions on a decision — what shows them', () => {
     ]) {
       forgetDecision(IDENTITY);
       fetchDecision.mockResolvedValueOnce(reply);
-      const view = render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+      const view = render(<InTab />);
       await waitFor(() => expect(fetchDecision).toHaveBeenCalled());
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       expect(screen.queryByRole('button', { name: 'Discussioni sulla decisione' })).toBeNull();
@@ -139,7 +146,7 @@ describe('discussions on a decision — what shows them', () => {
   it('a found decision without text still takes general discussions: the button, no «Discuti», no passages, no hash', async () => {
     fetchDecision.mockResolvedValue(found({}));
     vi.mocked(articleDiscussionService.create).mockResolvedValue(fullThread());
-    render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    render(<InTab />);
     fireEvent.click(await screen.findByRole('button', { name: 'Discussioni sulla decisione' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
@@ -161,7 +168,7 @@ describe('discussions on a decision — what shows them', () => {
       data: [fullThread({ id: 't-old', title: 'Vecchio dubbio', isOwner: false, passageReleased: false, passage: { quote: 'ricorso', start: 3, prefix: 'Il ', suffix: ' è fondato' } })],
       pagination: { page: 1, limit: 20, total: 1, pages: 1 },
     });
-    render(<DecisionTabView tabId="tab-1" reference={IDENTITY} />);
+    render(<InTab />);
     fireEvent.click(await screen.findByRole('button', { name: 'Discussioni sulla decisione' }));
     expect(await screen.findByText('Il passo citato non è mostrato: il testo della decisione non è disponibile.')).toBeInTheDocument();
     expect(screen.queryByText(/in verifica/)).toBeNull();

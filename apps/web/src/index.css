@@ -80,6 +80,19 @@
   --color-primary-900: #1e3a8a;
   --color-primary-950: #172554;
 
+  /* The review card's reveal (VisuaLex Studia): the hairline draws, then the answer unfolds.
+     Used only as `motion-safe:animate-vlx-rule` / `motion-safe:animate-vlx-unfold`. */
+  --animate-vlx-rule: vlx-rule 90ms ease-out both;
+  --animate-vlx-unfold: vlx-unfold 90ms ease-out 90ms both;
+  @keyframes vlx-rule {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  @keyframes vlx-unfold {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+  }
+
   /* Radius */
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -281,31 +294,6 @@
            focus:rounded-lg focus:shadow-lg focus:font-medium;
   }
 
-  /* Cmd+F search result highlight — subtler than user highlights so it
-     doesn't fight their colour picks, but distinctive enough (amber
-     underline, light fill) that matches pop on first scan. */
-  .search-match {
-    background-color: color-mix(in srgb, hsl(43 96% 56%) 25%, transparent);
-    color: inherit;
-    border-radius: 2px;
-    padding: 0 1px;
-    box-decoration-break: clone;
-    -webkit-box-decoration-break: clone;
-  }
-  .dark .search-match {
-    background-color: color-mix(in srgb, hsl(43 96% 56%) 18%, transparent);
-  }
-  .search-match.search-match-active {
-    background-color: hsl(43 96% 56%);
-    color: hsl(24 80% 14%);
-    box-shadow: 0 0 0 2px hsl(43 96% 56% / 0.4);
-  }
-  .dark .search-match.search-match-active {
-    background-color: hsl(43 96% 56%);
-    color: hsl(24 80% 14%);
-    box-shadow: 0 0 0 2px hsl(43 96% 56% / 0.5);
-  }
-
   /* Toggle from the Highlights actions picker. The highlight markup
      uses inline `style="background-color:hsl(var(--hl-*-bg)); color:
      hsl(var(--hl-*-fg))"`, so a class-level rule on .highlight-mark
@@ -346,6 +334,22 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-400 dark:bg-slate-600;
+}
+
+/* The page's height: the dynamic viewport where it is supported (a phone browser's `100vh` is taller
+   than what is visible while its toolbars show, and `Layout` clips the document), `100vh` where it is
+   not. Two declarations on purpose: a browser drops the one it does not understand. */
+@utility h-app {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* A column of the practice's row beside its windows: the page's height less the content area's
+   padding above and below it (`p-8`, 2 rem each, in `Layout`), so the scroller's content is never
+   taller than the scroller and a `scrollIntoView` inside a window does not move the page. */
+@utility h-app-row {
+  height: calc(100vh - 4rem);
+  height: calc(100dvh - 4rem);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -836,9 +840,11 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CITATION HOVER — Subtle recognition of norm references
+   CITATION HOVER — Subtle recognition of norm references and of the
+   decisions a text cites (.decision-cite, utils/decisionCitationMatcher.ts)
    ═══════════════════════════════════════════════════════════ */
-.citation-hover {
+.citation-hover,
+.decision-cite {
   cursor: default;
   text-decoration: none;
   transition: all 0.15s ease;
@@ -847,14 +853,16 @@
   margin: 0 -1px;
 }
 
-.citation-hover:hover {
+.citation-hover:hover,
+.decision-cite:hover {
   text-decoration: underline dotted;
   text-decoration-color: hsl(var(--primary));
   text-underline-offset: 3px;
   background-color: hsl(var(--primary) / 0.08);
 }
 
-.dark .citation-hover:hover {
+.dark .citation-hover:hover,
+.dark .decision-cite:hover {
   background-color: hsl(var(--primary) / 0.15);
 }
 

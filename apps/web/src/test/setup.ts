@@ -1,4 +1,4 @@
-import { afterEach } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import { cleanup, configure } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
@@ -8,12 +8,23 @@ import '@testing-library/jest-dom'
 // going to fail anyway, so a generous one costs nothing on a green run.
 configure({ asyncUtilTimeout: 5000 })
 
+// The tours are driver.js overlays started a moment after a component mounts: none runs under test.
+// A test of the tours themselves mocks `useTour` (or the module) in its own file, which wins.
+vi.mock('../hooks/useTour', () => ({
+  useTour: () => ({
+    startTour: vi.fn(), stopTour: vi.fn(), resetTour: vi.fn(), resetAndStartTour: vi.fn(),
+    hasSeenTour: () => true, tryStartTour: vi.fn(), getTourVersion: () => 0, isActive: () => false, isMobile: () => false,
+  }),
+}))
+
 // Cleanup after each test
 afterEach(async () => {
   cleanup()
   // lazily, so the module (and legalFetch behind it) is not loaded before a test mocks them
   const cache = await import('../utils/decisionSearchCache')
   cache.clearDecisionSearchCache()
+  const articleCards = await import('../utils/articleCardsCache')
+  articleCards.clearArticleCardsCache()
 })
 
 // Mock localStorage

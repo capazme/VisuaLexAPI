@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -12,7 +12,8 @@ import { UndoToastContainer } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
-import { GlobalSearch } from '../features/search/GlobalSearch';
+import { FindWindow } from '../features/search/FindWindow';
+import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
@@ -32,11 +33,35 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const navigate = useNavigate();
+  // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
+  const { pathname } = useLocation();
+  const onSearchPage = pathname === '/';
+  // The review's grade bar and the validators' vote bar are pinned to the bottom edge on a phone,
+  // where the feedback button and the services pill would cover them.
+  const inReviewSession = pathname.startsWith('/studia/ripasso/sessione');
+  const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
+  const barPinnedAtBottom = inReviewSession || onValidationQueue;
+  // Below lg the menu button floats at the top left over the content: every page starts under it,
+  // except the ones that draw their own header beside it (the search page's phone table, its tab
+  // header and the full-screen reader pad their headers by the button's width instead).
+  const headerBesideMenuButton = onSearchPage;
+
+  // Leaving the search page closes the window: its matches are in practices no longer on screen.
+  useEffect(() => {
+    if (!onSearchPage) closeFindWindow();
+  }, [onSearchPage]);
 
   // Onboarding Tour
-  const { startTour, hasSeenTour, resetAndStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+  // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
+  // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
+  // address is read when the welcome ends, not when this callback was made.
+  const { startTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+    theme: settings.theme as 'light' | 'dark',
+    onComplete: (type) => {
+      if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
+    },
+  });
 
   // Auto-start welcome tour on first visit
   useEffect(() => {
@@ -101,10 +126,13 @@ export function Layout() {
         e.preventDefault();
         toggleSearchPanel();
       }
-      // Cmd/Ctrl+F for global search
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+      // Cmd/Ctrl+F opens the floating find window (spec §13.1), or focuses its field when it is open.
+      // Off the search page, and under an overlay that covers the workspace (a modal dialog, the
+      // discussion panel, Study Mode, the palette, CompareView, the PDF viewer), the browser's own find is left alone.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f'
+        && onSearchPage && !isWorkspaceCovered()) {
         e.preventDefault();
-        setGlobalSearchOpen(true);
+        openFindWindow();
       }
       // Open keyboard shortcuts with '?' (Shift + /)
       if (e.key === '?' && !isTyping) {
@@ -114,10 +142,10 @@ export function Layout() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette]);
+  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage]);
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div className="h-app overflow-hidden flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <motion.div
@@ -137,7 +165,7 @@ export function Layout() {
           opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
         }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="hidden lg:block flex-shrink-0"
+        className="hidden lg:block flex-shrink-0 h-full"
       >
         {sidebarVisible && !settings.focusMode && (
           <Sidebar
@@ -165,7 +193,7 @@ export function Layout() {
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         {/* Floating Focus Toggle */}
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -204,8 +232,10 @@ export function Layout() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto w-full h-full">
-          <div className={cn(
+          <div data-testid="layout-content" className={cn(
             'max-w-7xl mx-auto p-4 md:p-8',
+            // The button is about 42 px from top-4: 4.5rem clears it (md: again, or md:p-8 wins).
+            !settings.focusMode && !headerBesideMenuButton && 'pt-[4.5rem] md:pt-[4.5rem] lg:pt-8',
             settings.focusMode && 'max-w-4xl py-12'
           )}>
             <Outlet />
@@ -219,7 +249,7 @@ export function Layout() {
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
 
       {/* Feedback Button - only for authenticated users */}
-      {isAuthenticated && <FeedbackButton />}
+      {isAuthenticated && <FeedbackButton className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />}
 
       {/* Version changelog notification */}
       <ChangelogNotification />
@@ -235,10 +265,10 @@ export function Layout() {
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
 
-      <ServiceHealthBanner />
+      <ServiceHealthBanner className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />
 
-      {/* Global Search (Cmd+F) */}
-      <GlobalSearch isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
+      {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
+      <FindWindow />
 
       {/* Heavy reader overlays are loaded only when their route/state needs them. */}
       <Suspense fallback={null}>

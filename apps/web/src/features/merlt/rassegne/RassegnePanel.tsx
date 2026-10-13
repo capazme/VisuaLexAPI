@@ -24,11 +24,11 @@ interface YearProps {
   anno: number;
   count: number;
   initial?: { items: RassegnePasso[]; next: string | null };
-  besideTabId?: string;
+  besideId?: string;
   backEntry?: ReadingBackEntry;
 }
 
-function YearSection({ urn, archivio, anno, count, initial, besideTabId, backEntry }: YearProps) {
+function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry }: YearProps) {
   const [open, setOpen] = useState(Boolean(initial));
   const [items, setItems] = useState<RassegnePasso[]>(initial?.items ?? []);
   const [next, setNext] = useState<string | null>(initial?.next ?? null);
@@ -69,7 +69,7 @@ function YearSection({ urn, archivio, anno, count, initial, besideTabId, backEnt
       {open && (
         <div>
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {items.map((p) => <RassegnaPassage key={p.id} passo={p} besideTabId={besideTabId} backEntry={backEntry} />)}
+            {items.map((p) => <RassegnaPassage key={p.id} passo={p} besideId={besideId} backEntry={backEntry} />)}
           </ul>
           {failed && <p className="text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
           {next && !loading && (
@@ -86,8 +86,8 @@ function YearSection({ urn, archivio, anno, count, initial, besideTabId, backEnt
 
 export interface RassegnePanelProps {
   articleUrn?: string;
-  /** The workspace tab the article is in: a decision chip opens beside it. */
-  besideTabId?: string;
+  /** The place the article is read in (a practice or one of its windows): a decision chip opens beside it. */
+  besideId?: string;
   /** The way back to the article, recorded when a decision is opened from here. */
   backEntry?: ReadingBackEntry;
 }
@@ -96,9 +96,9 @@ export interface RassegnePanelProps {
  * "Nelle rassegne della Cassazione": the paragraphs of the Massimario's annual reviews whose
  * author cited this article, by year. A closed row under the article text (spec §7; placement
  * per the text-as-at-a-date spec §9). Self-contained: it takes the article's URN and ignores
- * the slot's other props, bar the tab it opens decisions beside.
+ * the slot's other props, bar the place it opens decisions beside.
  */
-export function RassegnePanel({ articleUrn, besideTabId, backEntry }: RassegnePanelProps) {
+export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanelProps) {
   const [open, setOpen] = useState(false);
   const [archivio, setArchivio] = useState<Archivio | undefined>(undefined);
   // Another article starts closed and unfiltered: the slot does not remount the panel per URN.
@@ -150,7 +150,7 @@ export function RassegnePanel({ articleUrn, besideTabId, backEntry }: RassegnePa
           {summary.failed && <p className="mb-2 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
           {data.anni.map(({ anno, passi: count }) => (
             <YearSection key={`${shownArchivio ?? ''}-${anno}`} urn={articleUrn} archivio={shownArchivio} anno={anno} count={count}
-              besideTabId={besideTabId} backEntry={backEntry}
+              besideId={besideId} backEntry={backEntry}
               initial={anno === data.anno ? { items: data.items, next: data.next_cursor } : undefined} />
           ))}
         </div>

@@ -20,6 +20,19 @@ describe('routes require authentication', () => {
     ['delete', '/api/auth/account'],
     ['get', '/api/lingo/simulazioni/tracce'],
     ['get', '/api/lingo/simulazioni/tracce/does-not-exist'],
+    ['patch', '/api/lingo/cards/x'],
+    ['get', '/api/lingo/articolo'],
+    ['post', '/api/lingo/cards/x/proponi'],
+    ['post', '/api/lingo/cards/x/ritira'],
+    ['get', '/api/lingo/validazione/coda'],
+    ['post', '/api/lingo/validazione/x'],
+    ['get', '/api/lingo/testi/PROPOSTA_SCHEDA'],
+    ['get', '/api/admin/studia/testi'],
+    ['post', '/api/admin/studia/testi/PROPOSTA_SCHEDA'],
+    ['get', '/api/lingo/srs/sessione'],
+    ['post', '/api/lingo/srs/revisioni'],
+    ['get', '/api/lingo/srs/preferenze'],
+    ['put', '/api/lingo/srs/preferenze'],
   ] as const)('%s %s answers 401 without a token', async (method, path) => {
     const response = await (request(app) as any)[method](path);
     expect(response.status).toBe(401);

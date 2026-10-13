@@ -4,8 +4,8 @@ import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { parseDecisionPath } from '../../../utils/decisionLinks';
 
-/** `/sentenze/…` opens the search space with the decision's tab (design 2026-10-05 §3): the
- *  address stays the contract LibreLex and the Massimario's links build, the page is the tab.
+/** `/sentenze/…` redirects to the search space and queues the decision, which opens in a practice (design
+ *  2026-10-05 §3): the address stays the contract LibreLex and the Massimario's links build.
  *  `/sentenze` alone, or an address that does not parse, opens the palette instead. */
 export function DecisionAddress() {
   const params = useParams<{ corte?: string; numero?: string; anno?: string }>();

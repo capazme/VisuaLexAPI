@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { trashService, type TrashEntry } from '../../../services/trashService';
 import { appStore, useAppStore } from '../../../store/useAppStore';
+import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 
 /** What a restore came to: back, a dossier to choose (its own is gone), or refused, in Italian. */
 export type RestoreOutcome =
@@ -58,6 +59,8 @@ export function useTrash() {
     try {
       const { dossierId } = await trashService.restore(entry.id, targetDossierId);
       drop(entry.id);
+      // The cards are back under their articles.
+      if (entry.kind === 'LINGO_CARDS') invalidateArticleCards();
       if (dossierId) await refreshDossier(dossierId);
       return { kind: 'restored' };
     } catch (err) {

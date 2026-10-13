@@ -9,6 +9,12 @@ import type {
   NotFoundDecision,
 } from '../types/decisions';
 import { formatDateForCitation, formatDateItalianLong, withPreposition } from './dateUtils';
+import { EU_COURT_FULL_NAME, EU_COURT_NAME, EU_MAX_NUMERO, euCaseLabel, euCasesPhrase, euSectionLabel, euSectionName, isEuCourt } from './euCourts';
+import {
+  ADMIN_MAX_NUMERO, KIND_NAME, PROVVEDIMENTO, SEATS, SENTENZA_KINDS,
+  adminCourtFullName, adminCourtName, adminSectionLabel, adminSectionName, adminSlug, isAdminCourt, isSeat,
+  kindAbbreviation,
+} from './adminCourts';
 
 /** True: App.tsx routes /sentenze/:corte/:numero/:anno (the address opens the decision's tab in the
  *  search space), so data that names a decision (the Massimario's chips) can link to it. The one
@@ -22,9 +28,23 @@ export interface LooseDecisionRef {
   numero: number;
   anno?: number | null;
   sezione?: string | null;
+  /** The administrative courts: a TAR's seat, and the kind of measure. */
+  sede?: string | null;
+  provvedimento?: string | null;
 }
 
-const LINKABLE_FIRST_YEAR: Record<string, number> = { cassazione: 1900, corte_costituzionale: 1956 };
+const LINKABLE_FIRST_YEAR: Record<string, number> = {
+  cassazione: 1900, corte_costituzionale: 1956, corte_giustizia_ue: 1953, tribunale_ue: 1989, consiglio_di_stato: 1990, cgars: 1990, tar: 1990,
+};
+const highestNumber = (corte: string | undefined): number =>
+  isEuCourt(corte) ? EU_MAX_NUMERO : isAdminCourt(corte) ? ADMIN_MAX_NUMERO : 999_999;
+
+/** `?provvedimento=ocau` for a kind that is not a sentenza; nothing for a sentenza or no kind. */
+function kindQuery(provvedimento: string | null | undefined): string {
+  // the identity's kind only; a reference's family is `adminPath`'s
+  return provvedimento && PROVVEDIMENTO.test(provvedimento) && !SENTENZA_KINDS.includes(provvedimento)
+    ? `?provvedimento=${provvedimento}` : '';
+}
 
 /**
  * The address of a decision named by other data, or null when that data cannot make a link (another
@@ -34,9 +54,16 @@ const LINKABLE_FIRST_YEAR: Record<string, number> = { cassazione: 1900, corte_co
 export function linkableDecisionPath(raw: LooseDecisionRef, now: Date = new Date()): string | null {
   const first = Object.hasOwn(LINKABLE_FIRST_YEAR, raw.corte) ? LINKABLE_FIRST_YEAR[raw.corte] : undefined;
   if (first === undefined) return null;
-  if (!Number.isInteger(raw.numero) || raw.numero < 1 || raw.numero > 999_999) return null;
+  if (!Number.isInteger(raw.numero) || raw.numero < 1 || raw.numero > highestNumber(raw.corte)) return null;
   if (raw.anno == null || !Number.isInteger(raw.anno) || raw.anno < first || raw.anno > now.getFullYear()) return null;
+  if (isAdminCourt(raw.corte)) {
+    // design 2026-10-12-administrative-courts §2: a TAR's page needs its seat
+    if (raw.corte === 'tar' && !isSeat(raw.sede)) return null;
+    return `/sentenze/${adminSlug(raw.corte, raw.sede)}/${raw.numero}/${raw.anno}${kindQuery(raw.provvedimento)}`;
+  }
   if (raw.corte === 'corte_costituzionale') return `/sentenze/corte-costituzionale/${raw.numero}/${raw.anno}`;
+  if (raw.corte === 'corte_giustizia_ue') return `/sentenze/corte-giustizia-ue/${raw.numero}/${raw.anno}`;
+  if (raw.corte === 'tribunale_ue') return `/sentenze/tribunale-ue/${raw.numero}/${raw.anno}`;
   if (raw.archivio === 'civile' || raw.archivio === 'penale') {
     return `/sentenze/cassazione-${raw.archivio}/${raw.numero}/${raw.anno}`;
   }
@@ -53,33 +80,69 @@ export function linkableDecisionPath(raw: LooseDecisionRef, now: Date = new Date
 
 export const DECISIONS_PATH = '/sentenze';
 export const MAX_NUMERO = 999_999;
-export const FIRST_YEAR: Record<DecisionCourt, number> = { cassazione: 1900, corte_costituzionale: 1956 };
+export const FIRST_YEAR: Record<DecisionCourt, number> = {
+  cassazione: 1900, corte_costituzionale: 1956, corte_giustizia_ue: 1953, tribunale_ue: 1989, consiglio_di_stato: 1990, cgars: 1990, tar: 1990,
+};
 
-const SLUGS: Record<string, { corte: DecisionCourt; archivio?: DecisionArchive }> = {
+const SLUGS: Record<string, { corte: DecisionCourt; archivio?: DecisionArchive; sede?: string }> = {
+  'consiglio-di-stato': { corte: 'consiglio_di_stato' },
+  cgars: { corte: 'cgars' },
+  tar: { corte: 'tar' },
+  ...Object.fromEntries(Object.keys(SEATS).map((sede) => [`tar-${sede}`, { corte: 'tar' as const, sede }])),
   'cassazione-civile': { corte: 'cassazione', archivio: 'civile' },
   'cassazione-penale': { corte: 'cassazione', archivio: 'penale' },
   cassazione: { corte: 'cassazione' },
   'corte-costituzionale': { corte: 'corte_costituzionale' },
+  'corte-giustizia-ue': { corte: 'corte_giustizia_ue' },
+  'tribunale-ue': { corte: 'tribunale_ue' },
 };
 
-export function decisionSlug(ref: { corte: DecisionCourt; archivio?: DecisionArchive }): string {
+export function decisionSlug(ref: { corte: DecisionCourt; archivio?: DecisionArchive; sede?: string }): string {
+  if (isAdminCourt(ref.corte)) return adminSlug(ref.corte, ref.sede);
   if (ref.corte === 'corte_costituzionale') return 'corte-costituzionale';
+  if (ref.corte === 'corte_giustizia_ue') return 'corte-giustizia-ue';
+  if (ref.corte === 'tribunale_ue') return 'tribunale-ue';
   return ref.archivio ? `cassazione-${ref.archivio}` : 'cassazione';
 }
 
 export function decisionPath(ref: DecisionReference): string {
+  if (isAdminCourt(ref.corte)) return adminPath(ref);
   const query = ref.corte === 'cassazione' && ref.sezione ? `?sezione=${encodeURIComponent(ref.sezione)}` : '';
   return `${DECISIONS_PATH}/${decisionSlug(ref)}/${ref.numero}/${ref.anno}${query}`;
 }
 
+/**
+ * An administrative court's address: the identity's (`/sentenze/tar-roma/1234/2020?provvedimento=ocau`),
+ * or, for a reference the words left open, `/sentenze/tar/…?regione=Lazio` (a TAR named by its region,
+ * D3) and `?tipo=ordinanza` (a family named, not a kind). The open forms are what the tab and the
+ * cache key a reference by; they read back through `parseDecisionPath`.
+ */
+function adminPath(ref: DecisionReference): string {
+  const seat = ref.corte !== 'tar' || isSeat(ref.sede);
+  const query = new URLSearchParams();
+  if (ref.provvedimento && PROVVEDIMENTO.test(ref.provvedimento)) {
+    if (!SENTENZA_KINDS.includes(ref.provvedimento)) query.set('provvedimento', ref.provvedimento);
+  } else if (ref.tipo && ref.tipo !== 'sentenza') query.set('tipo', ref.tipo);
+  if (!seat && ref.regione) query.set('regione', ref.regione);
+  const slug = adminSlug(ref.corte as Parameters<typeof adminSlug>[0], seat ? ref.sede : null);
+  const search = query.toString();
+  return `${DECISIONS_PATH}/${slug}/${ref.numero}/${ref.anno}${search ? `?${search}` : ''}`;
+}
+
 export function decisionKey(identity: DecisionIdentity): string {
-  return identity.corte === 'cassazione'
-    ? `cassazione:${identity.archivio}:${identity.numero}:${identity.anno}`
-    : `corte_costituzionale:${identity.numero}:${identity.anno}`;
+  if (identity.corte === 'cassazione') return `cassazione:${identity.archivio}:${identity.numero}:${identity.anno}`;
+  if (identity.corte === 'tar') return `tar:${identity.sede}:${identity.provvedimento}:${identity.numero}:${identity.anno}`;
+  if (isAdminCourt(identity.corte)) return `${identity.corte}:${identity.provvedimento}:${identity.numero}:${identity.anno}`;
+  return `${identity.corte}:${identity.numero}:${identity.anno}`;
 }
 
 export function identityOf(data: DecisionIdentity): DecisionIdentity {
-  return { corte: data.corte, numero: data.numero, anno: data.anno, ...(data.archivio ? { archivio: data.archivio } : {}) };
+  return {
+    corte: data.corte, numero: data.numero, anno: data.anno,
+    ...(data.archivio ? { archivio: data.archivio } : {}),
+    ...(data.sede ? { sede: data.sede } : {}),
+    ...(data.provvedimento ? { provvedimento: data.provvedimento } : {}),
+  };
 }
 
 export type ParsedDecisionPath =
@@ -98,14 +161,34 @@ export function parseDecisionPath(
   if (court) Object.assign(partial, court);
   else errors.corte = 'Organo non riconosciuto';
   const numero = /^\d{1,7}$/.test(params.numero ?? '') ? Number(params.numero) : NaN;
-  if (numero >= 1 && numero <= MAX_NUMERO) partial.numero = numero;
-  else errors.numero = 'Il numero va da 1 a 999999';
+  const highest = court ? highestNumber(court.corte) : MAX_NUMERO;
+  if (numero >= 1 && numero <= highest) partial.numero = numero;
+  else errors.numero = `Il numero va da 1 a ${highest}`;
   const first = FIRST_YEAR[court?.corte ?? 'cassazione'];
   const anno = /^\d{4}$/.test(params.anno ?? '') ? Number(params.anno) : NaN;
   if (anno >= first && anno <= now.getFullYear()) partial.anno = anno;
   else errors.anno = `L'anno va dal ${first} al ${now.getFullYear()}`;
   const sezione = search.get('sezione')?.trim();
   if (sezione && court?.corte === 'cassazione') partial.sezione = sezione;
+  // An administrative court's kind: none named is a sentenza (D2), the route reads it so.
+  if (isAdminCourt(court?.corte)) {
+    const provvedimento = search.get('provvedimento')?.trim();
+    if (provvedimento) {
+      if (PROVVEDIMENTO.test(provvedimento)) partial.provvedimento = provvedimento;
+      else errors.provvedimento = 'Tipo di provvedimento non riconosciuto';
+    }
+    const tipo = search.get('tipo')?.trim();
+    if (tipo && !provvedimento) {
+      if (tipo === 'sentenza' || tipo === 'ordinanza' || tipo === 'decreto') partial.tipo = tipo;
+      else errors.provvedimento = 'Tipo di provvedimento non riconosciuto';
+    }
+    // a TAR named by its region alone (D3): the route searches its seats
+    if (court?.corte === 'tar' && !court.sede) {
+      const regione = search.get('regione')?.trim();
+      if (regione && Object.values(SEATS).some((s) => s[1] === regione)) partial.regione = regione;
+      else errors.corte = 'Indica la sede o la regione del TAR';
+    }
+  }
   if (Object.keys(errors).length > 0) return { ok: false, errors, partial };
   return { ok: true, reference: partial as DecisionReference };
 }
@@ -143,6 +226,25 @@ function citationSection(raw: string | null | undefined): string | null {
 
 /** The identity line: "Corte di cassazione · Sez. III civile · Ordinanza n. 10787/2024 · depositata il …". */
 export function formatDecisionHeading(identity: DecisionIdentity, attrs: DecisionAttributes): string {
+  if (isAdminCourt(identity.corte)) {
+    // «Consiglio di Stato · Sez. VI · Sentenza n. 2270/2019 · depositata l'8 aprile 2019 · ECLI:…»
+    const kind = (identity.provvedimento && Object.hasOwn(KIND_NAME, identity.provvedimento) ? KIND_NAME[identity.provvedimento] : null)
+      ?? (attrs.tipo && Object.hasOwn(TIPO_TITLE, attrs.tipo) ? TIPO_TITLE[attrs.tipo] : 'Provvedimento');
+    const masculine = kind.startsWith('Decreto');
+    const deposited = attrs.data_deposito
+      ? `${masculine ? 'depositato' : 'depositata'} ${withPreposition('il', formatDateItalianLong(attrs.data_deposito))}` : null;
+    return [adminCourtFullName(identity.corte, identity.sede), adminSectionName(attrs.sezione),
+      `${kind} n. ${identity.numero}/${identity.anno}`, deposited, attrs.ecli ?? null].filter(Boolean).join(' · ');
+  }
+  if (isEuCourt(identity.corte)) {
+    // «Corte di giustizia dell'Unione europea · Grande Sezione · Sentenza, cause riunite C-293/12 e
+    // C-594/12 · pronunciata l'8 aprile 2014 · Alfa contro Beta · ECLI:…»
+    const kind = attrs.tipo && Object.hasOwn(TIPO_TITLE, attrs.tipo) ? TIPO_TITLE[attrs.tipo] : 'Pronuncia';
+    const delivered = attrs.data_decisione ? `pronunciata ${withPreposition('il', formatDateItalianLong(attrs.data_decisione))}` : null;
+    return [EU_COURT_FULL_NAME[identity.corte], euSectionName(attrs.sezione),
+      `${kind}, ${euCasesPhrase(identity.corte, identity.numero, identity.anno, attrs.cause_riunite)}`,
+      delivered, attrs.parti ?? null, attrs.ecli ?? null].filter(Boolean).join(' · ');
+  }
   const tipo = (attrs.tipo && Object.hasOwn(TIPO_TITLE, attrs.tipo) ? TIPO_TITLE[attrs.tipo] : null) || (identity.corte === 'cassazione' ? 'Decisione' : 'Pronuncia');
   const number = `${tipo} n. ${identity.numero}/${identity.anno}`;
   const deposited = attrs.data_deposito ? `${attrs.tipo === 'decreto' ? 'depositato' : 'depositata'} ${withPreposition('il', formatDateItalianLong(attrs.data_deposito))}` : null;
@@ -179,6 +281,20 @@ export function formatDecisionDeposit(attrs: DecisionAttributes): string | null 
  */
 export function formatDecisionCitation(identity: DecisionIdentity, attrs: DecisionAttributes): string {
   const tipo = attrs.tipo && Object.hasOwn(TIPO_ABBR, attrs.tipo) ? TIPO_ABBR[attrs.tipo] : null;
+  if (isAdminCourt(identity.corte)) {
+    // design 2026-10-12-administrative-courts §3 (D4): «Cons. Stato, sez. VI, sent. 8 aprile 2019, n. 2270»,
+    // the abbreviation read from the kind, which the key holds, never from `tipo`
+    const date = attrs.data_deposito ? formatDateForCitation(attrs.data_deposito) : null;
+    const kind = kindAbbreviation(identity.provvedimento);
+    return [adminCourtName(identity.corte, identity.sede), adminSectionLabel(attrs.sezione), [kind, date].filter(Boolean).join(' ') || null,
+      date ? `n. ${identity.numero}` : `n. ${identity.numero}/${identity.anno}`].filter(Boolean).join(', ');
+  }
+  if (isEuCourt(identity.corte)) {
+    // design 2026-10-12 §3.2: «Corte giust. UE, sez. I, sent. 7 dicembre 2023, causa C-634/21», no parties
+    const delivered = attrs.data_decisione ? formatDateForCitation(attrs.data_decisione) : null;
+    return [EU_COURT_NAME[identity.corte], euSectionLabel(attrs.sezione), [tipo, delivered].filter(Boolean).join(' ') || null,
+      euCasesPhrase(identity.corte, identity.numero, identity.anno, attrs.cause_riunite)].filter(Boolean).join(', ');
+  }
   const date = attrs.data_deposito ? formatDateForCitation(attrs.data_deposito) : null;
   const numero = date ? `n. ${identity.numero}` : `n. ${identity.numero}/${identity.anno}`;
   if (identity.corte === 'corte_costituzionale') {
@@ -199,6 +315,13 @@ export function formatDecisionCitation(identity: DecisionIdentity, attrs: Decisi
  * pins both.
  */
 export function formatDecisionShort(ref: LooseDecisionRef, rv?: readonly string[] | null): string {
+  if (isAdminCourt(ref.corte)) {
+    const numero = ref.anno ? `n. ${ref.numero}/${ref.anno}` : `n. ${ref.numero}`;
+    return [adminCourtName(ref.corte, ref.sede), adminSectionLabel(ref.sezione), numero].filter(Boolean).join(', ');
+  }
+  if (isEuCourt(ref.corte)) {
+    return ref.anno ? `${EU_COURT_NAME[ref.corte]}, ${euCaseLabel(ref.corte, ref.numero, ref.anno)}` : `${EU_COURT_NAME[ref.corte]}, ${ref.numero}`;
+  }
   const numero = ref.anno ? `n. ${ref.numero}/${ref.anno}` : `n. ${ref.numero}`;
   const head = ref.corte === 'corte_costituzionale'
     ? ['Corte cost.']
@@ -207,17 +330,34 @@ export function formatDecisionShort(ref: LooseDecisionRef, rv?: readonly string[
   return rv && rv.length > 0 ? `${label} · Rv. ${rv.join(', ')}` : label;
 }
 
-const KEY = /^(?:cassazione:(civile|penale):([1-9]\d{0,5}):(\d{4})|corte_costituzionale:([1-9]\d{0,5}):(\d{4}))$/;
+// The administrative courts: the kind, and a TAR's seat (design 2026-10-12-administrative-courts §2).
+const ADMIN_KEY = /^(?:(consiglio_di_stato|cgars):([a-z]{3,6})|tar:([a-z-]{3,20}):([a-z]{3,6})):([1-9]\d{0,4}):(\d{4})$/;
+const KEY = /^(?:cassazione:(civile|penale):([1-9]\d{0,5}):(\d{4})|corte_costituzionale:([1-9]\d{0,5}):(\d{4})|(corte_giustizia_ue|tribunale_ue):([1-9]\d{0,3}):(\d{4}))$/;
 
 /** A decision's key (`decisionKey`) read back, or null for anything else — a norm's key has no colon. */
 export function identityFromKey(key: string, now: Date = new Date()): DecisionIdentity | null {
+  const admin = ADMIN_KEY.exec(key);
+  if (admin) {
+    const anno = Number(admin[6]);
+    if (anno < FIRST_YEAR.tar || anno > now.getFullYear()) return null;
+    if (admin[3] !== undefined && !isSeat(admin[3])) return null;
+    return admin[1]
+      ? { corte: admin[1] as DecisionCourt, provvedimento: admin[2], numero: Number(admin[5]), anno }
+      : { corte: 'tar', sede: admin[3], provvedimento: admin[4], numero: Number(admin[5]), anno };
+  }
   const m = KEY.exec(key);
   if (!m) return null;
-  const corte: DecisionCourt = m[1] ? 'cassazione' : 'corte_costituzionale';
-  const numero = Number(m[2] ?? m[4]);
-  const anno = Number(m[3] ?? m[5]);
+  const corte: DecisionCourt = m[1] ? 'cassazione' : m[6] ? (m[6] as DecisionCourt) : 'corte_costituzionale';
+  const numero = Number(m[2] ?? m[4] ?? m[7]);
+  const anno = Number(m[3] ?? m[5] ?? m[8]);
   if (anno < FIRST_YEAR[corte] || anno > now.getFullYear()) return null;
   return corte === 'cassazione' ? { corte, archivio: m[1] as DecisionArchive, numero, anno } : { corte, numero, anno };
+}
+
+/** The short citation of a history row's decision key, or «Sentenza» when the key no longer reads. */
+export function decisionHistoryLabel(key: string | null | undefined): string {
+  const identity = identityFromKey(key ?? '');
+  return identity ? formatDecisionShort(identity) : 'Sentenza';
 }
 
 export function isDecisionKey(key: string): boolean {
@@ -298,6 +438,10 @@ export function describeNotice(notice: DecisionNotice, attrs: DecisionAttributes
       }
     case 'testo_da_archivio':
       return "Testo dell'archivio della Cassazione, provvisorio: potrebbe essere incompleto, e le note potrebbero non ritrovarsi nel testo completo.";
+    case 'causa_riunita':
+      return `La causa citata è stata riunita ad altre: la sentenza è registrata sotto la causa n. ${notice.numero}/${notice.anno}.`;
+    case 'sede_dedotta':
+      return `La citazione indica la regione, non la sede: la decisione è del TAR di ${notice.sede}.`;
     default: {
       // a new kind of notice fails to compile here, until it has its sentence
       const unhandled: never = notice;
@@ -323,6 +467,18 @@ export function notFoundMessage(answer: NotFoundDecision, ref: DecisionReference
       ? ` solo ${withPreposition('dal', formatDateItalianLong(answer.archivio_dal))}`
       : ' solo in parte';
     return `L'archivio pubblico della Cassazione copre il ${ref.anno}${since}: non si può escludere che la decisione esista.`;
+  }
+  if (isAdminCourt(ref.corte)) {
+    const court = ref.corte === 'tar' && !isSeat(ref.sede) && ref.regione ? `TAR ${ref.regione}` : adminCourtName(ref.corte, ref.sede);
+    // the kind asked for, else the family the words named, else a sentenza (D2)
+    const kind = ref.provvedimento
+      ? (Object.hasOwn(KIND_NAME, ref.provvedimento) ? KIND_NAME[ref.provvedimento].toLowerCase() : 'provvedimento di questo tipo')
+      : ref.tipo === 'ordinanza' || ref.tipo === 'decreto' ? ref.tipo : 'sentenza';
+    const none = kind.startsWith('decreto') || kind.startsWith('provvedimento') ? 'Nessun' : 'Nessuna';
+    return `${none} ${kind} n. ${ref.numero}/${ref.anno} (${court}) nell'archivio di giustizia-amministrativa.it.`;
+  }
+  if (isEuCourt(ref.corte)) {
+    return `Nessuna sentenza della causa ${euCaseLabel(ref.corte, ref.numero, ref.anno)} nell'archivio dell'Ufficio delle pubblicazioni dell'Unione europea: la causa può essersi chiusa senza sentenza, o essere ancora pendente.`;
   }
   const decisione = `La decisione n. ${ref.numero}/${ref.anno}`;
   if (answer.motivo === 'inesistente') {

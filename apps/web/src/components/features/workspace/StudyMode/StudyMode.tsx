@@ -384,6 +384,8 @@ export function StudyMode({
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
+        // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+        data-find-overlay=""
         style={isFullscreen ? undefined : windowStyle}
         className={cn(
           "fixed z-[130] flex flex-col shadow-2xl overflow-hidden",

@@ -7,8 +7,11 @@ vi.mock('../services/authService', () => ({
   getCurrentUser: vi.fn(),
 }));
 vi.mock('../services/decisionService', () => ({ fetchDecision: vi.fn() }));
+vi.mock('../services/studiaService', () => ({ studiaService: { forArticle: vi.fn() } }));
 
 import { fetchDecision } from '../services/decisionService';
+import { studiaService } from '../services/studiaService';
+import { useArticleCards } from '../components/features/studia/useArticleCards';
 import { fetchDecisionCached } from '../utils/decisionFetchCache';
 import { appStore } from '../store/useAppStore';
 import { useAuth } from './useAuth';
@@ -34,5 +37,22 @@ describe('useAuth — logout', () => {
     expect(s.commandPaletteQuery).toBeNull();
     await fetchDecisionCached(REF);
     expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets the cards read on an article, which are the last reader’s', async () => {
+    const urn = 'urn:nir:stato:legge:1990-08-07;241~art2';
+    vi.mocked(studiaService.forArticle).mockResolvedValue([]);
+    const cards = renderHook(() => useArticleCards(urn));
+    await waitFor(() => expect(cards.result.current.status).toBe('ready'));
+    cards.unmount();
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    const next = renderHook(() => useArticleCards(urn));
+    expect(next.result.current.status).toBe('loading');
+    await waitFor(() => expect(next.result.current.status).toBe('ready'));
+    expect(studiaService.forArticle).toHaveBeenCalledTimes(2);
   });
 });

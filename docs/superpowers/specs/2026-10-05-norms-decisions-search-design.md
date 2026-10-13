@@ -894,7 +894,7 @@ goes to the next, Shift+Enter to the previous (both wrap), Esc closes the box, c
 highlights and returns the focus to the button. The current match is scrolled into the middle of
 the tab's view. A query shorter than two characters highlights nothing. Past 1,000 matches the
 first 1,000 are highlighted and the counter says «oltre 1000: affina la ricerca». On a phone the
-box takes the toolbar's full width, the field on a row of its own. «Cerca nel testo» has no keyboard shortcut of its own. The app's Cmd/Ctrl+F is a different tool, the existing «Cerca negli articoli aperti» (`Layout.tsx`, unchanged by this PR): it searches the open articles, not decisions, and marks them in amber in the text.
+box takes the toolbar's full width, the field on a row of its own. (Superseded on 9 October by §13.1: one floating window, opened with Cmd/Ctrl+F or the magnifier, replaces this box and «Cerca negli articoli aperti».)
 A past text (gotcha 32) can be searched: searching stores nothing. A decision shown without its
 text has no button.
 
@@ -920,7 +920,8 @@ text. A soft hyphen or a zero-width space inside a word, in the text or in the q
 finds «respon­sabilità»). Ligatures (ﬁ, ﬂ, ﬃ) are not matched: they cannot fold one unit to one.
 In the query, a run of spaces matches any run of whitespace in the text; the query is trimmed at
 its edges, and the two-character minimum counts folded base characters (code points after the
-marks are dropped), so one emoji or one accented letter is not enough.
+marks are dropped) that are letters or digits (§13.2), so one emoji, one accented letter or one
+letter with a dot is not enough.
 
 **Where one block ends.** The text nodes of two blocks touch without a space, so the search runs
 over the text nodes joined by one virtual space wherever a block ends and another begins (a
@@ -941,6 +942,178 @@ open search, so two tabs searching at once do not clear each other. When the tex
 (a note added, highlights hidden), the matches are computed again and the current one is kept
 where it still exists. A browser without the API (Chrome and Edge before 105, Safari before
 17.2, Firefox before 140) still counts, moves and scrolls; it draws no highlight.
+
+#### 13.1 One floating window, on Cmd/Ctrl+F (the owner, 9 October)
+
+The owner, after PR 4c: «no però vorrei tutta la ricerca in cmd+f e vorrei tutta la barra di
+ricerca meno ingombrante, magari in una sua finestra fluttuante». So the two searches become one:
+the box under the toolbar (above) and the old «Cerca negli articoli aperti» (a modal over the
+stored article texts, marking matches in amber with elements in the text) are replaced by a
+single small floating window. What §13 says about matching, folding, block separators and drawing
+with the Highlight API still holds; this section says where the search is opened, what it covers
+and what goes.
+
+**The window.** One window for the whole app, mounted once in the signed-in layout and portalled
+to the document: a field «Cerca nel testo», the counter, «Risultato precedente» / «Risultato
+successivo» (↑ ↓), a scope switch and «Chiudi la ricerca» (×). It is small (a row for the field and its buttons, and a second line for the scope switch, about 420 px
+wide on a desktop), it is not modal (the reader keeps reading, selecting and scrolling while it is
+open), it can be dragged by its handle, and its place is remembered for the session
+(`sessionStorage`, clamped to the viewport, never stored with the workspace); it opens at the top
+right of the results area. On a phone it takes the full width at the top of the screen, the field
+on a row of its own, 44 px targets, and it is not dragged.
+
+**How it opens.** Cmd/Ctrl+F on the search page (`/`, where the workspace is drawn) opens it with
+its field focused; pressed again while it is open, it focuses the field and selects the query (as a
+browser does). On every other page (the dossier, the forum, the history, the graph…) Cmd/Ctrl+F is
+the browser's own find, and leaving the search page closes the window: its matches are in tabs no
+longer on screen, and a «go to» would restore tabs the reader cannot see.
+The magnifier in a reading toolbar (an article's, a decision's) opens the same window, scoped to
+that tab, with the first match taken in that text; there is no box under the toolbar any more.
+Esc in the window closes it, clears the highlights and returns the focus to where it was (the
+magnifier, when it was opened from one); it does not reach an open discussion panel or citation
+preview. Enter and Shift+Enter move as in §13 and wrap.
+While an overlay covers the workspace Cmd/Ctrl+F is not intercepted: the browser's own find works
+and the window does not open. An overlay is any element with `aria-modal="true"` (a modal dialog,
+the discussion panel) or marked `data-find-overlay` (Study Mode, the command palette, CompareView,
+the PDF viewer: they cover the reader but are not modal dialogs in ARIA terms, and Study Mode must
+not become one, since its note popovers are portalled outside it and a screen reader would hide
+them). A window already open when an overlay opens keeps its place in the stacking order: under the
+overlays above it (Study Mode and the overlay band, from z 1000), over the hand-rolled modals drawn
+at `z-50` and `z-[100]` (on the search page, the tree view and the quick norms manager), where it
+stays visible and usable. That is accepted: the window is small, not modal, and
+closes with Esc or ×; what the overlay rule prevents — a focused field the reader cannot see — cannot
+happen over a modal it sits above.
+
+**What it searches: the tab, or every tab.** A two-state switch, «Questa scheda» / «Tutte le
+schede» (`aria-pressed`), remembered for the session. «Questa scheda» is the tab in front: on a
+desktop the visible tab with the highest stacking order (the one `bringTabToFront` last raised),
+on a phone the tab on screen (the store's `mobileActiveTabId`, which the carousel writes; session
+only); it covers every article and decision in that tab. On a phone both scopes leave out loose
+articles and collections: the phone column draws norm blocks only, so their matches could be
+counted but never shown. «Tutte le schede»
+covers every open tab, minimised ones included; it replaces «Cerca negli articoli aperti» and,
+unlike it, finds decisions too. The matches are ordered by tab as the dock orders them, inside a
+tab by block and article as the tab shows them; a decision tab is one text.
+
+**A text on screen and a text that is not.** A text drawn on screen (its reading surface is
+mounted and displayed) is searched in its text root as §13 says, and its matches are drawn. An
+article that is open but not drawn (another article of the same block, a loose article in a
+minimised tab) is searched in its stored text (`article_text`, the projection: every `\n`
+dropped, folded the same way), so its matches are counted but not drawn. Going to one of them
+reveals its tab — raises it, restores it when minimised or hidden, and makes it the phone's tab on
+screen (`revealTab`) — and shows the article (`focusArticleInTab`: it opens a collapsed block or
+collection, and signals a loose article to open); once its text root is on screen the match is
+found there by its ordinal within that text and becomes current. `revealTab` is an action of its
+own rather than `bringTabToFront` made to reveal, because the restore button and the dock chip use
+`bringTabToFront`, and there a minimised tab stays minimised until its own button restores it. A
+text whose root does not appear within 3 seconds is given up for that query and its matches leave
+the counter. Typing never moves the reader; only «next» and «previous» do. The two counts can differ by a match at a block boundary or in folded update notes; the
+drawn count replaces the stored one as soon as the text is on screen. A decision tab always draws
+its text when it is shown; a decision whose tab is minimised is searched in the session cache of
+decisions, or, if absent, counted as nothing until it is shown.
+
+**The counter and the place.** «3 di 12», «Nessun risultato», «oltre 1000: affina la ricerca» as
+in §13; under «Tutte le schede» the window also names where the current match is, as one label, never
+two joined: for an article its `shortNorm`, for a decision its tab's own label (the richer one: it
+carries the section the text was read with). The counter and the place are in a polite live
+region.
+
+**Kept current.** The window recomputes when a text on screen is drawn again (§13's observer),
+when tabs are opened, closed, raised or minimised, and when an article is shown in a block; the
+current match is kept where it still exists (§13).
+
+**What goes.** `GlobalSearch.tsx`, `useGlobalSearch.ts` (its result list, the highlight broadcast
+and the navigation request), the article renderer's `search` mark kind (`searchQuery`, the
+`<mark class="search-match">` elements and their ordinal), the scroll-to-match code in
+`ArticleTabContent`, the `.search-match` styles, and the box under the toolbar (`FindInTextBox`
+in the two toolbars). With the `search` marks gone the article renderer adds no element for a
+search at all, so a search never changes the text DOM on either surface (root rule 23).
+
+**Not covered yet.** The dossier reader and Study Mode (Later). In both Cmd/Ctrl+F is the
+browser's own find (see «How it opens»).
+
+#### 13.2 A citation is searched as a citation (the owner, 11 October)
+
+The owner: «ma io intendevo la ricerca nel testo, poteri voler cercare una citazione nella
+sentenza»; then, on the proposal, «80 sì, subito». Measured on two real decisions with PR 4d's
+matcher: a citation is found only when typed exactly as the decision writes it. «art. 580 c.p.»
+finds nothing where the text says «art. 580 del codice penale» (4 times), «l. 219/2017» nothing
+where it says «legge n. 219 del 2017» (11 times), «art 110 cpa» nothing against «art. 110
+c.p.a.», «Cass. n. 8980/2018» nothing against «Cass., S.U. n 8980/2018». So, in the find window,
+a query that reads as a citation also finds the other forms of the same citation. §13's literal
+match stays, and both kinds of match are drawn the same way (one list, ordered by position,
+overlapping matches joined into one, their union, so the counter counts each place once); nothing
+is added to the page. When the query reads as a citation, its literal matches obey the bounds the
+citation's spans obey: a match never starts right after a letter, a digit or a dot, nor on a type
+that is the tail of another type's name (below); when the query ends with a dot, a match never
+ends right before a letter («art. 1 c.p.» is not in «art. 1 c.p.c.» or «art. 1 c.p.p.»); for a
+decision, a match inside an act's citation is dropped (below).
+
+**A norm.** When the query reads as a norm, the window also finds every span of the text that
+names the same norm:
+- a code's article («art. 580 c.p.», «art 110 cpa», «art. 2 Cost.»): every citation the
+  client's own `extractCitations` (`utils/citationMatcher.ts`, the reader of norm links in a
+  decision's text) resolves to the same code and article («art. 580 del codice penale», «art.
+  580 cod. pen.»);
+- a numbered act, with or without an article («l. 99/2015», «legge 99/2015», «d.P.R.
+  115/2002», «art. 1 l. 99/2015»): every span that names the same act type, number and year in
+  the forms decisions use — «legge n. 99 del 2015», «l. n. 99/2015», «legge 3 marzo 2015, n. 99»,
+  «L. 99/15», a date in figures («D.P.R. 30.5.2002 n. 115», «l. 3.3.2015, n. 99») —
+  with the type's forms read from the act-type table (`utils/sources/actTypes.ts`) and the
+  palette's other spellings of it («legge cost.», «l. cost.», «legge costituzionale»). A type is
+  never found inside another type's name: «l. 34/2020» does not find the «legge» of
+  «decreto-legge 19 maggio 2020, n. 34», «decreto legge n. 34 del 2020» or «decreto- legge n. 34
+  del 2020» (a hyphen may take spaces on either side), nor the «l.» of «d. l. 34/2020» or «d.l.
+  34/2020»;
+- when the query has an article, the act's span is found only with that article: before the act,
+  linked to it by nothing but commas and spaces, «comma N», «co. N», «lett. x», «n. N», «numero
+  N», «del», «della», «dell'», «di cui al», «di cui alla», and further articles of the same act
+  («art. 1 e l'art. 2 della legge …», «art. 2 e dell'art. 1 della legge …», «artt. 1, 2 e 3 della
+  legge …»: the span starts at the article the query names); or right after the act («legge n.
+  99/2015, art. 1, comma 3», «legge 99/2015, all'art. 1»), not followed by another act or a code
+  («legge 99/2015, art. 1 Cost.» is not it, nor «art. 1 della Carta», «CEDU», «della Convenzione»,
+  «del Trattato», «TFUE», «TUE»). Anything else between the article and the act breaks the link:
+  another act's name with or without a number, «Cost.», «c.c.», «cod.», «regolamento», «citato», a
+  full stop, a semicolon. «all'art.» and «dell'art.» are an article's prefix, in the text and in the
+  query;
+- a query that is only a code's abbreviation («c.p.») or an act without number is not a
+  citation: it is searched literally.
+
+**A decision.** When the query reads as a decision's number and year («Cass. n. 8980/2018»,
+«n. 8980/2018», «8980/2018», «sent. n. 8980 del 2018»), the window finds the number and year in
+every form: «n. 8980/2018», «n 8980/2018», «n. 8980 del 2018», «8980/2018». The court and
+section in the query are not required in the text (decisions cite «S.U.», «Sez. 3», or nothing).
+A query reads as a decision only with a court or a decision marker («Cass.», «Corte», «C.
+cost.», «sent.», «ord.», «S.U.», «n.»), or bare as «N/YYYY» with a four-digit year: «12/12»,
+«3/04» and «c. 99/2015» are searched literally. A number and year that are part of an act's
+citation are never a decision, neither as a span nor as a literal match: «Cass. n. 99/2015» and
+«n. 99/2015» do not find the number of «legge n. 99 del 2015» or «l. n. 99/2015». An act's
+citation, here, is any form of a type in the act-type table, or «decreto», «direttiva»,
+«regolamento» («dir.», «reg.»), followed by up to five words that are not a court or a decision's
+marker, then the number and year: «legge regionale n. 99 del 2015», «l.r. n. 99/2015», «legge
+della Regione Veneto n. 99 del 2015», «Reg. (UE) n. 99/2015», «decreto n. 99 del 2015».
+
+**Punctuation in abbreviations.** For every query, a dot or a comma inside or after an
+abbreviation is optional on both sides: «cpa» finds «c.p.a.», «art 13» finds «art. 13», «art.
+13, comma 1-quater» finds «art. 13 comma 1-quater». A dot that ends a sentence is never
+required. This rule widens the literal match only by punctuation; it never joins two words. A
+query word typed with a final dot ends where the text's word ends, with a dot or a word boundary:
+«art.» finds «art.» and «art 13», never «articolo»; a query without dots still finds an
+abbreviation, so «su» finds «S.U.». A dot may be followed by no space: «art. 13» finds «art.13»,
+«n. 2» finds «n.2», and a citation is read so too («art.13 c.c.», «Cass. n.8980/2018»). Only letters and digits count towards §13's two-character
+minimum: «n.», «l.», «c.» and «1.» are not searched, «c.p.» is.
+
+**Numbers.** For every query, a match never starts right after a digit when the query starts with
+a digit, nor ends right before a digit when it ends with one: «8980/2018» is not found in
+«18980/2018» nor in «8980/20181».
+
+**Not yet found.** A decision written date first («Cass. 12 aprile 2018, n. 8980»), and an
+article linked to its act through «primo comma», «commi», «e ss.» or «del c.c.».
+
+**Tests.** Synthetic texts in the repository, written for the cases above. Real decision texts
+stay out of the repository (they carry personal data): a local-only suite reads them from a
+git-ignored folder (`apps/web/src/utils/__fixtures__/private/`) and is skipped when the folder is
+absent, as the API's `_local` freeze test is.
 
 ## Security and data
 
@@ -1063,3 +1236,17 @@ senso che l'admin può rimetterlo in chiaro)»; 7 «sì».
   The same holds for a decision discussion's withdrawn quotation (§8.7, the limit): the API returns
   it to every signed-in caller and the panel's withholding is presentation, not access control, so
   the server must withhold it itself before the opening.
+- **Decisions in every search surface (proposals of 11 October, parked).** The owner asked «la
+  ricerca mi sembra ancora solo per le norme, estendiamola alle sentenze», then clarified he meant
+  searching inside a decision's text (PR 4d does it), and parked the rest: «ok, la 79 lasciamola
+  stare per ora». The proposals, kept for later: (1) the palette offers «Sentenze che citano …»
+  when the box reads as a norm, and reads incomplete decision citations («Cass. 10787/2024»
+  without section, «SU …», «sentenza n. …/2024»); (2) the empty search page shows a decision
+  example and «Sentenze aperte di recente»; (3) the Cronologia records topic and cited-norm
+  searches too (a migration) and filters Norme / Sentenze / Temi; (4) the dossier's «Aggiungi»
+  offers «Sentenza…»; (5) a decision cited as a MERL-T source opens its tab; (6) the documents
+  page finds decision citations, and decision citations inside a decision's text become links;
+  (7) a decision node in the graph opens its tab; (8) decision filters in the palette (archive,
+  years); (9) quick decisions and aliases for decisions; (10) searching the Corte costituzionale
+  (its open data, indexed locally); (11) a search over one's own notes and highlights, norms and
+  decisions together; (12) not planned: the find window inside result lists.

@@ -23,7 +23,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (~6 s, measured), past what a process manager waits before its SIGKILL (pm2,
   on the old server, waited 1.6 s).
 - `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
-  authenticated 300/min (by userId), writes 20/min. `RateLimiterRedis` when
+  authenticated 300/min (by userId), writes 200/min. `RateLimiterRedis` when
   `REDIS_ENABLED=true`, else in-memory with a startup warning.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
   connection errors fail open.
@@ -109,7 +109,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   restores an article with a new id and points its notes at it.
   `assertArticleOfDossier` is the one check behind both routes.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
-  identity and a label, never its text. Its content is checked by
+  identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
+  and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most
+  four digits, the formation as the source names it, `data_decisione`, `cause_riunite`; design
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §3), and the
+  Consiglio di Stato, the C.G.A.R.S. and the TAR (`norms/adminCourts.ts`: `provvedimento`, the kind,
+  required and part of the key; a TAR's `sede`, one of the 29 of `conventions/sources/tar-seats.json`,
+  of which `SEATS` is a copy pinned by `tests/norms/adminCourts.test.ts`; numbers to 99999, years from
+  1990; design `docs/superpowers/specs/2026-10-12-administrative-courts-design.md`). Its content is checked by
   `schemas/decisionItem.ts` (unknown keys refused) when an item is added and
   when a decision's content is updated; it must stay aligned with the web's
   `parseSentenzaContent`, so change both together. The item's `title` follows
@@ -132,12 +139,20 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   before; a deletion route also needs the read scope of what it deletes
   (`readScope` in the delegated table). `trash/trash.ts` copies the rows into
   `trash_entries` and deletes them in one transaction, the dossier row locked
-  (`FOR UPDATE`): `POST /dossiers/:id/trash {itemIds}` (the entries the user
+  (`FOR UPDATE`; for the cards, `trashLingoCards` locks the author's rows in id order,
+  so a `PATCH` in flight finishes before the payload is read and one that comes
+  after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
   saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
-  `/lingo/cards/trash` — exchanged tokens only, never the web app, whose own
-  deletions stay immediate. `GET /api/trash`, `POST /api/trash/:id/restore
-  {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
-  Restore brings every column back with the original ids; entries 30 days,
+  `/lingo/cards/trash` — the two dossier routes for exchanged tokens only,
+  whose own deletions in the web app stay immediate; the card trash is open to
+  the web app too: a deletion by the user's session is stored with no client,
+  no name and no grant (`DeletedBy` all null) and listed with
+  `byApplication: false`, while one through a connected application is
+  `byApplication: true` even when its name is unknown. `GET /api/trash`,
+  `POST /api/trash/:id/restore {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
+  Restore brings every column back with the original ids — for a card, also the author's
+  review state and log (`LingoStatoRipasso`, `LingoRevisioneSRS`), which the card's deletion
+  would otherwise cascade away; an entry from before carries none and restores as it was; entries 30 days,
   then swept (awaited, at most every ten minutes). No route reachable by an
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
@@ -152,6 +167,23 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   ones in one transaction, after the dossier's last item. Each resolved
   reference's `display` is its citation (below), never Python's own label
   («Art. 3 — legge» named no act).
+- **`POST /api/dossiers/:id/decisions`** — 1 to 10 court decisions in words
+  (`norms/resolveDecisions.ts`; design
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2): the Python
+  API's internal `/parse_decision` reads them in one call, then `/fetch_decision` confirms each,
+  two at a time, within a 100-second budget for the whole call (`decisionLookup`; the MCP server
+  waits 120, a cold Corte costituzionale lookup can take 240): past it a lookup is `unavailable`
+  and nothing is stored for it. `postLegalApi` takes the budget's signal in place of its own
+  30-second timeout. Outcomes: `added`, `already_present` (by the decision's key, against the
+  dossier's `sentenza` items and earlier references: `POST /items` itself checks none),
+  `not_recognised`, `court_not_supported` (with the `court` the words name), `ambiguous` (the
+  candidates' citations in `detail`, and what to add: the archive, a TAR's seat or the kind), `does_not_exist` (`non_trovata` with motivo `inesistente`;
+  a penal suggestion in `detail`), `unavailable` (the source down, a timeout, and `fuori_archivio`
+  or `anno_parziale`, which the source cannot verify). Each stored decision is what the item
+  schema admits, labelled by the server; `citation` names it in the answer, and a TAR read at a
+  seat deduced from its region (D3) says which in `detail` («Sede dedotta dalla regione: Roma.»,
+  the seat named from the identity, never from the notice's words). In the delegated
+  table with `dossier:write`, two points per reference, the unverified ones given back.
 - **`norms/citation.ts`** and **`norms/decisionCitation.ts`** — how the server names a
   source, in the source convention (spec
   `docs/superpowers/specs/2026-10-04-source-convention-design.md`, decided by the owner):
@@ -247,7 +279,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   The server derives the target from `normaKey` (`norms/decisionKey.ts`
   `readDecisionKey`, the twin of the web's `identityFromKey`, both pinned to
   `conventions/sources/decision-keys.json`): a key in the
-  `cassazione:` / `corte_costituzionale:` space must read back (else 400) and
+  `cassazione:` / `corte_costituzionale:` / `corte_giustizia_ue:` / `tribunale_ue:` / `consiglio_di_stato:` / `cgars:` / `tar:` space must read back (else 400) and
   comes with `articleId` `''` and no `version` or `articleUrn`; an optional body
   `target: { kind, key }` is accepted only if it agrees (an article target takes no key). The answer carries
   `target` and `passageReleased`. The list queries may omit `articleId` for a
@@ -305,29 +337,143 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `urn:nir:…` as identity, `normaKey`/`articleId` derived in one place, the AKN
   fingerprint from the part matched to the annex by article numbers, refused
   when ambiguous; a card with an unverifiable anchor is refused, the others
-  created; always the author's draft), `GET /` and `GET /:id` (own cards only),
-  `POST /trash` (personal states only, `PERSONAL_STATES`). Scopes
+  created; always the author's draft, with the connected application that wrote
+  it in `created_by_client_id`/`_name`, answered as `origine: { clientName } | null`,
+  the client's id never), `GET /` and `GET /:id` (own cards only; the list
+  filters by `materia`, `stato`, `tipo`, `normaKey` — any anchor on the act —
+  `q` — 1–100 characters, in the institute or the question, case-insensitive —
+  and `origine=applicazione`, ordered `ordine=recenti` (default) or `materia`,
+  then institute, newest, id; for the session, `dovuteOggi=true` keeps the cards due by
+  today's Rome day, and each card carries the caller's `prossimoRipasso` — `YYYY-MM-DD`,
+  or null when never reviewed or no longer reviewable — while under an exchanged token the
+  field is absent and `dovuteOggi` answers 403: study state is not delegated surface;
+  `GET /:id` adds, for the user's session only, `approvazioni` and `rilievi` — the
+  «migliorabile» and «errata» reasons, never who gave them: a connected application gets the
+  card without them, since a reason may name someone),
+  `POST /:id/proponi` and `POST /:id/ritira` (session only; see Studia validation below),
+  `POST /trash` (personal states only, `PERSONAL_STATES`; the session and
+  exchanged tokens alike), and `PATCH /:id` for the session only (not in the
+  delegated table: a default-deny 403 for an exchanged token). The patch takes
+  one card in the shape of an element of `POST`'s `cards` and replaces its
+  fields and anchors whole: `lingo/planCards.ts` (shared with `POST`) checks
+  the references first — every one unreachable is a 503, an unverifiable one a
+  400 `{ detail, anchors }`, and the draft stays as it was — then one
+  transaction locks the row (`FOR UPDATE`) and re-reads author and state (404;
+  409 unless `BOZZA_PERSONALE`). It never touches `created_by_client_*`.
+  Postgres text cannot hold a NUL byte, which would reach it as a 500, so
+  `lingo/noNul.ts` `hasNoNul` refuses it first: a 400 on the strings of the query
+  (`q` here, `urn` on `/articolo`) and of the trash body (`cardIds`), a 404 on a
+  `:id` (`router.param`: a NUL names no card). Scopes
   `lingo:cards:read` / `lingo:cards:write`; two points per reference, one of
-  the day's hundred per card.
+  the day's hundred per card. `lingo/serializeCard.ts` is the one answer shape.
+- **`GET /api/lingo/articolo?urn=`** (`routes/lingoArticolo.ts`, session only):
+  the user's non-archived cards anchored on the article (`comunita: false`,
+  `approvazioni: null`), then other people's `VALIDATA` ones (`comunita: true`,
+  `approvazioni` = the count of approvals; a card whose author is gone included),
+  at most 50, never another person's draft, proposal or archived card. The address is the reader's (`…urn:nir:…~art1453!vig=…`); the
+  identity is `anchorUrn`, the same cut that stores an anchor's `urn`, so
+  storage and lookup agree. An address with no `urn:` is a 400.
+- **Studia validation** (spec `docs/superpowers/specs/2026-10-07-studia-cards-screens-design.md`
+  decisions 13–15, 19, 20, 22; every route session only, none in the delegated table).
+  `POST /api/lingo/cards/:id/proponi { accettoTestoId? }`: the author's draft → proposed, in one
+  transaction that locks the row and reads the current version of `PROPOSTA_SCHEDA`
+  (`lingo/texts.ts` `currentText`, `hasAccepted`). If the caller has not accepted it, the body
+  must name that version's id and the acceptance is stored with the proposal; otherwise 409
+  `{ detail, richiedeTesto }` with the current version, nothing written. The card records the
+  version in `propostaTestoId`. `POST /:id/ritira`: proposed → draft at any time, deleting the
+  card's votes and clearing `propostaTestoId`. `routes/lingoValidazione.ts`:
+  `GET /api/lingo/validazione/coda?materia=&limit=` (1–20) and `POST /api/lingo/validazione/:cardId
+  { giudizio, motivazione? }` (reason 1–2,000 characters, required unless `APPROVATA`), for
+  validators only: `User.lingoValidatore`, set by an administrator through `PUT /admin/users/:id`
+  and read from the database on every call (a validator demoted mid-queue is refused at the next
+  vote). The queue holds proposed cards not written by the caller (author-less ones included —
+  a null `autoreId` fails a bare `not`, hence the `OR`) and not yet voted on by them, oldest first.
+  The vote locks the card row, refuses one's own card (403), a second vote (409) and a card that
+  is no longer proposed (404), stores the vote and lets `lingo/validationRule.ts` decide the
+  state: **provisional** (to confirm with the other developer), 2 approvals and no «errata»
+  validate, one «errata» archives, in two named constants. An archived card is its author's
+  alone (`PERSONAL_STATES`), so one whose author's account is gone is deleted in the vote's
+  transaction instead of archived (nobody could see or delete it); the answer still says
+  `ARCHIVIATA`. `GET /api/lingo/testi/:chiave` gives
+  the current text to accept and whether the caller accepted it; `routes/adminStudiaTesti.ts`
+  (`GET`/`POST /api/admin/studia/testi[/:chiave]`, administrators only) lists every version and
+  saves a new one numbered above the highest (two at once: the unique index refuses the second,
+  409). A version is never updated or deleted: acceptances and cards point at it with
+  `RESTRICT`. Version 1 of each key is written by the migration that creates the key
+  (`20261019100000_lingo_validation` for `PROPOSTA_SCHEDA`). `GET /auth/me` and the login answer
+  carry `lingo_validatore`.
+- **Card review** (`routes/lingoSrs.ts`, `/api/lingo/srs`, session only — not in the
+  delegated table, so every path is a 403 for an exchanged token; Studia spec decisions
+  7–9, 17, 18): `GET /sessione?materia=` answers `{ conteggi: { dovute, nuove }, cards }`,
+  the due cards first (earliest `dueAt`, at most 500 fetched, `dovute` exact), then the
+  new ones (oldest first) up to the daily goal minus the cards introduced today — state
+  rows with `reps = 1` reviewed today, since only a day's first grade is recorded — so
+  the goal holds across devices, and across subjects: a session narrowed to one subject
+  still counts the day's new cards of every subject; each card carries `nuova`, `comunita` and `anteprima`
+  (the days each grade would give, `previewIntervals`). `lingo/reviewQueue.ts`
+  `reviewScope` is decision 8: the user's own drafts, proposals and validated cards, and
+  the community's validated cards in the subjects switched on — never `autoreId != me`,
+  which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
+  rating, durataMs? }`: one transaction serialised on the pair by
+  `pg_advisory_xact_lock` (a first review has no state row to lock), the card row held
+  `FOR KEY SHARE` (a grade racing the trash waits, then answers 404; a P2003 is a 404 too), the scope checked
+  again inside it (404, nothing written), a second grade the same Rome day answered
+  `registrata: false` with nothing written; otherwise FSRS's `review` with the elapsed
+  Rome days, the state row upserted (`dueAt` = 00:00 Rome of the due day, `reps`,
+  `lapses`) and a log row appended. `GET`/`PUT /preferenze`: the daily goal (1–200,
+  default 20) and the community subjects; `GET` never creates the row.
+- **`lingo/studyDay.ts`** — what «a day» is (spec decision 18): `romeDay`, `daysBetween`
+  and `startOfRomeDay`, on `Intl` alone, the same under any `TZ`. `startOfRomeDay` takes
+  Rome's offset at the UTC-midnight guess and subtracts it: exact, because Rome changes
+  its clocks at 01:00 UTC, never near its midnight. Never compute a study day from the
+  server's local date or the browser's.
 - **LingoLex cards** (data layer): `LingoCard` and
   `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
   is the strict contract: one to ten anchors, a lower-case SHA-256 fingerprint,
   at most one primary, and the caller cannot set state, score, author or id.
   `is_primary` defaults to false in the database: the service is the only thing
   that decides which anchor is the primary one.
-  `lingo/cards.ts` `createLingoCard(authorId, input)` is one nested write that
+  `lingo/cards.ts` `createLingoCard(authorId, input, client?, origin?)` is one nested write that
   starts the card as `BOZZA_PERSONALE`; `lingo/cardStates.ts` holds the
-  lifecycle (`canTransition`). The author is optional: when an account goes
+  lifecycle (`canTransition`; proposed → draft is the withdrawal). The author is optional: when an account goes
   (`deleteUserAccount`, used by `DELETE /auth/account` and by the administrator's
   `DELETE /admin/users/:id`; never delete the user row by hand) the cards the
   community has taken up (proposed, validated, to review) stay without an author,
   and the person's drafts and archived cards are deleted with them, in one
-  transaction (plan, decision 14). `GET /auth/export` includes the user's cards
-  as `data.lingoCards`.
+  transaction that locks the person's cards first, so a vote archiving one meanwhile
+  finishes before the states are read (plan, decision 14). Their votes outlive them, anonymous
+  (`LingoValidazioneCard.utenteId` `SET NULL`), as do the text versions they wrote
+  (`autoreId` `SET NULL`); their acceptances go. A card's votes go with the card: one
+  restored from the trash comes back without them. `GET /auth/export` includes the user's cards
+  as `data.lingoCards`, their votes as `data.lingoValidazioni` (card id, verdict, reason, time)
+  and their acceptances as `data.lingoAccettazioni` (key, version, time). Review data is personal: `LingoStatoRipasso`
+  (`lingo_stato_ripasso`, one row per user and card, indexed by `(utente_id, due_at)`),
+  the append-only log `LingoRevisioneSRS` (`lingo_revisioni_srs`, kept to fit the weights
+  later) cascade from the user and from the card, `LingoPreferenzeStudio`
+  (`lingo_preferenze_studio`) from the user; the export carries the log as `data.lingoRipassi` (not the derived state)
+  and the preferences as `data.lingoPreferenze` (null when never saved).
+- **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
+  norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
+  `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
+  and `parseHistory` answers the Italian 400s first. A decision key must read back through
+  `norms/decisionKey.ts` (`readDecisionKey`). The five-minute de-duplication runs per kind
+  (by key for a decision). Responses carry `decision_key` and a nullable `act_type`.
+- **Development mode**: `User.devModeAllowed` is set only by `PUT /admin/users/:id`
+  (`devModeAllowed`); revoking it writes `devMode: false` in the same update. The user's own
+  switch is `PUT /auth/dev-mode {enabled}`, a strict schema (an extra key is a 400, not
+  stripped), session-only (not among the delegated routes), 403 «Modalità sviluppo non
+  abilitata per questo account» without the permission; the check is part of the write
+  (`updateMany` with `devModeAllowed: true` in the `where`), so a revocation between
+  `authenticate` and the write cannot leave the mode on. The mode only hides surfaces in the
+  web app, it never grants a permission. `GET /auth/me`, the login and the switch answer with
+  one shape (`toMeResponse`) carrying `dev_mode_allowed` and `dev_mode`;
+  `tests/devMode.test.ts`.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades, except the community's study cards, which stay without an
-  author: see LingoLex cards). Reached from the Settings modal. The export's
+  author, and the validators' votes and the text versions an administrator wrote,
+  which stay anonymous: see LingoLex cards). Reached from the Settings modal. The export's
+  history rows include `decisionKey` (raw Prisma fields, as the rest of the export); its
   discussion threads keep a release's time but not the releasing admin's id.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
@@ -348,7 +494,16 @@ schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 ## Tests
 
 Only through `npm test`: its setup runs `prisma migrate reset` and refuses a
-database whose name lacks "test". nock is replaced by a fetch shim (vitest
+database whose name lacks "test". The per-test `TRUNCATE … users CASCADE` also empties
+`lingo_testi_versioni` (it references `users`), so the setup reads the versions the migrations
+wrote once and puts them back after each truncation: every test starts with version 1 of each
+text to accept, as a fresh database has. The suite's environment is `.env.test` and the setup's own
+values, never a development `.env`: `dotenv` is mocked in the setup (so `src/config.ts` reads
+nothing); `@prisma/client` is wrapped there too, because Prisma loads `apps/server/.env` (when the
+client was generated in a checkout that has one) at the import and again at every construction,
+and whatever it adds is taken out at once; and every `OAUTH_*` / `MERLT_*` that `.env.test` does
+not name is dropped, a shell export too — `tests/devEnvGuard.ts`. A development MCP secret once made the whole
+OAuth suite answer `invalid_client` in the main checkout only. nock is replaced by a fetch shim (vitest
 alias) because nock 14 corrupted supertest's sockets, and the suite shares one
 persistent server bound to `127.0.0.1` (a wildcard bind on macOS could share its
 port with another local process).

@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import nock from 'nock';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
@@ -16,7 +17,7 @@ const ccArticle = (n: string) => ({
   tipo_atto: 'codice civile', tipo_atto_reale: 'regio decreto', data: '1942-03-16', numero_atto: '262', numero_articolo: n,
   allegato: '2', url: CC, urn: `${CC}:2~art${n}`, versione: null, data_versione: null,
 });
-const HASH: Record<string, string> = { '1453': 'a'.repeat(64), '1455': 'b'.repeat(64) };
+const HASH: Record<string, string> = { '1453': 'a'.repeat(64), '1454': 'c'.repeat(64), '1455': 'b'.repeat(64) };
 
 const LONG_ACT = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1941-09-09;1023';
 // A real act name long enough to overflow the card schema's 100-character normaKey (code review of PR 5).
@@ -51,17 +52,17 @@ function stubPythonApi() {
     if (body.urn === LONG_ACT) return [200, { available: true, fingerprints: { '7': { fingerprint: 'e'.repeat(64), date: null } }, parts: [], count: 1 }];
     return [200, {
       available: true,
-      fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } },
+      fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1454': { fingerprint: HASH['1454'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } },
       parts: [
         { name: 'Disposizioni sulla legge in generale', fingerprints: { '1': { fingerprint: 'f'.repeat(64), date: null } } },
-        { name: 'CODICE CIVILE', fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } } },
+        { name: 'CODICE CIVILE', fingerprints: { '1453': { fingerprint: HASH['1453'], date: null }, '1454': { fingerprint: HASH['1454'], date: null }, '1455': { fingerprint: HASH['1455'], date: null } } },
       ],
       count: 3,
     }];
   });
   nock(API).post('/fetch_tree').times(200).reply(() => {
     count('/fetch_tree');
-    return [200, { articles: [{ allegato: '1', numero: '1' }, { allegato: '2', numero: '1453' }, { allegato: '2', numero: '1455' }] }];
+    return [200, { articles: [{ allegato: '1', numero: '1' }, { allegato: '2', numero: '1453' }, { allegato: '2', numero: '1454' }, { allegato: '2', numero: '1455' }] }];
   });
   nock(API).post('/fetch_article_text').times(200).reply(() => [200, [{ article_text: 'I dati personali sono trattati in modo lecito…', norma_data: {} }]]);
 }
@@ -259,6 +260,110 @@ describe('the study-card routes', () => {
     expect(refused.body.quota).toBe('card');
   });
 
+  describe('the list for the Studia area', () => {
+    const list = (who: Record<string, string>, query = '') => request(app).get(`/api/lingo/cards${query}`).set(who);
+    const idsOf = (response: { body: { cards: { id: string }[] } }) => response.body.cards.map((c) => c.id);
+    /** Seeds rows directly: the list's filters do not depend on how a card was written. */
+    const seed = (autoreId: string, fields: Partial<Omit<Prisma.LingoCardUncheckedCreateInput, 'ancore'>> = {}, normaKeys: string[] = ['codice_civile']) =>
+      prisma.lingoCard.create({
+        data: {
+          autoreId,
+          materia: 'DIRITTO_CIVILE',
+          istituto: 'Istituto',
+          domanda: 'Domanda?',
+          risposta: 'Risposta.',
+          ...fields,
+          ancore: { create: normaKeys.map((normaKey, i) => ({ normaKey, articleId: `art_${i + 1}`, urn: `urn:${normaKey}:${fields.istituto ?? 'x'}:${i}`, aknFingerprint: 'a'.repeat(64), isPrimary: i === 0 })) },
+        },
+      });
+
+    it('records the application that created a card, and nothing for one made from the web app', async () => {
+      const write = await delegated(alice, 'lingo:cards:write');
+      const client = await prisma.oAuthClient.findFirst();
+      const viaClient = (await create(write, [CARD])).body.results[0].id;
+      const viaWeb = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      const read = await list(authHeader(alice));
+      const byId = new Map<string, { origine: unknown }>(read.body.cards.map((c: { id: string; origine: unknown }) => [c.id, c]));
+      expect(client).not.toBeNull();
+      expect(byId.get(viaClient)!.origine).toEqual({ clientName: client!.clientName });
+      expect(byId.get(viaWeb)!.origine).toBeNull();
+      expect(JSON.stringify(read.body)).not.toContain(client!.id);
+      expect((await list(authHeader(alice), `/${viaClient}`)).body.origine).toEqual({ clientName: client!.clientName });
+    });
+
+    it('filters by kind', async () => {
+      const caso = await seed(alice.id, { tipo: 'CASO_APPLICATIVO' });
+      await seed(alice.id, { tipo: 'ISTITUTO_DEFINIZIONE' });
+      expect(idsOf(await list(authHeader(alice), '?tipo=CASO_APPLICATIVO'))).toEqual([caso.id]);
+      expect((await list(authHeader(alice), '?tipo=NOPE')).status).toBe(400);
+    });
+
+    it('filters by act on any anchor, not only the primary one', async () => {
+      const second = await seed(alice.id, { istituto: 'Secondo' }, ['codice_penale', 'codice_civile']);
+      const first = await seed(alice.id, { istituto: 'Primo' }, ['codice_civile']);
+      await seed(alice.id, { istituto: 'Altro' }, ['codice_penale']);
+      expect(idsOf(await list(authHeader(alice), '?normaKey=codice_civile')).sort()).toEqual([first.id, second.id].sort());
+      expect((await list(authHeader(alice), '?normaKey=Codice%20Civile')).status).toBe(400);
+      expect((await list(authHeader(alice), `?normaKey=${'a'.repeat(101)}`)).status).toBe(400);
+    });
+
+    it('searches the institute and the question, case-insensitively, and refuses an empty or over-long text', async () => {
+      const byInstitute = await seed(alice.id, { istituto: 'Risoluzione per inadempimento', domanda: 'Quando?' });
+      const byQuestion = await seed(alice.id, { istituto: 'Recesso', domanda: 'Come si ottiene la RISOLUZIONE?' });
+      await seed(alice.id, { istituto: 'Usucapione', domanda: 'Quanto dura?' });
+      expect(idsOf(await list(authHeader(alice), '?q=risoluz')).sort()).toEqual([byInstitute.id, byQuestion.id].sort());
+      expect(idsOf(await list(authHeader(alice), '?q=%20%20usucap%20'))).toHaveLength(1);
+      expect((await list(authHeader(alice), '?q=')).status).toBe(400);
+      expect((await list(authHeader(alice), '?q=%20%20')).status).toBe(400);
+      expect((await list(authHeader(alice), `?q=${'a'.repeat(101)}`)).status).toBe(400);
+      expect((await list(authHeader(alice), `?q=${'a'.repeat(100)}`)).status).toBe(200);
+    });
+
+    it('refuses a text with a NUL byte, which the database cannot hold', async () => {
+      expect((await list(authHeader(alice), '?q=ris%00oluz')).status).toBe(400);
+    });
+
+    it('filters to the cards a connected application wrote', async () => {
+      const write = await delegated(alice, 'lingo:cards:write');
+      const viaClient = (await create(write, [CARD])).body.results[0].id;
+      await create(authHeader(alice), [CARD]);
+      expect(idsOf(await list(authHeader(alice), '?origine=applicazione'))).toEqual([viaClient]);
+      expect((await list(authHeader(alice), '?origine=web')).status).toBe(400);
+    });
+
+    it('orders by subject, then institute, then newest, and pages never repeat or skip a card', async () => {
+      const at = (day: number) => new Date(`2026-10-0${day}T10:00:00Z`);
+      const rows = [
+        await seed(alice.id, { materia: 'DIRITTO_PENALE', istituto: 'Dolo', createdAt: at(1) }),
+        await seed(alice.id, { materia: 'DIRITTO_CIVILE', istituto: 'Recesso', createdAt: at(2) }),
+        await seed(alice.id, { materia: 'DIRITTO_CIVILE', istituto: 'Caparra', createdAt: at(3) }),
+        await seed(alice.id, { materia: 'DIRITTO_CIVILE', istituto: 'Caparra', createdAt: at(4) }),
+        await seed(alice.id, { materia: 'DIRITTO_PENALE', istituto: 'Dolo', createdAt: at(5) }),
+        await seed(alice.id, { materia: 'DIRITTO_PENALE', istituto: 'Colpa', createdAt: at(6) }),
+      ];
+      const expected = [rows[3], rows[2], rows[1], rows[5], rows[4], rows[0]].map((r) => r.id);
+      const pages: string[] = [];
+      let offset: number | null = 0;
+      while (offset !== null) {
+        const page = await list(authHeader(alice), `?ordine=materia&limit=2&offset=${offset}`);
+        pages.push(...idsOf(page));
+        offset = page.body.nextOffset;
+      }
+      expect(pages).toEqual(expected);
+      expect((await list(authHeader(alice), '?ordine=altro')).status).toBe(400);
+      // The default stays newest first.
+      expect(idsOf(await list(authHeader(alice)))).toEqual([...rows].reverse().map((r) => r.id));
+    });
+
+    it('never shows another user’s cards, whatever the filter', async () => {
+      const bob = await createTestUser('cards-bob3');
+      await seed(bob.id, { tipo: 'CASO_APPLICATIVO', istituto: 'Risoluzione', createdByClientId: 'client-x', createdByClientName: 'Claude Code' });
+      for (const query of ['', '?tipo=CASO_APPLICATIVO', '?normaKey=codice_civile', '?q=risoluz', '?origine=applicazione', '?ordine=materia']) {
+        expect((await list(authHeader(alice), query)).body.cards, query).toEqual([]);
+      }
+    });
+  });
+
   describe('deleting cards through a connected application', () => {
     it('moves the user’s own drafts and archived cards; a card the community took up is refused, another user’s not found', async () => {
       const [draft, archived, proposed] = (await create(authHeader(alice), [CARD, CARD, CARD])).body.results.map((r: { id: string }) => r.id);
@@ -275,7 +380,7 @@ describe('the study-card routes', () => {
       expect(await prisma.lingoCard.count({ where: { id: { in: [draft, archived] } } })).toBe(0);
       expect(await prisma.lingoCard.count({ where: { id: { in: [proposed, bobs] } } })).toBe(2);
       const trash = (await request(app).get('/api/trash').set(authHeader(alice))).body;
-      expect(trash[0]).toMatchObject({ kind: 'LINGO_CARDS', dossierId: null, label: 'Schede LingoLex', itemCount: 2 });
+      expect(trash[0]).toMatchObject({ kind: 'LINGO_CARDS', dossierId: null, label: 'Schede di studio', itemCount: 2 });
       expect(trash[0].cards[0]).toEqual({ istituto: CARD.istituto, domanda: CARD.domanda });
     });
 
@@ -302,10 +407,199 @@ describe('the study-card routes', () => {
       expect(await prisma.trashEntry.count()).toBe(0);
     });
 
-    it('needs content:delete and the card read permission; a user session cannot use it', async () => {
+    it('needs content:delete and the card read permission from a connected application', async () => {
       const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
       expect((await request(app).post('/api/lingo/cards/trash').set(await delegated(alice, 'lingo:cards:write')).send({ cardIds: [id] })).status).toBe(403);
-      expect((await request(app).post('/api/lingo/cards/trash').set(authHeader(alice)).send({ cardIds: [id] })).status).toBe(403);
+      expect(await prisma.lingoCard.count({ where: { id } })).toBe(1);
+    });
+
+    it('names the connected application in the trash’s list', async () => {
+      const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      await request(app).post('/api/lingo/cards/trash').set(await delegated(alice, 'content:delete')).send({ cardIds: [id] });
+      const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+      expect(entry).toMatchObject({ kind: 'LINGO_CARDS', byApplication: true });
+      expect(entry.clientName).toEqual(expect.any(String));
+    });
+  });
+
+  describe('deleting from the web app', () => {
+    const trash = (who: Record<string, string>, cardIds: string[]) => request(app).post('/api/lingo/cards/trash').set(who).send({ cardIds });
+
+    it('moves a draft into the trash, which lists it as the user’s own deletion', async () => {
+      const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      const response = await trash(authHeader(alice), [id]);
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ moved: [id], notFound: [], notDeletable: [] });
+      expect(await prisma.lingoCard.count({ where: { id } })).toBe(0);
+      const list = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+      expect(list).toHaveLength(1);
+      expect(list[0]).toMatchObject({ kind: 'LINGO_CARDS', clientName: null, byApplication: false, itemCount: 1 });
+      expect(await prisma.trashEntry.findFirstOrThrow()).toMatchObject({ clientId: null, clientName: null, grantId: null });
+    });
+
+    it('keeps a validated card, and another user’s card is not found', async () => {
+      const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      await prisma.lingoCard.update({ where: { id }, data: { stato: 'VALIDATA' } });
+      const bob = await createTestUser('cards-bob5');
+      const bobs = (await create(authHeader(bob), [CARD])).body.results[0].id;
+      const response = await trash(authHeader(alice), [id, bobs]);
+      expect(response.body).toMatchObject({ moved: [], notDeletable: [id], notFound: [bobs] });
+      expect(await prisma.trashEntry.count()).toBe(0);
+      expect(await prisma.lingoCard.count({ where: { id: { in: [id, bobs] } } })).toBe(2);
+    });
+
+    it('refuses an id with a NUL byte instead of failing in the database', async () => {
+      expect((await trash(authHeader(alice), ['ab\u0000c'])).status).toBe(400);
+    });
+
+    it('stores the card as an edit in flight left it: the deletion waits for the edit’s lock', async () => {
+      const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      let deletion: Promise<{ status: number }> | undefined;
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id = ${id} FOR UPDATE`;
+        deletion = trash(authHeader(alice), [id]).then((response) => response);
+        // Long enough for a deletion that does not wait to have read the card.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        await tx.lingoCard.update({ where: { id }, data: { domanda: 'Domanda dopo la modifica?' } });
+      });
+      expect((await deletion!).status).toBe(200);
+      const entry = await prisma.trashEntry.findFirstOrThrow();
+      expect((entry.payload as { cards: { domanda: string }[] }).cards[0].domanda).toBe('Domanda dopo la modifica?');
+    });
+
+    it('is restored with its anchors', async () => {
+      const id = (await create(authHeader(alice), [CARD])).body.results[0].id;
+      const before = await prisma.lingoCard.findUniqueOrThrow({ where: { id }, include: { ancore: { orderBy: { articleId: 'asc' } } } });
+      await trash(authHeader(alice), [id]);
+      const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+      expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+      const after = await prisma.lingoCard.findUniqueOrThrow({ where: { id }, include: { ancore: { orderBy: { articleId: 'asc' } } } });
+      expect(after.ancore).toHaveLength(2);
+      const { updatedAt: _a, ...beforeRest } = before;
+      const { updatedAt: _b, ...afterRest } = after;
+      expect(afterRest).toEqual(beforeRest);
+    });
+  });
+
+  describe('editing a draft', () => {
+    const patch = (who: Record<string, string>, id: string, body: unknown) => request(app).patch(`/api/lingo/cards/${id}`).set(who).send(body as object);
+    const NEW_CARD = { ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }] };
+    const read = (id: string) => prisma.lingoCard.findUniqueOrThrow({ where: { id }, include: { ancore: { orderBy: { articleId: 'asc' } } } });
+    let id: string;
+    beforeEach(async () => {
+      id = (await create(authHeader(alice), [NEW_CARD])).body.results[0].id;
+    });
+
+    it('replaces the fields and the anchors; the first anchor stays the primary one', async () => {
+      const response = await patch(authHeader(alice), id, { ...NEW_CARD, domanda: 'Che cosa è la risoluzione?', ancore: [{ riferimento: 'art. 1453 c.c.' }, { riferimento: 'art. 1454 c.c.' }] });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ id, domanda: 'Che cosa è la risoluzione?', stato: 'BOZZA_PERSONALE' });
+      expect(response.body.ancore.map((a: { articleId: string; isPrimary: boolean }) => [a.articleId, a.isPrimary]).sort()).toEqual([['art_1453', true], ['art_1454', false]]);
+      expect((await read(id)).ancore.map((a) => a.aknFingerprint)).toEqual([HASH['1453'], HASH['1454']]);
+    });
+
+    it('takes the primary anchor the caller names', async () => {
+      const response = await patch(authHeader(alice), id, { ...NEW_CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }, { riferimento: 'art. 1455 c.c.', principale: true }] });
+      expect(response.body.ancore.find((a: { isPrimary: boolean }) => a.isPrimary).articleId).toBe('art_1455');
+    });
+
+    it('never changes the application that wrote the card', async () => {
+      await prisma.lingoCard.update({ where: { id }, data: { createdByClientId: 'client-x', createdByClientName: 'Claude Code' } });
+      const response = await patch(authHeader(alice), id, { ...NEW_CARD, istituto: 'Altro istituto' });
+      expect(response.body.origine).toEqual({ clientName: 'Claude Code' });
+      expect(await read(id)).toMatchObject({ createdByClientId: 'client-x', createdByClientName: 'Claude Code', istituto: 'Altro istituto' });
+    });
+
+    it('answers 404 for an id with a NUL byte, as it does when reading', async () => {
+      expect((await patch(authHeader(alice), 'ab%00c', NEW_CARD)).status).toBe(404);
+      expect((await request(app).get('/api/lingo/cards/ab%00c').set(authHeader(alice))).status).toBe(404);
+    });
+
+    it('answers 404 for another user’s card and changes nothing', async () => {
+      const bob = await createTestUser('cards-bob4');
+      const before = await read(id);
+      expect((await patch(authHeader(bob), id, { ...NEW_CARD, domanda: 'Mia?' })).status).toBe(404);
+      expect((await patch(authHeader(alice), 'does-not-exist', NEW_CARD)).status).toBe(404);
+      expect(await read(id)).toEqual(before);
+    });
+
+    it('answers 409 for a card that is no longer a draft', async () => {
+      await prisma.lingoCard.update({ where: { id }, data: { stato: 'PROPOSTA_COMMUNITY' } });
+      const before = await read(id);
+      expect((await patch(authHeader(alice), id, { ...NEW_CARD, domanda: 'Nuova?' })).status).toBe(409);
+      expect(await read(id)).toEqual(before);
+    });
+
+    it('answers 400 naming an article that does not exist, and the card is unchanged', async () => {
+      const before = await read(id);
+      const response = await patch(authHeader(alice), id, { ...NEW_CARD, domanda: 'Nuova?', ancore: [{ riferimento: 'art. 99999 c.c.' }] });
+      expect(response.status).toBe(400);
+      expect(response.body.anchors[0]).toMatchObject({ reference: 'art. 99999 c.c.', outcome: 'does_not_exist' });
+      expect(response.body.detail).toEqual(expect.any(String));
+      expect(await read(id)).toEqual(before);
+    });
+
+    it('Review Focus 3. sources down for every reference: 503, and the draft is as it was, updatedAt included', async () => {
+      const before = await read(id);
+      pythonDown = true;
+      const response = await patch(authHeader(alice), id, { ...NEW_CARD, domanda: 'Nuova?', ancore: [{ riferimento: 'art. 1454 c.c.' }] });
+      expect(response.status).toBe(503);
+      expect(await read(id)).toEqual(before);
+    });
+
+    it('refuses a body that sets the state, the author or an unknown key, and one with a fingerprint', async () => {
+      const before = await read(id);
+      for (const extra of [{ stato: 'VALIDATA' }, { autoreId: 'x' }, { createdByClientId: 'x' }, { cards: [] }]) {
+        expect((await patch(authHeader(alice), id, { ...NEW_CARD, ...extra })).status, JSON.stringify(extra)).toBe(400);
+      }
+      expect((await patch(authHeader(alice), id, { ...NEW_CARD, ancore: [{ riferimento: 'art. 1453 c.c.', aknFingerprint: 'a'.repeat(64) }] })).status).toBe(400);
+      expect(await read(id)).toEqual(before);
+    });
+
+    it('is not reachable by an exchanged token, whatever its scope', async () => {
+      const write = await delegated(alice, 'lingo:cards:write');
+      const before = await read(id);
+      expect((await patch(write, id, { ...NEW_CARD, domanda: 'Nuova?' })).status).toBe(403);
+      expect(await read(id)).toEqual(before);
+    });
+  });
+
+  describe('the cards of an article', () => {
+    const OF_1453 = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453!vig=2026-10-07';
+    const ofArticle = (who: Record<string, string>, urn?: string) => request(app).get('/api/lingo/articolo').query(urn === undefined ? {} : { urn }).set(who);
+    const idsOf = (response: { body: { cards: { id: string }[] } }) => response.body.cards.map((c) => c.id).sort();
+
+    it('lists exactly the user’s cards anchored on that article, found from the reader’s address', async () => {
+      const on1453 = (await create(authHeader(alice), [{ ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }] }, CARD])).body.results.map((r: { id: string }) => r.id);
+      await create(authHeader(alice), [{ ...CARD, ancore: [{ riferimento: 'art. 1454 c.c.' }] }]);
+      const response = await ofArticle(authHeader(alice), OF_1453);
+      expect(response.status).toBe(200);
+      expect(idsOf(response)).toEqual([...on1453].sort());
+      expect(response.body.cards[0]).toMatchObject({ comunita: false, approvazioni: null, stato: 'BOZZA_PERSONALE', ancore: expect.any(Array) });
+    });
+
+    it('leaves out an archived card', async () => {
+      const [kept, archived] = (await create(authHeader(alice), [CARD, CARD])).body.results.map((r: { id: string }) => r.id);
+      await prisma.lingoCard.update({ where: { id: archived }, data: { stato: 'ARCHIVIATA' } });
+      expect(idsOf(await ofArticle(authHeader(alice), OF_1453))).toEqual([kept]);
+    });
+
+    it('shows nobody else’s cards', async () => {
+      await create(authHeader(alice), [CARD]);
+      const bob = await createTestUser('cards-bob6');
+      expect((await ofArticle(authHeader(bob), OF_1453)).body.cards).toEqual([]);
+    });
+
+    it('refuses an address that is missing or has no URN', async () => {
+      expect((await ofArticle(authHeader(alice))).status).toBe(400);
+      expect((await ofArticle(authHeader(alice), '')).status).toBe(400);
+      expect((await ofArticle(authHeader(alice), 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita')).status).toBe(400);
+      expect((await ofArticle(authHeader(alice), 'a'.repeat(601))).status).toBe(400);
+      expect((await ofArticle(authHeader(alice), 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art14\u000053')).status).toBe(400);
+    });
+
+    it('is not reachable by an exchanged token', async () => {
+      expect((await ofArticle(await delegated(alice, 'lingo:cards:read'), OF_1453)).status).toBe(403);
     });
   });
 

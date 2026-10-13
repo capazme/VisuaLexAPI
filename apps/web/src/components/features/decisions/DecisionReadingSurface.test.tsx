@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { appStore } from '../../../store/useAppStore';
 import type { Annotation, Highlight } from '../../../types';
@@ -7,6 +7,8 @@ import { decisionProjection } from '../../../utils/decisionRender';
 import { DECISION_TEXTS } from '../../../utils/__fixtures__/decisionTexts';
 import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { DecisionView } from './DecisionView';
+import { findRootsFor } from '../../../utils/findTargets';
+import { findTargetsInScope } from '../../../utils/findScope';
 
 const IDENTITY: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
 const TESTO: DecisionText = {
@@ -29,13 +31,15 @@ const addHighlight = vi.fn();
 const addAnnotation = vi.fn();
 const removeHighlight = vi.fn();
 const removeAnnotation = vi.fn();
+// What the surface records is the call: the store keeps an entry only when it names a practice's subject.
+const pushReadingBack = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
   appStore.setState({
-    searchTrigger: null, readingBackStack: [], workspaceTabs: [], highlights: [], annotations: [],
+    searchTrigger: null, readingBackStack: [], highlights: [], annotations: [],
     loadHighlightsForArticle: loadHighlights, loadAnnotationsForArticle: loadAnnotations,
-    addHighlight, addAnnotation, removeHighlight, removeAnnotation,
+    addHighlight, addAnnotation, removeHighlight, removeAnnotation, pushReadingBack,
   });
 });
 
@@ -84,25 +88,36 @@ describe('DecisionReadingSurface', () => {
     expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(TESTO));
   });
 
-  it('a click searches the norm beside the host tab and records the way back to the decision', () => {
+  it('a click searches the norm beside the host and records the way back to the decision', () => {
     const { container } = render(
       <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} hostTabId="dec-tab" />,
     );
     fireEvent.click(container.querySelector('.citation-hover')!);
     expect(appStore.getState().searchTrigger).toEqual({
       act_type: 'codice civile', act_number: '', date: '', article: '2043',
-      version: 'vigente', show_brocardi_info: true, besideTabId: 'dec-tab',
+      version: 'vigente', show_brocardi_info: true, besideId: 'dec-tab',
     });
-    expect(appStore.getState().readingBackStack).toEqual([
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
       { tabId: 'dec-tab', blockId: 'dec-tab', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
-    ]);
+    );
+  });
+
+  it('a host block names the place the way back returns to, inside the host (a decision row of a practice)', () => {
+    const { container } = render(
+      <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{ sezione: '3' }} hostTabId="practice-1" hostBlockId="decision-1" />,
+    );
+    fireEvent.click(container.querySelector('.citation-hover')!);
+    expect(appStore.getState().searchTrigger).toMatchObject({ besideId: 'practice-1' });
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
+      { tabId: 'practice-1', blockId: 'decision-1', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
+    );
   });
 
   it('without a host tab the norm opens by the ordinary search and no way back is recorded', () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
     fireEvent.click(container.querySelector('.citation-hover')!);
     expect(appStore.getState().searchTrigger).toMatchObject({ act_type: 'codice civile', article: '2043' });
-    expect(appStore.getState().searchTrigger).not.toHaveProperty('besideTabId');
+    expect(appStore.getState().searchTrigger).not.toHaveProperty('besideId');
     expect(appStore.getState().readingBackStack).toEqual([]);
   });
 
@@ -133,6 +148,44 @@ describe('DecisionReadingSurface', () => {
     const notPrevented = fireEvent.copy(container.querySelector('.vlx-decision')!, { clipboardData: { setData } });
     expect(notPrevented).toBe(false);
     expect(setData).toHaveBeenCalledWith('text/plain', 'riga seconda');
+  });
+});
+
+describe('DecisionReadingSurface — the decisions the text cites', () => {
+  const CITING: DecisionText = {
+    motivazione: 'Così Cass. civ., sez. III, n. 99999/2024 (questa stessa), Sez. U, n. 9100 del 2015, Corte cost. n. 71/2020 e C-634/21.',
+  };
+  const openDecision = vi.fn(() => ({ practiceId: 'p', decisionId: 'd' }));
+  const originalOpen = appStore.getState().openDecision;
+  beforeEach(() => appStore.setState({ openDecision } as never));
+  afterEach(() => appStore.setState({ openDecision: originalOpen }));
+  const written = (container: HTMLElement) => [...container.querySelectorAll('.decision-cite')].map((e) => e.textContent);
+
+  it('links them, not the decision to itself, and reads a bare section as the Cassazione’s', () => {
+    const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={CITING} attributi={{}} />);
+    expect(written(container)).toEqual(['Sez. U, n. 9100 del 2015', 'Corte cost. n. 71/2020', 'C-634/21']);
+    expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(CITING));
+  });
+
+  it('reads a bare section as a Cassazione citation only inside a Cassazione decision', () => {
+    const { container } = render(
+      <DecisionReadingSurface identity={{ corte: 'corte_costituzionale', numero: 5, anno: 2020 }} testo={CITING} attributi={{}} />,
+    );
+    expect(written(container)).toEqual(['Cass. civ., sez. III, n. 99999/2024', 'Corte cost. n. 71/2020', 'C-634/21']);
+  });
+
+  it('a click records the way back, then opens the decision beside the host', () => {
+    const { container } = render(
+      <DecisionReadingSurface identity={IDENTITY} testo={CITING} attributi={{ sezione: '3' }} hostTabId="practice-1" hostBlockId="decision-1" />,
+    );
+    fireEvent.click(container.querySelector('.decision-cite')!);
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
+      { tabId: 'practice-1', blockId: 'decision-1', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
+    );
+    expect(openDecision).toHaveBeenCalledExactlyOnceWith(
+      { corte: 'cassazione', numero: 9100, anno: 2015, sezione: 'U' },
+      { fromLink: true, besideId: 'practice-1' },
+    );
   });
 });
 
@@ -261,5 +314,26 @@ describe('DecisionView — what has no text or no identity', () => {
     view({ esito: 'ambigua', candidati: [{ identita: IDENTITY, attributi: {} }] });
     expect(screen.queryByRole('button', { name: /note|evidenziazioni/i })).toBeNull();
     expect(loadHighlights).not.toHaveBeenCalled();
+  });
+});
+
+describe('DecisionReadingSurface — the find window\'s text root', () => {
+  it('registers its text root under the key the scope computes for the decision tab', () => {
+    const tabId = appStore.getState().openDecision(IDENTITY, { fromLink: true }).decisionId;
+    const { container, unmount } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} hostTabId={tabId} />);
+
+    const roots = findRootsFor(tabId);
+    const [target] = findTargetsInScope(appStore.getState(), 'all', null);
+    expect(roots).toHaveLength(1);
+    expect(roots[0].targetKey).toBe(target.targetKey);
+    expect(roots[0].element).toBe(container.querySelector('.vlx-art.vlx-decision'));
+    unmount();
+    expect(findRootsFor(tabId)).toHaveLength(0);
+  });
+
+  it('registers nothing without a host tab', () => {
+    const { unmount } = render(<DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} />);
+    expect(findRootsFor()).toHaveLength(0);
+    unmount();
   });
 });

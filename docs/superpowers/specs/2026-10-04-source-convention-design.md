@@ -108,7 +108,7 @@ the golden file pins both (§7).
 
 | Case | Identity |
 |---|---|
-| **Year only** (`legge`, `1983`, `184`) | none until the date is known. The full date comes from Normattiva's resolver **checked against the page's title** (`act_dates.py`, `POST /resolve_act_dates`): the resolver matches year and number only and can answer with another act (`act_dates.py:11-13`). The year-only form `…:legge:1983;184` is what is handed to that check, never a URN text is fetched from, and never stored as an identity, a key or a graph node. `generate_urn` must stop writing `1983-01-01`; the owner chose how (4 October 2026: «se davvero non serve più complete_date sostituiamola»): `act_dates` replaces `complete_date` where no caller still needs it, in the small-fixes job; this spec's PR 3b follows it. |
+| **Year only** (`legge`, `1983`, `184`) | none until the date is known. The full date comes from Normattiva's resolver **checked against the page's title** (`act_dates.py`, `POST /resolve_act_dates`): the resolver matches year and number only and can answer with another act (the docstring of `act_dates.py`). The year-only form `…:legge:1983;184` is what is handed to that check, never a URN text is fetched from, and never stored as an identity, a key or a graph node. `generate_urn` must stop writing `1983-01-01`; the owner chose how (4 October 2026: «se davvero non serve più complete_date sostituiamola»): `act_dates` replaces `complete_date` where no caller still needs it, in the small-fixes job; this spec's PR 3b follows it. |
 | **No number** (a d.p.c.m. of 8 March 2020) | `…:2020-03-08~art1`, with no `;`. Never `;None`. The exact form Normattiva accepts for an unnumbered act is checked live in the adoption PR before it is frozen in the golden file. |
 | **Annexes** of an ordinary act | `:N` after the number, as for the codes. |
 | **Preleggi, disp. att.** | their own annex or decree from the codes table (`262:1`, `318:1`, `1368:1`); never the codice civile's. |
@@ -158,7 +158,7 @@ area:
 
 | Field | Values |
 |---|---|
-| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4) |
+| `corte` | `cassazione`, `corte_costituzionale`; future courts add values (§2.4); decided on 12 October 2026: `corte_giustizia_ue`, `tribunale_ue`, `consiglio_di_stato`, `tar`, `cgars` |
 | `numero` | integer 1–999999, no leading zeros |
 | `anno` | the year of the number (for the penal Cassazione, the year of deposit) |
 | `archivio` | `civile`, `penale`; the Cassazione only, and always there |
@@ -194,9 +194,21 @@ penal; the Massimario's paragraphs sometimes give a hearing date
 
 A new court adds a `corte` value and its key shape `<corte>:<numero>:<anno>`,
 with the court's own qualifiers in place of `archivio` when its numbering
-needs them (a TAR's seat and section, the Consiglio di Stato's section). Where
-the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI. Not
-built now.
+needs them. **Decided 12 October 2026 for the administrative courts**
+(`2026-10-12-administrative-courts-design.md` §2, D1, «continuiamo»): the qualifiers are the kind
+of measure and, for a TAR, its seat (`consiglio_di_stato:sent:2270:2019`,
+`tar:roma:ocau:1234:2020`); the section stays an attribute, as for the Cassazione (§2.2). ~~Where
+the court's own identifier is the ECLI (CGUE, CEDU), the key is the ECLI.~~
+
+**Decided 12 October 2026 for the CGUE** (`2026-10-12-decisions-mcp-and-eu-courts-design.md`
+§3, Q10–Q13, «continuiamo»): the Court of Justice and the General
+Court are named by their case, as lawyers cite them and as the proposal of #112
+put it, which the owner accepted («95–100 come raccomandi»). Two courts,
+`corte_giustizia_ue` and `tribunale_ue`; the key `corte_giustizia_ue:634:2021`
+for C-634/21, the path `/sentenze/corte-giustizia-ue/634/2021`; the ECLI an
+attribute, as for the Corte costituzionale, since it names one document of a case
+(the judgment, an order, the Advocate General's opinion), not the case. The ECtHR
+is left to its own design.
 
 ## 3. Norms: labels
 
@@ -305,6 +317,19 @@ as `Cass. civ., sez. un., n. 10787/2024`.
 | idem, hearing date known (Massimario) | `Cass. pen., sez. VII, ord. 10 gennaio 2024 (dep. 14 marzo 2024), n. 10787` | idem |
 | Corte cost. 71/2020, sentenza decisa 12 febbraio, depositata 24 aprile 2020 | `Corte cost., sent. 24 aprile 2020, n. 71` | `Corte cost., n. 71/2020` |
 | with a massima (Massimario chip) | — | `Cass. civ., sez. un., n. 31310/2024 · Rv. 673165-01` |
+
+The courts of the Union (decided 12 October 2026, Q11–Q12 of
+`2026-10-12-decisions-mcp-and-eu-courts-design.md`):
+
+| Decision | citation | short |
+|---|---|---|
+| C-634/21, sez. I, 7 dicembre 2023 | `Corte giust. UE, sez. I, sent. 7 dicembre 2023, causa C-634/21` | `Corte giust. UE, C-634/21` |
+| C-293/12 and C-594/12, grande sez., 8 aprile 2014 | `Corte giust. UE, grande sez., sent. 8 aprile 2014, cause riunite C-293/12 e C-594/12` | `Corte giust. UE, C-293/12` |
+| T-612/17, sez. IX ampliata, 10 novembre 2021 | `Trib. UE, sez. IX ampliata, sent. 10 novembre 2021, causa T-612/17` | `Trib. UE, T-612/17` |
+
+The administrative courts (decided 12 October 2026, D4 of
+`2026-10-12-administrative-courts-design.md`, its §3): «Cons. Stato, sez. VI, sent. 8 aprile 2019,
+n. 2270», «TAR Lazio, Roma, sez. I, ord., n. 1234/2020», «T.R.G.A. Bolzano, …».
 
 ### 4.3 Section names
 

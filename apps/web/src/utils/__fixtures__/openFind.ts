@@ -10,7 +10,7 @@ export class FakeHighlight {
 }
 
 /**
- * Root rule 23 under a search: opens a find over `root` the way `useFindInText` does (collect, match, ranges, the
+ * Root rule 23 under a search: opens a find over `root` the way `useFindWindow` does (collect, match, ranges, the
  * highlight registry) with `CSS.highlights` and `Highlight` stubbed, and hands back what was drawn. Mount `root` in the
  * document first (the collector reads computed styles). `close()` clears the registry and restores the globals.
  */

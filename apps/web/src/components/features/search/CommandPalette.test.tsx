@@ -12,6 +12,7 @@ vi.mock('../../../hooks/useTour', () => ({
 
 import { CommandPalette } from './CommandPalette';
 import { appStore } from '../../../store/useAppStore';
+import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 
 /**
  * The palette parses the query on the client, against the ~40 acts in
@@ -98,6 +99,34 @@ describe('CommandPalette — act names the client does not carry', () => {
     // A backend that stopped answering must not be silent (CLAUDE.md gotcha 18).
     await waitFor(() => expect(errors.length).toBeGreaterThan(0));
     expect(screen.queryByText(/Invio Ricerca/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette — the annex a citation names', () => {
+  it('searches the annex the client read', async () => {
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 d.lgs. 81/2008 (All. A){Enter}');
+
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'decreto legislativo', act_number: '81', annex: 'A' }));
+  });
+
+  it('keeps the annex the server read', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ recognized: true, parsed: { act_type: 'decreto legislativo', act_number: '81', date: '2008', article: '1', annex: 'A' } }),
+    })));
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 tusl (All. A)');
+    await settle();
+    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await user.keyboard('{Enter}');
+
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_number: '81', annex: 'A' }));
   });
 });
 
@@ -268,14 +297,14 @@ describe('CommandPalette — presets the server already understands', () => {
  * and a custom alias trigger of the user's wins.
  */
 describe('CommandPalette — a decision named in the box', () => {
-  const openDecisionTab = vi.fn(() => 'tab');
-  const original = appStore.getState().openDecisionTab;
+  const openDecision = vi.fn(() => 'tab');
+  const original = appStore.getState().openDecision;
 
-  beforeEach(() => openDecisionTab.mockClear());
-  afterEach(() => appStore.setState({ openDecisionTab: original, customAliases: [] }));
+  beforeEach(() => openDecision.mockClear());
+  afterEach(() => appStore.setState({ openDecision: original, customAliases: [] }));
 
   it('shows the decision line and Enter opens its tab and closes the palette', async () => {
-    appStore.setState({ openDecisionTab } as never);
+    appStore.setState({ openDecision } as never);
     const onClose = vi.fn();
     const onSearch = vi.fn();
     const user = userEvent.setup();
@@ -289,7 +318,7 @@ describe('CommandPalette — a decision named in the box', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Sentenza: Cass. civ., n. 99999/2024. Invio per aprire.');
 
     await user.keyboard('{Enter}');
-    expect(openDecisionTab).toHaveBeenCalledWith({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 });
+    expect(openDecision).toHaveBeenCalledWith({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }, { fromLink: true });
     expect(onClose).toHaveBeenCalled();
     expect(onSearch).not.toHaveBeenCalled();
     // the server fallback is not asked about a decision
@@ -297,7 +326,7 @@ describe('CommandPalette — a decision named in the box', () => {
   });
 
   it('opens the decision even when a norm answer from the server is still around', async () => {
-    appStore.setState({ openDecisionTab } as never);
+    appStore.setState({ openDecision } as never);
     const user = fakeTimeUser();
     const onSearch = vi.fn();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
@@ -310,7 +339,7 @@ describe('CommandPalette — a decision named in the box', () => {
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
     await user.keyboard('{Enter}');
 
-    expect(openDecisionTab).toHaveBeenCalledTimes(1);
+    expect(openDecision).toHaveBeenCalledTimes(1);
     expect(onSearch).not.toHaveBeenCalled();
   });
 
@@ -338,7 +367,7 @@ describe('CommandPalette — a decision named in the box', () => {
 
   it('does not read a decision when the first word is a custom alias trigger', async () => {
     appStore.setState({
-      openDecisionTab,
+      openDecision,
       customAliases: [{
         id: 'a1', trigger: 'cass', type: 'reference' as const,
         expandTo: 'Art. 1490 c.c.', usageCount: 0, createdAt: '2026-08-27T00:00:00.000Z',
@@ -351,7 +380,7 @@ describe('CommandPalette — a decision named in the box', () => {
 
     expect(screen.queryByText(/Sentenza →/)).toBeNull();
     await user.keyboard('{Enter}');
-    expect(openDecisionTab).not.toHaveBeenCalled();
+    expect(openDecision).not.toHaveBeenCalled();
   });
 });
 
@@ -396,13 +425,13 @@ describe('CommandPalette — a citation handed over as it opens', () => {
 
 describe('CommandPalette — a topic for the Cassazione', () => {
   const open = vi.fn(() => 'tab');
-  const original = appStore.getState().openDecisionSearchTab;
+  const original = appStore.getState().openTopicSearch;
   beforeEach(() => {
     open.mockClear();
-    appStore.setState({ openDecisionSearchTab: open } as never);
+    appStore.setState({ openTopicSearch: open } as never);
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
   });
-  afterEach(() => appStore.setState({ openDecisionSearchTab: original, customAliases: [] }));
+  afterEach(() => appStore.setState({ openTopicSearch: original, customAliases: [] }));
 
   it('offers the line, announces it, and Enter opens a search tab', async () => {
     const user = fakeTimeUser();
@@ -462,5 +491,36 @@ describe('CommandPalette — a topic for the Cassazione', () => {
     expect(screen.queryByText(/nelle sentenze della Cassazione/)).toBeNull();
     await act(async () => { answer({ ok: true, status: 200, json: async () => ({ recognized: false }) }); });
     expect(await screen.findByText('Cerca "perdita di chance" nelle sentenze della Cassazione')).toBeInTheDocument();
+  });
+});
+
+describe('CommandPalette — over the workspace', () => {
+  it('leaves Cmd/Ctrl+F to the browser while it is open', () => {
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(isWorkspaceCovered()).toBe(true);
+    // Not a dialog in ARIA terms: the mark is all it gains.
+    expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(isWorkspaceCovered()).toBe(false);
+  });
+});
+
+describe('CommandPalette — Escape', () => {
+  it('closed, it leaves Escape alone: not prevented, onClose not called (the rail\'s overlay honours defaultPrevented)', () => {
+    const onClose = vi.fn();
+    render(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('open, it closes on Escape and takes the key', () => {
+    const onClose = vi.fn();
+    render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

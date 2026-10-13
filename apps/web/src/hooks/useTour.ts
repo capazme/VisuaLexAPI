@@ -59,6 +59,12 @@ function isMobileDevice(): boolean {
     return window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
+// ==================== ONE TOUR AT A TIME ====================
+
+// Two components can ask for a tour in the same moment (the table's, the act's): a second overlay
+// over the first is worse than a missed tour. The driver on screen, if any, is module-wide.
+let onScreen: Driver | null = null;
+
 // ==================== HOOK ====================
 
 interface UseTourOptions {
@@ -128,7 +134,11 @@ export function useTour(options: UseTourOptions = {}) {
 
         const isDark = options.theme === 'dark';
 
-        // Destroy any existing tour
+        // Another component's tour is on screen: this one is not started over it (its caller asks
+        // again the next time it mounts, and a tour not seen stays unseen).
+        if (onScreen?.isActive() && onScreen !== driverRef.current) return;
+
+        // Destroy this hook's own existing tour
         if (driverRef.current) {
             driverRef.current.destroy();
         }
@@ -152,10 +162,12 @@ export function useTour(options: UseTourOptions = {}) {
                 driverRef.current?.destroy();
             },
             onDestroyed: () => {
+                if (onScreen === driverRef.current) onScreen = null;
                 driverRef.current = null;
             }
         });
 
+        onScreen = driverRef.current;
         driverRef.current.drive();
     }, [options, markTourComplete, disableOnMobile]);
 
@@ -178,8 +190,10 @@ export function useTour(options: UseTourOptions = {}) {
     // Try to start a contextual tour if not seen
     const tryStartTour = useCallback((tourType: TourType): void => {
         if (!hasSeenTour(tourType)) {
-            // Small delay to ensure DOM is ready
-            setTimeout(() => startTour(tourType), 300);
+            // Small delay to ensure DOM is ready; seen again when it fires, for a tour completed meanwhile
+            setTimeout(() => {
+                if (!hasSeenTour(tourType)) startTour(tourType);
+            }, 300);
         }
     }, [hasSeenTour, startTour]);
 

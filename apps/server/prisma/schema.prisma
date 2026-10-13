@@ -72,6 +72,22 @@ model User {
 
   // LingoLex: the study cards this user wrote
   lingoCards LingoCard[]
+  lingoStatiRipasso     LingoStatoRipasso[]
+  lingoRevisioni        LingoRevisioneSRS[]
+  lingoPreferenzeStudio LingoPreferenzeStudio?
+
+  // LingoLex validation: set by an administrator; the votes this user cast (kept,
+  // anonymous, when the account goes), the notice versions they wrote (same) and
+  // the ones they accepted (removed with the account).
+  lingoValidatore       Boolean                  @default(false) @map("lingo_validatore")
+  lingoValidazioni      LingoValidazioneCard[]
+  lingoTestiScritti     LingoTestoVersione[]
+  lingoAccettazioni     LingoAccettazioneTesto[]
+
+  // Development mode: the administrator allows it (set only on the admin route), the
+  // user then turns it on or off. It only shows or hides surfaces, never a permission.
+  devModeAllowed Boolean @default(false) @map("dev_mode_allowed")
+  devMode        Boolean @default(false) @map("dev_mode")
 
   // OAuth: the applications this user connected (MCP spike)
   oauthAuthorizationRequests OAuthAuthorizationRequest[]
@@ -633,11 +649,14 @@ model Feedback {
 
 model SearchHistory {
   id        String   @id @default(uuid())
-  actType   String   @map("act_type")
+  actType   String?  @map("act_type")
   actNumber String?  @map("act_number")
   article   String?
   date      String?
   version   String?  @default("vigente")
+  // A row is a norm (actType) or a court decision (decisionKey), never both: a CHECK in the
+  // migration (not in Prisma's model) holds it.
+  decisionKey String? @map("decision_key")
   userId    String   @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -980,8 +999,9 @@ model LingoTraccia {
 
 // LINGOLEX — study cards and their anchors in the norm text.
 // The card's state follows the lifecycle in `src/lingo/cardStates.ts`. Reviews
-// (`LingoRevisioneSRS`) and validations (`LingoValidazioneCard`) are not here yet:
-// they arrive with the routes that write them.
+// (`LingoStatoRipasso`, `LingoRevisioneSRS`) are below, after the anchors;
+// validations (`LingoValidazioneCard`) are not here yet: they arrive with the
+// routes that write them.
 
 enum LingoCardStato {
   BOZZA_PERSONALE
@@ -1014,6 +1034,11 @@ model LingoCard {
   authorityScore Float          @default(0) @map("authority_score")
   // Set when the validators disagree beyond the threshold, so the minority view is kept.
   isControversa  Boolean        @default(false) @map("is_controversa")
+  // The connected application that created the card (Claude Code, LibreLex), as on DossierItem.
+  createdByClientId   String?        @map("created_by_client_id")
+  createdByClientName String?        @map("created_by_client_name")
+  // The version of the notice the card was proposed under; null for a draft, cleared on withdrawal.
+  propostaTestoId     String?        @map("proposta_testo_id")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
@@ -1021,8 +1046,12 @@ model LingoCard {
   // to review) is community property and outlives its author, anonymous. What
   // belongs to the person alone (drafts, archived) is removed in
   // `deleteUserAccount`, because only the application knows the card's state.
-  autore User?             @relation(fields: [autoreId], references: [id], onDelete: SetNull)
-  ancore LingoCardAncora[]
+  autore        User?                  @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  ancore        LingoCardAncora[]
+  propostaTesto LingoTestoVersione?    @relation(fields: [propostaTestoId], references: [id], onDelete: Restrict)
+  validazioni   LingoValidazioneCard[]
+  statiRipasso  LingoStatoRipasso[]
+  revisioni     LingoRevisioneSRS[]
 
   @@index([materia, istituto, stato])
   @@index([stato])
@@ -1052,6 +1081,121 @@ model LingoCardAncora {
   @@index([normaKey, articleId, aknFingerprint])
   @@index([cardId])
   @@map("lingo_card_ancore")
+}
+
+enum LingoGiudizio {
+  APPROVATA
+  MIGLIORABILE
+  ERRATA
+}
+
+model LingoValidazioneCard {
+  id          String        @id @default(uuid())
+  cardId      String        @map("card_id")
+  // Null once the validator's account is gone: the vote stays (decision 19).
+  utenteId    String?       @map("utente_id")
+  giudizio    LingoGiudizio
+  motivazione String?       @db.Text
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  utente User?     @relation(fields: [utenteId], references: [id], onDelete: SetNull)
+
+  @@unique([cardId, utenteId])
+  @@index([utenteId])
+  @@map("lingo_validazioni_card")
+}
+
+enum LingoTestoChiave {
+  PROPOSTA_SCHEDA
+}
+
+// A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
+model LingoTestoVersione {
+  id        String           @id @default(uuid())
+  chiave    LingoTestoChiave
+  versione  Int
+  titolo    String
+  corpo     String           @db.Text
+  conferma  String           // the checkbox, e.g. «Ho letto e accetto»
+  azione    String           // the button, e.g. «Proponi»
+  createdAt DateTime         @default(now()) @map("created_at")
+  // The administrator who wrote it; null for version 1 (written by the migration) or once that account is gone.
+  autoreId  String?          @map("autore_id")
+
+  autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  accettazioni LingoAccettazioneTesto[]
+  carte        LingoCard[]
+
+  @@unique([chiave, versione])
+  @@map("lingo_testi_versioni")
+}
+
+model LingoAccettazioneTesto {
+  id         String   @id @default(uuid())
+  utenteId   String   @map("utente_id")
+  testoId    String   @map("testo_id")
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+
+  utente User               @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  testo  LingoTestoVersione @relation(fields: [testoId], references: [id], onDelete: Restrict)
+
+  @@unique([utenteId, testoId])
+  @@map("lingo_accettazioni_testi")
+}
+
+// LINGOLEX — review (Studia PR C). What the scheduler knows about a card for one
+// user, the append-only log of their grades, and their study preferences.
+// All three are personal: they cascade from the user, and from the card (the
+// reviews of a card that is deleted go with it). Days are Europe/Rome days
+// (`src/lingo/studyDay.ts`).
+
+model LingoStatoRipasso {
+  utenteId     String   @map("utente_id")
+  cardId       String   @map("card_id")
+  stability    Float
+  difficulty   Float
+  dueAt        DateTime @map("due_at")      // the Europe/Rome day the card is due, at 00:00 local
+  lastReviewAt DateTime @map("last_review_at")
+  reps         Int      @default(1)
+  lapses       Int      @default(0)
+
+  utente User      @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([utenteId, cardId])
+  @@index([utenteId, dueAt])
+  @@map("lingo_stato_ripasso")
+}
+
+model LingoRevisioneSRS {
+  id            String   @id @default(uuid())
+  utenteId      String   @map("utente_id")
+  cardId        String   @map("card_id")
+  dataRevisione DateTime @default(now()) @map("data_revisione")
+  rating        Int      // 1 = Di nuovo, 2 = Difficile, 3 = Bene, 4 = Facile
+  scheduledDays Int      @map("scheduled_days")
+  stability     Float
+  difficulty    Float
+  durataMs      Int?     @map("durata_ms")
+
+  utente User      @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([utenteId, cardId, dataRevisione])
+  @@index([utenteId, dataRevisione])
+  @@map("lingo_revisioni_srs")
+}
+
+model LingoPreferenzeStudio {
+  utenteId        String         @id @map("utente_id")
+  nuoveAlGiorno   Int            @default(20) @map("nuove_al_giorno")   // 1–200
+  materieComunita LingoMateria[] @default([]) @map("materie_comunita")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@map("lingo_preferenze_studio")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────

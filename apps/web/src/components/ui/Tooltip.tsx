@@ -21,7 +21,9 @@ export function Tooltip({
   const [isVisible, setIsVisible] = useState(false);
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
+  // Hover and keyboard focus alike: what a pointer learns, a keyboard must learn too.
   const handleMouseEnter = () => {
+    if (timeoutId) clearTimeout(timeoutId);
     const id = setTimeout(() => setIsVisible(true), delay);
     setTimeoutId(id);
   };
@@ -52,6 +54,8 @@ export function Tooltip({
       className="relative inline-block"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocus={handleMouseEnter}
+      onBlur={handleMouseLeave}
     >
       {children}
 

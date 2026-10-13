@@ -8,6 +8,8 @@
 # MERL-T's front-end flags are decided HERE, at build time, and default to on:
 #   --build-arg VITE_FEATURE_MERLT=false        hides all of it (and stops the tracking)
 #   --build-arg VITE_FEATURE_MERLT_GRAPH=false  hides the graph only
+# VisuaLex Studia's is decided here too, and defaults to on:
+#   --build-arg VITE_FEATURE_STUDIA=false       hides the study cards (the Sidebar entry, /studia, the reader's row)
 # Leave them out to keep them on. An empty value is NOT "on": the app reads "" as off.
 
 FROM node:24-bookworm-slim AS web
@@ -20,6 +22,7 @@ ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 ARG VITE_FEATURE_MERLT
 ARG VITE_FEATURE_MERLT_GRAPH
+ARG VITE_FEATURE_STUDIA
 RUN npm run build
 
 FROM caddy:2-alpine

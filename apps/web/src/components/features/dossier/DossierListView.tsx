@@ -13,19 +13,20 @@ import {
   Upload,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
-  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, importToastType, searchParamsFromGroup, searchesForGroups,
+  formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, importToastType, searchParamsFromGroup,
   tabLabelForGroup, validateImportedDossier, type ImportCheck, type NormaGroup,
 } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
+import { searchesIntoOnePractice } from './openInPractice';
 import type { Dossier } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { actsSummary, layoutDossier } from './dossierLayout';
@@ -43,7 +44,7 @@ interface Props {
 type SortBy = 'date' | 'name' | 'items';
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash }: Props) {
-  const { dossiers, deleteDossier, updateDossier, triggerSearch, triggerMultiSearch, importDossier, addWorkspaceTab } = useAppStore();
+  const { dossiers, deleteDossier, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -112,31 +113,29 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       return;
     }
     if (groups.length === 1) {
-      openGroupOnDashboard(dossier, groups[0]);
+      // A dossier of one group is opened whole, its decisions too, as from its page (spec §5.1,
+      // T17); the picker's single group below brings none.
+      openAllGroupsOnDashboard(dossier, groups);
       return;
     }
     setOpenPickerGroups({ dossier, groups });
   };
 
   const openGroupOnDashboard = (dossier: Dossier, group: NormaGroup) => {
-    // Pre-create the tab so we never merge into an orphan with the same label
-    // (workspaceTabs is persisted in localStorage — stale tabs can linger).
-    // A group asking for a past text has a tab of its own (see tabLabelForGroup).
+    // Pre-create the practice so we never merge into an orphan with the same label (gotcha 15): one
+    // practice named after the dossier, active; one group picked brings no decision.
     const tabLabel = tabLabelForGroup(dossier.title, group);
-    const tabId = addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
+    const tabId = appStore.getState().createPractice(dossier.title, { custom: true, activate: true });
     navigate('/');
-    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
+    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetPracticeId: tabId });
   };
 
   const openAllGroupsOnDashboard = (dossier: Dossier, groups: NormaGroup[]) => {
     if (groups.length === 0) return;
-    // Pre-create the tabs and thread their ids to the searches so SearchPanel's
-    // direct-merge path writes each group where it belongs: the texts in force
-    // into the dossier's tab, every past group into a tab of its own.
-    const paramsList = searchesForGroups(
-      dossier.title, groups,
-      (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
-    );
+    // Create the practice up front and thread its id to the searches so SearchPanel's direct-merge
+    // path writes every group into it: ONE practice for every group, and the dossier's decisions,
+    // unread (T17).
+    const paramsList = searchesIntoOnePractice(dossier, groups, true);
     navigate('/');
     triggerMultiSearch(paramsList);
   };

@@ -6,6 +6,7 @@ import { sanitizeHTML } from '../sanitizeHtml';
 import {
   foldForSearch,
   findMatches,
+  isSearchableQuery,
   collectSearchableText,
   rangesForMatches,
 } from '../findInText';
@@ -67,10 +68,20 @@ describe('findMatches', () => {
     expect(findMatches('e\ufb03cace', 'efficace').matches).toEqual([]);
   });
 
-  it('counts the two-character minimum in folded base characters', () => {
+  it('counts the two-character minimum in letters and digits (folded base characters)', () => {
     expect(findMatches('x😀y é', '😀').matches).toEqual([]);
     expect(findMatches('e\u0301 e', 'e\u0301').matches).toEqual([]);
-    expect(findMatches('x😀y', '😀y').matches).toEqual([[1, 4]]);
+    expect(findMatches('x😀y', '😀y').matches).toEqual([]);
+    expect(findMatches('x😀yz', '😀yz').matches).toEqual([[1, 5]]);
+  });
+
+  it('does not count punctuation: «n.», «l.», «c.», «1.» are not searchable, «c.p.» is', () => {
+    for (const q of ['n.', 'l.', 'c.', '1.', ' n. ', '..', '«»']) {
+      expect(isSearchableQuery(q), q).toBe(false);
+      expect(findMatches('n. 5, l. 3, c. 2, 1. nulla', q).matches, q).toEqual([]);
+    }
+    for (const q of ['c.p.', 'n. 5', '12', 'ab']) expect(isSearchableQuery(q), q).toBe(true);
+    expect(findMatches('il c.p. vigente', 'c.p.').matches).toEqual([[3, 7]]);
   });
 
   it('finds accented forms with an unaccented query, at the original offsets', () => {
@@ -100,7 +111,7 @@ describe('findMatches', () => {
 
   it('treats regex characters as plain text', () => {
     expect(findMatches('a.b axb', 'a.b').matches).toEqual([[0, 3]]);
-    expect(findMatches('(x)', '(x)').matches).toEqual([[0, 3]]);
+    expect(findMatches('(xy)', '(xy)').matches).toEqual([[0, 4]]);
   });
 
   it('caps at the limit and says so', () => {
@@ -252,3 +263,67 @@ describe('the query folds as the text does', () => {
   });
 });
 
+
+describe('punctuation in abbreviations is optional (spec §13.2)', () => {
+  const words = (text: string, query: string) => findMatches(text, query).matches.map(([s, e]) => text.slice(s, e));
+
+  it('finds an abbreviation with or without its dots, on either side', () => {
+    expect(words("l'art. 110 c.p.a. dispone", 'cpa')).toEqual(['c.p.a']);
+    expect(words("l'art. 110 cpa dispone", 'c.p.a.')).toEqual(['cpa']);
+    expect(words('secondo il D.Lgs. citato', 'dlgs')).toEqual(['D.Lgs']);
+  });
+
+  it('finds «art 13» in «art. 13» and a comma after a number made optional', () => {
+    expect(words("l'art. 13 dispone", 'art 13')).toEqual(['art. 13']);
+    const text = "L'art. 13, comma 1-quater, e poi l'art. 13 comma 1-quater ancora.";
+    expect(words(text, 'art. 13, comma 1-quater')).toEqual(['art. 13, comma 1-quater', 'art. 13 comma 1-quater']);
+    expect(words(text, 'art. 13 comma 1-quater')).toEqual(['art. 13, comma 1-quater', 'art. 13 comma 1-quater']);
+  });
+
+  it('a dot may be followed by no space: «art. 13» finds «art.13», «n. 2» finds «n.2»', () => {
+    const text = "l'art.13 e l'art. 13, il n.2 e il n. 2";
+    expect(words(text, 'art. 13')).toEqual(['art.13', 'art. 13']);
+    expect(words(text, 'art 13')).toEqual(['art.13', 'art. 13']);
+    expect(words(text, 'n. 2')).toEqual(['n.2', 'n. 2']);
+    expect(words("l'art.130", 'art. 13')).toEqual([]);
+  });
+
+  it('never requires a dot that ends a sentence', () => {
+    expect(words('il danno ingiusto, e la colpa', 'danno ingiusto.')).toEqual(['danno ingiusto']);
+  });
+
+  it('never joins two words', () => {
+    expect(words('la part 13 del modulo', 'art. 13')).toEqual([]);
+    expect(words('la part 13 del modulo', 'art 13')).toEqual(['art 13']);
+    expect(words('secondo il c. p. a. vigente', 'cpa')).toEqual([]);
+    expect(words("l'art. 13 dispone", 'art13')).toEqual([]);
+  });
+
+  it('a query word ending with a dot ends where the text word ends', () => {
+    const text = "l'art. 13, l'articolo 2, l'art 5 e l'arte";
+    expect(words(text, 'art.')).toEqual(['art.', 'art']);
+    expect(words('secondo il cp e il cpp', 'c.p.')).toEqual(['cp']);
+    expect(words('secondo il cpp', 'c.p.')).toEqual([]);
+  });
+
+  it('a query without dots still finds an abbreviation: «su» finds «S.U.»', () => {
+    expect(words('Cass., S.U. n. 1 su ricorso', 'su')).toEqual(['S.U', 'su']);
+  });
+
+  it('keeps the literal match first, and a dot between digits literal', () => {
+    expect(words('c.p. vigente', 'c.p.')).toEqual(['c.p.']);
+    expect(words('euro 1.000 e 1000', '1.000')).toEqual(['1.000']);
+  });
+});
+
+describe('findMatches — a number is never cut out of a longer one', () => {
+  it('a query starting with a digit does not start right after a digit', () => {
+    expect(findMatches('n. 18980/2018 e n. 8980/2018', '8980/2018').matches).toEqual([[19, 28]]);
+  });
+  it('a query ending with a digit does not end right before a digit', () => {
+    expect(findMatches('n. 8980/20181 e n. 8980/2018.', 'n. 8980/2018').matches).toEqual([[16, 28]]);
+  });
+  it('a query edge that is not a digit is unchanged', () => {
+    expect(findMatches('il 12fatto', 'fatto').matches).toEqual([[5, 10]]);
+  });
+});

@@ -44,7 +44,7 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, decisionCitationOf, searchParamsFromNorma, searchesForGroups, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { DossierActBlock } from './DossierActBlock';
@@ -60,6 +60,7 @@ import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
+import { searchesIntoOnePractice } from './openInPractice';
 import { AddNoteModal } from './AddNoteModal';
 import { saveBlob } from '../../../utils/saveBlob';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
@@ -96,7 +97,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     triggerMultiSearch,
     addToDossier,
     addNoteToDossier,
-    addWorkspaceTab,
   } = useAppStore();
   const navigate = useNavigate();
 
@@ -301,16 +301,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   const normaGroups = useMemo<NormaGroup[]>(() => computeNormaGroups(dossier.items), [dossier.items]);
 
-  // Queue one search per norma-group (one act's, or the dossier's). The tabs are
-  // created up front (the texts in force share the dossier's, each past group has
-  // its own) and their ids passed as `targetTabId`, so results never leak into a
-  // pre-existing custom tab with the same label (gotcha 15).
-  const openGroupsOnDashboard = (groups: NormaGroup[]) => {
+  // Queue one search per norma-group (one act's, or the dossier's). The practice is created up front
+  // and its id passed as `targetPracticeId`, so results never leak into a pre-existing practice with the
+  // same label (gotcha 15). One practice holds them all, and `everyGroup` (the whole dossier opened)
+  // brings its decisions too (spec §5.1, T17).
+  const openGroupsOnDashboard = (groups: NormaGroup[], everyGroup = false) => {
     if (groups.length === 0) return;
-    const paramsList = searchesForGroups(
-      dossier.title, groups,
-      (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
-    );
+    const paramsList = searchesIntoOnePractice(dossier, groups, everyGroup);
     navigate('/');
     triggerMultiSearch(paramsList);
   };
@@ -318,7 +315,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const handleOpenAllOnDashboard = () => {
     if (normaGroups.length === 0) return;
     if (normaGroups.length === 1) {
-      openGroupsOnDashboard(normaGroups);
+      openGroupsOnDashboard(normaGroups, true);
       return;
     }
     setOpenPickerGroups(normaGroups);
@@ -347,8 +344,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   const copyShareLink = async () => {
-    const data = btoa(JSON.stringify(dossier));
-    const shareUrl = `${window.location.origin}/dossier?import=${encodeURIComponent(data)}`;
+    let shareUrl: string;
+    try {
+      shareUrl = `${window.location.origin}/dossier?import=${encodeDossierShare(dossier)}`;
+    } catch (e) {
+      console.error('Failed to build share link:', e);
+      showToast('Impossibile creare il link di condivisione di questo dossier. Puoi esportarlo in JSON.', 'error');
+      return;
+    }
     try {
       await navigator.clipboard.writeText(shareUrl);
       showToast('Link di condivisione copiato negli appunti', 'success');
@@ -793,7 +796,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           }}
           onPickAll={() => {
             setOpenPickerGroups(null);
-            openGroupsOnDashboard(normaGroups);
+            openGroupsOnDashboard(normaGroups, true);
           }}
           onClose={() => setOpenPickerGroups(null)}
         />

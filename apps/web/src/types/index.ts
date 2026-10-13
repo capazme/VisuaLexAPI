@@ -176,14 +176,14 @@ export interface SearchParams {
     show_brocardi_info: boolean;
     filters?: SearchFilters;
     annex?: string; // Optional annex number/letter (e.g., "1", "2", "A", "B")
-    tabLabel?: string; // Optional custom label for the workspace tab
-    // Optional pre-existing tab id to merge into (used by dossier "apri tutto" so
-    // multiple queued searches all land in the same pre-created tab without
+    tabLabel?: string; // Optional custom label for the practice a search creates
+    // Optional pre-existing practice id to land in (used by dossier "apri tutto" so
+    // multiple queued searches all land in the same pre-created practice without
     // relying on label-matching timing in processResult).
-    targetTabId?: string;
-    // The workspace tab the search was started from: the tab it opens is placed beside it
-    // (a norm cited in a decision opens next to the decision).
-    besideTabId?: string;
+    targetPracticeId?: string;
+    // The place the search was started from (a practice, one of its windows or the phone's reader):
+    // the norm it opens is placed beside it (a norm cited in a decision opens next to the decision).
+    besideId?: string;
 }
 
 // Annex metadata returned by tree endpoint

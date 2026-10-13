@@ -5,19 +5,26 @@ import { ElicitResultSchema, ErrorCode, McpError, type RequestId } from '@modelc
 export const CONFIRMATION_TIMEOUT_MS = 5 * 60 * 1000;
 export const TRASH_DAYS = 30;
 
-/** What came of the question: only 'confirmed' deletes anything. */
-export type Confirmation = 'confirmed' | 'declined' | 'timeout' | 'failed' | 'unsupported';
+/**
+ * What came of the question: only 'confirmed' deletes anything. 'unticked' is an Accept
+ * with the box left empty: nothing goes, but the user is told to tick it, not that they declined.
+ */
+export type Confirmation = 'confirmed' | 'unticked' | 'declined' | 'timeout' | 'failed' | 'unsupported';
 
 const MAX_LINES = 20;
 const MAX_LINE = 120;
+/** A dossier's title may come from another user's environment: short enough to read as a name, never as a sentence. */
+const MAX_TITLE = 60;
+/** The checkbox's label: Claude Code's terminal cuts it at about twenty characters. */
+export const CONFIRM_LABEL = 'Confermo';
 // Stored names reach the dialog, and a model may have written them: no control or format
 // characters (direction overrides, zero-width marks, soft hyphens), no line or paragraph
 // separators, no markup, and no quote of any kind that could close or fake the dialog's « ».
 const UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}<>«»‹›“”„‟"《》≪≫⟪⟫❮❯＜＞〈〉⟨⟩]/gu;
 
-const clean = (text: string): string => {
+const clean = (text: string, max = MAX_LINE): string => {
   const flat = text.replace(UNSAFE, '').replace(/\s+/g, ' ').trim();
-  return flat.length > MAX_LINE ? `${flat.slice(0, MAX_LINE - 1)}…` : flat;
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
 
 const KIND_PLURALS: Record<string, [string, string]> = {
@@ -56,7 +63,7 @@ export function deletionMessage(what: {
   wholeDossier?: boolean;
   attachedNotesStaying?: number;
 }): string {
-  const name = clean(what.dossierName) || clean(what.dossierId ?? '') || 'senza nome';
+  const name = clean(what.dossierName, MAX_TITLE) || clean(what.dossierId ?? '', MAX_TITLE) || 'senza nome';
   // The fixed words come first, so no stored text can pose as the question.
   const head = what.wholeDossier
     ? `ELIMINAZIONE — Spostare nel cestino il dossier «${name}» con ${what.total} ${what.total === 1 ? 'voce' : 'voci'}?`
@@ -79,7 +86,7 @@ export function cardDeletionMessage(lines: string[]): string {
   const shown = lines.slice(0, MAX_LINES).map((line) => `- ${clean(line)}`);
   if (lines.length > MAX_LINES) shown.push(`e altre ${lines.length - MAX_LINES}`);
   return [
-    `ELIMINAZIONE — Spostare nel cestino ${total} ${total === 1 ? 'scheda LingoLex' : 'schede LingoLex'}?`,
+    `ELIMINAZIONE — Spostare nel cestino ${total} ${total === 1 ? 'scheda di VisuaLex Studia' : 'schede di VisuaLex Studia'}?`,
     ...shown,
     `Resteranno ripristinabili per ${TRASH_DAYS} giorni dal cestino di VisuaLex.`,
   ].join('\n');
@@ -98,9 +105,10 @@ export function canAsk(server: McpServer): boolean {
 /**
  * Asks the user, through the client, to confirm (a form elicitation, spec §4.1).
  * The question travels on the tool call's own stream (`relatedRequestId`).
- * Only an explicit Accept with the box ticked confirms; Decline, Cancel, a
- * Decline, Cancel and an unticked box are 'declined'; a timeout is 'timeout'; any other failure 'failed'. A client that did
- * not declare elicitation is 'unsupported' — never a fallback.
+ * Only an explicit Accept with the box ticked confirms; an Accept with the box
+ * empty is 'unticked'; Decline and Cancel are 'declined'; a timeout is 'timeout';
+ * any other failure 'failed'. A client that did not declare elicitation is
+ * 'unsupported' — never a fallback.
  */
 export async function confirmWithUser(
   server: McpServer,
@@ -117,7 +125,7 @@ export async function confirmWithUser(
           message,
           requestedSchema: {
             type: 'object',
-            properties: { conferma: { type: 'boolean', title: 'Confermo: sposta nel cestino', default: false } },
+            properties: { conferma: { type: 'boolean', title: CONFIRM_LABEL, default: false } },
             required: ['conferma'],
           },
         },
@@ -125,7 +133,8 @@ export async function confirmWithUser(
       ElicitResultSchema,
       { relatedRequestId: options.relatedRequestId, timeout: options.timeoutMs, signal: options.signal },
     );
-    return result.action === 'accept' && result.content?.conferma === true ? 'confirmed' : 'declined';
+    if (result.action !== 'accept') return 'declined';
+    return result.content?.conferma === true ? 'confirmed' : 'unticked';
   } catch (error) {
     // Nothing was confirmed either way; the user is told which.
     return error instanceof McpError && error.code === ErrorCode.RequestTimeout ? 'timeout' : 'failed';

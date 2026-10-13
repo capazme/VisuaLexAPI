@@ -78,6 +78,36 @@ function getFromCache(key: string): ArticleData | null {
   return cached.data;
 }
 
+/**
+ * Calcola la posizione del popup rispetto all'elemento target (condivisa con l'anteprima delle decisioni)
+ */
+export function calculatePreviewPosition(element: HTMLElement): { top: number; left: number } {
+  const rect = element.getBoundingClientRect();
+  const popupWidth = 400;
+  const popupHeight = 300;
+  const padding = 12;
+
+  let left = rect.left + rect.width / 2 - popupWidth / 2;
+  let top = rect.bottom + padding;
+
+  // Evita overflow a destra
+  if (left + popupWidth > window.innerWidth - padding) {
+    left = window.innerWidth - popupWidth - padding;
+  }
+
+  // Evita overflow a sinistra
+  if (left < padding) {
+    left = padding;
+  }
+
+  // Se non c'è spazio sotto, mostra sopra
+  if (top + popupHeight > window.innerHeight - padding) {
+    top = rect.top - popupHeight - padding;
+  }
+
+  return { top, left };
+}
+
 export function useCitationPreview(options: UseCitationPreviewOptions = {}) {
   const { debounceMs = 300 } = options;
 
@@ -95,35 +125,7 @@ export function useCitationPreview(options: UseCitationPreviewOptions = {}) {
   const fetchAbortRef = useRef<AbortController | null>(null);
   const currentCacheKeyRef = useRef<string | null>(null);
 
-  /**
-   * Calcola la posizione del popup rispetto all'elemento target
-   */
-  const calculatePosition = useCallback((element: HTMLElement) => {
-    const rect = element.getBoundingClientRect();
-    const popupWidth = 400;
-    const popupHeight = 300;
-    const padding = 12;
-
-    let left = rect.left + rect.width / 2 - popupWidth / 2;
-    let top = rect.bottom + padding;
-
-    // Evita overflow a destra
-    if (left + popupWidth > window.innerWidth - padding) {
-      left = window.innerWidth - popupWidth - padding;
-    }
-
-    // Evita overflow a sinistra
-    if (left < padding) {
-      left = padding;
-    }
-
-    // Se non c'è spazio sotto, mostra sopra
-    if (top + popupHeight > window.innerHeight - padding) {
-      top = rect.top - popupHeight - padding;
-    }
-
-    return { top, left };
-  }, []);
+  const calculatePosition = calculatePreviewPosition;
 
   /**
    * Fetch dell'articolo dalla API

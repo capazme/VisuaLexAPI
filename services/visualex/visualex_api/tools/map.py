@@ -799,7 +799,25 @@ NORMATTIVA_SEARCH = {
         "disposizioni preliminari del codice civile": "preleggi",
         "disposizioni sulla legge in generale": "preleggi",
         "dm": "decreto ministeriale",
-        "dpcm": "decreto del presidente del consiglio dei ministri"}
+        "dpcm": "decreto del presidente del consiglio dei ministri",
+        # --- the source convention's own short forms (sources._TYPES) --------
+        # Every abbreviation cite_article writes must read back to its type.
+        # Without "l. cost." the scan below found the "cost." inside it and a
+        # legge costituzionale became the Costituzione, a real act but the
+        # wrong one; "d.l.", "r.d.l." and "d.lgs.lgt." were not read at all.
+        "d.l.": "decreto legge",
+        "decreto-legge": "decreto legge",
+        "l. cost.": "legge costituzionale",
+        "l.cost.": "legge costituzionale",
+        "l.cost": "legge costituzionale",
+        "legge cost.": "legge costituzionale",
+        "l. costituzionale": "legge costituzionale",
+        "legge costituzionale": "legge costituzionale",
+        "r.d.l.": "regio decreto legge",
+        "regio decreto legge": "regio decreto legge",
+        "regio decreto-legge": "regio decreto legge",
+        "d.lgs.lgt.": "decreto legislativo luogotenenziale",
+        "decreto legislativo luogotenenziale": "decreto legislativo luogotenenziale"}
 
 NORMATTIVA = {
         "d.lgs.": "decreto.legislativo",

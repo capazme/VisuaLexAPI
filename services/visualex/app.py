@@ -38,6 +38,7 @@ from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
 from visualex_api.services.akn_parser import presentable_title
+from visualex_api.services.decisions.citation import read_decision_citation
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
 from visualex_api.services.decisions.pdf_route import fetch_decision_pdf as fetch_decision_pdf_route
 from visualex_api.services.decisions.search_route import search_decisions as search_decisions_route
@@ -47,9 +48,9 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
+from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
-from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
+from visualex_api.tools.text_op import parse_article_input, normalize_act_type
 from visualex_api.tools.map import codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import cite_act, cite_article
@@ -402,6 +403,9 @@ class NormaController:
         self.app.add_url_rule('/fetch_massimario', view_func=self.fetch_massimario, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only (not routed by the ingress).
         self.app.add_url_rule('/resolve_act_dates', view_func=self.resolve_act_dates, methods=['POST'])
+        # Internal: the server's POST /api/dossiers/:id/decisions only (design 2026-10-12 §2.1).
+        # Not routed by the ingress (/parse_query* does not cover it) nor proxied by Vite.
+        self.app.add_url_rule('/parse_decision', view_func=self.parse_decision, methods=['POST'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
         self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
@@ -449,7 +453,6 @@ class NormaController:
         # it: every handler that reads an article starts from this method.
         reject_future_version_date(data.get('version_date'))
 
-        allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         act_type = data.get('act_type')
         act_number = data.get('act_number')
         norma_date = data.get('date')
@@ -472,19 +475,8 @@ class NormaController:
             tipo_atto_reale = codice_details['tipo_atto_reale']
             # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
 
-        if act_type in allowed_types:
-            log.info("Act type is allowed", act_type=act_type)
-            data_completa = await complete_date_or_parse_async(
-                date=norma_date,
-                act_type=act_type,
-                act_number=act_number
-            )
-            log.info("Completed date parsed", data_completa=data_completa)
-            # Keep YYYY-MM-DD format for Norma validation
-            norma_date = data_completa
-        else:
-            log.info("Act type is not in allowed types", act_type=act_type)
-            log.info("Using provided date", norma_date=norma_date)
+        norma_date = await complete_request_date(act_type, norma_date, act_number)
+        log.info("Using date", norma_date=norma_date)
 
         norma = Norma(
             tipo_atto=act_type,
@@ -523,6 +515,10 @@ class NormaController:
             # Convert to string if it's a number
             elif isinstance(annex_value, (int, float)):
                 annex_value = str(int(annex_value))
+
+        # The annex the caller named, before a code's default one is filled in: only
+        # that one can be pointed elsewhere when the article is not in it.
+        asked_annex = annex_value
 
         # If no annex specified (and not explicit dispositivo), check if this is a codice with a default annex
         # e.g., "codice civile" maps to "regio.decreto:1942-03-16;262:2" where :2 is the annex
@@ -607,13 +603,19 @@ class NormaController:
 
         log.info("Final annex value after smart lookup", annex=annex_value)
 
+        # Where the existence check looks: the dispositivo alone ('') when the caller asked for
+        # it explicitly, otherwise the annex settled above, or the whole act (None). Without
+        # this an article that exists only in an annex passed the check, and Normattiva then
+        # answered the dispositivo's request with its art. 1.
+        scope = '' if explicit_dispositivo else annex_value
+
         norma_visitata_list = []
         missing_articles = []
         for article in articles:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
             log.info("Processing article", article=cleaned_article)
 
-            exists = await self._article_exists_in_tree(norma, cleaned_article, annex_value)
+            exists = await self._article_exists_in_tree(norma, cleaned_article, scope)
             if exists is False:
                 log.info("Requested article is not in the act",
                          article=cleaned_article, norma=str(norma))
@@ -632,8 +634,18 @@ class NormaController:
         # A range like "1-50" on a 32-article act still returns the 32; only a
         # request where NOTHING exists is an error.
         if missing_articles and not norma_visitata_list:
+            hint = ''
+            named = '' if explicit_dispositivo else asked_annex
+            if named is not None and len(missing_articles) == 1:
+                hint = await self._where_else_in_tree(norma, missing_articles[0], named)
+            # Named a part (an annex, or the dispositivo): the article may be elsewhere in the
+            # act, so the refusal says which part it looked in, never "not in the act".
+            if explicit_dispositivo:
+                where = "nel testo di"
+            else:
+                where = f"nell'allegato {asked_annex} di" if asked_annex is not None else "in"
             raise ResourceNotFoundError(
-                f"Articolo {', '.join(missing_articles)} non presente in {norma}"
+                f"Articolo {', '.join(missing_articles)} non presente {where} {norma}{hint}"
             )
 
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
@@ -700,6 +712,42 @@ class NormaController:
             if normalize_article_key(entry.get('numero', '')) == wanted:
                 return True
         return False
+
+    async def _where_else_in_tree(self, norma, article, annex):
+        """Where else in the act the article is, as a sentence to append to the refusal,
+        or '' when it is nowhere else or the tree cannot be read.
+
+        Normattiva numbers an act's annexes by position, not by the act's own wording
+        (the c.p.a. is «Allegato 1» of d.lgs. 104/2010 and annex 2 on Normattiva; the
+        owner kept Normattiva's number as the identity, 11 October 2026), so a lawyer
+        can name the annex the text names and miss. The tree is the one the existence
+        check has just read (get_tree is cached): no new request.
+        """
+        try:
+            tree_result = await get_tree(getattr(norma, 'url', None) or str(norma), link=False,
+                                         details=False, return_metadata=True)
+        except Exception:  # noqa: BLE001 - a hint never fails the refusal
+            return ''
+        articles = tree_result[0] if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3 else tree_result
+        if isinstance(articles, str) or not articles:
+            return ''
+        wanted = normalize_article_key(article)
+        parts = []
+        for entry in articles:
+            if not isinstance(entry, dict) or normalize_article_key(entry.get('numero', '')) != wanted:
+                continue
+            part = str(entry.get('allegato') or '')
+            if part != str(annex) and part not in parts:
+                parts.append(part)
+        if not parts:
+            return ''
+        annexes = [p for p in parts if p]
+        places = []
+        if '' in parts:
+            places.append("nel testo dell'atto")
+        if annexes:
+            places.append(("nell'allegato " if len(annexes) == 1 else "negli allegati ") + ", ".join(annexes))
+        return f": su Normattiva l'art. {article} si trova {' e '.join(places)}"
 
     def get_scraper_for_norma(self, normavisitata):
         act_type_normalized = normavisitata.norma.tipo_atto.lower()
@@ -1160,6 +1208,23 @@ class NormaController:
             return jsonify({'kind': kind, 'id': element_id, 'data': data})
         except Exception as exc:
             return self._error_response(exc, 'fetch_massimario')
+
+    async def parse_decision(self):
+        """Decisions as a lawyer writes them → the references /fetch_decision takes (design
+        2026-10-12 §2.1). Internal route (the server's decisions route). `{citazioni: [1-10
+        strings of at most 300 characters]}` → `{risultati: [...]}`, one per string, in order:
+        `{riferimento}`, `{corte_non_supportata}` or `{non_riconosciuta: true}`. No request
+        leaves: it reads words only."""
+        try:
+            body = await request.get_json(silent=True)
+        except (RecursionError, UnicodeDecodeError):
+            body = None
+        citazioni = body.get('citazioni') if isinstance(body, dict) else None
+        if (not isinstance(citazioni, list) or not 1 <= len(citazioni) <= 10
+                or not all(isinstance(c, str) and 0 < len(c) <= 300 for c in citazioni)):
+            return jsonify({'esito': 'richiesta_non_valida',
+                            'errori': {'citazioni': 'attese da 1 a 10 citazioni di al massimo 300 caratteri'}}), 400
+        return jsonify({'risultati': [read_decision_citation(c).to_dict() for c in citazioni]})
 
     async def resolve_act_dates(self):
         """Full dates for acts cited by year only. Internal route (MERL-T only)."""

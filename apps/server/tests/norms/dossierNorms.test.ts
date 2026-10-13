@@ -43,7 +43,20 @@ const PARSED: Record<string, { parsed: Record<string, string> | null; recognized
   'art. 3 l. 241/1990': { parsed: { act_type: 'legge', act_number: '241', date: '1990', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
   'art. 3 l. 247/2012': { parsed: { act_type: 'legge', act_number: '247', date: '2012', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
   'art. 3 l. 49/2023': { parsed: { act_type: 'legge', act_number: '49', date: '2023', article: '3' }, recognized: true, display: 'Art. 3 — legge' },
+  // What /parse_query reads since 9 October 2026 (PR #113): the annex too.
+  'art. 29 d.lgs. 104/2010 (All. 2)': { parsed: { act_type: 'decreto legislativo', act_number: '104', date: '2010', article: '29', annex: '2' }, recognized: true },
+  'art. 29 d.lgs. 104/2010 (All. 1)': { parsed: { act_type: 'decreto legislativo', act_number: '104', date: '2010', article: '29', annex: '1' }, recognized: true },
 };
+
+// D.lgs. 104/2010: the codice del processo amministrativo is its annex, which Normattiva
+// numbers 2 by position (the act itself calls it «Allegato 1»; probed 11 October 2026).
+const DLGS_104 = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2010-07-02;104';
+const DLGS_104_TREE = [
+  ...Array.from({ length: 3 }, (_, i) => ({ allegato: null, numero: String(i + 1) })),
+  ...Array.from({ length: 40 }, (_, i) => ({ allegato: '2', numero: String(i + 1) })),
+];
+/** Every body /fetch_norma_data received, to check what the server sent on. */
+const normaDataBodies: Record<string, string>[] = [];
 
 // The full date fetch_norma_data finds for a law named by number and year.
 const LAW_DATES: Record<string, string> = { '241': '1990-08-07', '247': '2012-12-31', '49': '2023-04-21' };
@@ -76,6 +89,7 @@ const CC_TREE = [
 
 function stubPythonApi() {
   for (const key of Object.keys(calls)) delete calls[key];
+  normaDataBodies.length = 0;
   const count = (path: string) => (calls[path] = (calls[path] ?? 0) + 1);
   const forced = (path: string): [number, unknown] | undefined =>
     forcedStatus[path] ? [forcedStatus[path], { error: 'Too Many Requests' }] : undefined;
@@ -86,8 +100,14 @@ function stubPythonApi() {
   });
   nock(API).post('/fetch_norma_data').times(500).reply((_uri: string, body: Record<string, string>) => {
     count('/fetch_norma_data');
+    normaDataBodies.push(body);
     const f = forced('/fetch_norma_data');
     if (f) return f;
+    if (body.act_type === 'decreto legislativo' && body.act_number === '104') {
+      if (body.annex !== '2') return [404, { error: `Articolo ${body.article} non presente in decreto legislativo 2010-07-02, n. 104` }];
+      return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'decreto legislativo', tipo_atto_reale: null, data: '2010-07-02', numero_atto: '104',
+        numero_articolo: body.article, allegato: '2', url: DLGS_104, urn: `${DLGS_104}:2~art${body.article}` }] }];
+    }
     if (body.act_type === 'regolamento UE') return [200, { norma_data: [{ ...GDPR_5, numero_articolo: body.article, urn: GDPR_5.url }] }];
     if (body.act_type === 'legge' && !body.act_number) {
       return [200, { norma_data: [{ ...ART_2043, tipo_atto: 'legge', data: null, numero_atto: null, allegato: null,
@@ -109,6 +129,9 @@ function stubPythonApi() {
     const f = forced('/fetch_act_fingerprints');
     if (f) return f;
     if (!fingerprintsAvailable) return [200, { available: false, fingerprints: {}, parts: [], count: 0 }];
+    if (body.urn === DLGS_104) {
+      return [200, { available: true, fingerprints: { '1': 'x' }, parts: [{ name: 'Dispositivo', fingerprints: {} }, { name: 'Allegato 2', fingerprints: {} }], count: 1 }];
+    }
     if (body.urn.includes(':legge:')) return [200, { available: true, fingerprints: { '1': 'x', '2': 'y', '3': 'z' }, parts: [{ name: 'Legge', fingerprints: {} }], count: 3 }];
     // The codice civile has three parts; `fingerprints` is the dominant one (the code), which has an art. 40.
     return [200, {
@@ -118,11 +141,12 @@ function stubPythonApi() {
       count: 4,
     }];
   });
-  nock(API).post('/fetch_tree').times(500).reply(() => {
+  nock(API).post('/fetch_tree').times(500).reply((_uri: string, body: { urn: string }) => {
     count('/fetch_tree');
     const f = forced('/fetch_tree');
     if (f) return f;
     if (treeDown) return [500, { error: 'Normattiva non raggiungibile' }];
+    if (body.urn === DLGS_104) return [200, { articles: DLGS_104_TREE, count: DLGS_104_TREE.length }];
     return [200, { articles: CC_TREE, count: CC_TREE.length }];
   });
   nock(API).post('/fetch_article_text').times(500).reply((_uri: string, body: Record<string, string>) => {
@@ -175,6 +199,23 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(items.map((i) => i.position)).toEqual([0, 1]);
     expect(calls['/fetch_act_fingerprints']).toBe(1);
     expect(response.body.results[0].itemId).toBe(items[0].id);
+  });
+
+  it('carries the annex a reference names into the norm, its URN and its citation', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 29 d.lgs. 104/2010 (All. 2)']);
+    expect(response.body.results[0]).toMatchObject({ outcome: 'added', display: 'art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 2)' });
+    expect(normaDataBodies[0]).toMatchObject({ act_number: '104', article: '29', annex: '2' });
+    const [item] = await prisma.dossierItem.findMany({ where: { dossierId } });
+    expect(item.content).toMatchObject({ allegato: '2', urn: `${DLGS_104}:2~art29` });
+    // Existence on the act's tree, annex by annex: the fingerprints cover one part only.
+    expect(calls['/fetch_tree']).toBe(1);
+  });
+
+  it('never moves an article to another part of its act when the annex named has none', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 29 d.lgs. 104/2010 (All. 1)']);
+    expect(response.body.results[0].outcome).toBe('does_not_exist');
+    expect(normaDataBodies[0]).toMatchObject({ annex: '1' });
+    expect(await prisma.dossierItem.count()).toBe(0);
   });
 
   it('never saves an article that does not exist', async () => {

@@ -8,6 +8,8 @@ const { listPassages, listDiscussions } = vi.hoisted(() => ({
   listDiscussions: vi.fn(),
 }));
 
+// The cards row reads the study cards of the article; they are not under test.
+vi.mock('../../../../services/studiaService', () => ({ studiaService: { forArticle: () => Promise.resolve([]) } }));
 vi.mock('../../../../services/articleDiscussionService', () => ({
   articleDiscussionService: {
     list: listDiscussions,

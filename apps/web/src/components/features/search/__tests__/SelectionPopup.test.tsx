@@ -8,17 +8,19 @@ const RECT = { x: 40, y: 120, width: 90, height: 18 };
 
 type ReportFn = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
 type DiscussFn = (text: string, startOffset: number) => void;
+type CreateCardFn = (text: string) => void;
 
 interface HarnessProps {
   onReportCitation?: ReportFn;
   onDiscuss?: DiscussFn;
+  onCreateCard?: CreateCardFn;
   copyOnly?: boolean;
   onHighlight?: () => void;
   onAddNote?: () => void;
   onCopy?: (text: string) => void;
 }
 
-function Harness({ onReportCitation, onDiscuss, copyOnly, onHighlight, onAddNote, onCopy }: HarnessProps) {
+function Harness({ onReportCitation, onDiscuss, onCreateCard, copyOnly, onHighlight, onAddNote, onCopy }: HarnessProps) {
   const ref = useRef<HTMLDivElement>(null);
   return (
     <div ref={ref} data-testid="container">
@@ -29,6 +31,7 @@ function Harness({ onReportCitation, onDiscuss, copyOnly, onHighlight, onAddNote
         onCopy={onCopy ?? vi.fn()}
         onReportCitation={onReportCitation}
         onDiscuss={onDiscuss}
+        onCreateCard={onCreateCard}
         copyOnly={copyOnly}
       />
       <p>{TEXT}</p>
@@ -111,9 +114,32 @@ describe('SelectionPopup: "Discuti con i colleghi"', () => {
   });
 });
 
+describe('SelectionPopup: "Crea scheda"', () => {
+  it('does not offer the action when onCreateCard is not passed (the other readers)', async () => {
+    render(<Harness />);
+    await selectText('art. 2043 c.c.');
+    expect(screen.queryByRole('button', { name: 'Crea scheda' })).not.toBeInTheDocument();
+  });
+
+  it('offers the action and calls onCreateCard with the selected words, then closes', async () => {
+    const onCreateCard = vi.fn<CreateCardFn>();
+    render(<Harness onCreateCard={onCreateCard} />);
+    await selectText('art. 2043 c.c.');
+
+    const action = screen.getByRole('button', { name: 'Crea scheda' });
+    expect(action).toHaveAttribute('title', 'Crea scheda');
+    expect(action.className).toContain('min-h-[44px]');
+    fireEvent.click(action);
+
+    expect(onCreateCard).toHaveBeenCalledWith('art. 2043 c.c.');
+    expect(screen.queryByRole('button', { name: 'Crea scheda' })).not.toBeInTheDocument();
+    expect(window.getSelection()?.toString()).toBe('');
+  });
+});
+
 describe('SelectionPopup: a past text (copyOnly)', () => {
-  it('offers only "Copia": no highlight, no note, no discussion, no citation report', async () => {
-    render(<Harness copyOnly onDiscuss={vi.fn<DiscussFn>()} onReportCitation={vi.fn<ReportFn>()} />);
+  it('offers only "Copia": no highlight, no note, no discussion, no citation report, no card', async () => {
+    render(<Harness copyOnly onDiscuss={vi.fn<DiscussFn>()} onReportCitation={vi.fn<ReportFn>()} onCreateCard={vi.fn<CreateCardFn>()} />);
     await selectText('art. 2043 c.c.', /^copia/i);
 
     expect(screen.getByTitle(/^copia/i)).toBeInTheDocument();
@@ -121,6 +147,7 @@ describe('SelectionPopup: a past text (copyOnly)', () => {
     expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /discuti con i colleghi/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /segnala come citazione/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Crea scheda' })).not.toBeInTheDocument();
   });
 
   it('still copies the selection', async () => {

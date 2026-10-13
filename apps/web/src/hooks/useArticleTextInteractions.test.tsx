@@ -20,7 +20,7 @@ function Harness({ resetKey, contentKey = 'v1', withPopover = false, updatesOpen
   resetKey: string; contentKey?: string; withPopover?: boolean; updatesOpenByDefault?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(ref, resetKey, {
+  const { updatesOpen, openNote, closeNote, openBlock, closeBlock } = useArticleTextInteractions(ref, resetKey, {
     contentKey,
     updatesOpenByDefault,
   });
@@ -31,7 +31,6 @@ function Harness({ resetKey, contentKey = 'v1', withPopover = false, updatesOpen
       <div ref={ref} data-testid="body" dangerouslySetInnerHTML={html} />
       <output data-testid="state">{JSON.stringify({ updatesOpen, note: openNote?.id ?? null })}</output>
       <button type="button" onClick={closeNote}>chiudi</button>
-      <button type="button" onClick={openUpdates}>apri note</button>
       <output data-testid="block">{openBlock === null ? '' : String(openBlock)}</output>
       <button type="button" onClick={closeBlock}>chiudi blocco</button>
       {withPopover && openNote && (
@@ -117,13 +116,6 @@ describe('useArticleTextInteractions', () => {
     realClick(chip('119'));
     expect(state().note).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
-  });
-
-  it('unfolds the update notes on demand (a search hit inside them)', () => {
-    render(<Harness resetKey="a" />);
-    fireEvent.click(screen.getByText('apri note'));
-    expect(state().updatesOpen).toBe(true);
-    expect(toggle().getAttribute('aria-expanded')).toBe('true');
   });
 
   it('opens a block from its sign, from anywhere inside it, and closes it on a second click', () => {
@@ -262,15 +254,6 @@ describe('useArticleTextInteractions — update notes open by default (a past te
     expect(state().updatesOpen).toBe(true);
     fireEvent.click(sign(0));
     fireEvent.click(screen.getByText('chiudi blocco'));
-    expect(state().updatesOpen).toBe(true);
-    fireEvent.click(screen.getByText('apri note'));
-    expect(state().updatesOpen).toBe(true);
-  });
-
-  it('opens them on demand after the reader closed them', () => {
-    render(<Harness resetKey="a" updatesOpenByDefault />);
-    fireEvent.click(toggle());
-    fireEvent.click(screen.getByText('apri note'));
     expect(state().updatesOpen).toBe(true);
   });
 

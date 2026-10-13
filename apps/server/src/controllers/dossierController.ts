@@ -5,9 +5,10 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
+import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '../norms/resolveDecisions';
 import { citeStoredAct } from '../norms/citation';
-import { citeStoredItem } from '../norms/decisionCitation';
-import { parseDecisionItemContent } from '../schemas/decisionItem';
+import { citeDecision, citeStoredItem } from '../norms/decisionCitation';
+import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/decisionItem';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -649,6 +650,105 @@ export const addDossierNorms = async (req: Request, res: Response) => {
 
   // Under an exchanged token each reference is charged two points; one the
   // sources could not check is handed back (middleware/delegated.ts).
+  res.locals.delegatedRefund = results.filter((r) => r.outcome === 'unavailable').length * 2;
+  res.json({ results });
+};
+
+export const MAX_DECISIONS_PER_CALL = 10;
+
+const addDecisionsSchema = z.object({
+  references: z.array(z.string().trim().min(1).max(300)).min(1).max(MAX_DECISIONS_PER_CALL),
+}).strict();
+
+type DecisionResultOutcome = Exclude<DecisionOutcome, 'resolved'> | 'added' | 'already_present';
+
+/**
+ * Adds court decisions to a dossier from references in words («Cass. civ., sez. un., n.
+ * 31310/2024»), 1 to 10 per call (design 2026-10-12 §2.2). The Python API reads the words and
+ * confirms each decision at its source (`norms/resolveDecisions.ts`); one that is not recognised,
+ * of a court VisuaLex cannot read, ambiguous, missing or unverifiable is reported and does not
+ * stop the others. The confirmed ones are created in one transaction as `sentenza` items, after
+ * the dossier's last item, with the label the server computes; a decision already in the dossier
+ * (by its key) or twice in the call is added once. Nothing is updated, moved or deleted.
+ */
+export const addDossierDecisions = async (req: Request, res: Response) => {
+  const { references } = addDecisionsSchema.parse(req.body);
+  const dossier = await prisma.dossier.findFirst({
+    where: { id: req.params.id, userId: req.user!.id },
+    include: { items: { where: { itemType: 'sentenza' }, select: { content: true } } },
+  });
+  if (!dossier) throw new AppError(404, 'Dossier not found');
+
+  const resolutions = await resolveDecisionReferences(references);
+  // The decisions already kept, by key; a stored content the schema refuses names none.
+  const present = new Set(
+    dossier.items.flatMap((item) => {
+      const parsed = decisionItemContentSchema.safeParse(item.content);
+      return parsed.success ? [decisionKeyOf(parsed.data)] : [];
+    }),
+  );
+
+  type DecisionResult = {
+    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; detail?: string; itemId?: string;
+  };
+  const toCreate: number[] = [];
+  const results: DecisionResult[] = resolutions.map((resolution, index): DecisionResult => {
+    const base = { reference: references[index], ...(resolution.detail ? { detail: resolution.detail } : {}) };
+    if (resolution.outcome !== 'resolved') {
+      return { ...base, outcome: resolution.outcome, ...(resolution.court ? { court: resolution.court } : {}) };
+    }
+    const decision = resolution.decision!;
+    const citation = citeDecision(decision);
+    if (present.has(resolution.key!)) return { ...base, outcome: 'already_present', citation };
+    present.add(resolution.key!);
+    toCreate.push(index);
+    return { ...base, outcome: 'added', citation };
+  });
+
+  if (toCreate.length > 0) {
+    const created = await prisma.$transaction(async (tx) => {
+      // The lookups took up to the budget: read again, in the transaction, what the dossier holds
+      // now (another call may have added the same decision, or the dossier may be gone).
+      const current = await tx.dossier.findFirst({
+        where: { id: dossier.id, userId: req.user!.id },
+        include: { items: { where: { itemType: 'sentenza' }, select: { content: true } } },
+      });
+      if (!current) throw new AppError(404, 'Dossier not found');
+      const kept = new Set(current.items.flatMap((item) => {
+        const parsed = decisionItemContentSchema.safeParse(item.content);
+        return parsed.success ? [decisionKeyOf(parsed.data)] : [];
+      }));
+      const last = await tx.dossierItem.aggregate({ where: { dossierId: dossier.id }, _max: { position: true } });
+      let position = (last._max.position ?? -1) + 1;
+      const rows: { index: number; id: string }[] = [];
+      for (const index of toCreate) {
+        if (kept.has(resolutions[index].key!)) {
+          results[index].outcome = 'already_present';
+          continue;
+        }
+        // Checked by the item schema like any other write, the label recomputed (D9).
+        const decision = parseDecisionItemContent(resolutions[index].decision);
+        rows.push(
+          await tx.dossierItem.create({
+            data: {
+              dossierId: dossier.id,
+              itemType: 'sentenza',
+              title: decision.etichetta,
+              content: decision as unknown as Prisma.InputJsonValue,
+              position: position++,
+              ...provenanceFromRequest(req),
+            },
+          }).then((row) => ({ index, id: row.id })),
+        );
+      }
+      if (rows.length > 0) await tx.dossier.update({ where: { id: dossier.id }, data: { updatedAt: new Date() } });
+      return rows;
+    });
+    for (const { index, id } of created) results[index].itemId = id;
+  }
+
+  // Under an exchanged token each reference is charged two points; one the sources could not
+  // check is handed back (middleware/delegated.ts).
   res.locals.delegatedRefund = results.filter((r) => r.outcome === 'unavailable').length * 2;
   res.json({ results });
 };

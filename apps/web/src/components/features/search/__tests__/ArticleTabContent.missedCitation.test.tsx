@@ -3,6 +3,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import type { ArticleData } from '../../../../types';
 
+const devMode = vi.fn();
+vi.mock('../../../../features/devMode/useDevMode', () => ({ useDevMode: () => devMode() }));
+
 const features = vi.fn();
 vi.mock('../../../../features/merlt/useMerltFeatures', () => ({ useMerltFeatures: () => features() }));
 
@@ -16,6 +19,9 @@ vi.mock('../../../../services/merltService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../services/merltService')>()),
   sendNerFeedback: (...a: unknown[]) => sendNerFeedback(...a),
 }));
+
+// The cards row reads the study cards of the article; they are not under test.
+vi.mock('../../../../services/studiaService', () => ({ studiaService: { forArticle: () => Promise.resolve([]) } }));
 
 // The MERL-T plugin slots need the consent provider; they are not under test.
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
@@ -75,6 +81,7 @@ async function selectNeedle() {
 }
 
 beforeEach(() => {
+  devMode.mockReturnValue(true);
   passageThreadState.mockReturnValue({ threads: [], error: null, reload: vi.fn(), locations: new Map() });
   sendNerFeedback.mockReset().mockResolvedValue({ received: true, feedback_id: 'f1', sample_weight: 1 });
   // The per-article loaders hit the backend; the flow under test does not need them.
@@ -105,6 +112,15 @@ describe('ArticleTabContent: passage discussion loading', () => {
 describe('ArticleTabContent: "Segnala come citazione" (NER missed, Loop β #2)', () => {
   it('is not offered without full consent, and nothing is sent', async () => {
     features.mockReturnValue({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true });
+    renderArticle();
+    await selectNeedle();
+    expect(screen.queryByRole('button', { name: /segnala come citazione/i })).not.toBeInTheDocument();
+    expect(sendNerFeedback).not.toHaveBeenCalled();
+  });
+
+  it('is not offered with full consent either, outside the development mode: the report feeds MERL-T', async () => {
+    devMode.mockReturnValue(false);
+    features.mockReturnValue({ canContribute: true, qaAskable: true, consentLevel: 'full', merltEnabled: true });
     renderArticle();
     await selectNeedle();
     expect(screen.queryByRole('button', { name: /segnala come citazione/i })).not.toBeInTheDocument();

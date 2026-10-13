@@ -1,16 +1,54 @@
-import { beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, vi } from 'vitest';
 import { execSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
+import { dropDevelopmentEnv } from './devEnvGuard';
+
+// The suite's environment is `.env.test` alone (`tests/devEnvGuard.ts`). `src/config.ts` calls
+// `dotenv.config()`, which would read a development `apps/server/.env` into the run: a no-op here.
+vi.mock('dotenv', () => {
+  const config = () => ({ parsed: {} });
+  return { default: { config }, config };
+});
+// Prisma loads that `.env` itself, at the import and at every construction (the clients of
+// `src/lib/prisma.ts` and `tests/helpers.ts` come after this file): whatever it adds goes at once.
+vi.mock('@prisma/client', async (importOriginal) => {
+  const { dropAddedSince } = await import('./devEnvGuard');
+  const before = new Set(Object.keys(process.env));
+  const actual = await importOriginal<typeof import('@prisma/client')>();
+  dropAddedSince(before);
+  class PrismaClient extends actual.PrismaClient {
+    constructor(...args: ConstructorParameters<typeof actual.PrismaClient>) {
+      const known = new Set(Object.keys(process.env));
+      super(...args);
+      dropAddedSince(known);
+    }
+  }
+  return { ...actual, PrismaClient };
+});
 
 const prisma = new PrismaClient();
+// A guarded name exported by the shell, or anywhere else outside `.env.test`.
+dropDevelopmentEnv();
+
+// The texts the migrations insert (version 1 of the notice to accept). The TRUNCATE
+// below empties their table, since it references `users`; they are read once after
+// the reset and put back after every truncation, so the migration stays the one
+// place that holds their wording and every test starts from "one version, number 1".
+type TextVersionRow = {
+  id: string; chiave: string; versione: number; titolo: string; corpo: string;
+  conferma: string; azione: string; created_at: Date; autore_id: string | null;
+};
+let seededTexts: TextVersionRow[] = [];
 
 // The OAuth endpoints' own rate limits are per address, and the whole suite
 // comes from 127.0.0.1: lift them here (the flood test builds its own router
 // with a low one), and give the MCP server's credential a test value.
-process.env.OAUTH_REGISTRATIONS_PER_HOUR ??= '100000';
-process.env.OAUTH_REQUESTS_PER_15_MINUTES ??= '100000';
-process.env.OAUTH_MCP_CLIENT_SECRET ??= 'test-mcp-client-secret';
-process.env.OAUTH_DELEGATION_SECRET ??= 'test-delegation-secret';
+// Assigned, never `??=`: a value from outside must not win over the one the helpers
+// send (`tests/oauth/testEnv.test.ts`, and `tests/devEnvGuard.ts` for the rest).
+process.env.OAUTH_REGISTRATIONS_PER_HOUR = '100000';
+process.env.OAUTH_REQUESTS_PER_15_MINUTES = '100000';
+process.env.OAUTH_MCP_CLIENT_SECRET = 'test-mcp-client-secret';
+process.env.OAUTH_DELEGATION_SECRET = 'test-delegation-secret';
 
 // SAFETY GUARD: this setup resets the database (drops everything). If vitest is
 // run WITHOUT the `dotenv -e .env.test` wrapper (i.e. `npx vitest` instead of
@@ -29,7 +67,7 @@ function assertTestDatabase(): void {
   }
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   assertTestDatabase();
   // Pass process.env explicitly so the child process uses the test DATABASE_URL
   // (dotenv-cli sets it in process.env before vitest starts, but execSync forks
@@ -38,6 +76,10 @@ beforeAll(() => {
     stdio: 'ignore',
     env: process.env,
   });
+  seededTexts = await prisma.$queryRaw<TextVersionRow[]>`
+    SELECT id, chiave::text AS chiave, versione, titolo, corpo, conferma, azione, created_at, autore_id
+    FROM lingo_testi_versioni`;
+  if (seededTexts.length === 0) throw new Error('The migrations seed no text version: expected version 1 of PROPOSTA_SCHEDA.');
 });
 
 beforeEach(async () => {
@@ -68,8 +110,14 @@ beforeEach(async () => {
       "search_history",
       "feedbacks",
       "lingo_tracce",
+      "lingo_stato_ripasso",
+      "lingo_revisioni_srs",
+      "lingo_preferenze_studio",
       "lingo_card_ancore",
+      "lingo_validazioni_card",
+      "lingo_accettazioni_testi",
       "lingo_cards",
+      "lingo_testi_versioni",
       "oauth_tokens",
       "trash_entries",
       "oauth_authorization_codes",
@@ -79,6 +127,11 @@ beforeEach(async () => {
       "users"
     RESTART IDENTITY CASCADE;
   `);
+  for (const t of seededTexts) {
+    await prisma.$executeRaw`
+      INSERT INTO lingo_testi_versioni (id, chiave, versione, titolo, corpo, conferma, azione, created_at, autore_id)
+      VALUES (${t.id}, ${t.chiave}::"LingoTestoChiave", ${t.versione}, ${t.titolo}, ${t.corpo}, ${t.conferma}, ${t.azione}, ${t.created_at}, ${t.autore_id})`;
+  }
 });
 
 export { prisma };

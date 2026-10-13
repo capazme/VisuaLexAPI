@@ -9,6 +9,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { versionTabSuffix } from '../../../utils/versionDisplay';
+import { practiceArticleKey } from '../../../utils/practice';
 import { SafeHTML } from '../../../utils/sanitize';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
@@ -62,7 +63,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
   const [version, setVersion] = useState<'vigente' | 'originale' | 'data'>('vigente');
   const [versionDate, setVersionDate] = useState('');
 
-  const { workspaceTabs } = useAppStore();
+  const practices = useAppStore((s) => s.practices);
 
   // Smart citation parsing (same as CommandPalette)
   const parsedCitation = useMemo(() => {
@@ -73,48 +74,27 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
   const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
   const citationPreview = useMemo(() => parsedCitation ? formatParsedCitation(parsedCitation) : '', [parsedCitation]);
 
-  // Collect available articles from workspace tabs
+  // Collect available articles from every practice (spec §6.8): its acts in table order, each article
+  // named with its version and its practice.
   const availableArticles: AvailableArticle[] = [];
 
-  workspaceTabs.forEach(tab => {
-    tab.content.forEach(item => {
-      if (item.type === 'norma') {
-        item.articles.forEach(article => {
-          availableArticles.push({
-            id: `${tab.id}-${item.id}-${article.norma_data.numero_articolo}`,
-            article,
-            sourceNorma: {
-              tipo_atto: item.norma.tipo_atto,
-              numero_atto: item.norma.numero_atto,
-              data: item.norma.data,
-              urn: item.norma.urn,
-            },
-            label: `${shortNorm(article.norma_data)}${versionSuffixOf(article)}`,
-            source: 'tab',
-            tabName: tab.label,
-          });
-        });
-      } else if (item.type === 'loose-article') {
+  practices.forEach(practice => {
+    practice.acts.forEach(act => {
+      act.articles.forEach(article => {
         availableArticles.push({
-          id: `${tab.id}-${item.id}`,
-          article: item.article,
-          sourceNorma: item.sourceNorma,
-          label: `${shortNorm(item.article.norma_data)}${versionSuffixOf(item.article)}`,
+          id: `${practice.id}-${act.id}-${practiceArticleKey(article)}`,
+          article,
+          sourceNorma: {
+            tipo_atto: act.norma.tipo_atto,
+            numero_atto: act.norma.numero_atto,
+            data: act.norma.data,
+            urn: act.norma.urn,
+          },
+          label: `${shortNorm(article.norma_data)}${versionSuffixOf(article)}`,
           source: 'tab',
-          tabName: tab.label,
+          tabName: practice.label,
         });
-      } else if (item.type === 'collection') {
-        item.articles.forEach(({ article, sourceNorma }) => {
-          availableArticles.push({
-            id: `${tab.id}-${item.id}-${article.norma_data.numero_articolo}`,
-            article,
-            sourceNorma,
-            label: `${shortNorm(article.norma_data)}${versionSuffixOf(article)}`,
-            source: 'tab',
-            tabName: tab.label,
-          });
-        });
-      }
+      });
     });
   });
 
@@ -158,6 +138,9 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
       }
       if (params.date) {
         requestBody.date = parseItalianDate(params.date);
+      }
+      if (params.annex) {
+        requestBody.annex = params.annex;
       }
 
       // Add version_date for temporal comparison
@@ -241,7 +224,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             )}
           >
             <Layers size={14} />
-            Dalle Tab ({availableArticles.length})
+            Dalle pratiche ({availableArticles.length})
           </button>
           <button
             onClick={() => setActiveTab('search')}
@@ -623,6 +606,8 @@ export function CompareView() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+        data-find-overlay=""
         className={cn(
           "fixed inset-0 bg-black/50 backdrop-blur-sm",
           Z_INDEX.compare,

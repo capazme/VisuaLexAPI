@@ -58,14 +58,23 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
     portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
     down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
-  - `act_dates.py` — internal (MERL-T only): acts cited by year only → the full URN
-    through Normattiva's resolver, verified by the page's title (type, year and
-    number; State acts of nine kinds only, because the resolver answers a regional
-    URN with the State's act of the same number), cached a year.
+  - `act_dates.py` — acts cited by year only → their full date, through Normattiva's
+    resolver, verified by the page's title (type, year and number; State acts of nine
+    kinds only, because the resolver answers a regional URN with the State's act of the
+    same number), found dates cached a year. `complete_year` serves a search
+    (see Date System); `resolve_many` serves MERL-T (`/resolve_act_dates`).
   - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
-    `model.py` (identity and reference), `italgiure.py` (Cassazione, Italgiure's Solr),
+    `model.py` (identity and reference), `citation.py` (a decision cited in words → its
+    reference, the palette's patterns in Python, pinned to the golden file's `decision_citations`),
+    `italgiure.py` (Cassazione, Italgiure's Solr),
     `pdf_text.py` (the Cassazione's text from the court's PDF), `corte_cost.py` (Corte
-    costituzionale open data, range bundles on disk), `resolver.py` (one outcome, lookups
+    costituzionale open data, range bundles on disk), `curia.py` (the Court of Justice and the
+    General Court from the Publications Office's repository, CELLAR: a SPARQL query finds the
+    case's judgment, joined cases included, then its Italian XHTML or, before about 2009, the
+    former HTML; design 2026-10-12 §4), `giustizia_amministrativa.py` and `tar_seats.py` (the
+    Consiglio di Stato, the C.G.A.R.S. and the TAR from giustizia-amministrativa.it: the portal's
+    search form, read from the page each time, then the court's XML document; the 29 seats, a copy
+    of `conventions/sources/tar-seats.json`; design 2026-10-12-administrative-courts), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
     User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
     (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`.
@@ -82,7 +91,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `apps/web/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
     `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
     exists, which is why nothing looked broken
-  - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
+  - `sys_op.py` — `PlaywrightManager` singleton (browser pooling), reached through
+    `get_playwright_manager()`
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
   - `map.py` — act-type mappings, plus the act tables the resolver reads
     (`ATTI_NOTI` 64 aliases, `ATTI_DENOMINATI` 202 aliases over 81 acts, built
@@ -135,7 +145,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `cite_act` for a query with no article. A year-only URN and anything that is not a NIR
     URN pass through `normalize_norm_urn` unchanged
   - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
-    exposed at `POST /parse_query`
+    exposed at `POST /parse_query`. Every label the source convention writes reads
+    back to the norm it was written from (`tests/test_nl_parser_convention.py`, driven
+    by the golden file): «d.l.», «l. cost.», «r.d.l.», «d.lgs.lgt.», «1° settembre»,
+    and «(Allegato A)» / «(All. A)», sent on as `annex`. The Costituzione has no
+    number and no date: a type that reads as it next to either is refused, never
+    guessed («l. cost.» was once read as `cost.`)
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
     Regolamento UE 2016/679); runs before the NL parser
   - `citation_linker.py` — citation detection in article text, emits
@@ -184,8 +199,14 @@ POST unless noted, JSON bodies.
   whose hash moved. `available: false` with empty maps when there is no AKN
   index, or an index without fingerprints — the caller must then refetch
   everything, not conclude nothing changed
-- `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale,
-  numero, anno, archivio?, sezione?}` → `esito` trovata (identity, attributes, whole text,
+- `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale |
+  corte_giustizia_ue | tribunale_ue, numero, anno, archivio?, sezione?}` (the two courts of the Union
+  by their case, C-634/21 as 634 and 2021, decided by the owner, Q10 of the 2026-10-12 design; a joined case answers the first case's judgment with the notice `causa_riunita`, two
+  judgments of one case are `ambigua`; `consiglio_di_stato | cgars | tar` with `provvedimento?` (the
+  kind, the ECLI's suffix: `sent`, `ocau`…), `tipo?` (`sentenza | ordinanza | decreto`), and for a TAR
+  `sede` (a slug of `tar_seats.py`) or `regione`: no kind named is a sentenza, and a year holding
+  none is `ambigua` with what it holds; a region is searched at each of its seats, the seat found
+  told by the notice `sede_dedotta`; pareri left out) → `esito` trovata (identity, attributes, whole text,
   source) and ambigua 200, non_trovata 404 (with the reason and the archive's start),
   fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a fixed
   body). That is every answer the handler writes; the others carry no `esito`: the per-IP
@@ -221,6 +242,18 @@ POST unless noted, JSON bodies.
 - `POST /resolve_act_dates {"urns": [...]}` — internal (MERL-T): up to 20 year-only URNs (`urn:nir:stato:legge:1983;184`) → full URNs, through Normattiva's resolver; found dates cached a year. Only State acts of the nine kinds in
   `act_dates._TITLES` are resolved; any other URN, a page whose title is not that act's, a network failure and
   everything after the batch's first 120 s answer `null` for that act.
+- `POST /parse_decision {"citazioni": [...]}` — internal (the server's `POST /api/dossiers/:id/decisions`;
+  not routed by the ingress, not proxied by Vite): 1–10 decisions cited in words (at most 300
+  characters each) → one reading each, in order: `{riferimento}` (what `/fetch_decision` takes),
+  `{corte_non_supportata: "<court>"}` (a court recognised that VisuaLex cannot read: the Consiglio di
+  Stato's pareri, the Garante, the Corte EDU, the Corte di giustizia tributaria) or `{non_riconosciuta: true}`.
+  The Consiglio di Stato, the C.G.A.R.S. and a TAR are read with the section, the family the words
+  name (`tipo`) and, for a TAR, the seat or the region (a region with one seat gives its seat; a
+  T.R.G.A. needs its seat): design 2026-10-12-administrative-courts §4.
+  The Court of Justice and the General Court are read by their case («CGUE, C-634/21», a bare
+  «T-612/17», «Corte giust., causa 26/62»: a case before 1989 only after the court's name): the case's letter names the court, whatever name precedes it.
+  No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:
+  docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
@@ -269,14 +302,27 @@ Request fields are `act_type/act_number/date`; the `norma_data` in responses use
 
 Two complementary paths, chosen by whether you need speed or truth.
 
-**Backend** (`services/visualex/visualex_api/tools/text_op.py`):
-- `complete_date_or_parse(date_str)` — **sync, fast, approximate**. Year-only
-  dates become `YYYY-01-01`. Used by `urngenerator.py` so URN generation never
-  blocks on a lookup.
-- `complete_date_or_parse_async(date_str)` — **async, slow, accurate**. Drives
-  Playwright to read the real publication date from Normattiva, memoised in
-  `_date_cache`. Used where the date is displayed or compared.
-- `complete_date()` — the low-level Playwright call behind the async wrapper.
+**Backend** (`services/visualex/visualex_api/tools/urngenerator.py`):
+- `complete_date_or_parse(date, act_type, act_number)` — **sync, approximate**.
+  Year-only dates become `YYYY-01-01`. Used by `generate_urn` so URN generation
+  never blocks on a lookup (the source convention's PR 3b is to stop writing it).
+- `complete_request_date(act_type, date, act_number)` — **async**, the date a
+  request names, as `create_norma_visitata_from_data` (both servers) builds the
+  `Norma` with it. A year with a number goes to `act_dates.complete_year`: one
+  request to Normattiva's resolver, the date read from the act's own title only
+  when its type, year and number are the ones asked (cached a year). When the act
+  cannot be told for certain (a kind outside `act_dates._TITLES`, a number that is
+  not digits, another act's page, a failure, past `LOOKUP_BUDGET` = 15 s) the year
+  stands: never another act's date. A full date is read into ISO for `legge`,
+  `decreto legge`, `decreto legislativo`, `d.p.r.` and `regio decreto` (a malformed
+  one is a 400) and passed on as given for the others.
+- Until 9 October 2026 the year was completed by `complete_date`, which typed the
+  act into the portal's search with Playwright and took the first hit without
+  reading it: d.lgs. 231/2001 came back dated 2025-12-31, another act's day, and a
+  failed lookup was a 500. A norm saved from that answer (a tab, a dossier item, a
+  quick norm, a watched norm, an environment, a share link) keeps the wrong full
+  date and sends it back, which skips the lookup; the date is also part of
+  `buildItemKey`, so correcting it would orphan the notes made on it.
 
 **Frontend** (`apps/web/src/utils/dateUtils.ts`):
 - `parseItalianDate(dateStr)` — parses while preserving the original precision.
@@ -287,9 +333,8 @@ Two complementary paths, chosen by whether you need speed or truth.
 precision the backend actually has — a year-only entry displays as a year, and
 that is correct, not a bug to normalise away.
 
-If date completion feels slow, you are probably calling the async variant in a
-loop; if a browser timeout appears, the async wrapper catches it and falls back
-to the cached or synthetic value.
+If date completion feels slow, you are probably calling `complete_request_date`
+in a loop: each act it cannot find costs a request (a miss is not cached).
 
 ## Scraping Architecture
 
@@ -341,9 +386,9 @@ Duplicating any of these is a defect, not a shortcut.
 **Playwright work** —
 
 ```python
-from visualex_api.tools.browser_manager import PlaywrightManager
+from visualex_api.tools.sys_op import get_playwright_manager
 
-manager = PlaywrightManager()
+manager = get_playwright_manager()
 browser = await manager.get_browser()
 page = await browser.new_page()
 # ... work
@@ -406,7 +451,7 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
 Breaking one of these breaks the product. Read before editing.
 
 **Python** — `services/visualex/visualex_api/app.py` (controller) · `tools/norma.py` (models) ·
-`tools/text_op.py` (parsing + dates) · `tools/browser_manager.py` (browser pool) ·
+`tools/text_op.py` (parsing + dates) · `tools/sys_op.py` (browser pool) ·
 `services/*_scraper.py` (fragile HTML parsers).
 
 ## Gotchas
@@ -416,10 +461,11 @@ Breaking one of these breaks the product. Read before editing.
 2. **Async context** — never block the Python event loop; wrap blocking calls in
    `asyncio.to_thread()`.
 3. **Rate limiting** — per-IP, configured in `config.py`; 429 when exceeded.
-4. **Playwright** — needed for PDF export and date completion
-   (`playwright install chromium`); always via `PlaywrightManager`.
-5. **Dates** — sync for URNs (approximate), async for display (accurate); never
-   render a synthetic `YYYY-01-01`. See Date System.
+4. **Playwright** — needed for PDF export (`playwright install chromium`);
+   always via `PlaywrightManager`. Date completion no longer uses it.
+5. **Dates** — sync for URNs (approximate), `complete_request_date` for the
+   norm a request names (the act's own date, or its year); never render a
+   synthetic `YYYY-01-01`. See Date System.
 6. **CORS/proxy** — the Vite dev server proxies to the Python API; check
    `vite.config.ts`. `ALLOWED_ORIGINS` unset means localhost only.
 7. **Annex handling** — codici carry a default annex in the URN; see
@@ -445,7 +491,17 @@ Breaking one of these breaks the product. Read before editing.
     check in `create_norma_visitata_from_data` is what turns that into a 404
     ("Articolo N non presente in …", through `_error_response`); it fails open,
     so a Normattiva outage is never reported as "does not exist". A range where
-    *some* articles exist keeps those and drops the rest.
+    *some* articles exist keeps those and drops the rest. Normattiva numbers an
+    act's annexes by position, not as the act names them (the c.p.a. is «Allegato 1»
+    of d.lgs. 104/2010 and annex 2 on Normattiva), and that number stays the identity
+    (owner, 11 October 2026); so when an annex the caller named does not hold the
+    article, the refusal names the annex it looked in and adds where the article is
+    («Articolo 29 non presente nell'allegato 1 di …: su Normattiva l'art. 29 si trova
+    nell'allegato 2»), from the tree just read (`_where_else_in_tree`). Never for a
+    code's default annex: another annex of a code is another code. A request that asks
+    for the dispositivo explicitly (`annex: ""`) is checked against the dispositivo alone,
+    and its refusal reads «non presente nel testo di …» with the same hint: before, an
+    article found only in an annex passed and came back as the act's art. 1.
 
 30. **A path built from the URN is untrusted.** The guard on `/export_pdf` checks the
     host (`normattiva.it`), so everything after it is the caller's: `;../../x` used to
@@ -522,14 +578,26 @@ Breaking one of these breaks the product. Read before editing.
     characters (the texts before about 2001): the page draws a paragraph only between blank
     lines, so without it a block is one paragraph. Both add line breaks and nothing else.
     Whatever changes the shape of what a reader returns must raise the version in its cache
-    key (`italgiure:v4:…`, `corte_cost:v2:…`), or the entries cached before are served for up
-    to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
+    key (`italgiure:v4:…`, `corte_cost:v2:…`, `curia:v1:…`, one answer per case: the list of its
+    judgments; `ga:v1:…`, a measure's text by its key, and `ga:v1:search:…`, what a seat lists for a
+    number and year, kept a day), or the entries cached before are served for up to 30 days. The `v2` keys (`v3` for the Cassazione since the PDF, 2026-10-05; `v4`: carriage returns normalised, 7 October) cover the readers of Tasks 7a to 7c, none of which had shipped,
     so Task 7c raised no version of its own.
     The characters of a decision's text are to be frozen like an article's (root rule 23): the readers
     may add or move `\n` and move a boundary between blocks, never change another character, and a
     cache version bump is for shape only. `tests/test_decisions_text_frozen.py` (synthetic PDFs
     and records in CI; real ones in the `_local` twin) pins the projection (blocks stripped,
     concatenated, `\n` removed) as a SHA-256 and a length in `fixtures/decisions/frozen_projections.json`.
+    The CGUE reader is in it too (`curia_synthetic_*`, documents written for the test; real
+    judgments as `private/curia_<CELEX>.xhtml` or `.html` in the `_local` twin). It keeps the source's
+    characters, U+2011 included; it drops the footnote calls and the procedure-language note (which
+    becomes `lingua_processuale`; any other footnote stays, at the end), the former format's keywords
+    and summary, and the General Court's closing index. `tests/test_decisions_curia_live.py` (`-m live`) re-reads three real judgments.
+    The administrative courts' reader is in it too (`ga_synthetic_document`; real documents as
+    `private/ga_<key>.xml`): each `h:div` of the court's XML is a line, a div inside a div is read
+    once, ASCII whitespace runs become one space; it leaves out the metadata block and the German
+    twins (`…Ted`), and reads the bytes in the encoding the document declares. Its search never
+    drops a result row in silence: a row it cannot read, fewer rows than the portal's count, a
+    seat the form does not offer or an answer for another seat is `fonte_non_raggiungibile`.
     The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a
     reader that moves the projection's hash is a bug in the reader, never a reason to re-record the
     golden. The web app reads the same projection (`decisionProjection` in

@@ -31,9 +31,15 @@ ALLOWED_HOSTS: dict[str, str] = {
     "www.portaledelmassimario.ipzs.it": "Portale del Massimario — Corte di cassazione (realizzazione IPZS)",
     # --- European Union ---
     "eur-lex.europa.eu": "EUR-Lex — Ufficio delle pubblicazioni UE",
+    # The same Office's repository behind EUR-Lex (CELLAR): the CGUE's judgments by CELEX and its
+    # SPARQL endpoint (design 2026-10-12 §4), since EUR-Lex's page answers a server with a challenge.
+    "publications.europa.eu": "Ufficio delle pubblicazioni UE — archivio CELLAR (EUR-Lex)",
     # --- Italian State: courts (decision pages, design 2026-10-01) ---
     "www.italgiure.giustizia.it": "Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb)",
     "dati.cortecostituzionale.it": "Corte costituzionale — dati aperti (CC BY-SA 3.0)",
+    # The administrative courts: the decisions search and the documents (CdS/TAR design note, 2026-10-12).
+    "www.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (ricerca dei provvedimenti)",
+    "mdp.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (testi dei provvedimenti)",
     # --- Private ---
     # The only non-institutional source. Brocardi supplies doctrinal notes and
     # case-law abstracts, never the text of a norm: that always comes from
@@ -68,6 +74,11 @@ NON_NETWORK_HOSTS: dict[str, str] = {
         "never fetched by the server"
     ),
     "github.com": "appears only in massimario_portal.USER_AGENT, which names the project; never fetched",
+    "www.w3.org": (
+        "XML names, never fetched: the XML Schema datatype IRIs (xsd:gYear, xsd:string) inside the "
+        "CGUE reader's SPARQL query (decisions/curia.py) and the HTML namespace of the administrative "
+        "courts' documents (decisions/giustizia_amministrativa.py)"
+    ),
 }
 
 

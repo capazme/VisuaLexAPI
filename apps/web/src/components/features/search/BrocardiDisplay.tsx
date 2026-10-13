@@ -9,6 +9,7 @@ import { MarkableBrocardiSection } from './MarkableBrocardiSection';
 import { useAppStore } from '../../../store/useAppStore';
 import type { DecisionSearchNorma } from '../../../types/decisions';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 
 // Error Boundary for BrocardiSection — surfaces the failure instead of hiding
 // the section silently so users know something went wrong and can retry.
@@ -442,7 +443,7 @@ export interface GlossaryCaseLaw {
 
 function GlossarioSection({ entries, caseLaw }: { entries: GlossaryEntry[]; caseLaw?: GlossaryCaseLaw }) {
   const [isOpen, setIsOpen] = useState(false);
-  const openDecisionSearchTab = useAppStore((s) => s.openDecisionSearchTab);
+  const openTopicSearch = useAppStore((s) => s.openTopicSearch);
 
   const toggle = () => setIsOpen((v) => !v);
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -486,10 +487,10 @@ function GlossarioSection({ entries, caseLaw }: { entries: GlossaryEntry[]; case
               <button
                 type="button"
                 aria-label={`Sentenze su questo tema: ${entry.termine}`}
-                onClick={() => openDecisionSearchTab(
+                onClick={() => openTopicSearch(
                   { tema: entry.termine, ...(caseLaw ? { norma: caseLaw.norma, normaLabel: caseLaw.normaLabel } : {}) },
                   `Tema: ${entry.termine}`,
-                  caseLaw?.tabId ? { besideTabId: caseLaw.tabId } : undefined,
+                  caseLaw?.tabId ? { besideId: caseLaw.tabId } : undefined,
                 )}
                 className={`rounded-full px-2 py-1 text-xs text-primary-700 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE} inline-flex items-center`}
               >
@@ -578,6 +579,8 @@ interface BrocardiDisplayProps {
    * `rect` is the viewport-space bounding box of the selection, used by the
    * consumer to anchor an inline composer on the span itself. */
   onRequestAddNote?: (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
+  /** Where the commentary is read: given, the decisions the Ratio and the Spiegazione cite are links. */
+  decisionLinks?: { besideId?: string; origin?: ReadingBackEntry };
 }
 
 function BrocardiEmptyState({ link }: { link?: string | null }) {
@@ -606,7 +609,7 @@ function BrocardiEmptyState({ link }: { link?: string | null }) {
   );
 }
 
-export function BrocardiDisplay({ info, currentNorma, caseLaw, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote }: BrocardiDisplayProps) {
+export function BrocardiDisplay({ info, currentNorma, caseLaw, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote, decisionLinks }: BrocardiDisplayProps) {
   const canMark = Boolean(itemKey && uniqueArticleId && onRequestAddNote);
   // Default collapsed on mobile (<768px), expanded on desktop
   const [isMainOpen, setIsMainOpen] = useState(() =>
@@ -663,6 +666,7 @@ export function BrocardiDisplay({ info, currentNorma, caseLaw, onArticleClick, i
               itemKey={itemKey!}
               sectionArticleId={`${uniqueArticleId}/brocardi/ratio`}
               onRequestAddNote={onRequestAddNote!}
+              decisionLinks={decisionLinks}
             />
           ) : (
             <BrocardiSection title="Ratio" content={info.Ratio || null} />
@@ -674,6 +678,7 @@ export function BrocardiDisplay({ info, currentNorma, caseLaw, onArticleClick, i
               itemKey={itemKey!}
               sectionArticleId={`${uniqueArticleId}/brocardi/spiegazione`}
               onRequestAddNote={onRequestAddNote!}
+              decisionLinks={decisionLinks}
               icon={<FileText size={16} className="text-primary-500" />}
             />
           ) : (

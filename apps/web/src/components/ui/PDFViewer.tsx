@@ -13,7 +13,8 @@ export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps
   if (!isOpen) return null;
 
   return (
-    <div className={cn('fixed inset-0 flex items-center justify-center p-4 sm:p-6', Z_INDEX.modal)}>
+    // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+    <div data-find-overlay="" className={cn('fixed inset-0 flex items-center justify-center p-4 sm:p-6', Z_INDEX.modal)}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       
       <div className="relative bg-slate-900 rounded-xl shadow-2xl w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-800">

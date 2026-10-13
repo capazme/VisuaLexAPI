@@ -65,19 +65,67 @@ function wordPattern(word: string): string {
   return units.join(INVISIBLE);
 }
 
-/** Whether `query` is long enough to search: the rule `findMatches` applies (folded, trimmed, in base characters). */
+const LETTER = /^\p{L}$/u;
+const LETTER_OR_DIGIT = /^[\p{L}\p{N}]$/u;
+
+/** Between two words of the text: spaces, or a dot followed by none («art.13», «n.2»). */
+const WORD_GAP = '(?:[.,]?\\s+|\\.)';
+
+/**
+ * The query as a pattern in which punctuation of abbreviations is optional (spec §13.2): a «.» or
+ * «,» of the query after a letter, or ending a word, may be absent from the text; the text may have
+ * a «.» or «,» after any letter of a query word and at the end of any word but the last, where a
+ * dot may stand for the space («art 13» finds «art.13»). Never a space inside a word: it never joins
+ * two words. Matched only at the start of a word, so «art. 13» finds «art 13» but not «part 13».
+ */
+function punctuationFreePattern(words: string[]): string | null {
+  const parts: string[] = [];
+  words.forEach((word, w) => {
+    const units = [...word];
+    // A «.» or «,» after a letter, or at the end of the word, is optional: dropped here, and put
+    // back as an optional `[.,]` where a letter or the word's end allows one.
+    const kept = units.filter((u, i) => !((u === '.' || u === ',') && (LETTER.test(units[i - 1] ?? '') || i === units.length - 1)));
+    if (kept.length === 0) return;
+    kept.forEach((u, i) => {
+      parts.push(`${escapeRegExp(u)}\\p{M}*`);
+      if (i < kept.length - 1) parts.push(LETTER.test(u) ? '[.,\\u00ad\\u200b]?' : INVISIBLE);
+    });
+    // Between two words a «.» or «,» may end the first on either side («art 13» and «art. 13,
+    // comma»); the query's last word takes none, so a match never swallows a sentence's end. A
+    // last word typed with its final dot ends where the text's word ends: «art.» finds «art.» and
+    // «art 13», never «articolo».
+    if (w < words.length - 1) parts.push(WORD_GAP);
+    else if (word.endsWith('.')) parts.push('(?:\\.|(?![\\p{L}\\p{N}]))');
+  });
+  if (parts.length === 0) return null;
+  // A query ending with a word of punctuation alone ends on the word before it, as a last word does.
+  if (parts[parts.length - 1] === WORD_GAP) parts[parts.length - 1] = '[.,]?';
+  const body = parts.join('');
+  const first = [...words[0]][0] ?? '';
+  return LETTER_OR_DIGIT.test(first) ? `(?<![\\p{L}\\p{N}])${body}` : body;
+}
+
+const SEARCHABLE_UNIT = /[\p{L}\p{N}]/gu;
+
+/**
+ * Whether `query` is long enough to search: the rule `findMatches` applies. Only letters and digits
+ * count (folded base characters), so punctuation the match may drop never makes a one-letter query
+ * searchable: «n.», «l.», «1.» are not, «c.p.» is.
+ */
 export function isSearchableQuery(query: string): boolean {
-  return [...foldQuery(query).trim()].length >= MIN_QUERY_LENGTH;
+  return (foldQuery(query).match(SEARCHABLE_UNIT)?.length ?? 0) >= MIN_QUERY_LENGTH;
 }
 
 /**
  * Every match of `query` in `text`, as `[start, end)` offsets of the original
- * text. The query is folded and trimmed; under two characters (folded base
- * characters, that is code points) nothing matches; a run of whitespace in the
+ * text. The query is folded and trimmed; under two letters or digits (folded
+ * base characters; punctuation does not count) nothing matches; a run of whitespace in the
  * query matches any run in the text; a combining mark after a matched letter
  * is part of the match, and a soft hyphen or zero-width space between letters
- * is ignored. Ligatures (ﬁ, ﬂ) are not matched. Past `limit` matches the rest
- * are not collected and `truncated` is set.
+ * is ignored. Ligatures (ﬁ, ﬂ) are not matched. Where the literal match fails,
+ * the punctuation of abbreviations is optional (`punctuationFreePattern`: «cpa»
+ * finds «c.p.a.», «art 13» finds «art. 13»), from the start of a word only. Past
+ * `limit` matches the rest are not collected and `truncated` is set.
  */
 export function findMatches(
   text: string,
@@ -85,11 +133,37 @@ export function findMatches(
   { limit = 1000 }: { limit?: number } = {},
 ): FindResult {
   if (!isSearchableQuery(query)) return { matches: [], truncated: false };
+  return findMatchesInFolded(foldForSearch(text), query, { limit });
+}
+
+/**
+ * `findMatches` over a text already folded with `foldForSearch` (same length, so the offsets are
+ * the original text's): a caller searching the same stored text for every keystroke folds it once
+ * (`useFindWindow`).
+ */
+export function findMatchesInFolded(
+  haystack: string,
+  query: string,
+  { limit = 1000 }: { limit?: number } = {},
+): FindResult {
+  if (!isSearchableQuery(query)) return { matches: [], truncated: false };
   const folded = foldQuery(query).trim();
 
-  const pattern = folded.split(/\s+/).map(wordPattern).join('\\s+');
-  const re = new RegExp(pattern, 'gu');
-  const haystack = foldForSearch(text);
+  const words = folded.split(/\s+/);
+  // The literal match first; where it fails, the same words with the punctuation of
+  // abbreviations made optional (spec §13.2).
+  // A number is never cut out of a longer one: a query starting with a digit does not begin right
+  // after a digit, one ending with a digit does not end right before one («8980/2018» is not in
+  // «18980/2018» nor in «8980/20181»).
+  const edges = [...folded];
+  const before = /\p{N}/u.test(edges[0]) ? '(?<!\\p{N})' : '';
+  const after = /\p{N}/u.test(edges[edges.length - 1]) ? '(?!\\p{N})' : '';
+  // A query word ending with a dot may be followed by no space in the text: «n. 2» finds «n.2».
+  const literalBody = words.map((word, i) => (i === 0 ? '' : words[i - 1].endsWith('.') ? '\\s*' : '\\s+') + wordPattern(word)).join('');
+  const literal = `${before}(?:${literalBody})${after}`;
+  const relaxedBody = punctuationFreePattern(words);
+  const relaxed = relaxedBody ? `${before}(?:${relaxedBody})${after}` : null;
+  const re = new RegExp(relaxed ? `${literal}|${relaxed}` : literal, 'gu');
 
   const matches: [number, number][] = [];
   let truncated = false;
@@ -102,6 +176,23 @@ export function findMatches(
     matches.push([start, start + m[0].length]);
   }
   return { matches, truncated };
+}
+
+/**
+ * Where `pos` of `oldText` sits in `newText`: unchanged before the common prefix, shifted by the
+ * length difference after the common suffix, and at the start of the change when it falls inside
+ * what changed. How a caller keeping a current match carries its position through a redraw
+ * (`useFindWindow`) without re-finding it by content.
+ */
+export function mapThroughEdit(oldText: string, newText: string, pos: number): number {
+  const max = Math.min(oldText.length, newText.length);
+  let prefix = 0;
+  while (prefix < max && oldText[prefix] === newText[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < max - prefix && oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix += 1;
+  if (pos < prefix) return pos;
+  if (pos >= oldText.length - suffix) return pos + newText.length - oldText.length;
+  return prefix;
 }
 
 export interface TextSegment {

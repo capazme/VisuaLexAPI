@@ -13,6 +13,8 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ConnectPage } from './features/connections';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
+import { isStudiaEnabled } from './features/studia/featureFlag';
+import { DevRoute } from './features/devMode/DevRoute';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
 import { lazy, Suspense } from 'react';
@@ -28,6 +30,22 @@ const ContribPage = lazy(() =>
 );
 const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
+);
+
+const StudiaPage = lazy(() =>
+  import('./components/features/studia/StudiaPage').then(m => ({ default: m.StudiaPage })),
+);
+const MyCardsView = lazy(() =>
+  import('./components/features/studia/MyCardsView').then(m => ({ default: m.MyCardsView })),
+);
+const ValidationQueueView = lazy(() =>
+  import('./components/features/studia/ValidationQueueView').then(m => ({ default: m.ValidationQueueView })),
+);
+const ReviewHome = lazy(() =>
+  import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
+);
+const ReviewSession = lazy(() =>
+  import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
 
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
@@ -82,43 +100,71 @@ function App() {
           <Route path="environments" element={<EnvironmentPage />} />
           <Route path="forum" element={<BulletinBoardPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
+          {/* The MERL-T pages are development addresses (spec D6): without the development mode they
+              lead to «/». The server's guards (consent, validators, admins) stay the real barrier. */}
           <Route
             path="merlt"
             element={
-              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                <MerltHubPage />
-              </Suspense>
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <MerltHubPage />
+                </Suspense>
+              </DevRoute>
             }
           />
           <Route
             path="merlt/contribuisci"
             element={
-              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                <ContribPage />
-              </Suspense>
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <ContribPage />
+                </Suspense>
+              </DevRoute>
             }
           />
           <Route
             path="merlt/valida"
             element={
-              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                <ValidationPage />
-              </Suspense>
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <ValidationPage />
+                </Suspense>
+              </DevRoute>
             }
           />
           {/* Slice 4 absorb (Decision A): the Q&A page is gone — the graph is the
               SOLE deliberation surface. Both the old ask route and the legacy
               docs path redirect to /grafo, where the debate now lives. */}
-          <Route path="merlt/qa" element={<Navigate to="/grafo" replace />} />
-          <Route path="merlt/chiedi" element={<Navigate to="/grafo" replace />} />
+          <Route path="merlt/qa" element={<DevRoute><Navigate to="/grafo" replace /></DevRoute>} />
+          <Route path="merlt/chiedi" element={<DevRoute><Navigate to="/grafo" replace /></DevRoute>} />
           <Route
             path="grafo"
             element={
-              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                <GraphExplorerPage />
-              </Suspense>
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <GraphExplorerPage />
+                </Suspense>
+              </DevRoute>
             }
           />
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; valida is the validators' queue. */}
+          {isStudiaEnabled() && (
+            <Route
+              path="studia"
+              element={
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <StudiaPage />
+                </Suspense>
+              }
+            >
+              <Route index element={<Navigate to="ripasso" replace />} />
+              <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
+              <Route path="ripasso/sessione" element={<Suspense fallback={null}><ReviewSession /></Suspense>} />
+              <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+              <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+              <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />
+            </Route>
+          )}
           <Route path="sentenze" element={<DecisionAddress />} />
           <Route path="sentenze/:corte/:numero/:anno" element={<DecisionAddress />} />
           {/* Global 404 catch-all (inside the layout: sidebar stays visible) */}

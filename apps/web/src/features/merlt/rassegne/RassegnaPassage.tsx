@@ -44,7 +44,7 @@ function provenance(p: RassegnePasso): string {
   ].filter(Boolean).join(' › ');
 }
 
-export function RassegnaPassage({ passo, besideTabId, backEntry }: { passo: RassegnePasso; besideTabId?: string; backEntry?: ReadingBackEntry }) {
+export function RassegnaPassage({ passo, besideId, backEntry }: { passo: RassegnePasso; besideId?: string; backEntry?: ReadingBackEntry }) {
   const [full, setFull] = useState(false);
   const long = passo.testo.length > 400;
   return (
@@ -62,7 +62,7 @@ export function RassegnaPassage({ passo, besideTabId, backEntry }: { passo: Rass
       )}
       {passo.pronunce.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {passo.pronunce.map((p, i) => <DecisionChip key={`${p.key ?? p.label}-${i}`} pronuncia={p} besideTabId={besideTabId} backEntry={backEntry} />)}
+          {passo.pronunce.map((p, i) => <DecisionChip key={`${p.key ?? p.label}-${i}`} pronuncia={p} besideId={besideId} backEntry={backEntry} />)}
         </div>
       )}
       <p className="text-[11px] text-slate-400">

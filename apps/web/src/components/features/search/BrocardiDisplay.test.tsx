@@ -64,12 +64,12 @@ describe('BrocardiDisplay — Glossario', () => {
 });
 
 describe('BrocardiDisplay — Glossario, decisions on a term', () => {
-  const original = appStore.getState().openDecisionSearchTab;
-  afterEach(() => appStore.setState({ openDecisionSearchTab: original }));
+  const original = appStore.getState().openTopicSearch;
+  afterEach(() => appStore.setState({ openTopicSearch: original }));
 
   it('keeps the Brocardi link and opens a search tab beside the article', () => {
     const open = vi.fn(() => 'tab');
-    appStore.setState({ openDecisionSearchTab: open } as never);
+    appStore.setState({ openTopicSearch: open } as never);
     const norma = { tipo_atto: 'codice civile', numero_articolo: '2043' };
     render(<BrocardiDisplay
       caseLaw={{ norma, normaLabel: 'art. 2043 c.c.', tabId: 'article-tab' }}
@@ -81,7 +81,7 @@ describe('BrocardiDisplay — Glossario, decisions on a term', () => {
     expect(open).toHaveBeenCalledWith(
       { tema: 'danno ingiusto', norma, normaLabel: 'art. 2043 c.c.' },
       'Tema: danno ingiusto',
-      { besideTabId: 'article-tab' },
+      { besideId: 'article-tab' },
     );
   });
 });

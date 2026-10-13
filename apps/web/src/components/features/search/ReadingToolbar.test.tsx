@@ -191,7 +191,7 @@ describe('ReadingToolbar — the menu', () => {
 
 describe('ReadingToolbar — «Cerca nel testo»', () => {
     const find = (over: Partial<NonNullable<ReadingToolbarProps['find']>> = {}) => ({
-        isOpen: false, onToggle: vi.fn(), bar: <div role="search" />, ...over,
+        isOpen: false, onToggle: vi.fn(), ...over,
     });
 
     it('has the button in the desktop row and in the phone row', () => {
@@ -204,23 +204,60 @@ describe('ReadingToolbar — «Cerca nel testo»', () => {
         expect(screen.queryByRole('button', { name: 'Cerca nel testo' })).not.toBeInTheDocument();
     });
 
-    it('toggles from either row, and hands the box the button of the row on screen', () => {
+    it('toggles from either row, and hands the window the button of the row on screen', () => {
         const f = find();
         setup({ find: f });
         const [phone, desktop] = screen.getAllByRole('button', { name: 'Cerca nel testo' });
         // jsdom has no layout: say that the desktop row is the one on screen
         desktop.getClientRects = () => [{}] as unknown as DOMRectList;
         fireEvent.click(phone);
-        expect(f.onToggle).toHaveBeenLastCalledWith(desktop);
+        expect(f.onToggle).toHaveBeenLastCalledWith(desktop, false);
         desktop.getClientRects = () => [] as unknown as DOMRectList;
         fireEvent.click(desktop);
-        expect(f.onToggle).toHaveBeenLastCalledWith(phone);
+        expect(f.onToggle).toHaveBeenLastCalledWith(phone, false);
     });
 
-    it('draws the box only while the search is open, and keeps the phone buttons at 44 px', () => {
+    it('draws no box under the buttons, shows the window open on the buttons and keeps the phone buttons at 44 px', () => {
         setup({ find: find({ isOpen: true }) });
-        expect(screen.getByRole('search')).toBeInTheDocument();
-        const phone = screen.getAllByRole('button', { name: 'Cerca nel testo' })[0];
+        expect(screen.queryByRole('search')).not.toBeInTheDocument();
+        expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+        const [phone, desktop] = screen.getAllByRole('button', { name: 'Cerca nel testo' });
+        expect(phone).toHaveAttribute('aria-pressed', 'true');
+        expect(desktop).toHaveAttribute('aria-pressed', 'true');
         expect(phone).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    });
+});
+
+describe('ReadingToolbar — the compact form of a light window (spec §4.1)', () => {
+    const find = { isOpen: false, onToggle: vi.fn() };
+    // Both rows are mounted, one hidden by CSS: the desktop row is the one with the notes button.
+    const titles = (container: HTMLElement, selector: string) =>
+        [...container.querySelectorAll(`${selector} button, ${selector} a`)].map((b) => b.getAttribute('aria-label') ?? b.getAttribute('title'));
+
+    it('the desktop row holds notes, highlights, discussions, the magnifier and copy, and no «⋯»', () => {
+        const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
+        const row = container.querySelector('div.hidden.md\\:flex') as HTMLElement;
+        expect(titles(row, '')).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Discussioni sull’articolo', 'Cerca nel testo', 'Copia']);
+        expect(screen.queryByTitle('Altre azioni')).not.toBeInTheDocument();
+    });
+
+    it('the phone row holds discussions, the magnifier and copy: no quick norm, dossier, Study Mode or source link', () => {
+        const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
+        const row = container.querySelector('div.flex.md\\:hidden') as HTMLElement;
+        expect(titles(row, '')).toEqual(['Discussioni sull’articolo', 'Cerca nel testo', 'Copia testo']);
+    });
+
+    it('keeps the version chip and the annex badge, which say which text this is', () => {
+        setup({ compact: true, versionChip: HISTORICAL_CHIP, normaData: { tipo_atto: 'legge', data: '1990-08-07', numero_articolo: '1', allegato: 'A' } });
+        expect(screen.getByRole('button', { name: HISTORICAL_CHIP.label })).toBeInTheDocument();
+        expect(screen.getByText('Allegato A')).toBeInTheDocument();
+    });
+
+    it('the row (default) keeps every tool it had', () => {
+        const { container } = setup({ find, url: 'https://example.org/x' });
+        const desktop = container.querySelector('div.hidden.md\\:flex') as HTMLElement;
+        expect(titles(desktop, '')).toEqual(expect.arrayContaining(['Aggiungi a norme rapide', 'Aggiungi a dossier', 'Altre azioni', 'Copia']));
+        const phone = container.querySelector('div.flex.md\\:hidden') as HTMLElement;
+        expect(titles(phone, '')).toEqual(expect.arrayContaining(['Modalità studio', 'Aggiungi a dossier', 'Apri fonte']));
     });
 });

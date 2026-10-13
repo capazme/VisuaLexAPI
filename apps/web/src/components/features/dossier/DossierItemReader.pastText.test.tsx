@@ -83,8 +83,9 @@ describe('DossierItemReader — a past text', () => {
     const { container } = read(PAST_ITEM, MIDDLE);
     await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
     const toggle = () => container.querySelector('.vlx-updates-toggle') as HTMLElement;
-    expect(toggle()).not.toBeNull();
-    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+    // The toggle sits in the text's markup (drawn with `aria-expanded="false"`) and a passive effect
+    // writes the state into it a moment after the paint: wait for that, do not read it at once.
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-expanded', 'true'));
     expect(container.querySelector('.vlx-art')).toHaveClass('vlx-updates-open');
 
     fireEvent.click(toggle());

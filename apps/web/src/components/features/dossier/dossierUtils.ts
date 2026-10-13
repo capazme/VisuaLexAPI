@@ -5,8 +5,10 @@ import { requestIsHistorical, versionKey, versionTabSuffix } from '../../../util
 import type { ArticleData, Dossier, DossierItem, DossierNormaData, Norma, NormaVisitata, SearchParams } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 import type { DossierApi, DossierItemApi } from '../../../services/dossierService';
-import type { DecisionArchive, DecisionAttributes, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
-import { decisionKey, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
+import type { DecisionArchive, DecisionAttributes, DecisionCourt, DecisionIdentity, DossierSentenzaData } from '../../../types/decisions';
+import { decisionKey, FIRST_YEAR, formatDecisionCitation, identityOf } from '../../../utils/decisionLinks';
+import { EU_CASE, EU_MAX_NUMERO, EU_SECTION, isEuCourt } from '../../../utils/euCourts';
+import { ADMIN_MAX_NUMERO, ADMIN_SECTION, PROVVEDIMENTO, isAdminCourt, isSeat, kindFamily } from '../../../utils/adminCourts';
 import { rebuildNormEntry } from '../../../utils/sources';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
@@ -85,34 +87,35 @@ export function searchParamsFromGroup(group: NormaGroup): SearchParams {
   };
 }
 
-// The tab a group opens in: the dossier's own for the texts in force, and for a
-// group asking for a past text a tab of its own, named as the tabs of the "Testo
-// alla data" dialog are. A past text must not sit among the texts in force.
+// The label a group's search carries: the dossier's own for the texts in force, and for a
+// group asking for a past text the dossier's with the version, as the "Testo alla data"
+// dialog names its results. A past text must not pass for the text in force.
 export function tabLabelForGroup(dossierTitle: string, group: NormaGroup): string {
   return requestIsHistorical(group)
     ? `${dossierTitle}${versionTabSuffix({ version: group.versione, versionDate: group.data_versione })}`
     : dossierTitle;
 }
 
-// One search per group, each routed to the tab it belongs to (`createTab` makes a
-// tab and returns its id). The texts in force share the dossier's tab, created
-// only when there is one to put in it; every past group gets a tab of its own.
+// One search per group, each routed to the practice it belongs to (`createPractice` makes one
+// and returns its id). The texts in force share the dossier's practice, created only when there
+// is one to put in it; the dossier's open-all passes one id for every group, so a past group
+// lands as rows of the same acts.
 export function searchesForGroups(
   dossierTitle: string,
   groups: NormaGroup[],
-  createTab: (label: string) => string,
+  createPractice: (label: string) => string,
 ): SearchParams[] {
-  let sharedTabId: string | undefined;
+  let sharedPracticeId: string | undefined;
   return groups.map((group) => {
     const tabLabel = tabLabelForGroup(dossierTitle, group);
-    let targetTabId: string;
+    let targetPracticeId: string;
     if (requestIsHistorical(group)) {
-      targetTabId = createTab(tabLabel);
+      targetPracticeId = createPractice(tabLabel);
     } else {
-      sharedTabId ??= createTab(tabLabel);
-      targetTabId = sharedTabId;
+      sharedPracticeId ??= createPractice(tabLabel);
+      targetPracticeId = sharedPracticeId;
     }
-    return { ...searchParamsFromGroup(group), tabLabel, targetTabId };
+    return { ...searchParamsFromGroup(group), tabLabel, targetPracticeId };
   });
 }
 
@@ -133,7 +136,7 @@ export function searchParamsFromNorma(norma: NormaVisitata): SearchParams {
   };
 }
 
-// What the window header's "Aggiungi a dossier" stores for one article of a tab.
+// What a practice's "Salva come dossier" stores for one article of an act.
 // It rebuilds the item from the block's norma and the article, and used to drop
 // the version: a historical text was saved under the same label as the current
 // one and reopened as the text in force.
@@ -145,7 +148,7 @@ export function normaForDossier(norma: Norma, article: ArticleData): NormaVisita
     data: norma.data,
     numero_articolo: article.norma_data.numero_articolo,
     urn: norma.urn,
-    // The annex is part of the item's key and id: without it the item is not the article the tab shows.
+    // The annex is part of the item's key and id: without it the item is not the article the row shows.
     ...(article.norma_data.allegato ? { allegato: article.norma_data.allegato } : {}),
     ...(versione ? { versione } : {}),
     ...(data_versione ? { data_versione } : {}),
@@ -191,7 +194,10 @@ export function assertNever(value: never): never {
   throw new Error(`Unexpected dossier item: ${JSON.stringify(value)}`);
 }
 
-const SENTENZA_KEYS = new Set(['corte', 'numero', 'anno', 'archivio', 'sezione', 'tipo', 'data_deposito', 'etichetta']);
+const SENTENZA_KEYS = new Set([
+  'corte', 'numero', 'anno', 'archivio', 'sezione', 'tipo', 'data_deposito', 'data_decisione', 'cause_riunite', 'sede', 'provvedimento', 'etichetta',
+]);
+const ISO_DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 const SEZIONI = new Set(['1', '2', '3', '4', '5', '6', '7', 'L', 'U', 'F']);
 const TIPI = new Set(['sentenza', 'ordinanza', 'ordinanza interlocutoria', 'decreto']);
 
@@ -201,25 +207,45 @@ export function parseSentenzaContent(data: unknown, now: Date = new Date()): Dos
   if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
   const d = data as Record<string, unknown>;
   if (Object.keys(d).some((k) => !SENTENZA_KEYS.has(k))) return null;
-  const { corte, numero, anno, archivio, sezione, tipo, data_deposito, etichetta } = d;
-  if (corte !== 'cassazione' && corte !== 'corte_costituzionale') return null;
-  if (typeof numero !== 'number' || !Number.isInteger(numero) || numero < 1 || numero > 999_999) return null;
-  const first = corte === 'corte_costituzionale' ? 1956 : 1900;
+  const { corte, numero, anno, archivio, sezione, tipo, data_deposito, data_decisione, cause_riunite, sede, provvedimento, etichetta } = d;
+  const eu = isEuCourt(corte);
+  const admin = isAdminCourt(corte);
+  if (corte !== 'cassazione' && corte !== 'corte_costituzionale' && !eu && !admin) return null;
+  const highest = eu ? EU_MAX_NUMERO : admin ? ADMIN_MAX_NUMERO : 999_999;
+  if (typeof numero !== 'number' || !Number.isInteger(numero) || numero < 1 || numero > highest) return null;
+  const first = FIRST_YEAR[corte as DecisionCourt];
   if (typeof anno !== 'number' || !Number.isInteger(anno) || anno < first || anno > now.getFullYear()) return null;
-  if (typeof etichetta !== 'string' || !etichetta.trim() || etichetta.length > 200) return null;
+  if (typeof etichetta !== 'string' || !etichetta.trim() || etichetta.length > 600) return null;
   if (corte === 'cassazione' && archivio !== 'civile' && archivio !== 'penale') return null;
   if (corte === 'corte_costituzionale' && (archivio !== undefined || sezione !== undefined)) return null;
-  if (sezione !== undefined && !(typeof sezione === 'string' && SEZIONI.has(sezione))) return null;
+  if (eu && (archivio !== undefined || data_deposito !== undefined)) return null;
+  if (!eu && (data_decisione !== undefined || cause_riunite !== undefined)) return null;
+  if (admin) {
+    // the kind is part of the key, a TAR's seat too (design 2026-10-12-administrative-courts §2)
+    if (archivio !== undefined || typeof provvedimento !== 'string' || !PROVVEDIMENTO.test(provvedimento)) return null;
+    if (corte === 'tar' ? !isSeat(sede) : sede !== undefined) return null;
+    // `tipo` is the kind's family, or absent (the server's rule)
+    if (tipo !== undefined && tipo !== kindFamily(provvedimento)) return null;
+  } else if (sede !== undefined || provvedimento !== undefined) return null;
+  const sectionOk = (value: string) => (eu ? EU_SECTION.test(value) : admin ? ADMIN_SECTION.test(value) : SEZIONI.has(value));
+  if (sezione !== undefined && !(typeof sezione === 'string' && sectionOk(sezione))) return null;
   if (tipo !== undefined && !(typeof tipo === 'string' && TIPI.has(tipo))) return null;
-  if (data_deposito !== undefined && !(typeof data_deposito === 'string' && /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(data_deposito))) return null;
+  if (data_deposito !== undefined && !(typeof data_deposito === 'string' && ISO_DAY.test(data_deposito))) return null;
+  if (data_decisione !== undefined && !(typeof data_decisione === 'string' && ISO_DAY.test(data_decisione))) return null;
+  if (cause_riunite !== undefined && !(Array.isArray(cause_riunite) && cause_riunite.length >= 2 && cause_riunite.length <= 30
+    && cause_riunite.every((c) => typeof c === 'string' && EU_CASE.test(c)))) return null;
   return {
-    corte,
+    corte: corte as DecisionCourt,
     numero,
     anno,
     ...(archivio ? { archivio: archivio as DecisionArchive } : {}),
     ...(sezione ? { sezione: sezione as string } : {}),
     ...(tipo ? { tipo: tipo as string } : {}),
     ...(data_deposito ? { data_deposito: data_deposito as string } : {}),
+    ...(data_decisione ? { data_decisione: data_decisione as string } : {}),
+    ...(cause_riunite ? { cause_riunite: [...(cause_riunite as string[])] } : {}),
+    ...(sede ? { sede: sede as string } : {}),
+    ...(provvedimento ? { provvedimento: provvedimento as string } : {}),
     etichetta,
   };
 }
@@ -234,6 +260,8 @@ export function decisionCitationOf(data: Omit<DossierSentenzaData, 'etichetta'>)
     ...(data.sezione ? { sezione: data.sezione } : {}),
     ...(data.tipo ? { tipo: data.tipo } : {}),
     ...(data.data_deposito ? { data_deposito: data.data_deposito } : {}),
+    ...(data.data_decisione ? { data_decisione: data.data_decisione } : {}),
+    ...(data.cause_riunite ? { cause_riunite: data.cause_riunite } : {}),
   });
 }
 
@@ -245,9 +273,18 @@ export function sentenzaFromDecision(identity: DecisionIdentity, attrs: Decision
     numero: identity.numero,
     anno: identity.anno,
     ...(identity.archivio ? { archivio: identity.archivio } : {}),
+    ...(isAdminCourt(identity.corte) && identity.sede ? { sede: identity.sede } : {}),
+    ...(isAdminCourt(identity.corte) && identity.provvedimento ? { provvedimento: identity.provvedimento } : {}),
     ...(attrs.sezione && SEZIONI.has(attrs.sezione) && identity.corte === 'cassazione' ? { sezione: attrs.sezione } : {}),
-    ...(attrs.tipo && TIPI.has(attrs.tipo) ? { tipo: attrs.tipo } : {}),
-    ...(attrs.data_deposito && /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
+    ...(attrs.sezione && isAdminCourt(identity.corte) && ADMIN_SECTION.test(attrs.sezione) ? { sezione: attrs.sezione } : {}),
+    ...(attrs.sezione && isEuCourt(identity.corte) && EU_SECTION.test(attrs.sezione) ? { sezione: attrs.sezione } : {}),
+    ...(attrs.tipo && TIPI.has(attrs.tipo) && (!isAdminCourt(identity.corte) || attrs.tipo === kindFamily(identity.provvedimento))
+      ? { tipo: attrs.tipo } : {}),
+    ...(attrs.data_deposito && !isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_deposito) ? { data_deposito: attrs.data_deposito } : {}),
+    ...(attrs.data_decisione && isEuCourt(identity.corte) && ISO_DAY.test(attrs.data_decisione) ? { data_decisione: attrs.data_decisione } : {}),
+    // more than 30 joined cases: the citation names the case alone, as the item schema keeps at most 30
+    ...(isEuCourt(identity.corte) && attrs.cause_riunite && attrs.cause_riunite.length > 1 && attrs.cause_riunite.length <= 30
+      && attrs.cause_riunite.every((c) => EU_CASE.test(c)) ? { cause_riunite: [...attrs.cause_riunite] } : {}),
   };
   return { ...kept, etichetta: decisionCitationOf(kept) };
 }
@@ -295,6 +332,29 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
   const text = typeof data === 'string' ? data
     : entry && typeof entry === 'object' && typeof entry.note === 'string' ? entry.note : '';
   return { ...base, type: 'note', data: text };
+}
+
+/**
+ * Share links carry the dossier as base64url of its UTF-8 JSON, after this prefix. The first
+ * links were `btoa` of the bare JSON, which throws on any character past U+00FF (a «’» in a
+ * title or a note); those links hold only Latin-1, so they are still read as they were made.
+ */
+const SHARE_PREFIX = 'u8.';
+
+export function encodeDossierShare(dossier: Dossier): string {
+  // Never throws on text: JSON.stringify writes a lone surrogate as `\ud800`, and TextEncoder takes any string.
+  const bytes = new TextEncoder().encode(JSON.stringify(dossier));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return SHARE_PREFIX + btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** The JSON a share link carries, new or old; throws on anything that is neither. */
+export function decodeDossierShare(value: string): string {
+  if (!value.startsWith(SHARE_PREFIX)) return atob(value);
+  const body = value.slice(SHARE_PREFIX.length).replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(body + '='.repeat((4 - (body.length % 4)) % 4));
+  return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
 }
 
 export interface ImportCheck {
@@ -420,12 +480,6 @@ export function dossierFromApi(d: DossierApi): Dossier {
     tags: d.tags ?? [],
     isPinned: d.is_pinned,
   };
-}
-
-/** «scritta da Claude Code (applicazione collegata)»: who wrote an entry, on screen (`ClaudeMark`) and in the PDF. */
-export function claudeMarkSentence(createdBy: NonNullable<DossierItem['createdBy']>): string {
-  const name = createdBy.clientName?.trim();
-  return name ? `scritta da ${name} (applicazione collegata)` : "scritta da un'applicazione collegata";
 }
 
 export function computeItemCounts(items: DossierItem[]): { norme: number; sentenze: number; note: number; important: number } {

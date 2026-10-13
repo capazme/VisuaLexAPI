@@ -3,11 +3,13 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import * as authService from '../services/authService';
+import { subscribeToUser } from '../services/authEvents';
 import type { UserResponse } from '../types/api';
 import { appStore } from '../store/useAppStore';
 import { getErrorMessage } from '../utils/errors';
 import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
+import { clearArticleCardsCache } from '../utils/articleCardsCache';
 
 interface AuthState {
   user: UserResponse | null;
@@ -60,6 +62,18 @@ export function useAuth() {
 
     loadUser();
   }, []);
+
+  /**
+   * Follow the user another instance changed (the development mode's switch), without a reload.
+   */
+  useEffect(
+    () =>
+      subscribeToUser((user) => {
+        // Only the account this instance already reads (or none yet): never a stranger's.
+        setState((prev) => (prev.isAuthenticated && (!prev.user || prev.user.id === user.id) ? { ...prev, user } : prev));
+      }),
+    []
+  );
 
   /**
    * Register new user
@@ -132,6 +146,7 @@ export function useAuth() {
     appStore.getState().clearUserData();
     clearDecisionCache();
     clearDecisionSearchCache();
+    clearArticleCardsCache();
     setState({
       user: null,
       loading: false,
@@ -173,6 +188,14 @@ export function useAuth() {
   );
 
   /**
+   * Turn the development mode on or off. Resolves once the server has answered and every mounted
+   * instance has the new user; rejects (403, network) with the mode as it was.
+   */
+  const setDevMode = useCallback(async (enabled: boolean) => {
+    await authService.setDevMode(enabled);
+  }, []);
+
+  /**
    * Clear error
    */
   const clearError = useCallback(() => {
@@ -182,6 +205,12 @@ export function useAuth() {
   return {
     ...state,
     isAdmin: state.user?.is_admin ?? false,
+    isValidator: state.user?.lingo_validatore ?? false,
+    // The administrator lets an account use the mode; the account chooses. The mode hides entries
+    // and pages and never grants a permission, so it counts only when both are true.
+    canUseDevMode: state.user?.dev_mode_allowed ?? false,
+    devMode: (state.user?.dev_mode_allowed ?? false) && (state.user?.dev_mode ?? false),
+    setDevMode,
     register,
     login,
     logout,

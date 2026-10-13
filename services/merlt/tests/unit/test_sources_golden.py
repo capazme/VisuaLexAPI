@@ -97,7 +97,11 @@ def test_what_is_not_a_norm_comes_back_as_it_is():
         assert normalize_norm_urn(value) == value
 
 
-@pytest.mark.parametrize("case", DECISIONS, ids=_ids(DECISIONS))
+# A key still open waits for the owner (none today: the courts of the Union were decided on 12 October 2026).
+_KEYED = [c for c in DECISIONS if not c["identity"].get("key", {}).get("status", "").startswith("open:")]
+
+
+@pytest.mark.parametrize("case", _KEYED, ids=_ids(_KEYED))
 def test_a_decision_key_is_the_massimarios(case):
     ref = case["input"]["reference"]
     key = case["identity"].get("key", {}).get("value")
@@ -105,7 +109,8 @@ def test_a_decision_key_is_the_massimarios(case):
         with pytest.raises(ValueError):
             DecisionIdentity(ref["corte"], ref["numero"], ref.get("anno") or 0, ref.get("archivio"))
     else:
-        assert DecisionIdentity(ref["corte"], ref["numero"], ref["anno"], ref.get("archivio")).key == key
+        assert DecisionIdentity(ref["corte"], ref["numero"], ref["anno"], ref.get("archivio"),
+                                ref.get("sede"), ref.get("provvedimento")).key == key
 
 
 # --- labels of norms ----------------------------------------------------------------------
@@ -166,13 +171,15 @@ def test_an_ingested_article_stores_the_short_label(case):
 
 # --- labels of decisions ------------------------------------------------------------------
 
-_DECISION_SHORT = [c for c in DECISIONS if "short" in c["labels"]]
+_ASSERTED = ("decided", "current", "proposed")
+_DECISION_SHORT = [c for c in DECISIONS if c["labels"].get("short", {}).get("status") in _ASSERTED]
 
 
 def _decision(case, with_rv: bool):
     ref, attrs = case["input"]["reference"], case["input"]["attributes"]
     return decision_short(ref["corte"], ref["numero"], ref.get("anno"), ref.get("archivio"),
-                          attrs.get("sezione") or ref.get("sezione"), case["input"].get("rv") if with_rv else None)
+                          attrs.get("sezione") or ref.get("sezione"), case["input"].get("rv") if with_rv else None,
+                          sede=ref.get("sede"))
 
 
 @pytest.mark.parametrize("case", _DECISION_SHORT, ids=_ids(_DECISION_SHORT))
@@ -180,8 +187,10 @@ def test_decision_short_label(case):
     assert _decision(case, with_rv=False) == case["labels"]["short"]["value"]
 
 
-@pytest.mark.parametrize("case", [c for c in DECISIONS if "short_with_rv" in c["labels"]],
-                         ids=_ids([c for c in DECISIONS if "short_with_rv" in c["labels"]]))
+_DECISION_SHORT_RV = [c for c in DECISIONS if c["labels"].get("short_with_rv", {}).get("status") in _ASSERTED]
+
+
+@pytest.mark.parametrize("case", _DECISION_SHORT_RV, ids=_ids(_DECISION_SHORT_RV))
 def test_decision_short_label_with_its_massime(case):
     assert _decision(case, with_rv=True) == case["labels"]["short_with_rv"]["value"]
 
@@ -202,7 +211,26 @@ def test_decision_short_section_codes(sezione, expected):
 def test_the_massimario_writes_the_short_label(case):
     ref, attrs = case["input"]["reference"], case["input"]["attributes"]
     cited = CitedDecision(corte=ref["corte"], numero=ref["numero"], anno=ref.get("anno"), archivio=ref.get("archivio"),
-                          sezione=attrs.get("sezione") or ref.get("sezione"), rv=case["input"].get("rv") or [])
+                          sezione=attrs.get("sezione") or ref.get("sezione"), rv=case["input"].get("rv") or [],
+                          sede=ref.get("sede"))
     assert cited.estremi == case["labels"]["short"]["value"]
     if "short_with_rv" in case["labels"]:
         assert cited.label == case["labels"]["short_with_rv"]["value"]
+
+
+def test_the_tar_seats_are_the_conventions_copy():
+    from merlt.utils.tar_seats import SEATS
+    seats = json.loads((ROOT / "conventions" / "sources" / "tar-seats.json").read_text(encoding="utf-8"))["seats"]
+    assert SEATS == {s["slug"]: (s["sede"], s["regione"], s["principale"], s["organo"]) for s in seats}
+
+
+def test_an_administrative_identity_takes_the_kind_and_section_as_the_convention_writes_them():
+    from merlt.utils.sources import admin_section
+    with pytest.raises(ValueError):
+        DecisionIdentity(corte="consiglio_di_stato", numero=1, anno=2020, provvedimento="SENT")
+    with pytest.raises(ValueError):
+        DecisionIdentity(corte="tar", numero=1, anno=2020, provvedimento="sent", sede="constructor")
+    assert DecisionIdentity(corte="cgars", numero=5, anno=2020, provvedimento="sent").key == "cgars:sent:5:2020"
+    assert admin_section("6") is None
+    assert admin_section("II-quater") == "sez. II-quater"
+    assert admin_section("plenaria") == "ad. plen."

@@ -1,4 +1,4 @@
-import { useRef, type ReactNode, type Ref } from 'react';
+import { useRef, type Ref } from 'react';
 import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -50,14 +50,22 @@ export interface ReadingToolbarProps {
     onOpenVersionInput: () => void;
     onCompare: () => void;
     /**
-     * «Cerca nel testo»: the button (desktop row and phone row) and, while open, the box in a row of its own under the
-     * buttons, sticky with the toolbar. Absent when there is no text to search.
+     * The compact form of a light window beside a practice's table (spec §4.1, T12): notes,
+     * highlights, discussions, copy and the magnifier, nothing else (the phone row has no notes or
+     * highlights buttons to begin with). The version chip and the annex badge stay: they say which
+     * text this is. The tools the table's row keeps (quick norm, dossier, Study Mode, the source
+     * link, «⋯») are the row's.
+     */
+    compact?: boolean;
+    /**
+     * «Cerca nel testo»: the magnifier (desktop row and phone row), which opens the floating find window on this tab.
+     * Absent when there is no text to search.
      */
     find?: {
+        /** The window is open and scoped to this tab. */
         isOpen: boolean;
-        /** Told which of the two buttons was on screen, for the box to give focus back to. */
-        onToggle: (button: HTMLElement | null) => void;
-        bar: ReactNode;
+        /** Told which of the two buttons was on screen, for the window to give focus back to. */
+        onToggle: (button: HTMLElement | null, wasPressed: boolean) => void;
     };
 }
 
@@ -90,15 +98,16 @@ export function ReadingToolbar({
     onOpenAdvancedExport,
     onOpenVersionInput,
     onCompare,
+    compact = false,
     find,
 }: ReadingToolbarProps) {
-    // Both rows are mounted and one is hidden by CSS: the box returns focus to the one on screen.
+    // Both rows are mounted and one is hidden by CSS: the window returns focus to the one on screen.
     const desktopFindRef = useRef<HTMLButtonElement>(null);
     const phoneFindRef = useRef<HTMLButtonElement>(null);
-    const toggleFind = () => {
+    const toggleFind = (wasPressed: boolean) => {
         if (!find) return;
         const desktop = desktopFindRef.current;
-        find.onToggle(desktop && desktop.getClientRects().length > 0 ? desktop : phoneFindRef.current);
+        find.onToggle(desktop && desktop.getClientRects().length > 0 ? desktop : phoneFindRef.current, wasPressed);
     };
     // A switched-off tool keeps its name and gains the reason in its tooltip.
     const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);
@@ -107,7 +116,7 @@ export function ReadingToolbar({
     // carries no version: anything that may not be copied, or is a reading, stays in.
     const exportLockedReason = copyLockedReason ?? lockedReason;
     return (
-        <div className={cn('glass-toolbar sticky top-0 flex flex-wrap gap-x-1 gap-y-1 items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
+        <div data-pinned-head className={cn('glass-toolbar sticky top-[var(--reading-toolbar-top,0px)] flex flex-wrap gap-x-1 gap-y-1 items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
             {/* Version Info & Annex Source Badge */}
             <div className="contents md:flex md:items-center md:gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {versionChip && <VersionStatusChip chip={versionChip} onClick={onOpenVersionInput} />}
@@ -124,7 +133,7 @@ export function ReadingToolbar({
 
             {/* Mobile: Quick Actions + Study Mode toggle */}
             <div className="flex md:hidden ml-auto flex-wrap justify-end items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
-                <button
+                {!compact && <button
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}
                     className={cn(
@@ -137,7 +146,7 @@ export function ReadingToolbar({
                     {...lock(lockedReason)}
                 >
                     <Zap size={20} className={cn(isPinnedQuick && "fill-amber-500")} />
-                </button>
+                </button>}
                 <button
                     onClick={onToggleDiscussion}
                     aria-expanded={isDiscussionOpen}
@@ -157,7 +166,7 @@ export function ReadingToolbar({
                 >
                     <Copy size={20} />
                 </button>
-                <button
+                {!compact && <button
                     onClick={onOpenDossier}
                     className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
                     title={tip("Aggiungi a dossier", copyLockedReason)}
@@ -165,17 +174,17 @@ export function ReadingToolbar({
                     {...lock(copyLockedReason)}
                 >
                     <FolderPlus size={20} />
-                </button>
+                </button>}
                 {/* Study Mode button - sempre visibile */}
-                <button
+                {!compact && <button
                     onClick={onOpenStudyMode}
                     className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-purple-500 transition-colors"
                     title={tip("Modalità studio", lockedReason)}
                     {...lock(lockedReason)}
                 >
                     <BookOpen size={20} />
-                </button>
-                {url && (
+                </button>}
+                {url && !compact && (
                     <a
                         href={url}
                         target="_blank"
@@ -191,7 +200,7 @@ export function ReadingToolbar({
             {/* Desktop: Full Quick Actions */}
             <div className="hidden md:flex items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
                 {/* Primary buttons */}
-                <button
+                {!compact && <button
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}
                     className={cn(
@@ -204,7 +213,7 @@ export function ReadingToolbar({
                     {...lock(lockedReason)}
                 >
                     <Zap size={16} className={cn(isPinnedQuick && "fill-amber-500")} />
-                </button>
+                </button>}
                 <NotesHighlightsButtons
                     notesCount={notesCount}
                     highlightsCount={highlightsCount}
@@ -231,7 +240,7 @@ export function ReadingToolbar({
                 >
                     <Copy size={16} />
                 </button>
-                <button
+                {!compact && <button
                     ref={dossierButtonRef}
                     onClick={onOpenDossier}
                     className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
@@ -240,12 +249,12 @@ export function ReadingToolbar({
                     {...lock(copyLockedReason)}
                 >
                     <FolderPlus size={16} />
-                </button>
+                </button>}
 
-                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
+                {!compact && <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />}
 
                 {/* More menu */}
-                <div className="relative">
+                {!compact && <div className="relative">
                     <button
                         onClick={() => onToggleMoreMenu(!showMoreMenu)}
                         className={cn(
@@ -310,9 +319,8 @@ export function ReadingToolbar({
                             </div>
                         </>
                     )}
-                </div>
+                </div>}
             </div>
-            {find?.isOpen && find.bar}
         </div>
     );
 }

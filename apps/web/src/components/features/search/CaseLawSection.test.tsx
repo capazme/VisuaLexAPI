@@ -68,7 +68,7 @@ describe('CaseLawSection', () => {
     expect(screen.getByText('Cons. Stato').closest('a')).toBeNull();
     expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
     expect(slotCalls.at(-1)?.props).toMatchObject({
-      articleUrn: NORMA.urn, isHistorical: false, besideTabId: 'tab-1',
+      articleUrn: NORMA.urn, isHistorical: false, besideId: 'tab-1',
       backEntry: { tabId: 'tab-1', label: 'art. 2043 c.c.' },
     });
     expect(screen.getByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeInTheDocument();
@@ -99,6 +99,21 @@ describe('CaseLawSection', () => {
     expect(screen.queryByText('Massime (Brocardi)')).toBeNull();
     expect(slotCalls.at(-1)?.props).toMatchObject({ isHistorical: true });
     expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
+  });
+
+  it('offers the Cassazione\'s archive on no act of the Union, whatever the spelling of its type', async () => {
+    for (const tipo_atto of ['regolamento ue', 'Regolamento UE', 'direttiva ue', 'tfue']) {
+      const view = show({ norma: { ...NORMA, tipo_atto, urn: undefined } });
+      await userEvent.click(toggle());
+      expect(screen.queryByRole('button', { name: 'Cerca nell’archivio della Cassazione' }), tipo_atto).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Cassazione — menzionano l’articolo' }), tipo_atto).toBeNull();
+      // the rest of the section stays
+      expect(screen.getByRole('heading', { name: 'Massime (Brocardi)' })).toBeInTheDocument();
+      expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
+      view.unmount();
+      window.sessionStorage.clear();
+    }
+    expect(searchMock).not.toHaveBeenCalled();
   });
 
   it('says so when Brocardi gave no massime for the text in force', async () => {

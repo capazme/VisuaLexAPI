@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { appStore } from '../../store/useAppStore';
 import { wrapCitationsInHtml } from '../../utils/citationMatcher';
@@ -17,7 +17,14 @@ function Host(props: Omit<CitationLinksOptions, 'isHoveringPopupRef'> & { hoveri
 
 const citation = () => screen.getByTestId('host').querySelector('.citation-hover')!;
 
-beforeEach(() => appStore.setState({ readingBackStack: [] }));
+// What the hook records is the call: the store keeps an entry only when it names a practice's subject.
+const pushReadingBack = vi.fn();
+const originalPush = appStore.getState().pushReadingBack;
+beforeEach(() => {
+  pushReadingBack.mockClear();
+  appStore.setState({ pushReadingBack } as never);
+});
+afterEach(() => appStore.setState({ pushReadingBack: originalPush }));
 
 describe('useCitationLinks', () => {
   it('a click records the origin, then opens the citation and hides the preview', () => {
@@ -26,7 +33,7 @@ describe('useCitationLinks', () => {
     render(<Host onOpen={onOpen} origin={ORIGIN} showPreview={vi.fn()} hidePreview={hidePreview} />);
     fireEvent.click(citation());
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ article: '2043' }));
-    expect(appStore.getState().readingBackStack).toEqual([ORIGIN]);
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(ORIGIN);
     expect(hidePreview).toHaveBeenCalled();
   });
 
@@ -35,11 +42,11 @@ describe('useCitationLinks', () => {
     const { unmount } = render(<Host onOpen={onOpen} showPreview={vi.fn()} hidePreview={vi.fn()} />);
     fireEvent.click(citation());
     expect(onOpen).toHaveBeenCalledTimes(1);
-    expect(appStore.getState().readingBackStack).toEqual([]);
+    expect(pushReadingBack).not.toHaveBeenCalled();
     unmount();
     render(<Host origin={ORIGIN} showPreview={vi.fn()} hidePreview={vi.fn()} />);
     fireEvent.click(citation());
-    expect(appStore.getState().readingBackStack).toEqual([]);
+    expect(pushReadingBack).not.toHaveBeenCalled();
   });
 
   it('hovering a citation asks for its preview; leaving it hides the preview unless the popup is hovered', () => {

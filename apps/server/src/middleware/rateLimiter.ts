@@ -111,7 +111,7 @@ export const globalRateLimiter = async (
 
 /**
  * Write endpoint rate limiter middleware.
- * Applied on top of globalRateLimiter for POST/PUT/PATCH/DELETE: 20 req/min.
+ * Applied on top of globalRateLimiter for POST/PUT/PATCH/DELETE: `WRITE_POINTS` (200) req/min.
  */
 export const writeRateLimiter = async (
   req: Request,
