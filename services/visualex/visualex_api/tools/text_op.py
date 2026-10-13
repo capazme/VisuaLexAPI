@@ -59,6 +59,25 @@ def _canonicalise_article_token(part):
     return part
 
 
+def article_input_error(error):
+    """The exception for an error dict of `parse_article_input`: the index unreadable is the source
+    failing (503), an empty range is not found (404), anything else a malformed input (400)."""
+    from .exceptions import IndexUnavailableError, ResourceNotFoundError, ValidationError
+    kind = error.get('kind')
+    if kind == 'source':
+        return IndexUnavailableError(error['error'])
+    if kind == 'not_found':
+        return ResourceNotFoundError(error['error'])
+    return ValidationError(error['error'])
+
+
+# What a reader is told when a range (or a whole act) needs the act's index and it cannot be read.
+INDEX_UNREADABLE = (
+    "Non riesco a leggere ora l'indice di quest'atto, quindi non posso aprire {what}: "
+    "riprova più tardi, oppure indica gli articoli uno per uno (es. «1, 2, 3»)."
+)
+
+
 async def parse_article_input(article_string, normurn):
     """
     Pulisce e valida la stringa degli articoli, supporta range e articoli separati da virgole.
@@ -68,6 +87,10 @@ async def parse_article_input(article_string, normurn):
     Arguments:
     article_string -- Stringa contenente gli articoli (es. "1, 2-bis, 3, 4-6, 7-ter")
     normurn -- URL dell'atto per estrarre la lista completa degli articoli
+
+    An error comes back as a dict: `{"error": <Italian>, "kind": "source"}` when the act's index
+    could not be read, `"not_found"` for a range with no article in the index, and no kind for a
+    malformed input. The callers turn them into a 503, a 404 and a 400.
     """
     logging.info("Parsing article input string")
     logging.debug(f"Article string: {article_string}")
@@ -76,14 +99,17 @@ async def parse_article_input(article_string, normurn):
     # Se la stringa degli articoli è vuota, restituisci la lista completa
     if not article_string.strip():
         try:
-            all_articles, _ = await get_tree(normurn)
-            logging.info("Returning complete list of articles from norm")
-            logging.debug(f"All articles retrieved: {all_articles}")
-            return all_articles
+            all_articles, count = await get_tree(normurn)
         except Exception as e:
-            error_message = f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}"
-            logging.error(error_message, exc_info=True)
-            return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
+            logging.error(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
+            return {"error": INDEX_UNREADABLE.format(what="l'atto intero"), "kind": "source"}
+        # get_tree answers a failure (a blocked page, a timeout) with a message and 0, not an exception.
+        if not isinstance(all_articles, list) or count == 0:
+            logging.error(f"Act index unreadable for {normurn}: {all_articles!r}")
+            return {"error": INDEX_UNREADABLE.format(what="l'atto intero"), "kind": "source"}
+        logging.info("Returning complete list of articles from norm")
+        logging.debug(f"All articles retrieved: {all_articles}")
+        return all_articles
 
     articles = []
 
@@ -108,9 +134,16 @@ async def parse_article_input(article_string, normurn):
 
             # Chiamata a get_tree solo in caso di range
             try:
-                all_articles, _ = await get_tree(normurn)
+                all_articles, count = await get_tree(normurn)
+                # A failure (EUR-Lex's firewall, a timeout) comes back as a message and 0, not an
+                # exception: read as a list of characters it gave no article and no error, and the
+                # reader saw an empty search. Said as it is instead.
+                if not isinstance(all_articles, list) or count == 0:
+                    logging.error(f"Act index unreadable for {normurn}: {all_articles!r}")
+                    return {"error": INDEX_UNREADABLE.format(what=f"gli artt. {start}-{end}"), "kind": "source"}
                 logging.info("Successfully retrieved article list from norm")
                 logging.debug(f"All articles retrieved: {all_articles}")
+                found_before = len(articles)
 
                 # Aggiungi tutti gli articoli nel range, inclusi quelli con estensioni.
                 # get_tree ora ritorna una lista mista di dict (articoli, con campo
@@ -131,11 +164,12 @@ async def parse_article_input(article_string, normurn):
                         if start <= article_num <= end:
                             logging.debug(f"Adding article from range: {article_str}")
                             articles.append(_canonicalise_article_token(article_str).lower())
+                if len(articles) == found_before:
+                    return {"error": f"Nessun articolo tra {start} e {end} nell'indice di quest'atto.", "kind": "not_found"}
 
             except Exception as e:
-                error_message = f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}"
-                logging.error(error_message, exc_info=True)
-                return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
+                logging.error(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
+                return {"error": INDEX_UNREADABLE.format(what=f"gli artt. {start}-{end}"), "kind": "source"}
 
         else:
             # Articolo singolo: catena di ordinali con eventuale sotto-numero
