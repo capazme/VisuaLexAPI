@@ -90,13 +90,26 @@ export function ConnectAiAppPage() {
         </p>
       </header>
 
-      <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+      <section
+        aria-labelledby="ai-personal-data"
+        className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+      >
         <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden />
-        <span>
-          Collega solo app di cui ti fidi. Un’app collegata agisce con il tuo account, nei limiti dei permessi che le dai;
-          puoi revocarla in qualsiasi momento qui sotto.
-        </span>
-      </p>
+        <div className="space-y-1">
+          <h2 id="ai-personal-data" className="font-semibold">
+            Dati personali e app AI
+          </h2>
+          <p>
+            Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci e le tue schede di studio, e li
+            passa al servizio di intelligenza artificiale che usa. Non scrivere lì dati personali dei clienti, oppure collega
+            solo app AI di cui ti fidi.
+          </p>
+          <p>
+            Un’app collegata agisce con il tuo account, nei limiti dei permessi che le dai; puoi revocarla in qualsiasi momento
+            qui sotto.
+          </p>
+        </div>
+      </section>
 
       <section aria-labelledby="mcp-address" className="space-y-2">
         <h2 id="mcp-address" className={sectionTitle}>

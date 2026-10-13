@@ -34,7 +34,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/history`, `/environments`, `/forum`, `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
-  the clients our server refuses listed apart and why —, what a connected app can do, and
+  the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
+  names, entry titles and citations, study cards; no clients' personal data there, or only trusted AI apps — the owner,
+  13 Oct 2026, in place of pseudonymisation; the consent page `/connect` carries the same notice), what a connected app can do, and
   `ConnectedAppsSection`, the same list Impostazioni shows; reached from the user menu), then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open in a practice; `/sentenze` alone and an
