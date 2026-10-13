@@ -285,6 +285,29 @@ describe('labels (D3)', () => {
       expect(c.rows[1].label).toBe('riscritto');
     }
   });
+  it('is «aggiunto», not «abrogato», when a comma repealed in the older text is written again (numbered or not)', () => {
+    const text = 'Il debitore risponde dell\'inadempimento con tutti i suoi beni presenti e futuri.';
+    const numbered = compareArticles(
+      article('1. Il primo.\n\n2. ((COMMA ABROGATO DALLA L. 1 GENNAIO 2020, N. 1))\n\n3. Il terzo.', at('2015-12-31')),
+      article(`1. Il primo.\n\n2. ${text}\n\n3. Il terzo.`),
+    );
+    expect(labels(numbered)).toEqual(['invariato', 'aggiunto', 'invariato']);
+    const base = [1, 2, 3].map((n) => `Questa disposizione regola il caso ${wordsOf(12, 'c' + n)} secondo la volontà delle parti.`);
+    const unnumbered = compareArticles(
+      article(normattiva('Art. 2000.', null, [base[0], '((COMMA ABROGATO DALLA L. 1 GENNAIO 2020, N. 1))', base[2]]), at('2015-12-31')),
+      article(normattiva('Art. 2000.', null, [base[0], base[1], base[2]])),
+    );
+    expect(labels(unnumbered)).toEqual(['invariato', 'aggiunto', 'invariato']);
+    expect(summarySentence(unnumbered.summary)).toBe('Dal testo al 31 dicembre 2015 al testo in vigore: 1 comma aggiunto · 2 invariati');
+  });
+  it('is «invariato» for an older repeal notice that has no counterpart: it was repealed already', () => {
+    const c = compareArticles(
+      article('1. Il primo.\n\n2. ((COMMA ABROGATO DALLA L. 1 GENNAIO 2020, N. 1))', at('2015-12-31')),
+      article('1. Il primo.'),
+    );
+    expect(labels(c)).toEqual(['invariato', 'invariato']);
+    expect(c.summary.counts.abrogato).toBe(0);
+  });
   it('is «invariato» when the comma was already repealed in the older text, worded differently', () => {
     const oldRaw = '1. Il primo.\n\n2. ((COMMA ABROGATO DALLA L. 27 MAGGIO 2015, N. 69))';
     const newRaw = '1. Il primo.\n\n2. ((COMMA ABROGATO DALLA LEGGE 27 MAGGIO 2015, N. 69 E SUCCESSIVE MODIFICAZIONI))';

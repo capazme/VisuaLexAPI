@@ -360,9 +360,10 @@ function align(first: readonly UnitInfo[], second: readonly UnitInfo[], score: (
 function versionScore(a: UnitInfo, b: UnitInfo): number | null {
   const s = similarity(a, b);
   if (a.unit.number !== null && b.unit.number !== null) return a.unit.number === b.unit.number ? 1 + s.value : null;
-  // A repeal notice shares no word with the comma it replaced: it takes that comma's place
-  // at the floor of the pairing measure, so it is read as its repeal and not as an addition.
-  if (b.repeal) return Math.max(s.value, PAIRING_FLOOR);
+  // A repeal notice shares no word with the comma it replaced (or that replaced it): it takes
+  // that comma's place at the floor of the pairing measure, so it is read as a repeal (newer
+  // side) or as a comma back in force (older side), and not as an addition or a loss.
+  if (a.repeal || b.repeal) return Math.max(s.value, PAIRING_FLOOR);
   return s.reaches(PAIRING_RATIO) ? s.value : null;
 }
 
@@ -412,6 +413,8 @@ function labelPair(older: UnitInfo, newer: UnitInfo, olderSide: CompareSide): Pi
   // Repealed in both versions, only worded differently: nothing happened between them.
   if (older.repeal && newer.repeal) return { label: 'invariato' };
   if (newer.repeal) return { label: 'abrogato' };
+  // Repealed in the older text and written again in the newer: the comma exists again.
+  if (older.repeal) return { label: 'aggiunto' };
   if (!similarity(older, newer).reaches(MODIFIED_RATIO)) return { label: 'riscritto' };
   if (older.tokens.length > DIFF_WORD_CAP || newer.tokens.length > DIFF_WORD_CAP) return { label: 'riscritto', tooLong: true };
   return { label: 'modificato', diff: wordDiff(older, newer, olderSide) };
@@ -429,8 +432,10 @@ function buildRow(
   if (o !== null) row[olderSide] = olderUnits[o].unit;
   if (n !== null) row[newerSide] = newerUnits[n].unit;
   if (o !== null && n !== null) Object.assign(row, labelPair(olderUnits[o], newerUnits[n], olderSide));
-  // A repeal notice standing alone is the repeal of what the older text had, never an addition.
-  else row.label = o !== null || newerUnits[n!].repeal ? 'abrogato' : 'aggiunto';
+  // A repeal notice standing alone: in the newer text it is the repeal of what the older had,
+  // never an addition; in the older text it was repealed already, so its disappearance is no change.
+  else if (o !== null) row.label = olderUnits[o].repeal ? 'invariato' : 'abrogato';
+  else row.label = newerUnits[n!].repeal ? 'abrogato' : 'aggiunto';
   return row;
 }
 
