@@ -91,6 +91,11 @@ const LIST_NEXT = /\s*(?:,|e|ed)\s*(n(?:r|um(?:ero)?)?\.?\s*\d{1,6}\s*(?:\/\s*\d
 const AFTER_CITATION = /^[\s,([\u2013\u2014-]*(?:(?:della|delle|del|dello|dell['’]|dalla|dal|di|il|lo|la|le|l['’]|emessa|pronunciata|resa|adottata)\s*)*/u;
 // Inside a Corte costituzionale ruling, other courts named by description: the Sezioni unite (always the
 // Cassazione's), «la Suprema Corte», «il giudice di legittimità», «il giudice amministrativo»…
+// «l'ordinanza n. 5 del 2020 del Sindaco di Roma», «… del giudice di primo grado»: an author who is not the Court, written
+// after a genitive only («…, il giudice comune è chiamato» is the subject of the next clause). «Giudice delle leggi» is the Court.
+const OTHER_AUTHOR = /^[\s([]*(?:della|del|dello|dell['’]|dalla|dal|emessa|pronunciata|resa|adottata)\s*(?:(?:il|lo|la|l['’])\s*)?(?:giudice(?!\s+delle\s+leggi)(?![\p{L}\p{N}])|sindac|president[ei](?![\p{L}\p{N}])|capo\s+del|ministr[oi](?![\p{L}\p{N}])|prefett|questor|commissari|giunta|dirigent|direttor|autorita|garante)/u;
+// «…, passata in giudicato, del Tribunale», «…, emessa in grado di appello dalla Corte d'appello»: a participial clause before the author.
+const PARTICIPLE_CLAUSE = /^,\s*(?:emess|pronunciat|passat|res|adottat|depositat)\p{L}*(?:\s+[^\s,;()\d]+){0,6}?\s*,?\s*(?=(?:della|del|dello|dell['’]|dalla|dal|da)\s)/u;
 const SECTION_BEFORE_COURT = /^(?:(?:prima|seconda|terza|quarta|quinta|sesta|settima)\s+)?sez(?:ion[ei]|\.)\s[^,;()]{0,40}?(?:della|del|dell['’]|dello)\s*/u;
 const OTHER_COURT_WORDS = /^(?:sez(?:ioni|\.)?\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+(?:di\s+legittimit|amministrativ|ordinari|contabil|tributari))/u;
 // Before a «sentenza n. …», only the names of another court: «la giurisdizione del giudice amministrativo (sentenze n. 204
@@ -161,7 +166,10 @@ function findHeads(text: string, folded: string, within: DecisionContext | undef
 
 /** Whether a court is named right after `end`: «… del 2015 della Corte di cassazione». */
 function courtFollows(folded: string, end: number, ownCourt: boolean): boolean {
+  const clause = PARTICIPLE_CLAUSE.exec(folded.slice(end, end + 90));
+  if (clause) end += clause[0].length;
   const after = folded.slice(end, end + 70);
+  if (OTHER_AUTHOR.test(after)) return true;
   const joined = AFTER_CITATION.exec(after);
   if (!joined) return false;
   let here = end + joined[0].length;
@@ -191,6 +199,10 @@ function ownCourtFollows(folded: string, end: number): boolean {
 }
 const OWN_COURT_AFTER = /^(?:quest[ao]\s+corte|corte\s+cost|c\.\s*cost)/u;
 
+// Authorities that issue ordinances: «Il Presidente della Regione ha adottato l'ordinanza n. 37 del 2020» is not the Court's.
+// Only an ordinanza is read against them (they issue no sentenze); «il Presidente di questa Corte» is not one.
+const AUTHORITY_MARKERS = /(?<![\p{L}\p{N}])(?:sindac\p{L}*|president[ei]\s+della\s+(?:regione|giunta|provincia)|capo\s+del\s+dipartimento|prefett\p{L}*|commissari[oa]\s+(?:straordinari|delegat|ad\s+acta)\p{L}*)/giu;
+
 // «questa Corte»: the Court speaking of itself.
 const THIS_COURT = /(?<![\p{L}\p{N}])quest[ao]\s+corte(?![\p{L}\p{N}])/giu;
 
@@ -207,6 +219,13 @@ function courtMarkers(folded: string, heads: readonly Head[]): CourtMarker[] {
   for (const m of folded.matchAll(THIS_COURT)) markers.push({ end: (m.index ?? 0) + m[0].length, own: true });
   for (const m of folded.matchAll(OTHER_COURT_MARKERS)) markers.push({ end: (m.index ?? 0) + m[0].length, own: false });
   return markers.sort((a, b) => a.end - b.end);
+}
+
+/** The court markers plus the authorities that issue ordinances: what an «ordinanza n. …» is read against. */
+function ordinanceMarkers(folded: string, markers: readonly CourtMarker[]): CourtMarker[] {
+  const all = [...markers];
+  for (const m of folded.matchAll(AUTHORITY_MARKERS)) all.push({ end: (m.index ?? 0) + m[0].length, own: false });
+  return all.sort((a, b) => a.end - b.end);
 }
 
 /**
@@ -399,6 +418,7 @@ export function extractDecisionCitations(
   const starts = heads.map((h) => h.start);
   const courtStarts = heads.filter((h) => h.court).map((h) => h.start);
   const markers = options.within === 'corte_costituzionale' ? courtMarkers(folded, heads) : [];
+  const ordinanceOnes = options.within === 'corte_costituzionale' ? ordinanceMarkers(folded, markers) : [];
   const found: DecisionCitationSpan[] = [];
   let acts: Array<[number, number]> | null = null;
   let consumed = 0;
@@ -410,7 +430,8 @@ export function extractDecisionCitations(
     if ((head.section || head.kind) && lastCourt && head.start < lastCourt.coverEnd && inCourtCitation(text, lastCourt.end, head.start)) continue;
     consumed = head.end;
     // another court named before: the Court's own only when it says so right after the number («… di questa Corte»)
-    const ownOnlyIfSaid = Boolean(head.kind) && otherCourtBefore(text, folded, markers, head.start);
+    const ordinance = Boolean(head.kind) && /^ord/.test(folded.slice(head.start, head.start + 3));
+    const ownOnlyIfSaid = Boolean(head.kind) && otherCourtBefore(text, folded, ordinance ? ordinanceOnes : markers, head.start);
     const cut = head.court ? courtStarts : starts;
     const next = firstAtOrAfter(cut, head.end);
     const limit = Math.min(head.start + MAX_TAIL, next < cut.length ? cut[next] : folded.length);
