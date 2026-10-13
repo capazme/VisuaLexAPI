@@ -119,8 +119,11 @@ On the VisuaLex side, the BFF keeps:
 - `merlt_qa_jobs`: the question and the full result. Finished rows are purged
   after `MERLT_QA_RETENTION_DAYS`, default 30.
 - The consent level and its audit trail, and the authority cache.
-- `backend/logs/merlt-dead-letter.jsonl`: the full payload of every tracking
-  event that failed to reach MERL-T. It is capped at 50 MB and never rotated.
+- The dead-letter log of tracking events that failed to reach MERL-T
+  (`apps/server/logs/merlt-dead-letter-YYYY-MM-DD.jsonl`): the event's name,
+  time and error class and the article URNs it was about — no user id, no id
+  that leads back to one, no text. One file a day, deleted after
+  `MERLT_DEAD_LETTER_RETENTION_DAYS` (7); 50 MB at most.
 
 **The trust boundary is the BFF.** MERL-T makes its API key optional on every
 route except those behind `require_role("admin")`. Its admin configuration and

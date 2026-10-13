@@ -6,13 +6,15 @@ import { join } from 'node:path';
  *
  * Fire-and-forget on the frontend, so a 503 from the BFF means the event is
  * dropped; this keeps a trace for post-mortem: which event, when, which error,
- * and the event's identifiers (article URNs, ids of dossiers and environments,
- * numbers). Nothing replays it.
+ * and what it was about (the article URNs, a shared environment's id, numbers).
+ * Nothing replays it.
  *
- * It holds no personal data: never the user's id, never text the user wrote or
- * selected (a note, a highlight, a citation, tags), never their authority
+ * It holds no personal data: never the user's id nor an id that leads back to
+ * one (a dossier's, a session's), never text the user wrote or selected (a note,
+ * a highlight, a citation, tags), never their authority
  * (`redactDeadLetterPayload` keeps an allow-list, so a field added to an event
- * later stays out until someone adds it here). A day's entries go to
+ * later stays out until someone adds it here). A URN is cut to 300 characters
+ * and a colour kept only as a word or a hex code: nothing free-form gets in. A day's entries go to
  * `merlt-dead-letter-YYYY-MM-DD.jsonl` (UTC) under `MERLT_DEAD_LETTER_DIR`
  * (default `logs/` under the working directory); files older than
  * `MERLT_DEAD_LETTER_RETENTION_DAYS` days (default 7) are deleted by
@@ -33,13 +35,12 @@ const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
 const DEFAULT_RETENTION_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The event fields a dead letter keeps: identifiers and numbers, no text. */
+/** The event fields a dead letter keeps: what the event was about and numbers, no text. */
 const KEPT_FIELDS = new Set([
   'type',
   'article_urn',
   'source_urn',
   'target_urn',
-  'norma_visitata_id',
   'start_offset',
   'color',
   'dwell_ms',
@@ -47,7 +48,9 @@ const KEPT_FIELDS = new Set([
   'shared_env_id',
   'articleUrn',
 ]);
-const KEPT_CONTEXT_FIELDS = new Set(['dossier_id']);
+const URN_FIELDS = new Set(['article_urn', 'source_urn', 'target_urn', 'articleUrn']);
+const MAX_URN_LENGTH = 300;
+const COLOR = /^(#[0-9a-fA-F]{3,8}|[a-z-]{1,30})$/;
 
 let capWarned = false;
 
@@ -57,28 +60,28 @@ function logDir(): string {
 
 export function retentionDays(): number {
   const raw = Number(process.env.MERLT_DEAD_LETTER_RETENTION_DAYS);
-  return Number.isInteger(raw) && raw >= 1 ? raw : DEFAULT_RETENTION_DAYS;
-}
-
-function pick(source: Record<string, unknown>, keep: Set<string>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(source)) {
-    if (keep.has(key) && value !== undefined) out[key] = value;
-  }
-  return out;
+  return Number.isInteger(raw) && raw >= 1 && raw <= 3650 ? raw : DEFAULT_RETENTION_DAYS;
 }
 
 /** What of an event a dead letter keeps (see KEPT_FIELDS). */
 export function redactDeadLetterPayload(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return {};
-  const source = payload as Record<string, unknown>;
-  const out = pick(source, KEPT_FIELDS);
-  const context = source.context;
-  if (context && typeof context === 'object' && !Array.isArray(context)) {
-    const kept = pick(context as Record<string, unknown>, KEPT_CONTEXT_FIELDS);
-    if (Object.keys(kept).length > 0) out.context = kept;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload as Record<string, unknown>)) {
+    if (!KEPT_FIELDS.has(key) || value === undefined) continue;
+    if (URN_FIELDS.has(key) && typeof value === 'string') out[key] = value.slice(0, MAX_URN_LENGTH);
+    else if (key === 'color') {
+      if (typeof value === 'string' && COLOR.test(value)) out[key] = value;
+    } else if (typeof value === 'string' || typeof value === 'number' || value === null) out[key] = value;
   }
   return out;
+}
+
+/** An error's class, or a filesystem error's code: never its message. */
+function errorKind(err: unknown): string {
+  const code = (err as NodeJS.ErrnoException | null)?.code;
+  if (typeof code === 'string') return code;
+  return err instanceof Error ? err.name : typeof err;
 }
 
 async function totalBytes(dir: string): Promise<number> {
@@ -126,7 +129,7 @@ export async function logDeadLetter(eventName: string, payload: unknown, err: un
   } catch (logErr) {
     // Never let dead-letter logging crash the request path
     // eslint-disable-next-line no-console
-    console.warn('[merlt] failed to write dead-letter log:', logErr instanceof Error ? logErr.name : logErr);
+    console.warn('[merlt] failed to write dead-letter log:', errorKind(logErr));
   }
 }
 
@@ -135,9 +138,10 @@ export async function logDeadLetter(eventName: string, payload: unknown, err: un
  * Returns the names deleted. Never throws: it runs on a timer.
  */
 export async function sweepDeadLetters(now: Date = new Date()): Promise<string[]> {
-  const dir = logDir();
   const deleted: string[] = [];
   try {
+    // Inside the try: process.cwd() throws when the working directory is gone.
+    const dir = logDir();
     const names = await fs.readdir(dir).catch(() => [] as string[]);
     // The oldest day still kept, as YYYY-MM-DD: today counts as one of the days.
     const oldestKept = new Date(now.getTime() - (retentionDays() - 1) * DAY_MS).toISOString().slice(0, 10);
@@ -153,7 +157,7 @@ export async function sweepDeadLetters(now: Date = new Date()): Promise<string[]
     }
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn('[merlt] dead-letter sweep failed:', err instanceof Error ? err.name : err);
+    console.warn('[merlt] dead-letter sweep failed:', errorKind(err));
   }
   return deleted;
 }

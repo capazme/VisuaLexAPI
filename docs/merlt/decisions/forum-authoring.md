@@ -5,8 +5,8 @@ October 2026:** the server no longer relays `target_author_id`. The author of
 an environment or of a suggestion is a third party who never consented to
 MERL-T, and nothing in MERL-T read the field. The forum events carry the
 environment only; `forumSignalRequestSchema` strips an older client's
-`originalAuthorId`, and erasing a person's MERL-T data removes the key from
-events stored before (`services/merlt/merlt/privacy/user_data.py`). The rest of
+`originalAuthorId`, and the per-user erasure in MERL-T removes the key from
+the events stored before. The rest of
 this page is the history of the original decision.
 **Open question reference:** design doc §10.3
 

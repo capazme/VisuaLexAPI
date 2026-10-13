@@ -43,7 +43,13 @@ describe('dead letters hold no personal data', () => {
     }
   });
 
-  it('drops the tags of a bookmark and the text of a citation', () => {
+  it('cuts a long URN and keeps only a colour word or hex code', () => {
+    const kept = redactDeadLetterPayload({ article_urn: 'u'.repeat(1000), color: 'la mia nota segreta' });
+    expect(kept).toEqual({ article_urn: 'u'.repeat(300) });
+    expect(redactDeadLetterPayload({ color: '#ffcc00' })).toEqual({ color: '#ffcc00' });
+  });
+
+  it('drops the tags of a bookmark, the dossier and the text of a citation', () => {
     const bookmark = toMerltDossierBookmark(
       {
         kind: 'dossier',
@@ -53,11 +59,8 @@ describe('dead letters hold no personal data', () => {
       },
       user
     );
-    expect(redactDeadLetterPayload(bookmark)).toEqual({
-      type: 'dossier:item_added',
-      article_urn: 'urn:x',
-      context: { dossier_id: '00000000-0000-0000-0000-000000000001' },
-    });
+    // The dossier's id leads back to its owner: not kept.
+    expect(redactDeadLetterPayload(bookmark)).toEqual({ type: 'dossier:item_added', article_urn: 'urn:x' });
     const citation = toMerltCitationClicked(
       { sourceArticleUrn: 'urn:a', targetArticleUrn: null, citationText: 'art. 2043 c.c.' },
       user
@@ -134,6 +137,8 @@ describe('dead-letter files', () => {
     process.env.MERLT_DEAD_LETTER_RETENTION_DAYS = '0';
     expect(retentionDays()).toBe(7);
     process.env.MERLT_DEAD_LETTER_RETENTION_DAYS = 'una settimana';
+    expect(retentionDays()).toBe(7);
+    process.env.MERLT_DEAD_LETTER_RETENTION_DAYS = '1000000000';
     expect(retentionDays()).toBe(7);
   });
 

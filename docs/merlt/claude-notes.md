@@ -263,8 +263,9 @@ Slice 1 wires 5 user-action signals into MERL-T.
 - `services/merlt/deadLetterLog.ts`: NDJSON, one file a day
   (`merlt-dead-letter-YYYY-MM-DD.jsonl` under `MERLT_DEAD_LETTER_DIR`, default
   `apps/server/logs`). It holds no personal data: the event's name, time, the
-  error's class and an allow-list of the event's identifiers
-  (`redactDeadLetterPayload`), never the user id, a text, tags or authority.
+  error's class and an allow-list of what the event was about (URNs cut to 300
+  characters, a shared environment's id, numbers; `redactDeadLetterPayload`),
+  never the user id, a dossier's or a session's id, a text, tags or authority.
   Days older than `MERLT_DEAD_LETTER_RETENTION_DAYS` (7) are deleted by the
   sweep `index.ts` starts (at boot and every six hours), with the old single
   file `merlt-dead-letter.jsonl`; 50 MB at most in all. Skipped under
