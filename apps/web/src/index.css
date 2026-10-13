@@ -839,6 +839,59 @@
   content: " ";
 }
 
+/* A decision's key passages (utils/decisionKeyPassages.ts): computed, never the reader's. A dotted
+   underline in a teal no highlight uses, drawn as a background so that a highlight over the same
+   words (nested inside, `RANK`) paints over it; the label at its start is generated content on an
+   empty-of-text head, so no character is added (root rule 23). `key-passages-hidden` on the
+   container switches them off, as `highlights-hidden` does the highlights. */
+.vlx-decision .vlx-key-passage {
+  --key-passage: 173 80% 30%;
+  cursor: pointer;
+  background-image: linear-gradient(to right, hsl(var(--key-passage)) 55%, transparent 0);
+  background-position: 0 100%;
+  background-repeat: repeat-x;
+  background-size: 5px 2px;
+  padding-bottom: 1px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.dark .vlx-decision .vlx-key-passage {
+  --key-passage: 172 66% 52%;
+}
+
+.vlx-decision .vlx-key-head::before {
+  content: attr(data-key-label);
+  display: inline-block;
+  margin-right: 0.35em;
+  padding: 0 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.68em;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: 0.15em;
+  color: hsl(173 80% 24%);
+  background-color: hsl(173 70% 92%);
+  @apply font-sans;
+}
+
+/* A rule of its own, as the block labels' (a `dark:` utility inside `::before` is dropped). */
+.dark .vlx-decision .vlx-key-head::before {
+  color: hsl(172 66% 75%);
+  background-color: hsl(173 60% 18%);
+}
+
+.key-passages-hidden .vlx-key-passage {
+  cursor: auto;
+  background-image: none;
+}
+
+.key-passages-hidden .vlx-key-head::before {
+  content: none;
+}
+
 /* ═══════════════════════════════════════════════════════════
    CITATION HOVER — Subtle recognition of norm references and of the
    decisions a text cites (.decision-cite, utils/decisionCitationMatcher.ts)

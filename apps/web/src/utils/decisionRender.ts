@@ -17,6 +17,7 @@ import { groupAnchorsByBlock, resolveAnchors, type LocatedThread, type ResolvedA
 import { highlightOpen, noteOpen, renderSpan, signHtml, threadFocusOpen, type Mark } from './articleRender';
 import type { ArticleStructure } from './articleStructure';
 import { decisionParagraphs } from './decisionText';
+import type { KeyPassage, KeyPassageKind } from './decisionKeyPassages';
 
 const BLOCKS: ReadonlyArray<readonly [keyof DecisionText, string]> = [
   ['epigrafe', 'Epigrafe'],
@@ -50,6 +51,9 @@ export function decisionProjection(testo: DecisionText): string {
     .join('')
     .replace(/\n/g, '');
 }
+
+const keyPassageOpen = (kind: KeyPassageKind, index: number): string =>
+  `<span class="vlx-key-passage" data-key-passage="${kind}" data-key-index="${index}" title="${KEY_PASSAGE_LABELS[kind]} · evidenziato automaticamente">`;
 
 export interface DecisionLayout {
   label: string;
@@ -106,12 +110,28 @@ export interface RenderDecisionInput {
   threads?: readonly LocatedThread[];
   /** The discussion open in the panel: its words light up (`.vlx-thread-focus`), nested as an article's. */
   focusedThreadId?: string | null;
+  /** The key passages (`keyPassages`): wrapped, never stored; hidden by a class on the container. */
+  keyPassages?: readonly KeyPassage[];
 }
 
-export function renderDecisionHtml({ testo, highlights, annotations, signs = false, threads = [], focusedThreadId = null }: RenderDecisionInput): string {
+/** The label a key passage starts with, drawn by CSS from `data-key-label`. */
+export const KEY_PASSAGE_LABELS: Record<KeyPassageKind, string> = {
+  principio: 'Principio di diritto',
+  dispositivo: 'Dispositivo',
+  decisione: 'Decisione',
+};
+
+export function renderDecisionHtml({ testo, highlights, annotations, signs = false, threads = [], focusedThreadId = null, keyPassages = [] }: RenderDecisionInput): string {
   const plain = decisionProjection(testo);
   const anchors = resolveAnchors(plain, highlights, annotations);
   const marks: Mark[] = [];
+  keyPassages.forEach((p, index) => {
+    if (p.start < 0 || p.end > plain.length || p.end <= p.start) return;
+    marks.push({ start: p.start, end: p.end, kind: 'key', open: keyPassageOpen(p.kind, index), close: '</span>', seq: marks.length });
+    // the label sits on the first character (both units of an astral one): an element, no text
+    const head = Math.min(p.end, p.start + (/[\ud800-\udbff]/.test(plain[p.start]) ? 2 : 1));
+    marks.push({ start: p.start, end: head, kind: 'key-head', open: `<span class="vlx-key-head" data-key-label="${KEY_PASSAGE_LABELS[p.kind]}">`, close: '</span>', seq: marks.length });
+  });
   anchors.forEach((anchor, seq) => {
     if (anchor.kind === 'highlight') {
       marks.push({ start: anchor.start, end: anchor.end, kind: 'highlight', open: highlightOpen(anchor.highlight), close: '</mark>', seq });

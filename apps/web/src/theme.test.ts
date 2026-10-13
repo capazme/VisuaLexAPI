@@ -58,6 +58,16 @@ describe('the reading surface', () => {
     expect(css).toMatch(/\.vlx-decision \.vlx-dec-block::?before\s*\{[^}]*\bcolor:\s*var\(--color-slate-500\)/);
     expect(css).toMatch(/\.dark \.vlx-decision \.vlx-dec-block::?before\s*\{[^}]*\bcolor:\s*var\(--color-slate-400\)/);
   }, 30000);
+
+  it('draws a decision\'s key passages and their labels in both themes, and hides them with the switch', async () => {
+    const css = await compile(['block']);
+    expect(css).toMatch(/\.vlx-decision \.vlx-key-passage\s*\{[^}]*background-image:\s*linear-gradient/);
+    expect(css).toMatch(/\.dark \.vlx-decision \.vlx-key-passage\s*\{[^}]*--key-passage:/);
+    expect(css).toMatch(/\.vlx-decision \.vlx-key-head::?before\s*\{[^}]*content:\s*attr\(data-key-label\)/);
+    expect(css).toMatch(/\.dark \.vlx-decision \.vlx-key-head::?before\s*\{[^}]*\bcolor:/);
+    expect(css).toMatch(/\.key-passages-hidden \.vlx-key-passage\s*\{[^}]*background-image:\s*none/);
+    expect(css).toMatch(/\.key-passages-hidden \.vlx-key-head::?before\s*\{[^}]*content:\s*none/);
+  }, 30000);
 });
 
 describe('the page height', () => {
