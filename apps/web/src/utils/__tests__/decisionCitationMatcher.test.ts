@@ -263,3 +263,67 @@ describe('extractDecisionCitations, hostile text', () => {
     });
   });
 });
+
+// The act words that keep a decision's number out of an administrative act («nota», «provvedimento»,
+// «parere»…) must not swallow the administrative court that follows them as a name.
+describe('extractDecisionCitations, administrative acts and administrative courts', () => {
+  it('links a decision after «nota» or «provvedimento» when a court follows', () => {
+    expect(writtenIn('Come nota il T.A.R. Lazio n. 1234/2018.')).toEqual(['T.A.R. Lazio n. 1234/2018']);
+    expect(writtenIn('Come nota il C.d.S. n. 1234/2018.')).toEqual(['C.d.S. n. 1234/2018']);
+    expect(writtenIn('Il provvedimento impugnato T.A.R. Lazio n. 1234/2018.')).toEqual(['T.A.R. Lazio n. 1234/2018']);
+  });
+
+  it("does not link the administrative act of a court («parere del C.d.S.», «nota del T.A.R.»)", () => {
+    expect(writtenIn('Il parere del C.d.S. n. 1234/2018.')).toEqual([]);
+    expect(writtenIn('Il parere del Consiglio di Stato n. 1234/2018.')).toEqual([]);
+    expect(writtenIn('La nota del T.A.R. Lazio n. 1234/2018.')).toEqual([]);
+  });
+});
+
+describe('extractDecisionCitations, «C.d.S.» as the codice della strada', () => {
+  it('does not link the code cited after an article or a preposition', () => {
+    for (const text of [
+      'Il verbale ex art. 142 c.d.s. n. 5/2018 è nullo.',
+      "Si applica l'art. 142 del c.d.s. n. 5/2018.",
+      'Il conducente, in violazione del C.d.S. n. 5/2018, è sanzionato.',
+      "Vale l'art. 142, comma 8, C.d.S., n. 5/2018 per la velocità.",
+      "Vale l'art. 186 cds n. 5/2018 per la guida.",
+      'Vale art. 126-bis c.d.s. n. 5/2018.',
+      'Valgono artt. 142 e 143 C.d.S. n. 5/2018.',
+    ]) {
+      expect(writtenIn(text), text).toEqual([]);
+      expect(writtenIn(text, 'cassazione'), text).toEqual([]);
+    }
+  });
+
+  it('still links the Consiglio di Stato written C.d.S.', () => {
+    expect(writtenIn('Come in C.d.S., sez. IV, n. 5/2018 e nulla più.')).toEqual(['C.d.S., sez. IV, n. 5/2018']);
+    expect(writtenIn('Come affermato (C.d.S. n. 5/2018) in tema di appalti.')).toEqual(['C.d.S. n. 5/2018']);
+    expect(writtenIn('Cfr. art. 142 c.d.s. e C.d.S., sez. IV, n. 5/2018.')).toEqual(['C.d.S., sez. IV, n. 5/2018']);
+    expect(writtenIn('Si veda art. 5. C.d.S. n. 5/2018 ha deciso.')).toEqual(['C.d.S. n. 5/2018']);
+  });
+});
+
+describe('extractDecisionCitations, «C.d.S.» followed by a section is the court', () => {
+  it('links the Consiglio di Stato after «del», «dal» or an article, and in a Cassazione decision too', () => {
+    const forms: [string, string][] = [
+      ['Come afferma la sentenza del C.d.S., sez. IV, n. 5/2018.', 'C.d.S., sez. IV, n. 5/2018'],
+      ['Come ritenuto dal C.d.S., sez. IV, n. 5/2018.', 'C.d.S., sez. IV, n. 5/2018'],
+      ["Vale l'art. 21-nonies, C.d.S., sez. VI, n. 5/2018 per l'annullamento.", 'C.d.S., sez. VI, n. 5/2018'],
+      ["Vale l'art. 21-nonies, C.d.S., Ad. plen., n. 5/2018 per l'annullamento.", 'C.d.S., Ad. plen., n. 5/2018'],
+    ];
+    for (const [text, span] of forms) {
+      for (const within of [undefined, 'cassazione', 'corte_costituzionale'] as const) {
+        expect(writtenIn(text, within), `${within} ${text}`).toEqual([span]);
+        for (const s of spansOf(text, within)) expect(s.reference.corte, text).toBe('consiglio_di_stato');
+      }
+    }
+  });
+
+  it('without a section, «dal/al/nel C.d.S. n. …» stays the code (truly ambiguous)', () => {
+    for (const text of ['Come ritenuto dal C.d.S. n. 5/2018 in tema di appalti.', 'Si rinvia al C.d.S. n. 5/2018.', 'Previsto nel C.d.S. n. 5/2018.']) {
+      expect(writtenIn(text), text).toEqual([]);
+      expect(writtenIn(text, 'cassazione'), text).toEqual([]);
+    }
+  });
+});

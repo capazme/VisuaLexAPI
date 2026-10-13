@@ -423,3 +423,66 @@ describe('extractCitations — an abbreviation is not the head of a longer one',
     expect(read('previsto dall\'art. 110 c.p. Il ricorso è infondato')).toEqual([["dall'art. 110 c.p.", 'codice penale', '110']]);
   });
 });
+
+// The matcher reads documents a user drops in («Analizza documento»): a long run of one character
+// must cost time proportional to its length, never its square (a crafted text froze the tab).
+describe('extractCitations — long runs in linear time', () => {
+  const RUN = 100_000;
+  const norma = { tipo_atto: 'legge', numero_atto: '1', data: '2000' };
+  const spaces = ' '.repeat(RUN);
+
+  const hostile: Record<string, string> = {
+    'spaces after an article': `art. 1${spaces}x legge 99/2015`,
+    'spaces after an article and a comma': `art. 1,${spaces}x`,
+    'spaces after «art.»': `art.${spaces}x`,
+    'spaces after «comma»': `art. 1, comma${spaces}x`,
+    'spaces after a comma clause': `art. 1, comma 2${spaces}x`,
+    'spaces after a letter clause': `art. 1, lett.${spaces}x`,
+    'spaces after «e»': `art. 1 e${spaces}x`,
+    'spaces after «del»': `art. 1 del${spaces}x`,
+    'spaces after an act and its number': `legge 241/1990${spaces}x`,
+    'spaces after an act': `d.lgs.${spaces}x`,
+    'spaces after a regulation': `art. 1 del regolamento${spaces}x`,
+    'spaces after a regulation and an open parenthesis': `regolamento (${spaces}ue`,
+    'spaces in a regulation marker': `regolamento ( ue${spaces}) 2016/679`,
+    'spaces around a pair': `direttiva 95${spaces}/${spaces}46${spaces}/${spaces}ce`,
+    'spaces after a code': `art. 1 c.${spaces}c`,
+    'tabs after an article': `art. 1${'\t'.repeat(RUN)}x`,
+    'new lines after an article': `art. 1${'\n'.repeat(RUN)}x`,
+    'commas after an article': `art. 1${','.repeat(RUN)}x`,
+    'comma and space after an article': `art. 1${', '.repeat(RUN / 2)}x`,
+    'hyphens after an article': `art. 1${'-'.repeat(RUN)}x`,
+    'a list of articles': `artt. 1${' e 2'.repeat(RUN / 4)}x`,
+    'a comma list of articles': `art. 1${', 2'.repeat(RUN / 3)}x`,
+    'comma clauses': `art. 1${', comma 1'.repeat(RUN / 9)} c.c.`,
+    'digits': `art. ${'1'.repeat(RUN)}x`,
+    'a number and a year': `legge ${'1'.repeat(RUN)}/${'2'.repeat(RUN)}x`,
+    'tags': `${'<a>'.repeat(RUN / 3)}art. 1 c.c.`,
+  };
+
+  for (const [name, text] of Object.entries(hostile)) {
+    it(`${name}`, () => {
+      for (const defaultNorma of [undefined, norma]) {
+        const start = performance.now();
+        extractCitations(text, defaultNorma);
+        expect(performance.now() - start).toBeLessThan(1500);
+      }
+    });
+  }
+
+  it('thousands of citations in one text', () => {
+    const start = performance.now();
+    const found = extractCitations('art. 2043 c.c. '.repeat(20_000));
+    expect(found).toHaveLength(20_000);
+    expect(performance.now() - start).toBeLessThan(1500);
+  });
+
+  it('a citation across a long gap of spaces is still read', () => {
+    const [m] = extractCitations(`art. 5${' '.repeat(5000)}c.c.`);
+    expect(m.parsed).toMatchObject({ act_type: 'codice civile', article: '5' });
+    const [n] = extractCitations(`art. 5, comma 2,${' '.repeat(5000)}del codice civile`);
+    expect(n.parsed).toMatchObject({ act_type: 'codice civile', article: '5' });
+    const [r] = extractCitations(`art. 5 del regolamento ( UE ${' '.repeat(5000)}) 2016/679`);
+    expect(r.parsed).toMatchObject({ act_type: 'Regolamento UE', act_number: '679', date: '2016', article: '5' });
+  });
+});

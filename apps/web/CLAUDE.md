@@ -362,8 +362,20 @@ or dot, never before a letter when the query ends with a dot («art. 1 c.p.» is
 per text, replaced when the text changes, dropped when the target leaves the scope). Act types come from `sources/actTypes.ts` plus the
 palette's spellings (`NUMBERED_ACT_SPELLINGS`); a type is never found inside another's name («legge»
 in «decreto-legge» or «decreto- legge»), a decision's number never inside an act's citation (any
-type of the table, or «decreto», «direttiva», «regolamento»: regional laws and Union acts too), and
-an article links to its act only across the gap §13.2 whitelists. Its tests use synthetic texts (no run of 30
+type of the table, or «decreto», «direttiva», «regolamento», or an administrative act, in every form of the number and
+year: «circolare», «nota», «provvedimento», «delibera», «determina», «risoluzione», «parere»…; regional laws and
+Union acts too, never «ordinanza» or «sentenza», which are decisions; an administrative court (`ADMIN_COURT_HEAD_SOURCE`)
+named in the act's words is a decision's head, except right after «del»/«della»/«dello»/«dell'», where it is the act's issuer: «il parere del C.d.S. n. 5/2018» is an act; any other court there stays a head: «il decreto del Tribunale di Milano n. 5/2018» is a decision), and
+an article links to its act only across the gap §13.2 whitelists (commas, «comma N», «commi 2 e 3», «primo comma» and the
+other ordinals, «e ss.», «lett.», «n.», «del»…). A decision cited date first («Cass., sez. III, 12 aprile 2018, n. 8980») is found by
+its date and number when the date's year is the query's and a court or a decision's marker stands within 60
+characters before the date (`followsDecisionMarker`: no act's name, semicolon or end of a sentence between; a full stop ends a sentence
+after a word of five letters or more, a digit, a bracket or a quote, a short abbreviation never does), never
+as an act's («legge 12 aprile 2018, n. 8980»); without a marker nothing is found, because date first is also how
+ministerial decrees, regional laws and administrative acts are cited. A code's article
+is found across the same words (`blankCodeLinks`: «art. 2043 del c.c.», «art. 2043, primo comma, c.c.», «art. 2043 e ss. c.c.»
+are blanked to spaces at the same offsets and `extractCitations` reads the text again; it is the one reader of codes, and it
+still does not make «del c.c.» a link). Its tests use synthetic texts (no run of 30
 characters shared with the real ones); the real ones live in
 the git-ignored `utils/__fixtures__/private/` (personal data: never copy them into a committed
 file) and `citationSearch.local.test.ts` is skipped where the folder is absent.
@@ -502,7 +514,7 @@ Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the sam
 (`ui/PreviewFrame`, `calculatePreviewPosition`): the decision's heading and first lines from
 `fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
 leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
-The scanner never links a court that is not written (D2): a bare «n. 123/2020» stays text everywhere; the one
+«C.d.S.» and «cds» are also the codice della strada: right after an article citation («art. 142 c.d.s.», «art. 142, comma 8, C.d.S.», «art. 142 del cds») or after «del»/«al»/«dal»/«nel» they are the code and no court head, unless «sez.»/«Ad. plen.» follows them («C.d.S., sez. IV» is the court; «dal C.d.S. n. 5/2018» alone stays the code, truly ambiguous) (`isCodiceDellaStrada`, `decisionCitationParser.ts`, used by this scanner and by the find window's marker rule). The scanner never links a court that is not written (D2): a bare «n. 123/2020» stays text everywhere; the one
 context rules (the owner, 13 October 2026) are two: inside a Cassazione decision a section without its court
 («Sez. U, n. 9100 del 2015») reads as the Cassazione; inside a Corte costituzionale decision «sentenza/ordinanza
 n. N del YYYY» (also «sentenze n. … e n. …», each number its own span) reads as the Court's own, unless a court is
@@ -895,7 +907,9 @@ Duplicating any of these is a defect, not a shortcut.
   `citation_linker.py`) read the same prose forms: "regolamento (UE)
   2016/679, art. 5", "art. 5 del regolamento (UE) 2016/679", "art. 5, comma
   1, del …", and a list ("articoli 8 e 9 del …") becomes one link per number,
-  all towards the EU act. The client matcher reads the article-first form
+  all towards the EU act. The matcher also reads documents a user drops in, so its patterns read a run of
+  spaces in one way only (`\s*(?:,\s*)?`, never `\s*,?\s*`; two adjacent `\s*` are quadratic) and its used
+  ranges are a byte map, not a list: `citationMatcher.test.ts` and `citationParser.test.ts` (the palette's parser, `extractArticleRefs`) time 100 000-character runs. The client matcher reads the article-first form
   for numbered national acts too ("art. 7 del d.lgs. 196/2003", with or
   without the preposition), as the server's `_EXPLICIT_CITE_RE` and
   `_ART_DEL_ACT_RE` do, and the codici and the Costituzione named in full
