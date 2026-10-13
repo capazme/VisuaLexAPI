@@ -331,6 +331,8 @@ const COVER_WORDS = new Set([
 ]);
 const MAX_COVER_GAP = 60;
 const CONJUNCTION = /^[\s,]*(?:e|ed)(?![\p{L}\p{N}])/iu;
+// «…, sezioni unite, e la sentenza n. …»: another decision named in the court's preamble starts a citation of its own.
+const ANOTHER_DECISION = /(?<![\p{L}\p{N}])(?:e|ed)\s+(?:(?:il|lo|la|i|gli|le|l['’])\s*)?(?:sent|sentenz|ord|ordinanz|decr|decret)/iu;
 
 /** Whether a section at `to` stands in the citation of the court whose name ends at `from`, not in prose after it. */
 function inCourtCitation(text: string, from: number, to: number): boolean {
@@ -392,8 +394,10 @@ export function extractDecisionCitations(
     const properNames = read.reference.corte === 'tar';
     let cursor = at(Math.max(read.headEnd, prefix.length));
     // «Consiglio di Stato e la sentenza n. 7 del 2017»: an «e» right after the court ends its citation, and the
-    // number after it is not its. (A list inside one citation, «Cass., sez. III, n. 1/2020 e n. 2/2021», is untouched.)
-    if (head.court && CONJUNCTION.test(text.slice(cursor, at(pieces[0][0])))) continue;
+    // number after it is not its; so does «…, sezioni unite, e la sentenza n. …» anywhere before the number.
+    // (A list inside one citation, «Cass., sez. III, n. 1/2020 e n. 2/2021», is untouched.)
+    const preamble = text.slice(cursor, at(pieces[0][0]));
+    if (head.court && (CONJUNCTION.test(preamble) || ANOTHER_DECISION.test(preamble))) continue;
     let clean = true;
     const number = read.words[0]; // the parsers list the number (or the pair) first
     pieces.forEach((piece, i) => {
