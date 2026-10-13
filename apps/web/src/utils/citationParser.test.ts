@@ -345,6 +345,8 @@ describe('the palette parser — long runs in linear time', () => {
     'spaces inside a marker': `regolamento (ue${spaces}) 2016/679`,
     'spaces after «reg. ue»': `reg. ue${spaces}2016${spaces}/${spaces}679`,
     'spaces after «direttiva»': `direttiva${spaces}95/46`,
+    'spaces after «direttiva (UE)»': `direttiva (UE)${spaces}2016/680`,
+    'spaces after «art. 1» and «direttiva (UE)»': `art. 1 della direttiva (UE)${spaces}x`,
     'spaces after «art. 1»': `art. 1${spaces}x`,
     'spaces after «art. 1» and a code': `art. 1${spaces}c.c.`,
     'spaces after «art.»': `art.${spaces}1`,
