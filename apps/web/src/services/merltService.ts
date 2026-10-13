@@ -81,13 +81,28 @@ export async function getMerlt<T>(url: string, params?: JsonRecord, timeout = ME
 }
 
 // ----------------------------------------------------------------------------
-// Consent contract (Slice 2b) — single source of truth is the BFF.
-// Shape mirrors backend ConsentResponse ({ level, reason? } in, full state out).
-// Replaces the broken PUT + { consentLevel } path.
+// Consent contract — single source of truth is the BFF (spec
+// docs/superpowers/specs/2026-10-13-merlt-data-protection-design.md).
+// A level is chosen under a version of the MERL-T notice; `level` is what may be
+// collected now (`none` until the current notice is answered), `storedLevel` the
+// person's last choice.
 // ----------------------------------------------------------------------------
+
+/** The current MERL-T notice: plain text, a blank line between paragraphs. */
+export interface MerltNotice {
+    id: string;
+    versione: number;
+    titolo: string;
+    corpo: string;
+    conferma: string;
+    azione: string;
+}
 
 export interface MerltConsentResponse {
     level: 'none' | 'basic' | 'full';
+    storedLevel: 'none' | 'basic' | 'full';
+    noticeAnswered: boolean;
+    notice: MerltNotice | null;
     contributionEnabled: boolean;
     validationEnabled: boolean;
     graphEnabled: boolean;
@@ -116,19 +131,45 @@ export async function fetchMerltProfile(): Promise<MerltProfile> {
     return getMerlt<MerltProfile>('/merlt/profile');
 }
 
-/** POST /api/merlt/consent — set or upgrade the consent level. */
+/**
+ * POST /api/merlt/consent — choose a level under the notice the person read. A notice that is
+ * no longer the current one is a 409 (`notice_changed`) carrying the current one.
+ */
 export async function setMerltConsent(
     level: 'none' | 'basic' | 'full',
+    noticeId: string,
     reason?: string,
 ): Promise<MerltConsentResponse> {
-    return postMerlt<MerltConsentResponse>('/merlt/consent', { level, reason });
+    return postMerlt<MerltConsentResponse>('/merlt/consent', { level, noticeId, reason });
 }
 
-/** DELETE /api/merlt/consent — revoke (server forces level to 'none'). */
-export async function revokeMerltConsent(reason?: string): Promise<MerltConsentResponse> {
-    const response = await apiClient.delete<MerltConsentResponse>('/merlt/consent', {
-        data: { reason },
+export interface MerltRevokeResponse extends MerltConsentResponse {
+    /** With `deleteData`: whether MERL-T already confirmed the erasure (else it is retried). */
+    erasure: { requested: boolean; completed: boolean };
+}
+
+/** DELETE /api/merlt/consent — revoke; with `deleteData`, also erase what was collected. */
+export async function revokeMerltConsent(
+    options: { reason?: string; deleteData?: boolean } = {},
+): Promise<MerltRevokeResponse> {
+    const response = await apiClient.delete<MerltRevokeResponse>('/merlt/consent', {
+        data: { reason: options.reason, deleteData: options.deleteData ?? false },
     });
+    return response.data;
+}
+
+/** GET /api/merlt/data/export — everything MERL-T and VisuaLex keep for MERL-T about the person. */
+export async function exportMerltData(): Promise<Blob> {
+    const response = await apiClient.get<Blob>('/merlt/data/export', { responseType: 'blob' });
+    return response.data;
+}
+
+/**
+ * DELETE /api/merlt/data — erase the person's MERL-T data (the consent stays). `completed`
+ * false means MERL-T did not confirm yet: the server retries until it does.
+ */
+export async function deleteMerltData(): Promise<{ completed: boolean }> {
+    const response = await apiClient.delete<{ completed: boolean }>('/merlt/data');
     return response.data;
 }
 
@@ -277,10 +318,10 @@ export async function sendCitationClickedEvent(
 // MERLT-1.10 — forum signals
 // ----------------------------------------------------------------------------
 
+/** The environment only: its author, or a suggestion's, is a third party who never consented. */
 export interface ForumSignalEventInput {
     action: 'like' | 'download' | 'suggestion_accepted' | 'suggestion_declined';
     sharedEnvId: string;
-    originalAuthorId: string | null;
 }
 
 export type ForumSignalEventResponse = MerltEventResponse;

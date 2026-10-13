@@ -267,15 +267,15 @@ describe('MerltHubPage', () => {
     );
   });
 
-  it('exposes a revoke action on the consent card and calls revokeConsent on confirm', async () => {
-    const revokeConsent = vi.fn().mockResolvedValue(undefined);
+  it('exposes a revoke action on the consent card: revoke only, or revoke and erase', async () => {
+    const revokeConsent = vi.fn().mockResolvedValue({ erasureCompleted: false });
     useConsentMock.mockReturnValue({ ...baseConsent, revokeConsent });
     renderHub();
     // click "Revoca" in the consent card
     fireEvent.click(screen.getByRole('button', { name: /^Revoca$/ }));
-    // confirm dialog appears with the danger confirm button
-    const confirm = await screen.findByRole('button', { name: /Revoca consenso/i });
-    fireEvent.click(confirm);
-    await waitFor(() => expect(revokeConsent).toHaveBeenCalledTimes(1));
+    // the dialog names both ways out
+    expect(await screen.findByRole('button', { name: /Revoca ed elimina i dati raccolti/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Revoca soltanto/i }));
+    await waitFor(() => expect(revokeConsent).toHaveBeenCalledWith({ reason: expect.any(String), deleteData: false }));
   });
 });

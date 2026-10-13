@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
-import type { MerltConsentResponse } from '../../../../services/merltService';
+import type { MerltConsentResponse, MerltNotice } from '../../../../services/merltService';
 
 // ---- service mock (hoisted) ----
 const fetchConsent = vi.fn();
@@ -14,34 +14,61 @@ vi.mock('../../../../services/merltService', () => ({
 
 import { ConsentProvider } from '../ConsentContext';
 import { useConsent } from '../useConsent';
-import { getMerltConsentLevel } from '../../merltConsent';
+import { NoticeChangedError } from '../context';
+
+const notice: MerltNotice = {
+  id: 'notice-1',
+  versione: 1,
+  titolo: 'MERL-T: i dati della tua attività',
+  corpo: 'Primo paragrafo.\n\nSecondo paragrafo.',
+  conferma: 'Ho letto l’informativa',
+  azione: 'Conferma la scelta',
+};
 
 const full: MerltConsentResponse = {
   level: 'full',
+  storedLevel: 'full',
+  noticeAnswered: true,
+  notice,
   contributionEnabled: true,
   validationEnabled: true,
   graphEnabled: true,
   updatedAt: '2026-05-26T00:00:00.000Z',
   lastAuditAt: '2026-05-26T00:00:00.000Z',
 };
-const none: MerltConsentResponse = {
+const fresh: MerltConsentResponse = {
   level: 'none',
+  storedLevel: 'none',
+  noticeAnswered: false,
+  notice,
   contributionEnabled: false,
   validationEnabled: false,
   graphEnabled: false,
   updatedAt: null,
   lastAuditAt: null,
 };
+const none: MerltConsentResponse = { ...fresh, noticeAnswered: true, updatedAt: '2026-10-13T00:00:00.000Z' };
+
+let lastError: unknown = null;
 
 function Probe() {
-  const { status, level, canTrack, setConsent, revokeConsent } = useConsent();
+  const { status, level, canTrack, needsAnswer, setConsent, revokeConsent } = useConsent();
   return (
     <div>
       <span data-testid="status">{status}</span>
       <span data-testid="level">{level}</span>
       <span data-testid="canTrack">{String(canTrack)}</span>
-      <button onClick={() => void setConsent('full', 'ok')}>set-full</button>
-      <button onClick={() => void revokeConsent('bye')}>revoke</button>
+      <span data-testid="needsAnswer">{String(needsAnswer)}</span>
+      <button
+        onClick={() =>
+          void setConsent('full', 'notice-1', 'ok').catch((err: unknown) => {
+            lastError = err;
+          })
+        }
+      >
+        set-full
+      </button>
+      <button onClick={() => void revokeConsent({ reason: 'bye', deleteData: true })}>revoke</button>
     </div>
   );
 }
@@ -58,6 +85,7 @@ beforeEach(() => {
   fetchConsent.mockReset();
   setConsentApi.mockReset();
   revokeConsentApi.mockReset();
+  lastError = null;
   localStorage.removeItem('visualex.merlt.consent');
 });
 
@@ -69,58 +97,67 @@ describe('ConsentContext', () => {
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
     expect(screen.getByTestId('level').textContent).toBe('full');
     expect(screen.getByTestId('canTrack').textContent).toBe('true');
+    expect(screen.getByTestId('needsAnswer').textContent).toBe('false');
     expect(fetchConsent).toHaveBeenCalledOnce();
   });
 
-  it('uses the localStorage boot cache for the level while loading', async () => {
-    localStorage.setItem('visualex.merlt.consent', 'basic');
+  it('collects nothing while the server has not answered, whatever this browser once kept', async () => {
+    localStorage.setItem('visualex.merlt.consent', 'full');
     let resolve!: (v: MerltConsentResponse) => void;
     fetchConsent.mockReturnValue(new Promise<MerltConsentResponse>((r) => { resolve = r; }));
     renderWithProvider();
-    // still loading → effective level comes from the boot cache
     expect(screen.getByTestId('status').textContent).toBe('loading');
-    expect(screen.getByTestId('level').textContent).toBe('basic');
-    expect(screen.getByTestId('canTrack').textContent).toBe('true');
-    await act(async () => { resolve(none); });
-    await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('none'));
+    expect(screen.getByTestId('canTrack').textContent).toBe('false');
+    // The old boot cache and the banner's snooze are removed once.
+    expect(localStorage.getItem('visualex.merlt.consent')).toBeNull();
+    await act(async () => { resolve(full); });
+    await waitFor(() => expect(screen.getByTestId('canTrack').textContent).toBe('true'));
   });
 
-  it('server value wins over a stale cache and is written back', async () => {
-    localStorage.setItem('visualex.merlt.consent', 'full');
-    fetchConsent.mockResolvedValue(none);
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('none'));
-    expect(getMerltConsentLevel()).toBe('none');
-  });
-
-  it('falls back to the cache and reports error when the fetch fails', async () => {
-    localStorage.setItem('visualex.merlt.consent', 'full');
+  it('collects nothing when the fetch fails', async () => {
     fetchConsent.mockRejectedValue(new Error('network'));
     renderWithProvider();
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('error'));
-    expect(screen.getByTestId('level').textContent).toBe('full');
+    expect(screen.getByTestId('level').textContent).toBe('none');
+    expect(screen.getByTestId('canTrack').textContent).toBe('false');
   });
 
-  it('setConsent calls the API, updates state and persists the cache', async () => {
-    fetchConsent.mockResolvedValue(none);
+  it('asks for an answer when the current notice was not answered', async () => {
+    fetchConsent.mockResolvedValue(fresh);
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('needsAnswer').textContent).toBe('true'));
+  });
+
+  it('setConsent sends the level with the notice it was chosen under', async () => {
+    fetchConsent.mockResolvedValue(fresh);
     setConsentApi.mockResolvedValue(full);
     renderWithProvider();
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
     await act(async () => { screen.getByText('set-full').click(); });
     await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('full'));
-    expect(setConsentApi).toHaveBeenCalledWith('full', 'ok');
-    expect(getMerltConsentLevel()).toBe('full');
+    expect(setConsentApi).toHaveBeenCalledWith('full', 'notice-1', 'ok');
+    expect(screen.getByTestId('needsAnswer').textContent).toBe('false');
   });
 
-  it('revokeConsent resets to none and clears the cache', async () => {
+  it('a notice changed meanwhile reads the new one and says so', async () => {
+    fetchConsent.mockResolvedValueOnce(fresh).mockResolvedValueOnce({ ...fresh, notice: { ...notice, id: 'notice-2', versione: 2 } });
+    setConsentApi.mockRejectedValue({ response: { status: 409, data: { detail: 'notice_changed' } } });
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    await act(async () => { screen.getByText('set-full').click(); });
+    await waitFor(() => expect(lastError).toBeInstanceOf(NoticeChangedError));
+    expect(fetchConsent).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('level').textContent).toBe('none');
+  });
+
+  it('revokeConsent sends the choice to erase and resets to none', async () => {
     fetchConsent.mockResolvedValue(full);
-    revokeConsentApi.mockResolvedValue(none);
+    revokeConsentApi.mockResolvedValue({ ...none, erasure: { requested: true, completed: true } });
     renderWithProvider();
     await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('full'));
     await act(async () => { screen.getByText('revoke').click(); });
     await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('none'));
-    expect(revokeConsentApi).toHaveBeenCalledWith('bye');
-    expect(getMerltConsentLevel()).toBe('none');
+    expect(revokeConsentApi).toHaveBeenCalledWith({ reason: 'bye', deleteData: true });
   });
 
   it('useConsent throws outside of a provider', () => {

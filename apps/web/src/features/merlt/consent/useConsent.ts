@@ -9,3 +9,11 @@ export function useConsent(): ConsentContextValue {
   }
   return ctx;
 }
+
+/**
+ * The consent context, or null outside a ConsentProvider: for the app's shell (the layout's tour,
+ * Impostazioni), which is also drawn where no provider is mounted.
+ */
+export function useConsentIfProvided(): ConsentContextValue | null {
+  return useContext(ConsentContext);
+}

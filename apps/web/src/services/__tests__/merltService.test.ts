@@ -17,11 +17,16 @@ import {
   fetchMerltConsent,
   setMerltConsent,
   revokeMerltConsent,
+  exportMerltData,
+  deleteMerltData,
   type MerltConsentResponse,
 } from '../merltService';
 
 const sample: MerltConsentResponse = {
   level: 'full',
+  storedLevel: 'full',
+  noticeAnswered: true,
+  notice: null,
   contributionEnabled: true,
   validationEnabled: true,
   graphEnabled: true,
@@ -43,40 +48,38 @@ describe('merltService — consent contract', () => {
     expect(result).toEqual(sample);
   });
 
-  it('setMerltConsent POSTs { level, reason } (not PUT, not consentLevel)', async () => {
+  it('setMerltConsent POSTs { level, noticeId, reason }: a choice is made under a notice', async () => {
     post.mockResolvedValue({ data: sample });
-    const result = await setMerltConsent('full', 'voglio contribuire');
+    const result = await setMerltConsent('full', 'notice-1', 'voglio contribuire');
     expect(post).toHaveBeenCalledWith(
       '/merlt/consent',
-      { level: 'full', reason: 'voglio contribuire' },
+      { level: 'full', noticeId: 'notice-1', reason: 'voglio contribuire' },
       expect.anything(),
     );
     expect(result).toEqual(sample);
   });
 
-  it('setMerltConsent works without a reason', async () => {
-    post.mockResolvedValue({ data: sample });
-    await setMerltConsent('basic');
-    expect(post).toHaveBeenCalledWith(
-      '/merlt/consent',
-      { level: 'basic', reason: undefined },
-      expect.anything(),
-    );
+  it('revokeMerltConsent DELETEs /merlt/consent with the reason and whether to erase', async () => {
+    del.mockResolvedValue({ data: { ...sample, level: 'none', erasure: { requested: true, completed: false } } });
+    const result = await revokeMerltConsent({ reason: 'non mi serve piu', deleteData: true });
+    expect(del).toHaveBeenCalledWith('/merlt/consent', { data: { reason: 'non mi serve piu', deleteData: true } });
+    expect(result.erasure).toEqual({ requested: true, completed: false });
   });
 
-  it('revokeMerltConsent DELETEs /merlt/consent with reason in the body', async () => {
-    const revoked: MerltConsentResponse = {
-      level: 'none',
-      contributionEnabled: false,
-      validationEnabled: false,
-      graphEnabled: false,
-      updatedAt: null,
-      lastAuditAt: null,
-    };
-    del.mockResolvedValue({ data: revoked });
-    const result = await revokeMerltConsent('non mi serve piu');
-    expect(del).toHaveBeenCalledWith('/merlt/consent', { data: { reason: 'non mi serve piu' } });
-    expect(result.level).toBe('none');
+  it('revokeMerltConsent erases nothing unless asked', async () => {
+    del.mockResolvedValue({ data: { ...sample, level: 'none', erasure: { requested: false, completed: false } } });
+    await revokeMerltConsent();
+    expect(del).toHaveBeenCalledWith('/merlt/consent', { data: { reason: undefined, deleteData: false } });
+  });
+
+  it('exportMerltData GETs the download as a blob; deleteMerltData DELETEs /merlt/data', async () => {
+    const blob = new Blob(['{}'], { type: 'application/json' });
+    get.mockResolvedValue({ data: blob });
+    expect(await exportMerltData()).toBe(blob);
+    expect(get).toHaveBeenCalledWith('/merlt/data/export', { responseType: 'blob' });
+    del.mockResolvedValue({ data: { completed: true } });
+    expect(await deleteMerltData()).toEqual({ completed: true });
+    expect(del).toHaveBeenCalledWith('/merlt/data');
   });
 });
 
