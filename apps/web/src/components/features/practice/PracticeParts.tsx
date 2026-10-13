@@ -5,6 +5,7 @@ import { Toast } from '../../ui/Toast';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { practiceLabel } from '../../../utils/practice';
+import { focusSearchField } from '../../../utils/searchFieldControl';
 
 /** What a search streaming into a practice has brought so far (`SearchPanel`'s progress). */
 export interface PracticeStreaming {
@@ -42,15 +43,14 @@ export function PracticeNotice() {
   );
 }
 
-/** An empty practice (spec §3.1): it says so and offers the palette. */
+/** An empty practice (spec §3.1): it says so and offers the search page's field. */
 export function PracticeEmpty() {
-  const openCommandPalette = useAppStore((s) => s.openCommandPalette);
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center dark:border-slate-700">
       <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Pratica vuota</p>
       <button
         type="button"
-        onClick={openCommandPalette}
+        onClick={() => focusSearchField()}
         className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-700 md:min-h-0 md:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
       >
         <Search size={16} aria-hidden />

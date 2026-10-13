@@ -86,13 +86,6 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     expect(screen.getByRole('button', { name: 'Pratica 1: Prima' })).toHaveAttribute('aria-current', 'true');
   });
 
-  it('keeps the previous chevron clear of the layout\'s menu button', () => {
-    s().createPractice('Una');
-    render(view());
-    const header = screen.getByRole('button', { name: 'Pratica precedente' }).closest('.pl-\\[4\\.5rem\\]');
-    expect(header).not.toBeNull();
-  });
-
   it('rows open in place: a reveal from the store opens the row on the phone too', () => {
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     render(view());

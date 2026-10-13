@@ -116,10 +116,9 @@ describe('ReadingFullScreen (spec §8, T19)', () => {
     expect(within(reader()).queryByRole('button', { name: /Studio/ })).not.toBeInTheDocument();
     expect(within(reader()).queryByText(/Nuova scheda/)).not.toBeInTheDocument();
     expect(within(reader()).getByRole('button', { name: 'Giurisprudenza' })).toHaveAttribute('aria-expanded', 'false');
-    // clear of the layout's menu button, a 44 px target
+    // a 44 px target (the search page's field above it clears the layout's menu button)
     const back = within(reader()).getByRole('button', { name: 'Pratica' });
     expect(back).toHaveClass('min-h-[44px]');
-    expect(back.parentElement).toHaveClass('pl-[4.5rem]');
 
     fireEvent.click(back);
     expect(s().phoneReader).toBeNull();
