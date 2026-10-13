@@ -66,7 +66,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   replayed refresh token the whole grant. Introspection answers only the MCP
   server's credential (`mcp-omnilex`, HTTP Basic, `OAUTH_MCP_CLIENT_SECRET`).
   `GET`/`DELETE /api/oauth/grants` list and revoke the user's connected
-  applications. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
+  applications. `GET /api/oauth/connection` gives the «Collega un'app AI» page the MCP
+  address (`OAUTH_MCP_RESOURCE`; null in production when it is a loopback address, the
+  compose default of a stack without `MCP_PUBLIC_URL`) and every scope worded as the
+  consent page words it (`SCOPE_LABELS`); session only, like every `/api/oauth` route but
+  the quota. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
   at most every ten minutes: never fire-and-forget it, a background sweep
   deadlocked the test suite's TRUNCATE.
 - **Exchanged tokens: how the MCP server acts for a user** (spec section 5).
