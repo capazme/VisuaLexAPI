@@ -85,7 +85,12 @@ const NUMBER_MARKS = new RegExp(`(?<![\\p{L}\\p{N}])${NUMBER_MARK}`, 'giu');
 // After a plural kind: «, e n. 12 del 2010» is the next decision of the list.
 const LIST_NEXT = /\s*(?:,|e|ed)\s*(n(?:r|um(?:ero)?)?\.?\s*\d{1,6}\s*(?:\/\s*\d{4}|del\s+\d{4}))/y;
 // A court named right after a citation is its court: «sentenza n. 1234 del 2015 della Corte di cassazione», «… (Corte di cassazione)», «…, Cass., sez. un.».
-const AFTER_CITATION = /^[\s,(\u2013\u2014-]*(?:(?:della|del|dello|dell['’]|dalla|dal|di|emessa|pronunciata|resa|adottata)\s*)*/u;
+// «…, la Corte di cassazione ha affermato» and «… [Corte di cassazione]» too.
+const AFTER_CITATION = /^[\s,([\u2013\u2014-]*(?:(?:della|delle|del|dello|dell['’]|dalla|dal|di|il|lo|la|le|l['’]|emessa|pronunciata|resa|adottata)\s*)*/u;
+// Inside a Corte costituzionale ruling, other courts named by description: the Sezioni unite (always the
+// Cassazione's), «la Suprema Corte», «il giudice di legittimità», «il giudice amministrativo»…
+const OTHER_COURT_WORDS = /^(?:sez(?:ioni|\.)?\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+(?:di\s+legittimit|amministrativ|ordinari|contabil|tributari))/u;
+const OTHER_COURT_MARKERS = /(?<![\p{L}\p{N}])(?:sez(?:ioni|\.)\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+(?:di\s+legittimit|amministrativ|ordinari|contabil|tributari)\p{L}*)/giu;
 const CORTE_COSTITUZIONALE = /^(?:corte\s+cost|c\.\s*cost)/i;
 const CORTE_DI_AFTER = /^(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+/u;
 
@@ -151,6 +156,7 @@ function courtFollows(folded: string, end: number, ownCourt: boolean): boolean {
   const joined = AFTER_CITATION.exec(after);
   if (!joined) return false;
   const here = end + joined[0].length;
+  if (OTHER_COURT_WORDS.test(folded.slice(here, here + 40))) return true;
   const skipped = CORTE_DI_AFTER.exec(folded.slice(here, here + 30));
   for (const at of skipped ? [here, here + skipped[0].length] : [here]) {
     for (const heads of [COURT_HEADS, UNSUPPORTED_HEADS]) {
@@ -179,6 +185,7 @@ function courtMarkers(folded: string, heads: readonly Head[]): CourtMarker[] {
     .filter((h) => h.court)
     .map((h) => ({ end: h.end, own: CORTE_COSTITUZIONALE.test(folded.slice(h.start, h.end)) }));
   for (const m of folded.matchAll(THIS_COURT)) markers.push({ end: (m.index ?? 0) + m[0].length, own: true });
+  for (const m of folded.matchAll(OTHER_COURT_MARKERS)) markers.push({ end: (m.index ?? 0) + m[0].length, own: false });
   return markers.sort((a, b) => a.end - b.end);
 }
 
@@ -220,7 +227,7 @@ function sharedYearItems(
   const probe = read(numbers[0].value);
   if (!probe) return null;
   const gap = text.slice(head.start + Math.max(probe.headEnd, prefix.length) - prefix.length, listStart);
-  if ((head.court && CONJUNCTION.test(gap)) || WRITTEN_DATE.test(gap)) return null;
+  if ((head.court && (CONJUNCTION.test(gap) || ANOTHER_DECISION.test(gap))) || WRITTEN_DATE.test(gap)) return null;
   if (!citationGap(gap, CITATION_WORDS, probe.reference.corte === 'tar')) return null;
 
   const acts = actSpans();
@@ -261,6 +268,16 @@ const ABBREVIATIONS = new Set([
   'art', 'artt', 'giust', 'trib', 'amm', 'decr', 'par', 'cd', 'ss', 'uu', 'aut', 'lett', 'co', 'cfr', 'app', 'comm', 'reg', 'prov', 'min', 'sorv',
 ]);
 const MAX_ABBREVIATION = 6;
+
+/** «(Corte di cassazione, …, n. 1234), e la sentenza …»: a tail ends at a «)» it did not open. */
+function closingBracket(text: string, start: number, limit: number): number {
+  let depth = 0;
+  for (let i = start; i < limit; i += 1) {
+    if (text[i] === '(') depth += 1;
+    else if (text[i] === ')' && (depth -= 1) < 0) return i;
+  }
+  return limit;
+}
 
 /** Where the tail of `[start, limit)` ends: at the first sentence end or Gazzetta Ufficiale inside it, or at `limit`. */
 function sentenceEnd(text: string, folded: string, start: number, limit: number): number {
@@ -332,7 +349,8 @@ const COVER_WORDS = new Set([
 const MAX_COVER_GAP = 60;
 const CONJUNCTION = /^[\s,]*(?:e|ed)(?![\p{L}\p{N}])/iu;
 // «…, sezioni unite, e la sentenza n. …»: another decision named in the court's preamble starts a citation of its own.
-const ANOTHER_DECISION = /(?<![\p{L}\p{N}])(?:e|ed)\s+(?:(?:il|lo|la|i|gli|le|l['’])\s*)?(?:sent|sentenz|ord|ordinanz|decr|decret)/iu;
+// «…, sezioni unite, e la n. 1237»: the preamble ends on «e» (with its article) before the number, which is not the court's either.
+const ANOTHER_DECISION = /(?<![\p{L}\p{N}])(?:e|ed)\s+(?:(?:il|lo|la|i|gli|le|l['’])\s*)?(?:sent|sentenz|ord|ordinanz|decr|decret)|(?<![\p{L}\p{N}])(?:e|ed)(?:\s+(?:il|lo|la|i|gli|le|l['’]))?[\s']*(?:n(?:r|um(?:ero)?)?\.?\s*)?$/iu;
 
 /** Whether a section at `to` stands in the citation of the court whose name ends at `from`, not in prose after it. */
 function inCourtCitation(text: string, from: number, to: number): boolean {
@@ -375,7 +393,7 @@ export function extractDecisionCitations(
     const cut = head.court ? courtStarts : starts;
     const next = firstAtOrAfter(cut, head.end);
     const limit = Math.min(head.start + MAX_TAIL, next < cut.length ? cut[next] : folded.length);
-    const tailEnd = sentenceEnd(text, folded, head.start, limit);
+    const tailEnd = closingBracket(text, head.start, sentenceEnd(text, folded, head.start, limit));
     if (head.court) lastCourt = { end: head.end, coverEnd: tailEnd };
     if (head.unsupported) continue;
     const prefix = head.kind ? SYNTHETIC_CORTE_COSTITUZIONALE : head.section ? SYNTHETIC_COURT : '';
