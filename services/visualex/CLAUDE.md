@@ -227,9 +227,12 @@ POST unless noted, JSON bodies.
   start and every six hours (`sweep_decision_caches`). Design:
   docs/superpowers/specs/2026-10-01-sentenze-design.md
 - `/search_decisions` — the Cassazione decisions that mention an article or a topic:
-  `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?}` → `esito`
-  risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, and per decision its identity,
-  attributes, `trovata` and `frammento`; cached a day), non_supportata, richiesta_non_valida
+  `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?, anno_dal?, anno_al?}`
+  → `esito` risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, `anni` (`[{anno, n}]`,
+  the matches per year, newest first, over every year whatever the range; absent when the archive
+  sent no facet), and per decision its identity, attributes, `trovata` and `frammento`; cached a
+  day; the range bounds the deposit year as a filter query, 1900 to this year, one bound alone is
+  open), non_supportata, richiesta_non_valida
   400, fonte_non_raggiungibile 503, errore_interno 500 (a bug: a fixed body). Italgiure only,
   the last five years; the index serves codes and the Constitution, any other act goes to the
   text search, and an act no way can phrase (an EU act among them) answers non_supportata. Design:

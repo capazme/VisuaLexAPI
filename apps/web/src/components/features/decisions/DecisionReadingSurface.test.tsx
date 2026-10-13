@@ -189,6 +189,35 @@ describe('DecisionReadingSurface — the decisions the text cites', () => {
   });
 });
 
+describe('DecisionReadingSurface — a Corte costituzionale decision cites its own precedents', () => {
+  const CC: DecisionIdentity = { corte: 'corte_costituzionale', numero: 99, anno: 2024 };
+  const OWN: DecisionText = {
+    motivazione: 'Come già affermato con l\'ordinanza n. 207 del 2018 e con le sentenze n. 253 del 2009 e n. 12 del 2010; non così la sentenza n. 7 del 2017 della Corte di cassazione. Questa sentenza n. 99 del 2024 è la presente.',
+  };
+  const openDecision = vi.fn(() => ({ practiceId: 'p', decisionId: 'd' }));
+  const originalOpen = appStore.getState().openDecision;
+  beforeEach(() => appStore.setState({ openDecision } as never));
+  afterEach(() => appStore.setState({ openDecision: originalOpen }));
+  const written = (container: HTMLElement) => [...container.querySelectorAll('.decision-cite')].map((e) => e.textContent);
+
+  it('reads «ordinanza/sentenza n. … del …» as the Court’s own, not the decision itself nor one of another court', () => {
+    const { container } = render(<DecisionReadingSurface identity={CC} testo={OWN} attributi={{}} />);
+    expect(written(container)).toEqual(['ordinanza n. 207 del 2018', 'sentenze n. 253 del 2009', 'n. 12 del 2010']);
+    expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(OWN));
+  });
+
+  it('a click opens the precedent beside the host', () => {
+    const { container } = render(<DecisionReadingSurface identity={CC} testo={OWN} attributi={{}} hostTabId="practice-1" />);
+    fireEvent.click(container.querySelector('.decision-cite')!);
+    expect(openDecision).toHaveBeenCalledExactlyOnceWith({ corte: 'corte_costituzionale', numero: 207, anno: 2018 }, { fromLink: true, besideId: 'practice-1' });
+  });
+
+  it('is the Court’s own rule: a Cassazione decision links no bare «sentenza n. …»', () => {
+    const { container } = render(<DecisionReadingSurface identity={{ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 }} testo={OWN} attributi={{}} />);
+    expect(written(container)).toEqual([]);
+  });
+});
+
 describe('DecisionReadingSurface — notes and highlights', () => {
   const MOTIVAZIONE = { motivazione: 'Il ricorso è fondato.' };
 

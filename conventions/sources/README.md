@@ -104,9 +104,12 @@ article's text or a Brocardi section, and returns the spans of the citations it 
 }
 ```
 
-A citation is linked only when its court is written in it; the one context rule (the owner, 13 October
-2026) is that, inside a Cassazione decision (`within`), a section written without the court reads as the
-Cassazione. A bare number, an act's citation, a court the app cannot open and prose between a court and a
+A citation is linked only when its court is written in it; the context rules (the owner, 13 October
+2026) are two: inside a Cassazione decision (`within: "cassazione"`) a section written without the court reads
+as the Cassazione, and inside a Corte costituzionale decision (`within: "corte_costituzionale"`) a kind of
+decision and its number («sentenza n. 207 del 2018», «sentenze n. 253 del 2009 e n. 12 del 2010», each number
+its own span) reads as the Court's own, unless another court is written right before or after it. No other
+court has such a rule. A bare number, an act's citation, a court the app cannot open and prose between a court and a
 number give no span (`spans: []`). The words are read by the parser behind `decision_citations`; the scan is
 the web app's alone, there is no Python twin. Asserted by
 `apps/web/src/utils/__tests__/decisionCitationMatcher.test.ts`.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { extractDecisionCitations } from '../decisionCitationMatcher';
+import { extractDecisionCitations, type DecisionContext } from '../decisionCitationMatcher';
 import { parseDecisionPath } from '../decisionLinks';
 
 // The sentences and the spans they hold live in the convention's golden file
@@ -15,14 +15,14 @@ function findGolden(from: string): string {
 }
 
 interface GoldenSpan { start: number; end: number; text: string; reference: unknown; path: string }
-interface GoldenCase { text: string; within?: 'cassazione'; spans: GoldenSpan[]; status: string }
+interface GoldenCase { text: string; within?: DecisionContext; spans: GoldenSpan[]; status: string }
 const { today, cases } = (JSON.parse(readFileSync(findGolden(__dirname), 'utf8')) as {
   decision_citations_in_text: { today: string; cases: GoldenCase[] };
 }).decision_citations_in_text;
 const NOW = new Date(`${today}T12:00:00Z`);
 
-const spansOf = (text: string, within?: 'cassazione') => extractDecisionCitations(text, { within, now: NOW });
-const writtenIn = (text: string, within?: 'cassazione') => spansOf(text, within).map((s) => text.slice(s.start, s.end));
+const spansOf = (text: string, within?: DecisionContext) => extractDecisionCitations(text, { within, now: NOW });
+const writtenIn = (text: string, within?: DecisionContext) => spansOf(text, within).map((s) => text.slice(s.start, s.end));
 
 describe('extractDecisionCitations, the golden file', () => {
   it('has the cases', () => {
@@ -205,6 +205,10 @@ const HOSTILE: Array<[string, string]> = [
   ['a Union court', hostile('Corte giust. UE, ')],
   ['acts with numbers', hostile('legge n. 1 del 12 marzo regio decreto-legge ')],
   ['one court and many case numbers', 'Cass. ' + hostile('C-1/2 ')],
+  ['kinds of decision', hostile('sentenze n. 1 del 2000, ord. n. 2 e ')],
+  ['lists of kinds', hostile('sentenza n. 1/2000 e n. 2/2001, n. 3 del 2002 e ')],
+  ['numbers sharing a year', hostile('Cass. n. 1 e n. 2, n. 3 e ')],
+  ['complete shared-year lists', hostile('sentenze n. 1, n. 2 e n. 3 del 2000 ')],
   ['courts the app cannot open', hostile("Trib. Milano, sez. 3, Corte d'appello ")],
   ['lists of precedents', hostile('Cass. n. 1/2020; Sez. 3, n. 2/2021 (in G.U. ')],
 ];
@@ -212,15 +216,17 @@ const HOSTILE: Array<[string, string]> = [
 describe('extractDecisionCitations, hostile text', () => {
   for (const [name, text] of HOSTILE) {
     it(`reads ${HOSTILE_SIZE.toLocaleString('en')} characters of ${name} in a bounded time`, () => {
-      const start = performance.now();
-      const found = extractDecisionCitations(text, { within: 'cassazione', now: NOW });
-      const elapsed = performance.now() - start;
-      expect(elapsed, `${name}: ${elapsed.toFixed(0)} ms`).toBeLessThan(500);
-      let last = 0;
-      for (const s of found) {
-        expect(s.start).toBeGreaterThanOrEqual(last);
-        expect(s.end).toBeGreaterThan(s.start);
-        last = s.end;
+      for (const within of ['cassazione', 'corte_costituzionale'] as const) {
+        const start = performance.now();
+        const found = extractDecisionCitations(text, { within, now: NOW });
+        const elapsed = performance.now() - start;
+        expect(elapsed, `${name} (${within}): ${elapsed.toFixed(0)} ms`).toBeLessThan(500);
+        let last = 0;
+        for (const s of found) {
+          expect(s.start).toBeGreaterThanOrEqual(last);
+          expect(s.end).toBeGreaterThan(s.start);
+          last = s.end;
+        }
       }
     });
   }
@@ -231,7 +237,7 @@ describe('extractDecisionCitations, hostile text', () => {
       ',', '.', ';', ':', '/', '-', '\n', '\n\n', ' ', ' ', ' ', ' ', ' ', '1', '12', '2020', '1999', '99999', '07', 'Corte cost.', 'C. cost.',
       'Cons. Stato', 'Ad. plen.', 'C.G.A.R.S.', 'TAR', 'T.A.R.', 'Lazio', 'Roma', 'T.R.G.A.', 'Bolzano', 'CGUE', 'Corte giust.', 'UE', 'Trib. UE',
       'C-', 'T-', 'causa', 'cause riunite', 'art.', '267', 'TFUE', 'd.l.', 'legge', 'decreto', 'direttiva', 'Il', 'la', 'ha', 'dichiarato',
-      'gennaio', 'aprile', 'sent.', 'ord.', 'sentenza', 'Tribunale', 'di', 'Milano', 'Corte', 'e', "l'", '’', 'à', 'È',
+      'gennaio', 'aprile', 'sentenze', 'sentenza', 'sent.', 'ord.', 'ordinanza', 'Tribunale', 'di', 'Milano', 'Corte', 'e', "l'", '’', 'à', 'È',
     ];
     const random = mulberry32(20261013);
     const texts: string[] = [];
@@ -242,7 +248,7 @@ describe('extractDecisionCitations, hostile text', () => {
       texts.push(text);
     }
     const start = performance.now();
-    const results = texts.map((text, i) => extractDecisionCitations(text, { within: i % 2 === 0 ? 'cassazione' : undefined, now: NOW }));
+    const results = texts.map((text, i) => extractDecisionCitations(text, { within: ([undefined, 'cassazione', 'corte_costituzionale'] as const)[i % 3], now: NOW }));
     const elapsed = performance.now() - start;
     expect(elapsed, `${elapsed.toFixed(0)} ms`).toBeLessThan(1000);
     results.forEach((found, i) => {
