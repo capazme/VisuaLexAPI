@@ -7,8 +7,10 @@ import { listTrash, purgeTrashEntry, restoreTrashEntry, trashDossier, trashDossi
 /**
  * The trash (MCP second round, spec §4.3). Two kinds of route:
  * - moving to the trash, for connected applications only (delegated table,
- *   `content:delete`): the web app keeps its own immediate deletion (S10) —
- *   except for study cards, which the web app moves too (`POST /lingo/cards/trash`);
+ *   `content:delete`). The web app moves a whole dossier through its own
+ *   `DELETE /dossiers/:id` and study cards through `POST /lingo/cards/trash`;
+ *   its removal of single entries stays immediate, with an undo (S10, as
+ *   amended on 13 October 2026);
  * - listing, restoring and emptying, for the user's session only: none of
  *   them is in the delegated table, so a connected application gets 403.
  */

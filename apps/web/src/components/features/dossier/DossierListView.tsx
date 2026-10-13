@@ -30,6 +30,7 @@ import { searchesIntoOnePractice } from './openInPractice';
 import type { Dossier } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { actsSummary, layoutDossier } from './dossierLayout';
+import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -44,7 +45,7 @@ interface Props {
 type SortBy = 'date' | 'name' | 'items';
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash }: Props) {
-  const { dossiers, deleteDossier, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
+  const { dossiers, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -149,10 +150,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
   const handleConfirmDelete = () => {
     if (deletingDossier) {
-      const title = deletingDossier.title;
-      deleteDossier(deletingDossier.id);
+      deleteDossierWithUndo(deletingDossier);
       setDeletingDossier(null);
-      showToast(`Dossier "${title}" eliminato`, 'success');
     }
   };
 
@@ -492,7 +491,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           open
           variant="danger"
           title="Eliminare questo dossier?"
-          message={`"${deletingDossier.title}" verrà rimosso. Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati.`}
+          message={deleteDossierMessage(deletingDossier.title)}
           confirmLabel="Elimina"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeletingDossier(null)}

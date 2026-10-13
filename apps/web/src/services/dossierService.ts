@@ -115,9 +115,9 @@ export const dossierService = {
     return tracked(async () => (await apiClient.put(`/dossiers/${id}`, data)).data);
   },
 
-  // Delete dossier
-  async delete(id: string): Promise<void> {
-    await tracked(() => apiClient.delete(`/dossiers/${id}`));
+  /** Moves the dossier to the trash for 30 days (question 160): the entry's id is what «Annulla» restores. */
+  async delete(id: string): Promise<{ trashId: string; itemCount: number }> {
+    return tracked(async () => (await apiClient.delete(`/dossiers/${id}`)).data);
   },
 
   // Add item to dossier

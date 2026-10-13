@@ -520,7 +520,8 @@ interface AppState {
     isBookmarked: (normaKey: string) => boolean;
 
     createDossier: (title: string, description?: string) => Promise<string | null>; // returns new server-side dossier ID, null on failure
-    deleteDossier: (id: string) => void;
+    /** Moves a dossier to the trash; the trash entry's id, or null when the server refused (put back, error shown). */
+    deleteDossier: (id: string) => Promise<string | null>;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
     addToDossier: (dossierId: string, item: DossierNormaData | DossierSentenzaData | string, type: 'norma' | 'note' | 'sentenza') => void;
@@ -1527,25 +1528,30 @@ const appStore = createStore<AppState>()(
                 }
             },
 
-            deleteDossier: (id) => {
+            deleteDossier: async (id) => {
                 const state = get();
-                const dossier = state.dossiers.find(d => d.id === id);
+                const index = state.dossiers.findIndex(d => d.id === id);
+                const dossier = state.dossiers[index];
 
                 // Optimistic update
                 set((state) => {
                     state.dossiers = state.dossiers.filter(d => d.id !== id);
                 });
 
-                // API call
-                dossierService.delete(id).catch(err => {
+                try {
+                    // The server moves it to the trash (question 160).
+                    return (await dossierService.delete(id)).trashId;
+                } catch (err) {
                     console.error('Failed to delete dossier:', err);
-                    // Rollback
+                    // Rollback, where it was
                     if (dossier) {
                         set((state) => {
-                            state.dossiers.push(dossier);
+                            if (!state.dossiers.some(d => d.id === id)) state.dossiers.splice(Math.min(index, state.dossiers.length), 0, dossier);
                         });
                     }
-                });
+                    get().pushSyncError('Impossibile eliminare il dossier. Riprova.');
+                    return null;
+                }
             },
 
             updateDossier: (id, updates) => {
