@@ -614,11 +614,12 @@ A page is cached for 24 hours per query and page. Design:
 | `tema` | string | One of the two | A topic, searched as a phrase in the text (at most 80 characters kept) |
 | `archivio` | string | No | `civile` or `penale`. Null is the same as left out. Without it, the article's own archive (codes and the Constitution), else both |
 | `pagina` | integer | No | 1 to 10, default 1 (null is 1) |
+| `anno_dal`, `anno_al` | integer | No | The deposit years to keep, 1900 to the current year in Rome, `anno_dal` not after `anno_al`; one alone is an open range. Anything else is a 400 on that field. Null is the same as left out. The range is the archive's filter on the deposit date (the year facet leaves it out) and is part of the cache key |
 | `modo` | string | No | `indice` (default for an article) or `testo`. The index serves the codes and the Constitution; for any other act, or an article suffix it does not know, the text is searched and the answer says `modo: "testo"`. Null is `indice` |
 
 | `esito` | Status | Content |
 |---------|--------|---------|
-| `risultati` | 200 | `totale`, `pagina`, `modo`, `archivio`, `archivio_dal` (first deposit covered: the archive's, or the earlier of the two when both are searched; `null` if unknown, and such an answer is not cached), `decisioni` |
+| `risultati` | 200 | `totale`, `pagina`, `modo`, `archivio`, `archivio_dal` (first deposit covered: the archive's, or the earlier of the two when both are searched; `null` if unknown, and such an answer is not cached), `anni` (`[{anno, n}]`, the matches per decision year, newest first, counted in the same request and over every year whatever the range; the key is absent when the archive sent no usable facet; in index mode it counts like `totale`, before the re-check of the citation), `decisioni` |
 | `non_supportata` | 200 | nothing else: an act the search cannot phrase (an EU act, for one) |
 | `richiesta_non_valida` | 400 | `errori`: each bad field, with what was expected |
 | `fonte_non_raggiungibile` | 503 | `fonte`: `cassazione`. A source that does not answer is never an empty page |

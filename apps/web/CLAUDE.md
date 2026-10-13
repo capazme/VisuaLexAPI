@@ -480,8 +480,15 @@ Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the sam
 `fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
 leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
 The scanner never links a court that is not written (D2): a bare «n. 123/2020» stays text everywhere; the one
-context rule is that inside a Cassazione decision a section without its court («Sez. U, n. 9100 del 2015») reads
-as the Cassazione. «decreto n.» of an administrative court is a known conservative miss.
+context rules (the owner, 13 October 2026) are two: inside a Cassazione decision a section without its court
+(«Sez. U, n. 9100 del 2015») reads as the Cassazione; inside a Corte costituzionale decision «sentenza/ordinanza
+n. N del YYYY» (also «sentenze n. … e n. …», each number its own span) reads as the Court's own, unless a court is
+written right before it (the court covers its own citation) or right after it («… della Corte di cassazione», «…, la
+Cassazione ha affermato», «… delle Sezioni unite», «… del giudice di legittimità»; a plural list is read whole first), or
+when another court (any head, the referring judge, the Sezioni unite, «la Suprema Corte» among them) is the nearest court named
+earlier in the same sentence ("questa Corte" or "Corte costituzionale" in between gives it back); a register number
+(«reg. ord. n. 120 del 2018») is never a ruling.
+`DecisionReadingSurface` passes `within` for these two courts only; no other court has such a rule. «decreto n.» of an administrative court is a known conservative miss.
 
 **A past text is a reading** (round "Testo alla data", spec
 `docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`). The server
@@ -765,9 +772,12 @@ Duplicating any of these is a defect, not a shortcut.
   parser exports its court-head sources (`COURT_HEAD_SOURCE`, `EU_COURT_HEAD_SOURCE`, …) for the scanner.
   `utils/decisionCitationMatcher.ts` — the decisions a running text cites: `extractDecisionCitations(text,
   { within, now })` gives `{ start, end, reference, path }` spans over the text (a court head, a bounded tail
-  of 200 characters cut at the next head, at a sentence end, at «;» and at the Gazzetta Ufficiale, handed to
+  of 200 characters cut at the next head, at a sentence end, at «;», at a «)» it did not open and at the Gazzetta Ufficiale, handed to
   `readDecisionCitation`; the words between the court and the number must be citation words, no number of
-  another; the reference is read again from the span's own words; never inside an act's citation,
+  another, and an «e» right after the court, or an «e la sentenza» / «e la n.» before its number, ends its citation («Consiglio di Stato e la sentenza n. 7»); a list whose
+  year is written once at its end («sentenze n. 96 e n. 229 del 2015») is one decision per number, only when nothing
+  but citation words stands before it; a section written in words («sezione prima civile») is a citation word
+  (the span links without a section: the parser reads the code of «sez. III», not of «terza»); the reference is read again from the span's own words; never inside an act's citation,
   `allActSpans`), and `wrapDecisionCitationsInHtml` (see «The decisions a text cites are links»). Pinned to
   the golden file's `decision_citations_in_text` (web only, no Python twin) by `decisionCitationMatcher.test.ts`.
   `utils/decisionFetchCache.ts` — `fetchDecisionCached`, one request per decision for the session

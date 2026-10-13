@@ -276,9 +276,12 @@ class SearchHit:
 class SearchPage:
     """One page of a search. `totale` is Solr's `numFound`: in index mode it counts records the
     re-check of the citation (`cites`) may still drop from the page (about 2% measured), so it can
-    exceed the decisions the pages hold in all; a client ends the list by `totale`, not by rows."""
+    exceed the decisions the pages hold in all; a client ends the list by `totale`, not by rows.
+    `anni` counts the same matches per year, newest first, whatever year range the query bounds
+    (the control shows the years outside it too); None when the archive sent no usable facet."""
     totale: int
     decisioni: list[SearchHit]
+    anni: list[dict[str, int]] | None = None
 
 
 def fragment_ranges(snippet: str) -> dict:
@@ -299,6 +302,31 @@ def fragment_ranges(snippet: str) -> dict:
             text.append(piece)
             pos += len(piece)
     return {"testo": "".join(text), "evidenziati": ranges}
+
+
+def year_counts(data: dict) -> list[dict[str, int]] | None:
+    """The per-year counts of Solr's `anno` facet (a flat list, year then count), newest first,
+    or None when the answer carries none or it is not that shape. Never raises: a facet is an
+    extra, and a page that was found must not turn into an error for it."""
+    facets = data.get("facet_counts")
+    fields = facets.get("facet_fields") if isinstance(facets, dict) else None
+    flat = fields.get("anno") if isinstance(fields, dict) else None
+    if not isinstance(flat, list) or len(flat) % 2:
+        return None
+    counts = []
+    for year, n in zip(flat[::2], flat[1::2]):
+        if isinstance(n, bool) or not isinstance(n, int) or not isinstance(year, (str, int)):
+            return None
+        if str(year).isascii() and str(year).isdigit():
+            counts.append({"anno": int(year), "n": n})
+    return sorted(counts, key=lambda c: -c["anno"])
+
+
+def year_filter(anni: tuple[int | None, int | None]) -> str:
+    """The deposit-date range of a year range, in the form `pd` (YYYYMMDD) holds it; a missing
+    bound is open. `pd` and `anno` agree: one query counted 1,595 records both ways (2026-10-13)."""
+    dal, al = anni
+    return f"pd:[{dal or 1900}0101 TO {al or 9999}1231]"
 
 
 class ItalgiureReader:
@@ -478,14 +506,20 @@ class ItalgiureReader:
         return (int(iso[:4]), iso) if iso else None
 
     async def search(self, q: str, pagina: int, rows: int = 20, *,
-                     coords: IndexCoordinates | None = None, hl_query: str | None = None) -> SearchPage:
+                     coords: IndexCoordinates | None = None, hl_query: str | None = None,
+                     anni: tuple[int | None, int | None] | None = None) -> SearchPage:
         """One Solr query for a page, sorted by deposit; the fragments are highlighted from the
-        text. With `coords` the records are index matches and each is re-checked with `cites`."""
+        text. With `coords` the records are index matches and each is re-checked with `cites`.
+        `anni` bounds the deposit years in a filter query that the year facet leaves out, so the
+        counts per year come in the same request and cover the years outside the range too."""
         params = {
             "q": q, "rows": str(rows), "start": str((pagina - 1) * rows),
             "fl": SEARCH_FIELDS + (INDEX_FIELDS if coords else ""),
             "sort": "pd desc", "hl": "true", "hl.fl": "ocr", "hl.snippets": "1",
-            "hl.fragsize": "200"}
+            "hl.fragsize": "200",
+            "facet": "true", "facet.field": "{!ex=yr}anno", "facet.mincount": "1", "facet.limit": "-1"}
+        if anni is not None:
+            params["fq"] = "{!tag=yr}" + year_filter(anni)
         if hl_query:
             params["hl.q"] = hl_query
         data = await self._select(params)
@@ -505,4 +539,4 @@ class ItalgiureReader:
             hits.append(SearchHit(identity, {k: v for k, v in attributes.items() if v},
                                   "indice" if coords else "testo",
                                   fragment_ranges(_scalar(snippet)) if snippet else None))
-        return SearchPage(int(data["response"].get("numFound") or 0), hits)
+        return SearchPage(int(data["response"].get("numFound") or 0), hits, year_counts(data))
