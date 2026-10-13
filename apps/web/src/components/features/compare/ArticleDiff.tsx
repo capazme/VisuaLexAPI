@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { cn } from '../../../lib/utils';
+import { diffSequences } from '../../../utils/articleCompare';
 
 interface ArticleDiffProps {
   leftText: string;
@@ -14,59 +15,22 @@ interface DiffSegment {
 }
 
 /**
- * Simple word-level diff algorithm using Longest Common Subsequence
+ * Word-level diff of two texts, whitespace kept as tokens of its own.
  */
 function computeDiff(oldText: string, newText: string): DiffSegment[] {
   const oldWords = oldText.split(/(\s+)/);
   const newWords = newText.split(/(\s+)/);
 
-  // Build LCS table
-  const m = oldWords.length;
-  const n = newWords.length;
-  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (oldWords[i - 1] === newWords[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
-  }
-
-  // Backtrack to find the diff
   const result: DiffSegment[] = [];
-  let i = m;
-  let j = n;
-  const temp: DiffSegment[] = [];
-
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && oldWords[i - 1] === newWords[j - 1]) {
-      temp.push({ type: 'equal', text: oldWords[i - 1] });
-      i--;
-      j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      temp.push({ type: 'insert', text: newWords[j - 1] });
-      j--;
-    } else {
-      temp.push({ type: 'delete', text: oldWords[i - 1] });
-      i--;
-    }
-  }
-
-  // Reverse and merge consecutive segments of the same type
-  temp.reverse();
-
-  for (const segment of temp) {
+  for (const op of diffSequences(oldWords, newWords)) {
+    const text = op.type === 'insert' ? newWords[op.b!] : oldWords[op.a!];
     const last = result[result.length - 1];
-    if (last && last.type === segment.type) {
-      last.text += segment.text;
+    if (last && last.type === op.type) {
+      last.text += text;
     } else {
-      result.push({ ...segment });
+      result.push({ type: op.type, text });
     }
   }
-
   return result;
 }
 

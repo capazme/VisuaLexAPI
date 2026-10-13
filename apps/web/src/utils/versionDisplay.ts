@@ -55,6 +55,24 @@ export function versionKey(request: VersionRequest | null | undefined): string {
   return `${textOf(request?.versione)?.toLowerCase() ?? 'vigente'}|${textOf(request?.data_versione) ?? ''}`;
 }
 
+/** Which text a request asks for: the original, the text at a day, or the text in force. */
+export type RequestedVersion = { kind: 'original' } | { kind: 'date'; date: string } | { kind: 'current' };
+
+/** The three ways to ask for a text, read the way `versionKey` reads them (the original wins over a day). */
+export function requestedVersion(request: VersionRequest | null | undefined): RequestedVersion {
+  if (asksForOriginal(request?.versione)) return { kind: 'original' };
+  const date = textOf(request?.data_versione);
+  return date ? { kind: 'date', date } : { kind: 'current' };
+}
+
+/** The text a request asks for, in words: «testo originale», «testo al 31 dicembre 2015», «testo in vigore». */
+export function versionLabel(request: VersionRequest | null | undefined): string {
+  const asked = requestedVersion(request);
+  if (asked.kind === 'original') return 'testo originale';
+  if (asked.kind === 'date') return `testo ${withPreposition('al', formatDateForCitation(asked.date))}`;
+  return 'testo in vigore';
+}
+
 /** `ArticleData.versionInfo` for a search: what was asked for, or nothing when the text in force was. */
 export function deriveVersionInfo(
   params: { version?: SearchParams['version']; version_date?: string },
