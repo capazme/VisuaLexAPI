@@ -237,6 +237,38 @@ describe('labels (D3)', () => {
   });
 });
 
+describe('note references are not compared', () => {
+  const withNote = (body: string, id: string) =>
+    `1. ${body} (${id})\n\n-------------\nAGGIORNAMENTO (${id})\n\n Il D.Lgs. 1 gennaio 2020, n. 1 ha disposto la modifica.`;
+
+  it('is «invariato» when a comma differs only in the number of its update note', () => {
+    const c = compareArticles(
+      article(withNote('Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d\'anno.', '129'), at('2015-12-31')),
+      article(withNote('Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d\'anno.', '348')),
+    );
+    expect(c.rows.map((r) => r.label)).toEqual(['invariato']);
+  });
+  it('is «invariato» when a note reference is added, including the ((49)) form', () => {
+    const body = 'Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d\'anno.';
+    const bare = `1. ${body}`;
+    expect(compareArticles(article(bare, at('2015-12-31')), article(withNote(body, '129'))).rows[0].label).toBe('invariato');
+    const double = `1. ${body} ((49))\n\n-------------\nAGGIORNAMENTO (49)\n\n Nota.`;
+    expect(compareArticles(article(bare, at('2015-12-31')), article(double)).rows[0].label).toBe('invariato');
+  });
+  it('keeps the reference out of the diff and out of the measure of a word that did change', () => {
+    const oldRaw = withNote('Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d\'anno.', '129');
+    const newRaw = withNote('Il saggio degli interessi legali è determinato in misura pari al 10 per cento in ragione d\'anno.', '348');
+    const row = compareArticles(article(oldRaw, at('2015-12-31')), article(newRaw)).rows[0];
+    expect(row.label).toBe('modificato');
+    expect(sliced(oldRaw, row.diff!.left)).toEqual(['5']);
+    expect(sliced(newRaw, row.diff!.right)).toEqual(['10']);
+  });
+  it('still compares a parenthesised number that no update note explains', () => {
+    const c = compareArticles(article('1. Il termine è di trenta giorni (30).', at('2015-12-31')), article('1. Il termine è di trenta giorni (60).'));
+    expect(c.rows[0].label).toBe('modificato');
+  });
+});
+
 describe('the rubric', () => {
   it('is labelled the same way', () => {
     const oldRaw = normattiva('Art. 1284.', 'Saggio degli interessi', ['1. Il saggio è del cinque per cento.']);

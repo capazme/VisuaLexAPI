@@ -77,8 +77,9 @@ export interface ArticleComparison {
  * The diff is a table of m x n cells (Uint32): at 600 words 361 000 cells, about
  * 1.4 MB and a few milliseconds, where a comma of 5 000 words would take 100 MB.
  * Real commi stay far below (the longest in the fixtures, d.lgs. 196/2003
- * art. 2-ter comma 1-bis, has about 160 words); a comma above the cap is shown
- * as «riscritto», the two versions side by side without word marks.
+ * art. 2-ter comma 1-bis, has about 160 words); a comma above the cap is
+ * «troppo lungo per il confronto parola per parola»: it is shown as «riscritto»,
+ * the two versions side by side without word marks.
  */
 export const DIFF_WORD_CAP = 600;
 
@@ -216,7 +217,7 @@ interface Token {
 
 interface UnitInfo {
   unit: CompareUnit;
-  /** The unit's text with the «(( ))» marks off and the whitespace folded: «invariato» is equality of this. */
+  /** The unit's text with the «(( ))» marks and the note references off and the whitespace folded: «invariato» is equality of this. */
   folded: string;
   tokens: Token[];
   /** The words of D3's measure: case and punctuation folded. */
@@ -249,7 +250,14 @@ function isRepealNotice(raw: string, unit: CompareUnit, decorations: readonly In
 }
 
 function inspect(raw: string, unit: CompareUnit, structure: ArticleStructure): UnitInfo {
-  const text = raw.slice(unit.start, unit.end);
+  // The «(119)» references to an update note are pointers, not words: blanked out
+  // (same length, so every offset stays the text's own) before anything is compared.
+  const chars = raw.slice(unit.start, unit.end).split('');
+  for (const d of structure.decorations) {
+    if (d.kind !== 'ref' && d.kind !== 'ref-missing') continue;
+    for (let i = Math.max(d.start, unit.start); i < Math.min(d.end, unit.end); i++) chars[i - unit.start] = ' ';
+  }
+  const text = chars.join('');
   const tokens: Token[] = [];
   const counts = new Map<string, number>();
   let total = 0;
