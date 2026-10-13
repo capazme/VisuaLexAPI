@@ -363,7 +363,12 @@ per text, replaced when the text changes, dropped when the target leaves the sco
 palette's spellings (`NUMBERED_ACT_SPELLINGS`); a type is never found inside another's name («legge»
 in «decreto-legge» or «decreto- legge»), a decision's number never inside an act's citation (any
 type of the table, or «decreto», «direttiva», «regolamento»: regional laws and Union acts too), and
-an article links to its act only across the gap §13.2 whitelists. Its tests use synthetic texts (no run of 30
+an article links to its act only across the gap §13.2 whitelists (commas, «comma N», «commi 2 e 3», «primo comma» and the
+other ordinals, «e ss.», «lett.», «n.», «del»…). A decision cited date first («Cass., sez. III, 12 aprile 2018, n. 8980») is found by
+its date and number when the date's year is the query's, never as an act's («legge 12 aprile 2018, n. 8980»). A code's article
+is found across the same words (`blankCodeLinks`: «art. 2043 del c.c.», «art. 2043, primo comma, c.c.», «art. 2043 e ss. c.c.»
+are blanked to spaces at the same offsets and `extractCitations` reads the text again; it is the one reader of codes, and it
+still does not make «del c.c.» a link). Its tests use synthetic texts (no run of 30
 characters shared with the real ones); the real ones live in
 the git-ignored `utils/__fixtures__/private/` (personal data: never copy them into a committed
 file) and `citationSearch.local.test.ts` is skipped where the folder is absent.

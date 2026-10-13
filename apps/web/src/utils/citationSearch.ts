@@ -5,8 +5,10 @@
  * query is not a citation and is searched literally only. `findCitationSpans` returns `[start,
  * end)` offsets of the original text: codes through `extractCitations` (the in-text reader of norm
  * links), numbered acts and decisions through patterns over `foldForSearch(text)`, which keeps
- * every offset. A span covers the citation as written: from «art.» or the act type to the year or
- * the number. Pure and read-only: nothing here touches the DOM (root rule 23).
+ * every offset (a code's article also across the words `extractCitations` does not read, blanked
+ * first: «del c.c.», «primo comma», «e ss.»). A span covers the citation as written: from «art.» or
+ * the act type to the year or the number; a decision cited date first, from its date to its number.
+ * Pure and read-only: nothing here touches the DOM (root rule 23).
  */
 
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
@@ -99,11 +101,31 @@ const ANY_ACT_TYPE = `(?:${ACT_TYPE_FORMS.map((f) => f.source).sort((a, b) => b.
 const NUMBER_WORD = '(?:n|nr|num|numero)\\.?\\s*';
 /** The day and month of a date: «22 dicembre », «1° marzo », or in figures «22.12.», «30/5/». */
 const DAY_MONTH = '(?:\\d{1,2}[°º]?\\s+\\p{L}+\\s+|\\d{1,2}\\s*[./-]\\s*\\d{1,2}\\s*[./-]\\s*)';
+/**
+ * The date of a decision cited date first, up to its year: «12 aprile », «1° marzo », «12.4.», «12/04/»,
+ * with a real month and a day of one or two digits (stricter than `DAY_MONTH`: a decision's date
+ * is only read where the year is the query's, so the shape must be a date and nothing else).
+ */
+const DECISION_DAY = '(?:0?[1-9]|[12]\\d|3[01])';
+const DECISION_DATE =
+  `(?:${DECISION_DAY}[°º]?\\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\\s+` +
+  `|${DECISION_DAY}\\s*[./-]\\s*(?:0?[1-9]|1[0-2])\\s*[./-]\\s*)`;
 const ARTICLE_WORD = "(?<![\\p{L}\\p{N}])art(?:t|icol[oi])?\\.?";
 const ARTICLE_ITEM = `\\d+(?:\\s*-?\\s*(?:${ARTICLE_SUFFIX_ALTERNATION})\\b)?`;
 const ARTICLE_LIST = `${ARTICLE_ITEM}(?:\\s*(?:,|\\be\\b)\\s*${ARTICLE_ITEM})*`;
-const COMMA_CLAUSE =
-  `(?:\\s*,?\\s*(?:comma|co\\.)\\s*${ARTICLE_ITEM})?(?:\\s*,?\\s*(?:lett\\.?|lettera)\\s*\\p{L}\\)?)?`;
+/** Spaces and at most one comma, in one way only (no backtracking over a long run of spaces). */
+const SEP = '\\s*(?:,\\s*)?';
+/** «primo comma», «ultimo comma», «secondo e terzo comma». */
+const ORDINAL = '(?:primo|secondo|terzo|quarto|quinto|sesto|settimo|ottavo|nono|decimo|ultimo)';
+const ORDINAL_COMMA = `${ORDINAL}(?:\\s*(?:,|\\be\\b)\\s*${ORDINAL})*\\s+comma(?!\\p{L})`;
+/** «commi 2 e 3», «commi 2-4», «commi 1, 2 e 4»: a list of commi, which «comma» and «co.» do not take. */
+const COMMI_LIST = `${ARTICLE_ITEM}(?:\\s*(?:[-\u2013,]|\\be\\b)\\s*${ARTICLE_ITEM})*`;
+/** What names the comma of an article: «comma 2», «co. 2», «commi 2 e 3», «primo comma». */
+const COMMA_REF = `(?:(?:comma|co\\.)\\s*${ARTICLE_ITEM}|commi\\s*${COMMI_LIST}|${ORDINAL_COMMA})`;
+/** «e ss.», «e seguenti», «ss.»: the articles that follow the one named, which is not an article of its own. */
+const AND_FOLLOWING = '(?:e\\s+)?(?:ss(?:\\.|(?!\\p{L}))|seguenti(?!\\p{L}))';
+const LETTER_REF = '(?:lett\\.?|lettera)\\s*\\p{L}\\)?';
+const COMMA_CLAUSE = `(?:${SEP}${AND_FOLLOWING})?(?:${SEP}${COMMA_REF})?(?:${SEP}${LETTER_REF})?`;
 const PREPOSITION = "(?:(?:della|dello|del|dell')\\s*)?";
 
 interface NumberYearSlots {
@@ -134,13 +156,12 @@ const ARTICLE_REACH = 160;
 
 /**
  * What may sit between an article and its act (spec §13.2), and nothing else: the article's comma,
- * letter or number («, comma 2», «co. 2», «lett. b)», «n. 3», «numero 3»), further articles of the
- * same act («art. 1 e l'art. 2», «artt. 1, 2 e 3»), commas and spaces, and «del», «della»,
- * «dell'», «di cui al», «di cui alla» before the act. Any other word, a full stop or a semicolon
- * breaks the link: the article is then not this act's.
+ * letter or number («, comma 2», «co. 2», «commi 2 e 3», «primo comma», «lett. b)», «n. 3», «numero
+ * 3»), «e ss.», further articles of the same act («art. 1 e l'art. 2», «artt. 1, 2 e 3»), commas and
+ * spaces, and «del», «della», «dell'», «di cui al», «di cui alla» before the act. Any other word, a
+ * full stop or a semicolon breaks the link: the article is then not this act's.
  */
-const ARTICLE_QUALIFIER =
-  `\\s*,?\\s*(?:(?:comma|co\\.)\\s*${ARTICLE_ITEM}|(?:lett\\.?|lettera)\\s*\\p{L}\\)?|(?:n\\.?|numero)\\s*${ARTICLE_ITEM})`;
+const ARTICLE_QUALIFIER = `${SEP}(?:${COMMA_REF}|${LETTER_REF}|(?:n\\.?|numero)\\s*${ARTICLE_ITEM}|${AND_FOLLOWING})`;
 const ARTICLE_WITH_QUALIFIERS = `${ARTICLE_WORD}\\s*${ARTICLE_LIST}(?:${ARTICLE_QUALIFIER})*`;
 /** «l'», «all'», «dell'» before an article («e dell'art. 2», «, all'art. 1»). */
 const ARTICLE_PREFIX = "(?:(?:l|all|dell)'\\s*)";
@@ -184,6 +205,12 @@ const DECISION_HEAD =
   '(?:cass|cassazione|corte|c\\.\\s*cost|cons|consiglio|tar|trib|tribunale|app|sent|sentenza|ord|ordinanza|sez|sezione|sezioni|s\\.\\s*u|ss\\.\\s*uu)(?!\\p{L})';
 const QUERY_DECISION = new RegExp(
   `^(?<head>${DECISION_HEAD}[^/]*?[\\s.,]+)?(?<numberWord>${NUMBER_WORD})?(?<number>\\d+)\\s*(?:\\/\\s*(?<slashYear>\\d{4}|\\d{2})|,?\\s+del\\s+(?<delYear>\\d{4}))$`,
+  'u',
+);
+
+/** A decision cited date first: «Cass. 12 aprile 2018, n. 8980». The court is required; the number needs its «n.». */
+const QUERY_DECISION_DATE_FIRST = new RegExp(
+  `^(?<head>${DECISION_HEAD}[^/]*?[\\s.,]+)${DECISION_DATE}(?<year>\\d{4})\\s*(?:,\\s*)?${NUMBER_WORD}(?<number>\\d+)$`,
   'u',
 );
 
@@ -234,12 +261,26 @@ function readCode(query: string, folded: string): QueryCitation | null {
   // A list of articles is not one citation: it is searched literally.
   if (/(?<!\p{L})(?:artt|articoli)(?!\p{L})/u.test(folded)) return null;
   const trimmed = query.trim().replace(ARTICLE_DOT_DIGIT, '$& ');
-  const found = extractCitations(trimmed);
-  if (found.length !== 1) return null;
-  const [c] = found;
-  if (c.startIndex !== 0 || trimmed.slice(c.endIndex).replace(/[\s.,;:]/g, '') !== '') return null;
-  if (c.parsed.act_number || c.parsed.date) return null;
-  return { kind: 'code', code: c.parsed.act_type, article: c.parsed.article };
+  // «art. 2043 del c.c.», «art. 2043, primo comma, c.c.»: read as the code's article, as in a text.
+  for (const source of [trimmed, blankCodeLinks(trimmed, foldForSearch(trimmed))]) {
+    const found = source ? extractCitations(source) : [];
+    if (found.length !== 1) continue;
+    const [c] = found;
+    if (c.startIndex !== 0 || trimmed.slice(c.endIndex).replace(/[\s.,;:]/g, '') !== '') continue;
+    if (c.parsed.act_number || c.parsed.date) continue;
+    return { kind: 'code', code: c.parsed.act_type, article: c.parsed.article };
+  }
+  return null;
+}
+
+/**
+ * «Cass. 12 aprile 2018, n. 8980» reads as number 8980 and year 2018. Never when an act's name stands
+ * between the court and the date («Cass. … legge 12 aprile 2018, n. 8980»): that is an act's citation.
+ */
+function readDecisionDateFirst(folded: string): QueryCitation | null {
+  const m = QUERY_DECISION_DATE_FIRST.exec(folded);
+  if (!m?.groups || new RegExp(ACT_WORD, 'u').test(m.groups.head)) return null;
+  return { kind: 'decision', number: m.groups.number, year: m.groups.year };
 }
 
 /**
@@ -248,7 +289,7 @@ function readCode(query: string, folded: string): QueryCitation | null {
  */
 function readDecision(folded: string): QueryCitation | null {
   const m = QUERY_DECISION.exec(folded);
-  if (!m?.groups) return null;
+  if (!m?.groups) return readDecisionDateFirst(folded);
   const { head, numberWord, number, slashYear, delYear } = m.groups;
   if (!head && !numberWord && slashYear?.length !== 4) return null;
   const year = slashYear ? expandTwoDigitYear(slashYear) : delYear;
@@ -397,6 +438,20 @@ export function allActSpans(folded: string): Span[] {
 
 const overlapsAny = (spans: readonly Span[], [s, e]: Span): boolean => spans.some(([a, b]) => s < b && a < e);
 
+/**
+ * A decision cited date first («Cass., sez. III, 12 aprile 2018, n. 8980», «sent. 12.4.2018 n.
+ * 8980»): the date, whose year is the query's, and the number, joined by a comma and spaces only. The
+ * number is whole and bears no other year («n. 8980/2019», «n. 8980 del 2019» are not it).
+ */
+function decisionDateFirstSpans(folded: string, c: Extract<QueryCitation, { kind: 'decision' }>): Span[] {
+  const re = new RegExp(
+    `(?<![\\p{N}/.-])${DECISION_DATE}${c.year}(?!\\d)\\s*(?:,\\s*)?${NUMBER_WORD}${escapeRegExp(c.number)}(?!\\d)` +
+      '(?!\\s*\\/\\s*\\d)(?!\\s*,?\\s+del\\s+\\d)',
+    'gu',
+  );
+  return [...folded.matchAll(re)].map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
+}
+
 /** A decision's number and year in every form; never where they belong to an act (`anyActSpans`). */
 function decisionSpans(folded: string, c: Extract<QueryCitation, { kind: 'decision' }>, acts: readonly Span[]): Span[] {
   const re = new RegExp(
@@ -404,9 +459,45 @@ function decisionSpans(folded: string, c: Extract<QueryCitation, { kind: 'decisi
       `(?:\\/\\s*${slashYearSource(c.year)}|,?\\s+del\\s+(?:${DAY_MONTH})?${c.year})(?!\\d)`,
     'gu',
   );
-  return [...folded.matchAll(re)]
-    .map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length])
+  const numberYear = [...folded.matchAll(re)].map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  return [...numberYear, ...decisionDateFirstSpans(folded, c)]
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
     .filter((span) => !overlapsAny(acts, span));
+}
+
+/**
+ * The words `extractCitations` does not read between a code's article and the code: «del», «della»,
+ * «dello», «dell'», the article's comma («primo comma», «commi 2 e 3»), «e ss.» (the reader takes
+ * «art. 2043 c.c.», not «art. 2043 del c.c.»).
+ */
+const ARTICLE_THEN_LINKS = new RegExp(
+  `^(${ARTICLE_WORD}\\s*${ARTICLE_LIST})((?:${ARTICLE_QUALIFIER})*${SEP}(?:(?:della|dello|del|dell')\\s*)?)`,
+  'u',
+);
+const ARTICLE_WORD_EVERYWHERE = new RegExp(ARTICLE_WORD, 'gu');
+/** How far after «art.» the words before a code may reach. */
+const LINKS_REACH = 240;
+
+/**
+ * `text` with those words blanked to spaces, so that `extractCitations` reads «art. 2043 del c.c.»
+ * as «art. 2043     c.c.» at the same offsets; `null` when no article has any. `folded` is
+ * `foldForSearch(text)` (same length).
+ */
+function blankCodeLinks(text: string, folded: string): string | null {
+  const ranges: Span[] = [];
+  for (const article of folded.matchAll(ARTICLE_WORD_EVERYWHERE)) {
+    const from = article.index ?? 0;
+    const m = ARTICLE_THEN_LINKS.exec(folded.slice(from, from + LINKS_REACH));
+    if (m && /\p{L}/u.test(m[2])) ranges.push([from + m[1].length, from + m[1].length + m[2].length]);
+  }
+  if (ranges.length === 0) return null;
+  let out = '';
+  let at = 0;
+  for (const [start, end] of ranges) {
+    out += text.slice(at, start) + ' '.repeat(end - start);
+    at = end;
+  }
+  return out + text.slice(at);
 }
 
 /** «dell'», «all'»… that `extractCitations` reads with the article: the span starts at «art.». */
@@ -430,9 +521,21 @@ export function citationText(text: string, folded: string = foldForSearch(text))
   return { text, folded };
 }
 
+/**
+ * The norm citations of a text: `extractCitations`, and what it reads once the words it does not know
+ * are blanked (`blankCodeLinks`) where that gives a citation it did not give; its own reading wins.
+ */
+function textCitations(t: CitationText): CitationMatch[] {
+  const own = extractSpaced(t.text);
+  const blanked = blankCodeLinks(t.text, t.folded);
+  if (!blanked) return own;
+  const more = extractSpaced(blanked).filter((c) => !own.some((o) => c.startIndex < o.endIndex && o.startIndex < c.endIndex));
+  return [...own, ...more].sort((a, b) => a.startIndex - b.startIndex);
+}
+
 function codeSpans(t: CitationText, c: Extract<QueryCitation, { kind: 'code' }>): Span[] {
   const code = c.code.toLowerCase();
-  t.citations ??= extractSpaced(t.text);
+  t.citations ??= textCitations(t);
   return t.citations
     .filter((m) => !m.parsed.act_number && m.parsed.act_type.toLowerCase() === code)
     .filter((m) => m.parsed.article === c.article || (ARTICLE_LIST_HEAD.test(m.text) && listHas(m.text, c.article)))

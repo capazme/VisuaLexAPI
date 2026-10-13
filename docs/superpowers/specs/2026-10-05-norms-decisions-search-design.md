@@ -1054,7 +1054,14 @@ names the same norm:
 - a code's article («art. 580 c.p.», «art 110 cpa», «art. 2 Cost.»): every citation the
   client's own `extractCitations` (`utils/citationMatcher.ts`, the reader of norm links in a
   decision's text) resolves to the same code and article («art. 580 del codice penale», «art.
-  580 cod. pen.»);
+  580 cod. pen.»), and the same with the words that reader does not know between the article and
+  the code (PR 4f): «del», «della», «dello», «dell'» before the abbreviation («art. 2043 del c.c.»,
+  «art. 2 della Cost.»), the article's ordinal comma, «commi» and «e ss.» (below: «art. 2043,
+  primo comma, c.c.», «art. 2043, commi 2 e 3, del cod. civ.», «art. 2043 e ss. c.c.»). Those
+  words are blanked to spaces, at the same offsets, and `extractCitations` reads the text again;
+  what it read before stands, and the span covers the words as written. The reader of links
+  itself is unchanged: such a citation is found in the window, not made a link. The same
+  reading applies to the query («art. 2043 del c.c.» is the code's article 2043);
 - a numbered act, with or without an article («l. 99/2015», «legge 99/2015», «d.P.R.
   115/2002», «art. 1 l. 99/2015»): every span that names the same act type, number and year in
   the forms decisions use — «legge n. 99 del 2015», «l. n. 99/2015», «legge 3 marzo 2015, n. 99»,
@@ -1066,11 +1073,15 @@ names the same norm:
   del 2020» (a hyphen may take spaces on either side), nor the «l.» of «d. l. 34/2020» or «d.l.
   34/2020»;
 - when the query has an article, the act's span is found only with that article: before the act,
-  linked to it by nothing but commas and spaces, «comma N», «co. N», «lett. x», «n. N», «numero
+  linked to it by nothing but commas and spaces, «comma N», «co. N», «commi 2 e 3», «commi 2-4»,
+  «commi 1, 2 e 4», the ordinal comma («primo comma» … «decimo comma», «ultimo comma», «secondo e
+  terzo comma»), «e ss.», «e seguenti», «ss.» (not an article of its own: the span starts at the
+  article the query names, and «art. 3» is not found in «art. 1 e ss.»), «lett. x», «n. N», «numero
   N», «del», «della», «dell'», «di cui al», «di cui alla», and further articles of the same act
   («art. 1 e l'art. 2 della legge …», «art. 2 e dell'art. 1 della legge …», «artt. 1, 2 e 3 della
   legge …»: the span starts at the article the query names); or right after the act («legge n.
-  99/2015, art. 1, comma 3», «legge 99/2015, all'art. 1»), not followed by another act or a code
+  99/2015, art. 1, comma 3», «legge 99/2015, art. 1, primo comma», «legge 99/2015, art. 1 e ss.»,
+  «legge 99/2015, all'art. 1»), not followed by another act or a code
   («legge 99/2015, art. 1 Cost.» is not it, nor «art. 1 della Carta», «CEDU», «della Convenzione»,
   «del Trattato», «TFUE», «TUE»). Anything else between the article and the act breaks the link:
   another act's name with or without a number, «Cost.», «c.c.», «cod.», «regolamento», «citato», a
@@ -1093,6 +1104,21 @@ citation, here, is any form of a type in the act-type table, or «decreto», «d
 marker, then the number and year: «legge regionale n. 99 del 2015», «l.r. n. 99/2015», «legge
 della Regione Veneto n. 99 del 2015», «Reg. (UE) n. 99/2015», «decreto n. 99 del 2015».
 
+A decision cited date first (PR 4f) is found too: «Cass. 12 aprile 2018, n. 8980», «Cass., sez.
+III, 12 aprile 2018, n. 8980», «sent. 12.4.2018 n. 8980», «Cass. civ., 12/04/2018, n. 8980» for
+the number 8980 and the year 2018. The span covers the date and the number: a date whose year is
+the query's (day and month real: a month's name in full, or two numbers; four-digit year), then a
+comma and spaces only, then «n.», «nr.», «num.» or «numero» and exactly the query's number (not
+the start of a longer one, not followed by «/» and a year or by «del» and a year: «n. 8980/2019»
+and «n. 8980 del 2019» are other citations). The court before the date is not required in the text.
+A query typed date first reads as that number and year only with a court or a decision's marker
+before the date (as the other queries) and the «n.» before the number: «Cass. 12 aprile 2018, n.
+8980» is the number 8980 of 2018; «12 aprile 2018, n. 8980» and «Cass. 12 aprile 2018, 8980» are
+searched literally, and so is a query with an act's name between the court and the date. The act
+guard holds on both sides: «legge 12 aprile 2018, n. 8980», «d.lgs. 12 aprile 2018, n. 8980»,
+«decreto 12 aprile 2018, n. 8980» are never a decision, as a number and year in the other forms
+never are.
+
 **Punctuation in abbreviations.** For every query, a dot or a comma inside or after an
 abbreviation is optional on both sides: «cpa» finds «c.p.a.», «art 13» finds «art. 13», «art.
 13, comma 1-quater» finds «art. 13 comma 1-quater». A dot that ends a sentence is never
@@ -1107,8 +1133,15 @@ minimum: «n.», «l.», «c.» and «1.» are not searched, «c.p.» is.
 a digit, nor ends right before a digit when it ends with one: «8980/2018» is not found in
 «18980/2018» nor in «8980/20181».
 
-**Not yet found.** A decision written date first («Cass. 12 aprile 2018, n. 8980»), and an
-article linked to its act through «primo comma», «commi», «e ss.» or «del c.c.».
+**Not found.** Still not found, by choice (a form that is doubtful is not matched): a decision
+cited date first with no «n.» before the number, with a two-digit year or an abbreviated month
+(«12 apr. 2018»), and an act's article linked through «sgg.»/«segg.», «comma unico», «primo
+periodo» or any other word not listed above. A decision cited date first after a section named
+«L» («Sez. L, 12 aprile 2018, n. 8980») is lost to the act guard, which reads the «L» as «legge»
+(as «Sez. L, n. 8980/2018» already is). A date-first number is not told apart from the same
+date and number of an administrative act that the act guard does not list («circolare 12 aprile
+2018, n. 8980»). «art. 2043 del c.c.» is found in the window; `extractCitations` still does not
+read it, so it is no link in a decision's text.
 
 **Tests.** Synthetic texts in the repository, written for the cases above. Real decision texts
 stay out of the repository (they carry personal data): a local-only suite reads them from a
