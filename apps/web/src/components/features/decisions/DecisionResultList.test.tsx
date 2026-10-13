@@ -354,7 +354,8 @@ describe('DecisionResultList — the section’s year control', () => {
       mockSearch({ ...PAGE, totale: 40, anni: [{ anno: 2026, n: 30 }, { anno: 2019, n: 10 }], decisioni: [HIT] });
       render(wrap(<DecisionResultList query={QUERY} />));
       await screen.findByRole('link', { name: /n\. 24908\/2026/ });
-      expect(lastReport()).toEqual([{ year: 2026, n: 30, approx: true }, { year: 2019, n: 10, approx: true }]);
+      // The years are reported from an effect: under load it can land after the list is drawn.
+      await waitFor(() => expect(lastReport()).toEqual([{ year: 2026, n: 30, approx: true }, { year: 2019, n: 10, approx: true }]));
       expect(report).toHaveBeenCalledWith('cassazione', expect.anything());
     });
 
@@ -363,10 +364,10 @@ describe('DecisionResultList — the section’s year control', () => {
       mockSearch({ esito: 'fonte_non_raggiungibile', fonte: 'cassazione' });
       render(wrap(<DecisionResultList query={QUERY} />));
       await screen.findByRole('link', { name: /n\. 24908\/2026/ });
-      expect(lastReport()).toEqual([{ year: 2026, n: 30, approx: true }, { year: 2019, n: 10, approx: true }]);
+      await waitFor(() => expect(lastReport()).toEqual([{ year: 2026, n: 30, approx: true }, { year: 2019, n: 10, approx: true }]));
       await userEvent.click(screen.getByRole('button', { name: 'Nel testo' }));
       await screen.findByText('L’archivio della Cassazione non risponde in questo momento.');
-      expect(lastReport()).toEqual([]);
+      await waitFor(() => expect(lastReport()).toEqual([]));
     });
 
     it('stay while only the range changes, so they do not flicker', async () => {
@@ -386,14 +387,14 @@ describe('DecisionResultList — the section’s year control', () => {
       mockSearch({ ...PAGE_TEXT, anni: [{ anno: 2026, n: 312 }] });
       render(wrap(<DecisionResultList query={QUERY} />));
       await screen.findByText('menzionato nel testo');
-      expect(lastReport()).toEqual([{ year: 2026, n: 312 }]);
+      await waitFor(() => expect(lastReport()).toEqual([{ year: 2026, n: 312 }]));
     });
 
     it('count the hits loaded when the archive sent no counts', async () => {
       mockSearch({ ...PAGE, totale: 2, decisioni: [HIT, OLD] });
       render(wrap(<DecisionResultList query={QUERY} />));
       await screen.findByRole('link', { name: /n\. 500\/2019/ });
-      expect(lastReport()).toEqual([{ year: 2026, n: 1 }, { year: 2019, n: 1 }]);
+      await waitFor(() => expect(lastReport()).toEqual([{ year: 2026, n: 1 }, { year: 2019, n: 1 }]));
     });
   });
 
