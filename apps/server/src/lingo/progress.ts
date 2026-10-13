@@ -15,8 +15,13 @@ import { dueWhere, introducedToday, newCardsWhere, queueFinished } from './today
  *
  * In SQL a review's Rome day is `(data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome'`: the
  * column is a TIMESTAMP without a zone holding UTC, and read straight as Rome time it would be off by one
- * or two hours. It agrees with `romeDay` (tests/lingoProgress.routes.test.ts).
+ * or two hours. It agrees with `romeDay` (tests/lingoProgress.routes.test.ts). The log is read from the
+ * start of a Rome day as an instant (`romeDayStartSql`), so the index `(utente_id, data_revisione)` bounds
+ * the scan to the window asked for.
  */
+
+/** 00:00 in Rome of `day`, as the UTC TIMESTAMP the review columns hold. */
+const romeDayStartSql = (day: string) => Prisma.sql`((${day}::date)::timestamp AT TIME ZONE 'Europe/Rome') AT TIME ZONE 'UTC'`;
 
 export const CALENDAR_WEEKS = 26;
 export const FORECAST_DAYS = 14;
@@ -96,8 +101,7 @@ export async function readProgress(userId: string, materia?: LingoMateria): Prom
   const recent = await prisma.$queryRaw<{ materia: LingoMateria; n: number }[]>`
     SELECT c.materia::text AS materia, COUNT(*)::int AS n
     FROM lingo_revisioni_srs r JOIN lingo_cards c ON c.id = r.card_id
-    WHERE r.utente_id = ${userId}
-      AND ((r.data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome')::date >= ${recentStart}::date
+    WHERE r.utente_id = ${userId} AND r.data_revisione >= ${romeDayStartSql(recentStart)}
     GROUP BY c.materia`;
   const recentBySubject = new Map(recent.map((row) => [row.materia, row.n]));
 
@@ -130,18 +134,19 @@ export async function readProgress(userId: string, materia?: LingoMateria): Prom
   };
 }
 
-/** One subject's reviews per Rome day from `start`: «new» is the card's first review ever, read over the whole log. */
+/** One subject's reviews per Rome day from `start`: «new» is the card's first review ever by the user (no earlier one). */
 async function subjectDays(userId: string, materia: LingoMateria, start: string) {
   const rows = await prisma.$queryRaw<{ giorno: Date; ripassi: number; nuove: number; sbagliate: number }[]>(Prisma.sql`
-    SELECT giorno, COUNT(*)::int AS ripassi, (COUNT(*) FILTER (WHERE n = 1))::int AS nuove, (COUNT(*) FILTER (WHERE rating = 1))::int AS sbagliate
-    FROM (
-      SELECT r.rating, c.materia::text AS materia,
-             ((r.data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome')::date AS giorno,
-             ROW_NUMBER() OVER (PARTITION BY r.card_id ORDER BY r.data_revisione, r.id) AS n
-      FROM lingo_revisioni_srs r JOIN lingo_cards c ON c.id = r.card_id
-      WHERE r.utente_id = ${userId}
-    ) AS x
-    WHERE materia = ${materia} AND giorno >= ${start}::date
-    GROUP BY giorno`);
+    SELECT ((r.data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome')::date AS giorno,
+           COUNT(*)::int AS ripassi,
+           (COUNT(*) FILTER (WHERE NOT EXISTS (
+             SELECT 1 FROM lingo_revisioni_srs e
+             WHERE e.utente_id = r.utente_id AND e.card_id = r.card_id
+               AND (e.data_revisione < r.data_revisione OR (e.data_revisione = r.data_revisione AND e.id < r.id))
+           )))::int AS nuove,
+           (COUNT(*) FILTER (WHERE r.rating = 1))::int AS sbagliate
+    FROM lingo_revisioni_srs r JOIN lingo_cards c ON c.id = r.card_id
+    WHERE r.utente_id = ${userId} AND r.data_revisione >= ${romeDayStartSql(start)} AND c.materia::text = ${materia}
+    GROUP BY 1`);
   return new Map(rows.map((row) => [dateToDay(row.giorno), { ripassi: row.ripassi, nuove: row.nuove, sbagliate: row.sbagliate }]));
 }

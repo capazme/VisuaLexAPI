@@ -520,6 +520,17 @@ describe('the review routes', () => {
       expect(await storedDay(alice, '2026-10-19')).toMatchObject({ ripassi: 2, nuove: 2 });
     });
 
+    it('says the goal closed exactly once when two grades race on the threshold', async () => {
+      setClock(MONDAY_MORNING);
+      const [one, two] = [await card(alice), await card(alice), await card(alice)];
+      await request(app).put(PREFS).set(a).send({ ripassiAlGiorno: 2 });
+
+      const answers = await Promise.all([grade(a, { cardId: one.id, rating: 3 }), grade(a, { cardId: two.id, rating: 3 })]);
+
+      expect(answers.map((r) => r.body.oggi.appenaRaggiunto).sort()).toEqual([false, true]);
+      expect(await storedDay(alice, '2026-10-19')).toMatchObject({ ripassi: 2, valido: true });
+    });
+
     it('puts a grade at 23:59 and one at 00:01 in Rome on two days', async () => {
       const [one, two] = [await card(alice), await card(alice), await card(alice)];
       setClock('2026-10-19T21:59:00Z'); // 23:59 in Rome (CEST)

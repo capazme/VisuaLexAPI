@@ -252,6 +252,34 @@ describe('the progress read', () => {
     expect(counted).toEqual({ '2027-03-27': 1, '2027-03-28': 2, '2027-03-29': 1 });
   });
 
+  it('recounts today with the goal in force, whatever the stored row says', async () => {
+    setClock('2026-10-19T08:00:00Z');
+    for (let i = 0; i < 3; i++) await card(alice);
+    await storedRow(alice, '2026-10-19', { ripassi: 3, valido: true });
+    // The goal raised behind the routes' back: the stored row still says the day counts.
+    await prisma.lingoPreferenzeStudio.create({ data: { utenteId: alice.id, ripassiAlGiorno: 5 } });
+
+    const body = (await progress(a)).body;
+
+    expect(body.oggi).toMatchObject({ ripassi: 3, obiettivo: 5, raggiunto: false });
+    expect(body.serie.attuale).toBe(0);
+    expect(body.serie.ultimiGiorni.at(-1).stato).toBe('oggi');
+    expect(body.calendario.at(-1)).toMatchObject({ giorno: '2026-10-19', valido: false });
+  });
+
+  it('counts the last 30 Rome days from midnight in Rome, as an instant', async () => {
+    const c = await card(alice, 'DIRITTO_PENALE');
+    // On 28 October the window starts on 29 September, 00:00 in Rome: 22:00 UTC on the 28th (summer time).
+    for (const at of ['2026-09-28T21:59:00Z', '2026-09-28T22:01:00Z']) {
+      await prisma.lingoRevisioneSRS.create({ data: { utenteId: alice.id, cardId: c.id, dataRevisione: new Date(at), rating: 3, scheduledDays: 1, stability: 1, difficulty: 5 } });
+    }
+    setClock('2026-10-28T08:00:00Z');
+
+    const body = (await progress(a)).body;
+
+    expect(body.materie.find((m: { materia: string }) => m.materia === 'DIRITTO_PENALE').ripassi30).toBe(1);
+  });
+
   it('is not open to a connected application', async () => {
     const response = await request(app).get(PROGRESS).set(await delegated(alice));
     expect(response.status).toBe(403);

@@ -133,12 +133,14 @@ Rule (spec D8): walk forward from the earliest counted day to today. A counted d
 /** Inside the grade's transaction, after the log row: count the grade into today's row and say whether the day counts now. */
 export async function recordGradeDay(tx: Prisma.TransactionClient, userId: string, today: string, grade: { isNew: boolean; wrong: boolean }): Promise<{ ripassi: number; obiettivo: number; before: boolean; after: boolean }>;
 /** On a read of today's session or progress: an empty queue makes today a counted day (spec D7). Idempotent. */
-export async function markEmptyDay(db: Prisma.TransactionClient | PrismaClient, userId: string, today: string): Promise<void>;
+export async function markQueueFinished(db: Prisma.TransactionClient, userId: string, today: string): Promise<void>;
+/** After the review goal changed: today's `valido` by the new goal; past days untouched. */
+export async function recountToday(db: Prisma.TransactionClient, userId: string, today: string, goal: number): Promise<void>;
 export function dayToDate(day: string): Date;   // 'YYYY-MM-DD' → the Date Prisma maps to a DATE (UTC midnight)
 export function dateToDay(date: Date): string;  // the inverse, read in UTC, never through romeDay
 ```
 
-`recordGradeDay`, in order: `INSERT … ON CONFLICT ("utente_id", "giorno") DO NOTHING` (raw SQL); `SELECT "valido" … FOR UPDATE` (the row lock serialises a user's grades of the day); `queueFinished`; one `UPDATE` adding the counters and setting `coda_finita = coda_finita OR $finished` and `valido = ripassi + 1 >= $N OR coda_finita OR $finished`, `RETURNING` the new values. The grade route calls it inside its transaction only when the grade is recorded; after the transaction it reads the counted days and calls `computeStreak` for `serie`. `markEmptyDay` is an `INSERT … ON CONFLICT DO NOTHING` with the two flags true, called by `GET /sessione` when `dovute` and `nuove` are both zero and no subject narrows it.
+`recordGradeDay`, in order: `INSERT … ON CONFLICT ("utente_id", "giorno") DO NOTHING` (raw SQL); `SELECT "valido" … FOR UPDATE` (the row lock serialises a user's grades of the day); `queueFinished`; one `UPDATE` adding the counters and setting `coda_finita = coda_finita OR $finished` and `valido = ripassi + 1 >= $N OR coda_finita OR $finished`, `RETURNING` the new values. The grade route calls it inside its transaction only when the grade is recorded; after the transaction it reads the counted days and calls `computeStreak` for `serie`. `markQueueFinished` is an upsert setting the two flags true (a row with reviews gets them too), called by `GET /sessione` when `dovute` and `nuove` are both zero, no subject narrows it and `queueFinished` agrees (false for someone who never reviewed a card in scope); `PUT /preferenze` with `ripassiAlGiorno` calls `recountToday`.
 - [ ] **Step 4:** Run the file's tests; commit `feat(server): each recorded grade counts into the day; the grade says when the goal closes`.
 
 ### Task 4: `GET /api/lingo/srs/progressi`
@@ -150,7 +152,7 @@ export function dateToDay(date: Date): string;  // the inverse, read in UTC, nev
 
 The answer is spec §5.2's shape. Where each part comes from:
 
-- `oggi`: today's row (or zeros), `obiettivo` the current N, `raggiunto = ripassi >= N || codaFinita || queueFinished(now)`; an empty queue calls `markEmptyDay`. `dovute` and `nuove` are the session's counts for the subject asked (the home shows them in its sentence).
+- `oggi`: today's row (or zeros), `obiettivo` the current N, `raggiunto = ripassi >= N || codaFinita || queueFinished(now)`; a finished queue calls `markQueueFinished`. `dovute` and `nuove` are the session's counts for the subject asked (the home shows them in its sentence).
 - `serie`: `computeStreak` over the stored counted days, with today as just computed.
 - `stati`, `materie`, `prossimi`: one `findMany` of the state rows in scope (`select: { dueAt, lastReviewAt, card: { select: { materia } } }`), split in TypeScript with `cardMaturity.ts` (`CONSOLIDATED_DAYS = 21`; the interval is `daysBetween(romeDay(lastReviewAt), romeDay(dueAt))`), and one `lingoCard.groupBy({ by: ['materia'] })` of the new cards in scope. `prossimi`: 14 days from today, overdue counted today.
 - `materie[].ripassi30`: the log of the last 30 Rome days joined to the card's subject, grouped by subject, in SQL with the review-focus expression.
@@ -166,7 +168,7 @@ The answer is spec §5.2's shape. Where each part comes from:
 - Test: `apps/server/tests/lingoAccountErasure.test.ts`, the export's test, `apps/server/tests/trash*.test.ts` (whichever holds the card trash round trip)
 
 - [ ] **Step 1: Failing tests:** `GET /auth/export` carries `data.lingoGiornate` (day as 'YYYY-MM-DD', the three counts, the two flags), and `data.lingoPreferenze` gains `ripassiAlGiorno`; `DELETE /auth/account` leaves no `lingo_giornate_studio` row; trashing a studied draft and restoring it leaves every stored day byte for byte as before (review focus 4).
-- [ ] **Step 2:** Implement the export. Update `apps/server/CLAUDE.md`: the «Card review» paragraph (`/progressi`, the grade's `oggi`, `ripassiAlGiorno`, the stored days, `markEmptyDay`), «LingoLex cards» (the export key, the cascade), and the Rome-day SQL gotcha.
+- [ ] **Step 2:** Implement the export. Update `apps/server/CLAUDE.md`: the «Card review» paragraph (`/progressi`, the grade's `oggi`, `ripassiAlGiorno`, the stored days, `markQueueFinished`, `recountToday`), «LingoLex cards» (the export key, the cascade), and the Rome-day SQL gotcha.
 - [ ] **Step 3:** Full server suite and build; `code-reviewer` over the branch; fix every finding; push; open PR 1. **Do not merge before the answer to question 182.**
 
 ---
