@@ -671,9 +671,16 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
   number and ordinal, the text in force before past texts. A block shows the
-  act's title (`/fetch_rubriche` `title`, not for codes) and each row «art. N —
-  rubrica» through `useActDetails` (one cached call per act; the tree only for an
-  act in parts — `utils/actRubriche.ts`). Acts reorder by drag:
+  act's title (`/fetch_rubriche` `title`, not for codes; an EU act's subject from
+  its EUR-Lex page) and each row «art. N — rubrica» through `useActDetails` (one
+  cached call per act; the tree only for an act in parts — `utils/actRubriche.ts`).
+  The hook reads the whole act (`act`), never what the dossier's search left of it;
+  what it read stays on screen while the act is read again and when a reading
+  fails, and a block that mounts again shows it at once (the PDF falls back to it,
+  `lastActTitle`). `/fetch_rubriche` answers
+  200 even when the source failed, so `actStructureCache` keeps no empty answer:
+  until 13 October 2026 one empty answer blanked the act's title for the session,
+  and each new annex or search blanked it while it was read. Acts reorder by drag:
   `setDossierItemOrder` saves the whole order and waits, never sending a
   temporary id, while an added or restored item is pending
   (`pendingDossierOrders`). Articles do not drag. The header has three actions

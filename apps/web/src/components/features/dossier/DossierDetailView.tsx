@@ -51,7 +51,7 @@ import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
 import { buildPdfBlocks, loadDossierTexts, writeDossierPdf } from './dossierPdf';
-import { resolveBlockUrn } from './useActDetails';
+import { lastActTitle, resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
@@ -409,7 +409,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             console.error('PDF: act title unavailable for', block.heading, err);
             return null;
           });
-        titles.set(block.key, answer?.title?.trim() || null);
+        // A source that fails now keeps the title the block shows.
+        titles.set(block.key, answer?.title?.trim() || lastActTitle(block.key));
       }));
       const blocks = buildPdfBlocks(dossier.items, texts, titles);
 
@@ -683,6 +684,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                     <DossierActBlock
                       key={block.key}
                       block={block}
+                      act={fullBlocks.get(block.key) ?? block}
                       dragDisabled={hasFilter}
                       isFolded={foldedActs.has(block.key)}
                       onToggleFold={() => toggleFolded(block.key)}
