@@ -12,6 +12,12 @@ The recommendation was «prima le regole (principio di diritto, P.Q.M., passi ch
 massime), segnate come automatiche e mai mescolate alle tue evidenziazioni. L'IA dopo, se servono».
 The owner, 13 October: «Ok proviamo».
 
+Four choices put to the owner with this spec (his numbers 191–194), answered on 13 October:
+«191-194 va bene». So: the massime stay out of this round; the preview shows the first key passage
+(the principle of law, else the dispositivo) instead of the first lines; the passages are on by
+default, with the switch remembered in the browser; at the Corte costituzionale every decision
+sentence is marked.
+
 ## Where the ranges are computed
 
 In the web, over `decisionProjection`: the projection is defined there, so the readers' output and
@@ -72,7 +78,7 @@ them in this round.
 4. **Never stored, never exported.** The passages exist only on screen. Highlights, notes, the .txt
    and PDF exports, environments, the Forum and the account export read stored data only, so they
    never carry an automatic passage unless the user made it theirs.
-5. **The preview (proposal).** The list preview of PR #169 shows, for a found decision, its first key
+5. **The preview.** The list preview of PR #169 shows, for a found decision, its first key
    passage — the principle, else the dispositivo — under «Passaggio chiave · evidenziato
    automaticamente», instead of the first lines (which for the Cassazione are the parties' names).
 

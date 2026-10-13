@@ -51,8 +51,8 @@ Spec: `docs/superpowers/specs/2026-10-13-decision-key-passages-design.md`. One p
 
 - `DecisionPreviewContent` for a found decision shows its first passage (principle, else dispositivo)
   under «Passaggio chiave · evidenziato automaticamente», cut as `previewLines` cuts; without one,
-  the first lines as today. Hover and list previews alike. Only if the owner agrees (spec, «The
-  preview»).
+  the first lines as today. Hover and list previews alike (the owner agreed, 13 October: «191-194 va
+  bene»).
 
 ## Task 5 — close
 
