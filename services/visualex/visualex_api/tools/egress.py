@@ -76,7 +76,8 @@ NON_NETWORK_HOSTS: dict[str, str] = {
     "github.com": "appears only in massimario_portal.USER_AGENT, which names the project; never fetched",
     "www.w3.org": (
         "XML names, never fetched: the XML Schema datatype IRIs (xsd:gYear, xsd:string) inside the "
-        "CGUE reader's SPARQL query (decisions/curia.py) and the HTML namespace of the administrative "
+        "CGUE reader's SPARQL query (decisions/curia.py), the OWL namespace of the query that lists the "
+        "Union's decisions citing an article (decisions/eu_case_law.py) and the HTML namespace of the administrative "
         "courts' documents (decisions/giustizia_amministrativa.py)"
     ),
 }
