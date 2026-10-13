@@ -89,8 +89,11 @@ const LIST_NEXT = /\s*(?:,|e|ed)\s*(n(?:r|um(?:ero)?)?\.?\s*\d{1,6}\s*(?:\/\s*\d
 const AFTER_CITATION = /^[\s,([\u2013\u2014-]*(?:(?:della|delle|del|dello|dell['’]|dalla|dal|di|il|lo|la|le|l['’]|emessa|pronunciata|resa|adottata)\s*)*/u;
 // Inside a Corte costituzionale ruling, other courts named by description: the Sezioni unite (always the
 // Cassazione's), «la Suprema Corte», «il giudice di legittimità», «il giudice amministrativo»…
+const SECTION_BEFORE_COURT = /^(?:(?:prima|seconda|terza|quarta|quinta|sesta|settima)\s+)?sez(?:ion[ei]|\.)\s[^,;()]{0,40}?(?:della|del|dell['’]|dello)\s*/u;
 const OTHER_COURT_WORDS = /^(?:sez(?:ioni|\.)?\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+(?:di\s+legittimit|amministrativ|ordinari|contabil|tributari))/u;
-const OTHER_COURT_MARKERS = /(?<![\p{L}\p{N}])(?:sez(?:ioni|\.)\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+(?:di\s+legittimit|amministrativ|ordinari|contabil|tributari)\p{L}*)/giu;
+// Before a «sentenza n. …», only the names of another court: «la giurisdizione del giudice amministrativo (sentenze n. 204
+// del 2004 …)» speaks of a jurisdiction, and the rulings cited are the Court's own.
+const OTHER_COURT_MARKERS = /(?<![\p{L}\p{N}])(?:sez(?:ioni|\.)\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+di\s+legittimit\p{L}*)/giu;
 const CORTE_COSTITUZIONALE = /^(?:corte\s+cost|c\.\s*cost)/i;
 const CORTE_DI_AFTER = /^(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+/u;
 
@@ -155,8 +158,11 @@ function courtFollows(folded: string, end: number, ownCourt: boolean): boolean {
   const after = folded.slice(end, end + 70);
   const joined = AFTER_CITATION.exec(after);
   if (!joined) return false;
-  const here = end + joined[0].length;
+  let here = end + joined[0].length;
   if (OTHER_COURT_WORDS.test(folded.slice(here, here + 40))) return true;
+  // «… della terza sezione civile della Corte di cassazione»: a section named before its court
+  const section = SECTION_BEFORE_COURT.exec(folded.slice(here, here + 60));
+  if (section) here += section[0].length;
   const skipped = CORTE_DI_AFTER.exec(folded.slice(here, here + 30));
   for (const at of skipped ? [here, here + skipped[0].length] : [here]) {
     for (const heads of [COURT_HEADS, UNSUPPORTED_HEADS]) {
@@ -393,8 +399,10 @@ export function extractDecisionCitations(
     const cut = head.court ? courtStarts : starts;
     const next = firstAtOrAfter(cut, head.end);
     const limit = Math.min(head.start + MAX_TAIL, next < cut.length ? cut[next] : folded.length);
-    const tailEnd = closingBracket(text, head.start, sentenceEnd(text, folded, head.start, limit));
-    if (head.court) lastCourt = { end: head.end, coverEnd: tailEnd };
+    const sentenceTail = sentenceEnd(text, folded, head.start, limit);
+    // the bracket ends what is read as this citation, not the court's cover: «(Corte d'appello di Milano), sez. lav.» is its section
+    const tailEnd = closingBracket(text, head.start, sentenceTail);
+    if (head.court) lastCourt = { end: head.end, coverEnd: sentenceTail };
     if (head.unsupported) continue;
     const prefix = head.kind ? SYNTHETIC_CORTE_COSTITUZIONALE : head.section ? SYNTHETIC_COURT : '';
     const shared = sharedYearItems(text, folded, head, prefix, tailEnd, now, () => (acts ??= allActSpans(folded)));
