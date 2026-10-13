@@ -31,6 +31,19 @@ const stripEdges = (s: string): string => s.replace(/^[ \t\n\r\f\v]+|[ \t\n\r\f\
 const blockTexts = (testo: DecisionText): Array<[string, string, string]> =>
   BLOCKS.map(([key, name]) => [key, name, stripEdges(testo[key] ?? '')]);
 
+/**
+ * Each block as the projection counts it: its text stripped at its edges (with its `\n`, which the
+ * rules reading paragraphs need) and the projection offset of its first character.
+ */
+export function decisionBlocks(testo: DecisionText): Array<{ key: keyof DecisionText; text: string; start: number }> {
+  let start = 0;
+  return blockTexts(testo).map(([key, , text]) => {
+    const block = { key: key as keyof DecisionText, text, start };
+    start += text.replace(/\n/g, '').length;
+    return block;
+  });
+}
+
 export function decisionProjection(testo: DecisionText): string {
   return blockTexts(testo)
     .map(([, , text]) => text)
