@@ -69,6 +69,8 @@ const UNSUPPORTED_HEADS = new RegExp(
     `|giudice\\s+a\\s+quo|giudice\\s+rimettente|rimettente|comm(?:issione)?\\.?\\s*trib(?:utaria)?\\.?|giudice\\s+di\\s+pace|g\\.\\s*d\\.\\s*p\\.|c\\.\\s*t\\.\\s*[pr]\\.?|ct[pr])(?![\\p{L}\\p{N}])`,
   'giu',
 );
+// «(Trib. Milano), sez. II»: a Tribunale in brackets, a place after it; «(trib.)» alone is the Cassazione's tax section.
+const TRIBUNALE_IN_BRACKETS = /\(\s*([Tt]rib\.)(?=\s*\p{Lu})/gu;
 // «Corte di cassazione», «Suprema Corte di Cassazione»: the span starts at the first of these words.
 const CORTE_DI = /(?<![\p{L}\p{N}])(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+$/u;
 const CORTE_DI_REACH = 30;
@@ -126,6 +128,10 @@ function findHeads(text: string, folded: string, within: DecisionContext | undef
     if (bare && !TAX_PLACE.test(text.slice(end, end + 40))) continue;
     if (!supported.has(start)) heads.push({ start, end, court: true, section: false, unsupported: true });
   }
+  for (const m of text.matchAll(TRIBUNALE_IN_BRACKETS)) {
+    const start = (m.index ?? 0) + m[0].length - m[1].length;
+    if (!supported.has(start)) heads.push({ start, end: start + m[1].length, court: true, section: false, unsupported: true });
+  }
   for (const m of folded.matchAll(CASE_HEADS)) {
     const start = m.index ?? 0;
     // «c-12/2020» in lower case is not a case number
@@ -176,6 +182,14 @@ function courtFollows(folded: string, end: number, ownCourt: boolean): boolean {
   }
   return false;
 }
+
+/** Whether the Court names itself right after `end`: «… del 2018 di questa Corte», «… della Corte costituzionale». */
+function ownCourtFollows(folded: string, end: number): boolean {
+  const after = folded.slice(end, end + 50);
+  const joined = AFTER_CITATION.exec(after);
+  return OWN_COURT_AFTER.test(after.slice(joined ? joined[0].length : 0));
+}
+const OWN_COURT_AFTER = /^(?:quest[ao]\s+corte|corte\s+cost|c\.\s*cost)/u;
 
 // «questa Corte»: the Court speaking of itself.
 const THIS_COURT = /(?<![\p{L}\p{N}])quest[ao]\s+corte(?![\p{L}\p{N}])/giu;
@@ -349,7 +363,7 @@ function citationGap(written: string, words: ReadonlySet<string>, properNames: b
 
 // What may stand between a court's name and its own section: a seat, the court's kind («reg.», «prov.»).
 const COVER_WORDS = new Set([
-  ...CITATION_WORDS, 'reg', 'regionale', 'prov', 'provinciale', 'pace', 'appello', 'secondo',
+  ...CITATION_WORDS, 'rinvio', 'reg', 'regionale', 'prov', 'provinciale', 'pace', 'appello', 'secondo',
   'min', 'minorenni', 'sorv', 'sorveglianza', 'disciplinare', 'dal', 'dalla', 'dallo', 'dalle', 'dai', 'al', 'alla',
 ]);
 const MAX_COVER_GAP = 60;
@@ -395,7 +409,8 @@ export function extractDecisionCitations(
     if (head.start < consumed) continue;
     if ((head.section || head.kind) && lastCourt && head.start < lastCourt.coverEnd && inCourtCitation(text, lastCourt.end, head.start)) continue;
     consumed = head.end;
-    if (head.kind && otherCourtBefore(text, folded, markers, head.start)) continue;
+    // another court named before: the Court's own only when it says so right after the number («… di questa Corte»)
+    const ownOnlyIfSaid = Boolean(head.kind) && otherCourtBefore(text, folded, markers, head.start);
     const cut = head.court ? courtStarts : starts;
     const next = firstAtOrAfter(cut, head.end);
     const limit = Math.min(head.start + MAX_TAIL, next < cut.length ? cut[next] : folded.length);
@@ -407,6 +422,7 @@ export function extractDecisionCitations(
     const prefix = head.kind ? SYNTHETIC_CORTE_COSTITUZIONALE : head.section ? SYNTHETIC_COURT : '';
     const shared = sharedYearItems(text, folded, head, prefix, tailEnd, now, () => (acts ??= allActSpans(folded)));
     if (shared) {
+      if (ownOnlyIfSaid && !ownCourtFollows(folded, shared[shared.length - 1].end)) continue;
       found.push(...shared);
       consumed = shared[shared.length - 1].end;
       if (head.court && lastCourt) lastCourt.coverEnd = consumed;
@@ -477,6 +493,7 @@ export function extractDecisionCitations(
     }
     const lastEnd = items.length > 0 ? items[items.length - 1].end : end;
     if (head.kind && courtFollows(folded, lastEnd, true)) continue;
+    if (ownOnlyIfSaid && !ownCourtFollows(folded, lastEnd)) continue;
 
     found.push({ start, end, reference, path: decisionPath(reference) }, ...items);
     consumed = lastEnd;
