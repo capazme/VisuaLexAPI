@@ -79,7 +79,7 @@ Read from develop e08005eb.
 ## Design
 
 **Server** (`apps/server`).
-- Migration `<next>_dossier_kind_forum_source` (name from the orchestrator): enum `DossierKind` (`lavoro`, `studio`);
+- Migration `20261023100000_dossier_kind_forum_source` (name assigned by the orchestrator): enum `DossierKind` (`lavoro`, `studio`);
   `dossiers.kind DossierKind NOT NULL DEFAULT 'lavoro'`; `shared_environments.source_dossier_id TEXT NULL` →
   `dossiers(id) ON DELETE SET NULL`, with a partial unique index (`WHERE source_dossier_id IS NOT NULL`);
   `shared_environments.withdrawn_by_admin_at TIMESTAMP NULL` (Q8). Additive only; tested on a copy of the dev DB

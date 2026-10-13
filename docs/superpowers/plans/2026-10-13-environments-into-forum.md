@@ -19,7 +19,7 @@ Q1–Q8; the tasks assume the recommended answers and change where he chose othe
 
 ## PR 1 — `feat/dossier-kind-forum-server` (apps/server)
 
-**Task 1.1 — the migration and the kind.** Announce the migration to the orchestrator and take the name it assigns.
+**Task 1.1 — the migration and the kind.** Migration `20261023100000_dossier_kind_forum_source` (assigned by the orchestrator).
 `DossierKind`, `dossiers.kind` default `lavoro`, `shared_environments.source_dossier_id TEXT` (SetNull, partial unique
 index), `withdrawn_by_admin_at`; by hand, `migrate deploy` on the test DB, then on a copy of the dev DB with row counts
 before and after. Dossier create/update accept `kind`; serializers return it and `published`; the trash restore keeps
