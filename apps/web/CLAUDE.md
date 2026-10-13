@@ -900,7 +900,9 @@ Duplicating any of these is a defect, not a shortcut.
   `citation_linker.py`) read the same prose forms: "regolamento (UE)
   2016/679, art. 5", "art. 5 del regolamento (UE) 2016/679", "art. 5, comma
   1, del …", and a list ("articoli 8 e 9 del …") becomes one link per number,
-  all towards the EU act. The client matcher reads the article-first form
+  all towards the EU act. The matcher also reads documents a user drops in, so its patterns read a run of
+  spaces in one way only (`\s*(?:,\s*)?`, never `\s*,?\s*`; two adjacent `\s*` are quadratic) and its used
+  ranges are a byte map, not a list: `citationMatcher.test.ts` times 100 000-character runs. The client matcher reads the article-first form
   for numbered national acts too ("art. 7 del d.lgs. 196/2003", with or
   without the preposition), as the server's `_EXPLICIT_CITE_RE` and
   `_ART_DEL_ACT_RE` do, and the codici and the Costituzione named in full
