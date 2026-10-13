@@ -137,7 +137,7 @@ The Rome day of a stored instant is computed in SQL as `((data_revisione AT TIME
 `POST /api/lingo/srs/revisioni` adds to its answer, when the grade was recorded:
 
 ```jsonc
-"oggi": { "ripassi": 20, "obiettivo": 20, "raggiunto": true, "appenaRaggiunto": true, "serie": 13 }
+"oggi": { "giorno": "2026-10-13", "ripassi": 20, "obiettivo": 20, "raggiunto": true, "appenaRaggiunto": true, "serie": 13 }
 ```
 
 `appenaRaggiunto` is true on the one grade that made the day count (it did not before), so the session celebrates at that moment, also across two devices. Raising N after the goal was met makes the day not count again, and the grade that reaches the new N says `appenaRaggiunto` again; the web app still celebrates once a day (decision 10) by remembering the day it celebrated (§6.4). Additive: nothing that reads the answer today changes.

@@ -161,7 +161,7 @@ router.post('/revisioni', async (req, res) => {
   res.json({
     ...recorded,
     // What the session needs to celebrate the goal at the grade that closes it (Studia progress spec §5.3).
-    oggi: { ripassi: day.ripassi, obiettivo: day.obiettivo, raggiunto: day.after, appenaRaggiunto: day.after && !day.before, serie },
+    oggi: { giorno: today, ripassi: day.ripassi, obiettivo: day.obiettivo, raggiunto: day.after, appenaRaggiunto: day.after && !day.before, serie },
   });
 });
 

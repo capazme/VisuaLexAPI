@@ -442,7 +442,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   new slot or no new card left), and it is false for someone who never reviewed a card in scope.
   `lingo/streak.ts` `computeStreak` is the one definition of the streak: one missed day in seven
   is a rest (`REST_SPACING_DAYS`), today still open never breaks it. The grade's answer carries
-  `oggi: { ripassi, obiettivo, raggiunto, appenaRaggiunto, serie }` when the grade is recorded;
+  `oggi: { giorno, ripassi, obiettivo, raggiunto, appenaRaggiunto, serie }` when the grade is recorded;
   `appenaRaggiunto` is true on the one grade that made the day count. `GET /progressi?materia=`
   (`lingo/progress.ts`): `oggi`, `serie`, `stati` (new / learning / consolidated at
   `CONSOLIDATED_DAYS` = 21, `lingo/cardMaturity.ts`), `materie` (all five), `calendario`

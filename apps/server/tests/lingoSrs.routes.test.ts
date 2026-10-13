@@ -266,7 +266,7 @@ describe('the review routes', () => {
       // Her only card is graded: the whole queue is finished, so the day counts at once (Studia progress spec D7).
       expect(response.body).toEqual({
         registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2,
-        oggi: { ripassi: 1, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 1 },
+        oggi: { giorno: '2026-10-19', ripassi: 1, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 1 },
       });
       const state = await prisma.lingoStatoRipasso.findUniqueOrThrow({ where: { utenteId_cardId: { utenteId: alice.id, cardId: c.id } } });
       expect(state).toMatchObject({ stability: 2.4, difficulty: 4.93, reps: 1, lapses: 0 });
@@ -468,7 +468,7 @@ describe('the review routes', () => {
       const [one, two] = [await card(alice), await card(alice), await card(alice)];
 
       const first = await grade(a, { cardId: one.id, rating: 3 });
-      expect(first.body.oggi).toEqual({ ripassi: 1, obiettivo: 10, raggiunto: false, appenaRaggiunto: false, serie: 0 });
+      expect(first.body.oggi).toEqual({ giorno: '2026-10-19', ripassi: 1, obiettivo: 10, raggiunto: false, appenaRaggiunto: false, serie: 0 });
       await grade(a, { cardId: two.id, rating: 1 });
       expect(await storedDay(alice, '2026-10-19')).toEqual({ ripassi: 2, nuove: 2, sbagliate: 1, codaFinita: false, valido: false });
 
@@ -495,7 +495,7 @@ describe('the review routes', () => {
 
       expect(answers.map((o) => o.appenaRaggiunto)).toEqual([false, false, true, false]);
       expect(answers.map((o) => o.raggiunto)).toEqual([false, false, true, true]);
-      expect(answers[2]).toEqual({ ripassi: 3, obiettivo: 3, raggiunto: true, appenaRaggiunto: true, serie: 1 });
+      expect(answers[2]).toEqual({ giorno: '2026-10-19', ripassi: 3, obiettivo: 3, raggiunto: true, appenaRaggiunto: true, serie: 1 });
     });
 
     it('counts a day whose whole queue is finished with fewer than N reviews', async () => {
@@ -505,7 +505,7 @@ describe('the review routes', () => {
       expect((await grade(a, { cardId: one.id, rating: 3 })).body.oggi.raggiunto).toBe(false);
       const last = await grade(a, { cardId: two.id, rating: 3 });
 
-      expect(last.body.oggi).toEqual({ ripassi: 2, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 1 });
+      expect(last.body.oggi).toEqual({ giorno: '2026-10-19', ripassi: 2, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 1 });
       expect(await storedDay(alice, '2026-10-19')).toEqual({ ripassi: 2, nuove: 2, sbagliate: 0, codaFinita: true, valido: true });
     });
 
