@@ -303,3 +303,27 @@ describe('extractDecisionCitations, «C.d.S.» as the codice della strada', () =
     expect(writtenIn('Si veda art. 5. C.d.S. n. 5/2018 ha deciso.')).toEqual(['C.d.S. n. 5/2018']);
   });
 });
+
+describe('extractDecisionCitations, «C.d.S.» followed by a section is the court', () => {
+  it('links the Consiglio di Stato after «del», «dal» or an article, and in a Cassazione decision too', () => {
+    const forms: [string, string][] = [
+      ['Come afferma la sentenza del C.d.S., sez. IV, n. 5/2018.', 'C.d.S., sez. IV, n. 5/2018'],
+      ['Come ritenuto dal C.d.S., sez. IV, n. 5/2018.', 'C.d.S., sez. IV, n. 5/2018'],
+      ["Vale l'art. 21-nonies, C.d.S., sez. VI, n. 5/2018 per l'annullamento.", 'C.d.S., sez. VI, n. 5/2018'],
+      ["Vale l'art. 21-nonies, C.d.S., Ad. plen., n. 5/2018 per l'annullamento.", 'C.d.S., Ad. plen., n. 5/2018'],
+    ];
+    for (const [text, span] of forms) {
+      for (const within of [undefined, 'cassazione', 'corte_costituzionale'] as const) {
+        expect(writtenIn(text, within), `${within} ${text}`).toEqual([span]);
+        for (const s of spansOf(text, within)) expect(s.reference.corte, text).toBe('consiglio_di_stato');
+      }
+    }
+  });
+
+  it('without a section, «dal/al/nel C.d.S. n. …» stays the code (truly ambiguous)', () => {
+    for (const text of ['Come ritenuto dal C.d.S. n. 5/2018 in tema di appalti.', 'Si rinvia al C.d.S. n. 5/2018.', 'Previsto nel C.d.S. n. 5/2018.']) {
+      expect(writtenIn(text), text).toEqual([]);
+      expect(writtenIn(text, 'cassazione'), text).toEqual([]);
+    }
+  });
+});

@@ -1120,7 +1120,7 @@ the start of a longer one, not followed by «/» and a year or by «del» and a 
 and «n. 8980 del 2019» are other citations; nor «n. 8980 del Sindaco», «della Giunta», «del
 Ministero»…: an office's number). In the text a court or a decision's marker must stand before the
 date (a court, a section, «sent.», «sentenza», «ord.», «ordinanza», «S.U.», and the administrative
-courts' abbreviations «T.A.R.», «C.d.S.», «C.G.A.», «C.G.A.R.S.»…; «c.d.s.» right after an article or after «del», «al», «dal», «nel» is the codice della strada and no marker), within 60 characters, with no
+courts' abbreviations «T.A.R.», «C.d.S.», «C.G.A.», «C.G.A.R.S.»…; «c.d.s.» right after an article or after «del», «al», «dal», «nel» is the codice della strada and no marker, unless a section follows it: «C.d.S., sez. IV» is the court), within 60 characters, with no
 act's name, no semicolon and no end of a sentence (a full stop after a word of five letters or
 more, after a digit, a closing bracket or a quote; «giust.», «giurisd.», «contr.», «interloc.»,
 «amm.» and «spec.» are abbreviations, not ends) between the two: date first is also how ministerial decrees, regional laws and

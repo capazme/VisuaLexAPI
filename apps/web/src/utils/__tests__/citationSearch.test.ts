@@ -464,6 +464,10 @@ describe('findCitationSpans', () => {
       'sentenza del C.d.S. 12 aprile 2018, n. 5',
       'art. 142 c.d.s.; C.d.S. 12 aprile 2018, n. 5',
       'Cons. Stato, sez. IV, 12 aprile 2018, n. 5',
+      'la sentenza del C.d.S., sez. IV, 12 aprile 2018, n. 5',
+      'dal C.d.S., sez. IV, 12 aprile 2018, n. 5',
+      'art. 21-nonies, C.d.S., sez. VI, 12 aprile 2018, n. 5',
+      'art. 21-nonies, C.d.S., Ad. plen., 12 aprile 2018, n. 5',
     ];
     for (const text of found5) expect(cited(text, q), text).toEqual(['12 aprile 2018, n. 5']);
   });

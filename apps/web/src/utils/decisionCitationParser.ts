@@ -127,17 +127,21 @@ const AFTER_ARTICLE = new RegExp(
   'u',
 );
 const AFTER_PREPOSITION = /(?<![\p{L}\p{N}])(?:del|al|dal|nel)\s*$/u;
+// A section of the Consiglio di Stato right after («C.d.S., sez. IV», «C.d.S., Ad. plen.») names the court.
+const SECTION_AFTER = /^\s*,?\s*(?:sez(?:ion[ei])?\.?(?![\p{L}\p{N}])|ad(?:unanza)?\.?\s*plen)/u;
 /** How far before a head the article or the preposition may stand. */
 const CDS_REACH = 80;
 
 /**
  * Whether the head at `[start, end)` of `folded` (lower case, as `foldForSearch` makes it) is the
  * codice della strada and not the Consiglio di Stato: «c.d.s.» or «cds» right after an article
- * citation («art. N[-suffix][, comma M][,] [del]») or after «del», «al», «dal», «nel». The one rule of
+ * citation («art. N[-suffix][, comma M][,] [del]») or after «del», «al», «dal», «nel», unless a
+ * section follows it («C.d.S., sez. IV», «C.d.S., Ad. plen.»: then it is the court). The one rule of
  * both readers of a text (`decisionCitationMatcher`, the find window's `followsDecisionMarker`).
  */
 export function isCodiceDellaStrada(folded: string, start: number, end: number): boolean {
   if (!ABBREVIATED_CDS.test(folded.slice(start, end).trim().replace(/[\s.,;:(]+$/, ''))) return false;
+  if (SECTION_AFTER.test(folded.slice(end, end + 30))) return false;
   const before = folded.slice(Math.max(0, start - CDS_REACH), start);
   return AFTER_PREPOSITION.test(before) || AFTER_ARTICLE.test(before);
 }
