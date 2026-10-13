@@ -8,6 +8,15 @@ the decision, whose `owl:annotatedTarget` is the act (found by its CELEX) and wh
 the article may be written `A6` or `A06`). One SPARQL query per article returns the citing
 decisions with CELEX, ECLI, date and type.
 
+Only the acts of sector 3 of the CELEX (regulations, directives and decisions: `3YYYY[RLD]NNNN`)
+are searched. A treaty (`12012E/TXT`) gave no row when measured on 13 October 2026, and an empty
+list there would pass for "no case law": any other well-formed CELEX is `non_supportata`.
+
+Each decision carries its identity (`identita`, the shape `/fetch_decision` takes: court, case
+number, case year) and its CELEX. Only a judgment opens with `/fetch_decision`'s CGUE reader, which
+finds judgments (CELEX types CJ and TJ) by case; an order or an Advocate General's opinion
+(`tipo`) opens on EUR-Lex by its `celex` (owner's orchestration, 13 October 2026).
+
 The list is not complete: the article-level fragments arrive late for recent cases and are thin
 before 2021 (measured on 12 October 2026), which is why the web block says so. A source that
 cannot be reached, or answers something unreadable, is `fonte_non_raggiungibile`, never an empty
@@ -27,6 +36,7 @@ from ...tools.cache_manager import get_cache_manager
 from ...tools.exceptions import DocumentNotFoundError, NetworkError
 from .curia import COURTS, SPARQL_URL, case_label
 from .http import decisions_http_client, http_headers
+from .model import Identity
 
 log = structlog.get_logger()
 
@@ -35,7 +45,7 @@ EU_TIMEOUT = 25.0
 _REQUEST_TIMEOUT = 20
 ROW_LIMIT = 500
 # Prefix of the cache key: bump it whenever the shape of the answer changes.
-CACHE_VERSION = "v1"
+CACHE_VERSION = "v2"
 
 #: `work_has_resource-type` → the answer's `tipo`. Any other type (a notice, an opinion of the
 #: Court under art. 218 TFEU, …) is left out by the query itself.
@@ -45,6 +55,8 @@ _TYPE_URI = "http://publications.europa.eu/resource/authority/resource-type/"
 # The act by its CELEX («32016R0679», a treaty's «12012E/TXT») and the article as digits: both
 # enter the query, so both are checked against these patterns first. ASCII only.
 _ACT_CELEX = re.compile(r"[0-9]\d{4}[A-Z]{1,2}(?:\d{4}|/[A-Z]{3})", re.ASCII)
+# What is searched: sector 3, a regulation, a directive or a decision.
+_SEARCHABLE_CELEX = re.compile(r"3\d{4}[RLD]\d{4}", re.ASCII)
 _ARTICLE = re.compile(r"[1-9]\d{0,3}", re.ASCII)
 # A decision's CELEX: 6, the case's year, the court's letter (C or T), the kind of document, the
 # number. The Civil Service Tribunal's (F, closed in 2016) is not a court of the table: left out.
@@ -65,10 +77,14 @@ def validate(celex: Any, articolo: Any) -> dict[str, str]:
     return errors
 
 
+def is_searchable(celex: str) -> bool:
+    return bool(_SEARCHABLE_CELEX.fullmatch(celex))
+
+
 def sparql_query(celex: str, articolo: str) -> str:
     """The query. `celex` and `articolo` are checked here too: nothing a caller wrote enters it
     unchecked, even if a caller forgot `validate`."""
-    if validate(celex, articolo):
+    if validate(celex, articolo) or not is_searchable(celex):
         raise ValueError("CELEX o articolo non validi")
     types = ", ".join(f"<{_TYPE_URI}{name}>" for name in TYPES)
     return (
@@ -100,7 +116,9 @@ def decisions_from_sparql(payload: Any) -> tuple[list[dict[str, Any]], bool]:
     for row in rows:
         if not isinstance(row, dict):
             continue
-        value = lambda key: (row.get(key) or {}).get("value")  # noqa: E731
+        def value(key: str) -> Any:
+            cell = row.get(key)
+            return cell.get("value") if isinstance(cell, dict) else None
         celex, type_uri, date = value("celex"), value("type"), value("date")
         m = _DECISION_CELEX.match(celex) if isinstance(celex, str) else None
         tipo = TYPES.get(type_uri.rsplit("/", 1)[-1]) if isinstance(type_uri, str) else None
@@ -117,6 +135,7 @@ def decisions_from_sparql(payload: Any) -> tuple[list[dict[str, Any]], bool]:
             "data": date if isinstance(date, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date) else None,
             "tipo": tipo,
             "celex": celex,
+            "identita": Identity(_COURT_OF_LETTER[letter], numero, anno).to_dict(),
         })
     decisions = sorted(found.values(), key=lambda d: (d["data"] or "", d["celex"]), reverse=True)
     return decisions, len(rows) >= ROW_LIMIT
@@ -140,11 +159,14 @@ _SOURCE_ERRORS = (NetworkError, DocumentNotFoundError, asyncio.TimeoutError, Val
 
 
 async def search_eu_case_law(celex: Any, articolo: Any) -> tuple[dict, int]:
-    """(the answer, the status): `risultati` 200, `richiesta_non_valida` 400,
+    """(the answer, the status): `risultati` 200, `non_supportata` 200 (a well-formed CELEX that is
+    not a regulation, a directive or a decision), `richiesta_non_valida` 400,
     `fonte_non_raggiungibile` 503. Only an answer the source gave is cached."""
     errors = validate(celex, articolo)
     if errors:
         return {"esito": "richiesta_non_valida", "errori": errors}, 400
+    if not is_searchable(celex):
+        return {"esito": "non_supportata"}, 200
     articolo = str(articolo)
     key = hashlib.sha256(json.dumps([CACHE_VERSION, celex, articolo]).encode()).hexdigest()
     cache = get_cache()

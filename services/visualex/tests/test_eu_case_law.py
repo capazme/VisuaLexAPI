@@ -139,6 +139,8 @@ def test_the_query_builder_refuses_what_validation_refuses():
     with pytest.raises(ValueError):
         sparql_query('32016R0679" ) } #', "6")
     with pytest.raises(ValueError):
+        sparql_query("12012E/TXT", "267")  # well formed, but not searched
+    with pytest.raises(ValueError):
         sparql_query("32016R0679", '6") } #')
 
 
@@ -147,18 +149,21 @@ def test_the_query_builder_refuses_what_validation_refuses():
 def test_a_judgment_of_the_court_of_justice():
     decisions, truncated = decisions_from_sparql(_payload(_row("62017CJ0496", "JUDG", "2019-01-16", "ECLI:EU:C:2019:26")))
     assert decisions == [{"corte": "corte_giustizia_ue", "causa": "C-496/17", "ecli": "ECLI:EU:C:2019:26",
-                          "data": "2019-01-16", "tipo": "JUDG", "celex": "62017CJ0496"}]
+                          "data": "2019-01-16", "tipo": "JUDG", "celex": "62017CJ0496",
+                          "identita": {"corte": "corte_giustizia_ue", "numero": 496, "anno": 2017}}]
     assert truncated is False
 
 
 def test_a_judgment_of_the_general_court():
     [d], _ = decisions_from_sparql(_payload(_row("62017TJ0612", "JUDG", "2020-03-04", "ECLI:EU:T:2020:96")))
     assert d["corte"] == "tribunale_ue" and d["causa"] == "T-612/17" and d["tipo"] == "JUDG"
+    assert d["identita"] == {"corte": "tribunale_ue", "numero": 612, "anno": 2017}
 
 
 def test_an_opinion_of_an_advocate_general_is_the_courts():
     [d], _ = decisions_from_sparql(_payload(_row("62021CC0077", "OPIN_AG", "2022-03-31", "ECLI:EU:C:2022:248")))
     assert d["corte"] == "corte_giustizia_ue" and d["causa"] == "C-77/21" and d["tipo"] == "OPIN_AG"
+    assert d["identita"] == {"corte": "corte_giustizia_ue", "numero": 77, "anno": 2021}
 
 
 def test_an_order_of_either_court():
@@ -171,6 +176,7 @@ def test_an_order_of_either_court():
 def test_a_case_before_1989_has_no_letter():
     [d], _ = decisions_from_sparql(_payload(_row("61962CJ0026", "JUDG", "1963-02-05", "ECLI:EU:C:1963:1")))
     assert d["causa"] == "26/62" and d["corte"] == "corte_giustizia_ue"
+    assert d["identita"] == {"corte": "corte_giustizia_ue", "numero": 26, "anno": 1962}
 
 
 def test_what_is_not_a_decision_of_a_court_in_the_table_is_dropped():
@@ -189,6 +195,17 @@ def test_what_is_not_a_decision_of_a_court_in_the_table_is_dropped():
 def test_a_row_that_is_not_an_object_is_skipped():
     decisions, _ = decisions_from_sparql(_payload("x", None, 3, _row("62024CJ0003")))
     assert [d["celex"] for d in decisions] == ["62024CJ0003"]
+
+
+def test_a_binding_that_is_not_an_object_is_a_row_without_that_field():
+    # {"celex": "62017CJ0496"} instead of {"celex": {"value": …}}: skipped, not an AttributeError
+    rows = [{"celex": "62017CJ0496", "date": {"value": "2019-01-16"}, "type": {"value": TYPE + "JUDG"}},
+            {"celex": {"value": "62024CJ0003"}, "date": "2024-01-01", "type": {"value": TYPE + "JUDG"},
+             "ecli": ["x"]},
+            _row("62024CJ0004")]
+    decisions, _ = decisions_from_sparql(_payload(*rows))
+    assert [d["celex"] for d in decisions] == ["62024CJ0004", "62024CJ0003"]
+    assert decisions[1]["data"] is None and decisions[1]["ecli"] is None
 
 
 def test_a_decision_comes_once_whatever_the_rows_and_newest_first():
@@ -258,6 +275,22 @@ async def test_an_article_with_no_decisions_is_an_empty_list_not_an_error(cache,
     _answers(monkeypatch, _payload())
     answer, status = await search_eu_case_law("32016R0679", "99")
     assert status == 200 and answer["esito"] == "risultati" and answer["totale"] == 0 and answer["decisioni"] == []
+
+
+@pytest.mark.parametrize("celex", [
+    "12012E/TXT",   # a treaty: the source gave no row for it, which would read as «no case law»
+    "12016E/TXT", "02016R0679", "32016H0001", "52016PC0001", "62017CJ0496",
+])
+async def test_an_act_that_is_not_searched_is_not_supported_not_empty(cache, monkeypatch, celex):
+    asked = _answers(monkeypatch, _payload())
+    answer, status = await search_eu_case_law(celex, "267")
+    assert status == 200 and answer == {"esito": "non_supportata"}
+    assert asked == [] and cache.data == {}
+
+
+@pytest.mark.parametrize("celex", ["32016R0679", "32011L0083", "32019D0001", "31995L0046"])
+def test_regulations_directives_and_decisions_are_searched(celex):
+    assert eu_case_law.is_searchable(celex)
 
 
 async def test_a_request_that_is_not_valid_never_reaches_the_source(cache, monkeypatch):
@@ -370,7 +403,15 @@ async def test_the_route_answers_a_list(client, cache, monkeypatch):
     assert resp.status_code == 200
     body = await resp.get_json()
     assert body["esito"] == "risultati" and body["decisioni"][0]["causa"] == "C-496/17"
-    assert set(body["decisioni"][0]) == {"corte", "causa", "ecli", "data", "tipo", "celex"}
+    assert set(body["decisioni"][0]) == {"corte", "causa", "ecli", "data", "tipo", "celex", "identita"}
+    assert body["decisioni"][0]["identita"] == {"corte": "corte_giustizia_ue", "numero": 496, "anno": 2017}
+
+
+async def test_the_route_says_a_treaty_is_not_supported(client, cache, monkeypatch):
+    asked = _answers(monkeypatch, _payload())
+    resp = await client.post("/search_eu_case_law", json={"celex": "12012E/TXT", "articolo": "267"})
+    assert resp.status_code == 200 and await resp.get_json() == {"esito": "non_supportata"}
+    assert asked == []
 
 
 @pytest.mark.parametrize("payload", [None, [], "x", 3])

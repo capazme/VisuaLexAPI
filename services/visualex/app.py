@@ -1145,7 +1145,8 @@ class NormaController:
     async def search_eu_case_law(self):
         """The decisions of the Court of Justice and the General Court that cite an article of
         an act of the Union (design 2026-10-12 §D1): `{celex, articolo}`. JSON with `esito`:
-        risultati 200, richiesta_non_valida 400, fonte_non_raggiungibile 503, errore_interno 500
+        risultati and non_supportata (a CELEX that is not a regulation, a directive or a
+        decision) 200, richiesta_non_valida 400, fonte_non_raggiungibile 503, errore_interno 500
         (a bug: a fixed body). A source that cannot be reached is never an empty list.
 
         Answers this handler does not write are not JSON with `esito`: the per-IP rate limit

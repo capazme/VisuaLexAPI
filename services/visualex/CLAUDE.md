@@ -235,20 +235,25 @@ POST unless noted, JSON bodies.
   text search, and an act no way can phrase (an EU act among them) answers non_supportata. Design:
   docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md
 - `/search_eu_case_law` — the decisions of the Court of Justice and the General Court that cite an
-  article of an act of the Union: `{celex, articolo}` (the act's CELEX, `32016R0679`, a treaty's
-  `12012E/TXT`; the article as digits, 1 to 9999, both checked against strict patterns before they enter
-  the SPARQL query) → `esito` risultati (`decisioni`: `{corte, causa, ecli, data, tipo, celex}` newest
-  first, `tipo` JUDG | ORDER | OPIN_AG, the Advocates General's opinions included; `totale`; `troncato`
-  when the query hit its 500-row limit; cached 3 days per act and article, `cache_manager.EU_CASE_LAW_TTL`),
-  richiesta_non_valida 400, fonte_non_raggiungibile 503 (`fonte: curia`; a timeout, a partial or
-  unreadable answer: never an empty list, never cached), errore_interno 500 (a bug: a fixed body).
+  article of a regulation, a directive or a decision of the Union: `{celex, articolo}` (the act's CELEX,
+  `32016R0679`; the article as digits, 1 to 9999; both checked against strict patterns before they enter
+  the SPARQL query) → `esito` risultati (`decisioni`: `{corte, causa, ecli, data, tipo, celex, identita}`
+  newest first, `identita` = `{corte, numero, anno}` as `/fetch_decision` takes it, `tipo` JUDG | ORDER |
+  OPIN_AG, the Advocates General's opinions included; `totale`; `troncato` when the query hit its 500-row
+  limit; cached 3 days per act and article, `cache_manager.EU_CASE_LAW_TTL`), non_supportata 200 (a
+  well-formed CELEX that is not `3YYYY[RLD]NNNN`: a treaty such as `12012E/TXT` gave no row on 13 October
+  2026 and an empty list would read as «no case law»; never queried, never cached), richiesta_non_valida
+  400, fonte_non_raggiungibile 503 (`fonte: curia`; a timeout, a partial, malformed or unreadable answer:
+  never an empty list, never cached), errore_interno 500 (a bug: a fixed body).
   CELLAR reifies a decision's citation of an act as an `owl:Axiom` (`owl:annotatedSource` the decision,
   `owl:annotatedTarget` the act, `annotation:fragment_cited_target` a literal such as `A06P1L1LB`); the
   fragment is matched `^A0?<n>($|[PL])`, so article 6 never finds `A60`. The list is not complete: the
   fragments arrive late for recent cases and are thin before 2021. Decisions of other types (a notice,
   an opinion under art. 218 TFEU) and of the Civil Service Tribunal (closed 2016) are left out.
-  Measured on 13 October 2026: 0.06 to 0.8 s, 35 to 100 decisions (5 to 15 KB) for an article of a
-  regulation or a directive; the TFEU's CELEX gave no row. Design: docs/superpowers/specs/2026-10-12-case-law-section-design.md
+  Only a judgment opens with `/fetch_decision`'s CGUE reader (it finds CELEX types CJ and TJ by case):
+  an order or an Advocate General's opinion opens on EUR-Lex by its `celex` (decided 13 October 2026).
+  Measured on 13 October 2026 for a regulation or a directive: 0.06 to 0.8 s, 35 to 114 decisions
+  (5 to 25 KB with `identita`). Design: docs/superpowers/specs/2026-10-12-case-law-section-design.md
 - `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
   PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
   fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.
