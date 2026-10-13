@@ -771,6 +771,18 @@ describe('the review routes', () => {
       expect((await session(a)).body.cards.some((x: { id: string; nuova: boolean }) => x.id === c.id && x.nuova)).toBe(false);
     });
 
+    it('leaves the stored study days as they were, through the trash and back (Studia progress spec D13)', async () => {
+      const c = await studiedDraft();
+      const days = () => prisma.lingoGiornataStudio.findMany({ orderBy: { giorno: 'asc' } });
+      const before = await days();
+      expect(before).toHaveLength(2);
+
+      await trash(a, c.id);
+      expect(await days()).toEqual(before);
+      await restore(a);
+      expect(await days()).toEqual(before);
+    });
+
     it('takes along only the author’s reviews, not another user’s', async () => {
       const c = await studiedDraft();
       await prisma.lingoRevisioneSRS.create({ data: { utenteId: bob.id, cardId: c.id, rating: 3, scheduledDays: 2, stability: 2.4, difficulty: 4.93 } });
@@ -814,6 +826,8 @@ describe('the review routes', () => {
       expect((await request(app).post(GRADE).set(token).send({ cardId: c.id, rating: 3 })).status).toBe(403);
       expect((await request(app).get(PREFS).set(token)).status).toBe(403);
       expect((await request(app).put(PREFS).set(token).send({ nuoveAlGiorno: 5 })).status).toBe(403);
+      expect((await request(app).put(PREFS).set(token).send({ ripassiAlGiorno: 5 })).status).toBe(403);
+      expect((await request(app).get('/api/lingo/srs/progressi').set(token)).status).toBe(403);
       const write = await delegated(alice, 'lingo:cards:write');
       expect((await request(app).post(GRADE).set(write).send({ cardId: c.id, rating: 3 })).status).toBe(403);
       expect(await prisma.lingoRevisioneSRS.count()).toBe(0);
