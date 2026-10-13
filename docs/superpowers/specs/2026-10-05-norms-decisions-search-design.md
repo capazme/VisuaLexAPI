@@ -1100,11 +1100,13 @@ cost.», «sent.», «ord.», «S.U.», «n.»), or bare as «N/YYYY» with a fo
 citation are never a decision, neither as a span nor as a literal match: «Cass. n. 99/2015» and
 «n. 99/2015» do not find the number of «legge n. 99 del 2015» or «l. n. 99/2015». An act's
 citation, here, is any form of a type in the act-type table, or «decreto», «direttiva»,
-«regolamento» («dir.», «reg.»), or an administrative act cited «date, n. N» («circolare»,
+«regolamento» («dir.», «reg.»), or an administrative act («circolare»,
 «nota», «provvedimento», «delibera», «deliberazione», «determina», «determinazione»,
 «risoluzione», «parere»; «circ.», «provv.», «delib.», «det.»; never «ordinanza» or «sentenza»,
-which are decisions), followed by up to five words that are not a court or a decision's
-marker, then the number and year: «legge regionale n. 99 del 2015», «l.r. n. 99/2015», «legge
+which are decisions), in every form of the number and year, not only date first, followed by up to five words that are not a court or a decision's
+marker (an administrative court is one, except right after «del», «della», «dello», «dell'»: «il
+parere del C.d.S. n. 99/2015» is an act, «come nota il C.d.S. n. 99/2015» a decision), then the
+number and year: «legge regionale n. 99 del 2015», «l.r. n. 99/2015», «legge
 della Regione Veneto n. 99 del 2015», «Reg. (UE) n. 99/2015», «decreto n. 99 del 2015».
 
 A decision cited date first (PR 4f) is found too: «Cass. 12 aprile 2018, n. 8980», «Cass., sez.
@@ -1115,9 +1117,11 @@ comma and spaces only, then «n.», «nr.», «num.» or «numero» and exactly 
 the start of a longer one, not followed by «/» and a year or by «del» and a year: «n. 8980/2019»
 and «n. 8980 del 2019» are other citations; nor «n. 8980 del Sindaco», «della Giunta», «del
 Ministero»…: an office's number). In the text a court or a decision's marker must stand before the
-date (a court, a section, «sent.», «sentenza», «ord.», «ordinanza», «S.U.»…), within 60 characters,
-with no act's name, no semicolon and no end of a sentence (a word of five letters or more before a
-full stop) between the two: date first is also how ministerial decrees, regional laws and
+date (a court, a section, «sent.», «sentenza», «ord.», «ordinanza», «S.U.», and the administrative
+courts' abbreviations «T.A.R.», «C.d.S.», «C.G.A.», «C.G.A.R.S.»…), within 60 characters, with no
+act's name, no semicolon and no end of a sentence (a full stop after a word of five letters or
+more, after a digit, a closing bracket or a quote; «giust.», «giurisd.», «contr.», «interloc.»,
+«amm.» and «spec.» are abbreviations, not ends) between the two: date first is also how ministerial decrees, regional laws and
 administrative acts are cited, and only the marker tells them apart. «Cass. 12 aprile 2018 e 13
 maggio 2018, n. 8980» finds the second date; «il decreto del Ministro dell'economia e delle
 finanze 12 aprile 2018, n. 8980» and «il 12 aprile 2018, n. 8980 persone» find nothing. A query typed date first reads as that number and year only with a court or a decision's marker
@@ -1154,7 +1158,10 @@ number is not told apart from an administrative act the guard does not name (a �
 
 **Known ambiguity.** «ss.» ends with the dot of an abbreviation, which may also end a sentence:
 «… art. 1 e ss. Legge 99/2015» links article 1 to the act, because the folded text has lost the
-capital that would tell the two apart. Refusing it would lose «artt. 1 e ss. L. 99/2015».
+capital that would tell the two apart. Refusing it would lose «artt. 1 e ss. L. 99/2015». The same
+for the end of a sentence in a date-first decision: a sentence that ends on a short abbreviation
+(«… art. 3 Cost. Il 12 aprile 2018, n. 8980 …», «… sul c.c. Il …») is not seen as an end, so a
+marker earlier in it reaches the date; telling the two apart by capitals would break «Cass. Sez. U».
 
 **Tests.** Synthetic texts in the repository, written for the cases above. Real decision texts
 stay out of the repository (they carry personal data): a local-only suite reads them from a

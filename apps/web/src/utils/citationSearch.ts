@@ -15,6 +15,7 @@ import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 import { extractCitations, type CitationMatch } from './citationMatcher';
 import { NUMBERED_ACT_SPELLINGS, toApiArticleNumber } from './citationParser';
 import { expandTwoDigitYear } from './dateUtils';
+import { ADMIN_COURT_HEAD_SOURCE } from './decisionCitationParser';
 import { foldForSearch } from './findInText';
 import { ACT_TYPES } from './sources/actTypes';
 
@@ -199,10 +200,12 @@ const QUERY_ACT = new RegExp(
 
 /**
  * Words a decision's citation may start with: the court, the section, the kind of decision. «c.»
- * alone is not one (it may be «comma»); «C. cost.» is.
+ * alone is not one (it may be «comma»); «C. cost.» is. The administrative courts' abbreviations
+ * («T.A.R.», «C.d.S.», «C.G.A.R.S.») are the ones the decisions' reader knows (`ADMIN_COURT_HEAD_SOURCE`).
  */
 const DECISION_HEAD =
-  '(?:cass|cassazione|corte|c\\.\\s*cost|cons|consiglio|tar|trib|tribunale|app|sent|sentenza|ord|ordinanza|sez|sezione|sezioni|s\\.\\s*u|ss\\.\\s*uu)(?!\\p{L})';
+  '(?:(?:cass|cassazione|corte|c\\.\\s*cost|cons|consiglio|tar|trib|tribunale|app|sent|sentenza|ord|ordinanza|sez|sezione|sezioni|s\\.\\s*u|ss\\.\\s*uu)(?!\\p{L})' +
+  `|${ADMIN_COURT_HEAD_SOURCE})`;
 const QUERY_DECISION = new RegExp(
   `^(?<head>${DECISION_HEAD}[^/]*?[\\s.,]+)?(?<numberWord>${NUMBER_WORD})?(?<number>\\d+)\\s*(?:\\/\\s*(?<slashYear>\\d{4}|\\d{2})|,?\\s+del\\s+(?<delYear>\\d{4}))$`,
   'u',
@@ -408,7 +411,7 @@ const ACT_WORD =
  * A word between an act's name and its number: «regionale», «reg.», «r.», «della», «Regione»,
  * «Friuli-Venezia», «(UE)». Never a court or a decision's marker: «la legge e Cass. n. …» is a decision.
  */
-const ACT_NAME_WORD = `(?!${DECISION_HEAD})(?:\\p{L}+(?:-\\p{L}+)*(?!\\p{L})\\.?|\\(\\p{L}+\\))`;
+const ACT_NAME_WORD = `(?:(?<=(?<!\\p{L})(?:del|della|dello|dell['’])\\s*)|(?!${DECISION_HEAD}))(?:\\p{L}+(?:-\\p{L}+)*(?!\\p{L})\\.?|\\(\\p{L}+\\))`;
 /** Spaces and at most one comma, in one way only (no backtracking over a long run of spaces). */
 const ACT_NAME_GAP = '\\s*(?:,\\s*)?';
 /** How many such words: «legge della Provincia autonoma di Trento». */
@@ -447,8 +450,13 @@ const overlapsAny = (spans: readonly Span[], [s, e]: Span): boolean => spans.som
 /** How far before a date a court or a decision's marker may stand. */
 const MARKER_REACH = 60;
 const DECISION_HEAD_ANYWHERE = new RegExp(`(?<![\\p{L}\\p{N}])${DECISION_HEAD}`, 'gu');
-/** A word of five letters or more before a full stop ends a sentence; a shorter one is an abbreviation («Cass.», «sez.»). */
-const SENTENCE_END = /\p{L}{5,}\.(?:\s|$)|[!?]\s/u;
+/**
+ * The end of a sentence: a full stop after a word of five letters or more (a shorter one is an
+ * abbreviation: «Cass.», «sez.», and so are «giust.», «giurisd.», «contr.», «interloc.»), after a digit
+ * or a closing bracket or quote, or a «!» or «?». A sentence that ends on a short abbreviation
+ * («… Cost. Il …») is not seen: the fold has lost the capital that would tell it.
+ */
+const SENTENCE_END = /(?<!\p{L})(?!(?:giust|giurisd|contr|interloc|amm|spec)\.)\p{L}{5,}\.(?:\s|$)|[\p{N})\]»"]\.(?:\s|$)|[!?]\s/u;
 /** «n. 8980 del Sindaco»: the number of an administrative act of an office, never of a court. */
 const OFFICE_AFTER = '(?!\\s*,?\\s+(?:del|della|dello|dell\')\\s*(?:sindaco|comune|presidente|prefetto|questore|giunta|ministro|ministero|dirigente|direttore|regione)(?!\\p{L}))';
 

@@ -402,6 +402,47 @@ describe('findCitationSpans', () => {
     for (const text of none) expect(cited(text, q), text).toEqual([]);
   });
 
+  it('a sentence ends at a full stop after a number, a bracket or a quote, so the marker does not reach over it', () => {
+    const q = 'Cass. n. 8980/2018';
+    const none = [
+      '(Cass. n. 5/2017). Il Comune, con atto 12 aprile 2018, n. 8980, ha disposto',
+      'Cass. n. 5/2017. Il 12 aprile 2018, n. 8980 persone',
+      'Così (Cass. sez. 3). Il 12 aprile 2018, n. 8980 persone',
+      'Come in «Cass. n. 5/2017». Il 12 aprile 2018, n. 8980 persone',
+      'Come in "Cass. n. 5/2017". Il 12 aprile 2018, n. 8980 persone',
+    ];
+    for (const text of none) expect(cited(text, q), text).toEqual([]);
+    // The dots of a date are not a sentence's end, and a decision's own dots are not either.
+    expect(cited('Cass. 12.4.2018 e 13.4.2018, n. 8980', q)).toEqual(['13.4.2018, n. 8980']);
+    expect(cited('Cass. S.U. 12.4.2018, n. 8980', q)).toEqual(['12.4.2018, n. 8980']);
+  });
+
+  it('abbreviations of a court, a section or a decision are no end of a sentence, nor are the administrative courts', () => {
+    const q = 'Cass. n. 8980/2018';
+    const found8980: [string, string][] = [
+      ['Cons. giust. amm. Sicilia, 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['Corte conti, sez. giurisd. 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['Corte conti, sez. contr. 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['Cass., ord. interloc. 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['T.A.R. Lazio 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['TAR Lazio, Roma, sez. II-bis, 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['C.d.S. 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['CdS, sez. IV, 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['C.G.A. 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+      ['C.G.A.R.S. 12 aprile 2018, n. 8980', '12 aprile 2018, n. 8980'],
+    ];
+    for (const [text, span] of found8980) expect(cited(text, q), text).toEqual([span]);
+    for (const head of ['T.A.R. Lazio', 'C.d.S.', 'C.G.A.R.S.']) {
+      expect(readQueryCitation(`${head} 12 aprile 2018, n. 8980`), head).toEqual({ kind: 'decision', number: '8980', year: '2018' });
+    }
+  });
+
+  it('a sentence that ends on a short abbreviation is not seen as an end (a known ambiguity)', () => {
+    const q = 'Cass. n. 8980/2018';
+    expect(cited("Cass. n. 5/2017 sull'art. 3 Cost. Il 12 aprile 2018, n. 8980 il Comune", q)).toEqual(['12 aprile 2018, n. 8980']);
+    expect(cited('Cass. n. 5/2017 sul c.c. Il 12 aprile 2018, n. 8980 il Comune', q)).toEqual(['12 aprile 2018, n. 8980']);
+  });
+
   it("never finds a decision's number inside an administrative act, cited date first or not", () => {
     const acts = [
       'circolare', 'circ.', 'nota', 'provvedimento', 'provv.', 'delibera', 'delib.', 'deliberazione', 'determina', 'det.',

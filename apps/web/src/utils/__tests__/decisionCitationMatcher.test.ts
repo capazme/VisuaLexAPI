@@ -263,3 +263,19 @@ describe('extractDecisionCitations, hostile text', () => {
     });
   });
 });
+
+// The act words that keep a decision's number out of an administrative act («nota», «provvedimento»,
+// «parere»…) must not swallow the administrative court that follows them as a name.
+describe('extractDecisionCitations, administrative acts and administrative courts', () => {
+  it('links a decision after «nota» or «provvedimento» when a court follows', () => {
+    expect(writtenIn('Come nota il T.A.R. Lazio n. 1234/2018.')).toEqual(['T.A.R. Lazio n. 1234/2018']);
+    expect(writtenIn('Come nota il C.d.S. n. 1234/2018.')).toEqual(['C.d.S. n. 1234/2018']);
+    expect(writtenIn('Il provvedimento impugnato T.A.R. Lazio n. 1234/2018.')).toEqual(['T.A.R. Lazio n. 1234/2018']);
+  });
+
+  it("does not link the administrative act of a court («parere del C.d.S.», «nota del T.A.R.»)", () => {
+    expect(writtenIn('Il parere del C.d.S. n. 1234/2018.')).toEqual([]);
+    expect(writtenIn('Il parere del Consiglio di Stato n. 1234/2018.')).toEqual([]);
+    expect(writtenIn('La nota del T.A.R. Lazio n. 1234/2018.')).toEqual([]);
+  });
+});
