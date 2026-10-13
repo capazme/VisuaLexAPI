@@ -247,7 +247,13 @@ Slice 1 wires 5 user-action signals into MERL-T.
   when the person ever consented, the person's own request, a revocation with
   `deleteData`), tried once at once (a few seconds), then by the worker
   `index.ts` starts (every five minutes, waiting five minutes after a failure,
-  doubling, at most a day) until MERL-T answers 200; then deleted.
+  doubling, at most a day; a failure logs its status, never the id) until MERL-T
+  answers 200; then, when it owes one (`confirmAgainAt`: always for an account
+  deleted or a revocation, for the person's own request only with work in
+  flight), once more an hour later, since a deliberation in flight can still
+  write; then deleted. With `MERLT_ENABLED=false` the `/api/merlt` routes are
+  off, these included: the requests already written still go out, and an
+  account deletion still writes one.
 - `routes/merlt/events.ts`: 5 endpoints (`article-viewed`,
   `highlight-annotation`, `dossier-bookmark`, `citation-clicked`,
   `forum-signal`). Each one runs `authenticate → consentGuard → Zod →

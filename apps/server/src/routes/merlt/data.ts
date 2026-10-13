@@ -80,8 +80,9 @@ router.get('/data/export', authenticate, async (req: Request, res: Response): Pr
 router.delete('/data', authenticate, async (req: Request, res: Response): Promise<void> => {
   const userId = req.user!.id;
   await prisma.$transaction(async (tx) => {
-    await eraseLocalMerltData(tx, userId);
+    // The request first: it reads whether work is in flight from the jobs about to go.
     await requestMerltErasure(tx, userId, 'user_request');
+    await eraseLocalMerltData(tx, userId);
   });
   const completed = await attemptMerltErasureNow(userId, 15_000);
   res.status(202).json({ completed });

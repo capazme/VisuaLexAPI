@@ -121,7 +121,9 @@ erase it (`DELETE /api/merlt/data`); deleting an account erases it too when
 the person ever consented. The erasure is a row in `merlt_erasure_requests`,
 written in the same transaction, and a worker sends it to MERL-T
 (`DELETE /api/v1/user-data/{id}`, admin key) until MERL-T confirms every store;
-then the row goes. MERL-T deletes the private data and keeps what the
+then, for an account deleted or a revocation, once more an hour later (work in
+flight can still write), and the row goes: until then it holds the id of an
+account that may be gone. MERL-T deletes the private data and keeps what the
 community took up (approved proposals, votes, reports) with the link to the
 person cut (`services/merlt/merlt/privacy/user_data.py`). Activity events
 expire after `MERLT_TRACKING_RETENTION_DAYS`.

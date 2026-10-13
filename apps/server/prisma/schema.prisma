@@ -145,9 +145,10 @@ model MerltConsentAudit {
 }
 
 // A person's MERL-T data to erase (an account deleted, or the person asked). No relation to
-// `users`: the account may be gone. The worker (`services/merlt/erasure.ts`) sends it to MERL-T
-// until MERL-T answers that every store is done, then deletes the row, so the id is kept no
-// longer than the erasure takes.
+// `users`: the account may be gone. The worker (`services/merlt/userData.ts`) sends it to MERL-T
+// until MERL-T answers that every store is done; then once more at `confirmAgainAt` (work in
+// flight at the first pass, such as a deliberation, can still write), then deletes the row, so
+// the id is kept no longer than the erasure takes.
 model MerltErasureRequest {
   id            String    @id @default(uuid())
   userId        String    @map("user_id")
@@ -156,6 +157,8 @@ model MerltErasureRequest {
   attempts      Int       @default(0)
   nextAttemptAt DateTime  @default(now()) @map("next_attempt_at")
   lastError     String?   @map("last_error") @db.VarChar(100)
+  // The second confirmation, an hour after the request; null once MERL-T confirmed the first.
+  confirmAgainAt DateTime? @map("confirm_again_at")
 
   @@index([nextAttemptAt])
   @@map("merlt_erasure_requests")

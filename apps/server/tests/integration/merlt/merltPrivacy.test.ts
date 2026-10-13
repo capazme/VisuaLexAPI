@@ -22,7 +22,7 @@ const TEST_MERLT_BASE = 'http://merlt-test.local:8000';
 
 beforeAll(() => {
   process.env.MERLT_API_URL = TEST_MERLT_BASE;
-  process.env.MERLT_TIMEOUT_MS = '500';
+  process.env.MERLT_USER_DATA_TIMEOUT_MS = '500';
   if (!nock.isActive()) nock.activate();
   nock.disableNetConnect();
   nock.enableNetConnect(/(127\.0\.0\.1|localhost)/);
@@ -36,7 +36,7 @@ afterAll(() => {
   nock.enableNetConnect();
   nock.restore();
   delete process.env.MERLT_API_URL;
-  delete process.env.MERLT_TIMEOUT_MS;
+  delete process.env.MERLT_USER_DATA_TIMEOUT_MS;
 });
 
 async function consent(user: TestUser, level: 'none' | 'basic' | 'full') {
@@ -188,7 +188,7 @@ describe("the person's MERL-T data", () => {
     expect(await prisma.merltErasureRequest.count()).toBe(0);
   });
 
-  it('revoking can erase what was collected', async () => {
+  it('revoking can erase what was collected, and confirms it again an hour later', async () => {
     nock(TEST_MERLT_BASE).delete(`/api/v1/user-data/${user.id}`).reply(200, { complete: true });
     const res = await request(app)
       .delete('/api/merlt/consent')
@@ -197,6 +197,25 @@ describe("the person's MERL-T data", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ level: 'none', noticeAnswered: true, erasure: { requested: true, completed: true } });
     expect(await prisma.merltQaJob.count({ where: { userId: user.id } })).toBe(0);
+
+    // Work in flight at the first pass could still write: one more pass, an hour on.
+    const waiting = await prisma.merltErasureRequest.findFirstOrThrow({ where: { userId: user.id } });
+    expect(waiting.confirmAgainAt).toBeNull();
+    expect(waiting.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() + 50 * 60 * 1000);
+    await prisma.merltErasureRequest.update({ where: { id: waiting.id }, data: { nextAttemptAt: new Date(0) } });
+    nock(TEST_MERLT_BASE).delete(`/api/v1/user-data/${user.id}`).reply(200, { complete: true });
+    expect(await processMerltErasures()).toBe(1);
+    expect(await prisma.merltErasureRequest.count()).toBe(0);
+  });
+
+  it('a plain erasure with a question in flight is confirmed again too', async () => {
+    await prisma.merltQaJob.create({
+      data: { userId: user.id, query: 'ancora in corso', mode: 'deliberazione', consentLevel: 'basic', status: 'running' },
+    });
+    nock(TEST_MERLT_BASE).delete(`/api/v1/user-data/${user.id}`).reply(200, { complete: true });
+    await request(app).delete('/api/merlt/data').set(authHeader(user));
+    const waiting = await prisma.merltErasureRequest.findFirstOrThrow({ where: { userId: user.id } });
+    expect(waiting).toMatchObject({ reason: 'user_request', confirmAgainAt: null });
   });
 
   it('revoking alone erases nothing', async () => {
@@ -225,7 +244,9 @@ describe('an account deletion reaches MERL-T', () => {
     await request(app).delete('/api/merlt/consent').set(authHeader(user)).send({});
     nock(TEST_MERLT_BASE).delete(`/api/v1/user-data/${user.id}`).reply(200, { complete: true });
     await deleteUserAccount(user.id);
-    expect(await prisma.merltErasureRequest.count()).toBe(0);
+    // Confirmed once; the second confirmation is still owed.
+    const waiting = await prisma.merltErasureRequest.findFirstOrThrow({ where: { userId: user.id } });
+    expect(waiting).toMatchObject({ reason: 'account_deleted', confirmAgainAt: null, attempts: 0 });
   });
 
   it('asks nothing of MERL-T for a person who never consented', async () => {

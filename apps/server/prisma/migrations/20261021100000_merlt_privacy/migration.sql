@@ -18,6 +18,7 @@ CREATE TABLE "merlt_erasure_requests" (
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "next_attempt_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "last_error" VARCHAR(100),
+    "confirm_again_at" TIMESTAMP(3),
 
     CONSTRAINT "merlt_erasure_requests_pkey" PRIMARY KEY ("id")
 );

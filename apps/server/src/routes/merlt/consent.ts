@@ -160,8 +160,8 @@ router.delete('/consent', async (req: Request, res: Response): Promise<void> => 
   let erasure: { requested: boolean; completed: boolean } = { requested: false, completed: false };
   if (parsed.data.deleteData) {
     await prisma.$transaction(async (tx) => {
-      await eraseLocalMerltData(tx, userId);
       await requestMerltErasure(tx, userId, 'consent_revoked');
+      await eraseLocalMerltData(tx, userId);
     });
     erasure = { requested: true, completed: await attemptMerltErasureNow(userId, 15_000) };
   }
