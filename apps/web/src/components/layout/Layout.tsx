@@ -12,6 +12,7 @@ import { UndoToastContainer } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
+import { Z_INDEX } from '../../constants/zIndex';
 import { FindWindow } from '../features/search/FindWindow';
 import { GlobalSearch } from '../features/search/GlobalSearch';
 import { SearchField, SEARCH_BAR_HEIGHT } from '../features/search/SearchField';
@@ -243,8 +244,10 @@ export function Layout() {
             data-testid="search-bar"
             style={{ height: SEARCH_BAR_HEIGHT }}
             // Below lg the menu button floats at the top left: the field starts beside it. From md the
-            // Focus toggle floats at the top right: the field ends before it.
-            className="flex flex-shrink-0 items-center justify-center border-b border-slate-200 bg-white/80 pl-[4.5rem] pr-4 backdrop-blur-xl md:pr-[4.5rem] lg:pl-8 dark:border-slate-800 dark:bg-slate-900/80"
+            // Focus toggle floats at the top right: the field ends before it. Positioned in the dropdown
+            // band, so the line under the field paints over the practice's sticky headings (its blur
+            // makes the bar a stacking context, gotcha 22) and under the floating buttons.
+            className={cn('relative flex flex-shrink-0 items-center justify-center border-b', Z_INDEX.dropdown, 'border-slate-200 bg-white/80 pl-[4.5rem] pr-4 backdrop-blur-xl md:pr-[4.5rem] lg:pl-8 dark:border-slate-800 dark:bg-slate-900/80')}
           >
             <SearchField />
           </div>

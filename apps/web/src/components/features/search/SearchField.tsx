@@ -8,6 +8,7 @@ import { useSearchActions } from '../../../hooks/useSearchActions';
 import { subscribeSearchField } from '../../../utils/searchFieldControl';
 import { defaultSearchFilters } from '../../../utils/searchFilters';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
 /** The field's height, which `Layout` subtracts from the practice's columns (`--search-bar-height`). */
 export const SEARCH_BAR_HEIGHT = '4.5rem';
@@ -29,6 +30,8 @@ export function SearchField() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic } = useSearchQuery(value);
   const actions = useSearchActions();
+  // On a phone the examples do not fit: the placeholder says what the field takes, and stops there.
+  const isDesktop = useIsDesktop();
   const trackAliasUsage = useAppStore((s) => s.trackAliasUsage);
   const openCommandPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
@@ -126,7 +129,7 @@ export function SearchField() {
             onBlur={() => setFocused(false)}
             aria-label="Cerca una norma, una sentenza o un tema"
             aria-describedby="search-field-status"
-            placeholder="Norma, sentenza o tema: art. 2043 c.c., Cass. civ. 10787/2024"
+            placeholder={isDesktop ? 'Norma, sentenza o tema: art. 2043 c.c., Cass. civ. 10787/2024' : 'Norma, sentenza o tema'}
             className={cn(
               'h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-base text-slate-900 shadow-sm placeholder:text-slate-400 md:text-sm',
               'dark:border-slate-700 dark:bg-slate-900 dark:text-white',
