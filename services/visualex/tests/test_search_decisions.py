@@ -17,8 +17,8 @@ class FakeSearcher:
     def __init__(self, page=None, error=None):
         self.page, self.error, self.queries = page, error, []
 
-    async def search(self, q, pagina, rows=20, *, coords=None, hl_query=None):
-        self.queries.append((q, pagina, coords, hl_query, rows))
+    async def search(self, q, pagina, rows=20, *, coords=None, hl_query=None, anni=None):
+        self.queries.append((q, pagina, coords, hl_query, rows, anni))
         if self.error:
             raise self.error
         return self.page
@@ -251,3 +251,77 @@ async def test_the_start_is_read_while_the_search_runs(client, monkeypatch):
     monkeypatch.setattr("visualex_api.services.decisions.search_route.archive_start", start)
     await client.post("/search_decisions", json={"tema": "perdita di chance", "archivio": "civile"})
     assert order.index("start") < order.index("search-end")
+
+
+# --- the deposit years (design 2026-10-12 D4, plan Task B1)
+
+@pytest.fixture(autouse=True)
+def _year_2026(monkeypatch):
+    monkeypatch.setattr("visualex_api.services.decisions.search_route.current_year", lambda: 2026)
+
+
+@pytest.mark.parametrize("body, anni", [
+    ({"anno_dal": 2022, "anno_al": 2024}, (2022, 2024)),
+    ({"anno_dal": 2022}, (2022, None)),
+    ({"anno_al": 2024}, (None, 2024)),
+    ({"anno_dal": 2024, "anno_al": 2024}, (2024, 2024)),
+    ({"anno_dal": 1900, "anno_al": 2026}, (1900, 2026)),
+    ({"anno_dal": None, "anno_al": None}, None),
+    ({}, None),
+])
+async def test_the_year_range_reaches_the_search(client, monkeypatch, body, anni):
+    s = _use(monkeypatch, FakeSearcher(SearchPage(1, [HIT])))
+    resp = await client.post("/search_decisions", json={"tema": "perdita di chance", **body})
+    assert resp.status_code == 200
+    # the range is never a clause of the query: it travels as the archive's filter
+    assert s.queries[0][5] == anni and s.queries[0][0] == '(ocr:"perdita di chance")'
+
+
+@pytest.mark.parametrize("body, fields", [
+    ({"anno_dal": 1899}, {"anno_dal"}),
+    ({"anno_al": 2027}, {"anno_al"}),
+    ({"anno_dal": 0, "anno_al": 3000}, {"anno_dal", "anno_al"}),
+    ({"anno_dal": -2024}, {"anno_dal"}),
+    ({"anno_dal": "2024"}, {"anno_dal"}),
+    ({"anno_al": 2024.0}, {"anno_al"}),
+    ({"anno_al": True}, {"anno_al"}),
+    ({"anno_dal": [2024]}, {"anno_dal"}),
+    ({"anno_dal": 2025, "anno_al": 2024}, {"anno_dal"}),
+])
+async def test_a_bad_year_says_which_field_in_italian(client, monkeypatch, body, fields):
+    s = _use(monkeypatch, FakeSearcher(SearchPage(0, [])))
+    resp = await client.post("/search_decisions", json={"tema": "perdita di chance", **body})
+    assert resp.status_code == 400
+    out = await resp.get_json()
+    assert out["esito"] == "richiesta_non_valida" and set(out["errori"]) == fields
+    assert all(isinstance(m, str) and m.startswith("L'anno") for m in out["errori"].values())
+    assert s.queries == []
+
+
+async def test_the_current_year_is_the_last_one_accepted(client, monkeypatch):
+    _use(monkeypatch, FakeSearcher(SearchPage(0, [])))
+    monkeypatch.setattr("visualex_api.services.decisions.search_route.current_year", lambda: 2027)
+    resp = await client.post("/search_decisions", json={"tema": "x y", "anno_al": 2027})
+    assert resp.status_code == 200
+
+
+async def test_each_range_has_its_own_cache_entry(client, monkeypatch):
+    s = _use(monkeypatch, FakeSearcher(SearchPage(1, [HIT])))
+    ranges = [{}, {"anno_dal": 2022}, {"anno_al": 2022}, {"anno_dal": 2022, "anno_al": 2024},
+              {"anno_dal": 2022, "anno_al": 2025}]
+    for body in ranges * 2:
+        await client.post("/search_decisions", json={"tema": "perdita di chance", **body})
+    assert len(s.queries) == len(ranges) and len(s.cache.data) == len(ranges)
+
+
+async def test_the_counts_per_year_come_with_the_page_when_there_are_some(client, monkeypatch):
+    counts = [{"anno": 2024, "n": 779}, {"anno": 2023, "n": 816}]
+    _use(monkeypatch, FakeSearcher(SearchPage(1595, [HIT], counts)))
+    body = await (await client.post("/search_decisions", json={"tema": "perdita di chance"})).get_json()
+    assert body["anni"] == counts and body["totale"] == 1595
+
+
+async def test_without_counts_the_answer_has_no_anni(client, monkeypatch):
+    _use(monkeypatch, FakeSearcher(SearchPage(1, [HIT])))
+    body = await (await client.post("/search_decisions", json={"tema": "perdita di chance"})).get_json()
+    assert "anni" not in body
