@@ -88,6 +88,8 @@ describe('DossierListView — the menu of a card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Azioni su Pratica Rossi' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
     expect(screen.getByText('Eliminare questo dossier?')).toBeInTheDocument();
+    // It goes to the trash (question 160), and the dialog says so.
+    expect(screen.getByText(/«Pratica Rossi» andrà nel cestino, dove resta 30 giorni/)).toBeInTheDocument();
   });
 });
 

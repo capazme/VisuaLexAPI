@@ -47,6 +47,7 @@ import {
   formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
+import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
@@ -85,7 +86,6 @@ interface Props {
 export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) {
   const {
     dossiers,
-    deleteDossier,
     removeFromDossier,
     restoreDossierItem,
     updateDossier,
@@ -769,11 +769,11 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         open={confirmDeleteOpen}
         variant="danger"
         title="Eliminare questo dossier?"
-        message={`"${dossier.title}" verrà rimosso. Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati.`}
+        message={deleteDossierMessage(dossier.title)}
         confirmLabel="Elimina"
         onConfirm={() => {
           setConfirmDeleteOpen(false);
-          deleteDossier(dossier.id);
+          deleteDossierWithUndo(dossier, trash ? () => void trash.reload() : undefined);
           onBack();
         }}
         onCancel={() => setConfirmDeleteOpen(false)}

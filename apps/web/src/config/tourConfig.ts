@@ -61,7 +61,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Inizia a Cercare',
-            description: 'Clicca Ricerca, oppure premi Cmd+K (Mac) o Ctrl+K (Windows), per aprire la ricerca veloce. Prova subito!',
+            description: 'Ricerca ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce. Prova subito!',
             side: 'right',
             align: 'start',
         }
@@ -72,16 +72,16 @@ export const WELCOME_STEPS: DriveStep[] = [
  * Search Page Tour - Panoramica ricerca (4 step)
  *
  * Parte sulla pagina di ricerca, che alla prima visita è vuota: i passi puntano a ciò che la
- * pagina mostra allora (l'invito a cercare, la voce Ricerca, le norme preferite). Il tavolo di
+ * pagina mostra allora (il campo di ricerca in cima, la voce Ricerca, le norme preferite). Il tavolo di
  * lavoro ha i suoi tour (`practice`, `practiceAct`).
  */
 export const SEARCH_STEPS: DriveStep[] = [
     {
-        element: '#tour-main-content',
+        element: '#tour-search-field',
         popover: {
             title: 'Cerca una Norma',
-            description: 'Scrivi una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024": non serve compilare dei campi. Ogni risultato finisce sul tavolo di una pratica.',
-            side: 'top',
+            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024", e premi Invio: non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
+            side: 'bottom',
             align: 'center',
         }
     },
@@ -89,7 +89,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Ricerca e Cmd+K',
-            description: 'Preferisci la tastiera? Usa Ricerca (o Cmd+K) per aprire la ricerca da qualsiasi punto.',
+            description: 'Ricerca riporta al campo. Preferisci la tastiera? Cmd+K (Ctrl+K) apre la ricerca veloce da qualsiasi pagina, con filtri, alias e tutti gli atti.',
             side: 'right',
             align: 'start',
         }

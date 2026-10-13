@@ -48,8 +48,8 @@ export function EnvironmentPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [importingEnv, setImportingEnv] = useState<Environment | null>(null);
   const [applyModalEnv, setApplyModalEnv] = useState<Environment | null>(null);
-  // Guard for replace-mode: it deletes existing dossiers server-side, which
-  // is irreversible. Held here until the user confirms in a second step.
+  // Guard for replace-mode: it moves the existing dossiers to the trash and deletes
+  // the annotations and highlights for good. Held here until the user confirms in a second step.
   const [replaceConfirm, setReplaceConfirm] = useState<Environment | null>(null);
   const [editingEnv, setEditingEnv] = useState<Environment | null>(null);
   const [detailEnv, setDetailEnv] = useState<Environment | null>(null);
@@ -199,8 +199,8 @@ export function EnvironmentPage() {
   const handleApply = (env: Environment, mode: 'replace' | 'merge') => {
     setApplyModalEnv(null);
     if (mode === 'replace') {
-      // Route replace through a ConfirmDialog — the op deletes existing
-      // dossiers server-side (irreversible).
+      // Route replace through a ConfirmDialog — the op trashes the existing dossiers
+      // and deletes the annotations and highlights (irreversible).
       setReplaceConfirm(env);
       return;
     }
@@ -460,12 +460,12 @@ export function EnvironmentPage() {
         />
       )}
 
-      {/* Replace-mode guard: delete of server-side dossiers is irreversible */}
+      {/* Replace-mode guard: the dossiers go to the trash, annotations and highlights are gone for good */}
       <ConfirmDialog
         open={replaceConfirm !== null}
         variant="danger"
         title={replaceConfirm ? `Sostituire tutto con "${replaceConfirm.name}"?` : ''}
-        message="Tutti i tuoi dossier, annotazioni ed evidenziazioni attuali verranno eliminati definitivamente dal server prima di applicare l'ambiente. Questa azione non è reversibile."
+        message="Prima di applicare l'ambiente, i tuoi dossier attuali andranno nel cestino (30 giorni, si possono ripristinare) e le tue annotazioni ed evidenziazioni verranno eliminate definitivamente: per queste l'azione non è reversibile."
         confirmLabel="Sì, sostituisci"
         onConfirm={() => {
           const env = replaceConfirm;
