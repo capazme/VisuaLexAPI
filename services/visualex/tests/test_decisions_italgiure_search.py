@@ -177,3 +177,59 @@ def test_ranges_are_always_inside_the_text_sorted_and_not_empty(snippet):
 
 def test_an_uppercase_marker_is_a_marker():
     assert fragment_ranges("<EM>a</EM> b") == {"testo": "a b", "evidenziati": [[0, 1]]}
+
+
+def _facet_answer(flat, docs=()):
+    return json.dumps({"response": {"numFound": 5, "start": 0, "docs": list(docs)},
+                       "facet_counts": {"facet_fields": {"anno": flat}}})
+
+
+async def test_a_search_without_a_range_has_no_filter_query_and_asks_for_the_year_facet(monkeypatch):
+    calls = _serve(monkeypatch, [EMPTY])
+    await ItalgiureReader().search('kind:"snciv" AND (ocr:"x")', pagina=1)
+    data = calls[-1][2]["data"]
+    assert "fq" not in data and data["q"] == 'kind:"snciv" AND (ocr:"x")'
+    assert data["facet"] == "true" and data["facet.field"] == "{!ex=yr}anno"
+    assert data["facet.mincount"] == "1" and data["facet.limit"] == "-1"
+
+
+@pytest.mark.parametrize("anni, fq", [
+    ((2022, 2024), "{!tag=yr}pd:[20220101 TO 20241231]"),
+    ((2022, None), "{!tag=yr}pd:[20220101 TO 99991231]"),
+    ((None, 2024), "{!tag=yr}pd:[19000101 TO 20241231]"),
+    ((2024, 2024), "{!tag=yr}pd:[20240101 TO 20241231]"),
+])
+async def test_the_range_is_a_filter_query_on_the_deposit_date_the_facet_leaves_out(monkeypatch, anni, fq):
+    calls = _serve(monkeypatch, [EMPTY])
+    await ItalgiureReader().search('kind:"snciv" AND (ocr:"x")', pagina=2, anni=anni)
+    data = calls[-1][2]["data"]
+    assert data["fq"] == fq and data["q"] == 'kind:"snciv" AND (ocr:"x")'
+    assert data["start"] == "20" and data["facet.field"] == "{!ex=yr}anno"
+
+
+async def test_the_year_counts_are_parsed_newest_first(monkeypatch):
+    _serve(monkeypatch, [_facet_answer(["2021", 214, "2022", 637, "2026", 688])])
+    page = await ItalgiureReader().search('kind:"snciv" AND (ocr:"x")', pagina=1)
+    assert page.anni == [{"anno": 2026, "n": 688}, {"anno": 2022, "n": 637}, {"anno": 2021, "n": 214}]
+
+
+@pytest.mark.parametrize("facets", [
+    None, {}, {"facet_fields": {}}, {"facet_fields": {"anno": None}},
+    {"facet_fields": {"anno": ["2021", 214, "2022"]}},       # odd length
+    {"facet_fields": {"anno": ["2021", "214"]}},             # a count that is not a number
+    {"facet_fields": {"anno": [["2021"], 214]}},             # a year that is not a scalar
+    "garbage",
+])
+async def test_a_missing_or_unreadable_facet_is_no_counts_never_an_error(monkeypatch, facets):
+    answer = {"response": {"numFound": 0, "docs": []}}
+    if facets is not None:
+        answer["facet_counts"] = facets
+    _serve(monkeypatch, [json.dumps(answer)])
+    page = await ItalgiureReader().search('kind:"snciv" AND (ocr:"x")', pagina=1)
+    assert page.anni is None and page.totale == 0
+
+
+async def test_a_facet_value_that_is_not_a_year_is_left_out(monkeypatch):
+    _serve(monkeypatch, [_facet_answer(["2023", 3, "n.d.", 1, "٢٠٢٤", 2])])
+    page = await ItalgiureReader().search('kind:"snciv" AND (ocr:"x")', pagina=1)
+    assert page.anni == [{"anno": 2023, "n": 3}]
