@@ -70,7 +70,7 @@ const UNSUPPORTED_HEADS = new RegExp(
   'giu',
 );
 // «(Trib. Milano), sez. II»: a Tribunale in brackets, a place after it; «(trib.)» alone is the Cassazione's tax section.
-const TRIBUNALE_IN_BRACKETS = /\(\s*([Tt]rib\.)(?=\s*\p{Lu})(?!\s*(?:Sez(?:ione|\.)?|Civ(?:ile|\.)|Pen(?:ale|\.)|Lav(?:oro|\.)|Un(?:ite|\.))(?!\p{L})(?!\s*\p{Lu}\p{Ll}))/gu;
+const TRIBUNALE_IN_BRACKETS = /\(\s*([Tt]rib\.)(?=\s*\p{Lu})(?!\s*(?:Sez(?:ione|\.)?|Civ(?:ile|\.)|Pen(?:ale|\.)|Lav(?:oro|\.)|Un(?:ite|\.))(?!\p{L})(?!\s*(?!(?:Prima|Seconda|Terza|Quarta|Quinta|Sesta|Settima)(?!\p{L}))\p{Lu}\p{Ll}))/gu;
 // «Corte di cassazione», «Suprema Corte di Cassazione»: the span starts at the first of these words.
 const CORTE_DI = /(?<![\p{L}\p{N}])(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+$/u;
 const CORTE_DI_REACH = 30;
@@ -206,7 +206,9 @@ function ownCourtFollows(folded: string, end: number): boolean {
   const own = OWN_COURT_AFTER.exec(after.slice(at));
   if (!own) return false;
   // «…, questa Corte con la n. 3 del 2020»: the Court is the subject of the next item, not the author of this one
-  if (/^\s*con\s+(?:(?:la|le|il|l['’])\s*)?(?:sent|ord|decr|n(?:r|um)?\.?\s*\d)/u.test(after.slice(at + own[0].length))) return false;
+  // (a genitive, «… n. 5 del 2019 di questa Corte con l'ordinanza …», names this decision's author all the same)
+  const genitive = /(?<![\p{L}\p{N}])(?:di|della)\s*$/u.test(after.slice(0, at));
+  if (!genitive && /^\s*con\s+(?:(?:la|le|il|l['’])\s*)?(?:sent|ord|decr|n(?:r|um)?\.?\s*\d)/u.test(after.slice(at + own[0].length))) return false;
   return !/^c/.test(own[0]) || isThisCourt(folded, end + at);
 }
 const OWN_COURT_AFTER = /^(?:quest[ao]\s+corte|corte\s+cost|c\.\s*cost)/u;
@@ -228,7 +230,14 @@ function courtMarkers(folded: string, heads: readonly Head[]): CourtMarker[] {
   const markers: CourtMarker[] = heads
     .filter((h) => h.court)
     .map((h) => ({ end: h.end, own: isThisCourt(folded, h.start) }));
-  for (const m of folded.matchAll(THIS_COURT)) markers.push({ end: (m.index ?? 0) + m[0].length, own: true });
+  for (const m of folded.matchAll(THIS_COURT)) {
+    const at = m.index ?? 0;
+    const end = at + m[0].length;
+    // «… n. 5 del 2019 di questa Corte con l'ordinanza n. 7»: «di questa Corte» belongs to the decision before it; who
+    // adopted the next one is told earlier in the sentence (unlike «da questa Corte con l'ordinanza», the Court's own)
+    if (/(?<![\p{L}\p{N}])di\s+$/u.test(folded.slice(Math.max(0, at - 4), at)) && /^\s*con(?![\p{L}\p{N}])/u.test(folded.slice(end, end + 6))) continue;
+    markers.push({ end, own: true });
+  }
   for (const m of folded.matchAll(OTHER_COURT_MARKERS)) markers.push({ end: (m.index ?? 0) + m[0].length, own: false });
   return markers.sort((a, b) => a.end - b.end);
 }
