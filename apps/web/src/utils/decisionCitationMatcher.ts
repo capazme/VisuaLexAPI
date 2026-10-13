@@ -70,7 +70,7 @@ const UNSUPPORTED_HEADS = new RegExp(
   'giu',
 );
 // «(Trib. Milano), sez. II»: a Tribunale in brackets, a place after it; «(trib.)» alone is the Cassazione's tax section.
-const TRIBUNALE_IN_BRACKETS = /\(\s*([Tt]rib\.)(?=\s*\p{Lu})(?!\s*(?:Sez(?:ione|\.)?|Civ(?:ile|\.)|Pen(?:ale|\.)|Lav(?:oro|\.)|Un(?:ite|\.))(?!\p{L}))/gu;
+const TRIBUNALE_IN_BRACKETS = /\(\s*([Tt]rib\.)(?=\s*\p{Lu})(?!\s*(?:Sez(?:ione|\.)?|Civ(?:ile|\.)|Pen(?:ale|\.)|Lav(?:oro|\.)|Un(?:ite|\.))(?!\p{L})(?!\s*\p{Lu}\p{Ll}))/gu;
 // «Corte di cassazione», «Suprema Corte di Cassazione»: the span starts at the first of these words.
 const CORTE_DI = /(?<![\p{L}\p{N}])(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+$/u;
 const CORTE_DI_REACH = 30;
@@ -206,8 +206,8 @@ function ownCourtFollows(folded: string, end: number): boolean {
   const own = OWN_COURT_AFTER.exec(after.slice(at));
   if (!own) return false;
   // «…, questa Corte con la n. 3 del 2020»: the Court is the subject of the next item, not the author of this one
-  if (/^\s*con(?![\p{L}\p{N}])/u.test(after.slice(at + own[0].length))) return false;
-  return !/^c/.test(own[0]) || isThisCourt(after, at);
+  if (/^\s*con\s+(?:(?:la|le|il|l['’])\s*)?(?:sent|ord|decr|n(?:r|um)?\.?\s*\d)/u.test(after.slice(at + own[0].length))) return false;
+  return !/^c/.test(own[0]) || isThisCourt(folded, end + at);
 }
 const OWN_COURT_AFTER = /^(?:quest[ao]\s+corte|corte\s+cost|c\.\s*cost)/u;
 
