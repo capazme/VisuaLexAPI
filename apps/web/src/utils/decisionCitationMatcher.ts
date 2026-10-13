@@ -93,9 +93,10 @@ const AFTER_CITATION = /^[\s,([\u2013\u2014-]*(?:(?:della|delle|del|dello|dell['
 // Cassazione's), «la Suprema Corte», «il giudice di legittimità», «il giudice amministrativo»…
 // «l'ordinanza n. 5 del 2020 del Sindaco di Roma», «… del giudice di primo grado»: an author who is not the Court, written
 // after a genitive only («…, il giudice comune è chiamato» is the subject of the next clause). «Giudice delle leggi» is the Court.
-const OTHER_AUTHOR = /^[\s([]*(?:della|del|dello|dell['’]|dalla|dal|emessa|pronunciata|resa|adottata)\s*(?:(?:il|lo|la|l['’])\s*)?(?:giudice(?!\s+delle\s+leggi)(?![\p{L}\p{N}])|sindac|president[ei](?![\p{L}\p{N}])|capo\s+del|ministr[oi](?![\p{L}\p{N}])|prefett|questor|commissari|giunta|dirigent|direttor|autorita|garante)/u;
+const OTHER_AUTHOR = /^[\s([]*(?:della|del|dello|dell['’]|dalla|dal|emessa|pronunciata|resa|adottata)\s*(?:(?:il|lo|la|l['’])\s*)?(?:giudice(?!\s+delle\s+leggi)(?![\p{L}\p{N}])|sindac[oi](?![\p{L}\p{N}])|president[ei](?![\p{L}\p{N}])|capo\s+del|ministr[oi](?![\p{L}\p{N}])|prefett[oi](?![\p{L}\p{N}])|questor|commissari|giunta|dirigent|direttor|autorita|garante)/u;
 // «…, passata in giudicato, del Tribunale», «…, emessa in grado di appello dalla Corte d'appello»: a participial clause before the author.
-const PARTICIPLE_CLAUSE = /^,\s*(?:emess|pronunciat|passat|res|adottat|depositat)\p{L}*(?:\s+[^\s,;()\d]+){0,6}?\s*,?\s*(?=(?:della|del|dello|dell['’]|dalla|dal|da)\s)/u;
+// The clause holds only the words of the decision's own course: «nel giudizio promosso dal Tribunale» names who raised it.
+const PARTICIPLE_CLAUSE = /^,\s*(?:emess|pronunciat|passat|res|adottat|depositat)\p{L}*(?:\s+(?:in|grado|di|d['’]|appello|primo|secondo|giudicato|cosa|giudicata|sede|rinvio))*\s*,?\s*(?=(?:della|del|dello|dell['’]|dalla|dal|da)\s)/u;
 const SECTION_BEFORE_COURT = /^(?:(?:prima|seconda|terza|quarta|quinta|sesta|settima)\s+)?sez(?:ion[ei]|\.)\s[^,;()]{0,40}?(?:della|del|dell['’]|dello)\s*/u;
 const OTHER_COURT_WORDS = /^(?:sez(?:ioni|\.)?\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+(?:di\s+legittimit|amministrativ|ordinari|contabil|tributari))/u;
 // Before a «sentenza n. …», only the names of another court: «la giurisdizione del giudice amministrativo (sentenze n. 204
@@ -212,7 +213,7 @@ const OWN_COURT_AFTER = /^(?:quest[ao]\s+corte|corte\s+cost|c\.\s*cost)/u;
 
 // Authorities that issue ordinances: «Il Presidente della Regione ha adottato l'ordinanza n. 37 del 2020» is not the Court's.
 // Only an ordinanza is read against them (they issue no sentenze); «il Presidente di questa Corte» is not one.
-const AUTHORITY_MARKERS = /(?<![\p{L}\p{N}])(?:sindac\p{L}*|president[ei]\s+della\s+(?:regione|giunta|provincia)|capo\s+del\s+dipartimento|prefett\p{L}*|commissari[oa]\s+(?:straordinari|delegat|ad\s+acta)\p{L}*)/giu;
+const AUTHORITY_MARKERS = /(?<![\p{L}\p{N}])(?:sindac[oi](?![\p{L}\p{N}])|president[ei]\s+della\s+(?:regione|giunta|provincia)|capo\s+del\s+dipartimento|prefett[oi](?![\p{L}\p{N}])|commissari[oa]\s+(?:straordinari|delegat|ad\s+acta)\p{L}*)/giu;
 
 // «questa Corte»: the Court speaking of itself.
 const THIS_COURT = /(?<![\p{L}\p{N}])quest[ao]\s+corte(?![\p{L}\p{N}])/giu;
