@@ -189,7 +189,9 @@ POST unless noted, JSON bodies.
   dossier names an act with one call. An EU act's title is its subject («relativo
   alla protezione delle persone fisiche …») from the page the tree is read from
   (`_extract_eurlex_title`: the OJ's `eli-main-title`, the consolidated
-  `title-doc-last`, the legacy page's `DC.description`). Always 200: a failure is
+  `title-doc-last`, the legacy page's `DC.description`; a run with no date line, a
+  Treaty's, gives none). `get_tree` keeps no failed or empty tree, in memory as on
+  disk (`_no_tree`), so a page EUR-Lex's firewall refused is asked again. Always 200: a failure is
   an empty answer (with `error` when the handler itself failed), which the web
   does not cache. Structure only: it never carries the
   display text

@@ -125,13 +125,26 @@ describe('useActDetails — the title stays', () => {
     expect(result.current.rubricaOf(layoutDossier([item('3')]).acts[0].articles[0].data)).toBe('Doveri');
   });
 
-  it('when an article arrives with the quiet refresh, and nothing is read again', async () => {
+  it('when an article arrives with the quiet refresh and the act is read again', async () => {
+    // Articles taken from the index carry no urn; one Claude adds does, so the act is read by it.
+    resolveAct.mockResolvedValue({ urn: `${URN}~art1`, norma: {} });
+    fetchActRubriche.mockResolvedValueOnce({ title: 'Nuova disciplina', rubriche: {}, parts: [] });
+    const { result, rerender } = renderHook(({ items }) => useActDetails(layoutDossier(items).acts[0]), {
+      initialProps: { items: [item('3', { urn: undefined })] },
+    });
+    await waitFor(() => expect(result.current.title).toBe('Nuova disciplina'));
+    fetchActRubriche.mockImplementation(pending);
+    rerender({ items: [item('3', { urn: undefined }), { ...item('5'), id: 'from-claude' }] });
+    expect(fetchActRubriche).toHaveBeenCalledTimes(2);
+    expect(result.current.title).toBe('Nuova disciplina');
+  });
+
+  it('when the quiet refresh hands the same act as new objects, and nothing is read again', async () => {
     fetchActRubriche.mockResolvedValue({ title: 'Nuova disciplina', rubriche: {}, parts: [] });
     const { result, rerender } = renderHook(({ items }) => useActDetails(layoutDossier(items).acts[0]), {
       initialProps: { items: [item('3')] },
     });
     await waitFor(() => expect(result.current.title).toBe('Nuova disciplina'));
-    // The refresh hands new objects, and here one more article of the same act (added by Claude).
     rerender({ items: [item('3'), { ...item('5'), id: 'from-claude' }] });
     expect(result.current.title).toBe('Nuova disciplina');
     expect(fetchActRubriche).toHaveBeenCalledTimes(1);

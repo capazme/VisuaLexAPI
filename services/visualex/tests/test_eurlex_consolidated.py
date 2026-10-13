@@ -445,6 +445,17 @@ class TestEurlexTitle:
             "delle comunicazioni elettroniche (direttiva relativa alla vita privata e alle comunicazioni elettroniche)"
         )
 
+    def test_a_flat_page_takes_the_first_run_only(self):
+        flat = GDPR_TITLE.replace('<div class="eli-main-title" id="tit_1">', "<div>").replace(
+            '<div class="eli-subdivision" id="anx_1"><p class="oj-doc-ti">ALLEGATO I</p></div>',
+            '<p class="oj-normal">IL PARLAMENTO EUROPEO</p><p class="oj-doc-ti">ALLEGATO I</p>')
+        title = _extract_eurlex_title(BeautifulSoup(flat, "html.parser"))
+        assert title.startswith("relativo alla protezione") and "ALLEGATO" not in title
+
+    def test_a_title_without_a_date_is_not_a_subject(self):
+        page = '<p class="oj-doc-ti">TRATTATO SUL FUNZIONAMENTO DELL\'UNIONE EUROPEA</p><p class="oj-doc-ti">ALLEGATO I</p>'
+        assert _extract_eurlex_title(BeautifulSoup(page, "html.parser")) == ""
+
     def test_a_page_without_one_says_nothing(self):
         assert _extract_eurlex_title(soup_of("gdpr_oj_trimmed.html")) == ""
 
@@ -514,3 +525,20 @@ class TestConsolidatedTree:
         numbers = [item["numero"] for item in result if isinstance(item, dict)]
         assert numbers == ["1", "2", "3", "4", "17"]
         assert "CAPO I" in result
+
+
+class TestTreeFailuresAreNotKept:
+    async def test_a_failed_page_is_asked_again(self):
+        from unittest.mock import AsyncMock, patch
+        from visualex_api.tools import treextractor
+        url = "https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:32099R9999"
+        page = (FIXTURES / "gdpr_oj_trimmed.html").read_text(encoding="utf-8")
+        fetch = AsyncMock(side_effect=[RuntimeError("waf"), page])
+        with patch.object(treextractor, "_fetch_with_playwright", fetch), \
+                patch.object(treextractor._tree_cache, "get", AsyncMock(return_value=None)), \
+                patch.object(treextractor._tree_cache, "set", AsyncMock()):
+            _, count, _ = await treextractor.get_tree(url, details=True, return_metadata=True)
+            assert count == 0
+            _, count, metadata = await treextractor.get_tree(url, details=True, return_metadata=True)
+        assert count > 0 and metadata["rubriche"]["1"] == "Oggetto e finalità"
+        assert fetch.await_count == 2

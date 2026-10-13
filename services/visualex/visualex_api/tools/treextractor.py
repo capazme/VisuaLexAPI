@@ -45,7 +45,14 @@ async def _fetch_with_playwright(url: str) -> str:
             await browser.close()
 
 
-@cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer())
+def _no_tree(result):
+    """A failure (a blocked page, a timeout) or an empty tree: (message or [], 0[, {}]). Never kept
+    in memory, as the persistent cache never keeps it: the next caller asks the source again
+    instead of reading the failure for an hour."""
+    return isinstance(result, tuple) and len(result) >= 2 and result[1] == 0
+
+
+@cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer(), skip_cache_func=_no_tree)
 async def get_tree(normurn, link=False, details=False, return_metadata=False):
     """
     Recupera l'albero degli articoli da un URN normativo e ne estrae le informazioni.
@@ -670,15 +677,25 @@ def _extract_eurlex_title(soup):
     the dossier already shows in the act's heading. '' when the page does not say.
 
     The OJ page names the act in `oj-doc-ti` lines inside `eli-main-title` (an annex's heading uses
-    the same class, so only the first run counts); the consolidated page in `title-doc-first` and
+    the same class, so only the first consecutive run counts, and only when it holds the date); the
+    consolidated page in `title-doc-first` and
     `title-doc-last` (printed twice, the first copy is enough); the legacy page in its
     `DC.description` meta only.
     """
     container = soup.find(class_="eli-main-title")
     first = (container or soup).find("p", class_="oj-doc-ti")
     if first is not None:
-        run = [first] + [p for p in first.find_next_siblings("p") if "oj-doc-ti" in (p.get("class") or [])]
-        return _eurlex_subject([p.get_text(" ", strip=True) for p in run])
+        run = [first]
+        for sibling in first.find_next_siblings():
+            if sibling.name != "p" or "oj-doc-ti" not in (sibling.get("class") or []):
+                break
+            run.append(sibling)
+        lines = [p.get_text(" ", strip=True) for p in run]
+        # The subject is what follows the date: without one (a Treaty's page), no title rather
+        # than the act's own name repeated under its heading.
+        if not any(_EURLEX_DATE_LINE.match(line) for line in lines):
+            return ""
+        return _eurlex_subject(lines)
     last = soup.find("p", class_="title-doc-last")
     if last is not None:
         return _eurlex_subject([last.get_text(" ", strip=True)])

@@ -41,7 +41,7 @@ function once<T>(key: string, load: () => Promise<T>, keep: (value: T) => boolea
       return value;
     },
     (error: unknown) => {
-      cache.delete(key);
+      if (cache.get(key) === promise) cache.delete(key);
       throw error;
     },
   );

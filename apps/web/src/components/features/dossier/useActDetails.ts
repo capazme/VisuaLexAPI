@@ -52,6 +52,11 @@ interface Read {
 // reader's data is kept here.
 const lastRead = new Map<string, Read>();
 
+/** The title last read for an act (by its block key) this session: the PDF's fallback when a new reading fails. */
+export function lastActTitle(actKey: string): string | null {
+  return lastRead.get(actKey)?.title ?? null;
+}
+
 /** Tests: start with nothing read. */
 export function forgetActDetails(): void {
   lastRead.clear();
