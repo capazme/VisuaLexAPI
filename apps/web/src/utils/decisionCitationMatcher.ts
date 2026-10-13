@@ -103,8 +103,8 @@ const OTHER_COURT_WORDS = /^(?:sez(?:ioni|\.)?\s*un(?:ite|\.)?(?![\p{L}\p{N}])|s
 // del 2004 …)» speaks of a jurisdiction, and the rulings cited are the Court's own.
 const OTHER_COURT_MARKERS = /(?<![\p{L}\p{N}])(?:sez(?:ioni|\.)\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+di\s+legittimit\p{L}*)/giu;
 const CORTE_COSTITUZIONALE = /^(?:corte\s+cost|c\.\s*cost)/i;
-// «la Corte costituzionale belga», «… federale tedesca», «… della Repubblica federale»: another country's court.
-const FOREIGN_QUALIFIER = /^\p{L}*\.?\s+(?:federale|belga|tedesca|austriaca|spagnola|francese|portoghese|polacca|ungherese|ceca|slovacca|slovena|croata|romena|rumena|lituana|lettone|estone|bulgara|greca|maltese|cipriota|turca|russa|ucraina|sudafricana|colombiana|della\s+repubblica(?!\s+italiana))(?![\p{L}\p{N}])/u;
+// «la Corte costituzionale belga», «… federale tedesca», «… del Belgio», «… della Repubblica federale»: another country's court.
+const FOREIGN_QUALIFIER = /^\p{L}*\.?\s+(?:federale|belga|tedesca|austriaca|spagnola|francese|portoghese|polacca|ungherese|ceca|slovacca|slovena|croata|romena|rumena|lituana|lettone|estone|bulgara|greca|maltese|cipriota|turca|russa|ucraina|sudafricana|colombiana|della\s+repubblica(?!\s+italiana))(?![\p{L}\p{N}])|^\p{L}*\.?\s+(?:(?:di|del|della|dello|delle|degli)\s+(?!repubblica\s+italiana)|dell['’]\s*)\p{L}/u;
 /** Whether the «Corte cost…» starting at `at` is this Court, not another country's. */
 function isThisCourt(folded: string, at: number): boolean {
   return CORTE_COSTITUZIONALE.test(folded.slice(at, at + 12)) && !FOREIGN_QUALIFIER.test(folded.slice(at + 'corte cost'.length, at + 'corte cost'.length + 50));
