@@ -1,8 +1,12 @@
 // apps/web/src/features/merlt/rassegne/RassegnePanel.tsx
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { RassegnaPassage } from './RassegnaPassage';
+import { textOfPassage, yearsOfPassage } from './rassegnaFilters';
+import { useCaseLawFilters, useReportCaseLawYears } from '../../../components/features/search/caseLaw/caseLawFiltersContext';
+import { applyCaseLawFilters, isNarrowing } from '../../../components/features/search/caseLaw/caseLawFilter';
+import { yearList } from '../../../components/features/search/caseLaw/caseLawYears';
 import { loadRassegne, useRassegneSummary } from './useRassegne';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import type { RassegnePasso } from './types';
@@ -34,6 +38,15 @@ function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry 
   const [next, setNext] = useState<string | null>(initial?.next ?? null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  // narrowed by the section's controls (the cited decisions' years, the text); the year of the
+  // review is this block's own, whose passages load as it opens
+  const filters = useCaseLawFilters();
+  const years = useMemo(() => yearList(items, yearsOfPassage), [items]);
+  useReportCaseLawYears(`rassegne-${archivio ?? 'tutte'}-${anno}`, years);
+  const shown = useMemo(
+    () => applyCaseLawFilters(items, { yearsOf: yearsOfPassage, textOf: textOfPassage }, filters),
+    [items, filters],
+  );
 
   const load = (cursor?: string) => {
     setLoading(true);
@@ -64,12 +77,17 @@ function YearSection({ urn, archivio, anno, count, initial, besideId, backEntry 
       <button type="button" aria-expanded={open} onClick={toggle}
         className="flex min-h-[44px] w-full items-center justify-between py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
         <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Rassegna dell'anno {anno}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">{passi(count)}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {isNarrowing(filters) && items.length > 0 ? `${shown.length} di ${items.length} caricati` : passi(count)}
+        </span>
       </button>
       {open && (
         <div>
+          {isNarrowing(filters) && items.length > 0 && shown.length === 0 && (
+            <p className="py-2 text-sm text-slate-500 dark:text-slate-400">Nessun passo caricato con i filtri selezionati.</p>
+          )}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {items.map((p) => <RassegnaPassage key={p.id} passo={p} besideId={besideId} backEntry={backEntry} />)}
+            {shown.map((p) => <RassegnaPassage key={p.id} passo={p} besideId={besideId} backEntry={backEntry} />)}
           </ul>
           {failed && <p className="text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
           {next && !loading && (
@@ -96,9 +114,12 @@ export interface RassegnePanelProps {
  * "Nelle rassegne della Cassazione": the paragraphs of the Massimario's annual reviews whose
  * author cited this article, by year. A closed row under the article text (spec §7; placement
  * per the text-as-at-a-date spec §9). Self-contained: it takes the article's URN and ignores
- * the slot's other props, bar the place it opens decisions beside.
+ * the slot's other props, bar the place it opens decisions beside. The section's controls reach it
+ * through `useCaseLawFilters` (the slot's props are a contract): it narrows the passages loaded
+ * and puts the review years in their order.
  */
 export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanelProps) {
+  const { order } = useCaseLawFilters();
   const [open, setOpen] = useState(false);
   const [archivio, setArchivio] = useState<Archivio | undefined>(undefined);
   // Another article starts closed and unfiltered: the slot does not remount the panel per URN.
@@ -148,7 +169,7 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
             </div>
           )}
           {summary.failed && <p className="mb-2 text-sm text-amber-600 dark:text-amber-400">Rassegne non disponibili ora.</p>}
-          {data.anni.map(({ anno, passi: count }) => (
+          {[...data.anni].sort((a, b) => (order === 'desc' ? b.anno - a.anno : a.anno - b.anno)).map(({ anno, passi: count }) => (
             <YearSection key={`${shownArchivio ?? ''}-${anno}`} urn={articleUrn} archivio={shownArchivio} anno={anno} count={count}
               besideId={besideId} backEntry={backEntry}
               initial={anno === data.anno ? { items: data.items, next: data.next_cursor } : undefined} />

@@ -1,5 +1,5 @@
 // apps/web/src/components/features/decisions/DecisionResultList.tsx
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { RotateCw } from 'lucide-react';
 import { DECISION_PAGE_SIZE } from '../../../services/decisionSearchService';
 import { searchDecisionsCached } from '../../../utils/decisionSearchCache';
@@ -10,7 +10,10 @@ import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import type { DecisionArchive, DecisionSearchHit, DecisionSearchQuery, SearchDecisionsAnswer } from '../../../types/decisions';
 import { Button } from '../../ui/Button';
-import { DecisionLink } from './DecisionLink';
+import { CaseLawRow } from '../search/caseLaw/CaseLawRow';
+import { useCaseLawFilters, useReportCaseLawYears } from '../search/caseLaw/caseLawFiltersContext';
+import { applyCaseLawFilters, isNarrowing } from '../search/caseLaw/caseLawFilter';
+import { rowYear, yearList, type YearRange, type YearsOf } from '../search/caseLaw/caseLawYears';
 
 /** The server pages by 20 and stops at the tenth page. */
 const MAX_PAGE = 10;
@@ -24,6 +27,11 @@ interface DecisionResultListProps {
   besideId?: string;
   /** Where the reader stands in the article: the way back from an opened decision. */
   backEntry?: ReadingBackEntry;
+  /**
+   * The years to keep, from the section's control by default. Applied here to the hits loaded;
+   * the archive's search takes it later (case-law section plan, PR b), and this is the one place to change.
+   */
+  yearRange?: YearRange;
 }
 
 const INDEX_REFUSED = 'L’indice della Cassazione non esprime questo atto';
@@ -58,30 +66,34 @@ function Fragment({ testo, evidenziati }: NonNullable<DecisionSearchHit['frammen
     at = e;
   }
   parts.push(testo.slice(at));
-  return <p className="text-sm text-slate-600 dark:text-slate-300">…{parts}…</p>;
+  return <>…{parts}…</>;
 }
+
+/** A hit's year is the deposit's (the archive's date), else the year of its number. */
+const yearsOfHit: YearsOf<DecisionSearchHit> = (hit) => {
+  const dated = rowYear({ date: hit.attributi.data_deposito });
+  return dated.length > 0 ? dated : rowYear({ year: hit.identita.anno });
+};
+const labelOfHit = (hit: DecisionSearchHit): string => formatDecisionShort({ ...hit.identita, sezione: hit.attributi.sezione });
+const textOfHit = (hit: DecisionSearchHit): string =>
+  [labelOfHit(hit), formatDecisionDeposit(hit.attributi) ?? '', hit.frammento?.testo ?? ''].join(' ');
 
 function Row({ hit, besideId, backEntry }: { hit: DecisionSearchHit; besideId?: string; backEntry?: ReadingBackEntry }) {
   const { identita, attributi } = hit;
-  const deposit = formatDecisionDeposit(attributi);
   return (
-    <li className="space-y-1 border-b border-slate-200 py-3 dark:border-slate-700">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <DecisionLink
-          to={{ ...identita, sezione: attributi.sezione }}
-          besideId={besideId}
-          backEntry={backEntry}
-          className={`font-medium text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE} inline-flex items-center`}
-        >
-          {formatDecisionShort({ ...identita, sezione: attributi.sezione })}
-        </DecisionLink>
-        <span className="text-sm text-slate-500 dark:text-slate-400">{deposit}</span>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {KIND_LABEL[hit.trovata]}
-        </span>
-      </div>
+    <CaseLawRow
+      decision={{ ...identita, sezione: attributi.sezione }}
+      authority="Cass."
+      date={attributi.data_deposito}
+      year={identita.anno}
+      whenLabel={formatDecisionDeposit(attributi)}
+      source="Archivio della Cassazione"
+      badges={[KIND_LABEL[hit.trovata]]}
+      besideId={besideId}
+      backEntry={backEntry}
+    >
       {hit.frammento && <Fragment {...hit.frammento} />}
-    </li>
+    </CaseLawRow>
   );
 }
 
@@ -125,8 +137,13 @@ type ArchiveChoice = DecisionArchive | 'entrambi';
  * count of the public archive (last five years), never of "all" decisions. The archive is the
  * list's own state: it starts from what the route chooses and is not kept in the tab's query.
  */
-export function DecisionResultList({ query, besideId, backEntry }: DecisionResultListProps) {
+export function DecisionResultList({ query, besideId, backEntry, yearRange }: DecisionResultListProps) {
   const refusedNoteId = useId();
+  const sectionFilters = useCaseLawFilters();
+  const filters = useMemo(
+    () => (yearRange ? { ...sectionFilters, range: yearRange } : sectionFilters),
+    [sectionFilters, yearRange],
+  );
   const [archivio, setArchivio] = useState<DecisionArchive | undefined>(undefined);
   const [modo, setModo] = useState<'indice' | 'testo'>('indice');
   const [hits, setHits] = useState<DecisionSearchHit[]>([]);
@@ -197,6 +214,18 @@ export function DecisionResultList({ query, besideId, backEntry }: DecisionResul
     return dropPending;
   }, [load, dropPending]);
 
+  const years = useMemo(() => yearList(hits, yearsOfHit), [hits]);
+  useReportCaseLawYears('cassazione', years);
+  // the year range, the text and the order narrow the hits loaded; the archive is asked for no year yet
+  // The archive pages newest first, so the oldest first is the pages loaded reversed, not the archive's:
+  // the order the reader asks for applies once every decision is loaded, and until then the archive's stands.
+  const complete = last !== null && last.pagina * DECISION_PAGE_SIZE >= last.totale;
+  const orderHeld = filters.order === 'asc' && !complete;
+  const shownHits = useMemo(
+    () => applyCaseLawFilters(hits, { yearsOf: yearsOfHit, textOf: textOfHit }, orderHeld ? { ...filters, order: 'desc' } : filters),
+    [hits, filters, orderHeld],
+  );
+
   const shownModo = last?.modo ?? modo;
   const indexRefused = hasNorma && Boolean(known?.indexRefused);
   // «Entrambi» exists where the route can search both: a topic, or an article it answered with no
@@ -259,10 +288,23 @@ export function DecisionResultList({ query, besideId, backEntry }: DecisionResul
       )}
 
       {countLine && <p className="text-sm text-slate-700 dark:text-slate-200">{countLine}</p>}
+      {isNarrowing(filters) && hits.length > 0 && (
+        <p className="text-sm text-slate-700 dark:text-slate-200">
+          {shownHits.length === 0
+            ? `Nessuna delle ${hits.length} decisioni caricate corrisponde ai filtri.`
+            : `${shownHits.length} di ${hits.length} decisioni caricate`}
+        </p>
+      )}
 
-      {hits.length > 0 && (
-        <ul>
-          {hits.map((hit) => (
+      {orderHeld && hits.length > 0 && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Ordinate dalla più recente: l’ordine inverso vale quando tutte le decisioni sono caricate
+        </p>
+      )}
+
+      {shownHits.length > 0 && (
+        <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+          {shownHits.map((hit) => (
             <Row key={`${hit.identita.archivio ?? ''}:${hit.identita.numero}:${hit.identita.anno}`} hit={hit} besideId={besideId} backEntry={backEntry} />
           ))}
         </ul>
