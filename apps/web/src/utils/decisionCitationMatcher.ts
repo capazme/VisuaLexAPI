@@ -70,7 +70,7 @@ const UNSUPPORTED_HEADS = new RegExp(
   'giu',
 );
 // «(Trib. Milano), sez. II»: a Tribunale in brackets, a place after it; «(trib.)» alone is the Cassazione's tax section.
-const TRIBUNALE_IN_BRACKETS = /\(\s*([Tt]rib\.)(?=\s*\p{Lu})/gu;
+const TRIBUNALE_IN_BRACKETS = /\(\s*([Tt]rib\.)(?=\s*\p{Lu})(?!\s*(?:Sez(?:ione|\.)?|Civ(?:ile|\.)|Pen(?:ale|\.)|Lav(?:oro|\.)|Un(?:ite|\.))(?!\p{L}))/gu;
 // «Corte di cassazione», «Suprema Corte di Cassazione»: the span starts at the first of these words.
 const CORTE_DI = /(?<![\p{L}\p{N}])(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+$/u;
 const CORTE_DI_REACH = 30;
@@ -102,6 +102,12 @@ const OTHER_COURT_WORDS = /^(?:sez(?:ioni|\.)?\s*un(?:ite|\.)?(?![\p{L}\p{N}])|s
 // del 2004 …)» speaks of a jurisdiction, and the rulings cited are the Court's own.
 const OTHER_COURT_MARKERS = /(?<![\p{L}\p{N}])(?:sez(?:ioni|\.)\s*un(?:ite|\.)?(?![\p{L}\p{N}])|suprema\s+corte|giudice\s+di\s+legittimit\p{L}*)/giu;
 const CORTE_COSTITUZIONALE = /^(?:corte\s+cost|c\.\s*cost)/i;
+// «la Corte costituzionale belga», «… federale tedesca», «… della Repubblica federale»: another country's court.
+const FOREIGN_QUALIFIER = /^\p{L}*\.?\s+(?:federale|belga|tedesca|austriaca|spagnola|francese|portoghese|polacca|ungherese|ceca|slovacca|slovena|croata|romena|rumena|lituana|lettone|estone|bulgara|greca|maltese|cipriota|turca|russa|ucraina|sudafricana|colombiana|della\s+repubblica(?!\s+italiana))(?![\p{L}\p{N}])/u;
+/** Whether the «Corte cost…» starting at `at` is this Court, not another country's. */
+function isThisCourt(folded: string, at: number): boolean {
+  return CORTE_COSTITUZIONALE.test(folded.slice(at, at + 12)) && !FOREIGN_QUALIFIER.test(folded.slice(at + 'corte cost'.length, at + 'corte cost'.length + 50));
+}
 const CORTE_DI_AFTER = /^(?:suprema\s+)?corte\s+(?:suprema\s+)?di\s+/u;
 
 interface Head {
@@ -185,7 +191,7 @@ function courtFollows(folded: string, end: number, ownCourt: boolean): boolean {
       const probe = folded.slice(at, at + 80).replace(/[);:\]]/g, ' ');
       const found = re.exec(probe);
       // inside a Corte costituzionale decision, «… della Corte costituzionale» is the Court itself
-      if (found && !(ownCourt && CORTE_COSTITUZIONALE.test(found[0]))) return true;
+      if (found && !(ownCourt && isThisCourt(probe, found.index))) return true;
     }
   }
   return false;
@@ -195,7 +201,12 @@ function courtFollows(folded: string, end: number, ownCourt: boolean): boolean {
 function ownCourtFollows(folded: string, end: number): boolean {
   const after = folded.slice(end, end + 50);
   const joined = AFTER_CITATION.exec(after);
-  return OWN_COURT_AFTER.test(after.slice(joined ? joined[0].length : 0));
+  const at = joined ? joined[0].length : 0;
+  const own = OWN_COURT_AFTER.exec(after.slice(at));
+  if (!own) return false;
+  // «…, questa Corte con la n. 3 del 2020»: the Court is the subject of the next item, not the author of this one
+  if (/^\s*con(?![\p{L}\p{N}])/u.test(after.slice(at + own[0].length))) return false;
+  return !/^c/.test(own[0]) || isThisCourt(after, at);
 }
 const OWN_COURT_AFTER = /^(?:quest[ao]\s+corte|corte\s+cost|c\.\s*cost)/u;
 
@@ -215,7 +226,7 @@ interface CourtMarker {
 function courtMarkers(folded: string, heads: readonly Head[]): CourtMarker[] {
   const markers: CourtMarker[] = heads
     .filter((h) => h.court)
-    .map((h) => ({ end: h.end, own: CORTE_COSTITUZIONALE.test(folded.slice(h.start, h.end)) }));
+    .map((h) => ({ end: h.end, own: isThisCourt(folded, h.start) }));
   for (const m of folded.matchAll(THIS_COURT)) markers.push({ end: (m.index ?? 0) + m[0].length, own: true });
   for (const m of folded.matchAll(OTHER_COURT_MARKERS)) markers.push({ end: (m.index ?? 0) + m[0].length, own: false });
   return markers.sort((a, b) => a.end - b.end);
