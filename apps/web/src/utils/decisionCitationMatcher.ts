@@ -472,7 +472,11 @@ export function extractDecisionCitations(
     if (head.court) lastCourt = { end: head.end, coverEnd: sentenceTail };
     if (head.unsupported) continue;
     // «… n. 5 del 2019 del Consiglio di Stato con l'ordinanza n. 7»: the court is the earlier decision's, not the next one's
-    if (head.court && namesEarlierDecision(folded, head.start, head.end)) continue;
+    if (head.court) {
+      // «… n. 5 del 2019 della Corte di cassazione con …»: the court's name starts at «Corte di»
+      const lead = CORTE_DI.exec(folded.slice(Math.max(0, head.start - CORTE_DI_REACH), head.start));
+      if (namesEarlierDecision(folded, lead ? head.start - lead[0].length : head.start, head.end)) continue;
+    }
     const prefix = head.kind ? SYNTHETIC_CORTE_COSTITUZIONALE : head.section ? SYNTHETIC_COURT : '';
     const shared = sharedYearItems(text, folded, head, prefix, tailEnd, now, () => (acts ??= allActSpans(folded)));
     if (shared) {
