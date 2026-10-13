@@ -153,15 +153,58 @@ export interface RevisioneInput {
   durataMs?: number;
 }
 
-/** `registrata: false`: the card had already been graded today (another device), so nothing was written. */
+/** Today's goal as a recorded grade leaves it; `appenaRaggiunto` on the one grade that made the day count. */
+export interface OggiDelVoto {
+  ripassi: number;
+  obiettivo: number;
+  raggiunto: boolean;
+  appenaRaggiunto: boolean;
+  /** The streak in days, today included once it counts. */
+  serie: number;
+}
+
+/** `registrata: false`: the card had already been graded today (another device), so nothing was written and there is no `oggi`. */
 export interface EsitoRevisione {
   registrata: boolean;
   prossimoRipasso: string;
   scheduledDays: number;
+  oggi?: OggiDelVoto;
 }
 
 export interface PreferenzeStudio {
   nuoveAlGiorno: number;
+  /** The reviews that make a day count for the streak (1–200). */
+  ripassiAlGiorno: number;
   /** The subjects whose validated community cards enter the review. */
   materieComunita: Materia[];
+}
+
+/** A day of the last seven: counted, a rest that kept the streak, missed, or today still open. */
+export type StatoGiorno = 'fatto' | 'riposo' | 'saltato' | 'oggi';
+
+export interface ConteggiStati {
+  nuove: number;
+  apprendimento: number;
+  consolidate: number;
+}
+
+/** A Rome day of the activity calendar; days with nothing are left out. */
+export interface GiornoAttivita {
+  giorno: string;
+  ripassi: number;
+  nuove: number;
+  sbagliate: number;
+  /** The day counted for the streak (always the whole day's, whatever the subject asked). */
+  valido: boolean;
+  riposo: boolean;
+}
+
+/** Everything the dashboard draws (`GET /lingo/srs/progressi`, Studia progress spec §5.2). Days are Rome days, 'YYYY-MM-DD'. */
+export interface Progressi {
+  oggi: { giorno: string; ripassi: number; obiettivo: number; raggiunto: boolean; dovute: number; nuove: number };
+  serie: { attuale: number; record: number; ultimiGiorni: { giorno: string; stato: StatoGiorno }[] };
+  stati: ConteggiStati;
+  materie: (ConteggiStati & { materia: Materia; ripassi30: number })[];
+  calendario: GiornoAttivita[];
+  prossimi: { giorno: string; schede: number }[];
 }
