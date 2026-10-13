@@ -10,7 +10,7 @@ import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardP
 import { DocumentReviewPage } from './components/features/documents/DocumentReviewPage';
 import { ConsentProvider } from './features/merlt/consent/ConsentContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { ConnectPage } from './features/connections';
+import { ConnectAiAppPage, ConnectPage } from './features/connections';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
 import { isStudiaEnabled } from './features/studia/featureFlag';
@@ -100,6 +100,8 @@ function App() {
           <Route path="environments" element={<EnvironmentPage />} />
           <Route path="forum" element={<BulletinBoardPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
+          {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
+          <Route path="collega-app" element={<ConnectAiAppPage />} />
           {/* The MERL-T pages are development addresses (spec D6): without the development mode they
               lead to «/». The server's guards (consent, validators, admins) stay the real barrier. */}
           <Route

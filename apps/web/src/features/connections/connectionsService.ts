@@ -22,7 +22,18 @@ export interface ConnectedApp {
   lastUsedAt: string | null;
 }
 
+/** What the «Collega un'app AI» page needs from the server: the MCP address and what each scope allows. */
+export interface ConnectionInfo {
+  /** The MCP server's address as a client is given it; null when this server has no MCP server running. */
+  mcpUrl: string | null;
+  scopes: { scope: string; label: string }[];
+}
+
 export const connectionsService = {
+  async getConnectionInfo(): Promise<ConnectionInfo> {
+    const response = await apiClient.get('/oauth/connection');
+    return response.data;
+  },
   async getRequest(requestId: string): Promise<AuthorizationRequestView> {
     const response = await apiClient.get(`/oauth/requests/${encodeURIComponent(requestId)}`);
     return response.data;
