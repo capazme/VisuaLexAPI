@@ -170,6 +170,8 @@ services:
       MERLT_SKIP_SEED: "${MERLT_SKIP_SEED:-false}"
       MERLT_SKIP_EMBEDDINGS: "${MERLT_SKIP_EMBEDDINGS:-true}"
       MERLT_HYGIENE_INTERVAL_HOURS: "${MERLT_HYGIENE_INTERVAL_HOURS:-24}"
+      # Activity events expire (merlt/privacy/retention.py); the purge always runs.
+      MERLT_TRACKING_RETENTION_DAYS: "${MERLT_TRACKING_RETENTION_DAYS:-365}"
     volumes: *merlt-volumes
     ports:
       - "127.0.0.1:${MERLT_API_PORT:-8000}:8000"

@@ -8,9 +8,10 @@ and some the user's own text (a highlight, a note). They are persisted to
 PostgreSQL (`tracking_events`), expire after the retention period
 (`merlt.privacy.retention`) and are exported and erased by user
 (`merlt.privacy.user_data`). If the DB is unavailable the endpoint answers 503
-and keeps nothing: the server logs the failure in its own dead-letter file,
-which has its own expiry. An in-memory buffer here was never drained, and an
-erasure could not reach it.
+and keeps nothing: the event is lost, and the VisuaLex server notes the failure
+in its dead-letter log, which keeps no personal data and expires
+(apps/server/src/services/merlt/deadLetterLog.ts). An in-memory buffer here was
+never drained, and an erasure could not reach it.
 
 Endpoints:
 - POST /tracking/events - Receive batch of tracking events

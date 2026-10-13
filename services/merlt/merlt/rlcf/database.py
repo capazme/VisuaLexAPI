@@ -88,7 +88,7 @@ def init_db(database_url: Optional[str] = None) -> None:
     pool_kwargs = {}
     if os.environ.get("MERLT_ENV") == "test":
         pool_kwargs["poolclass"] = NullPool
-    _engine = create_engine(url, echo=False, **pool_kwargs)
+    _engine = create_engine(url, echo=False, hide_parameters=True, **pool_kwargs)
     _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
     # Create all tables
@@ -122,7 +122,8 @@ async def init_async_db(database_url: Optional[str] = None) -> None:
     pool_kwargs = {}
     if os.environ.get("MERLT_ENV") == "test":
         pool_kwargs["poolclass"] = NullPool
-    _async_engine = create_async_engine(url, echo=False, **pool_kwargs)
+    # hide_parameters: an error's message never carries user ids or texts (merlt/privacy/).
+    _async_engine = create_async_engine(url, echo=False, hide_parameters=True, **pool_kwargs)
     _AsyncSessionLocal = async_sessionmaker(
         bind=_async_engine,
         class_=AsyncSession,

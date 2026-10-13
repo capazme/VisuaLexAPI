@@ -13,19 +13,30 @@ What the erasure does, by kind of data:
 - **proposals the community has not approved** (entities, relations,
   amendments): deleted, with the votes cast on them;
 - **what the community took up** (approved proposals, votes, issue reports, the
-  graph nodes and relations written from them): kept, with the link to the
-  person cut. A column that may be null is set to null; one that may not gets a
-  random value per row (``erased:<uuid>``), which names nobody and keeps the
-  unique constraints on votes;
+  graph nodes and relations written from them, the live sources the person
+  vouched for): kept, with the link to the person cut. A column that may be
+  null is set to null; one that may not gets a random value per row
+  (``erased:<uuid>``), which names nobody and keeps the unique constraints on
+  votes. In the graph, ``contributed_by`` becomes empty and the person's entry
+  in a live source's ``confirmed_by`` list becomes ``erased:<uuid>``: the list
+  must not shrink, or the hygiene sweep would prune a source someone vouched
+  for;
 - **another person's events that name this one** (a Forum event's
   ``target_author_id``): the key is removed from the payload;
 - the RLCF replay buffer, in memory and on disk: the person's experiences are
-  removed.
+  removed — theirs by user id, and any built on their questions (by trace id),
+  including other people's feedback on them.
+
+The export gives the person their own rows whole. Where they only reviewed,
+flagged or resolved someone else's row (``REFERENCE``), it gives the row's id
+and dates, never the other person's content.
 
 Left as they are, on purpose: ``audit_log`` (an append-only hash chain whose
 ``actor_hash`` is a hash of the user id: removing a row breaks the chain);
 ``api_keys`` (service keys, never a VisuaLex user's); the per-process rate-limit
-history of ``enrichment_router`` (minutes, in memory).
+history of ``enrichment_router`` (minutes, in memory); the application and
+access logs, which name user ids in some lines (the container's log rotation
+bounds them).
 
 Every step is idempotent: running the erasure again finishes what a failed run
 left, so the caller retries until it reports ``complete``.
@@ -34,6 +45,7 @@ left, so the caller retries until it reports ``complete``.
 from __future__ import annotations
 
 import os
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncContextManager, Callable, Dict, List, Mapping, Optional, Sequence
@@ -57,6 +69,10 @@ DELETE_UNLESS_APPROVED = "delete_unless_approved"  # proposals: approved ones ar
 # A value that names nobody, one per row, for a NOT NULL column being detached.
 _ERASED_VALUE = "'erased:' || gen_random_uuid()::text"
 
+# What the export gives for a column.
+ROW = "row"              # the person's own row, whole
+REFERENCE = "reference"  # someone else's row the person acted on: its id and dates only
+
 
 @dataclass(frozen=True)
 class UserColumn:
@@ -69,6 +85,9 @@ class UserColumn:
     nullable: bool = True
     # Columns left out of the export: internal machinery, not the person's data.
     export_exclude: Sequence[str] = ()
+    export_as: str = ROW
+    # For REFERENCE: the columns the export gives.
+    reference_columns: Sequence[str] = ("id", "created_at")
 
 
 # Order matters for the erasure: children before the rows they reference.
@@ -89,19 +108,22 @@ USER_COLUMNS: List[UserColumn] = [
     UserColumn(ENRICHMENT, "entity_issue_votes", "user_id", DETACH, nullable=False),
     UserColumn(ENRICHMENT, "relation_issue_votes", "user_id", DETACH, nullable=False),
     UserColumn(ENRICHMENT, "entity_issue_reports", "reported_by", DETACH, nullable=False),
-    UserColumn(ENRICHMENT, "entity_issue_reports", "resolved_by", DETACH),
+    UserColumn(ENRICHMENT, "entity_issue_reports", "resolved_by", DETACH, export_as=REFERENCE,
+               reference_columns=("issue_id", "resolved_at")),
     UserColumn(ENRICHMENT, "relation_issue_reports", "reported_by", DETACH, nullable=False),
-    UserColumn(ENRICHMENT, "relation_issue_reports", "resolved_by", DETACH),
+    UserColumn(ENRICHMENT, "relation_issue_reports", "resolved_by", DETACH, export_as=REFERENCE,
+               reference_columns=("issue_id", "resolved_at")),
     UserColumn(ENRICHMENT, "pending_entities", "contributed_by", DELETE_UNLESS_APPROVED),
     UserColumn(ENRICHMENT, "pending_relations", "contributed_by", DELETE_UNLESS_APPROVED),
     UserColumn(ENRICHMENT, "pending_amendments", "contributed_by", DELETE_UNLESS_APPROVED,
                nullable=False),
-    UserColumn(ENRICHMENT, "merlt_ingestion_batches", "created_by", DETACH),
-    UserColumn(ENRICHMENT, "merlt_ingestion_batches", "reviewed_by", DETACH),
+    UserColumn(ENRICHMENT, "merlt_ingestion_batches", "created_by", DETACH, export_as=REFERENCE),
+    UserColumn(ENRICHMENT, "merlt_ingestion_batches", "reviewed_by", DETACH, export_as=REFERENCE),
     # --- RLCF: questions to the assistant and their feedback -----------------
     UserColumn(RLCF, "qa_feedback", "user_id", DELETE),
-    UserColumn(RLCF, "qa_feedback", "flagged_by", DETACH),
-    UserColumn(RLCF, "qa_feedback", "reviewed_by", DETACH),
+    UserColumn(RLCF, "qa_feedback", "flagged_by", DETACH, export_as=REFERENCE),
+    UserColumn(RLCF, "qa_feedback", "reviewed_by", DETACH, export_as=REFERENCE,
+               reference_columns=("id", "reviewed_at")),
     # The execution trace is the engine's working, not the person's data.
     UserColumn(RLCF, "qa_traces", "user_id", DELETE, export_exclude=("full_trace",)),
     UserColumn(RLCF, "rlcf_feedback", "user_id", DELETE),
@@ -163,8 +185,9 @@ async def export_user_data(user_id: str, sessions: Optional[Sessions] = None) ->
             for col in (c for c in USER_COLUMNS if c.store == store):
                 if not await _table_exists(session, col.table):
                     continue
+                columns = "*" if col.export_as == ROW else ", ".join(col.reference_columns)
                 result = await session.execute(
-                    text(f"SELECT * FROM {col.table} WHERE {col.column} = :u"), {"u": user_id}
+                    text(f"SELECT {columns} FROM {col.table} WHERE {col.column} = :u"), {"u": user_id}
                 )
                 rows = _rows(result)
                 for row in rows:
@@ -219,8 +242,10 @@ async def _erase_column(session, col: UserColumn, user_id: str) -> Dict[str, int
 
 async def _erase_enrichment(
     user_id: str, counts: Dict[str, Dict[str, int]], sessions: Optional[Sessions]
-) -> List[str]:
-    """The enrichment database. Returns the storage paths of the person's files."""
+) -> None:
+    """The enrichment database, and the person's uploaded files. The files are
+    deleted inside the transaction, before its commit: a file that cannot be
+    deleted rolls the rows back, so a retry finds them and tries again."""
     files: List[str] = []
     async with _session_for(ENRICHMENT, sessions) as session:
         if await _table_exists(session, "user_documents"):
@@ -243,14 +268,15 @@ async def _erase_enrichment(
                 {"u": user_id},
             )
             counts["tracking_events.payload.target_author_id"] = {"detached": result.rowcount or 0}
-    return files
+        _erase_files(files, counts)
 
 
 async def _erase_rlcf(
     user_id: str, counts: Dict[str, Dict[str, int]], sessions: Optional[Sessions]
-) -> List[str]:
-    """The RLCF database. Returns the ids of the person's feedback rows, for the
-    replay buffer."""
+) -> None:
+    """The RLCF database, and the replay buffer. The buffer is cleaned inside the
+    transaction, before its commit: when that fails, the rows roll back and a
+    retry still has the feedback and trace ids the buffer is matched by."""
     feedback_ids: List[str] = []
     async with _session_for(RLCF, sessions) as session:
         trace_ids: List[str] = []
@@ -304,7 +330,7 @@ async def _erase_rlcf(
                         deleted += r.rowcount or 0
                 r = await session.execute(text("DELETE FROM users WHERE id = ANY(:ids)"), {"ids": legacy_ids})
                 counts["users.username"] = {"deleted": (r.rowcount or 0) + deleted}
-    return feedback_ids
+        _erase_replay_buffer(user_id, feedback_ids, trace_ids, counts)
 
 
 def _erase_files(paths: Sequence[str], counts: Dict[str, Dict[str, int]]) -> None:
@@ -312,17 +338,20 @@ def _erase_files(paths: Sequence[str], counts: Dict[str, Dict[str, int]]) -> Non
     never makes this delete anything else."""
     root = _upload_dir().resolve()
     deleted = 0
+    refused = 0
     for raw in paths:
         path = Path(raw).resolve()
         if root not in path.parents:
-            log.warning("user_data: refusing to delete a file outside UPLOAD_DIR", path=str(path))
+            # Counted, not fatal: a moved UPLOAD_DIR would otherwise fail every retry.
+            log.warning("user_data: refusing to delete a file outside UPLOAD_DIR")
+            refused += 1
             continue
         try:
             path.unlink()
             deleted += 1
         except FileNotFoundError:
             pass
-    counts["files.user_documents"] = {"deleted": deleted}
+    counts["files.user_documents"] = {"deleted": deleted, "refused": refused}
 
 
 async def _erase_graph(user_id: str, counts: Dict[str, Dict[str, int]], graph_client=None) -> None:
@@ -330,6 +359,9 @@ async def _erase_graph(user_id: str, counts: Dict[str, Dict[str, int]], graph_cl
     stops naming who proposed them (the writer stores an empty string when there
     is no contributor, and so does this)."""
     from merlt.pipeline.provisional_writer import _get_graph_client
+
+    def count(rows) -> int:
+        return int((rows[0].get("c") if rows else 0) or 0)
 
     gc = await _get_graph_client(graph_client)
     nodes = await gc.query(
@@ -341,20 +373,43 @@ async def _erase_graph(user_id: str, counts: Dict[str, Dict[str, int]], graph_cl
         "MATCH ()-[r]->() WHERE r.contributed_by = $u SET r.contributed_by = '' RETURN count(r) AS c",
         {"u": user_id},
     )
-    counts["graph.contributed_by"] = {
-        "detached": int((nodes[0].get("c") if nodes else 0) or 0) + int((rels[0].get("c") if rels else 0) or 0)
-    }
+    counts["graph.contributed_by"] = {"detached": count(nodes) + count(rels)}
+    # A live source the person vouched for (confirm-source): their entry becomes a
+    # value that names nobody. The list keeps its length: the hygiene sweep spares
+    # a source with a non-empty confirmed_by (pipeline/hygiene.py).
+    vouched = await gc.query(
+        "MATCH (n) WHERE $u IN coalesce(n.confirmed_by, []) "
+        "SET n.confirmed_by = [x IN n.confirmed_by WHERE x <> $u] + [$erased] RETURN count(n) AS c",
+        {"u": user_id, "erased": f"erased:{uuid.uuid4()}"},
+    )
+    counts["graph.confirmed_by"] = {"detached": count(vouched)}
 
 
-def _erase_replay_buffer(user_id: str, feedback_ids: Sequence[str], counts: Dict[str, Dict[str, int]]) -> None:
+def _erase_replay_buffer(
+    user_id: str,
+    feedback_ids: Sequence[str],
+    trace_ids: Sequence[str],
+    counts: Dict[str, Dict[str, int]],
+) -> None:
+    """The person's experiences: theirs by user id, and every one built on their
+    questions (by trace id: other people's feedback on them, the dossier
+    training loader's experiences, which carry no user id). Raises when the
+    buffer file cannot be saved, so the erasure is reported incomplete."""
     from merlt.rlcf.training_scheduler import get_scheduler
 
-    wanted = set(feedback_ids)
+    feedbacks = set(feedback_ids)
+    traces = set(trace_ids)
 
     def is_theirs(exp) -> bool:
         feedback = exp.feedback_data if isinstance(exp.feedback_data, dict) else {}
+        trace = exp.trace_data if isinstance(exp.trace_data, dict) else {}
         metadata = exp.metadata if isinstance(exp.metadata, dict) else {}
-        return feedback.get("user_id") == user_id or str(metadata.get("feedback_id")) in wanted
+        if feedback.get("user_id") == user_id:
+            return True
+        if str(metadata.get("feedback_id")) in feedbacks:
+            return True
+        candidates = (metadata.get("trace_id"), trace.get("trace_id"), trace.get("query_id"), feedback.get("query_id"))
+        return any(c is not None and str(c) in traces for c in candidates)
 
     counts["replay_buffer"] = {"deleted": get_scheduler().drop_experiences(is_theirs)}
 
@@ -374,31 +429,19 @@ async def erase_user_data(
     """
     counts: Dict[str, Dict[str, int]] = {}
     errors: Dict[str, str] = {}
-    files: List[str] = []
-    feedback_ids: List[str] = []
 
     try:
-        files = await _erase_enrichment(user_id, counts, sessions)
+        await _erase_enrichment(user_id, counts, sessions)
     except Exception as e:  # noqa: BLE001
         errors[ENRICHMENT] = _failure(e)
     try:
-        _erase_files(files, counts)
-    except Exception as e:  # noqa: BLE001
-        errors["files"] = _failure(e)
-    try:
-        feedback_ids = await _erase_rlcf(user_id, counts, sessions)
+        await _erase_rlcf(user_id, counts, sessions)
     except Exception as e:  # noqa: BLE001
         errors[RLCF] = _failure(e)
     try:
         await _erase_graph(user_id, counts, graph_client)
     except Exception as e:  # noqa: BLE001
         errors["graph"] = _failure(e)
-    if RLCF not in errors:
-        # Only once the feedback rows are gone, or a rehydration could bring them back.
-        try:
-            _erase_replay_buffer(user_id, feedback_ids, counts)
-        except Exception as e:  # noqa: BLE001
-            errors["replay_buffer"] = _failure(e)
 
     complete = not errors
     log.info("user_data: erasure", complete=complete, stores_failed=sorted(errors))

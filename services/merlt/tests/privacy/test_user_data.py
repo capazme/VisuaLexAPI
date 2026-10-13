@@ -210,6 +210,14 @@ async def _seed(sessions, tmp_path, me: str, other: str) -> dict:
         s.add(trace)
         await s.flush()
         s.add(QAFeedback(trace_id=trace.trace_id, user_id=me, inline_rating=5))
+        # The other person comments on my answer; and I review their feedback on theirs.
+        s.add(QAFeedback(trace_id=trace.trace_id, user_id=other, inline_rating=2,
+                         detailed_comment="commento dell'altro sulla mia risposta"))
+        theirs = QATrace(trace_id=f"trace_o_{tag}", user_id=other, query="la loro domanda")
+        s.add(theirs)
+        await s.flush()
+        s.add(QAFeedback(trace_id=theirs.trace_id, user_id=other, inline_rating=4,
+                         detailed_comment="il loro commento", reviewed_by=me))
         old = legacy.User(username=me)
         s.add(old)
         await s.flush()
@@ -242,6 +250,10 @@ async def test_export_finds_the_persons_rows(stores):
         assert "full_trace" not in tables["qa_traces"][0]
         assert "storage_path" not in tables["user_documents"][0]
         assert tables["users"][0]["username"] == me
+        # Their feedback I reviewed: its id and date, never their comment or their id.
+        reviewed = tables["qa_feedback.reviewed_by"]
+        assert len(reviewed) == 1 and set(reviewed[0]) == {"id", "reviewed_at"}
+        assert "il loro commento" not in str(tables) and other not in str(tables)
         # Nothing of the other person's.
         assert all(r["user_id"] == me for r in tables["tracking_events"])
     finally:
@@ -259,6 +271,9 @@ async def test_erasure_removes_the_person_and_spares_the_others(stores):
     scheduler = ts.get_scheduler()
     scheduler.add_experience({"t": 1}, _feedback(me), 1.0, metadata={"feedback_id": "x"})
     scheduler.add_experience({"t": 2}, _feedback(other), 1.0, metadata={"feedback_id": "y"})
+    # Built on my question, without my id: the other person's feedback, the dossier loader.
+    scheduler.add_experience({"trace_id": f"trace_{seeded['tag']}"}, _feedback(other), 1.0, metadata={})
+    scheduler.add_experience({"t": 3}, _feedback(None), 1.0, metadata={"trace_id": f"trace_{seeded['tag']}"})
     try:
         result = await erase_user_data(me, graph_client=graph, sessions=sessions)
         assert result["complete"] is True, result
@@ -286,11 +301,16 @@ async def test_erasure_removes_the_person_and_spares_the_others(stores):
         # The uploaded file is gone.
         assert not seeded["upload"].exists()
         # The graph was asked to forget me as contributor, by parameter.
-        assert graph.calls and all(params == {"u": me} for _, params in graph.calls)
+        assert graph.calls and all(params["u"] == me for _, params in graph.calls)
         # The replay buffer forgot my experience and kept theirs.
         left = [e.feedback_data["user_id"] for e in scheduler.buffer.tree.data if e is not None] \
             if hasattr(scheduler.buffer, "tree") else [e.feedback_data["user_id"] for e in scheduler.buffer.get_all()]
         assert left == [other]
+        # The other person's own question and feedback stay; their comment on mine went with it.
+        async with sessions[RLCF]() as s:
+            kept = (await s.execute(text(
+                "SELECT detailed_comment, reviewed_by FROM qa_feedback WHERE user_id = :o"), {"o": other})).all()
+        assert [tuple(r) for r in kept] == [("il loro commento", None)]
 
         # A second run finds nothing and is still complete.
         assert (await erase_user_data(me, graph_client=graph, sessions=sessions))["complete"] is True
@@ -314,6 +334,18 @@ async def test_a_failing_store_makes_the_erasure_incomplete(stores):
     assert result["errors"] == {"graph": "ConnectionError"}
 
 
+@needs_db
+async def test_a_buffer_that_cannot_be_saved_makes_the_erasure_incomplete(stores, monkeypatch):
+    sessions, tmp_path = stores
+    blocker = tmp_path / "not-a-dir"
+    blocker.write_text("x")
+    monkeypatch.setenv("MERLT_RLCF_BUFFER_PATH", str(blocker / "replay_buffer.json"))
+    ts.reset_scheduler()
+    result = await erase_user_data(f"me-{uuid.uuid4()}", graph_client=FakeGraph(), sessions=sessions)
+    assert result["complete"] is False
+    assert result["errors"] == {"rlcf": "RuntimeError"}
+
+
 async def test_a_file_outside_the_upload_dir_is_never_deleted(tmp_path, monkeypatch):
     uploads = tmp_path / "uploads"
     uploads.mkdir()
@@ -323,7 +355,7 @@ async def test_a_file_outside_the_upload_dir_is_never_deleted(tmp_path, monkeypa
     counts: dict = {}
     ud._erase_files([str(outside), str(uploads / ".." / "elsewhere.txt")], counts)
     assert outside.exists()
-    assert counts["files.user_documents"] == {"deleted": 0}
+    assert counts["files.user_documents"] == {"deleted": 0, "refused": 2}
 
 
 # =============================================================================

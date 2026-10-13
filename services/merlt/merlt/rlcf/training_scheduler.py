@@ -417,10 +417,12 @@ class TrainingScheduler:
     def drop_experiences(self, predicate: Callable[[Any], bool]) -> int:
         """Remove the experiences the predicate matches and save the buffer at
         once, so the file on disk no longer holds them either (a person's data
-        being erased). Returns how many were removed."""
+        being erased). Saves even when nothing was removed in memory: a retry
+        after a failed save must still rewrite the file. Raises when the save
+        fails. Returns how many were removed."""
         removed = self.buffer.remove_where(predicate)
-        if removed:
-            self._try_save_buffer()
+        if self.config.buffer_persistence_path and not self._try_save_buffer():
+            raise RuntimeError("replay buffer file not saved")
         return removed
 
     def get_buffer_stats(self) -> BufferStats:
