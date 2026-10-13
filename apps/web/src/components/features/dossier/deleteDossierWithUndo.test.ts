@@ -41,14 +41,17 @@ describe('a dossier deleted from the web app (question 160)', () => {
     toast?.onDismiss();
   });
 
-  it('«Annulla» restores it from the trash and reads it back from the server', async () => {
+  it('«Annulla» restores it from the trash and reads it back from the server; the trash is read again each time', async () => {
     svc.delete.mockResolvedValue({ trashId: 't1', itemCount: 3 });
     trash.restore.mockResolvedValue({ dossierId: 'a' });
     svc.getById.mockResolvedValue({ id: 'a', name: 'Ricorso Rossi', created_at: '2026-10-13T08:00:00Z', items: [] } as never);
-    deleteDossierWithUndo({ id: 'a', title: 'Ricorso Rossi' });
+    const trashChanged = vi.fn();
+    deleteDossierWithUndo({ id: 'a', title: 'Ricorso Rossi' }, trashChanged);
     await vi.waitFor(() => expect(toast).not.toBeNull());
+    expect(trashChanged).toHaveBeenCalledTimes(1);
     await toast!.onUndo();
     expect(trash.restore).toHaveBeenCalledWith('t1');
+    expect(trashChanged).toHaveBeenCalledTimes(2);
     expect(appStore.getState().dossiers.map((d) => d.id).sort()).toEqual(['a', 'b']);
   });
 
@@ -77,5 +80,11 @@ describe('an empty dossier the app could not fill', () => {
     await discardEmptyDossier('a');
     expect(trash.purge).toHaveBeenCalledWith('t9');
     expect(toast).toBeNull();
+  });
+
+  it('stays in the trash when the server says it held something (an answer lost on the way)', async () => {
+    svc.delete.mockResolvedValue({ trashId: 't9', itemCount: 1 });
+    await discardEmptyDossier('a');
+    expect(trash.purge).not.toHaveBeenCalled();
   });
 });

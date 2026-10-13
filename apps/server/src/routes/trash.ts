@@ -24,7 +24,7 @@ const restoreSchema = z.object({ targetDossierId: z.string().min(1).max(64).opti
 
 /** Who is deleting; only a connected application moves things to the trash. */
 function deletedBy(req: Request): DeletedBy {
-  if (!req.delegation) throw new AppError(403, 'Il cestino raccoglie solo ciò che eliminano le applicazioni collegate.');
+  if (!req.delegation) throw new AppError(403, 'Queste rotte sono per le applicazioni collegate.');
   return { clientId: req.delegation.clientId, clientName: req.delegation.clientName, grantId: req.delegation.grantId };
 }
 

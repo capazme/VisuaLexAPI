@@ -520,8 +520,8 @@ interface AppState {
     isBookmarked: (normaKey: string) => boolean;
 
     createDossier: (title: string, description?: string) => Promise<string | null>; // returns new server-side dossier ID, null on failure
-    /** Moves a dossier to the trash; the trash entry's id, or null when the server refused (put back, error shown). */
-    deleteDossier: (id: string) => Promise<string | null>;
+    /** Moves a dossier to the trash; the trash entry and what it holds, or null when the server refused (put back, error shown). */
+    deleteDossier: (id: string) => Promise<{ trashId: string; itemCount: number } | null>;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
     addToDossier: (dossierId: string, item: DossierNormaData | DossierSentenzaData | string, type: 'norma' | 'note' | 'sentenza') => void;
@@ -1540,7 +1540,7 @@ const appStore = createStore<AppState>()(
 
                 try {
                     // The server moves it to the trash (question 160).
-                    return (await dossierService.delete(id)).trashId;
+                    return await dossierService.delete(id);
                 } catch (err) {
                     console.error('Failed to delete dossier:', err);
                     // Rollback, where it was

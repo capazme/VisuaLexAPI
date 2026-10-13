@@ -713,8 +713,10 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   spostato nel cestino» has «Annulla», which restores that entry and reads the dossier
   back; a refusal puts it back where it was with a sync error and no toast. «Salva come
   dossier» that saved nothing discards its empty dossier from the trash at once
-  (`discardEmptyDossier`), and `applyEnvironment(replace)` sends the dossiers it replaces
-  there too. The web's removal of single entries stays immediate, with an undo, for now.
+  (`discardEmptyDossier`, only when the server says it held nothing), and
+  `applyEnvironment(replace)` and `importEnvironmentPartial(replace)` send the dossiers they
+  replace there too (their confirmation says so; annotations and highlights are still deleted
+  for good). The page's trash is read again after a deletion and after «Annulla». The web's removal of single entries stays immediate, with an undo, for now.
   Study cards go through it too: «Elimina» on a draft or an archived card in
   «Le mie schede» (`studiaService.trash`).
   A decision in the trash is named by the server's citation.

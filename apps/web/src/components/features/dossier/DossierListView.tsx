@@ -40,11 +40,13 @@ interface Props {
   /** Entries in the trash; the «Cestino» link shows only when there are some. */
   trashCount?: number;
   onOpenTrash?: () => void;
+  /** The trash changed here (a dossier deleted or put back): read it again for its count. */
+  onTrashChanged?: () => void;
 }
 
 type SortBy = 'date' | 'name' | 'items';
 
-export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash }: Props) {
+export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
   const { dossiers, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
   const navigate = useNavigate();
 
@@ -150,7 +152,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
   const handleConfirmDelete = () => {
     if (deletingDossier) {
-      deleteDossierWithUndo(deletingDossier);
+      deleteDossierWithUndo(deletingDossier, onTrashChanged);
       setDeletingDossier(null);
     }
   };

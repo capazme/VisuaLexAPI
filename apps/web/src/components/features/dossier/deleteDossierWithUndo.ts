@@ -15,16 +15,22 @@ export const deletedDossierMessage = (title: string) => `Dossier «${title}» sp
  * once, as «Ripristina» in the Cestino would. When the server refuses, the store
  * puts the dossier back and says so: no toast then, nothing went to the trash.
  */
-export function deleteDossierWithUndo(dossier: { id: string; title: string }): void {
+export function deleteDossierWithUndo(
+  dossier: { id: string; title: string },
+  /** The page's trash, read again after the move and after «Annulla» (its count). */
+  onTrashChanged?: () => void,
+): void {
   showUndoToast({
     action: async () => {
-      const trashId = await appStore.getState().deleteDossier(dossier.id);
-      if (!trashId) throw new Error('The dossier was not deleted');
-      return trashId;
+      const moved = await appStore.getState().deleteDossier(dossier.id);
+      if (!moved) throw new Error('The dossier was not deleted');
+      onTrashChanged?.();
+      return moved.trashId;
     },
     undo: async (trashId) => {
       try {
         await trashService.restore(trashId);
+        onTrashChanged?.();
         await appStore.getState().refreshDossier(dossier.id);
       } catch (err) {
         console.error('Failed to restore a deleted dossier:', dossier.id, err);
@@ -39,14 +45,15 @@ export function deleteDossierWithUndo(dossier: { id: string; title: string }): v
 
 /**
  * Removes a dossier the app made and could not fill («Salva come dossier» that saved nothing):
- * the user deleted nothing, so it does not stay in their trash. Logged when the purge fails;
- * the empty dossier then waits in the trash for its 30 days.
+ * the user deleted nothing, so it does not stay in their trash. Only when the server says it
+ * held nothing: an entry saved whose answer was lost stays in the trash, restorable. Logged when
+ * the purge fails; the empty dossier then waits in the trash for its 30 days.
  */
 export async function discardEmptyDossier(dossierId: string): Promise<void> {
-  const trashId = await appStore.getState().deleteDossier(dossierId);
-  if (!trashId) return;
+  const moved = await appStore.getState().deleteDossier(dossierId);
+  if (!moved || moved.itemCount > 0) return;
   try {
-    await trashService.purge(trashId);
+    await trashService.purge(moved.trashId);
   } catch (err) {
     console.error('Failed to purge a discarded empty dossier from the trash:', dossierId, err);
   }

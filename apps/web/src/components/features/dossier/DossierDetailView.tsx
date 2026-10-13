@@ -773,7 +773,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         confirmLabel="Elimina"
         onConfirm={() => {
           setConfirmDeleteOpen(false);
-          deleteDossierWithUndo(dossier);
+          deleteDossierWithUndo(dossier, trash ? () => void trash.reload() : undefined);
           onBack();
         }}
         onCancel={() => setConfirmDeleteOpen(false)}
