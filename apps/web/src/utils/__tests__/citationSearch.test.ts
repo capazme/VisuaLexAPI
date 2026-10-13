@@ -359,6 +359,68 @@ describe('findCitationSpans', () => {
     expect(cited(text, 'Cass. n. 8980/2018')).toEqual(['12 aprile 2018, n. 8980', 'n. 8980/2018', 'n. 8980 del 2018', 'n. 8980/2018']);
   });
 
+  it('a date-first decision needs a court or a decision marker before the date', () => {
+    const q = 'Cass. n. 8980/2018';
+    const decisions: [string, string][] = [
+      ['Così Cass. 12 aprile 2018, n. 8980 afferma.', '12 aprile 2018, n. 8980'],
+      ['Così Cass. civ., sez. III, 12/04/2018, n. 8980 afferma.', '12/04/2018, n. 8980'],
+      ['Così sent. 12.4.2018 n. 8980 afferma.', '12.4.2018 n. 8980'],
+      ['Così (ord. 12 aprile 2018, n. 8980) afferma.', '12 aprile 2018, n. 8980'],
+      ['Così Corte cost., sentenza 12 aprile 2018, n. 8980 afferma.', '12 aprile 2018, n. 8980'],
+      ['Così Cass. 12 aprile 2018 e 13 maggio 2018, n. 8980 afferma.', '13 maggio 2018, n. 8980'],
+      ['Così Cons. Stato, sez. VI, ordinanza 12 aprile 2018, n. 8980 afferma.', '12 aprile 2018, n. 8980'],
+      ['Così Cass. S.U. 12 aprile 2018, n. 8980 afferma.', '12 aprile 2018, n. 8980'],
+    ];
+    for (const [text, span] of decisions) expect(cited(text, q), text).toEqual([span]);
+    const none = [
+      // No court or marker: a ministerial decree, a regional law, an office's act.
+      "il decreto del Ministro dell'economia e delle finanze 12 aprile 2018, n. 8980",
+      "la legge della Regione autonoma Valle d'Aosta 12 aprile 2018, n. 8980",
+      'la legge provinciale della Provincia autonoma di Bolzano 12 aprile 2018, n. 8980',
+      'delle leggi 12 aprile 2018, n. 8980 e altre',
+      'dei decreti legislativi 12 aprile 2018, n. 8980',
+      'dei dd.lgs. 12 aprile 2018, n. 8980',
+      'il decreto legislativo 3 marzo 2015 n. 99 e 12 aprile 2018, n. 8980',
+      'il T.U. 12 aprile 2018, n. 8980',
+      'il testo unico 12 aprile 2018, n. 8980',
+      'il d.d.g. 12 aprile 2018, n. 8980',
+      'il provvedimento 12 aprile 2018, n. 8980',
+      'la delibera 12 aprile 2018, n. 8980',
+      'la deliberazione della Giunta regionale 12 aprile 2018, n. 8980',
+      "l'ordinanza 12 aprile 2018, n. 8980 del Sindaco",
+      'il 12 aprile 2018, n. 8980 persone',
+      'il giorno 12.4.2018, n. 8980 di protocollo',
+      // A marker too far, or cut off from the date.
+      'Cass. ha deciso. Il 12 aprile 2018, n. 8980 persone ne hanno fatto richiesta',
+      'Cass. è citata; 12 aprile 2018, n. 8980',
+      `Cass. ${'e poi '.repeat(15)}12 aprile 2018, n. 8980`,
+      'Cassazione. 12 aprile 2018, n. 8980',
+      // An act between the marker and the date.
+      'Cass. e la legge 12 aprile 2018, n. 8980',
+      'Cass. e il decreto del Ministro 12 aprile 2018, n. 8980',
+    ];
+    for (const text of none) expect(cited(text, q), text).toEqual([]);
+  });
+
+  it("never finds a decision's number inside an administrative act, cited date first or not", () => {
+    const acts = [
+      'circolare', 'circ.', 'nota', 'provvedimento', 'provv.', 'delibera', 'delib.', 'deliberazione', 'determina', 'det.',
+      'determinazione', 'risoluzione', 'parere',
+    ];
+    for (const act of acts) {
+      for (const form of [`${act} 12 aprile 2018, n. 8980`, `${act} n. 8980/2018`, `${act} n. 8980 del 2018`, `${act} del Ministero n. 8980/2018`]) {
+        const text = `Cass. e ${form}, non altro.`;
+        expect(cited(text, 'Cass. n. 8980/2018'), text).toEqual([]);
+        // The literal match of the number stays out of the act too.
+        expect(found(`Si veda la ${form}, non altro.`, 'n. 8980/2018'), form).toEqual([]);
+      }
+    }
+    // «ordinanza» and «sentenza» are decisions.
+    expect(cited('Cass., ordinanza n. 8980/2018 e sentenza n. 8980 del 2018.', 'Cass. n. 8980/2018')).toEqual(['n. 8980/2018', 'n. 8980 del 2018']);
+    expect(cited('Cass., sentenza 12 aprile 2018, n. 8980.', 'Cass. n. 8980/2018')).toEqual(['12 aprile 2018, n. 8980']);
+    expect(readQueryCitation('Cass. circolare 12 aprile 2018, n. 8980')).toBeNull();
+  });
+
   it('links an article to the act through its ordinal comma, its commi or «e ss.»', () => {
     const q = 'art. 1 l. 99/2015';
     const linked: [string, string][] = [
@@ -411,6 +473,11 @@ describe('findCitationSpans', () => {
       'La legge 99/2015, art. 2, primo comma, dispone.',
     ];
     for (const text of broken) expect(cited(text, q), text).toEqual([]);
+  });
+
+  it('«ss.» before an act type is read as «e ss.», not as the end of a sentence (a known ambiguity)', () => {
+    expect(cited('Si veda art. 1 e ss. Legge 99/2015, che dispone.', 'art. 1 l. 99/2015')).toEqual(['art. 1 e ss. Legge 99/2015']);
+    expect(cited('Si veda artt. 1 e ss. L. 99/2015.', 'art. 1 l. 99/2015')).toEqual(['artt. 1 e ss. L. 99/2015']);
   });
 
   it("finds a code's article with «del», an ordinal comma, «commi» or «e ss.», never another article or code", () => {

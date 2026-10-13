@@ -395,9 +395,15 @@ function actSpans(folded: string, c: Extract<QueryCitation, { kind: 'act' }>): S
 
 /**
  * What names an act for a decision's number (spec §13.2): any form of a type in the tables, or
- * «decreto», «direttiva», «regolamento» («dir.», «reg.»), whole or ending with a dot («l.r.»).
+ * «decreto», «direttiva», «regolamento» («dir.», «reg.»), or an administrative act cited «date, n.
+ * N» («circolare», «nota», «provvedimento», «delibera», «deliberazione», «determina»,
+ * «determinazione», «risoluzione», «parere» and their abbreviations: «circ.», «provv.», «delib.»,
+ * «det.»), whole or ending with a dot («l.r.»). «ordinanza» and «sentenza» are decisions, not here.
  */
-const ACT_WORD = `${TYPE_START}(?:${ANY_ACT_TYPE}|decreto|direttiva|dir\\.|regolamento|reg\\.)(?:(?<=\\.)|(?!\\p{L}))`;
+const ACT_WORD =
+  `${TYPE_START}(?:${ANY_ACT_TYPE}|decreto|direttiva|dir\\.|regolamento|reg\\.` +
+  '|circolare|circ\\.|nota|provvedimento|provv\\.|delibera|delib\\.|deliberazione|determina|det\\.|determinazione|risoluzione|parere' +
+  ')(?:(?<=\\.)|(?!\\p{L}))';
 /**
  * A word between an act's name and its number: «regionale», «reg.», «r.», «della», «Regione»,
  * «Friuli-Venezia», «(UE)». Never a court or a decision's marker: «la legge e Cass. n. …» is a decision.
@@ -438,18 +444,44 @@ export function allActSpans(folded: string): Span[] {
 
 const overlapsAny = (spans: readonly Span[], [s, e]: Span): boolean => spans.some(([a, b]) => s < b && a < e);
 
+/** How far before a date a court or a decision's marker may stand. */
+const MARKER_REACH = 60;
+const DECISION_HEAD_ANYWHERE = new RegExp(`(?<![\\p{L}\\p{N}])${DECISION_HEAD}`, 'gu');
+/** A word of five letters or more before a full stop ends a sentence; a shorter one is an abbreviation («Cass.», «sez.»). */
+const SENTENCE_END = /\p{L}{5,}\.(?:\s|$)|[!?]\s/u;
+/** «n. 8980 del Sindaco»: the number of an administrative act of an office, never of a court. */
+const OFFICE_AFTER = '(?!\\s*,?\\s+(?:del|della|dello|dell\')\\s*(?:sindaco|comune|presidente|prefetto|questore|giunta|ministro|ministero|dirigente|direttore|regione)(?!\\p{L}))';
+
+/**
+ * Whether a court or a decision's marker («Cass.», «sez.», «sent.», «ord.», «Corte cost.») stands
+ * within `MARKER_REACH` characters before `start`, with no act's name, semicolon or end of sentence
+ * between it and `start`.
+ */
+function followsDecisionMarker(folded: string, start: number): boolean {
+  const window = folded.slice(Math.max(0, start - MARKER_REACH), start);
+  let head: RegExpExecArray | undefined;
+  for (const m of window.matchAll(DECISION_HEAD_ANYWHERE)) head = m;
+  if (!head) return false;
+  const since = window.slice(head.index);
+  return !since.includes(';') && !SENTENCE_END.test(since) && !new RegExp(ACT_WORD, 'u').test(window.slice(head.index + head[0].length));
+}
+
 /**
  * A decision cited date first («Cass., sez. III, 12 aprile 2018, n. 8980», «sent. 12.4.2018 n.
- * 8980»): the date, whose year is the query's, and the number, joined by a comma and spaces only. The
- * number is whole and bears no other year («n. 8980/2019», «n. 8980 del 2019» are not it).
+ * 8980»): the date, whose year is the query's, and the number, joined by a comma and spaces only,
+ * after a court or a decision's marker (date first is also how ministerial decrees, regional laws and
+ * administrative acts are cited; the act guard of `decisionSpans` is not enough for them). The number
+ * is whole and bears no other year («n. 8980/2019», «n. 8980 del 2019» are not it).
  */
 function decisionDateFirstSpans(folded: string, c: Extract<QueryCitation, { kind: 'decision' }>): Span[] {
   const re = new RegExp(
     `(?<![\\p{N}/.-])${DECISION_DATE}${c.year}(?!\\d)\\s*(?:,\\s*)?${NUMBER_WORD}${escapeRegExp(c.number)}(?!\\d)` +
-      '(?!\\s*\\/\\s*\\d)(?!\\s*,?\\s+del\\s+\\d)',
+      `(?!\\s*\\/\\s*\\d)(?!\\s*,?\\s+del\\s+\\d)${OFFICE_AFTER}`,
     'gu',
   );
-  return [...folded.matchAll(re)].map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  return [...folded.matchAll(re)]
+    .filter((m) => followsDecisionMarker(folded, m.index ?? 0))
+    .map((m): Span => [m.index ?? 0, (m.index ?? 0) + m[0].length]);
 }
 
 /** A decision's number and year in every form; never where they belong to an act (`anyActSpans`). */

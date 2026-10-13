@@ -1100,7 +1100,10 @@ cost.», «sent.», «ord.», «S.U.», «n.»), or bare as «N/YYYY» with a fo
 citation are never a decision, neither as a span nor as a literal match: «Cass. n. 99/2015» and
 «n. 99/2015» do not find the number of «legge n. 99 del 2015» or «l. n. 99/2015». An act's
 citation, here, is any form of a type in the act-type table, or «decreto», «direttiva»,
-«regolamento» («dir.», «reg.»), followed by up to five words that are not a court or a decision's
+«regolamento» («dir.», «reg.»), or an administrative act cited «date, n. N» («circolare»,
+«nota», «provvedimento», «delibera», «deliberazione», «determina», «determinazione»,
+«risoluzione», «parere»; «circ.», «provv.», «delib.», «det.»; never «ordinanza» or «sentenza»,
+which are decisions), followed by up to five words that are not a court or a decision's
 marker, then the number and year: «legge regionale n. 99 del 2015», «l.r. n. 99/2015», «legge
 della Regione Veneto n. 99 del 2015», «Reg. (UE) n. 99/2015», «decreto n. 99 del 2015».
 
@@ -1110,8 +1113,14 @@ the number 8980 and the year 2018. The span covers the date and the number: a da
 the query's (day and month real: a month's name in full, or two numbers; four-digit year), then a
 comma and spaces only, then «n.», «nr.», «num.» or «numero» and exactly the query's number (not
 the start of a longer one, not followed by «/» and a year or by «del» and a year: «n. 8980/2019»
-and «n. 8980 del 2019» are other citations). The court before the date is not required in the text.
-A query typed date first reads as that number and year only with a court or a decision's marker
+and «n. 8980 del 2019» are other citations; nor «n. 8980 del Sindaco», «della Giunta», «del
+Ministero»…: an office's number). In the text a court or a decision's marker must stand before the
+date (a court, a section, «sent.», «sentenza», «ord.», «ordinanza», «S.U.»…), within 60 characters,
+with no act's name, no semicolon and no end of a sentence (a word of five letters or more before a
+full stop) between the two: date first is also how ministerial decrees, regional laws and
+administrative acts are cited, and only the marker tells them apart. «Cass. 12 aprile 2018 e 13
+maggio 2018, n. 8980» finds the second date; «il decreto del Ministro dell'economia e delle
+finanze 12 aprile 2018, n. 8980» and «il 12 aprile 2018, n. 8980 persone» find nothing. A query typed date first reads as that number and year only with a court or a decision's marker
 before the date (as the other queries) and the «n.» before the number: «Cass. 12 aprile 2018, n.
 8980» is the number 8980 of 2018; «12 aprile 2018, n. 8980» and «Cass. 12 aprile 2018, 8980» are
 searched literally, and so is a query with an act's name between the court and the date. The act
@@ -1134,14 +1143,18 @@ a digit, nor ends right before a digit when it ends with one: «8980/2018» is n
 «18980/2018» nor in «8980/20181».
 
 **Not found.** Still not found, by choice (a form that is doubtful is not matched): a decision
-cited date first with no «n.» before the number, with a two-digit year or an abbreviated month
-(«12 apr. 2018»), and an act's article linked through «sgg.»/«segg.», «comma unico», «primo
-periodo» or any other word not listed above. A decision cited date first after a section named
-«L» («Sez. L, 12 aprile 2018, n. 8980») is lost to the act guard, which reads the «L» as «legge»
-(as «Sez. L, n. 8980/2018» already is). A date-first number is not told apart from the same
-date and number of an administrative act that the act guard does not list («circolare 12 aprile
-2018, n. 8980»). «art. 2043 del c.c.» is found in the window; `extractCitations` still does not
-read it, so it is no link in a decision's text.
+cited date first with no «n.» before the number, with no court or marker before the date, with a
+two-digit year or an abbreviated month («12 apr. 2018»), and an act's article linked through
+«sgg.»/«segg.», «comma unico», «primo periodo» or any other word not listed above. A decision
+cited date first after a section named «L» («Sez. L, 12 aprile 2018, n. 8980») is lost to the act
+guard, which reads the «L» as «legge» (as «Sez. L, n. 8980/2018» already is). A date-first
+number is not told apart from an administrative act the guard does not name (a «T.U.», a
+«d.d.g.» are caught only by the missing marker). «art. 2043 del c.c.» is found in the window;
+`extractCitations` still does not read it, so it is no link in a decision's text.
+
+**Known ambiguity.** «ss.» ends with the dot of an abbreviation, which may also end a sentence:
+«… art. 1 e ss. Legge 99/2015» links article 1 to the act, because the folded text has lost the
+capital that would tell the two apart. Refusing it would lose «artt. 1 e ss. L. 99/2015».
 
 **Tests.** Synthetic texts in the repository, written for the cases above. Real decision texts
 stay out of the repository (they carry personal data): a local-only suite reads them from a

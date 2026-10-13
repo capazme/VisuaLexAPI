@@ -362,10 +362,15 @@ or dot, never before a letter when the query ends with a dot («art. 1 c.p.» is
 per text, replaced when the text changes, dropped when the target leaves the scope). Act types come from `sources/actTypes.ts` plus the
 palette's spellings (`NUMBERED_ACT_SPELLINGS`); a type is never found inside another's name («legge»
 in «decreto-legge» or «decreto- legge»), a decision's number never inside an act's citation (any
-type of the table, or «decreto», «direttiva», «regolamento»: regional laws and Union acts too), and
+type of the table, or «decreto», «direttiva», «regolamento», or an administrative act cited date first:
+«circolare», «nota», «provvedimento», «delibera», «determina», «risoluzione», «parere»…; regional laws and
+Union acts too, never «ordinanza» or «sentenza», which are decisions), and
 an article links to its act only across the gap §13.2 whitelists (commas, «comma N», «commi 2 e 3», «primo comma» and the
 other ordinals, «e ss.», «lett.», «n.», «del»…). A decision cited date first («Cass., sez. III, 12 aprile 2018, n. 8980») is found by
-its date and number when the date's year is the query's, never as an act's («legge 12 aprile 2018, n. 8980»). A code's article
+its date and number when the date's year is the query's and a court or a decision's marker stands within 60
+characters before the date (`followsDecisionMarker`: no act's name, semicolon or end of a sentence between), never
+as an act's («legge 12 aprile 2018, n. 8980»); without a marker nothing is found, because date first is also how
+ministerial decrees, regional laws and administrative acts are cited. A code's article
 is found across the same words (`blankCodeLinks`: «art. 2043 del c.c.», «art. 2043, primo comma, c.c.», «art. 2043 e ss. c.c.»
 are blanked to spaces at the same offsets and `extractCitations` reads the text again; it is the one reader of codes, and it
 still does not make «del c.c.» a link). Its tests use synthetic texts (no run of 30
