@@ -160,6 +160,13 @@ describe('EuCaseLawBlock', () => {
     expect(service).not.toHaveBeenCalled();
   });
 
+  it('does not say «not the Treaties» about a regulation or a directive whose article it cannot search', () => {
+    show({ ...GDPR, tipo_atto: 'direttiva ue', numero_articolo: '6 bis' });
+    expect(screen.getByText('Le decisioni dell’Unione si cercano per articoli con un numero semplice: per questo articolo non c’è una ricerca negli indici.')).toBeInTheDocument();
+    expect(screen.queryByText(/non per i Trattati/)).toBeNull();
+    expect(service).not.toHaveBeenCalled();
+  });
+
   it('says the route does not list the act when it answers so, with no «Riprova»', async () => {
     service.mockResolvedValue({ esito: 'non_supportata' });
     show();

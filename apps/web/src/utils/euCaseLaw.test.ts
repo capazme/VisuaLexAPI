@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { euCaseLawQuery, eurLexDecisionUrl } from './euCaseLaw';
+import { euCaseLawQuery, eurLexDecisionUrl, hasEuCaseLawList } from './euCaseLaw';
 
 const gdpr = { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6' };
 
@@ -13,9 +13,14 @@ describe('euCaseLawQuery', () => {
     expect(euCaseLawQuery({ tipo_atto: 'Direttiva UE', data: '2011', numero_atto: '83', numero_articolo: '6' })).toEqual({ celex: '32011L0083', articolo: '6' });
   });
 
-  it('takes the year from a number written with it, and a full date', () => {
-    expect(euCaseLawQuery({ ...gdpr, numero_atto: '2016/679', data: '' })).toEqual({ celex: '32016R0679', articolo: '6' });
+  it('takes the year from a full date', () => {
     expect(euCaseLawQuery({ ...gdpr, data: '2016-04-27' })).toEqual({ celex: '32016R0679', articolo: '6' });
+  });
+
+  it('does not guess at a pair written in the number: which side is the year differs from act to act', () => {
+    // «2016/679» is year first, «2006/2004» number first: reading both as year first names another act
+    expect(euCaseLawQuery({ ...gdpr, numero_atto: '2016/679', data: '' })).toBeNull();
+    expect(euCaseLawQuery({ ...gdpr, numero_atto: '2006/2004', data: '' })).toBeNull();
   });
 
   it('has no query for a Treaty, which the route does not list', () => {
@@ -49,5 +54,15 @@ describe('eurLexDecisionUrl', () => {
     expect(eurLexDecisionUrl('62023CC0097&x=1')).toBeNull();
     expect(eurLexDecisionUrl('javascript:alert(1)')).toBeNull();
     expect(eurLexDecisionUrl('')).toBeNull();
+  });
+});
+
+describe('hasEuCaseLawList', () => {
+  it('is true for a regulation and a directive, in any spelling, and false for a Treaty or a national act', () => {
+    expect(hasEuCaseLawList('Regolamento UE')).toBe(true);
+    expect(hasEuCaseLawList('direttiva ue')).toBe(true);
+    expect(hasEuCaseLawList('tfue')).toBe(false);
+    expect(hasEuCaseLawList('legge')).toBe(false);
+    expect(hasEuCaseLawList(undefined)).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -10,6 +11,8 @@ vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/decisionSearchService')>()),
   searchDecisions: vi.fn(),
 }));
+vi.mock('../../../services/euCaseLawService');
+import { searchEuCaseLaw } from '../../../services/euCaseLawService';
 const fetchRassegne = vi.fn();
 vi.mock('../../../features/merlt/rassegne/rassegneApi', () => ({ fetchRassegne: (...args: unknown[]) => fetchRassegne(...args) }));
 // the real slot would mount the whole MERL-T registry; only the Massimario's panel matters here
@@ -67,6 +70,7 @@ beforeEach(() => {
       : [];
     return { ...PAGE, totale: decisioni.length, decisioni } as SearchDecisionsAnswer;
   });
+  vi.mocked(searchEuCaseLaw).mockReset();
   fetchRassegne.mockReset().mockResolvedValue(RASSEGNE);
   _clearRassegneCacheForTests();
   window.sessionStorage.clear();
@@ -238,5 +242,67 @@ describe('CaseLawSection — on a phone', () => {
     const panel = screen.getByRole('button', { name: 'Giurisprudenza' }).closest('div')!;
     expect(panel.querySelector('[class*="overflow-y-"]')).toBeNull();
     expect(panel.querySelector('[class*="max-h-"]')).toBeNull();
+  });
+});
+
+describe('CaseLawSection — on an act of the Union', () => {
+  const GDPR: NormaVisitata = { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6', urn: 'u-gdpr' };
+  const eu = (tipo: 'JUDG' | 'ORDER', numero: number, anno: number, data: string) => ({
+    corte: 'corte_giustizia_ue' as const, causa: `C-${numero}/${String(anno).slice(2)}`, ecli: null, data, tipo,
+    celex: `6${anno}C${tipo === 'JUDG' ? 'J' : 'O'}${String(numero).padStart(4, '0')}`,
+    identita: { corte: 'corte_giustizia_ue' as const, numero, anno },
+  });
+
+  async function openGdpr() {
+    vi.mocked(searchEuCaseLaw).mockResolvedValue({
+      esito: 'risultati', celex: '32016R0679', articolo: '6', totale: 2, troncato: false,
+      decisioni: [eu('JUDG', 97, 2023, '2025-03-03'), eu('ORDER', 123, 2020, '2021-05-05')],
+    });
+    render(<MemoryRouter><CaseLawSection norma={GDPR} massime={MASSIME} articleUrn={GDPR.urn} tabId="tab-1" /></MemoryRouter>);
+    await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    await screen.findByText('Corte giust. UE, C-97/23');
+  }
+
+  it('counts the Court of Justice\'s years with the massime\'s, in the section\'s chips', async () => {
+    await openGdpr();
+    const chips = within(screen.getByRole('group', { name: 'Anni delle decisioni' })).getAllByRole('button').map((b) => b.textContent);
+    // massime 2025, 2020, 2019 · Court of Justice 2025, 2021
+    expect(chips).toEqual(['2025 (2)', '2021 (1)', '2020 (1)', '2019 (1)']);
+  });
+
+  it('narrows the Court of Justice\'s block together with the massime when a chip is pressed', async () => {
+    await openGdpr();
+    expect(screen.getByRole('button', { name: '3 di 3 massime' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '2025 (2)' }));
+    expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
+    expect(screen.getByText('1 di 2 decisioni')).toBeInTheDocument();
+    expect(screen.getByText('Corte giust. UE, C-97/23')).toBeInTheDocument();
+    expect(screen.queryByText(/C-123\/20/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: '2025 (2)' }));
+    expect(screen.getByText('2 decisioni')).toBeInTheDocument();
+  });
+
+  it('narrows it by a word as well', async () => {
+    await openGdpr();
+    await userEvent.type(screen.getByRole('searchbox'), 'ordinanza');
+    expect(screen.queryByText('Corte giust. UE, C-97/23')).toBeNull();
+    expect(screen.getByText(/C-123\/20/)).toBeInTheDocument();
+    expect(screen.getByText('1 di 2 decisioni')).toBeInTheDocument();
+  });
+});
+
+describe('CaseLawSection — one press, one request', () => {
+  // The development server runs every effect twice (StrictMode): the search is asked for once all the same
+  it.each([false, true])('asks the archive once for a range set before the button, strict mode %s', async (strict) => {
+    const ui = <MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>;
+    render(strict ? <StrictMode>{ui}</StrictMode> : ui);
+    await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Dall’anno' }), '2024');
+    await userEvent.type(screen.getByRole('textbox', { name: 'All’anno' }), '2024');
+    await userEvent.click(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' }));
+    await screen.findByText(/nell’archivio pubblico della Cassazione/);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(vi.mocked(searchDecisions)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(searchDecisions)).toHaveBeenCalledWith(expect.anything(), 1, 'indice', { dal: 2024, al: 2024 });
   });
 });

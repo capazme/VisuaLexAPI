@@ -251,14 +251,17 @@ with no year is kept only while no range is set. The year range and the text fil
 `DecisionResultList`'s `yearRange`; a new range starts the search again from page one, nothing is asked
 before the reader presses the button) and reports the archive's own `anni` counts for every year — approximate
 («circa») in index mode, which counts before the citation re-check, exact in the text search — or, when the
-archive sent none, the years of the hits loaded. On the Cassazione the reversed order applies once every
+archive sent none, the years of the hits loaded (the counts are kept for the query, archive and mode they
+count, not for the next one if that fails; the range is clamped to 1900 – this year in Rome, and a range wholly outside
+that answers «none» without a request). On the Cassazione the reversed order applies once every
 decision is loaded; until then the archive's order (newest first) stands and a line says so. Filters reset
 with the article.
 **An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
 regulation or a directive: `utils/euCaseLaw.ts` derives the act's CELEX from the norm
 (`3` + the year + `R`/`L` + the number on four digits, as the API's `sources.eu_identity` does — the norm
-carries none) and the plain-number article; a Treaty, or an article that is not a plain number, has no query
-and the block says the list is for regulations and directives. It asks `/search_eu_case_law`
+carries none; a pair written in `numero_atto` is not guessed at) and the plain-number article; a Treaty, or an article that is not a plain number, has no query
+and the block says the list is for regulations and directives (for a regulation or a directive whose article is not
+a plain number, that it is searched by simple numbers). It asks `/search_eu_case_law`
 (`services/euCaseLawService.ts`, `legalFetch`) when it appears, once per act and article for the session
 (`utils/euCaseLawCache.ts`, cleared at logout; only an answer is kept, so «Riprova» asks again). A row is
 `CaseLawRow`: a judgment is a `DecisionLink` from its `identita` (our reader, beside, the way back, the phone's

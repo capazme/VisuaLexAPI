@@ -5,7 +5,7 @@ import type { EuCaseLawAnswer, EuCaseLawDecision } from '../../../types/decision
 import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
-import { euCaseLawQuery, eurLexDecisionUrl, INFOCURIA_SEARCH_URL } from '../../../utils/euCaseLaw';
+import { euCaseLawQuery, eurLexDecisionUrl, hasEuCaseLawList, INFOCURIA_SEARCH_URL } from '../../../utils/euCaseLaw';
 import { searchEuCaseLawCached } from '../../../utils/euCaseLawCache';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { Button } from '../../ui/Button';
@@ -106,7 +106,13 @@ export function EuCaseLawBlock({ norma, besideId, backEntry }: EuCaseLawBlockPro
   );
 
   if (!query) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">{problemMessage({ esito: 'non_supportata' })}</p>;
+    return (
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        {hasEuCaseLawList(tipo_atto)
+          ? 'Le decisioni dell’Unione si cercano per articoli con un numero semplice: per questo articolo non c’è una ricerca negli indici.'
+          : problemMessage({ esito: 'non_supportata' })}
+      </p>
+    );
   }
   if (!answer) {
     return <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Ricerca negli indici dell’Unione europea…</p>;

@@ -57,6 +57,24 @@ export function normalizeRange({ from, to }: YearRange): YearRange {
   return from !== undefined && to !== undefined && from > to ? { from: to, to: from } : { from, to };
 }
 
+/** The years the Cassazione's archive takes: 1900 to the current year (in Rome), as `/search_decisions` validates them. */
+export const ARCHIVE_FIRST_YEAR = 1900;
+
+/**
+ * A range as the archive takes it: the wrong way round read the right way round, `dal` raised to 1900 and
+ * `al` lowered to `currentYear`. `outside` when no year of the range is one the archive can hold («dal 2030»,
+ * «al 1850»): the answer is none, and no request is worth sending.
+ */
+export function archiveYears(range: YearRange, currentYear: number): { dal?: number; al?: number; outside: boolean } {
+  const { from, to } = normalizeRange(range);
+  if ((from !== undefined && from > currentYear) || (to !== undefined && to < ARCHIVE_FIRST_YEAR)) return { outside: true };
+  return {
+    dal: from === undefined ? undefined : Math.max(from, ARCHIVE_FIRST_YEAR),
+    al: to === undefined ? undefined : Math.min(to, currentYear),
+    outside: false,
+  };
+}
+
 export function inRange(years: readonly RowYear[], range: YearRange): boolean {
   if (!isRangeSet(range)) return true;
   const { from, to } = normalizeRange(range);

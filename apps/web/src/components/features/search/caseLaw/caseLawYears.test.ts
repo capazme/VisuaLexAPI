@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  countByYear, filterByRange, inRange, isRangeSet, mergeYearCounts, normalizeRange, parseYear, rowYear, sortByYear, yearCounts, yearList, type YearsOf,
+  archiveYears, countByYear, filterByRange, inRange, isRangeSet, mergeYearCounts, normalizeRange, parseYear, rowYear, sortByYear, yearCounts, yearList, type YearsOf,
 } from './caseLawYears';
 
 interface Row { id: string; years: Array<{ year?: string | number | null; date?: string | null }> }
@@ -98,5 +98,31 @@ describe('the counts of several blocks', () => {
     const merged = mergeYearCounts([[{ year: 2024, n: 2 }], [{ year: 2024, n: 5, approx: true }, { year: 2019, n: 1 }]]);
     expect(merged).toEqual([{ year: 2024, n: 7, approx: true }, { year: 2019, n: 1 }]);
     expect(mergeYearCounts([[{ year: 2024, n: 5, approx: true }], [{ year: 2024, n: 2 }]])[0].approx).toBe(true);
+  });
+});
+
+describe('archiveYears', () => {
+  it('passes a range the archive can hold as it is', () => {
+    expect(archiveYears({ from: 2022, to: 2024 }, 2026)).toEqual({ dal: 2022, al: 2024, outside: false });
+    expect(archiveYears({}, 2026)).toEqual({ dal: undefined, al: undefined, outside: false });
+    expect(archiveYears({ from: 2022 }, 2026)).toEqual({ dal: 2022, al: undefined, outside: false });
+  });
+
+  it('lowers «al» to the current year and raises «dal» to 1900', () => {
+    expect(archiveYears({ from: 2022, to: 2027 }, 2026)).toEqual({ dal: 2022, al: 2026, outside: false });
+    expect(archiveYears({ from: 1850, to: 2024 }, 2026)).toEqual({ dal: 1900, al: 2024, outside: false });
+    expect(archiveYears({ to: 2099 }, 2026)).toEqual({ dal: undefined, al: 2026, outside: false });
+  });
+
+  it('reads a range typed the wrong way round the right way round first', () => {
+    expect(archiveYears({ from: 2027, to: 2022 }, 2026)).toEqual({ dal: 2022, al: 2026, outside: false });
+  });
+
+  it('says outside for a range no year of which the archive can hold', () => {
+    expect(archiveYears({ from: 2030 }, 2026).outside).toBe(true);
+    expect(archiveYears({ from: 2030, to: 2031 }, 2026).outside).toBe(true);
+    expect(archiveYears({ to: 1850 }, 2026).outside).toBe(true);
+    expect(archiveYears({ from: 2026 }, 2026).outside).toBe(false);
+    expect(archiveYears({ to: 1900 }, 2026).outside).toBe(false);
   });
 });

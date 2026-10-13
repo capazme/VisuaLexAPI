@@ -13,20 +13,24 @@ export interface EuCaseLawQuery {
 
 const SECTOR_3: Record<string, string> = { 'regolamento ue': 'R', 'direttiva ue': 'L' };
 
+/** Whether the route lists decisions for this type of act: a regulation or a directive, not a Treaty. */
+export const hasEuCaseLawList = (tipoAtto: string | null | undefined): boolean =>
+  Object.hasOwn(SECTOR_3, (tipoAtto || '').trim().toLowerCase());
+
 /**
  * The CELEX of a regulation or a directive of the Union and the article, as the route takes them,
  * or null: a Treaty (the route lists decisions for regulations and directives only), an act whose
- * year or number is not known, an article that is not a plain number. Derived as the API derives it
+ * year or number is not known as plain digits (a pair written in one field is not guessed at: which side
+ * is the year differs between acts, and a wrong CELEX lists another act's case law), an article that is
+ * not a plain number. Derived as the API derives it
  * (`sources.eu_identity`): `3`, the year of the act, `R` or `L`, the number on four digits. The norm
  * carries no CELEX of its own.
  */
 export function euCaseLawQuery(norma: Pick<NormaVisitata, 'tipo_atto' | 'data' | 'numero_atto' | 'numero_articolo'>): EuCaseLawQuery | null {
   const letter = SECTOR_3[(norma.tipo_atto || '').trim().toLowerCase()];
   if (!letter) return null;
-  // «2016» and «679», or a number written with its year, «2016/679»
-  const written = /^(\d{4})\/(\d{1,4})$/.exec((norma.numero_atto ?? '').trim());
-  const year = written ? written[1] : (norma.data ?? '').slice(0, 4);
-  const number = written ? written[2] : (norma.numero_atto ?? '').trim();
+  const year = (norma.data ?? '').slice(0, 4);
+  const number = (norma.numero_atto ?? '').trim();
   if (!/^\d{4}$/.test(year) || !/^\d{1,4}$/.test(number) || Number(number) < 1) return null;
   const articolo = (norma.numero_articolo ?? '').trim();
   if (!/^[1-9]\d{0,3}$/.test(articolo)) return null;
