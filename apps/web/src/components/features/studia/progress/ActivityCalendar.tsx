@@ -1,7 +1,7 @@
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { cn } from '../../../../lib/utils';
 import type { GiornoAttivita } from '../../../../types/studia';
-import { calendarGrid, formatDate, formatDayLong, heatLevel, type CalendarCell } from './layout';
+import { calendarGrid, describeDay, formatDate, heatLevel } from './layout';
 import { FOCUS_RING, HEAT_FILL, INK_TEXT, MUTED_TEXT } from './tokens';
 
 export interface ActivityCalendarProps {
@@ -21,22 +21,6 @@ const ROW_LABELS: Record<number, string> = { 0: 'L', 2: 'M', 4: 'V', 6: 'D' };
 const HUE_OPACITY = [0, 0.35, 0.55, 0.78, 1] as const;
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/** What the line under the calendar says of a day. */
-export function describeDay(cell: CalendarCell, today: string): string {
-  const name = cell.giorno === today ? `Oggi, ${formatDayLong(cell.giorno)}` : formatDayLong(cell.giorno);
-  const day = cell.day;
-  if (!day || (day.ripassi === 0 && !day.valido)) {
-    return day?.riposo ? `${name}: giorno di riposo, la serie regge` : `${name}: nessun ripasso`;
-  }
-  // A day with nothing to do that counted: the queue was empty when the user looked.
-  const parts = [day.ripassi === 0 ? 'niente da ripassare' : plural(day.ripassi, 'ripasso', 'ripassi')];
-  if (day.nuove > 0) parts.push(plural(day.nuove, 'nuova', 'nuove'));
-  if (day.sbagliate > 0) parts.push(plural(day.sbagliate, 'sbagliata', 'sbagliate'));
-  if (day.valido) parts.push('obiettivo raggiunto');
-  if (day.riposo) parts.push('giorno di riposo, la serie regge');
-  return `${name}: ${parts.join(' · ')}`;
-}
 
 /**
  * The review history as an activity calendar (Studia progress spec §4.4, §6.3): one cell per Rome day,

@@ -85,6 +85,24 @@ export function calendarGrid(days: GiornoAttivita[], today: string, weeks: numbe
   return { cells, columns: Math.ceil(cells.length / 7), months, max };
 }
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** What the line under the calendar says of a day. */
+export function describeDay(cell: CalendarCell, today: string): string {
+  const name = cell.giorno === today ? `Oggi, ${formatDayLong(cell.giorno)}` : formatDayLong(cell.giorno);
+  const day = cell.day;
+  if (!day || (day.ripassi === 0 && !day.valido)) {
+    return day?.riposo ? `${name}: giorno di riposo, la serie regge` : `${name}: nessun ripasso`;
+  }
+  // A day with nothing to do that counted: the queue was empty when the user looked.
+  const parts = [day.ripassi === 0 ? 'niente da ripassare' : plural(day.ripassi, 'ripasso', 'ripassi')];
+  if (day.nuove > 0) parts.push(plural(day.nuove, 'nuova', 'nuove'));
+  if (day.sbagliate > 0) parts.push(plural(day.sbagliate, 'sbagliata', 'sbagliate'));
+  if (day.valido) parts.push('obiettivo raggiunto');
+  if (day.riposo) parts.push('giorno di riposo, la serie regge');
+  return `${name}: ${parts.join(' · ')}`;
+}
+
 /** 0 for no review, else 1–4 by the share of the busiest day. */
 export function heatLevel(count: number, max: number): 0 | 1 | 2 | 3 | 4 {
   if (count <= 0 || max <= 0) return 0;

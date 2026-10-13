@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -28,8 +28,8 @@ const DAY_STATE_LABEL: Record<StatoGiorno, string> = {
 export function StreakBadge({ attuale, record, ultimiGiorni }: StreakBadgeProps) {
   const reduce = useReducedMotion();
   // The count pops only when it changes, never when it first appears.
-  const firstCount = useRef(attuale);
-  const grew = attuale !== firstCount.current;
+  const [firstCount] = useState(attuale);
+  const grew = attuale !== firstCount;
 
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={`Serie: ${attuale} ${attuale === 1 ? 'giorno' : 'giorni'} di fila, record ${record}`}>
