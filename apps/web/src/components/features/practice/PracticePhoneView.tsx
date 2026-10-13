@@ -131,9 +131,8 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
     <>
       {readerOpen ? <ReadingFullScreen onCrossReference={onCrossReference} /> : (
         <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
-          {/* The layout's fixed menu button (top-left, 16px in, 56px wide) sits over the header's left
-              edge: the inset keeps the previous chevron clear of it. */}
-          <div className="flex-shrink-0 border-b border-slate-200 bg-white/80 py-2 pl-[4.5rem] pr-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
+          {/* Under the search page's field, which sits beside the layout's menu button: no inset. */}
+          <div className="flex-shrink-0 border-b border-slate-200 bg-white/80 px-4 py-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center justify-between">
               <button
                 type="button"

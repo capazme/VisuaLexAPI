@@ -70,7 +70,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, `EuCaseLawBlock`, the Union's courts' decisions that cite an article of a regulation or a directive, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
-  (a link to `/` that also opens the palette; its hover label carries ⌘K; the quick norms' dot sits under it;
+  (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
+  the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Cronologia, Ambienti,
   Forum, «Analizza documento»; and at the bottom only the user menu, whose dropdown holds Impostazioni,
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
@@ -78,10 +79,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
   backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
   at the top left, and `Layout` starts every page's content under it (`pt-[4.5rem]`, repeated at `md`)
-  except the search page, whose phone headers sit beside it (`pl-[4.5rem]`); the practice row's
-  `h-app-row` is drawn only there, so its height is unchanged. There is no «Ricerca Veloce», no
+  except the search page, whose field sits beside it (`pl-[4.5rem]` below `lg`). There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.
+  **The search page's field** (`features/search/SearchField`, spec
+  `docs/superpowers/specs/2026-10-13-fixed-search-design.md`): `Layout` draws it on `/` (not in Focus mode) in a
+  bar of `SEARCH_BAR_HEIGHT` above the content scroller, so it is always on screen, and sets
+  `--search-bar-height` on `<main>`, which `h-app-row` subtracts. It reads what is typed with the palette's own
+  reading, `hooks/useSearchQuery` (a decision, a norm with the server's resolver as fallback, a topic): Enter opens
+  the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
+  lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
+  the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
+  closed. `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
+  the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
+  palette with the same words when no field is on screen (Focus mode).
+  **The palette is global**: `GlobalSearch` (the palette, `QuickNormsManager`, `AliasManager`) is mounted by
+  `Layout`, so ⌘K opens it on every page at once; what it opens lands in the practices through
+  `hooks/useSearchActions` (`search`, `browse`, `openDecision`, `openTopic`), which bring the reader to `/` from
+  any other page. A typed search (palette, field) is marked (`isTypedSearch`, on a copy of its params, never on a
+  quick norm's own) and `SearchPanel` does not run the annex auto-switch on it, as when the palette called the panel
+  directly; a quick norm used from its manager is a plain trigger (`trigger`), checked as before.
 - `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and
   `DevRoute` (a route element: without the mode, `<Navigate to="/" replace />`; while `useAuth` is
   still loading it draws nothing, so a reload on a development address is not mistaken for the mode
@@ -185,7 +203,8 @@ Three different things. Conflating them is the recurring mistake.
   advertising a shortcut that no longer runs, and the manager badges it
   "sovrascritto".
 
-`AliasManager` is reached **only** from the command palette (gotcha 27), and in
+`AliasManager` is reached **only** from the command palette (gotcha 27; both are mounted by `Layout`'s
+`GlobalSearch`), and in
 the palette the presets cost one line of header text at rest — they render as
 rows only once the user types, and cmdk does the matching. `useAliasCatalog`
 keeps its `loaded` flag in component state, so the palette and the manager each
@@ -661,7 +680,7 @@ plain click opens the decision's preview; its «Apri accanto», on the search pa
 article and, given a `backEntry`, records the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as
 for a citation jump, and elsewhere («Apri la sentenza») goes to the address; any other click follows the real
 `href`, which `DecisionAddress` turns into the same entry), the
-sidebar's «Ricerca» (which also opens the palette: there is no decisions page), the Cronologia
+palette's ⌘K on any page (there is no decisions page), the Cronologia
 (`DecisionHistoryRow`, from its preview too) and the address itself (queued in `pendingDecision`, drained by `SearchPanel`). The entry
 persists its reference until the route has found it, then the identity (a cited section
 travels with the reference to the route, which uses it to tell homonyms apart): the text is fetched again through `utils/decisionFetchCache.ts`.
@@ -1160,8 +1179,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsPopover.tsx` (a block's notes and
   highlights, opened from its sign), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic, and the mount point for both
-  `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
+  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx`, `SearchField.tsx` (the search page's field)
+  and `GlobalSearch.tsx` (the palette and the managers it opens, mounted by `Layout` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
 - `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
   edits, not for where it opens: it is reached from the command palette, not
@@ -1330,7 +1349,7 @@ meant to stay split; add new features as new files, not inside the shells:
     `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
     raising the child's value does nothing.
     The sidebar's navigation scrolls on its own in a low window (`overflow-y-auto`, which clips what hangs
-    out of it) and the document never scrolls (`Layout`'s root is `h-app overflow-hidden`: `index.css`'s utility, `100dvh` with a `100vh` fallback; the practice row's columns are `h-app-row`, that less the content area's 4 rem of padding), so its
+    out of it) and the document never scrolls (`Layout`'s root is `h-app overflow-hidden`: `index.css`'s utility, `100dvh` with a `100vh` fallback; the practice row's columns are `h-app-row`, that less the content area's 4 rem of padding and the search page's field, `--search-bar-height`), so its
     labels are portalled to the body (`SidebarTooltip`), placed from the control's rectangle; they show
     for a mouse pointer and on keyboard focus-visible (never after a tap or a click), and go with Esc, a scroll
     or a resize.
@@ -1350,13 +1369,14 @@ meant to stay split; add new features as new files, not inside the shells:
     `phoneReader` state, not a hidden copy of a window.
 
 27. **A store flag only opens a modal that is actually mounted.** `AliasManager`
-    (and its siblings) render inside `SearchPanel`, so `aliasManagerOpen` is
-    inert on `/dossier`, `/history` or any route that is not the search page —
-    the flag flipped and nothing appeared, silently. That is why the alias
-    manager is reached from the command palette, which lives in the same subtree,
-    and why the Settings entry that used to open it was removed rather than kept
-    as a second door. Before adding a global-looking "open X" button, check where
-    X is mounted.
+    and the palette used to render inside `SearchPanel`, so `aliasManagerOpen` and
+    ⌘K were inert on `/dossier`, `/history` or any route that is not the search page —
+    the flag flipped and nothing appeared until the reader came back to `/`. The palette,
+    `QuickNormsManager` and `AliasManager` now live in `Layout` (`GlobalSearch`); the
+    alias manager is still reached only from the palette, and the Settings entry that
+    used to open it was removed rather than kept as a second door. What the palette opens
+    lands in the practices, which only `/` draws: `useSearchActions` navigates there.
+    Before adding a global-looking "open X" button, check where X is mounted.
 
 29. **A Tailwind class whose token is undeclared fails in total silence.**
     `apps/web/tailwind.config.js` is a v3-style config and Tailwind v4 never

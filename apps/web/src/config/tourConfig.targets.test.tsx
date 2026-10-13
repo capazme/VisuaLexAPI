@@ -9,6 +9,7 @@ vi.mock('../components/features/search/ReadingBackControl', () => ({ ReadingBack
 
 import { appStore } from '../store/useAppStore';
 import { SearchPanel } from '../components/features/search/SearchPanel';
+import { SearchField } from '../components/features/search/SearchField';
 import { SEARCH_STEPS, TOUR_KEYS, TOUR_STEPS_MAP } from './tourConfig';
 
 // The sources of the app (not the tests, not the tour configuration): where a tour's target must be written.
@@ -41,7 +42,8 @@ describe('every tour points at something the app draws', () => {
 describe('the search tour on the search page', () => {
   it('every step finds its element on the page a first visit shows (the sidebar\'s is checked with the sidebar)', () => {
     appStore.setState({ practices: [], activePracticeId: null });
-    render(<MemoryRouter><SearchPanel /></MemoryRouter>);
+    // The field is drawn by `Layout`, above the search page's own content.
+    render(<MemoryRouter><SearchField /><SearchPanel /></MemoryRouter>);
     const targets = SEARCH_STEPS.map((s) => s.element).filter((e): e is string => typeof e === 'string' && !e.startsWith('#tour-nav-'));
     expect(targets.length).toBeGreaterThan(1);
     for (const selector of targets) expect(document.querySelector(selector), selector).not.toBeNull();
