@@ -1,5 +1,5 @@
 import type { ArticleData, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
-import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, withPreposition } from './dateUtils';
+import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, parseItalianDate, withPreposition } from './dateUtils';
 
 /**
  * What a reader is told about the version of the text on screen.
@@ -58,11 +58,14 @@ export function versionKey(request: VersionRequest | null | undefined): string {
 /** Which text a request asks for: the original, the text at a day, or the text in force. */
 export type RequestedVersion = { kind: 'original' } | { kind: 'date'; date: string } | { kind: 'current' };
 
-/** The three ways to ask for a text, read the way `versionKey` reads them (the original wins over a day). */
+/**
+ * The three ways to ask for a text. A day wins over the original, as in the tab
+ * (`versionTabSuffix`), and is written as an ISO day whenever `parseItalianDate` can read it.
+ */
 export function requestedVersion(request: VersionRequest | null | undefined): RequestedVersion {
-  if (asksForOriginal(request?.versione)) return { kind: 'original' };
   const date = textOf(request?.data_versione);
-  return date ? { kind: 'date', date } : { kind: 'current' };
+  if (date) return { kind: 'date', date: parseItalianDate(date) || date };
+  return asksForOriginal(request?.versione) ? { kind: 'original' } : { kind: 'current' };
 }
 
 /** The text a request asks for, in words: «testo originale», «testo al 31 dicembre 2015», «testo in vigore». */

@@ -48,6 +48,11 @@ export interface CompareRow {
   label?: CompareLabel;
   /** «modificato» only. */
   diff?: WordDiff;
+  /**
+   * The comma would have been «modificato» but a side is over `DIFF_WORD_CAP` words: it counts as
+   * «riscritto» and the view says «troppo lungo per il confronto parola per parola».
+   */
+  tooLong?: true;
 }
 
 export interface ComparisonSummary {
@@ -87,6 +92,7 @@ export const DIFF_WORD_CAP = 600;
 const MODIFIED_RATIO: readonly [number, number] = [3, 5];
 /** The same measure, at or above which two commi without a printed number may be paired (D2). */
 const PAIRING_RATIO: readonly [number, number] = [1, 2];
+const PAIRING_FLOOR = 0.5;
 
 // ── the word LCS (moved here from ArticleDiff) ──────────────────
 
@@ -223,13 +229,17 @@ interface UnitInfo {
   /** The words of D3's measure: case and punctuation folded. */
   counts: Map<string, number>;
   total: number;
-  notice: boolean;
+  /** The whole unit is a repeal notice («((COMMA ABROGATO …))», «((...))»), not any other notice. */
+  repeal: boolean;
 }
 
 const MARKS = /\(\(|\)\)/g;
 const WORD = /\S+/g;
 const FOLDED_OUT = /[^\p{L}\p{N}]+/gu;
 const BARE_REFERENCE = /\(\d{1,4}[a-z]?\)/g;
+/** What makes a notice a repeal: the parser's `notice` also covers OMISSIS, MODIFICAT and SOSTITUIT. */
+const REPEAL_WORDS = /ABROGAT|SOPPRESS/;
+const OMISSION = /^\(\(\s*(?:\.{3}|…)\s*\)\)$|^(?:\.{3}|…)$/;
 
 function isRepealNotice(raw: string, unit: CompareUnit, decorations: readonly InlineDecoration[], markerEnd: number): boolean {
   if (unit.items.length > 0 || unit.kind !== 'comma') return false;
@@ -237,6 +247,11 @@ function isRepealNotice(raw: string, unit: CompareUnit, decorations: readonly In
     (d) => d.kind === 'notice' && d.start >= unit.start && d.end <= unit.end,
   );
   if (covering.length === 0) return false;
+  const repeals = (d: InlineDecoration) => {
+    const text = raw.slice(d.start, d.end).trim();
+    return REPEAL_WORDS.test(text) || OMISSION.test(text);
+  };
+  if (!covering.every(repeals)) return false;
   const blanked = [
     ...covering,
     ...decorations.filter((d) => (d.kind === 'ref' || d.kind === 'ref-missing') && d.start >= unit.start && d.end <= unit.end),
@@ -279,7 +294,7 @@ function inspect(raw: string, unit: CompareUnit, structure: ArticleStructure): U
     tokens,
     counts,
     total,
-    notice: isRepealNotice(raw, unit, structure.decorations, marker?.end ?? unit.start),
+    repeal: isRepealNotice(raw, unit, structure.decorations, marker?.end ?? unit.start),
   };
 }
 
@@ -345,6 +360,9 @@ function align(first: readonly UnitInfo[], second: readonly UnitInfo[], score: (
 function versionScore(a: UnitInfo, b: UnitInfo): number | null {
   const s = similarity(a, b);
   if (a.unit.number !== null && b.unit.number !== null) return a.unit.number === b.unit.number ? 1 + s.value : null;
+  // A repeal notice shares no word with the comma it replaced: it takes that comma's place
+  // at the floor of the pairing measure, so it is read as its repeal and not as an addition.
+  if (b.repeal) return Math.max(s.value, PAIRING_FLOOR);
   return s.reaches(PAIRING_RATIO) ? s.value : null;
 }
 
@@ -389,11 +407,13 @@ function wordDiff(older: UnitInfo, newer: UnitInfo, olderSide: CompareSide): Wor
   return olderSide === 'left' ? { left: deleted, right: inserted } : { left: inserted, right: deleted };
 }
 
-function labelPair(older: UnitInfo, newer: UnitInfo, olderSide: CompareSide): Pick<CompareRow, 'label' | 'diff'> {
+function labelPair(older: UnitInfo, newer: UnitInfo, olderSide: CompareSide): Pick<CompareRow, 'label' | 'diff' | 'tooLong'> {
   if (older.folded === newer.folded) return { label: 'invariato' };
-  if (newer.notice) return { label: 'abrogato' };
-  const overCap = older.tokens.length > DIFF_WORD_CAP || newer.tokens.length > DIFF_WORD_CAP;
-  if (overCap || !similarity(older, newer).reaches(MODIFIED_RATIO)) return { label: 'riscritto' };
+  // Repealed in both versions, only worded differently: nothing happened between them.
+  if (older.repeal && newer.repeal) return { label: 'invariato' };
+  if (newer.repeal) return { label: 'abrogato' };
+  if (!similarity(older, newer).reaches(MODIFIED_RATIO)) return { label: 'riscritto' };
+  if (older.tokens.length > DIFF_WORD_CAP || newer.tokens.length > DIFF_WORD_CAP) return { label: 'riscritto', tooLong: true };
   return { label: 'modificato', diff: wordDiff(older, newer, olderSide) };
 }
 
@@ -409,7 +429,8 @@ function buildRow(
   if (o !== null) row[olderSide] = olderUnits[o].unit;
   if (n !== null) row[newerSide] = newerUnits[n].unit;
   if (o !== null && n !== null) Object.assign(row, labelPair(olderUnits[o], newerUnits[n], olderSide));
-  else row.label = o !== null ? 'abrogato' : 'aggiunto';
+  // A repeal notice standing alone is the repeal of what the older text had, never an addition.
+  else row.label = o !== null || newerUnits[n!].repeal ? 'abrogato' : 'aggiunto';
   return row;
 }
 
@@ -451,9 +472,19 @@ function olderSideOf(left: ArticleData, right: ArticleData): CompareSide {
 
 /** D1: the same article in two versions, or anything else. */
 export function compareKindOf(left: ArticleData, right: ArticleData): CompareKind {
-  return buildItemKey(left.norma_data) === buildItemKey(right.norma_data) && versionKey(left.norma_data) !== versionKey(right.norma_data)
+  return buildItemKey(left.norma_data) === buildItemKey(right.norma_data)
+    && versionKey(left.norma_data) !== versionKey(right.norma_data)
+    && !askForTheSameText(left, right)
     ? 'versions'
     : 'articles';
+}
+
+/**
+ * Two requests whose keys differ but that name one text (the same day written two ways): there is
+ * no older side and no change to label, so they are compared as two articles, side by side.
+ */
+function askForTheSameText(left: ArticleData, right: ArticleData): boolean {
+  return JSON.stringify(requestedVersion(left.norma_data)) === JSON.stringify(requestedVersion(right.norma_data));
 }
 
 const request = (article: ArticleData): VersionRequest => ({
@@ -568,5 +599,6 @@ export function summarySentence(summary: ComparisonSummary): string {
   }
   if (changes.length === 0) return `${head}: nessuna modifica`;
   const unchanged = summary.counts.invariato;
-  return `${head}: ${changes.join(', ')}${unchanged > 0 ? ` · ${unchanged} ${unchanged === 1 ? 'invariato' : 'invariati'}` : ''}`;
+  const unchangedPart = unchanged === 0 ? '' : ` · ${nounSaid ? unchanged : commi(unchanged)} ${unchanged === 1 ? 'invariato' : 'invariati'}`;
+  return `${head}: ${changes.join(', ')}${unchangedPart}`;
 }

@@ -55,6 +55,21 @@ describe('kind (D1)', () => {
   });
 });
 
+describe('two requests that name one text', () => {
+  it('are compared as two articles, with no older side and no labels', () => {
+    const a = article('1. Uno.', { versione: 'vigente', data_versione: '2015-12-31' });
+    const b = article('1. Uno.', { versione: 'originale', data_versione: '2015-12-31' });
+    const c = compareArticles(a, b);
+    expect(c.kind).toBe('articles');
+    expect(c.rows.every((r) => r.label === undefined)).toBe(true);
+    expect(compareKindOf(article('1. Uno.', at('31/12/2015')), article('1. Uno.', at('2015-12-31')))).toBe('articles');
+  });
+  it('are named once, the same way, whichever way the day is written', () => {
+    const c = compareArticles(article('1. Uno.', at('31/12/2015')), article('1. Uno.'));
+    expect(c.summary.labels.left).toBe('testo al 31 dicembre 2015');
+  });
+});
+
 describe('which side is older (versions)', () => {
   const older = (l: Partial<NormaVisitata>, r: Partial<NormaVisitata>, lv?: ArticleValidity, rv?: ArticleValidity) =>
     compareArticles(article('x', l, { validity: lv }), article('x', r, { validity: rv })).older;
@@ -75,12 +90,16 @@ describe('which side is older (versions)', () => {
     expect(older(at('2007-12-29'), at('2015-12-31'))).toBe('left');
     expect(older(at('2015-12-31'), at('2007-12-29'))).toBe('right');
   });
-  it('falls back on the validity windows when a day is not an ISO date', () => {
-    expect(older(at('31/12/2015'), at('29/12/2007'), validity('2015-01-01'), validity('2007-01-01'))).toBe('right');
-    expect(older(at('31/12/2015'), at('29/12/2007'), validity('2007-01-01'), validity('2015-01-01'))).toBe('left');
+  it('reads a day written as dd/mm/yyyy as the day it is', () => {
+    expect(older(at('31/12/2015'), at('29/12/2007'))).toBe('right');
+    expect(older(at('29-12-2007'), at('31 dicembre 2015'))).toBe('left');
+  });
+  it('falls back on the validity windows when a day cannot be read', () => {
+    expect(older(at('2015'), at('2007'), validity('2015-01-01'), validity('2007-01-01'))).toBe('right');
+    expect(older(at('2015'), at('2007'), validity('2007-01-01'), validity('2015-01-01'))).toBe('left');
   });
   it('falls back on the left when nothing says', () => {
-    expect(older(at('31/12/2015'), at('29/12/2007'))).toBe('left');
+    expect(older(at('2015'), at('2007'))).toBe('left');
   });
   it('is the left for two articles', () => {
     expect(compareArticles(article('x'), article('y', { numero_articolo: '2043' })).older).toBe('left');
@@ -173,6 +192,18 @@ describe('pairing by content (D2)', () => {
   });
 });
 
+describe('the pairing boundary (D2)', () => {
+  const pairOf = (shared: number) => {
+    const a = Array.from({ length: 100 }, (_, i) => `s${i}x`).join(' ');
+    const b = Array.from({ length: 100 }, (_, i) => (i < shared ? `s${i}x` : `t${i}x`)).join(' ');
+    return compareArticles(article(a, at('2015-12-31')), article(b)).rows.map((r) => r.label);
+  };
+  it('pairs two unnumbered commi at exactly half their words in common, not at 49 of 100', () => {
+    expect(pairOf(50)).toEqual(['riscritto']);
+    expect(pairOf(49)).toEqual(['abrogato', 'aggiunto']);
+  });
+});
+
 describe('labels (D3)', () => {
   const withMarker = (words: string[]) => words.join(' ');
   /** Two commi of 100 words of which `shared` are the same. */
@@ -219,6 +250,47 @@ describe('labels (D3)', () => {
     expect(labels(compareArticles(article(oldRaw, at('2015-12-31')), article(newRaw)))).toEqual(['invariato', 'invariato']);
     const live = '1. Il debitore risponde.\n\n2. Il creditore può agire in via esecutiva.';
     expect(labels(compareArticles(article(live, at('2015-12-31')), article(newRaw)))).toEqual(['invariato', 'abrogato']);
+  });
+  it('is «abrogato» when the notice is not paired by number: an unnumbered code article', () => {
+    const base = [1, 2, 3].map((n) => `Questa disposizione regola il caso ${wordsOf(12, 'c' + n)} secondo la volontà delle parti.`);
+    const oldRaw = normattiva('Art. 2000.', null, base);
+    for (const notice of ['((COMMA ABROGATO DALLA L. 1 GENNAIO 2020, N. 1))', '((...))']) {
+      const newRaw = normattiva('Art. 2000.', null, [base[0], notice, base[2]]);
+      const c = compareArticles(article(oldRaw, at('2015-12-31')), article(newRaw));
+      expect(labels(c)).toEqual(['invariato', 'abrogato', 'invariato']);
+      expect(c.rows[1].left).toBeDefined();
+      expect(c.rows[1].right).toBeDefined();
+      expect(summarySentence(c.summary)).toBe('Dal testo al 31 dicembre 2015 al testo in vigore: 1 comma abrogato · 2 invariati');
+    }
+  });
+  it('counts a whole article repealed as abrogati and never as «aggiunto» (the reader\'s own fixture)', () => {
+    const repealed = fixtureText('nrm-fx-abrogato');
+    const oldRaw = normattiva('Art. 3', null, ['1. Il primo comma dispone una cosa.', '2. Il secondo comma ne dispone un\'altra.']);
+    const c = compareArticles(article(oldRaw, at('2015-12-31')), article(repealed));
+    expect(c.summary.counts).toMatchObject({ abrogato: 2, aggiunto: 0, modificato: 0, riscritto: 0 });
+    expect(summarySentence(c.summary)).toBe('Dal testo al 31 dicembre 2015 al testo in vigore: 2 commi abrogati');
+  });
+  it('never counts a notice standing alone as «aggiunto»', () => {
+    const c = compareArticles(article('1. Un comma.', at('2015-12-31')), article('1. Un comma.\n\n2. ((COMMA ABROGATO DALLA L. 1 GENNAIO 2020, N. 1))'));
+    expect(labels(c)).toEqual(['invariato', 'abrogato']);
+    expect(c.rows[1].left).toBeUndefined();
+    expect(c.summary.counts.aggiunto).toBe(0);
+  });
+  it('leaves OMISSIS, MODIFICAT and SOSTITUIT notices to the word measure', () => {
+    for (const notice of ['((OMISSIS))', 'IL PRESENTE ARTICOLO È STATO MODIFICATO NEL SENSO SEGUENTE.', '((COMMA SOSTITUITO DALLA L. 1 GENNAIO 2020, N. 1))']) {
+      const c = compareArticles(
+        article('1. Il primo.\n\n2. Il debitore risponde dell\'inadempimento con tutti i suoi beni presenti e futuri.', at('2015-12-31')),
+        article(`1. Il primo.\n\n2. ${notice}`),
+      );
+      expect(c.rows[1].label).toBe('riscritto');
+    }
+  });
+  it('is «invariato» when the comma was already repealed in the older text, worded differently', () => {
+    const oldRaw = '1. Il primo.\n\n2. ((COMMA ABROGATO DALLA L. 27 MAGGIO 2015, N. 69))';
+    const newRaw = '1. Il primo.\n\n2. ((COMMA ABROGATO DALLA LEGGE 27 MAGGIO 2015, N. 69 E SUCCESSIVE MODIFICAZIONI))';
+    expect(labels(compareArticles(article(oldRaw, at('2015-12-31')), article(newRaw)))).toEqual(['invariato', 'invariato']);
+    const omitted = '1. Il primo.\n\n2. ((...))';
+    expect(labels(compareArticles(article(omitted, at('2015-12-31')), article(newRaw)))).toEqual(['invariato', 'invariato']);
   });
   it('does not take an ordinary comma with a modification for a notice', () => {
     const oldRaw = '1. Il debitore risponde del danno.';
@@ -334,10 +406,17 @@ describe('the word diff (D4)', () => {
     const over = compareArticles(article(base, at('2015-12-31')), article(edited)).rows[0];
     expect(over.label).toBe('riscritto');
     expect(over.diff).toBeUndefined();
+    expect(over.tooLong).toBe(true);
     const atCap = wordsOf(DIFF_WORD_CAP);
     const ok = compareArticles(article(atCap, at('2015-12-31')), article(atCap.replace('p10x', 'changed'))).rows[0];
     expect(ok.label).toBe('modificato');
     expect(ok.diff?.left).toHaveLength(1);
+    expect(ok.tooLong).toBeUndefined();
+  });
+  it('does not call a long comma that is really rewritten «troppo lungo»', () => {
+    const row = compareArticles(article(`1. ${wordsOf(DIFF_WORD_CAP + 1)}`, at('2015-12-31')), article(`1. ${wordsOf(DIFF_WORD_CAP + 1, 'q')}`)).rows[0];
+    expect(row.label).toBe('riscritto');
+    expect(row.tooLong).toBeUndefined();
   });
 });
 
@@ -417,6 +496,14 @@ describe('the summary (D6)', () => {
     const newer = article(normattiva('Art. 3000.', 'Saggio degli interessi legali', [c(1), c(2, 'secondo quanto il codice dispone')]));
     expect(sentence(older, newer)).toBe('Dal testo originale al testo in vigore: rubrica modificata, 1 comma modificato · 1 invariato');
   });
+  it('names the commi before the invariati when only the rubric changed', () => {
+    const l = (rubric: string | null) => article(normattiva('Art. 3000.', rubric, [c(1), c(2)]), at('2015-12-31'));
+    const r = (rubric: string | null) => article(normattiva('Art. 3000.', rubric, [c(1), c(2)]));
+    expect(sentence(l('Saggio degli interessi'), r('Saggio degli interessi legali')))
+      .toBe('Dal testo al 31 dicembre 2015 al testo in vigore: rubrica modificata · 2 commi invariati');
+    expect(sentence(article(normattiva('Art. 3000.', null, [c(1)]), at('2015-12-31')), article(normattiva('Art. 3000.', 'Una rubrica', [c(1)]))))
+      .toBe('Dal testo al 31 dicembre 2015 al testo in vigore: rubrica aggiunta · 1 comma invariato');
+  });
   it('writes riscritto, aggiunto and abrogato in the singular and the plural', () => {
     const older = article(normattiva('Art. 3000.', null, [`1. ${wordsOf(12, 'a')}`, `2. ${wordsOf(12, 'b')}`, `3. ${wordsOf(12, 'c')}`]), at('2007-12-29'));
     const newer = article(normattiva('Art. 3000.', null, [`1. ${wordsOf(12, 'q')}`, `2. ${wordsOf(12, 'r')}`, `4. ${wordsOf(12, 's')}`, `5. ${wordsOf(12, 't')}`, `6. ${wordsOf(12, 'u')}`]), at('2015-12-31'));
@@ -486,8 +573,9 @@ describe('the reader\'s real texts', () => {
     const c = compareArticles(article(earlier, { numero_articolo: '640', tipo_atto: 'codice penale', ...at('2015-12-31') }), article(raw, { numero_articolo: '640', tipo_atto: 'codice penale' }));
     expect(c.kind).toBe('versions');
     // the items belong to their comma: "2-bis" repealed and "2-ter" added are changes inside the second comma
-    expect(c.rows.map((r) => r.label)).toContain('modificato');
-    expect(c.summary.counts.aggiunto + c.summary.counts.modificato + c.summary.counts.riscritto).toBeGreaterThan(0);
+    expect(c.rows.map((r) => r.label)).toEqual(['invariato', 'modificato', 'invariato', 'invariato']);
+    expect([c.rows[1].left?.items.length, c.rows[1].right?.items.length]).toEqual([3, 4]);
+    expect(c.rows[1].diff?.right.length).toBeGreaterThan(0);
   });
 
   it('art. 2-ter d.lgs. 196/2003: the 1-bis comma entered between 1 and 2', () => {

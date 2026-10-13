@@ -391,8 +391,11 @@ describe('versionLabel — the text a request asks for, in words', () => {
     expect(versionLabel({ data_versione: '2007-12-11' })).toBe("testo all'11 dicembre 2007");
     expect(versionLabel({ data_versione: '2020-01-01' })).toBe('testo al 1° gennaio 2020');
   });
-  it('reads the original before a day, as versionKey does', () => {
-    expect(requestedVersion({ versione: 'Originale', data_versione: '2015-12-31' })).toEqual({ kind: 'original' });
+  it('reads a day before the original, as the tab does, and writes it as an ISO day', () => {
+    expect(requestedVersion({ versione: 'Originale', data_versione: '2015-12-31' })).toEqual({ kind: 'date', date: '2015-12-31' });
+    expect(requestedVersion({ data_versione: '31/12/2015' })).toEqual({ kind: 'date', date: '2015-12-31' });
+    expect(requestedVersion({ versione: 'Originale' })).toEqual({ kind: 'original' });
+    expect(versionLabel({ versione: 'originale', data_versione: '31/12/2015' })).toBe('testo al 31 dicembre 2015');
     expect(requestedVersion({ data_versione: ' 2015-12-31 ' })).toEqual({ kind: 'date', date: '2015-12-31' });
     expect(requestedVersion(null)).toEqual({ kind: 'current' });
   });
