@@ -718,16 +718,25 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `created_by`, by design, so Claude's mark does not survive a web undo (the
   MCP trash, which keeps ids, restores it). The note dialog closes only once
   the server has the note, so a refused note keeps its text.
-- **The trash** (what a connected application deleted, and the study cards the user deleted, 30 days; spec §10-11):
+- **The trash** (what a connected application deleted, the dossiers and the study cards the user deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
   «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
   which dossier to restore into — or emptied behind a danger confirmation; a
-  restore reloads that dossier from the server (`refreshDossier`). The web moves
-  no dossier or entry to the trash: its own deletions there stay immediate, with an undo.
-  Only study cards go through it: «Elimina» on a draft or an archived card in
+  restore reloads that dossier from the server (`refreshDossier`). A dossier deleted
+  from the web goes there (owner, 13 October 2026, question 160): `deleteDossierWithUndo`
+  (`dossier/deleteDossierWithUndo.ts`, the list's and the detail's «Elimina») removes it
+  from the store, the server answers the trash entry's id, and the toast «Dossier «…»
+  spostato nel cestino» has «Annulla», which restores that entry and reads the dossier
+  back; a refusal puts it back where it was with a sync error and no toast. «Salva come
+  dossier» that saved nothing discards its empty dossier from the trash at once
+  (`discardEmptyDossier`, only when the server says it held nothing), and
+  `applyEnvironment(replace)` and `importEnvironmentPartial(replace)` send the dossiers they
+  replace there too (their confirmation says so; annotations and highlights are still deleted
+  for good). The page's trash is read again after a deletion and after «Annulla». The web's removal of single entries stays immediate, with an undo, for now.
+  Study cards go through it too: «Elimina» on a draft or an archived card in
   «Le mie schede» (`studiaService.trash`).
   A decision in the trash is named by the server's citation.
 - **What another application changes shows without a reload** (`useDossierRefresh`, mounted by

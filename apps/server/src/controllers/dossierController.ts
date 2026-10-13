@@ -9,6 +9,7 @@ import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '
 import { citeStoredAct } from '../norms/citation';
 import { citeDecision, citeStoredItem } from '../norms/decisionCitation';
 import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/decisionItem';
+import { BY_THE_USER, trashDossier } from '../trash/trash';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -197,25 +198,15 @@ export const updateDossier = async (req: Request, res: Response) => {
 };
 
 /**
- * Delete dossier
+ * Delete a dossier from the web app: it goes to the trash for 30 days, with its
+ * entries and snapshots, listed «Rimosso da te» (owner, 13 October 2026,
+ * question 160; before, it was gone at once). The answer names the trash entry,
+ * so the page's «Annulla» restores it. Not in the delegated table: a connected
+ * application deletes through `POST /dossiers/:id/trash`.
  */
 export const deleteDossier = async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  // Check ownership
-  const existing = await prisma.dossier.findFirst({
-    where: { id, userId: req.user!.id },
-  });
-
-  if (!existing) {
-    throw new AppError(404, 'Dossier not found');
-  }
-
-  await prisma.dossier.delete({
-    where: { id },
-  });
-
-  res.status(204).send();
+  // 404 when the dossier is not the user's (checked under the row lock).
+  res.json(await trashDossier(req.user!.id, req.params.id, null, BY_THE_USER));
 };
 
 /**
