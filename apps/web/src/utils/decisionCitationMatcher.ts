@@ -220,6 +220,17 @@ const AUTHORITY_MARKERS = /(?<![\p{L}\p{N}])(?:sindac[oi](?![\p{L}\p{N}])|presid
 // «questa Corte»: the Court speaking of itself.
 const THIS_COURT = /(?<![\p{L}\p{N}])quest[ao]\s+corte(?![\p{L}\p{N}])/giu;
 
+/**
+ * «… n. 5 del 2019 di questa Corte con l'ordinanza n. 7», «… della Corte costituzionale, con l'ordinanza n. 7»: the Court
+ * named right after a decision's number or year is that decision's author; the decision introduced by «con» is told by
+ * who acts earlier in the sentence. «Il rimettente richiama la giurisprudenza di questa Corte con …» and «da questa Corte
+ * con l'ordinanza …» are not this.
+ */
+function namesEarlierDecision(folded: string, start: number, end: number): boolean {
+  return /(?:\d{4}|n\.?\s*\d+)\s+(?:di|del|della|dello|dell['’])\s*$/u.test(folded.slice(Math.max(0, start - 20), start))
+    && /^\s*,?\s*con\s+(?:(?:la|le|il|l['’])\s*)?(?:sent|ord|decr|n(?:r|um)?\.?\s*\d)/u.test(folded.slice(end, end + 30));
+}
+
 /** A court named in the text, in order of where it ends: the Corte costituzionale itself, or another. */
 interface CourtMarker {
   end: number;
@@ -227,16 +238,15 @@ interface CourtMarker {
 }
 
 function courtMarkers(folded: string, heads: readonly Head[]): CourtMarker[] {
-  const markers: CourtMarker[] = heads
-    .filter((h) => h.court)
-    .map((h) => ({ end: h.end, own: isThisCourt(folded, h.start) }));
+  const markers: CourtMarker[] = [];
+  for (const h of heads.filter((x) => x.court)) {
+    const own = isThisCourt(folded, h.start);
+    if (!(own && namesEarlierDecision(folded, h.start, h.end))) markers.push({ end: h.end, own });
+  }
   for (const m of folded.matchAll(THIS_COURT)) {
     const at = m.index ?? 0;
     const end = at + m[0].length;
-    // «… n. 5 del 2019 di questa Corte con l'ordinanza n. 7»: «di questa Corte» belongs to the decision before it; who
-    // adopted the next one is told earlier in the sentence (unlike «da questa Corte con l'ordinanza», the Court's own)
-    if (/(?<![\p{L}\p{N}])di\s+$/u.test(folded.slice(Math.max(0, at - 4), at)) && /^\s*con(?![\p{L}\p{N}])/u.test(folded.slice(end, end + 6))) continue;
-    markers.push({ end, own: true });
+    if (!namesEarlierDecision(folded, at, end)) markers.push({ end, own: true });
   }
   for (const m of folded.matchAll(OTHER_COURT_MARKERS)) markers.push({ end: (m.index ?? 0) + m[0].length, own: false });
   return markers.sort((a, b) => a.end - b.end);
@@ -461,6 +471,8 @@ export function extractDecisionCitations(
     const tailEnd = closingBracket(text, head.start, sentenceTail);
     if (head.court) lastCourt = { end: head.end, coverEnd: sentenceTail };
     if (head.unsupported) continue;
+    // «… n. 5 del 2019 del Consiglio di Stato con l'ordinanza n. 7»: the court is the earlier decision's, not the next one's
+    if (head.court && namesEarlierDecision(folded, head.start, head.end)) continue;
     const prefix = head.kind ? SYNTHETIC_CORTE_COSTITUZIONALE : head.section ? SYNTHETIC_COURT : '';
     const shared = sharedYearItems(text, folded, head, prefix, tailEnd, now, () => (acts ??= allActSpans(folded)));
     if (shared) {
