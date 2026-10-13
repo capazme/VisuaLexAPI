@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-vi.mock('./useActDetails', () => ({ useActDetails: () => ({ title: null, rubricaOf: () => null }) }));
+// What each act block asks its title and rubriche for.
+const actDetailsAskedFor = vi.hoisted(() => [] as { key: string; articles: unknown[] }[]);
+vi.mock('./useActDetails', () => ({
+  useActDetails: (block: { key: string; articles: unknown[] }) => {
+    actDetailsAskedFor.push(block);
+    return { title: null, rubricaOf: () => null };
+  },
+}));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
@@ -133,6 +140,16 @@ describe('DossierDetailView — the page by act', () => {
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
     expect(screen.getByRole('region', { name: L49 })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: `Sposta ${L49}` })).toBeNull();
+  });
+
+  it('reads the title of the whole act while the search shows part of it', () => {
+    renderView();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: 'art. 3' } });
+    const block = screen.getByRole('region', { name: L247 });
+    expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 3']);
+    // The act's title and rubriche are asked for both its articles, so the search reads nothing again.
+    const last = actDetailsAskedFor.filter((b) => b.key === 'legge|247|2012-12-31').at(-1);
+    expect(last?.articles).toHaveLength(2);
   });
 });
 

@@ -2,6 +2,7 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import { appStore } from '../../../store/useAppStore';
 import type { ToastProps } from '../../ui/Toast';
 import { dossierContainsDecision } from '../dossier/dossierUtils';
+import { discardEmptyDossier } from '../dossier/deleteDossierWithUndo';
 import { dossierHoldsArticle, practiceDossierItems } from './practiceDossierItems';
 
 export interface SaveNotice {
@@ -142,8 +143,8 @@ async function saveOnce(
   const missing = expected - saved;
   if (missing > 0) {
     if (saved <= 0 && !target) {
-      // Nothing made it: no half-made dossier is left behind.
-      appStore.getState().deleteDossier(dossierId);
+      // Nothing made it: no half-made dossier is left behind, nor in the trash (the user deleted nothing).
+      void discardEmptyDossier(dossierId);
       appStore.getState().pushSyncError('Impossibile salvare la pratica come dossier: nessun elemento è stato salvato. Riprova.');
     } else {
       appStore.getState().pushSyncError(

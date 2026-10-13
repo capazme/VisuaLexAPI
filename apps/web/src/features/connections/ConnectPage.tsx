@@ -141,6 +141,19 @@ export function ConnectPage() {
               </label>
             )}
 
+            <p
+              role="note"
+              aria-label="Dati personali"
+              className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+            >
+              <ShieldAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
+              <span>
+                <span className="font-semibold">Dati personali:</span> secondo i permessi qui sopra, l’app leggerà i nomi dei tuoi
+                dossier, i titoli e i riferimenti delle voci e le tue schede di studio, e li passerà al servizio di intelligenza
+                artificiale che usa. Non scrivere lì dati personali dei clienti, oppure autorizza solo app AI di cui ti fidi.
+              </span>
+            </p>
+
             <p className="text-xs text-slate-500">
               Puoi revocare il collegamento, o togliergli il permesso di eliminare, in qualsiasi momento da Impostazioni → Applicazioni collegate.
             </p>

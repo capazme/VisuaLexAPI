@@ -24,6 +24,7 @@ import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
 import { PracticeTable } from './PracticeTable';
 import { PracticeNotice } from './PracticeParts';
+import { subscribeSearchField } from '../../../utils/searchFieldControl';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FOUND, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
@@ -65,12 +66,16 @@ describe('PracticeTable (spec §3.1)', () => {
     void other;
   });
 
-  it('an empty practice says so and offers the palette', () => {
+  it('an empty practice says so and offers the search page\'s field', () => {
     s().createPractice('Vuota');
     render(table());
     expect(screen.getByText('Pratica vuota')).toBeInTheDocument();
+    const field = vi.fn();
+    const unsubscribe = subscribeSearchField(field);
     fireEvent.click(screen.getByRole('button', { name: 'Cerca una norma o una sentenza' }));
-    expect(s().commandPaletteOpen).toBe(true);
+    expect(field).toHaveBeenCalledTimes(1);
+    expect(s().commandPaletteOpen).toBe(false);
+    unsubscribe();
   });
 
   it('renames from a double click and from «⋯ › Rinomina»', () => {

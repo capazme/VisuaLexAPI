@@ -39,4 +39,17 @@ describe('actStructureCache', () => {
     await expect(fetchActTree('urn:a')).resolves.toEqual({ articles: [] });
     expect(legalFetch).toHaveBeenCalledTimes(2);
   });
+
+  it('does not keep an answer that says nothing: the server answers 200 even when the source failed', async () => {
+    vi.mocked(legalFetch)
+      .mockResolvedValueOnce(ok({ title: '', rubriche: {}, abrogati: [], parts: [], count: 0, error: 'timeout' }))
+      .mockResolvedValueOnce(ok({ title: '', rubriche: {}, abrogati: [], parts: [], count: 0 }))
+      .mockResolvedValueOnce(ok({ title: 'Nuova disciplina', rubriche: {}, parts: [] }));
+    await expect(fetchActRubriche('urn:a')).resolves.toMatchObject({ error: 'timeout' });
+    await expect(fetchActRubriche('urn:a')).resolves.toMatchObject({ title: '' });
+    await expect(fetchActRubriche('urn:a')).resolves.toMatchObject({ title: 'Nuova disciplina' });
+    // Once it said something, it is kept.
+    await fetchActRubriche('urn:a');
+    expect(legalFetch).toHaveBeenCalledTimes(3);
+  });
 });

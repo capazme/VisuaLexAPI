@@ -34,7 +34,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/history`, `/environments`, `/forum`, `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
-  the clients our server refuses listed apart and why —, what a connected app can do, and
+  the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
+  names, entry titles and citations, study cards; no clients' personal data there, or only trusted AI apps — the owner,
+  13 Oct 2026, in place of pseudonymisation; the consent page `/connect` carries the same notice), what a connected app can do, and
   `ConnectedAppsSection`, the same list Impostazioni shows; reached from the user menu), then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open in a practice; `/sentenze` alone and an
@@ -62,11 +64,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   decision read in its row, its window or the phone's reader, over `useDecisionAnswer` (the fetch, the
   candidates, the notices) and `DecisionAnswerBody`; `DecisionAddress`, the `/sentenze/…` route element;
   `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
+  `DecisionPreviewDialog` (with `useListDecisionPreview`, its own file), the preview a list opens on a decision (see «A
+  decision in a list opens its preview» below);
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, `EuCaseLawBlock`, the Union's courts' decisions that cite an article of a regulation or a directive, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
-  (a link to `/` that also opens the palette; its hover label carries ⌘K; the quick norms' dot sits under it;
+  (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
+  the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Cronologia, Ambienti,
   Forum, «Analizza documento»; and at the bottom only the user menu, whose dropdown holds Impostazioni,
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
@@ -74,10 +79,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
   backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
   at the top left, and `Layout` starts every page's content under it (`pt-[4.5rem]`, repeated at `md`)
-  except the search page, whose phone headers sit beside it (`pl-[4.5rem]`); the practice row's
-  `h-app-row` is drawn only there, so its height is unchanged. There is no «Ricerca Veloce», no
+  except the search page, whose field sits beside it (`pl-[4.5rem]` below `lg`). There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.
+  **The search page's field** (`features/search/SearchField`, spec
+  `docs/superpowers/specs/2026-10-13-fixed-search-design.md`): `Layout` draws it on `/` (not in Focus mode) in a
+  bar of `SEARCH_BAR_HEIGHT` above the content scroller, so it is always on screen, and sets
+  `--search-bar-height` on `<main>`, which `h-app-row` subtracts. It reads what is typed with the palette's own
+  reading, `hooks/useSearchQuery` (a decision, a norm with the server's resolver as fallback, a topic): Enter opens
+  the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
+  lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
+  the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
+  closed. `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
+  the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
+  palette with the same words when no field is on screen (Focus mode).
+  **The palette is global**: `GlobalSearch` (the palette, `QuickNormsManager`, `AliasManager`) is mounted by
+  `Layout`, so ⌘K opens it on every page at once; what it opens lands in the practices through
+  `hooks/useSearchActions` (`search`, `browse`, `openDecision`, `openTopic`), which bring the reader to `/` from
+  any other page. A typed search (palette, field) is marked (`isTypedSearch`, on a copy of its params, never on a
+  quick norm's own) and `SearchPanel` does not run the annex auto-switch on it, as when the palette called the panel
+  directly; a quick norm used from its manager is a plain trigger (`trigger`), checked as before.
 - `features/devMode/` — the per-user **development mode**: `useDevMode()` (the effective flag) and
   `DevRoute` (a route element: without the mode, `<Navigate to="/" replace />`; while `useAuth` is
   still loading it draws nothing, so a reload on a development address is not mistaken for the mode
@@ -97,7 +119,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   implicit citation feedback on a click. The mode is unrelated to the Q&A view's own `useQaDevMode`
   (a local toggle for the pipeline trace).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
-  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
+  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Sheet` (a phone's bottom sheet), plus feature-flavoured modals.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
   (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
   stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
@@ -156,8 +178,8 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   decision (`decision_key`, never both): `DecisionEntryView` records a found decision once per
   opening: the key it sent is kept on the practice's entry (`historyRecordedKey`, persisted with it,
   `markDecisionEntryRecorded`), so a remount, a closed and reopened row or a reload never records
-  again, while a new entry does (the copy on screen only), and `DecisionHistoryRow` reopens it with
-  `openDecision(…, { fromLink: true })`. The entry is marked
+  again, while a new entry does (the copy on screen only), and `DecisionHistoryRow` previews it on a
+  click and reopens it from the preview with `openDecision(…, { fromLink: true })`. The entry is marked
   before the request, so a failed request is not retried (not even after a reload) and the failure
   is logged: the history is a convenience.
 
@@ -181,7 +203,8 @@ Three different things. Conflating them is the recurring mistake.
   advertising a shortcut that no longer runs, and the manager badges it
   "sovrascritto".
 
-`AliasManager` is reached **only** from the command palette (gotcha 27), and in
+`AliasManager` is reached **only** from the command palette (gotcha 27; both are mounted by `Layout`'s
+`GlobalSearch`), and in
 the palette the presets cost one line of header text at rest — they render as
 rows only once the user types, and cmdk does the matching. `useAliasCatalog`
 keeps its `loaded` flag in component state, so the palette and the manager each
@@ -233,8 +256,8 @@ doctrine is shown — gotcha 32), the Massimario's panel (the plugin slot
 `article_case_law`, which takes `articleUrn`, `isHistorical`, `besideId`,
 `backEntry`) and the Cassazione's decisions that mention the article, searched
 only when the reader presses the button (`DecisionResultList`; not offered on an act of the Union,
-`isEuropeanAct`). On a past text the section stays; the massime do not. A decision opens beside the
-article with the way back. Every block draws its rows with the one `CaseLawRow`
+`isEuropeanAct`). On a past text the section stays; the massime do not. A click on a decision's estremi
+opens its preview, whose «Apri accanto» opens it beside the article with the way back. Every block draws its rows with the one `CaseLawRow`
 (`components/features/search/caseLaw/`: the estremi as a `DecisionLink`, the exact date else the year,
 the text cut at three lines with «Mostra tutto», the source as a small label; `authorityColor` is the
 one colour key) and the section's header holds the one set of controls (`CaseLawControls`): a range of
@@ -362,8 +385,20 @@ or dot, never before a letter when the query ends with a dot («art. 1 c.p.» is
 per text, replaced when the text changes, dropped when the target leaves the scope). Act types come from `sources/actTypes.ts` plus the
 palette's spellings (`NUMBERED_ACT_SPELLINGS`); a type is never found inside another's name («legge»
 in «decreto-legge» or «decreto- legge»), a decision's number never inside an act's citation (any
-type of the table, or «decreto», «direttiva», «regolamento»: regional laws and Union acts too), and
-an article links to its act only across the gap §13.2 whitelists. Its tests use synthetic texts (no run of 30
+type of the table, or «decreto», «direttiva», «regolamento», or an administrative act, in every form of the number and
+year: «circolare», «nota», «provvedimento», «delibera», «determina», «risoluzione», «parere»…; regional laws and
+Union acts too, never «ordinanza» or «sentenza», which are decisions; an administrative court (`ADMIN_COURT_HEAD_SOURCE`)
+named in the act's words is a decision's head, except right after «del»/«della»/«dello»/«dell'», where it is the act's issuer: «il parere del C.d.S. n. 5/2018» is an act; any other court there stays a head: «il decreto del Tribunale di Milano n. 5/2018» is a decision), and
+an article links to its act only across the gap §13.2 whitelists (commas, «comma N», «commi 2 e 3», «primo comma» and the
+other ordinals, «e ss.», «lett.», «n.», «del»…). A decision cited date first («Cass., sez. III, 12 aprile 2018, n. 8980») is found by
+its date and number when the date's year is the query's and a court or a decision's marker stands within 60
+characters before the date (`followsDecisionMarker`: no act's name, semicolon or end of a sentence between; a full stop ends a sentence
+after a word of five letters or more, a digit, a bracket or a quote, a short abbreviation never does), never
+as an act's («legge 12 aprile 2018, n. 8980»); without a marker nothing is found, because date first is also how
+ministerial decrees, regional laws and administrative acts are cited. A code's article
+is found across the same words (`blankCodeLinks`: «art. 2043 del c.c.», «art. 2043, primo comma, c.c.», «art. 2043 e ss. c.c.»
+are blanked to spaces at the same offsets and `extractCitations` reads the text again; it is the one reader of codes, and it
+still does not make «del c.c.» a link). Its tests use synthetic texts (no run of 30
 characters shared with the real ones); the real ones live in
 the git-ignored `utils/__fixtures__/private/` (personal data: never copy them into a committed
 file) and `citationSearch.local.test.ts` is skipped where the folder is absent.
@@ -388,7 +423,7 @@ shadow or gradient; the reveal is the area's one motion (a hairline, then the an
 only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
 but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
 menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
-(`DossierItemReader`) in a side panel on desktop and in `studia/Sheet` on a phone (the bottom sheet
+(`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
 shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
@@ -502,7 +537,23 @@ Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the sam
 (`ui/PreviewFrame`, `calculatePreviewPosition`): the decision's heading and first lines from
 `fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
 leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
-The scanner never links a court that is not written (D2): a bare «n. 123/2020» stays text everywhere; the one
+**A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
+every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
+Cassazione, Brocardi's massime, the Court of Justice's judgments; never an order or an opinion, which go to
+EUR-Lex), the Massimario's chips, a topic search's window, the Cronologia and a dossier's «Giurisprudenza» —
+opens the same body (`DecisionPreviewContent`, the hover popup's) at once on a click or Enter, through
+`useListDecisionPreview` (`useDecisionPreview().openPreview`, no delay; a second click on the estremi closes it)
+and `DecisionPreviewDialog`. On the desktop it is `PreviewFrame` as a non-modal `dialog` («Anteprima di …»)
+by the estremi (under them, else over them by its measured height), following them when the list scrolls: the
+focus goes to its «Apri accanto», Tab cycles inside, Esc (taken in the capture phase and marked taken, so a
+practice's table over the rail or a modal under it stays open), the X or a press outside closes it and the focus
+goes back to the estremi without scrolling to them (not after «Apri accanto», which hands it to the decision).
+`calculatePreviewPosition` takes the popup's height; when neither under nor over has room it keeps the popup inside
+the window, for the hover popups too (on a short window they may now cover the link they preview). On a phone
+it is `ui/Sheet` (the backdrop and Esc close it). The estremi carry
+`aria-haspopup="dialog"` and `aria-expanded`; ⌘/Ctrl-click and the middle button still follow the `href`.
+The palette's single decision is not a list and opens on Enter as before.
+«C.d.S.» and «cds» are also the codice della strada: right after an article citation («art. 142 c.d.s.», «art. 142, comma 8, C.d.S.», «art. 142 del cds») or after «del»/«al»/«dal»/«nel» they are the code and no court head, unless «sez.»/«Ad. plen.» follows them («C.d.S., sez. IV» is the court; «dal C.d.S. n. 5/2018» alone stays the code, truly ambiguous) (`isCodiceDellaStrada`, `decisionCitationParser.ts`, used by this scanner and by the find window's marker rule). The scanner never links a court that is not written (D2): a bare «n. 123/2020» stays text everywhere; the one
 context rules (the owner, 13 October 2026) are two: inside a Cassazione decision a section without its court
 («Sez. U, n. 9100 del 2015») reads as the Cassazione; inside a Corte costituzionale decision «sentenza/ordinanza
 n. N del YYYY» (also «sentenze n. … e n. …», each number its own span) reads as the Court's own, unless a court is
@@ -625,11 +676,12 @@ holds that decision the two merge — the survivor keeps the richer fields, its 
 the pending reveal follow, and it asks to take keyboard focus (`decisionFocusRequest`). The ways in:
 the palette (a citation such as «Cass. civ. 10787/2024» is read by `decisionCitationParser.ts`
 before the norm parser, unless the first word is one of the user's alias triggers), `DecisionLink` (a
-plain click on the search page opens the decision beside the article and, given a `backEntry`, records
-the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as for a citation jump; any
-other click follows the real `href`, which `DecisionAddress` turns into the same entry), the
-sidebar's «Ricerca» (which also opens the palette: there is no decisions page), the Cronologia
-(`DecisionHistoryRow`) and the address itself (queued in `pendingDecision`, drained by `SearchPanel`). The entry
+plain click opens the decision's preview; its «Apri accanto», on the search page, opens the decision beside the
+article and, given a `backEntry`, records the jump in `readingBackStack` so «‹ Torna a art. 2043 c.c.» works as
+for a citation jump, and elsewhere («Apri la sentenza») goes to the address; any other click follows the real
+`href`, which `DecisionAddress` turns into the same entry), the
+palette's ⌘K on any page (there is no decisions page), the Cronologia
+(`DecisionHistoryRow`, from its preview too) and the address itself (queued in `pendingDecision`, drained by `SearchPanel`). The entry
 persists its reference until the route has found it, then the identity (a cited section
 travels with the reference to the route, which uses it to tell homonyms apart): the text is fetched again through `utils/decisionFetchCache.ts`.
 The entry reads on the reading surface (`DecisionEntryView` over `DecisionAnswerBody`), where highlights and notes work as on an
@@ -657,9 +709,16 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
   number and ordinal, the text in force before past texts. A block shows the
-  act's title (`/fetch_rubriche` `title`, not for codes) and each row «art. N —
-  rubrica» through `useActDetails` (one cached call per act; the tree only for an
-  act in parts — `utils/actRubriche.ts`). Acts reorder by drag:
+  act's title (`/fetch_rubriche` `title`, not for codes; an EU act's subject from
+  its EUR-Lex page) and each row «art. N — rubrica» through `useActDetails` (one
+  cached call per act; the tree only for an act in parts — `utils/actRubriche.ts`).
+  The hook reads the whole act (`act`), never what the dossier's search left of it;
+  what it read stays on screen while the act is read again and when a reading
+  fails, and a block that mounts again shows it at once (the PDF falls back to it,
+  `lastActTitle`). `/fetch_rubriche` answers
+  200 even when the source failed, so `actStructureCache` keeps no empty answer:
+  until 13 October 2026 one empty answer blanked the act's title for the session,
+  and each new annex or search blanked it while it was read. Acts reorder by drag:
   `setDossierItemOrder` saves the whole order and waits, never sending a
   temporary id, while an added or restored item is pending
   (`pendingDossierOrders`). Articles do not drag. The header has three actions
@@ -678,16 +737,25 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `created_by`, by design, so Claude's mark does not survive a web undo (the
   MCP trash, which keeps ids, restores it). The note dialog closes only once
   the server has the note, so a refused note keeps its text.
-- **The trash** (what a connected application deleted, and the study cards the user deleted, 30 days; spec §10-11):
+- **The trash** (what a connected application deleted, the dossiers and the study cards the user deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
   «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
   which dossier to restore into — or emptied behind a danger confirmation; a
-  restore reloads that dossier from the server (`refreshDossier`). The web moves
-  no dossier or entry to the trash: its own deletions there stay immediate, with an undo.
-  Only study cards go through it: «Elimina» on a draft or an archived card in
+  restore reloads that dossier from the server (`refreshDossier`). A dossier deleted
+  from the web goes there (owner, 13 October 2026, question 160): `deleteDossierWithUndo`
+  (`dossier/deleteDossierWithUndo.ts`, the list's and the detail's «Elimina») removes it
+  from the store, the server answers the trash entry's id, and the toast «Dossier «…»
+  spostato nel cestino» has «Annulla», which restores that entry and reads the dossier
+  back; a refusal puts it back where it was with a sync error and no toast. «Salva come
+  dossier» that saved nothing discards its empty dossier from the trash at once
+  (`discardEmptyDossier`, only when the server says it held nothing), and
+  `applyEnvironment(replace)` and `importEnvironmentPartial(replace)` send the dossiers they
+  replace there too (their confirmation says so; annotations and highlights are still deleted
+  for good). The page's trash is read again after a deletion and after «Annulla». The web's removal of single entries stays immediate, with an undo, for now.
+  Study cards go through it too: «Elimina» on a draft or an archived card in
   «Le mie schede» (`studiaService.trash`).
   A decision in the trash is named by the server's citation.
 - **What another application changes shows without a reload** (`useDossierRefresh`, mounted by
@@ -703,7 +771,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's reading surface
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
-  «Giurisprudenza» (`DossierDecisionsSection`: each citation links to the decision's address, and
+  «Giurisprudenza» (`DossierDecisionsSection`: each citation is a `DecisionLink` — its preview's «Apri la sentenza» goes to the decision's address — and
   each row can be removed). The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
@@ -895,7 +963,9 @@ Duplicating any of these is a defect, not a shortcut.
   `citation_linker.py`) read the same prose forms: "regolamento (UE)
   2016/679, art. 5", "art. 5 del regolamento (UE) 2016/679", "art. 5, comma
   1, del …", and a list ("articoli 8 e 9 del …") becomes one link per number,
-  all towards the EU act. The client matcher reads the article-first form
+  all towards the EU act. The matcher also reads documents a user drops in, so its patterns read a run of
+  spaces in one way only (`\s*(?:,\s*)?`, never `\s*,?\s*`; two adjacent `\s*` are quadratic) and its used
+  ranges are a byte map, not a list: `citationMatcher.test.ts` and `citationParser.test.ts` (the palette's parser, `extractArticleRefs`) time 100 000-character runs. The client matcher reads the article-first form
   for numbered national acts too ("art. 7 del d.lgs. 196/2003", with or
   without the preposition), as the server's `_EXPLICIT_CITE_RE` and
   `_ART_DEL_ACT_RE` do, and the codici and the Costituzione named in full
@@ -1109,8 +1179,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsPopover.tsx` (a block's notes and
   highlights, opened from its sign), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic, and the mount point for both
-  `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
+  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx`, `SearchField.tsx` (the search page's field)
+  and `GlobalSearch.tsx` (the palette and the managers it opens, mounted by `Layout` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
 - `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
   edits, not for where it opens: it is reached from the command palette, not
@@ -1279,7 +1349,7 @@ meant to stay split; add new features as new files, not inside the shells:
     `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
     raising the child's value does nothing.
     The sidebar's navigation scrolls on its own in a low window (`overflow-y-auto`, which clips what hangs
-    out of it) and the document never scrolls (`Layout`'s root is `h-app overflow-hidden`: `index.css`'s utility, `100dvh` with a `100vh` fallback; the practice row's columns are `h-app-row`, that less the content area's 4 rem of padding), so its
+    out of it) and the document never scrolls (`Layout`'s root is `h-app overflow-hidden`: `index.css`'s utility, `100dvh` with a `100vh` fallback; the practice row's columns are `h-app-row`, that less the content area's 4 rem of padding and the search page's field, `--search-bar-height`), so its
     labels are portalled to the body (`SidebarTooltip`), placed from the control's rectangle; they show
     for a mouse pointer and on keyboard focus-visible (never after a tap or a click), and go with Esc, a scroll
     or a resize.
@@ -1299,13 +1369,14 @@ meant to stay split; add new features as new files, not inside the shells:
     `phoneReader` state, not a hidden copy of a window.
 
 27. **A store flag only opens a modal that is actually mounted.** `AliasManager`
-    (and its siblings) render inside `SearchPanel`, so `aliasManagerOpen` is
-    inert on `/dossier`, `/history` or any route that is not the search page —
-    the flag flipped and nothing appeared, silently. That is why the alias
-    manager is reached from the command palette, which lives in the same subtree,
-    and why the Settings entry that used to open it was removed rather than kept
-    as a second door. Before adding a global-looking "open X" button, check where
-    X is mounted.
+    and the palette used to render inside `SearchPanel`, so `aliasManagerOpen` and
+    ⌘K were inert on `/dossier`, `/history` or any route that is not the search page —
+    the flag flipped and nothing appeared until the reader came back to `/`. The palette,
+    `QuickNormsManager` and `AliasManager` now live in `Layout` (`GlobalSearch`); the
+    alias manager is still reached only from the palette, and the Settings entry that
+    used to open it was removed rather than kept as a second door. What the palette opens
+    lands in the practices, which only `/` draws: `useSearchActions` navigates there.
+    Before adding a global-looking "open X" button, check where X is mounted.
 
 29. **A Tailwind class whose token is undeclared fails in total silence.**
     `apps/web/tailwind.config.js` is a v3-style config and Tailwind v4 never

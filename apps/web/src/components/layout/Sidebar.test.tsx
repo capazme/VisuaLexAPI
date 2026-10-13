@@ -12,6 +12,7 @@ vi.mock('../../hooks/useForumNotifications', () => ({
 
 import { Sidebar } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
+import { subscribeSearchField } from '../../utils/searchFieldControl';
 
 /**
  * Every control in the sidebar is an icon. `label` reached the eye only: the
@@ -50,7 +51,7 @@ describe('Sidebar — accessible names', () => {
     }
   });
 
-  it('has no «Ricerca Veloce» and no «Sentenze»: «Ricerca» and ⌘K open the palette', () => {
+  it('has no «Ricerca Veloce» and no «Sentenze»: «Ricerca» leads to the field, ⌘K opens the palette', () => {
     renderSidebar();
     expect(screen.queryByRole('button', { name: /Ricerca Veloce/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /Ricerca Veloce/ })).toBeNull();
@@ -67,6 +68,17 @@ describe('Sidebar — accessible names', () => {
     expect(search.compareDocumentPosition(dot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.getElementById('tour-sidebar')).toContainElement(dot);
     appStore.setState({ quickNorms: [] });
+  });
+
+  it('«Ricerca» goes to the search page with the cursor in its field, no window over it (the owner, D1)', () => {
+    const field = vi.fn();
+    const unsubscribe = subscribeSearchField(field);
+    renderSidebar('/dossier');
+    fireEvent.click(screen.getByRole('link', { name: 'Ricerca' }));
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
+    expect(field).toHaveBeenCalledWith({});
+    expect(appStore.getState().commandPaletteOpen).toBe(false);
+    unsubscribe();
   });
 
   it('gives «Ricerca» the id the tours point at', () => {
