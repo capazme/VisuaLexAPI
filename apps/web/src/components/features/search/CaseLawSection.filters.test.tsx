@@ -178,7 +178,12 @@ describe('CaseLawSection — on a phone', () => {
     expect(filtri).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Anni' })).toBeNull();
+    // the button controls an element that is there, only hidden
+    const panel = document.getElementById(filtri.getAttribute('aria-controls')!);
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveAttribute('hidden');
     await userEvent.click(filtri);
+    expect(panel).not.toHaveAttribute('hidden');
     expect(filtri).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('searchbox')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Anni' })).toBeInTheDocument();

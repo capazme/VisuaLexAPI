@@ -155,11 +155,10 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
                   {active > 0 && <span aria-hidden="true" className="rounded-full bg-primary-600 px-1.5 text-xs text-white">{active}</span>}
                 </button>
               )}
-              {(desktop || filtersOpen) && (
-                <div id={`${panelId}-filters`}>
-                  <CaseLawControls filters={filters} onChange={setFilters} counts={counts} />
-                </div>
-              )}
+              {/* always there, so «Filtri» controls an element; hidden on a phone until it is opened */}
+              <div id={`${panelId}-filters`} hidden={!desktop && !filtersOpen}>
+                <CaseLawControls filters={filters} onChange={setFilters} counts={counts} />
+              </div>
             </div>
 
             {massimeState !== 'hidden' && (

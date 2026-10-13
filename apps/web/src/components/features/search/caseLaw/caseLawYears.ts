@@ -79,20 +79,23 @@ export function countByYear(years: readonly number[], order: YearOrder = 'desc')
     .sort((a, b) => (order === 'desc' ? b.year - a.year : a.year - b.year));
 }
 
-/** A year and, when known, the day, as one number to compare: 2026-09-01 → 20260901, 2026 → 20260000. */
-function sortKey(years: readonly RowYear[]): number | null {
+/**
+ * A year and, when known, the day, as one number to compare: 2026-09-01 → 20260901, 2026 → 20260000.
+ * A row with several years sits where it is first met: by its newest newest-first, by its oldest oldest-first.
+ */
+function sortKey(years: readonly RowYear[], order: YearOrder): number | null {
   let best: number | null = null;
   for (const { year, date } of years) {
     const day = date ? ISO_DAY.exec(date) : null;
     const key = year * 10000 + (day ? Number(day[2]) * 100 + Number(day[3]) : 0);
-    if (best === null || key > best) best = key;
+    if (best === null || (order === 'desc' ? key > best : key < best)) best = key;
   }
   return best;
 }
 
 /** By year (and day), newest first or oldest first; a stable sort, rows with no year always last. */
 export function sortByYear<T>(rows: readonly T[], yearsOf: YearsOf<T>, order: YearOrder): T[] {
-  const keyed = rows.map((row, index) => ({ row, index, key: sortKey(yearsOf(row)) }));
+  const keyed = rows.map((row, index) => ({ row, index, key: sortKey(yearsOf(row), order) }));
   keyed.sort((a, b) => {
     if (a.key === null || b.key === null) {
       if (a.key === b.key) return a.index - b.index;

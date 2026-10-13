@@ -75,7 +75,8 @@ describe('the order', () => {
   });
 
   it('reverses it, the rows without a year still last, and keeps equal rows in their order', () => {
-    expect(ids(sortByYear(rows, yearsOf, 'asc'))).toEqual(['a', 'd', 'b', 'e', 'c']);
+    // `d` cites 2024 and 2016: newest first it sits with 2024, oldest first with 2016
+    expect(ids(sortByYear(rows, yearsOf, 'asc'))).toEqual(['d', 'a', 'b', 'e', 'c']);
     const same: Row[] = [1, 2, 3].map((n) => ({ id: String(n), years: [{ year: 2020 }] }));
     expect(ids(sortByYear(same, yearsOf, 'asc'))).toEqual(['1', '2', '3']);
     expect(ids(sortByYear(same, yearsOf, 'desc'))).toEqual(['1', '2', '3']);

@@ -217,9 +217,13 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
   const years = useMemo(() => yearList(hits, yearsOfHit), [hits]);
   useReportCaseLawYears('cassazione', years);
   // the year range, the text and the order narrow the hits loaded; the archive is asked for no year yet
+  // The archive pages newest first, so the oldest first is the pages loaded reversed, not the archive's:
+  // the order the reader asks for applies once every decision is loaded, and until then the archive's stands.
+  const complete = last !== null && last.pagina * DECISION_PAGE_SIZE >= last.totale;
+  const orderHeld = filters.order === 'asc' && !complete;
   const shownHits = useMemo(
-    () => applyCaseLawFilters(hits, { yearsOf: yearsOfHit, textOf: textOfHit }, filters),
-    [hits, filters],
+    () => applyCaseLawFilters(hits, { yearsOf: yearsOfHit, textOf: textOfHit }, orderHeld ? { ...filters, order: 'desc' } : filters),
+    [hits, filters, orderHeld],
   );
 
   const shownModo = last?.modo ?? modo;
@@ -289,6 +293,12 @@ export function DecisionResultList({ query, besideId, backEntry, yearRange }: De
           {shownHits.length === 0
             ? `Nessuna delle ${hits.length} decisioni caricate corrisponde ai filtri.`
             : `${shownHits.length} di ${hits.length} decisioni caricate`}
+        </p>
+      )}
+
+      {orderHeld && hits.length > 0 && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Ordinate dalla più recente: l’ordine inverso vale quando tutte le decisioni sono caricate
         </p>
       )}
 

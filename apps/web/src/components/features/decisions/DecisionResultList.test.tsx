@@ -8,6 +8,8 @@ vi.mock('../../../services/decisionSearchService');
 import { searchDecisions } from '../../../services/decisionSearchService';
 import { DecisionResultList } from './DecisionResultList';
 import { clearDecisionSearchCache } from '../../../utils/decisionSearchCache';
+import { CaseLawFiltersContext } from '../search/caseLaw/caseLawFiltersContext';
+import { NO_FILTERS } from '../search/caseLaw/caseLawFilter';
 
 const NORMA = { tipo_atto: 'codice civile', numero_articolo: '2043' };
 const HIT: DecisionSearchHit = {
@@ -280,6 +282,28 @@ describe('DecisionResultList — the section’s year control', () => {
     render(<Wrapper><DecisionResultList query={QUERY} /></Wrapper>);
     await screen.findByRole('link', { name: /n\. 500\/2019/ });
     expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('24908/2026'), expect.stringContaining('500/2019')]);
+  });
+  describe('the oldest-first order', () => {
+    const asc = { filters: { ...NO_FILTERS, order: 'asc' as const }, reportYears: () => {} };
+    const render20 = (query = QUERY) => render(
+      <CaseLawFiltersContext.Provider value={asc}><Wrapper><DecisionResultList query={query} /></Wrapper></CaseLawFiltersContext.Provider>,
+    );
+
+    it('keeps the archive\'s order while more pages exist, and says so', async () => {
+      mockSearch({ ...PAGE, totale: 40, decisioni: [HIT, OLD] });
+      render20();
+      await screen.findByRole('link', { name: /n\. 500\/2019/ });
+      expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('24908/2026'), expect.stringContaining('500/2019')]);
+      expect(screen.getByText('Ordinate dalla più recente: l’ordine inverso vale quando tutte le decisioni sono caricate')).toBeInTheDocument();
+    });
+
+    it('reverses the list once every decision is loaded, and drops the line', async () => {
+      mockSearch({ ...PAGE, totale: 2, decisioni: [HIT, OLD] });
+      render20();
+      await screen.findByRole('link', { name: /n\. 500\/2019/ });
+      expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('500/2019'), expect.stringContaining('24908/2026')]);
+      expect(screen.queryByText(/Ordinate dalla più recente/)).toBeNull();
+    });
   });
 });
 
