@@ -8,7 +8,7 @@ import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { isStudiaEnabled } from '../../features/studia/featureFlag';
 import { useAppStore } from '../../store/useAppStore';
-import { useShallow } from 'zustand/react/shallow';
+import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
 import { Z_INDEX } from '../../constants/zIndex';
@@ -202,10 +202,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
 
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts }: SidebarProps) {
   const navigate = useNavigate();
-  const { openCommandPalette, quickNorms } = useAppStore(useShallow(s => ({
-    openCommandPalette: s.openCommandPalette,
-    quickNorms: s.quickNorms,
-  })));
+  const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, devMode, logout } = useAuth();
   const { count: forumNotifications } = useForumNotifications(!!user);
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
@@ -228,10 +225,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     }
   }, [showUserMenu]);
 
-  // «Ricerca» is the search space and the palette (⌘K) together: decisions are not a page, they
-  // are found through the palette, which lives in the search space. The link itself navigates.
+  // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
+  // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
   const handleSearchClick = () => {
-    openCommandPalette();
+    focusSearchField({}, { wait: true });
     closeMobile();
   };
 

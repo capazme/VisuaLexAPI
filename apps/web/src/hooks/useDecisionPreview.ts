@@ -1,7 +1,8 @@
 /**
  * The hover preview of a decision a text cites (design 2026-10-13 D5): after `PREVIEW_DELAY_MS` on the
  * link, the decision's answer from the session's cache (`fetchDecisionCached`: one request per decision
- * per session). Nothing is asked on render or on a hover that ends first.
+ * per session). Nothing is asked on render or on a hover that ends first. A list opens the same preview
+ * at once, on a click or a key (`openPreview`).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DecisionReference, FetchDecisionAnswer } from '../types/decisions';
@@ -38,6 +39,20 @@ export function useDecisionPreview() {
     timer.current = null;
   };
 
+  const show = useCallback((element: HTMLElement, reference: DecisionReference, path: string) => {
+    setState({ isVisible: true, isLoading: true, error: null, reference, answer: null, position: calculatePreviewPosition(element) });
+    fetchDecisionCached(reference).then(
+      (answer) => {
+        if (currentPath.current !== path) return;
+        setState((prev) => ({ ...prev, isLoading: false, answer }));
+      },
+      () => {
+        if (currentPath.current !== path) return;
+        setState((prev) => ({ ...prev, isLoading: false, error: 'Impossibile leggere la decisione' }));
+      },
+    );
+  }, []);
+
   const showPreview = useCallback((element: HTMLElement, reference: DecisionReference, path: string) => {
     // moving between the segments of one citation, or back onto it, is not a new hover
     if (currentPath.current === path) return;
@@ -45,18 +60,24 @@ export function useDecisionPreview() {
     clearTimer();
     timer.current = window.setTimeout(() => {
       timer.current = null;
-      setState({ isVisible: true, isLoading: true, error: null, reference, answer: null, position: calculatePreviewPosition(element) });
-      fetchDecisionCached(reference).then(
-        (answer) => {
-          if (currentPath.current !== path) return;
-          setState((prev) => ({ ...prev, isLoading: false, answer }));
-        },
-        () => {
-          if (currentPath.current !== path) return;
-          setState((prev) => ({ ...prev, isLoading: false, error: 'Impossibile leggere la decisione' }));
-        },
-      );
+      show(element, reference, path);
     }, PREVIEW_DELAY_MS);
+  }, [show]);
+
+  /** A click or a key on a decision in a list (design 2026-10-13 decision preview): shown at once, no delay. */
+  const openPreview = useCallback((element: HTMLElement, reference: DecisionReference, path: string) => {
+    clearTimer();
+    currentPath.current = path;
+    show(element, reference, path);
+  }, [show]);
+
+  /** Where the anchor moved to (the list scrolled), or the preview's measured height: the shown preview follows. */
+  const followAnchor = useCallback((element: HTMLElement, height?: number) => {
+    setState((prev) => {
+      if (!prev.isVisible) return prev;
+      const position = calculatePreviewPosition(element, height);
+      return position.top === prev.position.top && position.left === prev.position.left ? prev : { ...prev, position };
+    });
   }, []);
 
   /** The pointer left before the delay: nothing was shown, so nothing is asked. A shown preview stays (the pointer may be on its way to it). */
@@ -74,5 +95,5 @@ export function useDecisionPreview() {
 
   useEffect(() => clearTimer, []);
 
-  return { ...state, showPreview, hidePreview, cancelPending };
+  return { ...state, showPreview, openPreview, followAnchor, hidePreview, cancelPending };
 }

@@ -25,7 +25,7 @@ vi.mock('../../../hooks/useForumNotifications', () => ({
 
 vi.mock('../../../store/useAppStore', () => ({
   useAppStore: (selector: (s: unknown) => unknown) =>
-    selector({ openCommandPalette: vi.fn(), quickNorms: [] }),
+    selector({ quickNorms: [] }),
 }));
 
 import { Sidebar } from '../Sidebar';

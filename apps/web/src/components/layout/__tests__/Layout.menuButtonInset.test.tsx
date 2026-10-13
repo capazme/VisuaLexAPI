@@ -37,7 +37,7 @@ describe('Layout — page headers clear the floating menu button below lg', () =
     },
   );
 
-  it('leaves the search page alone: its phone headers sit beside the button', () => {
+  it('leaves the search page alone: its search field sits beside the button', () => {
     at('/');
     for (const cls of INSET) expect(screen.getByTestId('layout-content')).not.toHaveClass(cls);
   });

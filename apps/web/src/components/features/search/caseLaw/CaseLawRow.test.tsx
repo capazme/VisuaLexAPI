@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../../store/useAppStore';
 import { CaseLawRow } from './CaseLawRow';
+
+vi.mock('../../../../utils/decisionFetchCache', () => ({
+  fetchDecisionCached: () => Promise.resolve({ esito: 'non_trovata', motivo: 'inesistente' }),
+}));
 
 const show = (ui: React.ReactElement) => render(<MemoryRouter><ul>{ui}</ul></MemoryRouter>);
 const CASS = { corte: 'cassazione', archivio: 'civile', numero: 31191, anno: 2025 };
@@ -14,14 +18,16 @@ describe('CaseLawRow', () => {
     expect(screen.getByText('Brocardi')).toBeInTheDocument();
   });
 
-  it('opens the decision beside the article and records the way back', () => {
+  it('previews the decision, then opens it beside the article and records the way back', async () => {
     const open = vi.fn(() => 'tab');
     const push = vi.fn();
     const saved = appStore.getState();
     appStore.setState({ openDecision: open, pushReadingBack: push, readingBackStack: [] } as never);
     const back = { tabId: 't1', blockId: 'b1', articleId: 'a1', label: 'art. 2043 c.c.' };
     render(<MemoryRouter initialEntries={['/']}><ul><CaseLawRow decision={CASS} besideId="t1" backEntry={back} /></ul></MemoryRouter>);
-    fireEvent.click(screen.getByText('Cass. civ., n. 31191/2025'));
+    await act(async () => { fireEvent.click(screen.getByText('Cass. civ., n. 31191/2025')); });
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apri accanto' }));
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ numero: 31191 }), { fromLink: true, besideId: 't1' });
     expect(push).toHaveBeenCalledExactlyOnceWith(back);
     appStore.setState({ openDecision: saved.openDecision, pushReadingBack: saved.pushReadingBack } as never);

@@ -1,8 +1,8 @@
 import { useEffect, type ReactNode, type RefObject } from 'react';
 import { FloatingFocusManager, FloatingPortal, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { X } from 'lucide-react';
-import { Z_INDEX } from '../../../constants/zIndex';
-import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../constants/zIndex';
+import { cn } from '../../lib/utils';
 
 export interface SheetProps {
   title: string;
@@ -11,16 +11,18 @@ export interface SheetProps {
   initialFocusRef?: RefObject<HTMLElement | null>;
   /** Esc closes it. Off by default: a form must not lose what was typed to a stray key. */
   closeOnEscape?: boolean;
+  /** A press on the backdrop closes it. Off by default, for the same reason; a preview, which holds nothing typed, turns it on. */
+  closeOnBackdrop?: boolean;
   children: ReactNode;
 }
 
 /**
  * A phone's bottom sheet, after `AddToDossierPopover`'s: a backdrop, the sheet, the focus kept
  * inside. It is not `aria-modal`, so it carries `data-find-overlay`: Cmd/Ctrl+F is left to the
- * browser while it covers the workspace. A press outside never dismisses it: closing is the X (or
- * Esc, when allowed) and what the content offers.
+ * browser while it covers the workspace. A press outside dismisses it only with `closeOnBackdrop`:
+ * otherwise closing is the X (or Esc, when allowed) and what the content offers.
  */
-export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, children }: SheetProps) {
+export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, closeOnBackdrop = false, children }: SheetProps) {
   const { refs, context } = useFloating({ open: true });
   const role = useRole(context, { role: 'dialog' });
   const { getFloatingProps } = useInteractions([role]);
@@ -45,7 +47,11 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
 
   return (
     <FloatingPortal>
-      <div className={cn('fixed inset-0 bg-slate-900/40 motion-safe:animate-in motion-safe:fade-in duration-150', Z_INDEX.modal)} aria-hidden />
+      <div
+        className={cn('fixed inset-0 bg-slate-900/40 motion-safe:animate-in motion-safe:fade-in duration-150', Z_INDEX.modal)}
+        aria-hidden
+        onClick={closeOnBackdrop ? onClose : undefined}
+      />
       <FloatingFocusManager context={context} modal initialFocus={initialFocusRef ?? 0}>
         <div
           // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read

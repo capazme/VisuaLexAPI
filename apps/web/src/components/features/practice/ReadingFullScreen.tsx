@@ -15,9 +15,9 @@ export interface ReadingFullScreenProps {
  * The phone's full-screen reader (spec §8, T19): what `phoneReader` names — an article, a decision or
  * a topic search of a practice — over the whole content area, with «‹ Pratica» (44 px) to return to
  * the table. The body is the light window's (`ReadingWindowBody`), so the reading, the compact
- * toolbar and the find window's registration are the window's own. The header's left inset clears
- * the layout's fixed menu button; the column is not mounted under it (gotcha 26), so one subject has
- * one reading surface.
+ * toolbar and the find window's registration are the window's own. It sits under the search page's
+ * field, which clears the layout's fixed menu button; the column is not mounted under it (gotcha 26),
+ * so one subject has one reading surface.
  */
 export function ReadingFullScreen({ onCrossReference }: ReadingFullScreenProps) {
   const reader = useAppStore((s) => s.phoneReader);
@@ -36,7 +36,7 @@ export function ReadingFullScreen({ onCrossReference }: ReadingFullScreenProps) 
       data-window-id={reader.ref.id}
       className="flex h-app-row min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
     >
-      <header className="flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-slate-100 py-1 pl-[4.5rem] pr-3 dark:border-slate-700">
+      <header className="flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-1 dark:border-slate-700">
         <button
           type="button"
           onClick={closePhoneReader}

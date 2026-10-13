@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
 import type { SentenzaItem } from './dossierLayout';
+
+const fetchDecisionCached = vi.fn<(ref: unknown) => Promise<unknown>>(() => Promise.resolve({ esito: 'non_trovata', motivo: 'inesistente' }));
+vi.mock('../../../utils/decisionFetchCache', () => ({ fetchDecisionCached: (ref: unknown) => fetchDecisionCached(ref) }));
 
 // Stored with labels of an older style: the rows show the citation recomputed (source convention, Q9).
 const cass: SentenzaItem = { id: 's1', type: 'sentenza', addedAt: '',
@@ -21,6 +24,21 @@ describe('DossierDecisionsSection', () => {
       ['Corte cost., n. 1/2014', '/sentenze/corte-costituzionale/1/2014'],
     ]);
     expect(screen.queryByText('Cass. pen. 99999/2024')).toBeNull();
+  });
+
+  it('previews a decision on a click, and goes to its address from the preview', async () => {
+    function Where() { return <span data-testid="where">{useLocation().pathname}</span>; }
+    render(
+      <MemoryRouter initialEntries={['/dossier']}>
+        <Where />
+        <Routes><Route path="*" element={<DossierDecisionsSection decisions={[cost]} onRemove={vi.fn()} />} /></Routes>
+      </MemoryRouter>,
+    );
+    await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'Corte cost., n. 1/2014' })); });
+    expect(fetchDecisionCached).toHaveBeenCalledWith({ corte: 'corte_costituzionale', numero: 1, anno: 2014 });
+    expect(screen.getByTestId('where')).toHaveTextContent('/dossier');
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apri la sentenza' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/sentenze/corte-costituzionale/1/2014');
   });
 
   it('removes a decision as the other rows do', () => {
