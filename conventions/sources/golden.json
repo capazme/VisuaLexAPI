@@ -546,6 +546,8 @@
       {"text": "Il Tribunale ha richiamato la sentenza n. 5 del 2019 della Corte costituzionale della Repubblica italiana.", "within": "corte_costituzionale", "spans": [{"start": 30, "end": 52, "text": "sentenza n. 5 del 2019", "reference": {"corte": "corte_costituzionale", "numero": 5, "anno": 2019}, "path": "/sentenze/corte-costituzionale/5/2019"}], "status": "decided"},
       {"text": "(Trib. Pen. Milano), sez. II, n. 1234/2019.", "within": "cassazione", "spans": [], "status": "decided"},
       {"text": "(Trib. Lavoro Roma), sez. II, n. 1234/2019.", "within": "cassazione", "spans": [], "status": "decided"},
+      {"text": "La sentenza n. 5 del 2019, emessa in grado d'appello dalla Corte d'appello di Roma.", "within": "corte_costituzionale", "spans": [], "status": "decided"},
+      {"text": "La sentenza n. 5 del 2019, emessa nel giudizio d'appello dal Tribunale di Roma.", "within": "corte_costituzionale", "spans": [], "status": "decided"},
       {"text": "(Trib. Civitavecchia), sez. II, n. 1234/2019.", "within": "cassazione", "spans": [], "status": "decided"},
       {"text": "Cass. (Trib. Sez. V), n. 5/2020.", "spans": [{"start": 0, "end": 31, "text": "Cass. (Trib. Sez. V), n. 5/2020", "reference": {"corte": "cassazione", "numero": 5, "anno": 2020}, "path": "/sentenze/cassazione/5/2020"}], "status": "decided"},
       {"text": "(Trib. Milano), sez. II, n. 1234/2019.", "within": "cassazione", "spans": [], "status": "decided"},
