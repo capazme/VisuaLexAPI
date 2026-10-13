@@ -35,9 +35,17 @@ type InternalState =
   | { status: 'ready'; consent: MerltConsentResponse }
   | { status: 'error'; error: string };
 
+/**
+ * A 409 `notice_changed`. `services/api.ts` rejects with `{ status, message, data }`, not axios'
+ * error; the axios shape is read too, for a call made without the interceptor.
+ */
 function isNoticeChanged(err: unknown): boolean {
-  const response = (err as { response?: { status?: number; data?: { detail?: string } } } | null)?.response;
-  return response?.status === 409 && response.data?.detail === 'notice_changed';
+  const e = err as
+    | { status?: number; data?: { detail?: string }; response?: { status?: number; data?: { detail?: string } } }
+    | null;
+  const status = e?.status ?? e?.response?.status;
+  const detail = e?.data?.detail ?? e?.response?.data?.detail;
+  return status === 409 && detail === 'notice_changed';
 }
 
 export function ConsentProvider({ children }: { children: ReactNode }) {
@@ -129,7 +137,8 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     consent,
     level,
     canTrack: level !== 'none',
-    needsAnswer: consent !== null && consent.notice !== null && !consent.noticeAnswered,
+    // `=== false`: a server without the notice (older than this web app) answers neither field.
+    needsAnswer: consent !== null && consent.notice != null && consent.noticeAnswered === false,
     notice: consent?.notice ?? null,
     error: state.status === 'error' ? state.error : null,
     setConsent,

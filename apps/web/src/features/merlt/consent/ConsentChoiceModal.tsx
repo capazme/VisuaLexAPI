@@ -44,7 +44,8 @@ export function ConsentChoiceModal({
   const groupName = useId();
   const checkboxId = useId();
   const noticeHeadingId = useId();
-  const firstOptionRef = useRef<HTMLInputElement>(null);
+  // The notice first: a screen reader reads it before the choices, as a consent «informed» needs.
+  const noticeRef = useRef<HTMLDivElement>(null);
 
   // Reset to the offered level each time the modal opens (derived during render, gotcha 11).
   const [trackedOpen, setTrackedOpen] = useState(isOpen);
@@ -84,7 +85,7 @@ export function ConsentChoiceModal({
       showCloseButton={dismissible}
       closeOnBackdrop={dismissible}
       closeOnEscape={dismissible}
-      initialFocusRef={firstOptionRef}
+      initialFocusRef={noticeRef}
       footer={
         <>
           {dismissible && (
@@ -112,7 +113,10 @@ export function ConsentChoiceModal({
             Informativa · versione {notice.versione}
           </h3>
           <div
+            ref={noticeRef}
             tabIndex={0}
+            role="region"
+            aria-labelledby={noticeHeadingId}
             data-testid="merlt-notice-body"
             className={cn(
               'max-h-[40vh] space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4 leading-relaxed',
@@ -126,7 +130,7 @@ export function ConsentChoiceModal({
 
         <fieldset className="space-y-2">
           <legend className="mb-2 text-xs font-bold uppercase text-slate-500">La tua scelta</legend>
-          {CONSENT_LEVELS.map((meta, index) => {
+          {CONSENT_LEVELS.map((meta) => {
             const isSelected = selected === meta.level;
             const optionId = `${groupName}-${meta.level}`;
             return (
@@ -142,7 +146,6 @@ export function ConsentChoiceModal({
                 )}
               >
                 <input
-                  ref={index === 0 ? firstOptionRef : undefined}
                   id={optionId}
                   type="radio"
                   name={groupName}

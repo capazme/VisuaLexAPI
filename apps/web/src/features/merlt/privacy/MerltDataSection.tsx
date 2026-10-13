@@ -40,7 +40,9 @@ export function MerltDataSection() {
         : 'Caricamento…'
       : needsAnswer
         ? 'In pausa: l’informativa è cambiata e aspetta la tua risposta. Finché non rispondi, MERL-T non raccoglie nulla.'
-        : `Raccolta: ${LEVEL_LABEL[level]}.`;
+        : level === 'none'
+          ? 'Nessuna raccolta: MERL-T non riceve nulla della tua attività.'
+          : `Raccolta: ${LEVEL_LABEL[level]}.`;
 
   const handleExport = async () => {
     setBusy(true);
@@ -91,7 +93,7 @@ export function MerltDataSection() {
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
-              onClick={() => setChangeOpen(true)}
+              onClick={() => { setMessage(null); setChangeOpen(true); }}
               className={cn(ROW, 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700')}
             >
               <SlidersHorizontal size={16} aria-hidden /> Cambia scelta
@@ -107,22 +109,22 @@ export function MerltDataSection() {
               type="button"
               onClick={() => void handleExport()}
               disabled={busy}
-              className={cn(ROW, 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300')}
+              className={cn(ROW, 'bg-blue-50 text-blue-700 hover:bg-blue-100 sm:col-span-2 dark:bg-blue-950/30 dark:text-blue-300')}
             >
               <Download size={16} aria-hidden /> Scarica i miei dati
             </button>
             <button
               type="button"
-              onClick={() => setEraseOpen(true)}
+              onClick={() => { setMessage(null); setEraseOpen(true); }}
               disabled={busy}
-              className={cn(ROW, 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300')}
+              className={cn(ROW, 'bg-red-50 text-red-700 hover:bg-red-100 sm:col-span-2 dark:bg-red-950/30 dark:text-red-300')}
             >
               <Trash2 size={16} aria-hidden /> Elimina i miei dati MERL-T
             </button>
             {consent.storedLevel !== 'none' && (
               <button
                 type="button"
-                onClick={() => setRevokeOpen(true)}
+                onClick={() => { setMessage(null); setRevokeOpen(true); }}
                 disabled={busy}
                 className={cn(ROW, 'bg-red-50 text-red-700 hover:bg-red-100 sm:col-span-2 dark:bg-red-950/30 dark:text-red-300')}
               >
@@ -144,7 +146,7 @@ export function MerltDataSection() {
         open={eraseOpen}
         variant="danger"
         title="Eliminare i tuoi dati MERL-T?"
-        message="Eliminiamo quello che MERL-T ha raccolto su di te: letture, evidenziazioni, note, domande all’assistente, giudizi e documenti. I contributi già approvati dalla comunità restano, senza più alcun legame con te. La tua scelta sul consenso resta com’è: per fermare la raccolta, revocalo."
+        message="Eliminiamo tutto quello che MERL-T ha raccolto su di te. I contributi già approvati dalla comunità restano, senza più alcun legame con te. La tua scelta sul consenso resta com’è: per fermare la raccolta, revocalo."
         confirmLabel="Elimina i dati"
         onConfirm={() => void handleErase()}
         onCancel={() => setEraseOpen(false)}

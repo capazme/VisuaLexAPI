@@ -77,8 +77,8 @@ export function RevokeConsentDialog({ open, onClose, onDone }: RevokeConsentDial
       <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
         <p>Da ora MERL-T non raccoglie più nulla della tua attività.</p>
         <p>
-          Puoi anche eliminare quanto ha raccolto finora: letture, evidenziazioni, note, domande all’assistente,
-          giudizi e documenti. I contributi già approvati dalla comunità restano, senza più alcun legame con te.
+          Puoi anche eliminare tutto quello che ha raccolto su di te finora. I contributi già approvati dalla
+          comunità restano, senza più alcun legame con te.
         </p>
         {error && (
           <p role="alert" className="text-red-600 dark:text-red-400">

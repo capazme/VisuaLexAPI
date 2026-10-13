@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { holdTours } from '../../../hooks/useTour';
 import { useConsent } from './useConsent';
 import { ConsentChoiceModal } from './ConsentChoiceModal';
 
@@ -9,8 +11,17 @@ import { ConsentChoiceModal } from './ConsentChoiceModal';
  * be dismissed: «Nessuna raccolta» is one choice among three, and the app is usable after any.
  */
 export function ConsentScreen() {
-  const { needsAnswer, notice, consent, setConsent } = useConsent();
-  if (!needsAnswer || !notice || !consent) return null;
+  const { status, needsAnswer, notice, consent, setConsent } = useConsent();
+  const asking = needsAnswer && notice !== null && consent !== null;
+  // No tour over the screen, nor in the moment before the consent is known (a page's tour asks
+  // at its mount, and may come first).
+  const holding = status === 'loading' || asking;
+  useEffect(() => {
+    if (!holding) return;
+    holdTours(true);
+    return () => holdTours(false);
+  }, [holding]);
+  if (!asking || !notice || !consent) return null;
 
   // Someone who chose before (under an older notice) finds their level offered again;
   // someone never asked finds nothing chosen.

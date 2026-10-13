@@ -65,6 +65,14 @@ function isMobileDevice(): boolean {
 // over the first is worse than a missed tour. The driver on screen, if any, is module-wide.
 let onScreen: Driver | null = null;
 
+// A first-run screen that must be answered (the MERL-T consent) holds every tour: a tour asked
+// meanwhile is not started (it is asked again the next time its surface mounts, unseen).
+let held = false;
+
+export function holdTours(hold: boolean): void {
+    held = hold;
+}
+
 // ==================== HOOK ====================
 
 interface UseTourOptions {
@@ -134,8 +142,9 @@ export function useTour(options: UseTourOptions = {}) {
 
         const isDark = options.theme === 'dark';
 
-        // Another component's tour is on screen: this one is not started over it (its caller asks
-        // again the next time it mounts, and a tour not seen stays unseen).
+        // Another component's tour is on screen, or a screen holds them all: this one is not
+        // started over it (its caller asks again the next time it mounts, a tour not seen stays unseen).
+        if (held) return;
         if (onScreen?.isActive() && onScreen !== driverRef.current) return;
 
         // Destroy this hook's own existing tour

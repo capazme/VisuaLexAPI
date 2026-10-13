@@ -286,7 +286,7 @@ declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
   the `article_sidebar` graph rail, `AskMerltEntry`, and the citation reports
   that feed MERL-T («Segnala come citazione», `MissedCitationReporter`). Not
   behind it: the `article_content_after` tracker, the `global` slot (the
-  trackers and `ConsentBanner`), `article_case_law` (the Massimario's panel,
+  trackers and `ConsentScreen`), `article_case_law` (the Massimario's panel,
   content for every reader) and the implicit citation feedback on a click, so
   collection runs for whoever consented, with or without the mode. The mode
   never replaces a permission: the consent ladder and the server's guards stay
@@ -298,7 +298,7 @@ declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
   - The article element itself does not scroll, so measuring its own
     `scrollTop` always read 0.
 - `GlobalMerltSlot` hosts the four bus-subscriber trackers (forum,
-  highlight/annotation, dossier/bookmark, citation) and `ConsentBanner`. A
+  highlight/annotation, dossier/bookmark, citation) and `ConsentScreen`. A
   single mount means one BFF POST per bus event (Slice 3 §3.9); mounting them
   per article card duplicated every event.
 - `merltEventBus.ts` is pure pub/sub: `publishMerltEvent` makes no network
@@ -522,9 +522,13 @@ data. Two more cards are admin-only (`opsVisible`):
 - "Ops (admin)": `OpsTrainingButton`, `OpsHygieneButton` and `NerOpsCard`.
 - "Regolazione motore (admin)": `OpsConfigPanel`.
 
-`ConsentDialog.tsx` offers the three levels. `ConsentBanner.tsx` is a
-non-blocking first-run prompt in `GlobalMerltSlot`. It fires only on the real
-RLCF bus events (`TRACKED_EVENT_TYPES`), never on `scroll` or `text_selection`.
+`ConsentChoiceModal.tsx` is the one place a level is chosen, under the current
+MERL-T notice: `ConsentScreen` (in `GlobalMerltSlot`) asks it once as the app
+loads when the notice is unanswered, and cannot be dismissed; `ConsentDialog`
+is it on request; Impostazioni › «Dati MERL-T» (`features/merlt/privacy/`)
+changes, revokes, downloads and erases. There is no prompt during work (the
+banner after the first tracked action was removed in October 2026: the owner
+wants the consent asked once, outside the work flow).
 
 **Slice 2b gotchas:**
 1. **Revoking consent while a tracker is mounted.** React runs an effect's
@@ -533,7 +537,8 @@ RLCF bus events (`TRACKED_EVENT_TYPES`), never on `scroll` or `text_selection`.
    `useArticleViewedTracker` keeps `canTrack` out of its main effect deps and
    gates on `canTrackRef.current`.
 2. **The consent route was always right; the old client was the bug.** Use
-   `setMerltConsent(level, reason?)` (POST) and `revokeMerltConsent` (DELETE).
+   `setMerltConsent(level, noticeId, reason?)` (POST) and
+   `revokeMerltConsent({ reason?, deleteData? })` (DELETE).
    Never reintroduce a PUT or `{ consentLevel }`.
 3. **`MerltEventResponse` is `{ received, timestamp }`**, not `{ trace_id }`.
    `ArticleViewedEventResponse` can also carry `ingestionJob`.

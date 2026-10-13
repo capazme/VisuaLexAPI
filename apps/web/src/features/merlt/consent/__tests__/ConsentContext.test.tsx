@@ -141,7 +141,8 @@ describe('ConsentContext', () => {
 
   it('a notice changed meanwhile reads the new one and says so', async () => {
     fetchConsent.mockResolvedValueOnce(fresh).mockResolvedValueOnce({ ...fresh, notice: { ...notice, id: 'notice-2', versione: 2 } });
-    setConsentApi.mockRejectedValue({ response: { status: 409, data: { detail: 'notice_changed' } } });
+    // The shape services/api.ts rejects with.
+    setConsentApi.mockRejectedValue({ status: 409, message: 'notice_changed', data: { detail: 'notice_changed', notice } });
     renderWithProvider();
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
     await act(async () => { screen.getByText('set-full').click(); });

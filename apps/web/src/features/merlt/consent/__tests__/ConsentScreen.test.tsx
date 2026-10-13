@@ -6,6 +6,7 @@ const useConsentMock = vi.fn();
 vi.mock('../useConsent', () => ({ useConsent: () => useConsentMock() }));
 
 import { ConsentScreen } from '../ConsentScreen';
+import { holdTours } from '../../../../hooks/useTour';
 import { ConsentDialog } from '../ConsentDialog';
 
 const notice: MerltNotice = {
@@ -107,6 +108,15 @@ describe('ConsentScreen — asked once, outside the work', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Conferma la scelta' })); });
     expect(await screen.findByRole('alert')).toHaveTextContent('aggiornata nel frattempo');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('holds every tour while it asks, and lets them go once answered', () => {
+    vi.mocked(holdTours).mockClear();
+    const { rerender } = render(<ConsentScreen />);
+    expect(holdTours).toHaveBeenLastCalledWith(true);
+    useConsentMock.mockReturnValue(contextWith({ ...neverAsked, noticeAnswered: true }));
+    rerender(<ConsentScreen />);
+    expect(holdTours).toHaveBeenLastCalledWith(false);
   });
 
   it('draws nothing once the notice is answered', () => {
