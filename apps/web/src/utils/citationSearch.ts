@@ -411,7 +411,7 @@ const ACT_WORD =
  * A word between an act's name and its number: «regionale», «reg.», «r.», «della», «Regione»,
  * «Friuli-Venezia», «(UE)». Never a court or a decision's marker: «la legge e Cass. n. …» is a decision.
  */
-const ACT_NAME_WORD = `(?:(?<=(?<!\\p{L})(?:del|della|dello|dell['’])\\s*)|(?!${DECISION_HEAD}))(?:\\p{L}+(?:-\\p{L}+)*(?!\\p{L})\\.?|\\(\\p{L}+\\))`;
+const ACT_NAME_WORD = `(?:(?<=(?<!\\p{L})(?:del|della|dello|dell['’])\\s*)(?=${ADMIN_COURT_HEAD_SOURCE})|(?!${DECISION_HEAD}))(?:\\p{L}+(?:-\\p{L}+)*(?!\\p{L})\\.?|\\(\\p{L}+\\))`;
 /** Spaces and at most one comma, in one way only (no backtracking over a long run of spaces). */
 const ACT_NAME_GAP = '\\s*(?:,\\s*)?';
 /** How many such words: «legge della Provincia autonoma di Trento». */

@@ -365,7 +365,7 @@ in «decreto-legge» or «decreto- legge»), a decision's number never inside an
 type of the table, or «decreto», «direttiva», «regolamento», or an administrative act, in every form of the number and
 year: «circolare», «nota», «provvedimento», «delibera», «determina», «risoluzione», «parere»…; regional laws and
 Union acts too, never «ordinanza» or «sentenza», which are decisions; an administrative court (`ADMIN_COURT_HEAD_SOURCE`)
-named in the act's words is a decision's head, except right after «del»/«della»: «il parere del C.d.S. n. 5/2018» is an act), and
+named in the act's words is a decision's head, except right after «del»/«della»/«dello»/«dell'», where it is the act's issuer: «il parere del C.d.S. n. 5/2018» is an act; any other court there stays a head: «il decreto del Tribunale di Milano n. 5/2018» is a decision), and
 an article links to its act only across the gap §13.2 whitelists (commas, «comma N», «commi 2 e 3», «primo comma» and the
 other ordinals, «e ss.», «lett.», «n.», «del»…). A decision cited date first («Cass., sez. III, 12 aprile 2018, n. 8980») is found by
 its date and number when the date's year is the query's and a court or a decision's marker stands within 60

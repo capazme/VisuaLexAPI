@@ -402,6 +402,16 @@ describe('findCitationSpans', () => {
     for (const text of none) expect(cited(text, q), text).toEqual([]);
   });
 
+  it('an act of an administrative court is an act, the decree of any other court is a decision', () => {
+    const q = 'Cass. n. 5/2018';
+    for (const text of ['Il parere del C.d.S. n. 5/2018.', 'Il parere del Consiglio di Stato n. 5/2018.', 'La nota del T.A.R. Lazio n. 5/2018.', 'La nota della Cons. Stato n. 5/2018.']) {
+      expect(cited(text, q), text).toEqual([]);
+    }
+    for (const text of ['Il decreto del Tribunale di Milano n. 5/2018.', 'Il provvedimento del Tribunale di Roma n. 5/2018.', 'Il decreto della Corte d\'appello n. 5/2018.']) {
+      expect(cited(text, q), text).toEqual(['n. 5/2018']);
+    }
+  });
+
   it('a sentence ends at a full stop after a number, a bracket or a quote, so the marker does not reach over it', () => {
     const q = 'Cass. n. 8980/2018';
     const none = [

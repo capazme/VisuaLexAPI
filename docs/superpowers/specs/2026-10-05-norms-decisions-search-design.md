@@ -1104,8 +1104,10 @@ citation, here, is any form of a type in the act-type table, or «decreto», «d
 «nota», «provvedimento», «delibera», «deliberazione», «determina», «determinazione»,
 «risoluzione», «parere»; «circ.», «provv.», «delib.», «det.»; never «ordinanza» or «sentenza»,
 which are decisions), in every form of the number and year, not only date first, followed by up to five words that are not a court or a decision's
-marker (an administrative court is one, except right after «del», «della», «dello», «dell'»: «il
-parere del C.d.S. n. 99/2015» is an act, «come nota il C.d.S. n. 99/2015» a decision), then the
+marker (only an administrative court — the Consiglio di Stato, the C.G.A.R.S., a TAR, the T.R.G.A. —
+right after «del», «della», «dello» or «dell'» is read as the act's issuer, not as a marker: «il
+parere del C.d.S. n. 99/2015» is an act, «come nota il C.d.S. n. 99/2015» a decision; any other
+court after «del» stays a marker: «il decreto del Tribunale di Milano n. 99/2015» is a decision), then the
 number and year: «legge regionale n. 99 del 2015», «l.r. n. 99/2015», «legge
 della Regione Veneto n. 99 del 2015», «Reg. (UE) n. 99/2015», «decreto n. 99 del 2015».
 
