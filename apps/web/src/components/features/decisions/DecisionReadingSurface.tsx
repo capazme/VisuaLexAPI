@@ -124,9 +124,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
 
   // A bare «art. 5» with no act named stays text: a decision has no act of its own to default to.
   // The decisions it cites are linked after the norms; inside a Cassazione decision a section written
-  // without its court reads as the Cassazione's, and the decision's own name links nowhere.
+  // without its court reads as the Cassazione's, inside a Corte costituzionale decision «sentenza n. … del …»
+  // as the Court's own, and the decision's own name links nowhere.
   const selfPath = decisionPath(identity);
-  const within = identity.corte === 'cassazione' ? 'cassazione' : undefined;
+  const within = identity.corte === 'cassazione' || identity.corte === 'corte_costituzionale' ? identity.corte : undefined;
   const html = useMemo(
     () => wrapDecisionCitationsInHtml(
       wrapCitationsInHtml(renderDecisionHtml({
