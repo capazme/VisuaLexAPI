@@ -39,6 +39,7 @@ from types import SimpleNamespace
 from visualex_api.services.akn_fetch import fetch_act_index
 from visualex_api.services.akn_parser import presentable_title
 from visualex_api.services.decisions.citation import read_decision_citation
+from visualex_api.services.decisions.eu_case_law import search_eu_case_law as search_eu_case_law_route
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
 from visualex_api.services.decisions.pdf_route import fetch_decision_pdf as fetch_decision_pdf_route
 from visualex_api.services.decisions.search_route import search_decisions as search_decisions_route
@@ -397,6 +398,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_decision', view_func=self.fetch_decision, methods=['POST'])
         self.app.add_url_rule('/fetch_decision_pdf', view_func=self.fetch_decision_pdf, methods=['POST'])
         self.app.add_url_rule('/search_decisions', view_func=self.search_decisions, methods=['POST'])
+        self.app.add_url_rule('/search_eu_case_law', view_func=self.search_eu_case_law, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only. Not routed by the ingress
         # (infra/ingress/Caddyfile routes an allowlist of prefixes) nor proxied by Vite.
@@ -1137,6 +1139,31 @@ class NormaController:
             answer, status = await search_decisions_route(body)
         except Exception:
             log.exception("Decision search failed unexpectedly")
+            return jsonify({'esito': 'errore_interno'}), 500
+        return jsonify(answer), status
+
+    async def search_eu_case_law(self):
+        """The decisions of the Court of Justice and the General Court that cite an article of
+        an act of the Union (design 2026-10-12 §D1): `{celex, articolo}`. JSON with `esito`:
+        risultati 200, richiesta_non_valida 400, fonte_non_raggiungibile 503, errore_interno 500
+        (a bug: a fixed body). A source that cannot be reached is never an empty list.
+
+        Answers this handler does not write are not JSON with `esito`: the per-IP rate limit
+        (429 `{"error": …}`) and the login gate's 401 or 429, passed through by the ingress,
+        come before it; the framework answers with its own pages a method other than POST or
+        OPTIONS (405), a stalled body (408) and a body over 16 MB (413; 1 MB behind the
+        ingress, whose own page answers)."""
+        try:
+            body = await request.get_json(silent=True)
+        except (RecursionError, UnicodeDecodeError):
+            body = None
+        if not isinstance(body, dict):
+            return jsonify({'esito': 'richiesta_non_valida',
+                            'errori': {'body': 'atteso un oggetto JSON'}}), 400
+        try:
+            answer, status = await search_eu_case_law_route(body.get('celex'), body.get('articolo'))
+        except Exception:
+            log.exception("EU case law search failed unexpectedly")
             return jsonify({'esito': 'errore_interno'}), 500
         return jsonify(answer), status
 

@@ -77,7 +77,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     of `conventions/sources/tar-seats.json`; design 2026-10-12-administrative-courts), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
     User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
-    (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`.
+    (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`; behind
+    `POST /search_eu_case_law`: `eu_case_law.py` (the Union's courts' decisions that cite an article,
+    from CELLAR).
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -232,6 +234,21 @@ POST unless noted, JSON bodies.
   the last five years; the index serves codes and the Constitution, any other act goes to the
   text search, and an act no way can phrase (an EU act among them) answers non_supportata. Design:
   docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md
+- `/search_eu_case_law` — the decisions of the Court of Justice and the General Court that cite an
+  article of an act of the Union: `{celex, articolo}` (the act's CELEX, `32016R0679`, a treaty's
+  `12012E/TXT`; the article as digits, 1 to 9999, both checked against strict patterns before they enter
+  the SPARQL query) → `esito` risultati (`decisioni`: `{corte, causa, ecli, data, tipo, celex}` newest
+  first, `tipo` JUDG | ORDER | OPIN_AG, the Advocates General's opinions included; `totale`; `troncato`
+  when the query hit its 500-row limit; cached 3 days per act and article, `cache_manager.EU_CASE_LAW_TTL`),
+  richiesta_non_valida 400, fonte_non_raggiungibile 503 (`fonte: curia`; a timeout, a partial or
+  unreadable answer: never an empty list, never cached), errore_interno 500 (a bug: a fixed body).
+  CELLAR reifies a decision's citation of an act as an `owl:Axiom` (`owl:annotatedSource` the decision,
+  `owl:annotatedTarget` the act, `annotation:fragment_cited_target` a literal such as `A06P1L1LB`); the
+  fragment is matched `^A0?<n>($|[PL])`, so article 6 never finds `A60`. The list is not complete: the
+  fragments arrive late for recent cases and are thin before 2021. Decisions of other types (a notice,
+  an opinion under art. 218 TFEU) and of the Civil Service Tribunal (closed 2016) are left out.
+  Measured on 13 October 2026: 0.06 to 0.8 s, 35 to 100 decisions (5 to 15 KB) for an article of a
+  regulation or a directive; the TFEU's CELEX gave no row. Design: docs/superpowers/specs/2026-10-12-case-law-section-design.md
 - `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
   PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
   fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.
