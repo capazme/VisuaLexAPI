@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const legalFetch = vi.fn();
-vi.mock('../legalFetch', () => ({ legalFetch: (...args: unknown[]) => legalFetch(...args) }));
-
+vi.mock('../legalFetch');
+import { legalFetch as legalFetchReal } from '../legalFetch';
 import { searchEuCaseLaw } from '../euCaseLawService';
+
+const legalFetch = vi.mocked(legalFetchReal);
 
 const json = (status: number, body: unknown) =>
   ({ status, ok: status < 400, json: async () => body }) as unknown as Response;
@@ -20,7 +21,7 @@ describe('searchEuCaseLaw', () => {
     legalFetch.mockResolvedValue(json(200, answer));
     expect(await searchEuCaseLaw(QUERY)).toEqual(answer);
     expect(legalFetch).toHaveBeenCalledWith('/search_eu_case_law', expect.objectContaining({ method: 'POST' }));
-    expect(JSON.parse(legalFetch.mock.calls[0][1].body)).toEqual(QUERY);
+    expect(JSON.parse(legalFetch.mock.calls[0][1]?.body as string)).toEqual(QUERY);
   });
 
   it('hands back the route\'s own answers as they come, whatever the status', async () => {
@@ -51,5 +52,10 @@ describe('searchEuCaseLaw', () => {
     } finally {
       logged.mockRestore();
     }
+  });
+
+  it('rejects when no response arrives at all', async () => {
+    legalFetch.mockRejectedValueOnce(new TypeError('network'));
+    await expect(searchEuCaseLaw(QUERY)).rejects.toThrow('network');
   });
 });
