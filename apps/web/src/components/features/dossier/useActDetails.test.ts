@@ -10,7 +10,7 @@ vi.mock('../../../utils/actStructureCache', () => ({
 }));
 vi.mock('../../../utils/actUrn', () => ({ resolveAct: (...a: unknown[]) => resolveAct(...a) }));
 
-import { useActDetails, actUrnForBlock, annexFromActUrn, resolveBlockUrn } from './useActDetails';
+import { useActDetails, actUrnForBlock, annexFromActUrn, resolveBlockUrn, forgetActDetails } from './useActDetails';
 import { layoutDossier } from './dossierLayout';
 import type { DossierItem } from '../../../types';
 
@@ -20,7 +20,7 @@ const item = (numero_articolo: string, more: object = {}): DossierItem => ({
   data: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo, urn: `${URN}~art${numero_articolo}`, ...more },
 });
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => { vi.clearAllMocks(); forgetActDetails(); });
 
 describe('useActDetails', () => {
   it('reads the title and the rubriche of a flat act with one call, and no tree', async () => {
@@ -106,6 +106,74 @@ describe('useActDetails', () => {
     expect(result.current.title).toBeNull();
     expect(result.current.rubricaOf(block.articles[0].data)).toBeNull();
     error.mockRestore();
+  });
+});
+
+// Each trigger that blanked an act's title in a dossier (13 October 2026).
+describe('useActDetails — the title stays', () => {
+  const pending = () => new Promise<never>(() => {});
+
+  it('while a new article of another annex is read', async () => {
+    fetchActRubriche.mockResolvedValueOnce({ title: 'Nuova disciplina', rubriche: { '3': 'Doveri' }, parts: [] });
+    const { result, rerender } = renderHook(({ items }) => useActDetails(layoutDossier(items).acts[0]), {
+      initialProps: { items: [item('3')] },
+    });
+    await waitFor(() => expect(result.current.title).toBe('Nuova disciplina'));
+    fetchActRubriche.mockImplementation(pending);
+    rerender({ items: [item('3'), item('1', { allegato: 'A' })] });
+    expect(result.current.title).toBe('Nuova disciplina');
+    expect(result.current.rubricaOf(layoutDossier([item('3')]).acts[0].articles[0].data)).toBe('Doveri');
+  });
+
+  it('when an article arrives with the quiet refresh, and nothing is read again', async () => {
+    fetchActRubriche.mockResolvedValue({ title: 'Nuova disciplina', rubriche: {}, parts: [] });
+    const { result, rerender } = renderHook(({ items }) => useActDetails(layoutDossier(items).acts[0]), {
+      initialProps: { items: [item('3')] },
+    });
+    await waitFor(() => expect(result.current.title).toBe('Nuova disciplina'));
+    // The refresh hands new objects, and here one more article of the same act (added by Claude).
+    rerender({ items: [item('3'), { ...item('5'), id: 'from-claude' }] });
+    expect(result.current.title).toBe('Nuova disciplina');
+    expect(fetchActRubriche).toHaveBeenCalledTimes(1);
+  });
+
+  it('when a new reading fails', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchActRubriche.mockResolvedValueOnce({ title: 'Nuova disciplina', rubriche: {}, parts: [] });
+    const { result, rerender } = renderHook(({ items }) => useActDetails(layoutDossier(items).acts[0]), {
+      initialProps: { items: [item('3')] },
+    });
+    await waitFor(() => expect(result.current.title).toBe('Nuova disciplina'));
+    fetchActRubriche.mockRejectedValueOnce(new Error('down'));
+    rerender({ items: [item('3'), item('1', { allegato: 'A' })] });
+    await waitFor(() => expect(error).toHaveBeenCalled());
+    expect(result.current.title).toBe('Nuova disciplina');
+    error.mockRestore();
+  });
+
+  it('when the block comes back after the act was hidden or the page was left', async () => {
+    fetchActRubriche.mockResolvedValueOnce({ title: 'Nuova disciplina', rubriche: { '3': 'Doveri' }, parts: [] });
+    const [block] = layoutDossier([item('3')]).acts;
+    const first = renderHook(() => useActDetails(block));
+    await waitFor(() => expect(first.result.current.title).toBe('Nuova disciplina'));
+    first.unmount();
+    fetchActRubriche.mockImplementation(pending);
+    const again = renderHook(() => useActDetails(block));
+    // On the first render, before any answer.
+    expect(again.result.current.title).toBe('Nuova disciplina');
+    expect(again.result.current.rubricaOf(block.articles[0].data)).toBe('Doveri');
+  });
+
+  it('for another act, nothing of the previous one', async () => {
+    fetchActRubriche.mockResolvedValueOnce({ title: 'Nuova disciplina', rubriche: {}, parts: [] });
+    const other = (n: string) => item(n, { numero_atto: '49', data: '2023-04-21', urn: `urn:other~art${n}` });
+    const { result, rerender } = renderHook(({ items }) => useActDetails(layoutDossier(items).acts[0]), {
+      initialProps: { items: [item('3')] },
+    });
+    await waitFor(() => expect(result.current.title).toBe('Nuova disciplina'));
+    fetchActRubriche.mockImplementation(pending);
+    rerender({ items: [other('1')] });
+    expect(result.current.title).toBeNull();
   });
 });
 

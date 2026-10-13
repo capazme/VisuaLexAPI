@@ -139,6 +139,7 @@ from bs4 import BeautifulSoup
 from visualex_api.tools.exceptions import DocumentNotFoundError
 from visualex_api.tools.treextractor import (
     _extract_eurlex_rubriche,
+    _extract_eurlex_title,
     _parse_eurlex_tree,
     strip_amendment_markers,
 )
@@ -405,6 +406,52 @@ class TestConsolidatedRubriche:
     def test_inline_markers_are_stripped_from_rubriche(self):
         rubriche = _extract_eurlex_rubriche(soup_of("eprivacy_consolidated_20091219.html"))
         assert rubriche["4"] == "Sicurezza del trattamento"
+
+
+# The title block of the OJ page of regulation (EU) 2016/679, as EUR-Lex and CELLAR serve it
+# (13 October 2026); the trimmed fixture leaves it out. An annex heading shares the class.
+GDPR_TITLE = """<html><body><hr class="oj-separator"/><div class="eli-container">
+<div class="eli-main-title" id="tit_1">
+<p class="oj-doc-ti" id="d1e40-1-1">
+REGOLAMENTO (UE) 2016/679 DEL PARLAMENTO EUROPEO E DEL CONSIGLIO
+</p>
+<p class="oj-doc-ti">del 27 aprile 2016
+</p>
+<p class="oj-doc-ti">relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, nonché alla libera circolazione di tali dati e che abroga la direttiva 95/46/CE (regolamento generale sulla protezione dei dati)</p>
+<p class="oj-doc-ti">(Testo rilevante ai fini del SEE)</p>
+</div>
+<div class="eli-subdivision" id="anx_1"><p class="oj-doc-ti">ALLEGATO I</p></div>
+</div></body></html>"""
+
+
+class TestEurlexTitle:
+    def test_oj_page_gives_the_subject(self):
+        title = _extract_eurlex_title(BeautifulSoup(GDPR_TITLE, "html.parser"))
+        assert title == (
+            "relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, "
+            "nonché alla libera circolazione di tali dati e che abroga la direttiva 95/46/CE "
+            "(regolamento generale sulla protezione dei dati)"
+        )
+
+    def test_consolidated_page(self):
+        assert _extract_eurlex_title(soup_of("eprivacy_consolidated_20091219.html")) == (
+            "relativa al trattamento dei dati personali e alla tutela della vita privata nel settore "
+            "delle comunicazioni elettroniche (direttiva relativa alla vita privata e alle comunicazioni elettroniche)"
+        )
+
+    def test_legacy_page_reads_its_description(self):
+        assert _extract_eurlex_title(soup_of("eprivacy_oj_legacy.html")) == (
+            "relativa al trattamento dei dati personali e alla tutela della vita privata nel settore "
+            "delle comunicazioni elettroniche (direttiva relativa alla vita privata e alle comunicazioni elettroniche)"
+        )
+
+    def test_a_page_without_one_says_nothing(self):
+        assert _extract_eurlex_title(soup_of("gdpr_oj_trimmed.html")) == ""
+
+    async def test_the_tree_carries_it(self):
+        url = "https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:02002L0058-20091219"
+        _, _, metadata = await _parse_eurlex_tree(soup_of("eprivacy_consolidated_20091219.html"), url)
+        assert metadata["title"].startswith("relativa al trattamento dei dati personali")
 
 
 class TestStripAmendmentMarkers:

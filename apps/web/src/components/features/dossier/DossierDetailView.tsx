@@ -683,6 +683,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                     <DossierActBlock
                       key={block.key}
                       block={block}
+                      act={fullBlocks.get(block.key) ?? block}
                       dragDisabled={hasFilter}
                       isFolded={foldedActs.has(block.key)}
                       onToggleFold={() => toggleFolded(block.key)}

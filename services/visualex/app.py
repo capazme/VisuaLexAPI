@@ -1034,19 +1034,21 @@ class NormaController:
             # visit would mean launching another browser to get past the WAF.
             # get_tree is cached, so this reuses the fetch the index already
             # made rather than repeating it.
+            # The act's title (its subject) comes from the same page.
             if 'eur-lex' in str(urn):
                 try:
                     _, _, tree_metadata = await get_tree(
                         urn, link=False, details=True, return_metadata=True
                     )
                     rubriche = (tree_metadata or {}).get('rubriche') or {}
+                    title = (tree_metadata or {}).get('title') or ''
                 except Exception as exc:  # noqa: BLE001
                     log.warning("EUR-Lex rubriche unavailable",
                                 urn=str(urn)[:100], error=str(exc))
-                    rubriche = {}
+                    rubriche, title = {}, ''
                 log.info("Rubriche served (EUR-Lex)", urn=str(urn)[:100], count=len(rubriche))
                 return jsonify({
-                    'title': '',
+                    'title': title,
                     'rubriche': rubriche,
                     'abrogati': [],
                     'parts': [],
