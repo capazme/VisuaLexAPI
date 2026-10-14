@@ -54,10 +54,14 @@ const TRIGGER = /^[a-zA-Z0-9\-_.]{2,100}$/;
 const DATE_LIKE = /^\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
 type Json = Record<string, unknown>;
+/** Counts the rows a lenient pass leaves out, for an import's report. */
+type Tally = { refused: number };
 type Check<T> = { ok: true; value: T } | { ok: false; reason: string };
 
 const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
-const text = (value: unknown, max: number): string | null => (typeof value === 'string' && value.length <= max ? value : null);
+// Postgres text cannot hold a NUL: a string with one is refused (never altered), else it fails the write later.
+const text = (value: unknown, max: number): string | null =>
+  typeof value === 'string' && value.length <= max && !value.includes('\u0000') ? value : null;
 const filled = (value: unknown, max: number): string | null => {
   const t = text(value, max);
   return t !== null && t.trim() !== '' ? t : null;
@@ -190,6 +194,7 @@ function rows(
   action: string | undefined,
   check: (row: unknown, id: string) => Check<Json>,
   idOf: (index: number) => string,
+  tally?: Tally,
 ): Json[] {
   if (!Array.isArray(input)) {
     if (strict && input !== undefined) throw new AppError(400, `Contenuto non valido (${noun}): non può essere ${action}`);
@@ -197,22 +202,25 @@ function rows(
   }
   if (input.length > max) {
     if (strict) throw new AppError(400, `Troppi elementi (${noun}: al massimo ${max}): non può essere ${action}`);
+    if (tally) tally.refused += input.length - max;
   }
   const out: Json[] = [];
   for (const [index, row] of input.slice(0, max).entries()) {
     const checked = check(row, idOf(out.length));
     if (checked.ok) out.push(checked.value);
     else if (strict) throw new AppError(400, `${noun[0].toUpperCase()}${noun.slice(1)} ${index + 1}: ${checked.reason}: non può essere ${action}`);
+    else if (tally) tally.refused += 1;
   }
   return out;
 }
 
-function dossier(raw: unknown, position: number, mode: ContentMode): Json | null {
+function dossier(raw: unknown, position: number, mode: ContentMode, tally?: Tally): Json | null {
   // The dossier itself refuses on a publication or an update; on a restore or a read it is left out.
   const strict = mode === 'publish' || mode === 'update';
   const action = mode === 'read' ? undefined : ACTION[mode];
   const refuse = (reason: string): null => {
     if (strict) throw new AppError(400, `Dossier ${position}: ${reason}: non può essere ${action}`);
+    if (tally) tally.refused += 1;
     return null;
   };
   if (!isObject(raw)) return refuse('non leggibile');
@@ -228,12 +236,13 @@ function dossier(raw: unknown, position: number, mode: ContentMode): Json | null
   }
   // Tags are a dossier's own words, never cited: the readable ones travel (at most twenty), the rest is left out.
   if (Array.isArray(raw.tags)) {
-    out.tags = raw.tags.filter((t): t is string => typeof t === 'string' && t.trim() !== '' && t.length <= LIMITS.tag).slice(0, LIMITS.tags);
+    out.tags = raw.tags.filter((t): t is string => text(t, LIMITS.tag) !== null && (t as string).trim() !== '').slice(0, LIMITS.tags);
   }
   const entries = Array.isArray(raw.items) ? raw.items : null;
   if (entries === null) return refuse('voci mancanti');
   if (entries.length > LIMITS.entries) {
     if (strict) return refuse(`troppe voci (al massimo ${LIMITS.entries})`);
+    if (tally) tally.refused += entries.length - LIMITS.entries;
   }
   // Entries refuse in every mode but a read, as they always did: they become citations.
   const strictEntries = mode !== 'read';
@@ -243,6 +252,7 @@ function dossier(raw: unknown, position: number, mode: ContentMode): Json | null
     const rebuilt = rebuildEntry(entry);
     if (!rebuilt.ok) {
       if (strictEntries) throw new AppError(400, `Dossier ${named}, voce ${index + 1}: ${rebuilt.reason}: non può essere ${action}`);
+      if (tally) tally.refused += 1;
       continue;
     }
     const newId = `${id}-${items.length + 1}`;
@@ -269,29 +279,37 @@ export interface PublishedContent {
 }
 
 /** The content of a Forum item as the server stores and answers it (see the module's comment). */
-export function publishedContent(raw: unknown, mode: ContentMode): PublishedContent {
+export function publishedContent(raw: unknown, mode: ContentMode, tally?: Tally): PublishedContent {
   const strict = mode === 'publish' || mode === 'update';
   const action = mode === 'read' ? undefined : ACTION[mode];
   const input = isObject(raw) ? raw : {};
   if (!isObject(raw) && strict) throw new AppError(400, `Contenuto non leggibile: non può essere ${action}`);
 
   const sourceDossiers = Array.isArray(input.dossiers) ? input.dossiers : [];
-  if (sourceDossiers.length > LIMITS.dossiers && strict) {
-    throw new AppError(400, `Troppi dossier (al massimo ${LIMITS.dossiers}): non può essere ${action}`);
+  if (sourceDossiers.length > LIMITS.dossiers) {
+    if (strict) throw new AppError(400, `Troppi dossier (al massimo ${LIMITS.dossiers}): non può essere ${action}`);
+    if (tally) tally.refused += sourceDossiers.length - LIMITS.dossiers;
   }
   const dossiers: Json[] = [];
   for (const raw of sourceDossiers.slice(0, LIMITS.dossiers)) {
-    const rebuilt = dossier(raw, dossiers.length + 1, mode);
+    const rebuilt = dossier(raw, dossiers.length + 1, mode, tally);
     if (rebuilt) dossiers.push(rebuilt);
   }
   const content: PublishedContent = {
     dossiers,
-    quickNorms: rows(input.quickNorms, LIMITS.quickNorms, 'norma rapida', strict, action, quickNorm, (i) => `q${i + 1}`),
-    annotations: rows(input.annotations, LIMITS.annotations, 'nota', strict, action, annotation, (i) => `a${i + 1}`),
-    highlights: rows(input.highlights, LIMITS.highlights, 'evidenziazione', strict, action, highlight, (i) => `h${i + 1}`),
+    quickNorms: rows(input.quickNorms, LIMITS.quickNorms, 'norma rapida', strict, action, quickNorm, (i) => `q${i + 1}`, tally),
+    annotations: rows(input.annotations, LIMITS.annotations, 'nota', strict, action, annotation, (i) => `a${i + 1}`, tally),
+    highlights: rows(input.highlights, LIMITS.highlights, 'evidenziazione', strict, action, highlight, (i) => `h${i + 1}`, tally),
   };
   if (Array.isArray(input.customAliases)) {
-    content.customAliases = rows(input.customAliases, LIMITS.aliases, 'alias', strict, action, alias, (i) => `c${i + 1}`);
+    content.customAliases = rows(input.customAliases, LIMITS.aliases, 'alias', strict, action, alias, (i) => `c${i + 1}`, tally);
   }
   return content;
+}
+
+/** A read of someone's content for an import: what passes, and how many rows did not. */
+export function readableContent(raw: unknown): { content: PublishedContent; refused: number } {
+  const tally: Tally = { refused: 0 };
+  const content = publishedContent(raw, 'read', tally);
+  return { content, refused: tally.refused };
 }

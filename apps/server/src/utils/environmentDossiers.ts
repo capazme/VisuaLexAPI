@@ -50,7 +50,7 @@ export function rebuildEntry(entry: unknown): EntryCheck {
     return decision.ok ? envelope(item, 'sentenza', decision.entry) : { ok: false, reason: decision.reason };
   }
   if (item.type === 'note') {
-    if (typeof item.data !== 'string' || item.data.length > MAX_NOTE_LENGTH) {
+    if (typeof item.data !== 'string' || item.data.length > MAX_NOTE_LENGTH || item.data.includes('\u0000')) {
       return { ok: false, reason: `nota non valida (testo di al massimo ${MAX_NOTE_LENGTH} caratteri)` };
     }
     return envelope(item, 'note', item.data);

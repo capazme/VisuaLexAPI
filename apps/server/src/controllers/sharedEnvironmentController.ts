@@ -4,7 +4,8 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { dossierItemFromEntry, rebuildDossierPayload, type EntryItem } from '../utils/suggestionEntries';
-import { publishedContent, type PublishedContent } from '../utils/publishedContent';
+import { publishedContent, readableContent, type PublishedContent } from '../utils/publishedContent';
+import { importStudyDossiers, spendStudyImport, wireNormaKey } from '../services/studyImport';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -542,10 +543,34 @@ export const toggleLike = async (req: Request, res: Response) => {
 /**
  * Record download and return environment content
  */
+const downloadSwitchesSchema = z.object({ addNotes: z.boolean(), addHighlights: z.boolean() });
+
 export const recordDownload = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const env = await reachableEnvironment(id, req.user!);
+
+  // «Aggiungi ai miei dossier» (D8): with the two switches in the body, the item becomes the user's study
+  // dossiers in one request. Without a body an older client gets the content, as before.
+  const body = req.body as Record<string, unknown> | undefined;
+  if (body && typeof body === 'object' && ('addNotes' in body || 'addHighlights' in body)) {
+    const switches = downloadSwitchesSchema.parse(body);
+    await spendStudyImport(req.user!.id);
+    const own = env.userId === req.user!.id;
+    const { content, refused } = readableContent(env.content);
+    const report = await importStudyDossiers(req.user!.id, content, {
+      addNotes: switches.addNotes && env.includeNotes,
+      addHighlights: switches.addHighlights && env.includeHighlights,
+      addShortcuts: true,
+      // The publisher's, for the «da @utente» chip; one's own item is one's own work.
+      attributeTo: own ? null : env.userId,
+      refused,
+      // Counted with the rows, so a failure cannot answer 500 after the dossiers exist.
+      alsoInTransaction: own ? undefined : (tx) => tx.sharedEnvironment.update({ where: { id }, data: { downloadCount: { increment: 1 } } }),
+    });
+    res.status(201).json(report);
+    return;
+  }
 
   // Increment download count (don't count own downloads)
   if (env.userId !== req.user!.id) {
@@ -775,15 +800,25 @@ export const adminWithdrawEnvironment = async (req: Request, res: Response) => {
   // also when the author had withdrawn it first, else the author could put it back. The dossier it came
   // from is stamped too, so deleting this copy and publishing the dossier again does not undo it.
   const now = new Date();
-  const [updated] = await prisma.$transaction([
-    prisma.sharedEnvironment.update({
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.sharedEnvironment.update({
       where: { id },
       data: { isActive: false, withdrawnByAdminAt: env.withdrawnByAdminAt ?? now },
-    }),
-    ...(env.sourceDossierId
-      ? [prisma.dossier.updateMany({ where: { id: env.sourceDossierId, forumBlockedAt: null }, data: { forumBlockedAt: now } })]
-      : []),
-  ]);
+    });
+    // Both, whatever the link said when it was read: the dossier may have gone to the trash meanwhile
+    // (the link is cleared there). The block then goes into the trash entry, and comes back with the
+    // dossier on restore. Each statement is idempotent.
+    if (env.sourceDossierId) {
+      await tx.dossier.updateMany({ where: { id: env.sourceDossierId, forumBlockedAt: null }, data: { forumBlockedAt: now } });
+    }
+    await tx.$executeRaw`
+      UPDATE "trash_entries"
+      SET "payload" = jsonb_set("payload", '{dossier,forumBlockedAt}', to_jsonb(${now.toISOString()}::text))
+      WHERE "user_id" = ${env.userId} AND "kind" = 'DOSSIER'
+        AND "payload"->>'publishedCopyId' = ${env.id}
+        AND ("payload"->'dossier'->>'forumBlockedAt') IS NULL`;
+    return row;
+  });
 
   res.json({ id: updated.id, isActive: updated.isActive });
 };
@@ -806,15 +841,18 @@ export const adminRepublishEnvironment = async (req: Request, res: Response) => 
     throw new AppError(400, "L'elemento è già pubblicato.");
   }
 
-  const [updated] = await prisma.$transaction([
-    prisma.sharedEnvironment.update({
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.sharedEnvironment.update({
       where: { id },
       data: { isActive: true, withdrawnByAdminAt: null },
-    }),
-    ...(env.sourceDossierId
-      ? [prisma.dossier.updateMany({ where: { id: env.sourceDossierId }, data: { forumBlockedAt: null } })]
-      : []),
-  ]);
+    });
+    if (env.sourceDossierId) await tx.dossier.updateMany({ where: { id: env.sourceDossierId }, data: { forumBlockedAt: null } });
+    // Its dossier in the trash comes back unblocked too.
+    await tx.$executeRaw`
+      UPDATE "trash_entries" SET "payload" = jsonb_set("payload", '{dossier,forumBlockedAt}', 'null'::jsonb)
+      WHERE "user_id" = ${env.userId} AND "kind" = 'DOSSIER' AND "payload"->>'publishedCopyId' = ${env.id}`;
+    return row;
+  });
 
   res.json({ id: updated.id, isActive: updated.isActive });
 };
@@ -835,8 +873,16 @@ export const adminListForumBlocks = async (_req: Request, res: Response) => {
 
 /** The admin allows a blocked dossier to be published again. */
 export const adminClearForumBlock = async (req: Request, res: Response) => {
-  const cleared = await prisma.dossier.updateMany({ where: { id: req.params.dossierId, forumBlockedAt: { not: null } }, data: { forumBlockedAt: null } });
-  if (cleared.count === 0) throw new AppError(404, 'Nessun blocco per questo dossier.');
+  const { dossierId } = req.params;
+  const [cleared, inTrash] = await prisma.$transaction([
+    prisma.dossier.updateMany({ where: { id: dossierId, forumBlockedAt: { not: null } }, data: { forumBlockedAt: null } }),
+    // A blocked dossier in the trash comes back unblocked.
+    prisma.$executeRaw`
+      UPDATE "trash_entries" SET "payload" = jsonb_set("payload", '{dossier,forumBlockedAt}', 'null'::jsonb)
+      WHERE "kind" = 'DOSSIER' AND "payload"->'dossier'->>'id' = ${dossierId}
+        AND ("payload"->'dossier'->>'forumBlockedAt') IS NOT NULL`,
+  ]);
+  if (cleared.count === 0 && inTrash === 0) throw new AppError(404, 'Nessun blocco per questo dossier.');
   res.status(204).send();
 };
 
@@ -1213,17 +1259,19 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
       // raw articleId never matches that prefix query, so a taken note would be
       // invisible in-context. Reconstruct the wire key when the payload carries
       // both parts; fall back to the raw value for legacy payloads (no normaKey).
-      const wireNormaKey =
-        payload.normaKey && payload.articleId
-          ? `${payload.normaKey}::art::${payload.articleId}`
-          : payload.articleId ?? payload.normaKey ?? '';
+      // A decision's notes have an empty article id and live under `<decisionKey>::art::` (before
+      // 14 October 2026 they were stored under an empty key, invisible).
+      const normaKey =
+        typeof payload.normaKey === 'string' && payload.normaKey
+          ? wireNormaKey(payload.normaKey, typeof payload.articleId === 'string' ? payload.articleId : '')
+          : payload.articleId ?? '';
       const row = await (async () => {
         switch (item.itemType) {
           case 'annotation':
             return tx.annotation.create({
               data: {
                 userId: req.user!.id,
-                normaKey: wireNormaKey,
+                normaKey,
                 content: payload.text,
                 textContext: payload.anchorText,
                 position: payload.startOffset,
@@ -1231,14 +1279,19 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
               },
             });
           case 'highlight':
+            // A highlight is anchored by its offset: without one it would mark the article's first characters.
+            if (typeof payload.startOffset !== 'number' || !Number.isInteger(payload.startOffset) || payload.startOffset < 0) {
+              throw new AppError(400, 'Evidenziazione senza posizione nel testo: non può essere aggiunta.');
+            }
             return tx.highlight.create({
               data: {
                 userId: req.user!.id,
-                normaKey: wireNormaKey,
+                normaKey,
                 text: payload.anchorText ?? '',
                 color: payload.colorVar ?? 'yellow',
-                startOffset: payload.startOffset ?? 0,
-                endOffset: payload.endOffset ?? 0,
+                startOffset: payload.startOffset,
+                // As the web writes it: where the marked text ends.
+                endOffset: payload.endOffset ?? payload.startOffset + String(payload.anchorText ?? '').length,
                 ...attribution,
               },
             });

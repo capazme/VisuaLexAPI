@@ -258,9 +258,29 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   an admin republishes it (owner, question 190). The dossier it came from is stamped too
   (`dossiers.forum_blocked_at`, answered as `forum_blocked`, kept through the trash): the author may
   delete the copy but not publish the dossier again until an admin republishes the copy or lifts
-  the block (`GET /admin/forum-blocks` — owner and date, never the dossier's private name —
+  the block — both also reach a dossier waiting in the trash, whose stored row carries the block (`GET /admin/forum-blocks` — owner and date, never the dossier's private name —
   and `DELETE /admin/forum-blocks/:dossierId`). Messages the Forum shows are Italian (the daily limit: «Puoi pubblicare
   al massimo 5 dossier al giorno: riprova domani.»).
+- **Study dossiers from content** (`services/studyImport.ts`, spec D8–D9, D11–D12): the one way
+  content becomes a user's dossiers — `POST /shared-environments/:id/download` with
+  `{ addNotes, addHighlights }` («Aggiungi ai miei dossier»; without a body an older client still
+  gets the filtered content), `POST /environments/:id/recover` («Recupera i dossier» from the
+  archive) and `POST /dossiers/import-study { content, addNotes?, addHighlights? }` (packs, old
+  links, at most 1 MB; session only, not delegated). Each spends one of `IMPORTS_PER_HOUR` (30) per
+  user (`spendStudyImport`, 429 in Italian; a limiter failure lets it through). The content is read through the allow-list
+  (`readableContent`, which counts what it leaves out as `refused`); each dossier becomes a **new**
+  `studio` dossier (never an existing one changed), entries as the web writes them (title, the star
+  in `_dossierMeta`, a note's `aboutItemId` following its entry); notes and highlights go under the
+  key the web reads (`wireNormaKey`: `<key>::art::<articleId>`, a decision's `<decisionKey>::art::`),
+  a highlight's `endOffset` from its text's length, one identical (same key, text, anchor, offsets,
+  compared exactly) to the user's skipped; a legacy item's quick norms and aliases merge by label
+  (case folded) and trigger (exact). The user's rows are read first, then everything — a download's
+  count too — is written in one transaction (30 s): a database error rolls it all back, a skip
+  never does. Rows from someone else's item carry
+  `originalAuthorId` (the «da @utente» chip); notes live on the article, so they outlive the study
+  dossier. A download counts once per non-owner request. The suggestion «take» stores a note on a
+  decision under its `::art::` key too (before 14 October 2026 it wrote an empty key), and refuses
+  a highlight with no offset (400) instead of marking the article's first characters.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`

@@ -10,6 +10,8 @@ import { citeStoredAct } from '../norms/citation';
 import { citeDecision, citeStoredItem } from '../norms/decisionCitation';
 import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/decisionItem';
 import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
+import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
+import { readableContent } from '../utils/publishedContent';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -211,6 +213,34 @@ export const updateDossier = async (req: Request, res: Response) => {
   });
 
   res.json(serializeDossier(dossier));
+};
+
+const importStudySchema = z.object({
+  content: z.unknown(),
+  addNotes: z.boolean().default(true),
+  addHighlights: z.boolean().default(true),
+});
+
+/**
+ * New dossiers di studio from content the web app holds: a ready-made pack, an old environment
+ * link (spec docs/superpowers/specs/2026-10-13-environments-into-forum-design.md, D9, D11c, D12).
+ * Filtered as Forum content is, then imported as a download is; never an existing dossier
+ * changed. User session only: not in the delegated table.
+ */
+export const importStudyDossiersRoute = async (req: Request, res: Response) => {
+  const data = importStudySchema.parse(req.body);
+  if (JSON.stringify(data.content ?? null).length > 1024 * 1024) throw new AppError(400, 'Il contenuto supera la dimensione massima (1 MB).');
+  const { content, refused } = readableContent(data.content);
+  if (content.dossiers.length === 0) throw new AppError(400, 'Nessun dossier leggibile da aggiungere.');
+  await spendStudyImport(req.user!.id);
+  const report = await importStudyDossiers(req.user!.id, content, {
+    addNotes: data.addNotes,
+    addHighlights: data.addHighlights,
+    addShortcuts: false,
+    attributeTo: null,
+    refused,
+  });
+  res.status(201).json(report);
 };
 
 /**
