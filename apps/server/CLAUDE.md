@@ -147,10 +147,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   so a `PATCH` in flight finishes before the payload is read and one that comes
   after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
   saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
-  `/lingo/cards/trash` — the two dossier routes for exchanged tokens only,
-  whose own deletions in the web app stay immediate; the card trash is open to
-  the web app too: a deletion by the user's session is stored with no client,
-  no name and no grant (`DeletedBy` all null) and listed with
+  `/lingo/cards/trash` — the two dossier routes for exchanged tokens only; the card
+  trash is open to the web app too, and the web app's `DELETE /dossiers/:id` moves the
+  whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
+  once), whatever it holds (`trashDossier` with no `seenItemIds`), answering
+  `{ trashId, itemCount }` for the page's «Annulla»; the web app's removal of single
+  entries stays immediate. A deletion by the user's session is stored with no client,
+  no name and no grant (`BY_THE_USER`, `DeletedBy` all null) and listed with
   `byApplication: false`, while one through a connected application is
   `byApplication: true` even when its name is unknown. `GET /api/trash`,
   `POST /api/trash/:id/restore {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
@@ -442,7 +445,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   new slot or no new card left), and it is false for someone who never reviewed a card in scope.
   `lingo/streak.ts` `computeStreak` is the one definition of the streak: one missed day in seven
   is a rest (`REST_SPACING_DAYS`), today still open never breaks it. The grade's answer carries
-  `oggi: { ripassi, obiettivo, raggiunto, appenaRaggiunto, serie }` when the grade is recorded;
+  `oggi: { giorno, ripassi, obiettivo, raggiunto, appenaRaggiunto, serie }` when the grade is recorded;
   `appenaRaggiunto` is true on the one grade that made the day count. `GET /progressi?materia=`
   (`lingo/progress.ts`): `oggi`, `serie`, `stati` (new / learning / consolidated at
   `CONSOLIDATED_DAYS` = 21, `lingo/cardMaturity.ts`), `materie` (all five), `calendario`

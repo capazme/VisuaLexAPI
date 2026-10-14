@@ -45,7 +45,14 @@ async def _fetch_with_playwright(url: str) -> str:
             await browser.close()
 
 
-@cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer())
+def _no_tree(result):
+    """A failure (a blocked page, a timeout) or an empty tree: (message or [], 0[, {}]). Never kept
+    in memory, as the persistent cache never keeps it: the next caller asks the source again
+    instead of reading the failure for an hour."""
+    return isinstance(result, tuple) and len(result) >= 2 and result[1] == 0
+
+
+@cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer(), skip_cache_func=_no_tree)
 async def get_tree(normurn, link=False, details=False, return_metadata=False):
     """
     Recupera l'albero degli articoli da un URN normativo e ne estrae le informazioni.
@@ -439,7 +446,7 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
         result, count_articles = _walk_consolidated_tree(soup, normurn, link, details, eli_info)
         rubriche = _extract_eurlex_rubriche(soup)
         logging.info(f"Consolidated EUR-Lex tree: {count_articles} articles, {len(rubriche)} rubriche")
-        return result, count_articles, {"rubriche": rubriche}
+        return result, count_articles, {"rubriche": rubriche, "title": _extract_eurlex_title(soup)}
 
     # Pattern per identificare strutture gerarchiche
     title_pattern = re.compile(r'^(TITOLO|TITLE)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
@@ -524,7 +531,7 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     rubriche = _extract_eurlex_rubriche(soup)
     logging.info(f"EUR-Lex rubriche extracted: {len(rubriche)} of {count_articles} articles")
 
-    return result, count_articles, {"rubriche": rubriche}
+    return result, count_articles, {"rubriche": rubriche, "title": _extract_eurlex_title(soup)}
 
 
 _EURLEX_ARTICLE_NUM = re.compile(r"^(?:Articolo|Article)\s+([\w.-]+)", re.IGNORECASE)
@@ -644,6 +651,57 @@ def _extract_eurlex_rubriche(soup):
         if title:
             rubriche[match.group(1)] = title
     return rubriche
+
+
+# "del 27 aprile 2016", "dell'8 giugno 2000": the line between an act's name and its subject.
+_EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]", re.IGNORECASE)
+# The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …".
+_EURLEX_DESCRIPTION_SUBJECT = re.compile(
+    r",\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,\s*(.+)$", re.IGNORECASE | re.DOTALL)
+
+
+def _eurlex_subject(lines):
+    """The subject among a title's lines: what follows the date, without a note in brackets
+    such as "(Testo rilevante ai fini del SEE)"."""
+    lines = [strip_amendment_markers(line) for line in lines if line]
+    for i, line in enumerate(lines):
+        if _EURLEX_DATE_LINE.match(line):
+            lines = lines[i + 1:]
+            break
+    return " ".join(line for line in lines if not (line.startswith("(") and line.endswith(")")))
+
+
+def _extract_eurlex_title(soup):
+    """The act's title as Normattiva's `presentable_title` gives one: its subject ("relativo alla
+    protezione delle persone fisiche …"), without the act's name, its date or the EEA note, which
+    the dossier already shows in the act's heading. '' when the page does not say.
+
+    The OJ page names the act in `oj-doc-ti` lines inside `eli-main-title` (an annex's heading uses
+    the same class, so only the first consecutive run counts, and only when it holds the date); the
+    consolidated page in `title-doc-first` and
+    `title-doc-last` (printed twice, the first copy is enough); the legacy page in its
+    `DC.description` meta only.
+    """
+    container = soup.find(class_="eli-main-title")
+    first = (container or soup).find("p", class_="oj-doc-ti")
+    if first is not None:
+        run = [first]
+        for sibling in first.find_next_siblings():
+            if sibling.name != "p" or "oj-doc-ti" not in (sibling.get("class") or []):
+                break
+            run.append(sibling)
+        lines = [p.get_text(" ", strip=True) for p in run]
+        # The subject is what follows the date: without one (a Treaty's page), no title rather
+        # than the act's own name repeated under its heading.
+        if not any(_EURLEX_DATE_LINE.match(line) for line in lines):
+            return ""
+        return _eurlex_subject(lines)
+    last = soup.find("p", class_="title-doc-last")
+    if last is not None:
+        return _eurlex_subject([last.get_text(" ", strip=True)])
+    meta = soup.find("meta", attrs={"name": "DC.description"})
+    match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
+    return " ".join(match.group(1).split()) if match else ""
 
 
 def _extract_eli_info(normurn):

@@ -12,7 +12,7 @@ import { DossierItemReader } from '../dossier/DossierItemReader';
 import { formatInterval } from './formatInterval';
 import { GradeBar } from './GradeBar';
 import { ReviewCard } from './ReviewCard';
-import { Sheet } from './Sheet';
+import { Sheet } from '../../ui/Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import { SessionCelebration } from './progress/Celebration';
 import { SessionEndProgress } from './progress/SessionEndProgress';

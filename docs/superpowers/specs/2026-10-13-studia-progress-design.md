@@ -1,6 +1,6 @@
 # VisuaLex Studia — the streak and the progress dashboard
 
-**Status:** decided by the owner on 13 October 2026: the scope, the visual direction and the six interview points (§3). Decision 13, storing the days, waits for his answer (question 182, recommended); nothing that contains it is merged before it. No code yet.
+**Status:** decided by the owner: the scope, the visual direction and the six interview points on 13 October 2026, and decision 13, storing the days, on 14 October (question 182: «ok vai con le raccomandate»). The server is PR 1; the web app, PR 2, is in progress.
 **Builds on:** the Studia screens spec (`docs/superpowers/specs/2026-10-07-studia-cards-screens-design.md`): the review (PR C, decisions 7–9, 17, 18), its routes (`apps/server/src/routes/lingoSrs.ts`) and its screens (`ReviewHome`, `ReviewSession`).
 **Plan:** `docs/superpowers/plans/2026-10-13-studia-progress.md`.
 **Migration:** `20261022100000_lingo_study_days` (§5.1), assigned by the orchestrator.
@@ -57,7 +57,7 @@ Settled on 13 October:
 10. **One celebration a day** (O4), at the moment the goal closes; no sound; off under «riduci movimento».
 11. **Only reviews count** (O5); writing and validating cards wait for the daily challenges.
 12. **The calendar** (O6): 26 weeks on a computer, 12 on a phone.
-13. **The days are stored** (§5.1; awaiting the owner, question 182), one row per user and Rome day, written with each grade. Two reasons. Trashing a studied draft moves its review rows out of the log until it is restored, and a streak computed from the log alone would break backwards. And the log cannot say that a past day's queue was finished. A past day's row is frozen: changing N later does not rewrite it.
+13. **The days are stored** (§5.1; question 182, the owner on 14 October: «ok vai con le raccomandate»), one row per user and Rome day, written with each grade. Two reasons. Trashing a studied draft moves its review rows out of the log until it is restored, and a streak computed from the log alone would break backwards. And the log cannot say that a past day's queue was finished. A past day's row is frozen: changing N later does not rewrite it.
 
 ## 4. What the dashboard shows, and where each number comes from
 
@@ -128,19 +128,19 @@ Session only, like every `/api/lingo/srs` route, and not in the delegated table:
 }
 ```
 
-`materia` narrows `stati`, `calendario`'s counts and `prossimi`; `oggi`, `serie`, `valido` and `riposo` are always the whole day's, because the goal is.
+`materia` narrows `stati`, `calendario`'s counts, `prossimi`, and `oggi.dovute` and `oggi.nuove` (the band's sentence about the session «Inizia il ripasso» starts); `oggi.ripassi`, `obiettivo`, `raggiunto`, `serie`, `valido` and `riposo` are always the whole day's, because the goal is.
 
-The Rome day of a stored instant is computed in SQL as `(data_revisione AT TIME ZONE 'Europe/Rome')::date`, which agrees with `lingo/studyDay.ts` `romeDay`; the tests pin the two against each other across a daylight-saving night. The queries group by that day over the index `(utente_id, data_revisione)`; the calendar reads at most 26 weeks.
+The Rome day of a stored instant is computed in SQL as `((data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome')::date` (the column is a `TIMESTAMP` without a zone holding UTC), which agrees with `lingo/studyDay.ts` `romeDay`; the tests pin the two against each other across both daylight-saving nights. The log is read from 00:00 in Rome of the window's first day, as an instant, so the index `(utente_id, data_revisione)` bounds every scan: 30 days for `ripassi30`, 26 weeks for a subject's calendar.
 
 ### 5.3 The grade's answer
 
 `POST /api/lingo/srs/revisioni` adds to its answer, when the grade was recorded:
 
 ```jsonc
-"oggi": { "ripassi": 20, "obiettivo": 20, "raggiunto": true, "appenaRaggiunto": true, "serie": 13 }
+"oggi": { "giorno": "2026-10-13", "ripassi": 20, "obiettivo": 20, "raggiunto": true, "appenaRaggiunto": true, "serie": 13 }
 ```
 
-`appenaRaggiunto` is true on the one grade that closed the goal (the count before was under it), so the session celebrates at that moment and only then, also across two devices. Additive: nothing that reads the answer today changes.
+`appenaRaggiunto` is true on the one grade that made the day count (it did not before), so the session celebrates at that moment, also across two devices. Raising N after the goal was met makes the day not count again, and the grade that reaches the new N says `appenaRaggiunto` again; the web app still celebrates once a day (decision 10) by remembering the day it celebrated (§6.4). Additive: nothing that reads the answer today changes.
 
 ### 5.4 The preferences
 
@@ -196,7 +196,7 @@ States: while reading, a skeleton of the band and the panels at their final size
 
 ### 6.4 The session
 
-- When a grade's answer says `appenaRaggiunto`, the celebration plays in a layer above the session header, never over the card or the grade bar, without moving focus; the keys keep working. Under reduced motion, a one-line status: «Obiettivo di oggi raggiunto · serie di 13 giorni».
+- When a grade's answer says `appenaRaggiunto` and this browser has not celebrated today, the celebration plays in a layer above the session header, never over the card or the grade bar, without moving focus; the keys keep working. Under reduced motion, a one-line status: «Obiettivo di oggi raggiunto · serie di 13 giorni».
 - The end screen keeps its sentence and adds the ring and the streak as they are now.
 - Back on the home after a celebration, the stamp is there at rest; the home plays the celebration itself only when the goal was met today and this browser has not celebrated today (a `localStorage` key per day: a per-browser convenience, never the source of the streak).
 

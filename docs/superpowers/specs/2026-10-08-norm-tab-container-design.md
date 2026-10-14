@@ -381,7 +381,8 @@ height, and the windows beside it (§4). No floating panel.
 `ConfirmDialog`: «Gli atti e le sentenze della pratica verranno tolti dal tavolo. Dossier, note ed
 evidenziazioni non saranno toccati.»). While a search streams into the practice, today's inline
 progress bar sits under the header. An empty practice says «Pratica vuota» and offers «Cerca una
-norma o una sentenza» (opens the palette).
+norma o una sentenza» (opens the palette; *since 13 October 2026 it puts the cursor in the search page's fixed
+field: `2026-10-13-fixed-search-design.md` F7*).
 
 **3.2 The act block** (`PracticeActBlock`), shaped like the dossier's `DossierActBlock`:
 - **Heading**: drag handle (acts reorder with `@dnd-kit`, pointer and keyboard sensors, as the
@@ -642,7 +643,10 @@ name and the version suffix, instead of every tab's.
 
 **6.9 The palette** keeps every action: a norm search (§5.1), «Apri l'indice e sfoglia» (§5.1), a
 decision (§6.2), a topic (a `decision-search` window on the desktop, the full-screen reader on a
-phone, T8), aliases and quick norms untouched.
+phone, T8), aliases and quick norms untouched. *Since 13 October 2026 it is no longer the main door:
+the search page has a fixed field that reads the same words (a decision, a norm, a topic), and the
+palette is ⌘K, mounted on every page; what it opens from another page brings the reader to `/`
+(`2026-10-13-fixed-search-design.md`).*
 
 **6.10 The dossier's «Apri tutto»** (gotcha 15): §5.1. `searchesForGroups` keeps its signature; the
 callback returns the one practice's id for every group. P6 renames `SearchParams.targetTabId` to

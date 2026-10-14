@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Git flow.** PR 1 on `feat/studia-progress` (this worktree, off `origin/develop`), with the spec and this plan. PR 2 on `feat/studia-progress-web`, branched from PR 1's head and retargeted to `develop` once PR 1 is merged. Each goes into `develop` with a merge commit `merge: <branch> — <what changes>` at green CI. The orchestrator's brief, for the owner: «PRs: into `develop`; merge commit `merge: <branch> — <what changes>` at green CI. `main`, tags and releases are Guglielmo's. Never merge while a question to Guglielmo about that PR is open.» Quote it in every subagent dispatch that commits.
-- **The open question.** Spec D13 (storing the days) waits for the owner's answer to question 182. Nothing containing the migration is merged before it; PR 2 depends on PR 1 and waits too.
+- **The open question, answered.** Spec D13 (storing the days) waited for the owner's answer to question 182; on 14 October: «ok vai con le raccomandate». PR 2 builds on PR 1.
 - **The migration** is `20261022100000_lingo_study_days`, assigned by the orchestrator. Written by hand (`prisma migrate diff` from a copy of the old schema saved in the scratch directory), applied with `migrate deploy` to this session's test database only, never `migrate dev`, `reset` by hand or `prisma format`. The orchestrator applies it to the development database after the merge.
 - **Server tests** run against this session's own database, `visualex_test_studia_progressi`, in the development Postgres: inside the `dotenv -e .env.test` wrapper only the database name of `DATABASE_URL` is rewritten, by a shell substitution that never prints the URL. Never read or print a `.env` file. Drop the database at the end of the round.
 - **Machine load:** `uptime` before a suite; above about 10, no full suite. One suite at a time, nothing left in the background.
@@ -133,12 +133,14 @@ Rule (spec D8): walk forward from the earliest counted day to today. A counted d
 /** Inside the grade's transaction, after the log row: count the grade into today's row and say whether the day counts now. */
 export async function recordGradeDay(tx: Prisma.TransactionClient, userId: string, today: string, grade: { isNew: boolean; wrong: boolean }): Promise<{ ripassi: number; obiettivo: number; before: boolean; after: boolean }>;
 /** On a read of today's session or progress: an empty queue makes today a counted day (spec D7). Idempotent. */
-export async function markEmptyDay(db: Prisma.TransactionClient | PrismaClient, userId: string, today: string): Promise<void>;
+export async function markQueueFinished(db: Prisma.TransactionClient, userId: string, today: string): Promise<void>;
+/** After the review goal changed: today's `valido` by the new goal; past days untouched. */
+export async function recountToday(db: Prisma.TransactionClient, userId: string, today: string, goal: number): Promise<void>;
 export function dayToDate(day: string): Date;   // 'YYYY-MM-DD' → the Date Prisma maps to a DATE (UTC midnight)
 export function dateToDay(date: Date): string;  // the inverse, read in UTC, never through romeDay
 ```
 
-`recordGradeDay`, in order: `INSERT … ON CONFLICT ("utente_id", "giorno") DO NOTHING` (raw SQL); `SELECT "valido" … FOR UPDATE` (the row lock serialises a user's grades of the day); `queueFinished`; one `UPDATE` adding the counters and setting `coda_finita = coda_finita OR $finished` and `valido = ripassi + 1 >= $N OR coda_finita OR $finished`, `RETURNING` the new values. The grade route calls it inside its transaction only when the grade is recorded; after the transaction it reads the counted days and calls `computeStreak` for `serie`. `markEmptyDay` is an `INSERT … ON CONFLICT DO NOTHING` with the two flags true, called by `GET /sessione` when `dovute` and `nuove` are both zero and no subject narrows it.
+`recordGradeDay`, in order: `INSERT … ON CONFLICT ("utente_id", "giorno") DO NOTHING` (raw SQL); `SELECT "valido" … FOR UPDATE` (the row lock serialises a user's grades of the day); `queueFinished`; one `UPDATE` adding the counters and setting `coda_finita = coda_finita OR $finished` and `valido = ripassi + 1 >= $N OR coda_finita OR $finished`, `RETURNING` the new values. The grade route calls it inside its transaction only when the grade is recorded; after the transaction it reads the counted days and calls `computeStreak` for `serie`. `markQueueFinished` is an upsert setting the two flags true (a row with reviews gets them too), called by `GET /sessione` when `dovute` and `nuove` are both zero, no subject narrows it and `queueFinished` agrees (false for someone who never reviewed a card in scope); `PUT /preferenze` with `ripassiAlGiorno` calls `recountToday`.
 - [ ] **Step 4:** Run the file's tests; commit `feat(server): each recorded grade counts into the day; the grade says when the goal closes`.
 
 ### Task 4: `GET /api/lingo/srs/progressi`
@@ -150,7 +152,7 @@ export function dateToDay(date: Date): string;  // the inverse, read in UTC, nev
 
 The answer is spec §5.2's shape. Where each part comes from:
 
-- `oggi`: today's row (or zeros), `obiettivo` the current N, `raggiunto = ripassi >= N || codaFinita || queueFinished(now)`; an empty queue calls `markEmptyDay`. `dovute` and `nuove` are the session's counts for the subject asked (the home shows them in its sentence).
+- `oggi`: today's row (or zeros), `obiettivo` the current N, `raggiunto = ripassi >= N || codaFinita || queueFinished(now)`; a finished queue calls `markQueueFinished`. `dovute` and `nuove` are the session's counts for the subject asked (the home shows them in its sentence).
 - `serie`: `computeStreak` over the stored counted days, with today as just computed.
 - `stati`, `materie`, `prossimi`: one `findMany` of the state rows in scope (`select: { dueAt, lastReviewAt, card: { select: { materia } } }`), split in TypeScript with `cardMaturity.ts` (`CONSOLIDATED_DAYS = 21`; the interval is `daysBetween(romeDay(lastReviewAt), romeDay(dueAt))`), and one `lingoCard.groupBy({ by: ['materia'] })` of the new cards in scope. `prossimi`: 14 days from today, overdue counted today.
 - `materie[].ripassi30`: the log of the last 30 Rome days joined to the card's subject, grouped by subject, in SQL with the review-focus expression.
@@ -166,8 +168,8 @@ The answer is spec §5.2's shape. Where each part comes from:
 - Test: `apps/server/tests/lingoAccountErasure.test.ts`, the export's test, `apps/server/tests/trash*.test.ts` (whichever holds the card trash round trip)
 
 - [ ] **Step 1: Failing tests:** `GET /auth/export` carries `data.lingoGiornate` (day as 'YYYY-MM-DD', the three counts, the two flags), and `data.lingoPreferenze` gains `ripassiAlGiorno`; `DELETE /auth/account` leaves no `lingo_giornate_studio` row; trashing a studied draft and restoring it leaves every stored day byte for byte as before (review focus 4).
-- [ ] **Step 2:** Implement the export. Update `apps/server/CLAUDE.md`: the «Card review» paragraph (`/progressi`, the grade's `oggi`, `ripassiAlGiorno`, the stored days, `markEmptyDay`), «LingoLex cards» (the export key, the cascade), and the Rome-day SQL gotcha.
-- [ ] **Step 3:** Full server suite and build; `code-reviewer` over the branch; fix every finding; push; open PR 1. **Do not merge before the answer to question 182.**
+- [ ] **Step 2:** Implement the export. Update `apps/server/CLAUDE.md`: the «Card review» paragraph (`/progressi`, the grade's `oggi`, `ripassiAlGiorno`, the stored days, `markQueueFinished`, `recountToday`), «LingoLex cards» (the export key, the cascade), and the Rome-day SQL gotcha.
+- [ ] **Step 3:** Full server suite and build; `code-reviewer` over the branch; fix every finding; push; open PR 1. Merge it at green CI (question 182 answered on 14 October).
 
 ---
 
@@ -218,7 +220,7 @@ The answer is spec §5.2's shape. Where each part comes from:
 - [ ] Update `apps/web/CLAUDE.md`'s «Card review» paragraph (the dashboard, the chips, the celebration, the stored subject key).
 - [ ] Web suite, build, lint; `code-reviewer` over the branch against the spec and this plan; fix every finding.
 - [ ] **Browser pass** without touching the shared stack: the branch's server on port 3011 against this session's test database and the branch's web app on 5175 through an untracked `vite.config.*.mts` that overrides the `/api` proxy and `cacheDir`; a test account registered there and activated by the orchestrator; review history made by grading under the app (a few days of history seeded through the grade route with a moved clock, or by SQL on the test database only). In an isolated browser context opened by this session, closed at the end: desktop and 390 px, light and dark, reduced motion on and off; the ring filling, the celebration in the session and on the home, the calendar's keyboard, hover and tap readouts, the subject filter, the settings. Screenshots to the orchestrator.
-- [ ] Push; open PR 2 (base `feat/studia-progress` until PR 1 is merged, then `develop`). Merge only after PR 1 and the answer to question 182.
+- [ ] Push; open PR 2 (base `feat/studia-progress` until PR 1 is merged, then `develop`). Merge only after PR 1.
 
 ---
 

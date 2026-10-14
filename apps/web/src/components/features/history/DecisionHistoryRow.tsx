@@ -5,11 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { SearchHistoryItem } from '../../../services/historyService';
-import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
+import { decisionHistoryLabel, decisionPath, identityFromKey } from '../../../utils/decisionLinks';
+import { DecisionPreviewDialog } from '../decisions/DecisionPreviewDialog';
+import { useListDecisionPreview } from '../decisions/useListDecisionPreview';
 
 /**
  * A decision in the Cronologia: its short citation, a fixed slate stripe (no act type to colour it),
- * and a click that reopens it in the workspace. A key that no longer reads is shown as "Sentenza",
+ * and a click that opens its preview, whose «Apri la sentenza» reopens it in the workspace. A key that no longer reads is shown as "Sentenza",
  * logged, and not clickable: there is nothing to open.
  */
 export function DecisionHistoryRow({ item, variant, onDelete, id }: {
@@ -22,6 +24,7 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
   const openDecision = useAppStore((s) => s.openDecision);
   const key = item.decision_key ?? '';
   const identity = identityFromKey(key);
+  const { preview, anchorRef, toggle } = useListDecisionPreview();
 
   const open = () => {
     if (!identity) return;
@@ -44,7 +47,9 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
         {identity ? (
           <button
             type="button"
-            onClick={open}
+            onClick={(e) => toggle(e.currentTarget, identity, decisionPath(identity))}
+            aria-haspopup="dialog"
+            aria-expanded={preview.isVisible}
             className="flex-1 min-w-0 min-h-[44px] flex items-center gap-2 text-left rounded-lg hover:text-blue-700 dark:hover:text-blue-300"
           >
             <Gavel size={16} aria-hidden className="text-slate-500 flex-shrink-0" />
@@ -68,6 +73,9 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
           <Trash2 size={16} />
         </button>
       </div>
+      {preview.isVisible && (
+        <DecisionPreviewDialog preview={preview} anchorRef={anchorRef} onOpen={open} openLabel="Apri la sentenza" />
+      )}
     </div>
   );
 }

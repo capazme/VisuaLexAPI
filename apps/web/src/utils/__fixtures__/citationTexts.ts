@@ -43,4 +43,17 @@ export const CITATION_TEXTS = {
   decisionAndAct:
     'La legge n. 219 del 2017, la l. n. 219/2017 e la legge n. 219 del 22 dicembre 2017 non sono una sentenza; ' +
     'lo è Cass. n. 219/2017, come la n. 219 del 2017 della Sezione lavoro.',
+  /** A decision cited date first, in the forms courts use, and what it must not be. */
+  decisionDateFirst:
+    'Lo afferma Cass. 12 aprile 2018, n. 8980, come Cass., sez. III, 12 aprile 2018, n. 8980, la sent. 12.4.2018 n. 8980 ' +
+    'e Cass. civ., 12/04/2018, n. 8980. Non sono la stessa decisione Cass. 12 aprile 2019, n. 8980, Cass. 12 aprile 2018, ' +
+    'n. 89801, Cass. 12 aprile 2018, n. 898, Cass. 12 aprile 2018, n. 8980/2019, Cass. 12 aprile 2018, n. 8980 del 2019 ' +
+    'né Cass. 12 aprile 2018 (n. 8980), Cass. 112 aprile 2018, n. 8980 o Cass. 1/12/04/2018, n. 8980. Un atto non è ' +
+    'una sentenza: la legge 12 aprile 2018, n. 8980, il d.lgs. 12 aprile 2018, n. 8980, il decreto 12 aprile 2018, n. 8980.',
+  /** An article and its act, linked through the article's ordinal comma, «commi» or «e ss.». */
+  codeLinks:
+    "L'art. 2043 del c.c. e l'art. 2043, primo comma, c.c.; l'art. 2043 e ss. c.c., l'art. 2043, commi 2 e 3, del cod. " +
+    "civ. e l'art. 2043, secondo e terzo comma, del codice civile; l'art. 2043 della Costituzione non è l'art. 2043 " +
+    "della Cost.; non lo sono l'art. 2044 del c.c., l'art. 2043 del c.p.c., l'art. 2043 del c.p., l'art. 2043 del " +
+    "d.lgs. 5/2020, l'art. 2043 dello Statuto, né l'art. 2043 del c.c.i. o del c.c.n.l.",
 } as const;
