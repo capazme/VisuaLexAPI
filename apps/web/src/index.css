@@ -345,11 +345,12 @@
 }
 
 /* A column of the practice's row beside its windows: the page's height less the content area's
-   padding above and below it (`p-8`, 2 rem each, in `Layout`), so the scroller's content is never
+   padding above and below it (`p-8`, 2 rem each, in `Layout`) and less the search page's field
+   (`--search-bar-height`, set by `Layout` while the field is drawn), so the scroller's content is never
    taller than the scroller and a `scrollIntoView` inside a window does not move the page. */
 @utility h-app-row {
-  height: calc(100vh - 4rem);
-  height: calc(100dvh - 4rem);
+  height: calc(100vh - 4rem - var(--search-bar-height, 0px));
+  height: calc(100dvh - 4rem - var(--search-bar-height, 0px));
 }
 
 /* ═══════════════════════════════════════════════════════════

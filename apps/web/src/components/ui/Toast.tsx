@@ -59,9 +59,11 @@ export function Toast({
     warning: 'bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-900/30 text-slate-800 dark:text-slate-100 shadow-lg shadow-amber-500/5',
   };
 
+  // On a phone the width less a 16px gutter: a centring translate would be overwritten by the
+  // motion's own transform, and `left-1/2` alone squeezed a message into half the screen.
   const positionStyles = position === 'top'
-    ? 'top-4 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:top-4 md:right-4'
-    : 'bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:bottom-8 md:right-8';
+    ? 'top-4 inset-x-4 md:inset-x-auto md:top-4 md:right-4'
+    : 'bottom-4 inset-x-4 md:inset-x-auto md:bottom-8 md:right-8';
 
   return (
     <AnimatePresence>
@@ -72,7 +74,7 @@ export function Toast({
           exit={{ opacity: 0, y: position === 'top' ? -20 : 20, scale: 0.95 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className={cn(
-            'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-md',
+            'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border md:max-w-md',
             positionStyles,
             styles[type],
             className
@@ -128,8 +130,9 @@ export function UndoToastContainer() {
         exit={{ opacity: 0, y: 20, scale: 0.95 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className={cn(
-          'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-md',
-          'bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:bottom-8 md:right-8',
+          // The same placement as the plain toast's (above).
+          'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border md:max-w-md',
+          'bottom-4 inset-x-4 md:inset-x-auto md:bottom-8 md:right-8',
           'bg-slate-900 dark:bg-white border-slate-700 dark:border-slate-200',
           'text-white dark:text-slate-900 shadow-lg'
         )}

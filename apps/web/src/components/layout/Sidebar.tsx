@@ -8,7 +8,7 @@ import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { isStudiaEnabled } from '../../features/studia/featureFlag';
 import { useAppStore } from '../../store/useAppStore';
-import { useShallow } from 'zustand/react/shallow';
+import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
 import { Z_INDEX } from '../../constants/zIndex';
@@ -34,6 +34,26 @@ interface NavItemProps {
 }
 
 const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
+
+/** The unread "a saved norm changed" notifications, as words: the avatar's name and the menu's entry carry them. */
+function normaChangesLabel(count: number): string {
+  return count === 1 ? '1 norma salvata cambiata' : `${count} norme salvate cambiate`;
+}
+
+/** A count drawn on a control; the control's name says what it counts. */
+function CountBadge({ count, className }: { count: number; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none',
+        className,
+      )}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
 
 // Spring config for smooth animations
 const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
@@ -113,7 +133,6 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
-  const badgeLabel = (badgeCount ?? 0) > 99 ? '99+' : String(badgeCount);
 
   // The whole control is an icon, and `label` only ever reached the eye — the
   // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
@@ -169,14 +188,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
           )}
 
           {/* Notification badge */}
-          {showBadge && (
-            <span
-              aria-hidden
-              className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none ring-2 ring-white dark:ring-slate-900"
-            >
-              {badgeLabel}
-            </span>
-          )}
+          {showBadge && <CountBadge count={badgeCount ?? 0} className="absolute top-1 right-1 ring-2 ring-white dark:ring-slate-900" />}
 
           {/* Tooltip - hidden on mobile */}
           <AnimatePresence>
@@ -190,12 +202,12 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
 
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts }: SidebarProps) {
   const navigate = useNavigate();
-  const { openCommandPalette, quickNorms } = useAppStore(useShallow(s => ({
-    openCommandPalette: s.openCommandPalette,
-    quickNorms: s.quickNorms,
-  })));
+  const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, devMode, logout } = useAuth();
   const { count: forumNotifications } = useForumNotifications(!!user);
+  // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
+  // counted on the avatar and beside the entry («ok come raccomandi»).
+  const normaChanges = forumNotifications.normaChanges ?? 0;
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -213,10 +225,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     }
   }, [showUserMenu]);
 
-  // «Ricerca» is the search space and the palette (⌘K) together: decisions are not a page, they
-  // are found through the palette, which lives in the search space. The link itself navigates.
+  // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
+  // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
   const handleSearchClick = () => {
-    openCommandPalette();
+    focusSearchField({}, { wait: true });
     closeMobile();
   };
 
@@ -331,7 +343,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {isStudiaEnabled() && (
           <NavItem to="/studia" icon={GraduationCap} label="Studia" id="tour-nav-studia" onClick={closeMobile} />
         )}
-        <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} badgeCount={forumNotifications.normaChanges} />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
@@ -349,7 +360,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       <div className="flex flex-col items-center py-4 border-t border-slate-100 dark:border-slate-800/50">
         <button
           ref={userButtonRef}
-          aria-label="Menu utente"
+          aria-label={normaChanges > 0 ? `Menu utente, ${normaChangesLabel(normaChanges)}` : 'Menu utente'}
           aria-haspopup="menu"
           aria-expanded={showUserMenu}
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
@@ -375,6 +386,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           >
             {user?.username?.charAt(0).toUpperCase() || 'U'}
           </motion.div>
+          {normaChanges > 0 && <CountBadge count={normaChanges} className="absolute top-0 right-0 ring-2 ring-white dark:ring-slate-900" />}
         </button>
 
         {/* User Dropdown Menu - rendered via Portal */}
@@ -413,6 +425,18 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openSettings)} className={menuItemClass}>
                   <Settings size={16} />
                   Impostazioni
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={fromMenu(() => navigate('/history'))}
+                  aria-label={normaChanges > 0 ? `Cronologia, ${normaChangesLabel(normaChanges)}` : undefined}
+                  className={menuItemClass}
+                >
+                  <Clock size={16} />
+                  <span className="flex-1 text-left">Cronologia</span>
+                  {normaChanges > 0 && <CountBadge count={normaChanges} />}
                 </button>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/collega-app'))} className={menuItemClass}>
                   <Bot size={16} />

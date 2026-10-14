@@ -78,8 +78,8 @@ describe('the page height', () => {
 });
 
 describe('the practice row\'s columns', () => {
-  it('are the page height less the 4 rem of Layout\'s content padding, in dynamic viewport units with a 100vh fallback', async () => {
+  it('are the page height less the 4 rem of Layout\'s content padding and the search page\'s field, in dynamic viewport units with a 100vh fallback', async () => {
     const css = await compile(['h-app-row']);
-    expect(css).toMatch(/\.h-app-row\s*\{\s*height:\s*calc\(100vh - 4rem\);\s*height:\s*calc\(100dvh - 4rem\);?\s*\}/);
+    expect(css).toMatch(/\.h-app-row\s*\{\s*height:\s*calc\(100vh - 4rem - var\(--search-bar-height, 0px\)\);\s*height:\s*calc\(100dvh - 4rem - var\(--search-bar-height, 0px\)\);?\s*\}/);
   }, 30000);
 });

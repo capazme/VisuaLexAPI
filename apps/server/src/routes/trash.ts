@@ -7,8 +7,10 @@ import { listTrash, purgeTrashEntry, restoreTrashEntry, trashDossier, trashDossi
 /**
  * The trash (MCP second round, spec §4.3). Two kinds of route:
  * - moving to the trash, for connected applications only (delegated table,
- *   `content:delete`): the web app keeps its own immediate deletion (S10) —
- *   except for study cards, which the web app moves too (`POST /lingo/cards/trash`);
+ *   `content:delete`). The web app moves a whole dossier through its own
+ *   `DELETE /dossiers/:id` and study cards through `POST /lingo/cards/trash`;
+ *   its removal of single entries stays immediate, with an undo (S10, as
+ *   amended on 13 October 2026);
  * - listing, restoring and emptying, for the user's session only: none of
  *   them is in the delegated table, so a connected application gets 403.
  */
@@ -22,7 +24,7 @@ const restoreSchema = z.object({ targetDossierId: z.string().min(1).max(64).opti
 
 /** Who is deleting; only a connected application moves things to the trash. */
 function deletedBy(req: Request): DeletedBy {
-  if (!req.delegation) throw new AppError(403, 'Il cestino raccoglie solo ciò che eliminano le applicazioni collegate.');
+  if (!req.delegation) throw new AppError(403, 'Queste rotte sono per le applicazioni collegate.');
   return { clientId: req.delegation.clientId, clientName: req.delegation.clientName, grantId: req.delegation.grantId };
 }
 

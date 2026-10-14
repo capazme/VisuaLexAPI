@@ -24,17 +24,20 @@ afterEach(() => {
   act(() => closeFindWindow());
 });
 
+// The find window, by its name: the search page also draws its own search field.
+const FIND = { name: 'Cerca nel testo' };
+
 const press = (init: KeyboardEventInit) => fireEvent.keyDown(window, { key: 'f', ...init });
 
 describe('Layout — Cmd/Ctrl+F', () => {
   it('opens the find window with its field focused, on Cmd and on Ctrl', () => {
     render(<MemoryRouter><Layout /></MemoryRouter>);
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(screen.queryByRole('search', FIND)).not.toBeInTheDocument();
     press({ metaKey: true });
     expect(screen.getByRole('searchbox', { name: 'Cerca nel testo' })).toHaveFocus();
     act(() => closeFindWindow());
     press({ ctrlKey: true });
-    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(screen.getByRole('search', FIND)).toBeInTheDocument();
   });
 
   it('keeps the browser\'s own find away', () => {
@@ -49,7 +52,7 @@ describe('Layout — Cmd/Ctrl+F', () => {
   it('pressed again, focuses the field and selects the query', () => {
     render(<MemoryRouter><Layout /></MemoryRouter>);
     press({ metaKey: true });
-    const field = screen.getByRole('searchbox') as HTMLInputElement;
+    const field = screen.getByRole('searchbox', FIND) as HTMLInputElement;
     fireEvent.change(field, { target: { value: 'fatto' } });
     screen.getByRole('button', { name: 'Chiudi la ricerca' }).focus();
     press({ metaKey: true });
@@ -67,7 +70,7 @@ describe('Layout — Cmd/Ctrl+F', () => {
       window.dispatchEvent(event);
     });
     expect(event.defaultPrevented).toBe(false);
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(screen.queryByRole('search', FIND)).not.toBeInTheDocument();
     overlay.remove();
   });
 
@@ -78,7 +81,7 @@ describe('Layout — Cmd/Ctrl+F', () => {
       window.dispatchEvent(event);
     });
     expect(event.defaultPrevented).toBe(false);
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(screen.queryByRole('search', FIND)).not.toBeInTheDocument();
   });
 
   it('closes the window when the reader leaves the search page', () => {
@@ -93,10 +96,10 @@ describe('Layout — Cmd/Ctrl+F', () => {
       </MemoryRouter>,
     );
     press({ metaKey: true });
-    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(screen.getByRole('search', FIND)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Dossier' }));
     expect(screen.getByText('I miei dossier')).toBeInTheDocument();
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(screen.queryByRole('search', FIND)).not.toBeInTheDocument();
   });
 
   it('leaves the browser\'s own find alone under a modal overlay', () => {
@@ -109,9 +112,9 @@ describe('Layout — Cmd/Ctrl+F', () => {
       window.dispatchEvent(event);
     });
     expect(event.defaultPrevented).toBe(false);
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    expect(screen.queryByRole('search', FIND)).not.toBeInTheDocument();
     overlay.remove();
     press({ ctrlKey: true });
-    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(screen.getByRole('search', FIND)).toBeInTheDocument();
   });
 });
