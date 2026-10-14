@@ -77,7 +77,8 @@ describe('«Aggiungi ai miei dossier»: a Forum download', () => {
     expect(res.body.notes).toEqual({ added: 2, skipped: 0 });
     // The highlight without a position cannot be anchored: skipped and counted.
     expect(res.body.highlights).toEqual({ added: 1, skipped: 1 });
-    const notes = await prisma.annotation.findMany({ where: { userId: bob.id }, orderBy: { content: 'asc' } });
+    // Ordered here, not by the database: its collation of upper and lower case differs between machines.
+    const notes = (await prisma.annotation.findMany({ where: { userId: bob.id } })).sort((a, b) => a.normaKey.localeCompare(b.normaKey));
     expect(notes.map((n) => [n.normaKey, n.content, n.textContext, n.position, n.originalAuthorId])).toEqual([
       [`${NORM_KEY}::art::2043`, NOTE_TEXT, ANCHOR, 7, alice.id],
       [`${DECISION_KEY}::art::`, 'sulla sentenza', null, null, alice.id],
