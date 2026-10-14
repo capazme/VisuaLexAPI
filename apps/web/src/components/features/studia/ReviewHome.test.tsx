@@ -17,6 +17,12 @@ const savePreferences = vi.mocked(studiaService.savePreferences);
 
 const STORAGE_KEY = 'visualex.studia.ripasso.materia';
 
+/** A 2D context that draws nothing, so a burst runs its course in jsdom. */
+function fakeContext(): CanvasRenderingContext2D {
+  const noop = () => {};
+  return { scale: noop, clearRect: noop, save: noop, restore: noop, translate: noop, rotate: noop, fillText: noop, globalAlpha: 1, fillStyle: '', font: '' } as unknown as CanvasRenderingContext2D;
+}
+
 /** A dashboard answer: `dovute` and `nuove` today, the goal's state, a little history. */
 function answer(dovute: number, nuove: number, over: Partial<Progressi['oggi']> = {}, serie = 4): Progressi {
   return {
@@ -146,6 +152,38 @@ describe('ReviewHome', () => {
     expect(screen.getByRole('button', { name: 'Inizia il ripasso' })).toBeEnabled();
   });
 
+  it('speaks of the first day of the streak to someone who has none yet', async () => {
+    progress.mockResolvedValue(answer(18, 20, { ripassi: 0 }, 0));
+    const first = answer(18, 20, { ripassi: 0 }, 0);
+    first.serie.record = 0;
+    progress.mockResolvedValue(first);
+    renderHome();
+    expect(await screen.findByText('Il primo giorno comincia oggi')).toBeInTheDocument();
+    expect(screen.getByText('Ancora 10 ripassi per il primo giorno della serie.')).toBeInTheDocument();
+  });
+
+  it('says a subject has nothing left, and never asks to finish the day from one subject’s counts', async () => {
+    progress.mockResolvedValue(answer(5, 5));
+    renderHome();
+    await screen.findByText('Oggi: 5 da ripassare · 5 nuove');
+    progress.mockResolvedValue(answer(0, 0, { ripassi: 2 }));
+    await userEvent.setup().click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
+    expect(await screen.findByText('Niente da ripassare in questa materia, per oggi.')).toBeInTheDocument();
+    expect(screen.getByText('Ancora 8 ripassi per tenere viva la serie.')).toBeInTheDocument();
+  });
+
+  it('holds the panels’ places while the first read travels, and stops pulsing when it fails', async () => {
+    let fail: (reason: unknown) => void = () => {};
+    progress.mockReturnValue(new Promise((_, reject) => { fail = reject; }));
+    const { container } = renderHome();
+    expect(screen.getByText('Carico i tuoi progressi…')).toBeInTheDocument();
+    expect(container.querySelectorAll('.motion-safe\\:animate-pulse').length).toBeGreaterThan(2);
+    fail(new Error('down'));
+    expect(await screen.findByText('I tuoi progressi non sono disponibili, per ora.')).toBeInTheDocument();
+    expect(container.querySelectorAll('.motion-safe\\:animate-pulse')).toHaveLength(0);
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
   it('tells someone with no card yet where to begin', async () => {
     const empty = answer(0, 0, { ripassi: 0 }, 0);
     empty.stati = { nuove: 0, apprendimento: 0, consolidate: 0 };
@@ -232,6 +270,50 @@ describe('ReviewHome', () => {
       expect(await screen.findByTestId('goal-stamp')).toBeInTheDocument();
       expect(container.querySelector('canvas')).toBeNull();
       expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    it('marks the day as the burst begins, so leaving halfway does not replay it', async () => {
+      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+      const { container, unmount } = renderHome();
+      await screen.findByTestId('goal-stamp');
+      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
+      unmount();
+
+      const again = renderHome();
+      expect(await screen.findByTestId('goal-stamp')).toBeInTheDocument();
+      expect(again.container.querySelector('canvas')).toBeNull();
+    });
+
+    it('keeps the burst through a new read (a subject chosen halfway), and takes the canvas away after 1.5 s', async () => {
+      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+      const { container } = renderHome();
+      await screen.findByTestId('goal-stamp');
+      const canvas = container.querySelector('canvas');
+      expect(canvas).not.toBeNull();
+      await userEvent.setup().click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
+      expect(container.querySelector('canvas')).toBe(canvas);
+      await waitFor(() => expect(container.querySelector('canvas')).toBeNull(), { timeout: 3000 });
+    });
+
+    it('moves nothing under reduced motion: no canvas, the stamp at rest, the day still marked', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes('reduce'), media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+        addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+        const { container } = renderHome();
+        await screen.findByTestId('goal-stamp');
+        await waitFor(() => expect(container.querySelector('canvas')).toBeNull());
+        expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalled();
+        expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
+      } finally {
+        window.matchMedia = original;
+      }
     });
 
     it('shows no stamp before the goal', async () => {

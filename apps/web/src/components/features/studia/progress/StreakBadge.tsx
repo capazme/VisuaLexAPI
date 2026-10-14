@@ -10,6 +10,8 @@ export interface StreakBadgeProps {
   attuale: number;
   record: number;
   ultimiGiorni: { giorno: string; stato: StatoGiorno }[];
+  /** The celebration: the count pops, as when it grows. */
+  pop?: boolean;
 }
 
 const DAY_STATE_LABEL: Record<StatoGiorno, string> = {
@@ -25,11 +27,12 @@ const DAY_STATE_LABEL: Record<StatoGiorno, string> = {
  * counted, dashed for a rest, empty for a missed day, outlined for today. The count pops when it grows;
  * under reduced motion nothing moves.
  */
-export function StreakBadge({ attuale, record, ultimiGiorni }: StreakBadgeProps) {
+export function StreakBadge({ attuale, record, ultimiGiorni, pop = false }: StreakBadgeProps) {
   const reduce = useReducedMotion();
   // The count pops only when it changes, never when it first appears.
   const [firstCount] = useState(attuale);
-  const grew = attuale !== firstCount;
+  const grew = attuale !== firstCount || pop;
+  const firstDay = attuale === 0 && record === 0;
 
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={`Serie: ${attuale} ${attuale === 1 ? 'giorno' : 'giorni'} di fila, record ${record}`}>
@@ -46,7 +49,7 @@ export function StreakBadge({ attuale, record, ultimiGiorni }: StreakBadgeProps)
         </span>
         <div className="min-w-0" aria-hidden>
           <motion.span
-            key={attuale}
+            key={`${attuale}-${pop}`}
             initial={grew && !reduce ? { scale: 1.35 } : false}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 420, damping: 14 }}
@@ -55,7 +58,7 @@ export function StreakBadge({ attuale, record, ultimiGiorni }: StreakBadgeProps)
             {attuale}
           </motion.span>
           <p className={cn('text-xs', MUTED_TEXT)}>
-            {attuale === 1 ? 'giorno' : 'giorni'} di fila · record {record}
+            {firstDay ? 'Il primo giorno comincia oggi' : `${attuale === 1 ? 'giorno' : 'giorni'} di fila · record ${record}`}
           </p>
         </div>
       </div>

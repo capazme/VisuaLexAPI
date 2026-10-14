@@ -107,8 +107,10 @@ export function ReviewSession() {
   const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet } =
     useReviewSession(materia, { paused: confirmStop, onEscape: handleEscape });
   // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
-  const { celebrated, markCelebrated } = useCelebratedToday();
-  const celebrating = goalMet !== null && !celebrated(goalMet.giorno);
+  const { celebratedBefore, markCelebrated } = useCelebratedToday();
+  // The day whose notice has run its course here: the notice goes, and a later closing grade (the goal raised) does not bring it back.
+  const [noticeDone, setNoticeDone] = useState<string | null>(null);
+  const celebrating = goalMet !== null && !celebratedBefore(goalMet.giorno) && noticeDone !== goalMet.giorno;
 
   // An article belongs to the step it was opened at: a card that comes back is a new step.
   const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
@@ -177,12 +179,19 @@ export function ReviewSession() {
 
   return (
     // Room for the bar pinned at the bottom of a phone.
-    <section aria-label="Ripasso" className="pb-28 md:pb-0">
+    <section aria-label="Ripasso" className="relative pb-28 md:pb-0">
       {/* A live region of its own, not a second «status»: the screen's status line is the skipped card's. */}
       <p aria-live="polite" className="sr-only">
         {goalMet ? `Obiettivo di oggi raggiunto · serie di ${goalMet.serie} ${goalMet.serie === 1 ? 'giorno' : 'giorni'}` : ''}
       </p>
-      {celebrating && <SessionCelebration giorno={goalMet.giorno} serie={goalMet.serie} onDone={() => markCelebrated(goalMet.giorno)} />}
+      {celebrating && (
+        <SessionCelebration
+          giorno={goalMet.giorno}
+          serie={goalMet.serie}
+          onStart={() => markCelebrated(goalMet.giorno)}
+          onDone={() => setNoticeDone(goalMet.giorno)}
+        />
+      )}
       {skipped && (
         <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
           Questa scheda non è più da ripassare.

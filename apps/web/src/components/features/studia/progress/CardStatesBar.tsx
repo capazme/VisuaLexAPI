@@ -42,7 +42,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
               onFocus={() => setChosen(state.key)}
               onClick={() => setChosen(state.key)}
               style={{ flexGrow: stati[state.key] }}
-              className={cn('min-w-1 basis-0 transition-[flex-grow] duration-500 motion-reduce:transition-none', state.swatch, FOCUS_RING, 'focus-visible:ring-offset-0')}
+              className={cn('min-w-3 basis-0 transition-[flex-grow] duration-500 motion-reduce:transition-none', state.swatch, FOCUS_RING, 'focus-visible:ring-offset-0')}
             />
           ))}
         </div>

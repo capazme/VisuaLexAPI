@@ -5,7 +5,7 @@ import type { Materia } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
 import { StudyPreferences } from './StudyPreferences';
 import { ProgressBand } from './progress/ProgressBand';
-import { ProgressPanels } from './progress/ProgressPanels';
+import { ProgressPanels, ProgressPanelsSkeleton } from './progress/ProgressPanels';
 import { SubjectChips } from './progress/SubjectChips';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
@@ -44,10 +44,13 @@ export function ReviewHome() {
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const progress = useProgress(materia);
   const data = progress.data;
-  const { celebrated, markCelebrated } = useCelebratedToday();
-  // Once a day (spec decision 10): here, when the goal was met today with some review and this browser has not
-  // celebrated yet (the session celebrates at the grade that closes it, and marks the day the same way).
-  const celebrate = progress.status === 'ready' && progress.data.oggi.raggiunto && progress.data.oggi.ripassi > 0 && !celebrated(progress.data.oggi.giorno);
+  const { celebratedBefore, markCelebrated } = useCelebratedToday();
+  // The day whose burst has run its course on this page.
+  const [burstDone, setBurstDone] = useState<string | null>(null);
+  // Once a day (spec decision 10): here, when the goal was met today with some review and this browser had not
+  // celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the
+  // same way). It follows the data on screen, not the read's status, so a new read halfway does not cut it short.
+  const celebrate = data !== null && data.oggi.raggiunto && data.oggi.ripassi > 0 && !celebratedBefore(data.oggi.giorno) && burstDone !== data.oggi.giorno;
 
   const choose = (next: Materia | undefined) => {
     setMateria(next);
@@ -59,7 +62,16 @@ export function ReviewHome() {
   return (
     <section className="max-w-5xl space-y-5 pb-8">
       <h2 className="sr-only">Ripasso</h2>
-      <ProgressBand data={data} onStart={start} nothingLeft={nothingLeft} celebrate={celebrate} onCelebrated={() => data && markCelebrated(data.oggi.giorno)} />
+      <ProgressBand
+        data={data}
+        failed={progress.status === 'error'}
+        filtered={materia !== undefined}
+        onStart={start}
+        nothingLeft={nothingLeft}
+        celebrate={celebrate}
+        onCelebrationStart={() => data && markCelebrated(data.oggi.giorno)}
+        onCelebrated={() => data && setBurstDone(data.oggi.giorno)}
+      />
       {progress.status === 'error' && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           Non riesco a leggere i tuoi progressi.{' '}
@@ -69,10 +81,12 @@ export function ReviewHome() {
         </p>
       )}
       <SubjectChips selected={materia} onSelect={choose} />
-      {data && (
+      {data ? (
         <div className={cn('space-y-4 transition-opacity', progress.status === 'loading' && 'opacity-60')} aria-busy={progress.status === 'loading'}>
           <ProgressPanels data={data} materia={materia} onSelectMateria={choose} />
         </div>
+      ) : (
+        <ProgressPanelsSkeleton pulsing={progress.status === 'loading'} />
       )}
       <StudyPreferences onChanged={progress.reload} />
     </section>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FRAMES, PARTICLE_COUNT, fade, spawn, step } from './confetti';
+import { DURATION_MS, FRAMES, PARTICLE_COUNT, fade, spawn, step, stepsAt } from './confetti';
 
 describe('the confetti', () => {
   const steady = () => 0.5;
@@ -25,5 +25,16 @@ describe('the confetti', () => {
     expect(fade(FRAMES / 2)).toBeCloseTo(0.5);
     expect(fade(FRAMES)).toBe(0);
     expect(fade(FRAMES + 10)).toBe(0);
+  });
+});
+
+describe('the confetti’s clock', () => {
+  it('steps by elapsed time: the same 1.5 s on any screen', () => {
+    expect(DURATION_MS).toBe(1500);
+    expect(stepsAt(0)).toBe(0);
+    expect(stepsAt(1000 / 60)).toBe(1);
+    expect(stepsAt(750)).toBe(45);
+    expect(stepsAt(DURATION_MS)).toBe(FRAMES);
+    expect(stepsAt(5000)).toBe(FRAMES);
   });
 });

@@ -91,6 +91,8 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
             const tinted = hue !== undefined && level > 0;
             return (
               <g key={cell.giorno} data-day={cell.giorno} onPointerEnter={() => setSelected(index)} onClick={() => setSelected(index)} className="cursor-pointer">
+                {/* The whole pitch answers, gaps included: on a phone a cell is about 20 px. */}
+                <rect x={x - GAP / 2} y={y - GAP / 2} width={PITCH} height={PITCH} fill="transparent" />
                 <rect
                   x={x}
                   y={y}
@@ -104,11 +106,36 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
                 {cell.day?.riposo && (
                   <rect x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={1.2} strokeDasharray="2 1.5" className={cn('stroke-current', INK_TEXT)} />
                 )}
-                {cell.day?.valido && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={1.8} className="fill-white dark:fill-slate-900" />}
+                {/* In ink on the pale steps, in the ground's colour on the dark ones: readable on every cell. */}
+                {cell.day?.valido && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={1.8} className={level >= 3 && !tinted ? 'fill-white dark:fill-slate-900' : 'fill-primary-900 dark:fill-primary-300'} />}
               </g>
             );
           })}
         </svg>
+      </div>
+      <div aria-hidden className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 text-xs', MUTED_TEXT)}>
+        <span className="flex items-center gap-1">
+          meno
+          {HEAT_FILL.map((fill) => (
+            <svg key={fill} viewBox="0 0 10 10" className="h-2.5 w-2.5">
+              <rect width="10" height="10" rx="2" className={fill} />
+            </svg>
+          ))}
+          più
+        </span>
+        <span className="flex items-center gap-1">
+          <svg viewBox="0 0 10 10" className="h-2.5 w-2.5">
+            <rect width="10" height="10" rx="2" className={HEAT_FILL[1]} />
+            <circle cx="5" cy="5" r="1.6" className="fill-primary-900 dark:fill-primary-300" />
+          </svg>
+          obiettivo raggiunto
+        </span>
+        <span className="flex items-center gap-1">
+          <svg viewBox="0 0 10 10" className="h-2.5 w-2.5">
+            <rect x="0.6" y="0.6" width="8.8" height="8.8" rx="2" fill="none" strokeWidth="1.2" strokeDasharray="2 1.5" className={cn('stroke-current', INK_TEXT)} />
+          </svg>
+          giorno di riposo
+        </span>
       </div>
       <p id={readoutId} aria-live="polite" className={cn('min-h-5 text-sm tabular-nums', chosen ? 'text-slate-800 dark:text-slate-100' : MUTED_TEXT)}>
         {chosen ? describeDay(chosen, today) : 'Passa sopra un giorno, o toccalo, per i dettagli.'}

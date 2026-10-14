@@ -8,7 +8,7 @@ export interface SubjectChipsProps {
   onSelect: (materia: Materia | undefined) => void;
 }
 
-const CHIP = 'inline-flex min-h-[44px] items-center gap-2 rounded-md border px-3 text-sm md:min-h-0 md:py-1.5';
+const CHIP = 'inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm md:min-h-0 md:py-1.5';
 
 /**
  * The subject filter of the dashboard and of the session it starts (Studia progress spec §6.2):
@@ -24,7 +24,8 @@ export function SubjectChips({ selected, onSelect }: SubjectChipsProps) {
         : 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800',
     );
   return (
-    <div role="group" aria-label="Materia" className="flex flex-wrap gap-2">
+    // One scrolling row on a phone, where six chips would take four lines; wrapped from `md`.
+    <div role="group" aria-label="Materia" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
       <button type="button" aria-pressed={selected === undefined} onClick={() => onSelect(undefined)} className={chip(selected === undefined)}>
         Tutte le materie
       </button>

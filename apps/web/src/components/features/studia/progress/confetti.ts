@@ -16,7 +16,15 @@ export interface Particle {
 }
 
 export const PARTICLE_COUNT = 90;
-export const FRAMES = 90; // about 1.5 s at 60 frames a second
+/** The celebration's length, whatever the screen's refresh rate: the particles move in steps of 1/60 s. */
+export const DURATION_MS = 1500;
+const STEP_MS = 1000 / 60;
+export const FRAMES = Math.round(DURATION_MS / STEP_MS);
+
+/** How many steps the particles should have taken `elapsedMs` after the start. */
+export function stepsAt(elapsedMs: number): number {
+  return Math.min(FRAMES, Math.max(0, Math.floor(elapsedMs / STEP_MS)));
+}
 const GRAVITY = 0.32;
 const DRAG = 0.99;
 

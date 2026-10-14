@@ -55,3 +55,18 @@ export function ProgressPanels({ data, materia, onSelectMateria }: ProgressPanel
     </>
   );
 }
+
+/** The panels' places at their final size while the first read travels (spec §6.2): nothing jumps when it answers. */
+export function ProgressPanelsSkeleton({ pulsing }: { pulsing: boolean }) {
+  const block = cn('rounded-2xl bg-slate-100 dark:bg-slate-800/60', pulsing && 'motion-safe:animate-pulse');
+  return (
+    <div aria-hidden className="space-y-4">
+      <div className={cn(block, 'h-64')} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className={cn(block, 'h-48')} />
+        <div className={cn(block, 'h-48')} />
+      </div>
+      <div className={cn(block, 'h-80')} />
+    </div>
+  );
+}

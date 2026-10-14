@@ -474,7 +474,7 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
   const closing = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, oggi: { giorno: '2026-10-19', ripassi: 10, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 3 } };
   const open = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, oggi: { giorno: '2026-10-19', ripassi: 9, obiettivo: 10, raggiunto: false, appenaRaggiunto: false, serie: 2 } };
 
-  it('celebrates on the grade that closes the goal, says it to a screen reader, then remembers the day', async () => {
+  it('celebrates on the grade that closes the goal, remembers the day at once, says it to a screen reader, and is gone in 1.5 s', async () => {
     review.mockResolvedValueOnce(open).mockResolvedValueOnce(closing);
     renderSession([card('a'), card('b'), card('c')]);
     const user = userEvent.setup();
@@ -485,9 +485,10 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await user.click(screen.getByRole('button', { name: /Bene/ }));
 
     expect(await screen.findByText('Serie di 3 giorni')).toBeInTheDocument();
-    expect(screen.getByText('Obiettivo di oggi raggiunto · serie di 3 giorni')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText('Serie di 3 giorni')).not.toBeInTheDocument(), { timeout: SESSION_NOTICE_MS + 1000 });
     expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
+    expect(screen.getByText('Obiettivo di oggi raggiunto · serie di 3 giorni')).toBeInTheDocument();
+    expect(SESSION_NOTICE_MS).toBeLessThanOrEqual(1500);
+    await waitFor(() => expect(screen.queryByText('Serie di 3 giorni')).not.toBeInTheDocument(), { timeout: SESSION_NOTICE_MS + 1000 });
   });
 
   it('leaves the keys to the review while it plays: space reveals, a number grades', async () => {
@@ -502,7 +503,18 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     expect(await screen.findByText('Risposta b.')).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: '3' });
     await waitFor(() => expect(review).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('Serie di 3 giorni')).toBeInTheDocument();
+    expect(screen.getByTestId('session-celebration')).toBeInTheDocument();
+  });
+
+  it('sits in the page over the header row, never fixed over the card', async () => {
+    review.mockResolvedValueOnce(closing);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    const notice = await screen.findByTestId('session-celebration');
+    expect(notice.className).toContain('absolute');
+    expect(notice.className).not.toContain('fixed');
+    expect(notice.className).toContain('pointer-events-none');
   });
 
   it('does not celebrate twice in a day on this browser', async () => {
