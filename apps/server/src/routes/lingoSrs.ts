@@ -1,19 +1,25 @@
-import { LingoMateria, Prisma, type LingoPreferenzeStudio } from '@prisma/client';
+import { LingoMateria, Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
-import { DEFAULT_NUOVE_AL_GIORNO, previewIntervals, reviewScope } from '../lingo/reviewQueue';
+import { readProgress } from '../lingo/progress';
+import { previewIntervals, reviewScope } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
+import { computeStreak } from '../lingo/streak';
+import { countedDays, markQueueFinished, recordGradeDay, recountToday } from '../lingo/studyDays';
+import { answerPreferences, readPreferences } from '../lingo/studyPreferences';
 import { daysBetween, romeDay, startOfRomeDay } from '../lingo/studyDay';
+import { dueWhere, introducedToday, newCardsWhere, queueFinished } from '../lingo/todayQueue';
 import { review } from '../srs/fsrsEngine';
 
 /**
  * The review of study cards (Studia PR C, spec §5): today's session, a grade,
- * and the study preferences. For the user's session only: nothing here is in
- * the delegated table, so an exchanged token answers 403.
+ * the study preferences, and the progress dashboard's read (Studia progress
+ * spec §5). For the user's session only: nothing here is in the delegated
+ * table, so an exchanged token answers 403.
  *
  * Time is the Europe/Rome calendar day (`lingo/studyDay.ts`), read from the
  * server's clock and never from the browser's. `LingoStatoRipasso.dueAt` is 00:00
@@ -38,52 +44,46 @@ const gradeSchema = z
 const preferencesSchema = z
   .object({
     nuoveAlGiorno: z.number().int().min(1).max(200).optional(),
+    ripassiAlGiorno: z.number().int().min(1).max(200).optional(),
     materieComunita: z.array(z.nativeEnum(LingoMateria)).max(MAX_COMMUNITY_SUBJECTS).optional(),
   })
   .strict();
 
 const cardNotFound = () => new AppError(404, 'Scheda non trovata.');
 
-function answerPreferences(row: Pick<LingoPreferenzeStudio, 'nuoveAlGiorno' | 'materieComunita'> | null) {
-  return { nuoveAlGiorno: row?.nuoveAlGiorno ?? DEFAULT_NUOVE_AL_GIORNO, materieComunita: row?.materieComunita ?? [] };
-}
-
-async function readPreferences(db: Prisma.TransactionClient, userId: string) {
-  return answerPreferences(await db.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId } }));
-}
-
 router.get('/sessione', async (req, res) => {
   const userId = req.user!.id;
   const { materia } = sessionSchema.parse(req.query);
   const today = romeDay(new Date());
-  const startOfToday = startOfRomeDay(today);
-  const startOfTomorrow = startOfRomeDay(today, 1);
 
   const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
   const scope = reviewScope(userId, materieComunita, materia);
 
-  const dueWhere: Prisma.LingoStatoRipassoWhereInput = { utenteId: userId, dueAt: { lt: startOfTomorrow }, card: scope };
-  const [dovute, dueRows, introducedToday] = await Promise.all([
-    prisma.lingoStatoRipasso.count({ where: dueWhere }),
+  const due = dueWhere(userId, scope, today);
+  const [dovute, dueRows, introduced] = await Promise.all([
+    prisma.lingoStatoRipasso.count({ where: due }),
     prisma.lingoStatoRipasso.findMany({
-      where: dueWhere,
+      where: due,
       include: { card: { include: { ancore: true } } },
       orderBy: [{ dueAt: 'asc' }, { cardId: 'asc' }],
       take: MAX_DUE_PER_SESSION,
     }),
-    // Only the first grade of a day is recorded, so a state with one review made today was introduced today.
-    prisma.lingoStatoRipasso.count({ where: { utenteId: userId, reps: 1, lastReviewAt: { gte: startOfToday } } }),
+    introducedToday(prisma, userId, today),
   ]);
 
-  const newSlots = Math.max(0, nuoveAlGiorno - introducedToday);
+  const newSlots = Math.max(0, nuoveAlGiorno - introduced);
   const newCards = newSlots === 0
     ? []
     : await prisma.lingoCard.findMany({
-        where: { AND: [scope, { statiRipasso: { none: { utenteId: userId } } }] },
+        where: newCardsWhere(userId, scope),
         include: { ancore: true },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         take: newSlots,
       });
+  // Nothing left in the whole queue (not just in one subject): today counts (Studia progress spec D7).
+  if (!materia && dovute === 0 && newCards.length === 0 && (await queueFinished(prisma, userId, today))) {
+    await markQueueFinished(prisma, userId, today);
+  }
 
   const cards = [
     ...dueRows.map(({ card, ...state }) => {
@@ -120,10 +120,11 @@ router.post('/revisioni', async (req, res) => {
     const previous = await tx.lingoStatoRipasso.findUnique({ where: { utenteId_cardId: { utenteId: userId, cardId } } });
     if (previous && romeDay(previous.lastReviewAt) === today) {
       const dueDay = romeDay(previous.dueAt);
-      return { registrata: false, prossimoRipasso: dueDay, scheduledDays: daysBetween(today, dueDay) };
+      return { registrata: false, prossimoRipasso: dueDay, scheduledDays: daysBetween(today, dueDay), day: null };
     }
 
     const elapsedDays = previous ? Math.max(0, daysBetween(romeDay(previous.lastReviewAt), today)) : 0;
+    // `previous` is the user's state of the card, so no state means its first review ever (spec §5.1 «nuove»).
     const result = review(previous, rating, elapsedDays);
     const dueAt = startOfRomeDay(today, result.scheduledDays);
     const lapse = rating === 1 && previous ? 1 : 0;
@@ -144,13 +145,30 @@ router.post('/revisioni', async (req, res) => {
         durataMs: durataMs ?? null,
       },
     });
-    return { registrata: true, prossimoRipasso: romeDay(dueAt), scheduledDays: result.scheduledDays };
+    const day = await recordGradeDay(tx, userId, today, { isNew: !previous, wrong: rating === 1 });
+    return { registrata: true, prossimoRipasso: romeDay(dueAt), scheduledDays: result.scheduledDays, day };
   }).catch((error: unknown) => {
     // Belt: a card that vanished under the insert is a missing card, never a 500.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') throw cardNotFound();
     throw error;
   });
-  res.json(answer);
+  const { day, ...recorded } = answer;
+  if (day === null) {
+    res.json(recorded);
+    return;
+  }
+  const serie = computeStreak(await countedDays(prisma, userId), today, day.after).attuale;
+  res.json({
+    ...recorded,
+    // What the session needs to celebrate the goal at the grade that closes it (Studia progress spec §5.3).
+    oggi: { giorno: today, ripassi: day.ripassi, obiettivo: day.obiettivo, raggiunto: day.after, appenaRaggiunto: day.after && !day.before, serie },
+  });
+});
+
+// Everything the Studia dashboard draws, in one read (Studia progress spec §5.2).
+router.get('/progressi', async (req, res) => {
+  const { materia } = sessionSchema.parse(req.query);
+  res.json(await readProgress(req.user!.id, materia));
 });
 
 router.get('/preferenze', async (req, res) => {
@@ -159,9 +177,10 @@ router.get('/preferenze', async (req, res) => {
 
 router.put('/preferenze', async (req, res) => {
   const userId = req.user!.id;
-  const { nuoveAlGiorno, materieComunita } = preferencesSchema.parse(req.body);
+  const { nuoveAlGiorno, ripassiAlGiorno, materieComunita } = preferencesSchema.parse(req.body);
   const data = {
     ...(nuoveAlGiorno !== undefined ? { nuoveAlGiorno } : {}),
+    ...(ripassiAlGiorno !== undefined ? { ripassiAlGiorno } : {}),
     ...(materieComunita !== undefined ? { materieComunita: [...new Set(materieComunita)] } : {}),
   };
   const row = await prisma.lingoPreferenzeStudio.upsert({
@@ -169,6 +188,8 @@ router.put('/preferenze', async (req, res) => {
     create: { utenteId: userId, ...data },
     update: data,
   });
+  // Today counts by the goal as it now stands; the past days stay as they were (spec §5.1).
+  if (ripassiAlGiorno !== undefined) await recountToday(prisma, userId, romeDay(new Date()), row.ripassiAlGiorno);
   res.json(answerPreferences(row));
 });
 

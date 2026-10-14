@@ -82,6 +82,12 @@ export function daysBetween(fromDay: string, toDay: string): number {
   return Math.round((utcMidnight(toDay) - utcMidnight(fromDay)) / MS_PER_DAY);
 }
 
+/** The calendar day `plusDays` after `day` (before it when negative), as 'YYYY-MM-DD': day arithmetic, no clock. */
+export function addDays(day: string, plusDays: number): string {
+  if (!Number.isInteger(plusDays)) throw new RangeError('plusDays must be a whole number');
+  return new Date(utcMidnight(day) + plusDays * MS_PER_DAY).toISOString().slice(0, 10);
+}
+
 /**
  * 00:00 Europe/Rome of the day `plusDays` after `day`, as an instant: what `dueAt` stores.
  *

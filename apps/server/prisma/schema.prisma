@@ -75,6 +75,7 @@ model User {
   lingoStatiRipasso     LingoStatoRipasso[]
   lingoRevisioni        LingoRevisioneSRS[]
   lingoPreferenzeStudio LingoPreferenzeStudio?
+  lingoGiornateStudio   LingoGiornataStudio[]
 
   // LingoLex validation: set by an administrator; the votes this user cast (kept,
   // anonymous, when the account goes), the notice versions they wrote (same) and
@@ -1190,12 +1191,33 @@ model LingoRevisioneSRS {
 model LingoPreferenzeStudio {
   utenteId        String         @id @map("utente_id")
   nuoveAlGiorno   Int            @default(20) @map("nuove_al_giorno")   // 1–200
+  // The reviews that make a day count for the streak (Studia progress spec D7); 1–200, a CHECK in the migration.
+  ripassiAlGiorno Int            @default(10) @map("ripassi_al_giorno")
   materieComunita LingoMateria[] @default([]) @map("materie_comunita")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
   utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
 
   @@map("lingo_preferenze_studio")
+}
+
+// One Europe/Rome day of a user's review (Studia progress spec §5.1): written with each recorded grade
+// (`lingo/studyDays.ts`) and never by the trash, so deleting a card never rewrites a past day. `valido`
+// (the day counts for the streak) is frozen once the day is over: a later change of the goal leaves it.
+model LingoGiornataStudio {
+  utenteId   String   @map("utente_id")
+  giorno     DateTime @db.Date
+  ripassi    Int      @default(0)
+  nuove      Int      @default(0)
+  sbagliate  Int      @default(0)
+  codaFinita Boolean  @default(false) @map("coda_finita")
+  valido     Boolean  @default(false)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@id([utenteId, giorno])
+  @@map("lingo_giornate_studio")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
