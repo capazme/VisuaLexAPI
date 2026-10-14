@@ -104,9 +104,9 @@ docker stop visualex-merlt-api
 ```
 Con il consenso attivo, riapri l'articolo: la UI non si blocca. Poi controlla il log dead-letter:
 ```bash
-tail apps/server/logs/merlt-dead-letter.jsonl
+tail apps/server/logs/merlt-dead-letter-$(date -u +%F).jsonl
 ```
-Atteso: una riga con `event: "article-viewed"` e un `error` di rete o di timeout.
+Atteso: una riga con `event: "article-viewed"`, un `error` che è il nome della classe (`MerltNetworkError` o `MerltTimeoutError`) e nessun `user_id`.
 ```bash
 docker start visualex-merlt-api
 ```

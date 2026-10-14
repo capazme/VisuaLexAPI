@@ -201,26 +201,25 @@ describe('forumSignalRequestSchema', () => {
       const result = forumSignalRequestSchema.safeParse({
         action,
         sharedEnvId: sampleUuid,
-        originalAuthorId: otherUuid,
       });
       expect(result.success).toBe(true);
     }
   });
 
-  it('accepts null originalAuthorId (deleted author)', () => {
+  it("strips an older client's originalAuthorId (a third party's id)", () => {
     const result = forumSignalRequestSchema.safeParse({
       action: 'like',
       sharedEnvId: sampleUuid,
-      originalAuthorId: null,
+      originalAuthorId: otherUuid,
     });
     expect(result.success).toBe(true);
+    expect(result.success && 'originalAuthorId' in result.data).toBe(false);
   });
 
   it('rejects invalid action', () => {
     const result = forumSignalRequestSchema.safeParse({
       action: 'comment',
       sharedEnvId: sampleUuid,
-      originalAuthorId: otherUuid,
     });
     expect(result.success).toBe(false);
   });

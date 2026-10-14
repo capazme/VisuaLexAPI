@@ -135,7 +135,7 @@ Il dettaglio di ogni passo, con le chiamate di rete attese, è in [smoke-checkli
 | `MERLT_INGEST_STALE_MS` | 600000 | Rete del watchdog e supersede di `lazyIngest` |
 | `MERLT_EXTRACT_STALE_MS` | 2700000 | Rete per l'estrazione appunti (deve superare il `job_timeout` RQ di 1800 s) |
 | `MERLT_QA_STALE_MS` / `MERLT_QA_RETENTION_DAYS` | 1200000 / 30 | Rete Q&A (su `updatedAt`) e purge dei job terminati |
-| `MERLT_DEAD_LETTER_DIR` | `apps/server/logs` | Dove finisce `merlt-dead-letter.jsonl` |
+| `MERLT_DEAD_LETTER_DIR` / `MERLT_DEAD_LETTER_RETENTION_DAYS` | `apps/server/logs` / 7 | Dove finiscono i file `merlt-dead-letter-AAAA-MM-GG.jsonl` (uno al giorno, senza dati personali) e dopo quanti giorni vengono cancellati |
 
 ### Compose (shell o `.env` nella root; modello in `infra/.env.example`)
 

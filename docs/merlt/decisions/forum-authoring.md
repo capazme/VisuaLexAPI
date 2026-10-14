@@ -1,6 +1,13 @@
 # MERL-T Forum Signal Authoring — `target_author_id`
 
-**Status:** Decided 2026-05-23 — Slice 1, Story MERLT-1.10
+**Status:** Decided 2026-05-23 — Slice 1, Story MERLT-1.10. **Superseded
+October 2026:** the server no longer relays `target_author_id`. The author of
+an environment or of a suggestion is a third party who never consented to
+MERL-T, and nothing in MERL-T read the field. The forum events carry the
+environment only; `forumSignalRequestSchema` strips an older client's
+`originalAuthorId`, and the per-user erasure in MERL-T removes the key from
+the events stored before. The rest of
+this page is the history of the original decision.
 **Open question reference:** design doc §10.3
 
 ---
@@ -105,8 +112,9 @@ publishMerltEvent metadata):
 
 **MERL-T payload field** (after mapping):
 
-- `target_author_id` (snake_case) — opaque string for MERL-T's
-  in-memory tracking buffer.
+- `target_author_id` (snake_case) — another user's VisuaLex id, in clear
+  (never opaque), stored in `tracking_events.payload`. No longer sent: see the
+  status above.
 
 ---
 
