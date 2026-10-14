@@ -539,11 +539,26 @@ describe('a range and marked words (the comparison draws a comma at a time)', ()
   it('keeps a mark that crosses a modification and a reference well-formed', () => {
     const privacy = fixtureText('nrm-privacy-2ter');
     const s = parseArticleStructure(privacy);
+    // From inside the first «((o da atti amministrativi generali))» modification, across its end,
+    // the missing reference «((49))» (ref-missing) and into the next modification.
     const from = privacy.indexOf('((o da atti');
+    const to = privacy.indexOf('((49))') + '((49))'.length + 6;
+    expect(s.decorations.some((d) => d.kind === 'ref-missing' && d.start > from && d.end < to)).toBe(true);
+    expect(s.decorations.filter((d) => d.kind === 'mod' && d.start < to && d.end > from).length).toBeGreaterThanOrEqual(2);
     const html = renderArticleHtml({
       raw: privacy, structure: s, highlights: [], annotations: [],
-      changes: [{ start: from - 5, end: from + 25, kind: 'ins' }],
+      changes: [{ start: from + 3, end: to, kind: 'ins' }],
     });
-    expect(mount(html).textContent).toBe(privacy.replace(/\n/g, ''));
+    // Well-formed: the browser's parser rewrites nothing, so what it serialises back is what was written.
+    const parsed = document.createElement('div');
+    parsed.innerHTML = html;
+    expect(parsed.innerHTML).toBe(html);
+    // Nesting follows RANK: the reference is outside the change, the modification too.
+    expect(parsed.querySelector('.vlx-mod .vlx-ins')).not.toBeNull();
+    expect(parsed.querySelector('.vlx-ref-missing .vlx-ins')).not.toBeNull();
+    expect(parsed.querySelector('.vlx-ins .vlx-mod, .vlx-ins .vlx-ref-missing')).toBeNull();
+    // The change, however many pieces it is cut in, covers exactly its range.
+    expect([...parsed.querySelectorAll('.vlx-ins')].map((e) => e.textContent).join('')).toBe(privacy.slice(from + 3, to).replace(/\n/g, ''));
+    expect(parsed.textContent).toBe(privacy.replace(/\n/g, ''));
   });
 });

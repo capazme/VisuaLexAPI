@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { parseArticleStructure } from '../../../utils/articleStructure';
 import { CompareView } from './CompareView';
 import { closeCompare, setCompareState, type CompareArticle } from '../../../hooks/useCompare';
 import { TOO_LONG_TEXT } from './compareLayout';
@@ -85,6 +86,78 @@ describe('CompareView — each column spells its text (root rule 23)', () => {
     showAll();
     fireEvent.click(screen.getAllByRole('button', { name: 'Differenze' })[0]);
     expect(phone.container.querySelectorAll('.vlx-del, .vlx-ins').length).toBeGreaterThan(0);
+  });
+});
+
+/** The commi of a text, as ranges; removing one leaves every other character where it was. */
+const commiOf = (raw: string) => parseArticleStructure(raw).blocks.filter((b) => b.kind === 'comma');
+const withoutComma = (raw: string, index: number): string => {
+  const c = commiOf(raw)[index];
+  return raw.slice(0, c.start) + raw.slice(c.end);
+};
+const labelsDrawn = (container: HTMLElement) =>
+  [...container.querySelectorAll('[data-testid="compare-pill"]')].map((p) => p.getAttribute('data-label')!);
+
+describe('CompareView — every label spells its text too (root rule 23)', () => {
+  it('holds for commi removed, added, edited and for two different texts read as versions', () => {
+    const seen = new Set<string>();
+    const gaps = { left: 0, right: 0 };
+    const run = (left: CompareArticle, right: CompareArticle) => {
+      const { container } = open(left, right);
+      showAll();
+      expect(spelled(container, 'left'), 'left column').toBe(left.article.article_text!.replace(/\n/g, ''));
+      expect(spelled(container, 'right'), 'right column').toBe(right.article.article_text!.replace(/\n/g, ''));
+      for (const label of labelsDrawn(container)) seen.add(label);
+      gaps.left += container.querySelectorAll('[data-gap-side="left"]').length;
+      gaps.right += container.querySelectorAll('[data-gap-side="right"]').length;
+      cleanup();
+    };
+
+    ARTICLE_FIXTURES.forEach((f, i) => {
+      const raw = f.text;
+      if (commiOf(raw).length >= 2) {
+        const removed = withoutComma(raw, 1);
+        run(past(raw), compareArticle(removed)); // a comma gone: abrogato
+        run(past(removed), compareArticle(raw)); // a comma there: aggiunto
+      }
+      run(past(raw), compareArticle(ARTICLE_FIXTURES[(i + 1) % ARTICLE_FIXTURES.length].text));
+    });
+
+    // the older text on the right, and a word added (the 27 texts against an edited copy are above)
+    const cc = fixtureText('nrm-cc-1284');
+    run(compareArticle(edited(cc)), past(withoutComma(cc, 1)));
+    run(past(cc), compareArticle(edited(cc)));
+
+    // a repeal notice in place of a comma is «abrogato» (the fixtures hold none to remove)
+    const alive = normattiva('Art. 3000.', null, ['1. Il primo comma resta come è.', '2. Il secondo comma sarà tolto da una legge successiva.']);
+    const repealed = normattiva('Art. 3000.', null, ['1. Il primo comma resta come è.', '2. ((COMMA ABROGATO DALLA L. 1/2000))']);
+    run(past(alive), compareArticle(repealed));
+
+    expect([...seen].sort()).toEqual(['abrogato', 'aggiunto', 'invariato', 'modificato', 'riscritto']);
+    expect(gaps.left).toBeGreaterThan(0);
+    expect(gaps.right).toBeGreaterThan(0);
+  }, 30000);
+
+  it('holds on a phone, for each side as it is shown', () => {
+    setViewport(false);
+    const raw = fixtureText('nrm-cc-1284');
+    const left = past(raw);
+    const right = compareArticle(withoutComma(edited(raw), 1));
+    const { container } = open(left, right);
+    showAll();
+    // the phone shows one side at a time: switch every row (heading, rubric, commi) to the side being read
+    for (const [side, name] of [['left', '31/12/2015'], ['right', 'In vigore']] as const) {
+      for (const row of container.querySelectorAll<HTMLElement>('[data-compare-row]:not([data-compare-row="tail"])')) {
+        const button = within(row).queryByRole('button', { name });
+        if (button) fireEvent.click(button);
+      }
+      expect(spelled(container, side), `${side} as shown`).toBe((side === 'left' ? left : right).article.article_text!.replace(/\n/g, ''));
+    }
+    // and the diff view, which shows both sides of a modificato comma, still spells each
+    for (const row of container.querySelectorAll<HTMLElement>('[data-compare-row="comma"][data-label="modificato"]')) {
+      fireEvent.click(within(row).getByRole('button', { name: 'Differenze' }));
+    }
+    expect(container.querySelectorAll('.vlx-del, .vlx-ins').length).toBeGreaterThan(0);
   });
 });
 
@@ -199,6 +272,86 @@ describe('CompareView — two articles', () => {
   });
 });
 
+describe('CompareView — the desktop grid for a screen reader', () => {
+  const older = normattiva('Art. 3000.', 'Rubrica', [
+    '1. Il debitore risponde dell\'inadempimento con tutti i suoi beni presenti e futuri.',
+    '2. Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d\'anno.',
+  ]);
+  const newer = normattiva('Art. 3000.', 'Rubrica', [
+    '1. Il debitore risponde dell\'inadempimento con tutti i suoi beni presenti e futuri.',
+    '2. Il saggio degli interessi legali è determinato in misura pari al 10 per cento in ragione d\'anno.',
+  ]);
+
+  it('has only rows under the table, and the headers of the columns', () => {
+    open(past(older), compareArticle(newer));
+    const table = screen.getByRole('table', { name: 'Confronto dei commi' });
+    // the header, the heading, the rubric, the fold, the modified comma
+    expect([...table.children].map((c) => c.getAttribute('role'))).toEqual(['row', 'row', 'row', 'row', 'row']);
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers).toHaveLength(3);
+    expect(within(headers[1]).getByRole('button', { name: /Rimuovi dal confronto/ })).toBeInTheDocument();
+    expect(within(headers[2]).getByRole('button', { name: /Rimuovi dal confronto/ })).toBeInTheDocument();
+  });
+
+  it('holds the fold button in a cell of a row of its own', () => {
+    open(past(older), compareArticle(newer));
+    const cell = screen.getByTestId('compare-fold').parentElement!;
+    expect(cell).toHaveAttribute('role', 'cell');
+    expect(cell.parentElement).toHaveAttribute('role', 'row');
+    expect(cell.parentElement!.parentElement).toBe(screen.getByRole('table'));
+  });
+
+  it('moves the focus to the first comma «mostra» unfolded', () => {
+    const { container } = open(past(older), compareArticle(newer));
+    const fold = screen.getByTestId('compare-fold');
+    fold.focus();
+    fireEvent.click(fold);
+    const first = container.querySelector<HTMLElement>('[data-compare-row="comma"]')!;
+    expect(first).toHaveAttribute('data-label', 'invariato');
+    expect(document.activeElement).toBe(first.querySelector('[data-focus-key]'));
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it('moves the focus to the unfolded comma on a phone too', () => {
+    setViewport(false);
+    const { container } = open(past(older), compareArticle(newer));
+    fireEvent.click(screen.getByTestId('compare-fold'));
+    const first = container.querySelector<HTMLElement>('[data-compare-row="comma"]')!;
+    expect(first).toHaveAttribute('data-label', 'invariato');
+    expect(document.activeElement).toBe(first);
+  });
+
+  it('says what a gap lacks: a heading, a rubric or a comma', () => {
+    const a = compareArticle(normattiva('Art. 2043.', 'Risarcimento', ['1. Primo comma.', '2. Secondo comma.']), { numero_articolo: '2043' }, 'art. 2043 c.c.');
+    const b = compareArticle('1. Un comma solo, senza intestazione né rubrica.', { numero_articolo: '2059' }, 'art. 2059 c.c.');
+    const { container } = open(a, b);
+    const gap = (part: string) => container.querySelector(`[data-compare-row="${part}"] [data-gap]`);
+    expect(gap('head')).toHaveAttribute('aria-label', expect.stringMatching(/^Nessuna intestazione in: /));
+    expect(gap('rubric')).toHaveAttribute('aria-label', expect.stringMatching(/^Nessuna rubrica in: /));
+    expect(gap('comma')).toHaveAttribute('aria-label', expect.stringMatching(/^Nessun comma in: /));
+    // the gap's words are an attribute, never a text node of the column
+    expect(spelled(container, 'right')).toBe(b.article.article_text!.replace(/\n/g, ''));
+  });
+});
+
+describe('CompareView — a reference opens the note of its own column', () => {
+  const withNote = (comma: string, note: string) =>
+    `Art. 1.\n\n1. ${comma} (7)\n\n-------------\nAGGIORNAMENTO (7)\n\n ${note}`;
+
+  it('shows the right article\'s note from the right column, the left\'s from the left', () => {
+    const a = compareArticle(withNote('Primo testo.', 'Nota dell\'articolo di sinistra.'), { numero_articolo: '1' }, 'art. 1 c.c.');
+    const b = compareArticle(withNote('Secondo testo.', 'Nota dell\'articolo di destra.'), { numero_articolo: '2' }, 'art. 2 c.c.');
+    const { container } = open(a, b);
+    fireEvent.click(container.querySelector<HTMLElement>('[data-side="right"] .vlx-ref')!);
+    expect(screen.getByRole('dialog')).toHaveTextContent('Aggiornamento (7)');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Nota dell\'articolo di destra.');
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('sinistra');
+    fireEvent.click(container.querySelector<HTMLElement>('[data-side="left"] .vlx-ref')!);
+    expect(screen.getByRole('dialog')).toHaveTextContent('Nota dell\'articolo di sinistra.');
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('destra');
+  });
+});
+
 describe('CompareView — on a phone', () => {
   const older = normattiva('Art. 3000.', null, [
     '1. Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d\'anno.',
@@ -254,5 +407,27 @@ describe('CompareView — on a phone', () => {
     const { container } = open(a, b);
     const row = container.querySelector<HTMLElement>('[data-compare-row="comma"]')!;
     expect(within(row).getAllByRole('button').map((x) => x.textContent)).toEqual(['art. 2043 c.c.', 'art. 2059 c.c.']);
+  });
+
+  it('names a past text of an article with its day, as the summary does', () => {
+    const a = compareArticle('1. Primo.', { numero_articolo: '2043', versione: 'vigente', data_versione: '2015-12-31' }, 'art. 2043 c.c. — testo al 31/12/2015');
+    const b = compareArticle('1. Secondo.', { numero_articolo: '2059' }, 'art. 2059 c.c.');
+    const { container } = open(a, b);
+    const row = container.querySelector<HTMLElement>('[data-compare-row="comma"]')!;
+    expect(within(row).getAllByRole('button').map((x) => x.textContent)).toEqual([
+      'art. 2043 c.c. — testo al 31/12/2015',
+      'art. 2059 c.c.',
+    ]);
+  });
+
+  it('tells two sides apart when their names come out the same', () => {
+    const a = compareArticle('1. Primo.', { numero_articolo: '2043' }, 'art. 2043 c.c.');
+    const b = compareArticle('1. Secondo.', { numero_articolo: '2043', allegato: undefined }, 'art. 2043 c.c.');
+    const { container } = open(a, b);
+    const row = container.querySelector<HTMLElement>('[data-compare-row="comma"]')!;
+    const names = within(row).getAllByRole('button').map((x) => x.textContent);
+    expect(names).toHaveLength(2);
+    expect(names[0]).not.toBe(names[1]);
+    expect(names).toEqual([expect.stringMatching(/ · 1$/), expect.stringMatching(/ · 2$/)]);
   });
 });

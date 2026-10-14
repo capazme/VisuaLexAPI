@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { FOCUS_RING } from '../../../constants/interactions';
@@ -54,7 +54,17 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
 
   const versions = comparison.kind === 'versions';
   const defaultChoice: Choice = versions ? (comparison.older === 'left' ? 'right' : 'left') : 'left';
-  const unfold = (key: string) => setExpanded((prev) => new Set(prev).add(key));
+  // After «mostra» the button is gone: focus goes to the first comma it unfolded, not to the body.
+  const focusAfterUnfold = useRef<string | null>(null);
+  const unfold = (key: string) => {
+    focusAfterUnfold.current = `row-${key.slice('fold-'.length)}`;
+    setExpanded((prev) => new Set(prev).add(key));
+  };
+  useEffect(() => {
+    const target = focusAfterUnfold.current;
+    focusAfterUnfold.current = null;
+    if (target) rootRef.current?.querySelector<HTMLElement>(`[data-focus-key="${target}"]`)?.focus();
+  }, [expanded]);
   const toggleOnlyChanges = () => {
     setOnlyChanges((v) => !v);
     setExpanded(new Set());
@@ -172,13 +182,21 @@ function DesktopRows({
     <div role="table" aria-label="Confronto dei commi">
       <div role="row" className={cn(COLUMNS, 'sticky top-0 z-10 border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900')}>
         <div role="columnheader" aria-label="Comma" />
-        <ArticleHeader article={left} side="left" onRemove={() => onRemove('left')} />
-        <ArticleHeader article={right} side="right" onRemove={() => onRemove('right')} className="border-l border-slate-200 dark:border-slate-700" />
+        <div role="columnheader" className="min-w-0">
+          <ArticleHeader article={left} side="left" onRemove={() => onRemove('left')} />
+        </div>
+        <div role="columnheader" className="min-w-0 border-l border-slate-200 dark:border-slate-700">
+          <ArticleHeader article={right} side="right" onRemove={() => onRemove('right')} />
+        </div>
       </div>
 
       {items.map((item) =>
         item.type === 'fold' ? (
-          <FoldRow key={item.key} item={item} onUnfold={onUnfold} />
+          <div key={item.key} role="row" className={COLUMNS}>
+            <div role="cell" className="col-span-3">
+              <FoldRow item={item} onUnfold={onUnfold} />
+            </div>
+          </div>
         ) : (
           <div
             key={item.key}
@@ -187,7 +205,12 @@ function DesktopRows({
             data-label={item.label ?? ''}
             className={cn(COLUMNS, 'border-b border-slate-100 dark:border-slate-800')}
           >
-            <div role="rowheader" className="flex flex-col items-start gap-1.5 px-3 py-3 text-xs text-slate-500 dark:text-slate-400">
+            <div
+              role="rowheader"
+              tabIndex={-1}
+              data-focus-key={item.key}
+              className={cn('flex flex-col items-start gap-1.5 px-3 py-3 text-xs text-slate-500 dark:text-slate-400', FOCUS_RING)}
+            >
               {item.part !== 'head' && <span className="font-semibold text-slate-700 dark:text-slate-200">{rowName(item)}</span>}
               {item.label && <LabelPill label={item.label} tooLong={item.tooLong} />}
             </div>
@@ -203,7 +226,7 @@ function DesktopRows({
                 />
               ) : (
                 <div key={side} role="cell" className={cn('flex', side === 'right' && 'border-l border-slate-100 dark:border-slate-800')}>
-                  <GapCell side={side} name={names[side]} />
+                  <GapCell side={side} part={item.part} name={names[side]} />
                 </div>
               );
             })}
@@ -271,7 +294,9 @@ function PhoneRows({
             data-compare-row={item.part}
             data-label={item.label ?? ''}
             aria-label={rowName(item)}
-            className="py-2"
+            tabIndex={-1}
+            data-focus-key={item.key}
+            className={cn('py-2', FOCUS_RING)}
           >
             <div className="flex flex-wrap items-center gap-2 px-4 pt-1">
               {item.part !== 'head' && <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{rowName(item)}</span>}

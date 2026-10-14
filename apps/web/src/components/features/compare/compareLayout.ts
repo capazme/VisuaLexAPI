@@ -3,7 +3,6 @@ import type { ArticleComparison, CompareLabel, CompareRow, CompareSide, CompareU
 import { parseArticleStructure, type ArticleStructure, type TextRange } from '../../../utils/articleStructure';
 import { formatDateForDisplay } from '../../../utils/dateUtils';
 import { requestedVersion } from '../../../utils/versionDisplay';
-import { shortNorm } from '../../../utils/sources';
 
 /** One article's text, parsed once for the whole comparison. */
 export interface SideText {
@@ -154,11 +153,15 @@ function commaItem(comparison: ArticleComparison, row: CompareRow, index: number
 
 /**
  * Each side's name on a phone's switch: a version by its day («31/12/2015»), «Originale» or
- * «In vigore»; an article by its short norm («art. 2043 c.c.»).
+ * «In vigore»; an article by the label the summary gives it («art. 2043 c.c.», with «— testo al …»
+ * when it is a past text). Two articles that come out with the same name get « · 1» and « · 2».
  */
 export function sideNames(comparison: ArticleComparison, articles: Record<CompareSide, ArticleData>): Record<CompareSide, string> {
+  if (comparison.kind === 'articles') {
+    const { left, right } = comparison.summary.labels;
+    return left === right ? { left: `${left} · 1`, right: `${right} · 2` } : { left, right };
+  }
   const name = (side: CompareSide): string => {
-    if (comparison.kind === 'articles') return shortNorm(articles[side].norma_data);
     const asked = requestedVersion(articles[side].norma_data);
     if (asked.kind === 'original') return 'Originale';
     if (asked.kind === 'date') return formatDateForDisplay(asked.date);

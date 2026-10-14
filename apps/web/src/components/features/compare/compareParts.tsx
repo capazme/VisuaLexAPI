@@ -3,7 +3,7 @@ import { cn } from '../../../lib/utils';
 import { renderArticleHtml } from '../../../utils/articleRender';
 import type { CompareLabel, CompareSide } from '../../../utils/articleCompare';
 import { SafeHTML } from '../../../utils/sanitize';
-import { LABEL_TEXT, TOO_LONG_TEXT, type Cell, type SideText } from './compareLayout';
+import { LABEL_TEXT, TOO_LONG_TEXT, type Cell, type RowPart, type SideText } from './compareLayout';
 
 const PILL: Record<CompareLabel, string> = {
   invariato: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
@@ -28,14 +28,21 @@ export function LabelPill({ label, tooLong }: { label: CompareLabel; tooLong?: b
   );
 }
 
-/** A side that has no comma here: hatched, and said so for a screen reader. */
-export function GapCell({ side, name }: { side: CompareSide; name?: string }) {
+const NOTHING: Record<RowPart, string> = {
+  head: 'Nessuna intestazione',
+  rubric: 'Nessuna rubrica',
+  comma: 'Nessun comma',
+};
+
+/** A side that has nothing in this row (no comma, rubric or heading): hatched, and said so for a screen reader. */
+export function GapCell({ side, part = 'comma', name }: { side: CompareSide; part?: RowPart; name?: string }) {
+  const none = NOTHING[part];
   return (
     <div
       role="img"
       data-gap=""
       data-gap-side={side}
-      aria-label={name ? `Nessun comma in: ${name}` : 'Nessun comma'}
+      aria-label={name ? `${none} in: ${name}` : none}
       className="min-h-[3rem] self-stretch bg-[repeating-linear-gradient(135deg,transparent,transparent_6px,rgb(148_163_184/0.18)_6px,rgb(148_163_184/0.18)_7px)]"
     />
   );

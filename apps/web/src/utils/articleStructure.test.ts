@@ -136,6 +136,15 @@ describe('Normattiva — codici (allegato format)', () => {
     expect(decorations(raw, s, 'ref-missing')).toEqual([]);
   });
 
+  it('reads a run of references at the start of a line one by one', () => {
+    const raw = 'Art. 5\n\n1. Il termine è di dieci giorni.\n(12)(13) Testo che segue le note.\n\n-------------\nAGGIORNAMENTO (12)\n\n Nota dodici.\n\n-------------\nAGGIORNAMENTO (13)\n\n Nota tredici.';
+    const s = parseArticleStructure(raw);
+    expect(Object.keys(s.notes)).toEqual(expect.arrayContaining(['12', '13']));
+    expect(decorations(raw, s, 'ref')).toEqual(['(12)', '(13)']);
+    expect(decorations(raw, s, 'ref-missing')).toEqual([]);
+    expect(s.decorations.filter((d) => d.kind === 'ref').map((d) => d.noteId)).toEqual(['12', '13']);
+  });
+
   it('Costituzione art. 3: no rubric', () => {
     const raw = fixtureText('nrm-cost-3');
     const s = parseArticleStructure(raw);

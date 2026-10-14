@@ -606,7 +606,7 @@ invariati and a folded comma is not drawn. «(( ))» is a light highlight with t
 container for both columns, the note read from the article of the column the chip sits in; the tails' fold is shared).
 A comma over `DIFF_WORD_CAP` words that would have been «modificato» is «riscritto» with the line «troppo lungo per il
 confronto parola per parola» (`tooLong`). One scroll replaces the old synchronised scrolling (the rows are the
-alignment); `useCompare` still carries `syncScroll`, unused by the view.
+alignment).
 
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
