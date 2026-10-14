@@ -593,7 +593,7 @@ of `useArticleTextInteractions`).
 **«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
 a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history. The
 body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
-number, else by words — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
+number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
 article in two versions; two different articles are only set side by side. On the desktop a grid (label, left, right; a
 hatched `GapCell` where a side has no comma), on a phone (`useIsDesktop`, one layout per breakpoint) one column with a
 44 px switch between the two versions and «Differenze». Each cell is the reader's own markup for that comma:

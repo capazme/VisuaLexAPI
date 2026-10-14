@@ -378,6 +378,33 @@ function versionScore(a: UnitInfo, b: UnitInfo): number | null {
   return s.reaches(PAIRING_RATIO) ? s.value : null;
 }
 
+/**
+ * D2's last step for versions: between two paired commi (or an edge of the article), a run holding
+ * exactly one older comma and one newer comma that the words did not pair is the same comma
+ * rewritten, so the two are paired by place (and read «riscritto»), never «abrogato» plus
+ * «aggiunto». Two printed numbers that differ stay apart: the numbers say they are two commi.
+ */
+function pairLoneCommi(pairs: readonly Pair[], older: readonly UnitInfo[], newer: readonly UnitInfo[]): Pair[] {
+  const out: Pair[] = [];
+  let k = 0;
+  while (k < pairs.length) {
+    if (pairs[k][0] !== null && pairs[k][1] !== null) {
+      out.push(pairs[k++]);
+      continue;
+    }
+    let end = k;
+    while (end < pairs.length && (pairs[end][0] === null || pairs[end][1] === null)) end++;
+    const run = pairs.slice(k, end);
+    const o = run.filter((p) => p[0] !== null);
+    const n = run.filter((p) => p[1] !== null);
+    const numbers = o.length === 1 && n.length === 1 ? [older[o[0][0]!].unit.number, newer[n[0][1]!].unit.number] : null;
+    if (numbers && !(numbers[0] !== null && numbers[1] !== null && numbers[0] !== numbers[1])) out.push([o[0][0], n[0][1]]);
+    else out.push(...run);
+    k = end;
+  }
+  return out;
+}
+
 /** D2 for two articles: by number when both print one on every comma, else by position. */
 function pairArticles(left: readonly UnitInfo[], right: readonly UnitInfo[]): Pair[] {
   const numbered = (units: readonly UnitInfo[]) => units.length > 0 && units.every((u) => u.unit.number !== null);
@@ -535,7 +562,7 @@ export function compareArticles(left: ArticleData, right: ArticleData): ArticleC
   if (kind === 'versions') {
     const o = sides[older];
     const n = sides[newer];
-    rows = align(o.units, n.units, versionScore).map((pair) => buildRow(pair, o.units, n.units, older));
+    rows = pairLoneCommi(align(o.units, n.units, versionScore), o.units, n.units).map((pair) => buildRow(pair, o.units, n.units, older));
     for (const row of rows) counts[row.label!]++;
     if (o.rubric || n.rubric) {
       rubricRow = buildRow([o.rubric ? 0 : null, n.rubric ? 0 : null], o.rubric ? [o.rubric] : [], n.rubric ? [n.rubric] : [], older);

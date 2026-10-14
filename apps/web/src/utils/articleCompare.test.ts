@@ -166,13 +166,33 @@ describe('pairing by content (D2)', () => {
   it('an insertion and a removal at once', () => {
     const edited = [base[0], 'Un comma nuovo con parole mai viste prima in questo articolo del codice.', base[2], base[3]];
     const c = compareArticles(article(oldRaw, at('2015-12-31')), article(normattiva('Art. 2000.', 'Rubrica', edited)));
-    expect(c.summary.counts).toMatchObject({ invariato: 3, abrogato: 2, aggiunto: 1 });
-    expect(c.rows.filter((r) => r.left && r.right).every((r) => r.label === 'invariato')).toBe(true);
+    // base[1] and the new comma are alone between two paired commi: the same comma, rewritten.
+    expect(labels(c)).toEqual(['invariato', 'riscritto', 'invariato', 'invariato', 'abrogato']);
+    expect(c.summary.counts).toMatchObject({ invariato: 3, riscritto: 1, abrogato: 1, aggiunto: 0 });
   });
-  it('keeps the order: an older-only comma comes before a newer-only one at the same place', () => {
+  it('reads a comma replaced by other words as «riscritto», never «abrogato» plus «aggiunto» (art. 1284 c.c., comma 1)', () => {
     const swapped = [base[0], 'Parole interamente diverse e nuove, nessuna in comune con il comma sostituito.', base[2], base[3], base[4]];
     const c = compareArticles(article(oldRaw, at('2015-12-31')), article(normattiva('Art. 2000.', 'Rubrica', swapped)));
-    expect(labels(c).slice(0, 3)).toEqual(['invariato', 'abrogato', 'aggiunto']);
+    expect(labels(c)).toEqual(['invariato', 'riscritto', 'invariato', 'invariato', 'invariato']);
+    expect(c.rows[1].left && c.rows[1].right).toBeTruthy();
+  });
+  it('reads it so at the head of the article too, with nothing paired before it', () => {
+    const swapped = ['Parole interamente diverse e nuove, nessuna in comune con il comma sostituito.', ...base.slice(1)];
+    const c = compareArticles(article(oldRaw, at('2015-12-31')), article(normattiva('Art. 2000.', 'Rubrica', swapped)));
+    expect(labels(c)).toEqual(['riscritto', 'invariato', 'invariato', 'invariato', 'invariato']);
+  });
+  it('keeps the order where the place says nothing: an older-only comma comes before a newer-only one', () => {
+    const swapped = [base[0], 'Parole interamente diverse e nuove, nessuna in comune.', 'Altre parole del tutto nuove, anche queste mai viste.', base[3], base[4]];
+    const c = compareArticles(article(oldRaw, at('2015-12-31')), article(normattiva('Art. 2000.', 'Rubrica', swapped)));
+    // Two older commi (base[1], base[2]) and two newer ones between base[0] and base[3]: nothing says which is which.
+    expect(labels(c)).toEqual(['invariato', 'abrogato', 'abrogato', 'aggiunto', 'aggiunto', 'invariato', 'invariato']);
+  });
+  it('never pairs by place two commi whose printed numbers differ', () => {
+    const c = compareArticles(
+      article(`1. ${comma(1)}\n2. ${wordsOf(15, 'a')}\n3. ${comma(3)}`, at('2015-12-31')),
+      article(`1. ${comma(1)}\n2-bis. ${wordsOf(15, 'b')}\n3. ${comma(3)}`),
+    );
+    expect(labels(c)).toEqual(['invariato', 'abrogato', 'aggiunto', 'invariato']);
   });
   it('pairs a modified comma by its words when no number helps', () => {
     const edited = [...base];
@@ -187,20 +207,23 @@ describe('pairing by content (D2)', () => {
     );
     expect(numbered.rows).toHaveLength(1);
     expect(numbered.rows[0].label).toBe('modificato');
+    // Alone on each side, the two are paired by place: the words say «riscritto».
     const unrelated = compareArticles(article(`1. ${comma(1)}`, at('2015-12-31')), article(wordsOf(20, 'z')));
-    expect(labels(unrelated)).toEqual(['abrogato', 'aggiunto']);
+    expect(labels(unrelated)).toEqual(['riscritto']);
   });
 });
 
 describe('the pairing boundary (D2)', () => {
+  // Two older commi against one newer: the place alone cannot pair them, the words must.
   const pairOf = (shared: number) => {
+    const other = Array.from({ length: 30 }, (_, i) => `o${i}x`).join(' ');
     const a = Array.from({ length: 100 }, (_, i) => `s${i}x`).join(' ');
     const b = Array.from({ length: 100 }, (_, i) => (i < shared ? `s${i}x` : `t${i}x`)).join(' ');
-    return compareArticles(article(a, at('2015-12-31')), article(b)).rows.map((r) => r.label);
+    return compareArticles(article(`${other}\n${a}`, at('2015-12-31')), article(b)).rows.map((r) => r.label);
   };
   it('pairs two unnumbered commi at exactly half their words in common, not at 49 of 100', () => {
-    expect(pairOf(50)).toEqual(['riscritto']);
-    expect(pairOf(49)).toEqual(['abrogato', 'aggiunto']);
+    expect(pairOf(50)).toEqual(['abrogato', 'riscritto']);
+    expect(pairOf(49)).toEqual(['abrogato', 'abrogato', 'aggiunto']);
   });
 });
 
