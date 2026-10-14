@@ -41,6 +41,8 @@ export interface PdfArticle {
   missing: 'none' | 'blocked' | 'unavailable';
   /** «Solo le parti»: the marked passages, printed in place of `text` (empty: nothing is marked). */
   excerpt?: ExcerptPart[];
+  /** «Solo le parti»: the reader's marks could not be read, so nothing can be said of them. */
+  marksUnavailable?: boolean;
 }
 
 /** A decision of the «Giurisprudenza» section. */
@@ -51,6 +53,8 @@ export interface PdfDecision {
   model: DecisionPdfModel | null;
   /** «Solo le parti»: the marked passages in place of the text (empty: nothing is marked); null in the full text, or when the decision has no text. */
   excerpt: ExcerptPart[] | null;
+  /** The reader's marks could not be read: the text is printed without them, and the PDF says so. */
+  marksUnavailable?: boolean;
 }
 
 export type PdfBlock =
@@ -73,10 +77,13 @@ export type LoadedDecision = FoundDecision | null;
 export interface PdfMarks {
   highlights: Highlight[];
   notes: Annotation[];
+  /** They could not be read (the server refused or failed): never «nothing marked». */
+  unavailable?: boolean;
 }
 
 export const PDF_TEXT_UNAVAILABLE = 'Testo non disponibile al momento';
 export const PDF_NO_MARKS = 'Nessuna parte evidenziata o annotata';
+export const PDF_MARKS_UNAVAILABLE = 'Evidenziazioni e note non disponibili al momento';
 export const PDF_DECISIONS_HEADING = 'Giurisprudenza';
 
 // A note as the PDF prints it: its text, then who wrote it when an application did.
@@ -158,7 +165,7 @@ export interface PdfBuildOptions {
   marks?: Map<string, PdfMarks>;
   /** The decisions to print, by item id (the dossier's order is kept); none when absent. */
   decisions?: Map<string, LoadedDecision>;
-  /** ISO day written in each decision's source line; today in Rome by default. */
+  /** ISO day written in each decision's source line («Fonte: … · consultata il …»); today in Rome by default. */
   consultedOn?: string;
 }
 
@@ -188,7 +195,7 @@ function pdfDecision(item: Extract<DossierItem, { type: 'sentenza' }>, answer: L
       excerpt = excerptParts(length, anchors, textBetween);
     }
   }
-  return { citation, model, excerpt };
+  return { citation, model, excerpt, ...(marks.unavailable ? { marksUnavailable: true } : {}) };
 }
 
 /** The PDF's sections; `titles` maps an act's key to its title (none for a code). */
@@ -219,6 +226,7 @@ export function buildPdfBlocks(
           return {
             ...base, text: plain(loaded.text), missing: 'none',
             ...(options.excerpts ? { excerpt: articleExcerpt(loaded.text, marks) } : {}),
+            ...(options.excerpts && marks.unavailable ? { marksUnavailable: true } : {}),
           };
         }
         if (loaded?.blockedReason) return { ...base, text: loaded.blockedReason, missing: 'blocked' };
@@ -235,6 +243,15 @@ export function buildPdfBlocks(
     });
   }
   return blocks;
+}
+
+/** How many texts' highlights and notes the PDF could not read (printed as «non disponibili»), for the toast. */
+export function countMarksUnavailable(blocks: PdfBlock[]): number {
+  return blocks.reduce((n, b) => {
+    if (b.kind === 'act') return n + b.articles.filter((a) => a.marksUnavailable).length;
+    if (b.kind === 'decisions') return n + b.decisions.filter((d) => d.model && d.marksUnavailable).length;
+    return n;
+  }, 0);
 }
 
 /** How many texts the PDF could not print (an article or a decision), for the toast. */
@@ -287,8 +304,12 @@ function drawPdfDecision(w: PdfWriter, decision: PdfDecision): void {
     return;
   }
   drawDecisionHead(w, model);
-  if (excerpt) drawExcerpt(w, excerpt, { font: 'times', size: DECISION_BODY, leading: DECISION_LEADING });
-  else drawDecisionBlocks(w, model);
+  // Its source and the day it was read, which its own PDF carries in the page footer.
+  w.write(model.footer, 8, 'normal', 11, true);
+  w.y += 4;
+  if (decision.marksUnavailable) w.write(PDF_MARKS_UNAVAILABLE, 9, 'italic', 12, true);
+  if (excerpt && !decision.marksUnavailable) drawExcerpt(w, excerpt, { font: 'times', size: DECISION_BODY, leading: DECISION_LEADING });
+  else if (!excerpt) drawDecisionBlocks(w, model);
   drawDecisionTail(w, model);
 }
 
@@ -340,7 +361,8 @@ export function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): j
       const head = `${article.label}${article.rubrica ? ` — ${article.rubrica}` : ''}${article.versionLabel ? ` · ${article.versionLabel}` : ''}`;
       write(head, 11, 'bold', 15);
       article.notes.forEach((text) => write(`Nota: ${text}`, 9, 'italic', 12));
-      if (article.excerpt) drawExcerpt(w, article.excerpt, { font: 'helvetica', size: 9, leading: 12 });
+      if (article.marksUnavailable) write(PDF_MARKS_UNAVAILABLE, 9, 'italic', 12, true);
+      else if (article.excerpt) drawExcerpt(w, article.excerpt, { font: 'helvetica', size: 9, leading: 12 });
       else write(article.text, 9, article.missing === 'none' ? 'normal' : 'italic', 12, article.missing !== 'none');
       w.y += 10;
     });

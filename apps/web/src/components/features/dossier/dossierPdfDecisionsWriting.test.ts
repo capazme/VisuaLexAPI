@@ -21,7 +21,7 @@ vi.mock('jspdf', async (importOriginal) => {
 
 import type { FoundDecision } from '../../../types/decisions';
 import { decisionPdfModel } from '../decisions/decisionPdf';
-import { PDF_TEXT_UNAVAILABLE, writeDossierPdf, type PdfBlock, type PdfDecision } from './dossierPdf';
+import { PDF_MARKS_UNAVAILABLE, PDF_TEXT_UNAVAILABLE, writeDossierPdf, type PdfBlock, type PdfDecision } from './dossierPdf';
 
 const HEADER = { title: 'Pratica Rossi', countsLine: '1 sentenza', exportedOn: '13/10/2026' };
 
@@ -54,11 +54,12 @@ describe('writeDossierPdf — «Giurisprudenza»', () => {
         "text 44,122 Giurisprudenza",
         "text 44,146 Corte cost., sent., n. 71/2020",
         "text 44,164 Corte costituzionale · Sentenza n. 71/2020 · decisa il 12 marzo 2020",
-        "text 44,192 MOTIVAZIONE",
-        "text 44,206 Primo paragrafo della motivazione.",
-        "text 44,228.5 Secondo paragrafo.",
-        "text 44,261 Note sulla decisione",
-        "text 44,277 Da rileggere",
+        "text 44,186 Fonte: Corte costituzionale — dati aperti · consultata il 13 ottobre 2026",
+        "text 44,207 MOTIVAZIONE",
+        "text 44,221 Primo paragrafo della motivazione.",
+        "text 44,243.5 Secondo paragrafo.",
+        "text 44,276 Note sulla decisione",
+        "text 44,292 Da rileggere",
         "text 44,810 Pratica Rossi · VisuaLex",
         "text 555,810 Pagina 1",
       ]
@@ -89,6 +90,29 @@ describe('writeDossierPdf — «Giurisprudenza»', () => {
     expect(text).toContain('Nota: Una nota');
     expect(text.filter((t) => t === '[…]')).toHaveLength(2);
     expect(text.some((t) => t.includes('Primo paragrafo'))).toBe(false);
+  });
+
+  it('marks that could not be read are said to be unavailable, for an article and for a decision, never «nothing marked»', () => {
+    const model = decisionPdfModel(FOUND, { consultedOn: '2026-10-13', annotations: { highlights: [], notes: [] } });
+    calls.length = 0;
+    writeDossierPdf(HEADER, [
+      { kind: 'act', heading: 'Codice civile', title: null, articles: [
+        { label: 'art. 1', notes: [], rubrica: null, versionLabel: null, text: 'x', missing: 'none', excerpt: [], marksUnavailable: true },
+      ] },
+      ...section({ citation: 'c', model, excerpt: [], marksUnavailable: true }),
+    ]);
+    const text = drawn().filter((l) => l.startsWith('text')).map((l) => l.replace(/^text \S+ /, ''));
+    expect(text.filter((t) => t === PDF_MARKS_UNAVAILABLE)).toHaveLength(2);
+    expect(text).not.toContain('Nessuna parte evidenziata o annotata');
+  });
+
+  it('a decision carries its source and the day it was read', () => {
+    const model = decisionPdfModel(FOUND, { consultedOn: '2026-10-13', annotations: { highlights: [], notes: [] } });
+    calls.length = 0;
+    writeDossierPdf(HEADER, section({ citation: 'c', model, excerpt: null }));
+    const text = drawn().filter((l) => l.startsWith('text')).map((l) => l.replace(/^text \S+ /, ''));
+    expect(text).toContain(model.footer);
+    expect(model.footer).toMatch(/^Fonte: Corte costituzionale — dati aperti · consultata il 13 ottobre 2026$/);
   });
 
   it('a text with no marked passage says so, for an article and for a decision', () => {

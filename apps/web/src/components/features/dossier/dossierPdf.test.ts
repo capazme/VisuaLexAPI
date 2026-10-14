@@ -6,7 +6,7 @@ vi.mock('../../../utils/articleFetchCache', () => ({ fetchArticleForNorma: (...a
 const fetchDecisionCached = vi.fn();
 vi.mock('../../../utils/decisionFetchCache', () => ({ fetchDecisionCached: (...a: unknown[]) => fetchDecisionCached(...a) }));
 
-import {
+import { countMarksUnavailable,
   buildPdfBlocks, countUnavailable, loadDossierDecisions, loadDossierTexts, PDF_NO_MARKS, PDF_TEXT_UNAVAILABLE,
   type LoadedDecision, type PdfBlock, type PdfMarks,
 } from './dossierPdf';
@@ -189,6 +189,17 @@ describe('buildPdfBlocks — «solo le parti evidenziate e annotate»', () => {
       { kind: 'passage', text: '(Oggetto)\n1. Il debitore risponde', notes: ['Cfr. art. 1218'] },
       { kind: 'gap' },
     ]);
+  });
+
+  it('marks that could not be read are unavailable, never «nothing marked», and counted for the toast', () => {
+    const marks = new Map<string, PdfMarks>([['a1', { highlights: [], notes: [], unavailable: true }]]);
+    const blocks = buildPdfBlocks([a1], new Map([['a1', { text: RAW }]]), new Map(), { excerpts: true, marks });
+    expect(articleOf(blocks).marksUnavailable).toBe(true);
+    expect(countMarksUnavailable(blocks)).toBe(1);
+    // The full text prints no article marks: nothing is missing there.
+    const full = buildPdfBlocks([a1], new Map([['a1', { text: RAW }]]), new Map(), { marks });
+    expect(articleOf(full).marksUnavailable).toBeUndefined();
+    expect(countMarksUnavailable(full)).toBe(0);
   });
 
   it('an article with no mark says so; the full text is not asked for in the full mode', () => {

@@ -51,7 +51,7 @@ import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWith
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
-import { buildPdfBlocks, countUnavailable, loadDossierDecisions, loadDossierTexts, writeDossierPdf } from './dossierPdf';
+import { buildPdfBlocks, countMarksUnavailable, countUnavailable, loadDossierDecisions, loadDossierTexts, writeDossierPdf } from './dossierPdf';
 import { loadPdfMarks } from './dossierPdfMarks';
 import { DossierPdfDialog, type DossierPdfOptions } from './DossierPdfDialog';
 import { lastActTitle, resolveBlockUrn } from './useActDetails';
@@ -435,9 +435,12 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
       setPdfDialogOpen(false);
       const missing = countUnavailable(blocks);
-      if (missing > 0) {
-        showToast(`PDF salvato: ${missing === 1 ? '1 testo non disponibile' : `${missing} testi non disponibili`}`, 'info');
-      }
+      const unmarked = countMarksUnavailable(blocks);
+      const gaps = [
+        ...(missing > 0 ? [missing === 1 ? '1 testo non disponibile' : `${missing} testi non disponibili`] : []),
+        ...(unmarked > 0 ? [unmarked === 1 ? 'evidenziazioni e note di 1 testo non disponibili' : `evidenziazioni e note di ${unmarked} testi non disponibili`] : []),
+      ];
+      if (gaps.length > 0) showToast(`PDF salvato: ${gaps.join('; ')}`, 'info');
     } catch (err) {
       console.error('Failed to export the dossier PDF:', err);
       showToast('Impossibile creare il PDF del dossier', 'error');

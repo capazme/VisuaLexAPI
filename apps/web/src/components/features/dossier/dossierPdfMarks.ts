@@ -1,7 +1,9 @@
 import type { DossierItem } from '../../../types';
-import { appStore } from '../../../store/useAppStore';
+import { annotationService } from '../../../services/annotationService';
+import { highlightService } from '../../../services/highlightService';
 import { decisionKey, identityOf } from '../../../utils/decisionLinks';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
+import { annotationApiToStore, articleRootOf, buildWireNormaKeyPrefix, highlightApiToStore } from '../../../utils/storeApiMappers';
 import type { PdfMarks } from './dossierPdf';
 
 // A decision's highlights and notes are stored under its key with no article, as the reading surface does.
@@ -16,10 +18,14 @@ interface Wanted {
 
 /**
  * The reader's highlights and notes for the PDF, by item id: the articles' when `articles` is set
- * (only «solo le parti» prints them), and those of the chosen decisions. They are loaded through the
- * store's own actions (the reading surfaces do the same, and a row never opened holds none) and read
- * back from the store filtered as the readers filter them: the article's `buildItemKey` and
- * `uniqueArticleIdFromNorma`, the decision's `decisionKey` with no article.
+ * (only «solo le parti» prints them), and those of the chosen decisions. Read from the server with the
+ * store's own wire prefix and mappers, then filtered as the readers filter them: the article's
+ * `buildItemKey` and `uniqueArticleIdFromNorma`, the decision's `decisionKey` with no article.
+ *
+ * Not through the store's `load…ForArticle`: those swallow a failure (a 429 says nothing) and return
+ * at once while a reader's own load of the same article is still on its way, and either would print
+ * «Nessuna parte evidenziata o annotata» over a text that has some. A text whose marks could not be
+ * read is `unavailable`, and the PDF says so.
  */
 export async function loadPdfMarks(
   items: DossierItem[],
@@ -33,23 +39,27 @@ export async function loadPdfMarks(
       wanted.push({ itemId: item.id, normaKey: decisionKey(identityOf(item.data)), articleId: NO_ARTICLE });
     }
   }
-  const { loadAnnotationsForArticle, loadHighlightsForArticle } = appStore.getState();
+  const marks = new Map<string, PdfMarks>();
   let next = 0;
   const worker = async () => {
     while (next < wanted.length) {
-      const { normaKey, articleId } = wanted[next++];
-      await Promise.all([loadHighlightsForArticle(normaKey, articleId), loadAnnotationsForArticle(normaKey, articleId)]);
+      const { itemId, normaKey, articleId } = wanted[next++];
+      const prefix = buildWireNormaKeyPrefix(normaKey, articleRootOf(articleId));
+      try {
+        const [highlights, notes] = await Promise.all([
+          highlightService.getByNormaKeyPrefix(prefix),
+          annotationService.getByNormaKeyPrefix(prefix),
+        ]);
+        marks.set(itemId, {
+          highlights: highlights.map(highlightApiToStore).filter((h) => h.normaKey === normaKey && h.articleId === articleId),
+          notes: notes.map(annotationApiToStore).filter((a) => a.normaKey === normaKey && a.articleId === articleId),
+        });
+      } catch (err) {
+        console.error('PDF: highlights and notes unavailable for', normaKey, err);
+        marks.set(itemId, { highlights: [], notes: [], unavailable: true });
+      }
     }
   };
   await Promise.all(Array.from({ length: Math.min(LOADS_AT_ONCE, wanted.length) }, worker));
-
-  const { highlights, annotations } = appStore.getState();
-  const marks = new Map<string, PdfMarks>();
-  for (const { itemId, normaKey, articleId } of wanted) {
-    marks.set(itemId, {
-      highlights: highlights.filter((h) => h.normaKey === normaKey && h.articleId === articleId),
-      notes: annotations.filter((a) => a.normaKey === normaKey && a.articleId === articleId),
-    });
-  }
   return marks;
 }
