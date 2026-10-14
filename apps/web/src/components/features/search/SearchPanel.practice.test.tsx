@@ -6,7 +6,7 @@ const env = vi.hoisted(() => ({
   desktop: true,
   lines: [] as unknown[],
   /** The stream's lines for a request, or 'fail' for a refused one; else `lines`. */
-  stream: null as null | ((params: Record<string, unknown>) => unknown[] | 'fail'),
+  stream: null as null | ((params: Record<string, unknown>) => unknown[] | 'fail' | { status: number; error: string }),
   /** Every request's params, in order. */
   requests: [] as Array<Record<string, unknown>>,
   /** `/fetch_tree`'s answer (the annex auto-switch reads it); null answers 500. */
@@ -62,6 +62,7 @@ vi.mock('../../../services/legalFetch', () => ({
     env.requests.push(params);
     const lines = env.stream ? env.stream(params) : env.lines;
     if (lines === 'fail') return new Response('', { status: 500 });
+    if (!Array.isArray(lines)) return new Response(JSON.stringify({ error: lines.error }), { status: lines.status });
     return new Response(lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
   },
 }));
@@ -489,5 +490,16 @@ describe('SearchPanel with the practices: the phone\'s full-screen reader (spec 
     expect(s().phoneReader).toBeNull();
     expect(await screen.findByTestId('practice-column')).toBeInTheDocument();
     expect(s().practiceRows[`${p}/${actId}/${practiceArticleKey(ccArticle('1218'))}`]).toBe(true);
+  });
+});
+
+describe('SearchPanel — a refused search says why', () => {
+  it("says why in the API's own words: a range whose index cannot be read is not an empty search", async () => {
+    s().createPractice('P');
+    const why = "Non riesco a leggere ora l'indice di quest'atto, quindi non posso aprire gli artt. 1-5: riprova più tardi, oppure indica gli articoli uno per uno (es. «1, 2, 3»).";
+    env.stream = () => ({ status: 503, error: why });
+    panel();
+    act(() => { s().triggerSearch({ ...dlgsParams('1-5'), annex: '' }); });
+    expect(await screen.findByText(why)).toBeInTheDocument();
   });
 });

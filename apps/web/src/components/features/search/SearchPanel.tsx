@@ -13,6 +13,7 @@ import { cn } from '../../../lib/utils';
 import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { getErrorMessage } from '../../../utils/errors';
+import { responseErrorMessage } from '../../../utils/responseError';
 import { buildNormaKey } from '../../../utils/normaKeys';
 import { ReadingBackControl } from './ReadingBackControl';
 import { matchesSearchFilters } from '../../../utils/searchFilters';
@@ -323,7 +324,8 @@ export function SearchPanel() {
         signal: controller.signal,
       });
 
-      if (!response.ok) throw new Error('Errore nella richiesta');
+      // The API says why in Italian (a range whose index cannot be read, an article not in the act).
+      if (!response.ok) throw new Error(await responseErrorMessage(response, 'Errore nella richiesta'));
 
       // Stream results - articles appear as they're fetched
       if (!response.body) return;

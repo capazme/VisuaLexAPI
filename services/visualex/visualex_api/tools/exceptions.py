@@ -65,6 +65,15 @@ class RateLimitExceededError(VisuaLexError):
     pass
 
 
+class IndexUnavailableError(VisuaLexError):
+    """
+    The act's index (its tree) could not be read, so a request that needs it (a range of
+    articles, the whole act) cannot be answered now. Not a malformed request, not a missing
+    article: should return 503 to client, with the Italian message as it is.
+    """
+    pass
+
+
 class ExtractionError(VisuaLexError):
     """
     Error during data extraction (e.g., PDF extraction).
