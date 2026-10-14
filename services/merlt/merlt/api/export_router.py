@@ -2,7 +2,7 @@
 Dataset Export Router
 =====================
 
-GDPR-compliant dataset export for academic analysis.
+Dataset export for academic analysis, user ids pseudonymised (salted hash), texts dropped.
 
 Endpoints:
 - GET /export/feedback: Export QAFeedback dataset
@@ -33,7 +33,7 @@ _svc = DatasetExportService()
 async def export_feedback(
     since_days: int = Query(30, ge=1, le=365, description="Export data from last N days"),
     output_format: str = Query("json", description="json or csv"),
-    anonymize: bool = Query(True, description="Anonymize user data"),
+    anonymize: bool = Query(True, description="Pseudonymise user ids (salted hash) and drop texts"),
     api_key: ApiKey = Depends(require_role("admin")),
 ):
     """Export QAFeedback dataset for academic analysis."""
@@ -59,7 +59,7 @@ async def export_feedback(
 async def export_traces(
     since_days: int = Query(30, ge=1, le=365, description="Export data from last N days"),
     output_format: str = Query("json", description="json or csv"),
-    anonymize: bool = Query(True, description="Anonymize user data"),
+    anonymize: bool = Query(True, description="Pseudonymise user ids (salted hash) and drop texts"),
     api_key: ApiKey = Depends(require_role("admin")),
 ):
     """Export QATrace dataset for academic analysis."""

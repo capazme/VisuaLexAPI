@@ -414,14 +414,17 @@ class TrackingEventRecord(Base):
     Previously these lived only in an in-memory ring buffer that evaporated on
     every API restart, making the whole Slice-1 capture cosmetic. They now land
     here durably so the feedback loop has a real input substrate to build on.
-    No PII beyond the opaque VisuaLex user id (varchar string, never an FK).
+    Personal data: the VisuaLex user id in clear (a varchar, never an FK) and,
+    in the payload, what the user did — including a highlight's text and a
+    note's full text. Expires (`merlt.privacy.retention`), exported and erased
+    by user (`merlt.privacy.user_data`).
     """
 
     __tablename__ = "tracking_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     event_type = Column(String(100), nullable=False, index=True)
-    user_id = Column(String(100), index=True)  # opaque VisuaLex id, extracted from payload
+    user_id = Column(String(100), index=True)  # the VisuaLex user id, lifted from the payload
     payload = Column(JSON, default=dict)
     client_ts = Column(BigInteger)  # unix ms from the client
     created_at = Column(DateTime, default=func.now(), index=True)
@@ -722,8 +725,8 @@ class MerltUser(Base):
     Previously `PATCH /profile/qualification` and `PATCH /profile/notifications`
     computed a response but never persisted anything ("users table not yet
     implemented"), and `get_full_profile` always used `DEFAULT_BASELINE`. This
-    table closes that gap: one row per VisuaLex user id (opaque string, never
-    an FK, same convention as everywhere else in this module).
+    table closes that gap: one row per VisuaLex user id (a string in clear,
+    never an FK, same convention as everywhere else in this module).
     """
 
     __tablename__ = "merlt_users"

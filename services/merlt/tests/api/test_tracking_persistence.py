@@ -42,7 +42,7 @@ def test_build_records_extracts_user_id_and_fields():
     assert len(records) == 2
     assert all(isinstance(r, TrackingEventRecord) for r in records)
     assert records[0].event_type == "article:viewed"
-    assert records[0].user_id == "42"  # coerced to string (opaque id, never an FK)
+    assert records[0].user_id == "42"  # coerced to string (the user id in clear, never an FK)
     assert records[0].payload == {"user_id": 42, "urn": "x"}
     assert records[0].client_ts == 1700000000000
     assert records[1].user_id is None

@@ -339,8 +339,10 @@ Emission call-sites. Keep them thin: the tracker hooks do the BFF talk.
    `services/merlt/merlt/api/models/` and `services/merlt/merlt/disagreement/data/`. Use
    `--exclude='/models/'` to exclude the top level only.
 3. **Tracking is persisted.** `tracking_router` writes `tracking_events`
-   (`TrackingEventRecord`). When the DB is unreachable it falls back to a
-   bounded in-memory buffer and still answers 202. Verify with
+   (`TrackingEventRecord`). When the DB is unreachable it answers 503 and
+   keeps nothing (the BFF dead-letters the event). Events expire after
+   `MERLT_TRACKING_RETENTION_DAYS` and are exported and erased per user
+   (`services/merlt/merlt/privacy/`). Verify with
    `SELECT event_type, user_id, created_at FROM tracking_events ORDER BY created_at DESC`.
    Nothing in MERL-T reads the table yet, so the signals feed neither
    authority nor training.
