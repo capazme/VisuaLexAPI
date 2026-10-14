@@ -223,6 +223,8 @@ export interface AppSettings {
     fontFamily: 'sans' | 'serif' | 'mono';
     focusMode: boolean;
     splitView: boolean;
+    /** A decision's key passages are drawn (`utils/decisionKeyPassages.ts`); on by default (the owner, 13 Oct 2026). */
+    showKeyPassages: boolean;
     /**
      * Study Mode reading preferences, persisted across sessions. Without
      * this slice the user had to re-pick the font size, line height, and

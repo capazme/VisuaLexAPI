@@ -60,3 +60,15 @@ Spec: `docs/superpowers/specs/2026-10-13-decision-key-passages-design.md`. One p
 - Browser pass at desktop and phone width on a Cassazione decision with a principle, one without, a
   Corte costituzionale sentenza, a Consiglio di Stato decision (nothing marked).
 - Independent review, all suites of the web, then the pull request.
+
+## As built (14 October 2026)
+
+- A passage is identified by its index in the list `keyPassages` returns (`data-key-index`), not by an
+  `index` field; the menu and the popover read the same list.
+- Keyboard: a menu entry scrolls to its passage at once and opens its popover with the focus on «Fai
+  tua»; the passages themselves take no focus.
+- The preview names the kind («Principio di diritto · evidenziato automaticamente», «Dispositivo · …»)
+  rather than the generic «Passaggio chiave».
+- Words under a highlight are the reader's: a click there opens no popover, and the passage nested in
+  the highlight loses its underline and label (in dark mode a highlight does not paint over it).
+- The Consiglio di Stato case of the browser pass is covered by the tests only (no rules, nothing marked).

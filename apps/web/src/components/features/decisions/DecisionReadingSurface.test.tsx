@@ -366,3 +366,155 @@ describe('DecisionReadingSurface — the find window\'s text root', () => {
     unmount();
   });
 });
+
+describe('DecisionReadingSurface — the key passages', () => {
+  const PRINCIPLE = 'il fornitore che consegna in ritardo la merce deperibile risponde del danno anche quando il ritardo dipende dal vettore';
+  const WITH_PASSAGES: DecisionText = {
+    motivazione: `Il motivo è fondato.\n\nLa Corte enuncia il seguente principio di diritto: «${PRINCIPLE}».`,
+    dispositivo: 'P.Q.M.\n\nLa Corte accoglie il ricorso e condanna la controricorrente al pagamento delle spese.',
+  };
+  const mount = (testo: DecisionText = WITH_PASSAGES, identity: DecisionIdentity = IDENTITY) =>
+    render(<DecisionReadingSurface identity={identity} testo={testo} attributi={{}} />);
+  const settings = appStore.getState().settings;
+  const realMatchMedia = window.matchMedia;
+  /** `useIsDesktop`: the desktop draws a menu, a phone a sheet. */
+  const atDesktop = (desktop: boolean) => {
+    window.matchMedia = ((query: string) => ({
+      matches: desktop, media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  };
+  beforeEach(() => atDesktop(true));
+  afterEach(() => {
+    appStore.setState({ settings });
+    window.matchMedia = realMatchMedia;
+  });
+
+  it('marks them in the text with their label, the text nodes untouched', () => {
+    const { container } = mount();
+    const root = container.querySelector('.vlx-decision')!;
+    expect(textOf(root)).toBe(decisionProjection(WITH_PASSAGES));
+    const kinds = [...root.querySelectorAll<HTMLElement>('.vlx-key-head')].map((e) => e.dataset.keyLabel);
+    expect(kinds).toEqual(['Principio di diritto', 'Dispositivo']);
+    expect(container.querySelector('.key-passages-hidden')).toBeNull();
+  });
+
+  it('lists them under «Passaggi chiave» with the legend, and takes the reader to one', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Passaggi chiave (2), evidenziati automaticamente' }));
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveAccessibleDescription('Evidenziati automaticamente: non sono le tue evidenziazioni.');
+    const entries = within(menu).getAllByRole('menuitem').map((e) => e.textContent);
+    expect(entries[0]).toBe('Principio di diritto — «il fornitore che consegna in ritardo la…»');
+    expect(entries[1]).toBe('Dispositivo — «La Corte accoglie il ricorso»');
+    expect(entries[2]).toBe('Nascondi i passaggi chiave');
+    await act(async () => { fireEvent.click(within(menu).getAllByRole('menuitem')[0]); });
+    expect(scroll).toHaveBeenCalled();
+    expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
+  });
+
+  it('«Fai tua» on a passage makes one highlight of the reader\'s, with its words and offset', async () => {
+    const { container } = mount();
+    const plain = decisionProjection(WITH_PASSAGES);
+    const piece = container.querySelector<HTMLElement>('[data-key-passage="principio"]')!;
+    await act(async () => { fireEvent.click(piece); });
+    const dialog = await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' });
+    expect(within(dialog).getByText('Evidenziato automaticamente: non è una tua evidenziazione.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fai tua (evidenzia)' }));
+    expect(addHighlight).toHaveBeenCalledExactlyOnceWith(KEY, '', PRINCIPLE, '', 'yellow', plain.indexOf(PRINCIPLE));
+    expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
+  });
+
+  it('never stores a passage: nothing is added until the reader makes one theirs', () => {
+    mount();
+    expect(addHighlight).not.toHaveBeenCalled();
+    expect(addAnnotation).not.toHaveBeenCalled();
+    expect(appStore.getState().highlights).toEqual([]);
+  });
+
+  it('hides them all from the popover or the menu, remembers it, and shows them again', async () => {
+    const { container } = mount();
+    // the switch is a class on the text's container, as the highlights' is
+    const hidden = () => container.querySelector('.key-passages-hidden [data-key-passage]') !== null;
+    await act(async () => { fireEvent.click(container.querySelector<HTMLElement>('[data-key-passage="dispositivo"]')!); });
+    fireEvent.click(within(await screen.findByRole('dialog', { name: /Dispositivo/ })).getByRole('button', { name: 'Nascondi i passaggi chiave' }));
+    expect(appStore.getState().settings.showKeyPassages).toBe(false);
+    expect(hidden()).toBe(true);
+    // hidden, a click on the words opens nothing
+    await act(async () => { fireEvent.click(container.querySelector<HTMLElement>('[data-key-passage="dispositivo"]')!); });
+    expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Passaggi chiave \(2\)/ }));
+    const menu = screen.getByRole('menu');
+    expect(within(menu).getAllByRole('menuitem')[0]).toBeDisabled();
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Mostra i passaggi chiave' }));
+    expect(appStore.getState().settings.showKeyPassages).toBe(true);
+    expect(hidden()).toBe(false);
+  });
+
+  it('on a phone lists them in a sheet with the legend, and the switch is there too', async () => {
+    atDesktop(false);
+    Element.prototype.scrollIntoView = vi.fn();
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Passaggi chiave (2), evidenziati automaticamente' }));
+    const sheet = screen.getByRole('dialog', { name: 'Passaggi chiave' });
+    expect(within(sheet).getByText('Evidenziati automaticamente: non sono le tue evidenziazioni.')).toBeInTheDocument();
+    expect(within(sheet).getAllByRole('button').slice(1).map((b) => b.textContent)).toEqual([
+      'Principio di diritto — «il fornitore che consegna in ritardo la…»',
+      'Dispositivo — «La Corte accoglie il ricorso»',
+      'Nascondi i passaggi chiave',
+    ]);
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: /^Dispositivo/ }));
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(screen.queryByRole('dialog', { name: 'Passaggi chiave' })).toBeNull();
+    expect(await screen.findByRole('dialog', { name: 'Dispositivo, evidenziato automaticamente' })).toBeInTheDocument();
+  });
+
+  it('opens nothing on words the reader has highlighted: they are the reader\'s', async () => {
+    const plain = decisionProjection(WITH_PASSAGES);
+    appStore.setState({ highlights: [{ id: 'own', normaKey: KEY, articleId: '', text: PRINCIPLE, startOffset: plain.indexOf(PRINCIPLE), color: 'yellow' } as Highlight] });
+    const { container } = mount();
+    const covered = container.querySelector<HTMLElement>('.highlight-mark [data-key-passage="principio"]')!;
+    expect(covered).not.toBeNull();
+    await act(async () => { fireEvent.click(covered); });
+    expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
+  });
+
+  it('with the highlights hidden, a passage under one answers again', async () => {
+    const plain = decisionProjection(WITH_PASSAGES);
+    appStore.setState({ highlights: [{ id: 'own', normaKey: KEY, articleId: '', text: PRINCIPLE, startOffset: plain.indexOf(PRINCIPLE), color: 'yellow' } as Highlight] });
+    const { container } = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Nascondi evidenziazioni' }));
+    await waitFor(() => expect(container.querySelector('.highlights-hidden')).not.toBeNull());
+    await act(async () => { fireEvent.click(container.querySelector<HTMLElement>('.highlight-mark [data-key-passage="principio"]')!); });
+    expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
+  });
+
+  it('counts none of them among the reader\'s highlights: there is nothing to export', async () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
+    expect(await screen.findByRole('button', { name: 'Nessuna evidenziazione da esportare' })).toBeDisabled();
+  });
+
+  it('leaves a link inside a passage to its own click', async () => {
+    const testo: DecisionText = { motivazione: 'Il motivo è fondato.', dispositivo: 'P.Q.M.\n\nLa Corte, visto l\'art. 2043 c.c., accoglie il ricorso.' };
+    const { container } = mount(testo);
+    const link = container.querySelector<HTMLElement>('[data-key-passage] .citation-hover')!;
+    expect(link).not.toBeNull();
+    await act(async () => { fireEvent.click(link); });
+    expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
+  });
+
+  it('draws no menu and no mark where the rules find nothing, or for a court they were not measured on', () => {
+    const { container, unmount } = mount({ motivazione: 'Il motivo è fondato.' });
+    expect(screen.queryByRole('button', { name: /Passaggi chiave/ })).toBeNull();
+    expect(container.querySelector('[data-key-passage]')).toBeNull();
+    unmount();
+    const council = mount(WITH_PASSAGES, { corte: 'consiglio_di_stato', numero: 1, anno: 2024, provvedimento: 'sentenza' } as DecisionIdentity);
+    expect(council.container.querySelector('[data-key-passage]')).toBeNull();
+  });
+});

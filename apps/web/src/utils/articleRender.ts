@@ -49,7 +49,7 @@ export interface RenderArticleInput {
   focusedThreadId?: string | null;
 }
 
-export type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread';
+export type MarkKind = 'marker' | DecorationKind | 'key' | 'key-head' | 'note' | 'highlight' | 'thread';
 
 /**
  * Nesting order, outermost first. The printed enumerator is outermost and so
@@ -67,6 +67,10 @@ const RANK: Record<MarkKind, number> = {
   note: 4,
   highlight: 5,
   thread: 6,
+  // A decision's key passage (computed, never the reader's): inside the reader's own marks, so CSS
+  // can drop its sign where a highlight covers the same words; its head (the label) inside it.
+  key: 7,
+  'key-head': 7,
   'mod-paren': 8,
   'rubric-paren': 8,
   hidden: 9,
