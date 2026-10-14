@@ -198,6 +198,7 @@ jobs:
       # A directory argument fails on Node 26: the glob names the test files.
       - run: node --test '.claude/hooks/*.test.mjs'
       - run: sh scripts/ci/tests/test_checks.sh
+      - run: sh scripts/tests/test_release_notes.sh
 
   deploy:
     name: Production deploy scripts and stack

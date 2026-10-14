@@ -24,7 +24,8 @@ VisuaLex is an advanced web application designed to research, visualize, and stu
 | **[Component Library](docs/frontend/component_library.md)** | Reusable UI components |
 | **[User Guide](docs/user_guide.md)** | End-user documentation |
 | **[Setup](docs/setup.md)** | From clone to a running stack and green suites |
-| **[Git workflow](docs/git-workflow.md)** | `develop` and `main`, pull requests, code owners, releases, hotfixes |
+| **[Git workflow](docs/git-workflow.md)** | `develop` and `main`, pull requests, review, versions and releases, hotfixes |
+| **[Changelog](CHANGELOG.md)** | What changed, release by release |
 
 ---
 
