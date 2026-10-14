@@ -1,6 +1,6 @@
 # VisuaLex Studia — the streak and the progress dashboard
 
-**Status:** decided by the owner on 13 October 2026: the scope, the visual direction and the six interview points (§3). Decision 13, storing the days, waits for his answer (question 182, recommended); nothing that contains it is merged before it. The server (PR 1) is written; the web app (PR 2) is in progress.
+**Status:** decided by the owner: the scope, the visual direction and the six interview points on 13 October 2026, and decision 13, storing the days, on 14 October (question 182: «ok vai con le raccomandate»). The server is PR 1; the web app, PR 2, is in progress.
 **Builds on:** the Studia screens spec (`docs/superpowers/specs/2026-10-07-studia-cards-screens-design.md`): the review (PR C, decisions 7–9, 17, 18), its routes (`apps/server/src/routes/lingoSrs.ts`) and its screens (`ReviewHome`, `ReviewSession`).
 **Plan:** `docs/superpowers/plans/2026-10-13-studia-progress.md`.
 **Migration:** `20261022100000_lingo_study_days` (§5.1), assigned by the orchestrator.
@@ -57,7 +57,7 @@ Settled on 13 October:
 10. **One celebration a day** (O4), at the moment the goal closes; no sound; off under «riduci movimento».
 11. **Only reviews count** (O5); writing and validating cards wait for the daily challenges.
 12. **The calendar** (O6): 26 weeks on a computer, 12 on a phone.
-13. **The days are stored** (§5.1; awaiting the owner, question 182), one row per user and Rome day, written with each grade. Two reasons. Trashing a studied draft moves its review rows out of the log until it is restored, and a streak computed from the log alone would break backwards. And the log cannot say that a past day's queue was finished. A past day's row is frozen: changing N later does not rewrite it.
+13. **The days are stored** (§5.1; question 182, the owner on 14 October: «ok vai con le raccomandate»), one row per user and Rome day, written with each grade. Two reasons. Trashing a studied draft moves its review rows out of the log until it is restored, and a streak computed from the log alone would break backwards. And the log cannot say that a past day's queue was finished. A past day's row is frozen: changing N later does not rewrite it.
 
 ## 4. What the dashboard shows, and where each number comes from
 

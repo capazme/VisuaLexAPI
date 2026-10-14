@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Git flow.** PR 1 on `feat/studia-progress` (this worktree, off `origin/develop`), with the spec and this plan. PR 2 on `feat/studia-progress-web`, branched from PR 1's head and retargeted to `develop` once PR 1 is merged. Each goes into `develop` with a merge commit `merge: <branch> — <what changes>` at green CI. The orchestrator's brief, for the owner: «PRs: into `develop`; merge commit `merge: <branch> — <what changes>` at green CI. `main`, tags and releases are Guglielmo's. Never merge while a question to Guglielmo about that PR is open.» Quote it in every subagent dispatch that commits.
-- **The open question.** Spec D13 (storing the days) waits for the owner's answer to question 182. Nothing containing the migration is merged before it; PR 2 depends on PR 1 and waits too.
+- **The open question, answered.** Spec D13 (storing the days) waited for the owner's answer to question 182; on 14 October: «ok vai con le raccomandate». PR 2 builds on PR 1.
 - **The migration** is `20261022100000_lingo_study_days`, assigned by the orchestrator. Written by hand (`prisma migrate diff` from a copy of the old schema saved in the scratch directory), applied with `migrate deploy` to this session's test database only, never `migrate dev`, `reset` by hand or `prisma format`. The orchestrator applies it to the development database after the merge.
 - **Server tests** run against this session's own database, `visualex_test_studia_progressi`, in the development Postgres: inside the `dotenv -e .env.test` wrapper only the database name of `DATABASE_URL` is rewritten, by a shell substitution that never prints the URL. Never read or print a `.env` file. Drop the database at the end of the round.
 - **Machine load:** `uptime` before a suite; above about 10, no full suite. One suite at a time, nothing left in the background.
@@ -169,7 +169,7 @@ The answer is spec §5.2's shape. Where each part comes from:
 
 - [ ] **Step 1: Failing tests:** `GET /auth/export` carries `data.lingoGiornate` (day as 'YYYY-MM-DD', the three counts, the two flags), and `data.lingoPreferenze` gains `ripassiAlGiorno`; `DELETE /auth/account` leaves no `lingo_giornate_studio` row; trashing a studied draft and restoring it leaves every stored day byte for byte as before (review focus 4).
 - [ ] **Step 2:** Implement the export. Update `apps/server/CLAUDE.md`: the «Card review» paragraph (`/progressi`, the grade's `oggi`, `ripassiAlGiorno`, the stored days, `markQueueFinished`, `recountToday`), «LingoLex cards» (the export key, the cascade), and the Rome-day SQL gotcha.
-- [ ] **Step 3:** Full server suite and build; `code-reviewer` over the branch; fix every finding; push; open PR 1. **Do not merge before the answer to question 182.**
+- [ ] **Step 3:** Full server suite and build; `code-reviewer` over the branch; fix every finding; push; open PR 1. Merge it at green CI (question 182 answered on 14 October).
 
 ---
 
@@ -220,7 +220,7 @@ The answer is spec §5.2's shape. Where each part comes from:
 - [ ] Update `apps/web/CLAUDE.md`'s «Card review» paragraph (the dashboard, the chips, the celebration, the stored subject key).
 - [ ] Web suite, build, lint; `code-reviewer` over the branch against the spec and this plan; fix every finding.
 - [ ] **Browser pass** without touching the shared stack: the branch's server on port 3011 against this session's test database and the branch's web app on 5175 through an untracked `vite.config.*.mts` that overrides the `/api` proxy and `cacheDir`; a test account registered there and activated by the orchestrator; review history made by grading under the app (a few days of history seeded through the grade route with a moved clock, or by SQL on the test database only). In an isolated browser context opened by this session, closed at the end: desktop and 390 px, light and dark, reduced motion on and off; the ring filling, the celebration in the session and on the home, the calendar's keyboard, hover and tap readouts, the subject filter, the settings. Screenshots to the orchestrator.
-- [ ] Push; open PR 2 (base `feat/studia-progress` until PR 1 is merged, then `develop`). Merge only after PR 1 and the answer to question 182.
+- [ ] Push; open PR 2 (base `feat/studia-progress` until PR 1 is merged, then `develop`). Merge only after PR 1.
 
 ---
 
