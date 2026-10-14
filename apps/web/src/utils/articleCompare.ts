@@ -219,6 +219,8 @@ interface Token {
   end: number;
   /** What the diff compares: the word with Normattiva's «(( ))» marks taken off. Empty for a bare mark. */
   key: string;
+  /** Something not compared (a note reference, a bare «((») stands between this token and the previous one. */
+  breakBefore: boolean;
 }
 
 interface UnitInfo {
@@ -273,7 +275,16 @@ function isRepealNotice(raw: string, unit: CompareUnit, decorations: readonly In
 function inspect(raw: string, unit: CompareUnit, structure: ArticleStructure): UnitInfo {
   // The «(119)» references to an update note are pointers, not words: blanked out
   // (same length, so every offset stays the text's own) before anything is compared.
-  const chars = raw.slice(unit.start, unit.end).split('');
+  const slice = raw.slice(unit.start, unit.end);
+  const chars = slice.split('');
+  // A run of references is read on the text as written: once the parser has blanked the ones whose
+  // note is in the text, «(12)(13)» with only note 12 would leave «(13)» looking like a word.
+  WORD.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = WORD.exec(slice)) !== null) {
+    if (!REFERENCE_TOKEN.test(m[0])) continue;
+    for (let i = m.index; i < m.index + m[0].length; i++) chars[i] = ' ';
+  }
   for (const d of structure.decorations) {
     if (d.kind !== 'ref' && d.kind !== 'ref-missing') continue;
     for (let i = Math.max(d.start, unit.start); i < Math.min(d.end, unit.end); i++) chars[i - unit.start] = ' ';
@@ -282,17 +293,14 @@ function inspect(raw: string, unit: CompareUnit, structure: ArticleStructure): U
   const tokens: Token[] = [];
   const counts = new Map<string, number>();
   let total = 0;
+  let previousEnd = 0;
   WORD.lastIndex = 0;
-  let m: RegExpExecArray | null;
   while ((m = WORD.exec(text)) !== null) {
-    if (REFERENCE_TOKEN.test(m[0])) {
-      // out of the compared text too, not only out of the words («invariato» reads `folded`)
-      for (let i = m.index; i < m.index + m[0].length; i++) chars[i] = ' ';
-      continue;
-    }
     const key = m[0].replace(MARKS, '');
     if (key === '') continue;
-    tokens.push({ start: unit.start + m.index, end: unit.start + m.index + m[0].length, key });
+    const breakBefore = previousEnd > 0 && slice.slice(previousEnd, m.index).trim() !== '';
+    previousEnd = m.index + m[0].length;
+    tokens.push({ start: unit.start + m.index, end: unit.start + m.index + m[0].length, key, breakBefore });
     const word = key.toLowerCase().replace(FOLDED_OUT, '');
     if (word === '') continue;
     counts.set(word, (counts.get(word) ?? 0) + 1);
@@ -301,7 +309,7 @@ function inspect(raw: string, unit: CompareUnit, structure: ArticleStructure): U
   const marker = structure.blocks.find((b) => b.start === unit.start && b.kind === 'comma')?.marker;
   return {
     unit,
-    folded: chars.join('').replace(MARKS, '').replace(/\s+/g, ' ').trim(),
+    folded: text.replace(MARKS, '').replace(/\s+/g, ' ').trim(),
     tokens,
     counts,
     total,
@@ -427,7 +435,9 @@ function wordDiff(older: UnitInfo, newer: UnitInfo, olderSide: CompareSide): Wor
   let openDeleted: TextRange | null = null;
   let openInserted: TextRange | null = null;
   const extend = (open: TextRange | null, into: TextRange[], token: Token): TextRange => {
-    if (open) {
+    // A changed run never stretches over a reference between its words: the chip, the same on both
+    // sides, would be drawn as deleted on one and inserted on the other.
+    if (open && !token.breakBefore) {
       open.end = token.end;
       return open;
     }

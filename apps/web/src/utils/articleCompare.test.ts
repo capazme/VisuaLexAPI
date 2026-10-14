@@ -404,6 +404,22 @@ describe('note references are not compared', () => {
     expect(row.label).toBe('modificato');
     expect(sliced(changed, row.diff!.right)).toEqual(['10']);
   });
+  it('reads a run whole when only some of its notes are in the text', () => {
+    const tail = (id: string) => `\n\n-------------\nAGGIORNAMENTO (${id})\n\n Il D.Lgs. 1 gennaio 2020, n. 1 ha disposto la modifica.`;
+    const oldRaw = `1. Il saggio degli interessi legali è pari al 5 per cento. (12)(13)${tail('12')}`;
+    const newRaw = `1. Il saggio degli interessi legali è pari al 5 per cento. (14)(15)${tail('14')}`;
+    const c = compareArticles(article(oldRaw, at('2015-12-31')), article(newRaw));
+    expect(labels(c)).toEqual(['invariato']);
+  });
+  it('never draws a reference between changed words as changed', () => {
+    const tail = `\n\n-------------\nAGGIORNAMENTO (12)\n\n Il D.Lgs. 1 gennaio 2020, n. 1 ha disposto la modifica.`;
+    const oldRaw = `1. Il ricorso è proposto entro trenta (12) giorni dalla notifica dell'atto impugnato.${tail}`;
+    const newRaw = `1. Il ricorso è proposto entro sessanta (12) settimane dalla notifica dell'atto impugnato.${tail}`;
+    const row = compareArticles(article(oldRaw, at('2015-12-31')), article(newRaw)).rows[0];
+    expect(row.label).toBe('modificato');
+    expect(sliced(oldRaw, row.diff!.left)).toEqual(['trenta', 'giorni']);
+    expect(sliced(newRaw, row.diff!.right)).toEqual(['sessanta', 'settimane']);
+  });
 });
 
 describe('the rubric', () => {
