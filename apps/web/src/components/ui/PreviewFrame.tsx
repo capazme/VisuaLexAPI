@@ -1,10 +1,11 @@
 /**
  * PreviewFrame - the frame of the hover popups on citations: portal, animation, header with its close
  * button, body and footer. Whoever uses it writes the body (a norm: `CitationPreviewPopup`; a decision:
- * `DecisionPreviewPopup`); the position is computed by the preview's hook.
+ * `DecisionPreviewPopup`); the position is computed by the preview's hook. A preview opened by a click
+ * or a key (a decision in a list, `DecisionPreviewDialog`) is a non-modal `dialog` holding the focus.
  */
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -22,18 +23,24 @@ interface PreviewFrameProps {
   onMouseLeave?: () => void;
   children: ReactNode;
   footer: ReactNode;
+  /** Opened by a click or a key: a `dialog` named `label`, its element in `frameRef` for the focus. A hover popup is a `tooltip`. */
+  dialog?: { label: string; frameRef: RefObject<HTMLDivElement | null> };
 }
 
-export function PreviewFrame({ visible, position, title, badge, onClose, onMouseEnter, onMouseLeave, children, footer }: PreviewFrameProps) {
-  // Escape closes it
+export function PreviewFrame({ visible, position, title, badge, onClose, onMouseEnter, onMouseLeave, children, footer, dialog }: PreviewFrameProps) {
+  // Escape closes it. A dialog takes its Esc first (capture) and marks it taken, so what it sits on (a
+  // practice's table over the rail, a modal) does not close with it.
+  const isDialog = Boolean(dialog);
   useEffect(() => {
     if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      if (isDialog) e.preventDefault();
+      onClose();
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [visible, onClose]);
+    document.addEventListener('keydown', handleKeyDown, isDialog);
+    return () => document.removeEventListener('keydown', handleKeyDown, isDialog);
+  }, [visible, onClose, isDialog]);
 
   return createPortal(
     <AnimatePresence>
@@ -47,10 +54,12 @@ export function PreviewFrame({ visible, position, title, badge, onClose, onMouse
           style={{ top: position.top, left: position.left }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
-          role="tooltip"
+          ref={dialog?.frameRef}
+          role={dialog ? 'dialog' : 'tooltip'}
+          aria-label={dialog?.label}
           // Holds links: a press in it is not a click away from a practice's folded-table overlay.
           data-floating-tool
-          aria-live="polite"
+          aria-live={dialog ? undefined : 'polite'}
         >
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             {/* Header */}

@@ -304,7 +304,7 @@ export async function purgeTrashEntry(userId: string, trashId: string): Promise<
 export async function sweepExpiredTrash(now?: Date): Promise<number>;   // awaited, at most every 10 minutes
 ```
 
-  Routes: delegated `POST /api/dossiers/:id/trash` (weight 1, counter `trash`, scope `content:delete`) → `{ trashId, itemCount }`; delegated `POST /api/dossiers/:id/trash-items` `{ itemIds: string[] 1–50 }` (weight 1, counter `trash`) → `{ trashId, moved, notFound }` — `notFound` lists ids not in that dossier, which are never deleted; when `moved` is empty the answer is 404 and nothing is written. Session only: `GET /api/trash`, `POST /api/trash/:id/restore` `{ targetDossierId? }`, `DELETE /api/trash/:id`. Both trash routes refuse a user-session caller (403: they are for connected applications; the web app keeps its own immediate deletion, S10).
+  Routes: delegated `POST /api/dossiers/:id/trash` (weight 1, counter `trash`, scope `content:delete`) → `{ trashId, itemCount }`; delegated `POST /api/dossiers/:id/trash-items` `{ itemIds: string[] 1–50 }` (weight 1, counter `trash`) → `{ trashId, moved, notFound }` — `notFound` lists ids not in that dossier, which are never deleted; when `moved` is empty the answer is 404 and nothing is written. Session only: `GET /api/trash`, `POST /api/trash/:id/restore` `{ targetDossierId? }`, `DELETE /api/trash/:id`. Both trash routes refuse a user-session caller (403: they are for connected applications; the web app keeps its own immediate deletion, S10 — amended on 13 October 2026: the web's `DELETE /api/dossiers/:id` now moves the dossier to the trash too, see the spec's S10).
 
 - [ ] **Step 1: Save the schema**, as in Task 1 (`schema.before-task6.prisma`).
 - [ ] **Step 2: Failing tests** (`trash.test.ts`):

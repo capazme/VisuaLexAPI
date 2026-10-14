@@ -17,9 +17,6 @@ const env = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => env.desktop, isDesktopViewport: () => env.desktop }));
-vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
-vi.mock('./QuickNormsManager', () => ({ QuickNormsManager: () => null }));
-vi.mock('../settings/AliasManager', () => ({ AliasManager: () => null }));
 vi.mock('../../../config/annexConfig', () => ({ ANNEX_AUTO_SWITCH_CONFIG: env.annex }));
 vi.mock('./ArticleTabContent', () => ({
   ArticleTabContent: ({ data, onCrossReferenceNavigate }: {

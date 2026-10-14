@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MassimeSection } from './MassimeSection';
 import { appStore } from '../../../store/useAppStore';
+
+vi.mock('../../../utils/decisionFetchCache', () => ({
+  fetchDecisionCached: () => Promise.resolve({ esito: 'non_trovata', motivo: 'inesistente' }),
+}));
 
 function show(massime: Parameters<typeof MassimeSection>[0]['massime']) {
   return render(<MemoryRouter><MassimeSection massime={massime} /></MemoryRouter>);
@@ -40,7 +44,7 @@ describe('MassimeSection — the decision a Brocardi massima is headed with', ()
 });
 
 describe('MassimeSection — a decision opened from the article', () => {
-  it('opens beside the article and records the way back to it', () => {
+  it('previews the decision, then opens it beside the article and records the way back to it', async () => {
     const open = vi.fn(() => 'tab');
     const push = vi.fn();
     const original = appStore.getState().pushReadingBack;
@@ -55,7 +59,9 @@ describe('MassimeSection — a decision opened from the article', () => {
         />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByText('Cass. civ., n. 31191/2025'));
+    await act(async () => { fireEvent.click(screen.getByText('Cass. civ., n. 31191/2025')); });
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apri accanto' }));
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ numero: 31191 }), { fromLink: true, besideId: 't1' });
     expect(push).toHaveBeenCalledExactlyOnceWith(back);
     appStore.setState({ pushReadingBack: original } as never);
