@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import type { DossierKind } from '../types';
 
 // API types matching backend response format
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
@@ -25,7 +26,11 @@ export interface DossierApi {
   description?: string | null;
   color?: string | null;
   tags?: string[];
+  kind?: DossierKind;
   is_pinned: boolean;
+  // The owner's copy in the Forum, or null.
+  published?: { shared_environment_id: string; version: number; is_active: boolean; updated_at: string } | null;
+  forum_blocked?: boolean;
   created_at: string;
   updated_at: string;
   items: DossierItemApi[];
@@ -36,6 +41,7 @@ export interface DossierCreate {
   description?: string;
   color?: string;
   tags?: string[];
+  kind?: DossierKind;
 }
 
 export interface DossierUpdate {
@@ -44,6 +50,7 @@ export interface DossierUpdate {
   color?: string | null;
   tags?: string[];
   isPinned?: boolean;
+  kind?: DossierKind;
 }
 
 export interface DossierItemCreate {

@@ -767,6 +767,11 @@ host (a preview such as the palette's result card) registers and records nothing
 ### Dossier
 
 A dossier is where the articles needed for a task are aggregated and read.
+It is **di lavoro** (a practice: it may hold a client's data; the default, and what every older
+dossier is) or **di studio** (a topic studied) — `Dossier.kind`, chosen in `DossierModal` and
+«Modifica» (`DossierKindChoice`), filtered on the list («Tutti · Di lavoro · Di studio») and named in
+the detail's header line (`kindLabel`, `dossierKinds.ts`); `published` (its copy in the Forum, the owner's alone) and
+`forumBlocked` come from the server (spec `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`).
 It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-atto-design.md`).
 
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —

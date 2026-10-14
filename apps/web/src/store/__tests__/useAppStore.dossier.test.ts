@@ -62,12 +62,27 @@ describe('useAppStore dossier sync', () => {
             expect(dossierService.create).toHaveBeenCalledWith({
                 name: 'Ricerca 2043',
                 description: 'desc',
+                kind: 'lavoro',
             });
             const dossiers = appStore.getState().dossiers;
             expect(dossiers).toHaveLength(1);
             expect(dossiers[0].id).toBe('srv-dossier-1');
             expect(dossiers[0].title).toBe('Ricerca 2043');
             expect(dossiers[0].createdAt).toBe(serverDossier.created_at);
+            expect(dossiers[0].kind).toBe('lavoro');
+        });
+
+        it('creates a dossier di studio when asked, and changes the kind in «Modifica»', async () => {
+            vi.mocked(dossierService.create).mockResolvedValue(serverDossier);
+            vi.mocked(dossierService.update).mockResolvedValue(serverDossier);
+
+            await appStore.getState().createDossier('GDPR', undefined, 'studio');
+            expect(dossierService.create).toHaveBeenCalledWith({ name: 'GDPR', description: undefined, kind: 'studio' });
+            expect(appStore.getState().dossiers[0].kind).toBe('studio');
+
+            appStore.getState().updateDossier('srv-dossier-1', { kind: 'lavoro' });
+            expect(appStore.getState().dossiers[0].kind).toBe('lavoro');
+            expect(dossierService.update).toHaveBeenCalledWith('srv-dossier-1', expect.objectContaining({ kind: 'lavoro' }));
         });
 
         it('returns null, keeps the store clean and surfaces a sync error on failure', async () => {

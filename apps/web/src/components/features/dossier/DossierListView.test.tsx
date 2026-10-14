@@ -145,3 +145,29 @@ describe('DossierListView — the trash', () => {
     expect(onOpenTrash).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('DossierListView — dossiers di lavoro and di studio', () => {
+  const kinds: Dossier[] = [
+    { ...dossier([CIVIL]), id: 'w', title: 'Pratica Rossi', kind: 'lavoro' },
+    { ...dossier([PENAL]), id: 's', title: 'Diritto penale', kind: 'studio', published: { sharedEnvironmentId: 'e1', version: 2, isActive: true, updatedAt: '2026-10-14' } },
+    { ...dossier([]), id: 'o', title: 'Senza tipo' },
+  ];
+  const titles = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+
+  it('labels a dossier di studio and one published, and filters by kind (a dossier with no kind is di lavoro)', () => {
+    appStore.setState({ dossiers: kinds });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getAllByText('Di studio', { selector: 'span' })).toHaveLength(1);
+    expect(screen.getByText('Pubblicato nel Forum')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Di studio' }));
+    expect(titles()).toEqual(['Diritto penale']);
+    expect(screen.getByRole('button', { name: 'Di studio' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Di lavoro' }));
+    expect(titles().sort()).toEqual(['Pratica Rossi', 'Senza tipo']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tutti' }));
+    expect(titles()).toHaveLength(3);
+  });
+});

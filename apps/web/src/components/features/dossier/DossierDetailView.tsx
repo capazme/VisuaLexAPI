@@ -41,9 +41,9 @@ import {
 import { useAppStore } from '../../../store/useAppStore';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
-import type { Dossier, DossierItem } from '../../../types';
+import type { Dossier, DossierItem, DossierKind } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, shareableDossier, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
@@ -60,6 +60,7 @@ import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
+import { kindLabel } from './dossierKinds';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
@@ -305,7 +306,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   const exportDossierJSON = () => {
-    const data = JSON.stringify(dossier, null, 2);
+    const data = JSON.stringify(shareableDossier(dossier), null, 2);
     saveBlob(new Blob([data], { type: 'application/json' }), `${dossier.title.replace(/[^a-z0-9]/gi, '_')}.json`);
   };
 
@@ -425,9 +426,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     }
   };
 
-  const handleUpdateDossier = (title: string, description: string, tags: string[]) => {
+  const handleUpdateDossier = (title: string, description: string, tags: string[], kind: DossierKind) => {
     if (editingDossier) {
-      updateDossier(editingDossier.id, { title, description, tags });
+      updateDossier(editingDossier.id, { title, description, tags, kind });
     }
   };
 
@@ -476,7 +477,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               </div>
             )}
             <div className="text-xs md:text-sm text-slate-400 mt-2">
-              Creato il {formatTimestampLong(dossier.createdAt)} · {countsLine}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}
+              {kindLabel(dossier.kind)} · Creato il {formatTimestampLong(dossier.createdAt)} · {countsLine}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}
             </div>
           </div>
 

@@ -281,6 +281,17 @@ export interface Highlight {
     originalAuthor?: OriginalAuthor | null;
 }
 
+/** A dossier di lavoro holds a practice (it may carry a client's data); a dossier di studio a topic studied. */
+export type DossierKind = 'lavoro' | 'studio';
+
+/** The dossier's copy in the Forum, seen by its owner only. */
+export interface DossierPublication {
+    sharedEnvironmentId: string;
+    version: number;
+    isActive: boolean;
+    updatedAt: string;
+}
+
 export interface Dossier {
     id: string;
     title: string;
@@ -289,6 +300,11 @@ export interface Dossier {
     items: DossierItem[];
     tags?: string[];
     isPinned?: boolean;
+    /** Absent before the server answered: read as `lavoro`, the cautious kind. */
+    kind?: DossierKind;
+    published?: DossierPublication | null;
+    /** The admin withdrew its copy from the Forum: it cannot be published again until the admin allows it. */
+    forumBlocked?: boolean;
     sourceSuggestionId?: string | null;
     originalAuthor?: OriginalAuthor | null;
 }

@@ -31,7 +31,7 @@ beforeEach(async () => {
         { id: 'i2', item_type: 'note', title: 'Nota', citation: null, content: 'appunto', created_by: null, about_item_id: 'i1' },
       ],
     },
-    { id: 'd2', name: 'Doppio', items: [] },
+    { id: 'd2', name: 'Doppio', kind: 'studio', items: [] },
     { id: 'd3', name: 'Doppio', items: [] },
   ];
   client = new Client({ name: 'test-client', version: '1.0.0' });
@@ -71,12 +71,12 @@ describe('the tool list', () => {
 });
 
 describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
-  it('lists id, name and number of entries', async () => {
+  it('lists id, name, kind and number of entries (no kind from the server reads as «lavoro»)', async () => {
     const result = await client.callTool({ name: 'omnilex_elenca_dossier', arguments: {} });
     expect(json(result)).toEqual([
-      { id: 'd1', nome: 'Prova', voci: 2 },
-      { id: 'd2', nome: 'Doppio', voci: 0 },
-      { id: 'd3', nome: 'Doppio', voci: 0 },
+      { id: 'd1', nome: 'Prova', tipo: 'lavoro', voci: 2 },
+      { id: 'd2', nome: 'Doppio', tipo: 'studio', voci: 0 },
+      { id: 'd3', nome: 'Doppio', tipo: 'lavoro', voci: 0 },
     ]);
   });
 
@@ -87,6 +87,7 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
       expect(json(result)).toEqual({
         id: 'd1',
         nome: 'Prova',
+        tipo: 'lavoro',
         voci: [
           { id: 'i1', tipo: 'norm', titolo: 'codice civile', riferimento: 'art. 2043 c.c.', aggiunta_da: 'Claude Code', nota_su: null },
           { id: 'i2', tipo: 'note', titolo: 'Nota', riferimento: null, aggiunta_da: null, nota_su: 'i1' },
@@ -113,10 +114,19 @@ describe('omnilex_elenca_dossier and omnilex_leggi_dossier', () => {
 });
 
 describe('omnilex_crea_dossier', () => {
-  it('creates a dossier through dossier:write', async () => {
+  it('creates a dossier di lavoro through dossier:write unless told «studio»', async () => {
     const result = await client.callTool({ name: 'omnilex_crea_dossier', arguments: { nome: 'Nuovo' } });
-    expect(json(result)).toEqual({ id: 'd4', nome: 'Nuovo' });
+    expect(json(result)).toEqual({ id: 'd4', nome: 'Nuovo', tipo: 'lavoro' });
     expect(env.stub.exchanges.map((e) => e.scope)).toEqual(['dossier:write']);
+    const study = await client.callTool({ name: 'omnilex_crea_dossier', arguments: { nome: 'GDPR', tipo: 'studio' } });
+    expect(json(study)).toEqual({ id: 'd5', nome: 'GDPR', tipo: 'studio' });
+    expect(env.stub.apiCalls.filter((c) => c.method === 'POST').map((c) => (c.body as { kind?: string }).kind)).toEqual(['lavoro', 'studio']);
+  });
+
+  it('refuses a kind it does not know before calling anything', async () => {
+    const result = await client.callTool({ name: 'omnilex_crea_dossier', arguments: { nome: 'X', tipo: 'pratica' } });
+    expect(result.isError).toBe(true);
+    expect(env.stub.apiCalls).toHaveLength(0);
   });
 
   it('refuses a name longer than 100 characters before calling anything', async () => {
