@@ -52,7 +52,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'Da qui accedi a tutte le sezioni: Ricerca, Dossier per organizzare le tue raccolte, Cronologia e Ambienti di lavoro.',
+            description: 'Da qui accedi alle sezioni: Ricerca, Dossier per organizzare le tue raccolte e Ambienti di lavoro. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
