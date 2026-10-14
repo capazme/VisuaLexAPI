@@ -132,14 +132,18 @@ export async function trashDossier(
     if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
-      include: { items: { orderBy: { position: 'asc' } }, snapshots: { orderBy: { version: 'asc' } } },
+      include: {
+        items: { orderBy: { position: 'asc' } },
+        snapshots: { orderBy: { version: 'asc' } },
+        publishedCopy: { select: { id: true } },
+      },
     });
     if (!dossier) throw new AppError(404, 'Dossier not found');
     const seen = seenItemIds && new Set(seenItemIds);
     if (seen && (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id)))) {
       throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
     }
-    const { items, snapshots, ...row } = dossier;
+    const { items, snapshots, publishedCopy, ...row } = dossier;
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -148,7 +152,8 @@ export async function trashDossier(
         dossierId: dossier.id,
         label: dossier.name,
         summary: { itemCount: items.length },
-        payload: asJson({ dossier: row, items, snapshots }),
+        // Its copy in the Forum stays published; the link (cleared with the row) comes back on restore.
+        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -337,8 +342,9 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       if (!entry) throw new AppError(404, 'Elemento del cestino non trovato.');
 
       if (entry.kind === 'DOSSIER') {
-        const { dossier, items, snapshots } = entry.payload as unknown as {
+        const { dossier, items, snapshots, publishedCopyId } = entry.payload as unknown as {
           dossier: Record<string, unknown> & { id: string; createdAt: string; updatedAt: string };
+          publishedCopyId?: string | null;
           items: StoredItem[];
           snapshots: { id: string; dossierId: string; version: number; label: string | null; content: unknown; fingerprint: string | null; createdAt: string }[];
         };
@@ -351,6 +357,8 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             color: (dossier.color as string | null) ?? null,
             tags: (dossier.tags as string[]) ?? [],
             isPinned: Boolean(dossier.isPinned),
+            // An entry stored before dossiers had a kind restores as a dossier di lavoro, like every old dossier.
+            kind: dossier.kind === 'studio' ? 'studio' : 'lavoro',
             createdAt: new Date(dossier.createdAt),
             createdByClientId: (dossier.createdByClientId as string | null) ?? null,
             createdByClientName: (dossier.createdByClientName as string | null) ?? null,
@@ -373,6 +381,13 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
               fingerprint: s.fingerprint,
               createdAt: new Date(s.createdAt),
             })),
+          });
+        }
+        if (typeof publishedCopyId === 'string' && publishedCopyId) {
+          // Relinked only when the copy is still the user's and linked to nothing else.
+          await tx.sharedEnvironment.updateMany({
+            where: { id: publishedCopyId, userId, sourceDossierId: null },
+            data: { sourceDossierId: dossier.id },
           });
         }
         await tx.trashEntry.delete({ where: { id: entry.id } });

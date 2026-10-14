@@ -102,6 +102,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and never from a body; answered as `created_by: { clientName } | null`.
   Every dossier and item answer goes through `serializeDossier`/`serializeItem`
   in `dossierController.ts`: add a field there, not in a route.
+  A dossier has a `kind`, `lavoro` (a practice: it may hold a client's data; the default, and
+  what every dossier older than the column became) or `studio` (a topic studied: a dossier
+  taken from a Forum suggestion is one); `POST`/`PUT /dossiers` take it. Each dossier answer
+  carries `published` — its copy in the Forum (`SharedEnvironment.sourceDossierId`, unique,
+  `SET NULL`): `{ shared_environment_id, version, is_active, updated_at }` or null; the link is
+  the owner's alone and never part of the Forum's content. A dossier in the trash keeps its kind,
+  and its copy stays published, linked again on restore if still the user's and unlinked (spec
+  `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`).
   `POST /api/dossiers/:id/notes` `{ text, aboutItemId? }` (user session and
   exchanged tokens with `dossier:write`): plain text, 1–4,000 characters; with
   `aboutItemId` the note is about a norm entry of the same dossier as a whole

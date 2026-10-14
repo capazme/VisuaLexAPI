@@ -83,11 +83,12 @@ Read from develop e08005eb.
 **Server** (`apps/server`).
 - Migration `20261023100000_dossier_kind_forum_source` (name assigned by the orchestrator): enum `DossierKind` (`lavoro`, `studio`);
   `dossiers.kind DossierKind NOT NULL DEFAULT 'lavoro'`; `shared_environments.source_dossier_id TEXT NULL` →
-  `dossiers(id) ON DELETE SET NULL`, with a partial unique index (`WHERE source_dossier_id IS NOT NULL`);
+  `dossiers(id) ON DELETE SET NULL`, with a unique index (NULLs are distinct in Postgres, so legacy items without a
+  dossier are unaffected; Prisma cannot express a partial one);
   `shared_environments.withdrawn_by_admin_at TIMESTAMP NULL` (Q8). Additive only; tested on a copy of the dev DB
   (row counts of dossiers, environments, shared environments, likes, versions, suggestions equal before and after).
 - Dossier CRUD, serializers and the trash restore carry `kind`; `GET /dossiers` and `/:id` add `published:
-  { sharedEnvironmentId, version, isActive, updatedAt } | null`.
+  { shared_environment_id, version, is_active, updated_at } | null` (the dossier answers' snake_case).
 - `POST /shared-environments` accepts `sourceDossierId`: the caller's dossier or 404; a second publish is 409 (the
   unique index's P2002 too) → the client offers «Aggiorna»; `PUT` and restore never change it; `coexist` refused on
   an item with one. D6 on publish, update, restore and reads. D7's checks; the admin withdrawal stamped.

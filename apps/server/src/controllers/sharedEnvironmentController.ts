@@ -1142,6 +1142,8 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
                 userId: req.user!.id,
                 name: payload.title,
                 description: payload.description,
+                // Someone else's proposal: a topic to study, never one of the owner's practices.
+                kind: 'studio',
                 ...attribution,
                 items: { create: items },
               },

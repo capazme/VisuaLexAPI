@@ -414,12 +414,20 @@ model Highlight {
 // DOSSIERS (Work Folders / Projects)
 // ============================================
 
+// A dossier di lavoro holds a practice (it may carry a client's data); a dossier
+// di studio holds a topic studied: the examples, what comes from the Forum.
+enum DossierKind {
+  lavoro
+  studio
+}
+
 model Dossier {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   name        String
   description String?
   color       String?
-  tags        String[] @default([])
+  tags        String[]    @default([])
+  kind        DossierKind @default(lavoro)
   userId      String   @map("user_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -438,6 +446,8 @@ model Dossier {
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items            DossierItem[]
   snapshots        DossierSnapshot[]
+  // Its copy in the Forum, if published: seen by its owner only, never in the public content.
+  publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
   sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
   originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
@@ -819,6 +829,13 @@ model SharedEnvironment {
   currentVersion Int     @default(1) @map("current_version")
   isActive       Boolean @default(true) @map("is_active")
   replacedById   String? @map("replaced_by_id")
+  // Set when the admin withdraws it: its author cannot republish it.
+  withdrawnByAdminAt DateTime? @map("withdrawn_by_admin_at")
+
+  // The dossier it was published from (one Forum item per dossier). Owner-only:
+  // never part of the content nor of any answer to someone else.
+  sourceDossierId String?  @unique @map("source_dossier_id")
+  sourceDossier   Dossier? @relation("SharedEnvironmentSourceDossier", fields: [sourceDossierId], references: [id], onDelete: SetNull)
 
   // Ownership
   userId    String   @map("user_id")

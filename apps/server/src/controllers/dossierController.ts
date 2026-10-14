@@ -45,15 +45,37 @@ function serializeItem(i: ItemRow) {
   };
 }
 
+/**
+ * What a dossier route includes besides the row: the entries in order, and the
+ * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner).
+ */
+const DOSSIER_INCLUDE = {
+  items: { orderBy: { position: 'asc' } },
+  publishedCopy: { select: { id: true, currentVersion: true, isActive: true, updatedAt: true } },
+} satisfies Prisma.DossierInclude;
+
+type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean; updatedAt: Date };
+
 /** A dossier as every route answers it. */
-function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[] }) {
+function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null }) {
   return {
     id: d.id,
     name: d.name,
     description: d.description,
     color: d.color,
     tags: d.tags,
+    // `lavoro` (a practice) or `studio` (a topic studied).
+    kind: d.kind,
     is_pinned: d.isPinned,
+    // The dossier's copy in the Forum, or null when it was never published (or its copy was deleted).
+    published: d.publishedCopy
+      ? {
+          shared_environment_id: d.publishedCopy.id,
+          version: d.publishedCopy.currentVersion,
+          is_active: d.publishedCopy.isActive,
+          updated_at: d.publishedCopy.updatedAt,
+        }
+      : null,
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),
@@ -62,11 +84,14 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
 }
 
 // Validation schemas
+const dossierKindSchema = z.enum(['lavoro', 'studio']);
+
 const createDossierSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().optional(),
   color: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  kind: dossierKindSchema.optional(),
 });
 
 const updateDossierSchema = z.object({
@@ -75,6 +100,7 @@ const updateDossierSchema = z.object({
   color: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(),
   isPinned: z.boolean().optional(),
+  kind: dossierKindSchema.optional(),
 });
 
 const createDossierItemSchema = z.object({
@@ -106,11 +132,7 @@ const moveDossierItemSchema = z.object({
 export const listDossiers = async (req: Request, res: Response) => {
   const dossiers = await prisma.dossier.findMany({
     where: { userId: req.user!.id },
-    include: {
-      items: {
-        orderBy: { position: 'asc' },
-      },
-    },
+    include: DOSSIER_INCLUDE,
     orderBy: { createdAt: 'desc' },
   });
 
@@ -125,11 +147,7 @@ export const getDossier = async (req: Request, res: Response) => {
 
   const dossier = await prisma.dossier.findFirst({
     where: { id, userId: req.user!.id },
-    include: {
-      items: {
-        orderBy: { position: 'asc' },
-      },
-    },
+    include: DOSSIER_INCLUDE,
   });
 
   if (!dossier) {
@@ -151,12 +169,11 @@ export const createDossier = async (req: Request, res: Response) => {
       description: data.description,
       color: data.color,
       tags: data.tags ?? [],
+      kind: data.kind ?? 'lavoro',
       userId: req.user!.id,
       ...provenanceFromRequest(req),
     },
-    include: {
-      items: true,
-    },
+    include: DOSSIER_INCLUDE,
   });
 
   res.status(201).json(serializeDossier(dossier));
@@ -186,12 +203,9 @@ export const updateDossier = async (req: Request, res: Response) => {
       ...(data.color !== undefined && { color: data.color }),
       ...(data.tags !== undefined && { tags: data.tags }),
       ...(data.isPinned !== undefined && { isPinned: data.isPinned }),
+      ...(data.kind !== undefined && { kind: data.kind }),
     },
-    include: {
-      items: {
-        orderBy: { position: 'asc' },
-      },
-    },
+    include: DOSSIER_INCLUDE,
   });
 
   res.json(serializeDossier(dossier));
