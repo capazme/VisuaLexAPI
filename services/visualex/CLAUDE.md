@@ -305,8 +305,8 @@ or a `version_date`) never asks Brocardi, whose commentary carries no date.
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
-input), `ResourceNotFoundError` → 404 (the article is not in the act, a range with no
-article in the act's index), `RateLimitExceededError` → 429, `IndexUnavailableError` → 503 (a
+input), `ResourceNotFoundError` → 404 (the article is not in the act; a request whose ranges
+find no article in the act's index and that names nothing else), `RateLimitExceededError` → 429, `IndexUnavailableError` → 503 (a
 range, or a whole act, whose index `get_tree` could not read answers
 «Non riesco a leggere ora l'indice di quest'atto, quindi non posso aprire gli artt. 1-5: …»;
 `parse_article_input` returns its error dict with a `kind`, turned into the exception by

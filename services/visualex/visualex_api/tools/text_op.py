@@ -109,9 +109,15 @@ async def parse_article_input(article_string, normurn):
             return {"error": INDEX_UNREADABLE.format(what="l'atto intero"), "kind": "source"}
         logging.info("Returning complete list of articles from norm")
         logging.debug(f"All articles retrieved: {all_articles}")
-        return all_articles
+        # The tree mixes articles (dicts with `numero`) and section labels (strings): the callers
+        # want article numbers only, canonical as a range gives them.
+        return [_canonicalise_article_token(a['numero']).lower()
+                for a in all_articles if isinstance(a, dict) and a.get('numero')]
 
     articles = []
+    # Ranges that found no article in the index: an error only when nothing at all is found
+    # (gotcha 24: a request where some articles exist keeps those and drops the rest).
+    empty_ranges = []
 
     # Rimuovi spazi extra e dividi per virgole
     parts = article_string.strip().split(',')
@@ -165,7 +171,7 @@ async def parse_article_input(article_string, normurn):
                             logging.debug(f"Adding article from range: {article_str}")
                             articles.append(_canonicalise_article_token(article_str).lower())
                 if len(articles) == found_before:
-                    return {"error": f"Nessun articolo tra {start} e {end} nell'indice di quest'atto.", "kind": "not_found"}
+                    empty_ranges.append(f"{start} e {end}")
 
             except Exception as e:
                 logging.error(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
@@ -181,7 +187,7 @@ async def parse_article_input(article_string, normurn):
                 # Aggiungi l'articolo direttamente senza chiamare get_tree
                 articles.append(part)  # Aggiungiamo l'articolo, supponendo che la validità venga gestita successivamente
             else:
-                error_message = f"Invalid article format: {part}"
+                error_message = f"Formato dell'articolo non valido: «{part}»"
                 logging.error(error_message)
                 return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
 
@@ -195,6 +201,9 @@ async def parse_article_input(article_string, normurn):
         else:
             logging.warning(f"Duplicate article found and removed: {article}")
     
+    if not unique_articles and empty_ranges:
+        return {"error": f"Nessun articolo tra {', tra '.join(empty_ranges)} nell'indice di quest'atto.", "kind": "not_found"}
+
     logging.info("Article parsing completed successfully")
     logging.debug(f"Parsed articles (before dedup): {articles}")
     logging.debug(f"Unique articles (after dedup): {unique_articles}")

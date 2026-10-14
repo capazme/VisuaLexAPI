@@ -49,6 +49,20 @@ class TestParseArticleInput:
             result = await parse_article_input("500-510", "urn:x")
         assert result == {"error": "Nessun articolo tra 500 e 510 nell'indice di quest'atto.", "kind": "not_found"}
 
+    async def test_an_empty_range_beside_found_articles_keeps_them(self):
+        # Gotcha 24: a request where some articles exist keeps those and drops the rest.
+        with patch("visualex_api.tools.text_op.get_tree", new=AsyncMock(return_value=TREE)):
+            assert await parse_article_input("1-3, 500-510", "urn:x") == ["1", "2", "3"]
+            assert await parse_article_input("500-510, 600-610", "urn:x") == {
+                "error": "Nessun articolo tra 500 e 510, tra 600 e 610 nell'indice di quest'atto.", "kind": "not_found"}
+
+    async def test_the_whole_act_gives_its_article_numbers_only(self):
+        with patch("visualex_api.tools.text_op.get_tree", new=AsyncMock(return_value=TREE)):
+            assert await parse_article_input("  ", "urn:x") == ["1", "2", "3", "4", "5", "6"]
+
+    async def test_a_malformed_article_is_said_in_italian(self):
+        assert await parse_article_input("5a", "urn:x") == {"error": "Formato dell'articolo non valido: «5a»"}
+
     async def test_the_whole_act_with_no_index_is_said(self):
         with patch("visualex_api.tools.text_op.get_tree", new=AsyncMock(return_value=FAILED)):
             result = await parse_article_input("", "urn:x")
