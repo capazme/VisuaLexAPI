@@ -51,7 +51,9 @@ import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWith
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
-import { buildPdfBlocks, loadDossierTexts, writeDossierPdf } from './dossierPdf';
+import { buildPdfBlocks, countUnavailable, loadDossierDecisions, loadDossierTexts, writeDossierPdf } from './dossierPdf';
+import { loadPdfMarks } from './dossierPdfMarks';
+import { DossierPdfDialog, type DossierPdfOptions } from './DossierPdfDialog';
 import { lastActTitle, resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
@@ -117,6 +119,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
 
   // Hydrate the snapshot list, or the "• N snapshot" counter reads 0 after a
   // reload even when rows exist. Logged on failure, never hidden (gotcha 18).
@@ -392,13 +395,24 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   // The PDF as the page is: notes, then each act once with its articles and
-  // every text, fetched like the reader's (spec §9). Titles come from the
-  // session cache the act blocks already filled.
-  const handleExportPdf = async () => {
+  // every text, fetched like the reader's (spec §9), then the chosen decisions. Titles come from the
+  // session cache the act blocks already filled. `options` is what the export dialog asked for.
+  const handleExportPdf = async ({ excerpts, decisionIds }: DossierPdfOptions) => {
     if (pdfProgress) return;
     setPdfProgress({ done: 0, total: 0 });
     try {
-      const texts = await loadDossierTexts(dossier.items, (done, total) => setPdfProgress({ done, total }));
+      const chosen = new Set(decisionIds);
+      // Texts and decisions load side by side; one count covers both for the dialog.
+      const counts = { texts: { done: 0, total: 0 }, decisions: { done: 0, total: 0 } };
+      const report = () => setPdfProgress({
+        done: counts.texts.done + counts.decisions.done,
+        total: counts.texts.total + counts.decisions.total,
+      });
+      const [texts, decisions, marks] = await Promise.all([
+        loadDossierTexts(dossier.items, (done, total) => { counts.texts = { done, total }; report(); }),
+        loadDossierDecisions(dossier.items, chosen, (done, total) => { counts.decisions = { done, total }; report(); }),
+        loadPdfMarks(dossier.items, { articles: excerpts, decisionIds: chosen }),
+      ]);
       const titles = new Map<string, string | null>();
       await Promise.all(fullLayout.acts.map(async (block) => {
         if (block.isCode) return;
@@ -412,14 +426,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         // A source that fails now keeps the title the block shows.
         titles.set(block.key, answer?.title?.trim() || lastActTitle(block.key));
       }));
-      const blocks = buildPdfBlocks(dossier.items, texts, titles);
+      const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
       const doc = writeDossierPdf(
         { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine, exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );
       doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
-      const missing = blocks.reduce((n, b) => n + (b.kind === 'act' ? b.articles.filter((a) => a.missing === 'unavailable').length : 0), 0);
+      setPdfDialogOpen(false);
+      const missing = countUnavailable(blocks);
       if (missing > 0) {
         showToast(`PDF salvato: ${missing === 1 ? '1 testo non disponibile' : `${missing} testi non disponibili`}`, 'info');
       }
@@ -527,18 +542,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               align="left"
               triggerClassName={SECONDARY_BUTTON}
               items={[
-                { label: 'PDF', icon: Download, onSelect: () => void handleExportPdf(), disabled: !!pdfProgress },
+                { label: 'PDF', icon: Download, onSelect: () => setPdfDialogOpen(true), disabled: !!pdfProgress },
                 { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
                 { label: 'JSON', icon: FileJson, onSelect: exportDossierJSON },
                 { label: snapshotBusy ? 'Salvo lo snapshot…' : 'Salva snapshot', icon: History, onSelect: () => void handleCreateSnapshot(), disabled: snapshotBusy },
               ]}
             >
               <Download size={16} aria-hidden />
-              {pdfProgress ? (
-                <span role="status">Preparo il PDF…{pdfProgress.total > 0 ? ` ${pdfProgress.done} di ${pdfProgress.total}` : ''}</span>
-              ) : (
-                <span className="hidden sm:inline">Esporta</span>
-              )}
+              <span className="hidden sm:inline">Esporta</span>
             </MenuButton>
             <MenuButton
               label="Altre azioni"
@@ -764,6 +775,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           onSave={handleAddNote}
         />
       )}
+
+      <DossierPdfDialog
+        isOpen={pdfDialogOpen}
+        onClose={() => setPdfDialogOpen(false)}
+        decisions={fullLayout.decisions}
+        progress={pdfProgress}
+        onExport={(options) => void handleExportPdf(options)}
+      />
 
       <ConfirmDialog
         open={confirmDeleteOpen}

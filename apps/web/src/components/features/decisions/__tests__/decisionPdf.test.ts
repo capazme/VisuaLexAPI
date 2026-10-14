@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decisionPdfModel, writeDecisionPdf } from '../decisionPdf';
+import { decisionPdfModel, decisionTextBetween, writeDecisionPdf } from '../decisionPdf';
 
 const FOUND = {
   esito: 'trovata', identita: { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
@@ -103,5 +103,37 @@ describe('writeDecisionPdf', () => {
     });
     const doc = writeDecisionPdf(model);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(30);
+  });
+});
+
+describe('decisionTextBetween', () => {
+  const TESTO = { motivazione: 'il ricorrente\nsi duole del fatto.\n\nSecondo paragrafo.', dispositivo: 'P.Q.M.\n\nRigetta.' };
+
+  it('is the projection the anchors count on, with a range read as the PDF prints it', () => {
+    const { projection, length, textBetween } = decisionTextBetween(TESTO as never);
+    expect(projection).toBe('il ricorrentesi duole del fatto.Secondo paragrafo.P.Q.M.Rigetta.');
+    expect(length).toBe(projection.length);
+    expect(textBetween(0, length)).toBe('il ricorrente si duole del fatto.\nSecondo paragrafo.\nP.Q.M.\nRigetta.');
+  });
+
+  it('runs the lines of a paragraph on with a space only where neither side has one, and tells paragraphs apart by \\n', () => {
+    const { projection, textBetween } = decisionTextBetween(TESTO as never);
+    const from = projection.indexOf('ente');
+    const to = projection.indexOf('Secondo') + 'Secondo'.length;
+    expect(textBetween(from, to)).toBe('ente si duole del fatto.\nSecondo');
+    const spaced = decisionTextBetween({ motivazione: 'una riga \n seguita da un\'altra' } as never);
+    expect(spaced.textBetween(0, spaced.length)).toBe('una riga  seguita da un\'altra');
+  });
+
+  it('cuts inside a line, and gives nothing for an empty range', () => {
+    const { projection, textBetween } = decisionTextBetween(TESTO as never);
+    const at = projection.indexOf('Rigetta');
+    expect(textBetween(at + 2, at + 5)).toBe('get');
+    expect(textBetween(at, at)).toBe('');
+  });
+
+  it('keeps every character of the projection: no-break space and accents', () => {
+    const { textBetween, length } = decisionTextBetween({ motivazione: 'Perché l’obbligo' } as never);
+    expect(textBetween(0, length)).toBe('Perché l’obbligo');
   });
 });

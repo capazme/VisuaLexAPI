@@ -9,7 +9,29 @@ vi.mock('./useActDetails', () => ({
     actDetailsAskedFor.push(block);
     return { title: null, rubricaOf: () => null };
   },
+  resolveBlockUrn: async () => 'urn:act',
+  lastActTitle: () => null,
 }));
+// The PDF's reads and its file: the dialog and the flow are what is tested here.
+const pdf = vi.hoisted(() => ({
+  save: vi.fn(),
+  loadDossierTexts: vi.fn(),
+  loadDossierDecisions: vi.fn(),
+  loadPdfMarks: vi.fn(),
+  built: [] as unknown[][],
+}));
+vi.mock('./dossierPdf', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./dossierPdf')>();
+  return {
+    ...real,
+    loadDossierTexts: pdf.loadDossierTexts,
+    loadDossierDecisions: pdf.loadDossierDecisions,
+    buildPdfBlocks: (...args: Parameters<typeof real.buildPdfBlocks>) => { pdf.built.push(args); return real.buildPdfBlocks(...args); },
+    writeDossierPdf: () => ({ save: pdf.save }),
+  };
+});
+vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
+vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () => ({ title: 'Titolo' }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
@@ -247,5 +269,84 @@ describe('DossierDetailView — what Claude removed from it', () => {
     appStore.setState({ dossiers: [structuredClone(dossier)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
     render(<MemoryRouter><DossierDetailView dossier={dossier} onBack={() => {}} showToast={() => {}} trash={trash} /></MemoryRouter>);
     expect(screen.getByRole('button', { name: 'Rimossi di recente (1) — ripristina' })).toBeInTheDocument();
+  });
+});
+
+describe('DossierDetailView — «Esporta → PDF»', () => {
+  const withDecisions: Dossier = { ...dossier, items: [...dossier.items,
+    { id: 's1', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, tipo: 'sentenza', data_deposito: '2014-01-13', etichetta: 'x' } },
+    { id: 's2', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 2, anno: 2015, tipo: 'sentenza', data_deposito: '2015-01-13', etichetta: 'x' } }] };
+  const showToast = vi.fn();
+
+  const open = (d: Dossier) => {
+    appStore.setState({ dossiers: [structuredClone(d)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    render(<MemoryRouter><DossierDetailView dossier={d} onBack={() => {}} showToast={showToast} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Esporta' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PDF' }));
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    pdf.built.length = 0;
+    pdf.loadDossierTexts.mockImplementation(async (_items: unknown, progress: (d: number, t: number) => void) => { progress(3, 3); return new Map(); });
+    pdf.loadDossierDecisions.mockImplementation(async (_items: unknown, _ids: unknown, progress: (d: number, t: number) => void) => { progress(0, 0); return new Map(); });
+    pdf.loadPdfMarks.mockResolvedValue(new Map());
+  });
+
+  it('opens the dialog instead of downloading', () => {
+    open(dossier);
+    expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Sentenze' })).toBeNull();
+    expect(pdf.loadDossierTexts).not.toHaveBeenCalled();
+    expect(pdf.save).not.toHaveBeenCalled();
+  });
+
+  it('lists the dossier\'s decisions by their citation', () => {
+    open(withDecisions);
+    const group = screen.getByRole('group', { name: 'Sentenze' });
+    expect(within(group).getAllByRole('checkbox')).toHaveLength(2);
+    expect(within(group).getByRole('checkbox', { name: 'Corte cost., sent. 13 gennaio 2014, n. 1' })).toBeChecked();
+  });
+
+  it('exports the full text with every decision by default, saves the file and closes the dialog', async () => {
+    open(withDecisions);
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(pdf.save).toHaveBeenCalledWith('Ricorso_Rossi.pdf'));
+    expect(pdf.loadDossierDecisions).toHaveBeenCalledWith(expect.any(Array), new Set(['s1', 's2']), expect.any(Function));
+    expect(pdf.loadPdfMarks).toHaveBeenCalledWith(expect.any(Array), { articles: false, decisionIds: new Set(['s1', 's2']) });
+    expect(pdf.built[0][3]).toMatchObject({ excerpts: false });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('passes the choices on: only the marked passages, and not the decision left out', async () => {
+    open(withDecisions);
+    fireEvent.click(screen.getByRole('radio', { name: 'Solo le parti evidenziate e annotate' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Corte cost., sent. 13 gennaio 2014, n. 1' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(pdf.save).toHaveBeenCalled());
+    expect(pdf.loadDossierDecisions).toHaveBeenCalledWith(expect.any(Array), new Set(['s2']), expect.any(Function));
+    expect(pdf.loadPdfMarks).toHaveBeenCalledWith(expect.any(Array), { articles: true, decisionIds: new Set(['s2']) });
+    expect(pdf.built[0][3]).toMatchObject({ excerpts: true });
+  });
+
+  it('counts the decisions it could not read among the unavailable texts', async () => {
+    pdf.loadDossierDecisions.mockResolvedValue(new Map([['s1', null], ['s2', null]]));
+    pdf.loadDossierTexts.mockResolvedValue(new Map([
+      ['a1', { text: 'uno' }], ['a3', { text: 'tre' }], ['b1', { text: 'due' }],
+    ]));
+    open(withDecisions);
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('PDF salvato: 2 testi non disponibili', 'info'));
+  });
+
+  it('keeps the dialog open and says so when the PDF cannot be made', async () => {
+    pdf.loadDossierTexts.mockRejectedValue(new Error('down'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    open(dossier);
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Impossibile creare il PDF del dossier', 'error'));
+    expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeEnabled();
+    error.mockRestore();
   });
 });

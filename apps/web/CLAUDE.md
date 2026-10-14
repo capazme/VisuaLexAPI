@@ -784,7 +784,28 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
-  norma» do not have.
+  norma» do not have (spec `docs/superpowers/specs/2026-10-13-dossier-pdf-decisions-design.md`).
+  «Esporta → PDF» opens `DossierPdfDialog` (a `ui/Modal`), which only asks: «Cosa
+  stampare» («Testo completo», the default, or «Solo le parti evidenziate e annotate») and, when the
+  dossier holds decisions, «Sentenze» (a checkbox per decision, labelled `decisionCitationOf`, all ticked,
+  «Tutte»/«Nessuna»); `DossierDetailView.handleExportPdf({ excerpts, decisionIds })` loads and writes, the
+  dialog shows «Preparo il PDF… n di m» (`role="status"`, one count for texts and decisions), cannot be
+  closed meanwhile and closes when the file is saved. The chosen decisions are a «Giurisprudenza» section after
+  the acts, in the dossier's order: `loadDossierDecisions` reads each through `fetchDecisionCached` (three at a
+  time), `decisionPdfModel` lays it out with the reader's highlights and notes exactly as its own PDF
+  does and `drawDecisionHead`/`drawDecisionBlocks`/`drawDecisionTail` (`decisionPdf.ts`, the pieces of
+  `writeDecisionPdf`) draw it into the dossier's writer; one that cannot be read says
+  «Testo non disponibile al momento» and counts in the toast. «Solo le parti» (`pdfExcerpts.ts`, pure)
+  prints per article and decision the passages the reader marked: `resolveAnchors` over the projection the
+  anchors were made on (`article_text` without `\n`; `decisionProjection`), anchors that overlap or touch
+  merged, each passage followed by the notes anchored in it («Nota: …»), «[…]» where text is left out,
+  «Nessuna parte evidenziata o annotata» for a text with none. The passage is cut from the stored text
+  (`articleTextBetween`, `decisionTextBetween`): no character changes, the `\n` inside an article's passage stays
+  and a decision's paragraphs and lines are joined as `decisionPdfModel` joins them (root rule 23). A past text
+  takes no marks (gotcha 32); the notes about an article as a whole and a decision's free notes and lost
+  anchors print as in the full text. `loadPdfMarks` (`dossierPdfMarks.ts`) loads the marks through the store's
+  `load…ForArticle` actions and reads them with the readers' keys (`buildItemKey` + `uniqueArticleIdFromNorma`;
+  `decisionKey` + no article).
 - **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
   inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
   composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
@@ -1163,7 +1184,7 @@ meant to stay split; add new features as new files, not inside the shells:
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
-  `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `useActDetails.ts`.
+  `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
 - `features/environments/` — `EnvironmentPage.tsx` shell + `EnvironmentCard.tsx` +
   one file per modal; `EnvironmentContentViewer.tsx` renders the shared
   dossier/quickNorm/alias/annotation/highlight tree. Cards carry a category
