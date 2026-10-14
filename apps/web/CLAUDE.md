@@ -788,7 +788,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   until 13 October 2026 one empty answer blanked the act's title for the session,
   and each new annex or search blanked it while it was read. Acts reorder by drag:
   `setDossierItemOrder` saves the whole order and waits, never sending a
-  temporary id, while an added or restored item is pending
+  temporary id, while an added item is pending
   (`pendingDossierOrders`). Articles do not drag. The header has three actions
   and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
 - **Notes**: every note a dossier gets from the web takes the notes route
@@ -798,14 +798,10 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   all'articolo»; a note whose article is no longer in the dossier shows among
   the free notes. An entry an application wrote carries `ClaudeMark` (`components/ui/`,
   shared with Studia, its sentence `claudeMarkSentence` beside it; «scritta da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
-  gives the article a new id: `restoreDossierItem` reattaches its notes at once
-  (`PUT …/items/:noteId {aboutItemId}`, reverted with a sync error if refused);
-  an undone note comes back through the notes route, about its article if the
-  article is still there. It comes back as the user's: no web route sets
-  `created_by`, by design, so Claude's mark does not survive a web undo (the
-  MCP trash, which keeps ids, restores it). The note dialog closes only once
+  keeps the ids (question 181): «Annulla» restores the trash entry, so a note stays
+  about its article and Claude's mark survives, as in the MCP trash. The note dialog closes only once
   the server has the note, so a refused note keeps its text.
-- **The trash** (what a connected application deleted, the dossiers and the study cards the user deleted, 30 days; spec §10-11):
+- **The trash** (what a connected application deleted, and the dossiers, the entries removed from a dossier and the study cards the user deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
   «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
@@ -822,8 +818,19 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   (`discardEmptyDossier`, only when the server says it held nothing), and
   `applyEnvironment(replace)` and `importEnvironmentPartial(replace)` send the dossiers they
   replace there too (their confirmation says so; annotations and highlights are still deleted
-  for good). The page's trash is read again after a deletion and after «Annulla». The web's removal of single entries stays immediate, with an undo, for now.
-  Study cards go through it too: «Elimina» on a draft or an archived card in
+  for good). The page's trash is read again after a deletion and after «Annulla». Entries removed from
+  a dossier go there too (owner, 13 October 2026, question 181): one article, a whole act
+  («Rimuovi l'atto»), a multiple selection, a note, a decision. `removeItemsWithUndo`
+  (`dossier/removeItemsWithUndo.ts`, wired in `DossierDetailView`) calls the store's
+  `trashDossierItems(dossierId, ids)`, which removes them from the store and sends ONE
+  `POST /dossiers/:id/trash-items`, so one action is one trash entry («3 articoli da «Ricorso
+  Rossi»», «Rimosso da te»); the toast («Elemento rimosso», «N articoli rimossi») has «Annulla», which
+  restores that entry and reads the dossier back (`refreshDossier`, not quiet); a refusal puts the
+  entries back where they were with a sync error and no toast. An entry still saved (a temporary id in
+  `pendingDossierItemIds`) refuses the whole removal with «Riprova tra un istante»: nothing is half removed.
+  The multiple selection's confirmation says they go to the trash for 30 days. Nothing the web
+  reaches deletes an entry for good any more (`removeFromDossier` and `restoreDossierItem`, which
+  re-created entries under new ids, are gone). Study cards go through it too: «Elimina» on a draft or an archived card in
   «Le mie schede» (`studiaService.trash`).
   A decision in the trash is named by the server's citation.
 - **What another application changes shows without a reload** (`useDossierRefresh`, mounted by

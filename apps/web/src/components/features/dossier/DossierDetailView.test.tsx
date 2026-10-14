@@ -38,7 +38,9 @@ vi.mock('../../../services/dossierService', () => ({
     getSnapshots: vi.fn(async () => []),
     // A fresh id per call, as the server gives.
     addItem: vi.fn(async () => ({ id: `srv-${Math.random().toString(36).slice(2)}`, item_type: 'norm', title: '', content: {}, position: 0, status: 'unread', created_at: '' })),
-    deleteItem: vi.fn(async () => {}),
+    trashItems: vi.fn(async (_d: string, ids: string[]) => ({ trashId: 't1', moved: ids, notFound: [] })),
+    getById: vi.fn(),
+    writesInFlight: vi.fn(() => 0),
     updateItem: vi.fn(async () => ({})),
     reorderItems: vi.fn(async () => {}),
     addNote: vi.fn(async (_d: string, body: { text: string; aboutItemId?: string }) => ({
@@ -48,7 +50,10 @@ vi.mock('../../../services/dossierService', () => ({
   },
 }));
 
+vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn(async () => ({ dossierId: 'd1' })) } }));
+
 import { appStore } from '../../../store/useAppStore';
+import { trashService } from '../../../services/trashService';
 import { dossierService } from '../../../services/dossierService';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
 import { DossierDetailView } from './DossierDetailView';
@@ -87,10 +92,16 @@ function renderView(start: Dossier = dossier) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  appStore.setState({ lastSyncError: null });
   toast = null;
   unregister = registerUndoToastListener((t) => { toast = t; });
 });
-afterEach(() => unregister());
+afterEach(() => {
+  // A toast left open keeps ticking into the next test's listener.
+  toast?.onDismiss();
+  unregister();
+});
 
 describe('DossierDetailView — the page by act', () => {
   it('names each act once, in the order the acts entered, with its articles by number', () => {
@@ -140,19 +151,71 @@ describe('DossierDetailView — the page by act', () => {
     expect(items('Altre azioni')).toEqual(['Modifica', 'Aggiungi ai preferiti', 'Seleziona elementi', 'Elimina dossier']);
   });
 
-  it("removes a whole act behind one undo toast, and puts it back", async () => {
+  it("removes a whole act as one trash entry behind one undo toast, and «Annulla» restores it (question 181)", async () => {
     const { rerender } = renderView();
     fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
     fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dal dossier" }));
     await waitFor(() => expect(toast?.message).toBe('2 articoli rimossi'));
+    // One call for the act's articles, none of the others.
+    expect(dossierService.trashItems).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(dossierService.trashItems).mock.calls[0][0]).toBe('d1');
+    expect([...vi.mocked(dossierService.trashItems).mock.calls[0][1]].sort()).toEqual(['a1', 'a3']);
     expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['b1', 'n1']);
     rerender();
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
+    // The server has them back, with their own ids: the page reads the dossier again.
+    vi.mocked(dossierService.getById).mockResolvedValueOnce({
+      id: 'd1', name: 'Ricorso Rossi', is_pinned: false, created_at: '', updated_at: '', tags: [],
+      items: ['a1', 'a3', 'b1', 'n1'].map((id) => ({ id, item_type: 'note' as const, title: 'Nota', content: id, position: 0, status: 'unread' as const, created_at: '' })),
+    });
     await act(async () => { await toast?.onUndo(); });
-    // Back where they were, with the ids the server gives a restored item.
-    const items = appStore.getState().dossiers[0].items;
-    expect(items).toHaveLength(4);
-    expect(items.filter((i) => i.type === 'norma').map((i) => (i.data as { numero_articolo: string }).numero_articolo).sort()).toEqual(['1', '1', '3']);
+    expect(trashService.restore).toHaveBeenCalledWith('t1');
+    expect(dossierService.getById).toHaveBeenCalledWith('d1');
+    // Back where they were (the dossier's order before the removal), not where the server appended them.
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a3', 'b1', 'a1', 'n1']);
+  });
+
+  it('removes a note in one call, and the page trash is read again after the move and after «Annulla»', async () => {
+    const reload = vi.fn();
+    appStore.setState({ dossiers: [structuredClone(dossier)], pendingDossierItemIds: {}, pendingDossierOrders: {} });
+    const trash = { entries: [], error: null, reload, restore: vi.fn(), purge: vi.fn() };
+    render(<MemoryRouter><DossierDetailView dossier={appStore.getState().dossiers[0]} onBack={() => {}} showToast={() => {}} trash={trash} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi nota' }));
+    await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
+    expect(dossierService.trashItems).toHaveBeenCalledWith('d1', ['n1']);
+    expect(reload).toHaveBeenCalledTimes(1);
+    vi.mocked(dossierService.getById).mockResolvedValueOnce({ id: 'd1', name: 'Ricorso Rossi', is_pinned: false, created_at: '', updated_at: '', tags: [], items: [] });
+    await act(async () => { await toast?.onUndo(); });
+    expect(trashService.restore).toHaveBeenCalledWith('t1');
+    expect(reload).toHaveBeenCalledTimes(2);
+  });
+
+  it('a multiple selection is one call and one trash entry; its confirmation says where the entries go', async () => {
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('andranno nel cestino, dove restano 30 giorni e si possono ripristinare');
+    expect(dialog).toHaveTextContent('Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await waitFor(() => expect(toast?.message).toBe('3 elementi rimossi'));
+    expect(dossierService.trashItems).toHaveBeenCalledTimes(1);
+    expect([...vi.mocked(dossierService.trashItems).mock.calls[0][1]].sort()).toEqual(['a1', 'a3', 'b1']);
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['n1']);
+  });
+
+  it('refused by the server: everything is back, with an error and no toast', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(dossierService.trashItems).mockRejectedValueOnce(new Error('down'));
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: `Azioni su ${L247}` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto dal dossier" }));
+    await waitFor(() => expect(appStore.getState().lastSyncError?.message).toBe('Impossibile rimuovere dal dossier. Riprova.'));
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a3', 'b1', 'a1', 'n1']);
+    expect(toast).toBeNull();
+    error.mockRestore();
   });
 
   it('filters by the act, and turns dragging off while filtering', () => {
@@ -199,14 +262,20 @@ describe('DossierDetailView — decisions', () => {
     expect(screen.queryByRole('region', { name: L247 })).toBeNull();
   });
 
-  it('removes a decision behind the undo toast, and puts it back as a decision', async () => {
+  it('removes a decision behind the undo toast; «Annulla» restores the trash entry, the decision with its own id', async () => {
     renderView(withDecision);
     fireEvent.click(screen.getByRole('button', { name: `Rimuovi ${CITATION} dal dossier` }));
     await waitFor(() => expect(toast?.message).toBe('Elemento rimosso'));
+    expect(dossierService.trashItems).toHaveBeenCalledWith('d1', ['s1']);
     expect(appStore.getState().dossiers[0].items.map((i) => i.id)).not.toContain('s1');
+    vi.mocked(dossierService.getById).mockResolvedValueOnce({
+      id: 'd1', name: 'Ricorso Rossi', is_pinned: false, created_at: '', updated_at: '', tags: [],
+      items: [{ id: 's1', item_type: 'sentenza', title: CITATION, content: withDecision.items[4].data as never, position: 0, status: 'unread', created_at: '' }],
+    });
     await act(async () => { await toast?.onUndo(); });
-    expect(dossierService.addItem).toHaveBeenLastCalledWith('d1', expect.objectContaining({ itemType: 'sentenza', title: CITATION }));
-    expect(appStore.getState().dossiers[0].items.filter((i) => i.type === 'sentenza')).toHaveLength(1);
+    expect(trashService.restore).toHaveBeenCalledWith('t1');
+    expect(dossierService.addItem).not.toHaveBeenCalled();
+    expect(appStore.getState().dossiers[0].items.filter((i) => i.type === 'sentenza').map((i) => i.id)).toEqual(['s1']);
   });
 });
 

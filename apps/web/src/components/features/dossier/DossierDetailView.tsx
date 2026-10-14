@@ -41,13 +41,13 @@ import {
 import { useAppStore } from '../../../store/useAppStore';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
-import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import {
   formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
+import { removeItemsWithUndo, removeSelectionMessage } from './removeItemsWithUndo';
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
@@ -88,8 +88,6 @@ interface Props {
 export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) {
   const {
     dossiers,
-    removeFromDossier,
-    restoreDossierItem,
     updateDossier,
     toggleDossierPin,
     setDossierItemOrder,
@@ -245,46 +243,21 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   const clearSelection = () => setSelectedItems(new Set());
 
-  // Remove one item with a 5s undo window. Snapshot id + position + data up
-  // front so undo can re-insert at the exact spot with status/addedAt intact.
+  // Removing goes to the trash for 30 days, with «Annulla» for 5 s (question 181); the page's trash is
+  // read again so «Rimossi di recente» and «Cestino» count it.
+  const trashChanged = trash ? () => void trash.reload() : undefined;
+
   const handleRemoveSingle = (item: DossierItem) => {
-    const atIndex = dossier.items.findIndex((i) => i.id === item.id);
-    if (atIndex < 0) return;
-    void showUndoToast({
-      action: () => {
-        removeFromDossier(dossier.id, item.id);
-        return { item, atIndex };
-      },
-      undo: ({ item: snap, atIndex: idx }) => restoreDossierItem(dossier.id, snap, idx),
-      message: 'Elemento rimosso',
-    });
+    removeItemsWithUndo(dossier.id, [item.id], 'Elemento rimosso', trashChanged);
   };
 
   const confirmBulkDelete = () => {
     if (selectedItems.size === 0) return;
     setBulkDeleteConfirmOpen(false);
-    // Snapshot items + their indexes BEFORE deletion, in ascending order so
-    // undo can restore them in the same sequence (later items get the right
-    // index once earlier ones have been re-inserted).
-    const snapshots = Array.from(selectedItems)
-      .map((itemId) => {
-        const atIndex = dossier.items.findIndex((i) => i.id === itemId);
-        return atIndex >= 0 ? { item: dossier.items[atIndex], atIndex } : null;
-      })
-      .filter((s): s is { item: DossierItem; atIndex: number } => s !== null)
-      .sort((a, b) => a.atIndex - b.atIndex);
-    const count = snapshots.length;
+    const ids = dossier.items.filter((i) => selectedItems.has(i.id)).map((i) => i.id);
     clearSelection();
-    void showUndoToast({
-      action: () => {
-        snapshots.forEach((s) => removeFromDossier(dossier.id, s.item.id));
-        return snapshots;
-      },
-      undo: (snaps) => {
-        snaps.forEach((s) => restoreDossierItem(dossier.id, s.item, s.atIndex));
-      },
-      message: count === 1 ? 'Elemento rimosso' : `${count} elementi rimossi`,
-    });
+    if (ids.length === 0) return;
+    removeItemsWithUndo(dossier.id, ids, ids.length === 1 ? 'Elemento rimosso' : `${ids.length} elementi rimossi`, trashChanged);
   };
 
   const handleMoveToDossier = (targetDossierId: string) => {
@@ -324,21 +297,11 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     setOpenPickerGroups(normaGroups);
   };
 
-  // All the act's articles, behind one undo toast that puts them back where they were.
+  // All the act's articles, as one trash entry behind one undo toast.
   const handleRemoveAct = (block: ActBlock) => {
-    const snapshots = block.articles
-      .map((item) => ({ item: item as DossierItem, atIndex: dossier.items.findIndex((i) => i.id === item.id) }))
-      .filter((s) => s.atIndex >= 0)
-      .sort((a, b) => a.atIndex - b.atIndex);
-    if (snapshots.length === 0) return;
-    void showUndoToast({
-      action: () => {
-        snapshots.forEach((s) => removeFromDossier(dossier.id, s.item.id));
-        return snapshots;
-      },
-      undo: (snaps) => snaps.forEach((s) => restoreDossierItem(dossier.id, s.item, s.atIndex)),
-      message: snapshots.length === 1 ? 'Articolo rimosso' : `${snapshots.length} articoli rimossi`,
-    });
+    const ids = block.articles.map((item) => item.id).filter((id) => dossier.items.some((i) => i.id === id));
+    if (ids.length === 0) return;
+    removeItemsWithUndo(dossier.id, ids, ids.length === 1 ? 'Articolo rimosso' : `${ids.length} articoli rimossi`, trashChanged);
   };
 
   const exportDossierJSON = () => {
@@ -795,7 +758,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         confirmLabel="Elimina"
         onConfirm={() => {
           setConfirmDeleteOpen(false);
-          deleteDossierWithUndo(dossier, trash ? () => void trash.reload() : undefined);
+          deleteDossierWithUndo(dossier, trashChanged);
           onBack();
         }}
         onCancel={() => setConfirmDeleteOpen(false)}
@@ -805,7 +768,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         open={bulkDeleteConfirmOpen}
         variant="danger"
         title={selectedItems.size === 1 ? 'Eliminare l’elemento selezionato?' : `Eliminare ${selectedItems.size} elementi?`}
-        message="Verranno rimossi da questo dossier. Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati."
+        message={removeSelectionMessage}
         confirmLabel="Elimina"
         onConfirm={confirmBulkDelete}
         onCancel={() => setBulkDeleteConfirmOpen(false)}

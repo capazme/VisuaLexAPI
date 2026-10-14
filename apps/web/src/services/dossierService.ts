@@ -130,9 +130,13 @@ export const dossierService = {
     return tracked(async () => (await apiClient.put(`/dossiers/${dossierId}/items/${itemId}`, data)).data);
   },
 
-  // Delete dossier item
-  async deleteItem(dossierId: string, itemId: string): Promise<void> {
-    await tracked(() => apiClient.delete(`/dossiers/${dossierId}/items/${itemId}`));
+  /**
+   * Moves entries of one dossier to the trash for 30 days, as ONE trash entry (question 181):
+   * `trashId` is what «Annulla» restores, with the entries' own ids. `notFound` lists ids that
+   * were not in the dossier any more; the call fails (404) when none was.
+   */
+  async trashItems(dossierId: string, itemIds: string[]): Promise<{ trashId: string; moved: string[]; notFound: string[] }> {
+    return tracked(async () => (await apiClient.post(`/dossiers/${dossierId}/trash-items`, { itemIds })).data);
   },
 
   // A note, in the dossier or about one of its articles (the route Claude's notes take too).

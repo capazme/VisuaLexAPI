@@ -152,5 +152,8 @@ async def run(ctx: Context, report: Report) -> None:
         await ua.req("DELETE", f"{bff}/quick-norms/{quicknorm_id}", expect=204)
         await ua.req("DELETE", f"{bff}/highlights/{highlight_id}", expect=204)
         await ua.req("DELETE", f"{bff}/annotations/{annotation_id}", expect=204)
-        await ua.req("DELETE", f"{bff}/dossiers/{dossier_id}/items/{item_id}", expect=204)
-        await ua.req("DELETE", f"{bff}/dossiers/{dossier_id}", expect=204)
+        # Both go to the 30-day trash (questions 160 and 181): emptied right after.
+        _, moved_item = await ua.req("DELETE", f"{bff}/dossiers/{dossier_id}/items/{item_id}", expect=200)
+        _, moved_dossier = await ua.req("DELETE", f"{bff}/dossiers/{dossier_id}", expect=200)
+        for moved in (moved_item, moved_dossier):
+            await ua.req("DELETE", f"{bff}/trash/{moved['trashId']}", expect=204)

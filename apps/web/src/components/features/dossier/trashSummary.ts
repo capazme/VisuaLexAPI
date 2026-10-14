@@ -2,8 +2,8 @@ import { formatDateForCitation, todayInRome, withPreposition } from '../../../ut
 
 /**
  * What a trash entry holds, in one line, and when it goes. The trash keeps
- * what a connected application deleted (MCP second round, spec §4.3) and the
- * study cards the user removed in the web app; the entries' shape was agreed
+ * what a connected application deleted (MCP second round, spec §4.3) and what
+ * the user removed in the web app (a dossier, entries of one, study cards); the entries' shape was agreed
  * with the dossier round (`items`, `cards`).
  */
 

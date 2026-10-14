@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../services/trashService', () => ({ trashService: { purge: vi.fn(async () => {}) } }));
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
-    create: vi.fn(), addItem: vi.fn(), reorderItems: vi.fn(), delete: vi.fn(), updateItem: vi.fn(), deleteItem: vi.fn(),
+    create: vi.fn(), addItem: vi.fn(), reorderItems: vi.fn(), delete: vi.fn(), updateItem: vi.fn(),
   },
 }));
 
