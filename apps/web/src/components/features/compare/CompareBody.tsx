@@ -80,8 +80,10 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
       versione: article.norma_data.versione,
       data_versione: article.norma_data.data_versione,
     });
-    return !display.canCite && display.banner ? [{ side, banner: display.banner }] : [];
+    return !display.canCite && display.banner ? [{ side, banner: display.banner, hidden: !display.textVisible }] : [];
   });
+  // An article that did not exist yet has no text to read (the reader hides it): nothing is compared.
+  const nothingToCompare = warnings.some((w) => w.hidden);
   const tails = { left: tailRange(texts.left), right: tailRange(texts.right) };
 
   return (
@@ -123,16 +125,25 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
 
       {warnings.length > 0 && (
         <div data-testid="compare-warnings" className="border-b border-slate-100 px-4 pt-3 dark:border-slate-800">
-          {warnings.map(({ side, banner }) => (
+          {warnings.map(({ side, banner, hidden }) => (
             <div key={side}>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{names[side]}</p>
-              <VersionBanner banner={banner} />
+              <VersionBanner banner={banner} variant={hidden ? 'state' : 'banner'} />
+              {hidden && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(side)}
+                  className={cn('mb-4 min-h-[44px] rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 md:py-1.5 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING)}
+                >
+                  Scegli un altro articolo
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {isDesktop ? (
+      {nothingToCompare ? null : isDesktop ? (
         <DesktopRows
           left={left}
           right={right}

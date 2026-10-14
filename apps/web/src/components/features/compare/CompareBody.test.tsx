@@ -451,3 +451,16 @@ describe('a version the source did not give as asked (gotcha 32)', () => {
     expect(spelled(container, 'left')).toBe(missed.article.article_text!.replace(/\n/g, ''));
   });
 });
+
+describe('an article that did not exist yet on the day asked for', () => {
+  it('draws no text and compares nothing: its banner stands in its place, with a way to choose another', () => {
+    const notYet = past('Articolo non ancora in vigore.');
+    notYet.article.validity = {
+      state: 'not_yet', valid_from: null, valid_to: null, version_number: null, act_updated: null, request_in_window: false,
+    };
+    const inForce = compareArticle('1. Il saggio è del 5 per cento.');
+    const { container } = open(notYet, inForce);
+    expect(container.querySelectorAll('.vlx-art')).toHaveLength(0);
+    expect(within(screen.getByTestId('compare-warnings')).getByRole('button', { name: 'Scegli un altro articolo' })).toBeTruthy();
+  });
+});
