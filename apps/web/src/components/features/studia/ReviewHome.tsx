@@ -7,6 +7,7 @@ import { StudyPreferences } from './StudyPreferences';
 import { ProgressBand } from './progress/ProgressBand';
 import { ProgressPanels } from './progress/ProgressPanels';
 import { SubjectChips } from './progress/SubjectChips';
+import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
 import { FOCUS_RING } from './progress/tokens';
 
@@ -43,6 +44,10 @@ export function ReviewHome() {
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const progress = useProgress(materia);
   const data = progress.data;
+  const { celebrated, markCelebrated } = useCelebratedToday();
+  // Once a day (spec decision 10): here, when the goal was met today with some review and this browser has not
+  // celebrated yet (the session celebrates at the grade that closes it, and marks the day the same way).
+  const celebrate = progress.status === 'ready' && progress.data.oggi.raggiunto && progress.data.oggi.ripassi > 0 && !celebrated(progress.data.oggi.giorno);
 
   const choose = (next: Materia | undefined) => {
     setMateria(next);
@@ -54,7 +59,7 @@ export function ReviewHome() {
   return (
     <section className="max-w-5xl space-y-5 pb-8">
       <h2 className="sr-only">Ripasso</h2>
-      <ProgressBand data={data} onStart={start} nothingLeft={nothingLeft} />
+      <ProgressBand data={data} onStart={start} nothingLeft={nothingLeft} celebrate={celebrate} onCelebrated={() => data && markCelebrated(data.oggi.giorno)} />
       {progress.status === 'error' && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           Non riesco a leggere i tuoi progressi.{' '}

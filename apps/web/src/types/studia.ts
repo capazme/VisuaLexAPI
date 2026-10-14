@@ -155,6 +155,8 @@ export interface RevisioneInput {
 
 /** Today's goal as a recorded grade leaves it; `appenaRaggiunto` on the one grade that made the day count. */
 export interface OggiDelVoto {
+  /** The Rome day of the goal, 'YYYY-MM-DD'. */
+  giorno: string;
   ripassi: number;
   obiettivo: number;
   raggiunto: boolean;

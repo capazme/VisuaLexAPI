@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useRef } from 'react';
 import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
+import { ConfettiBurst, GoalStamp } from './Celebration';
 import { GoalRing } from './GoalRing';
 import { StreakBadge } from './StreakBadge';
 import { FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, SUCCESS_TEXT, TILE } from './tokens';
@@ -12,8 +13,10 @@ export interface ProgressBandProps {
   onStart: () => void;
   /** Nothing is left today. */
   nothingLeft: boolean;
-  /** What lies over the band: the celebration and the stamp. */
-  overlay?: ReactNode;
+  /** Plays the celebration now: confetti from the ring, the stamp pressed in (once a day, the caller decides). */
+  celebrate?: boolean;
+  /** The celebration is over. */
+  onCelebrated?: () => void;
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -32,7 +35,8 @@ function goalLine(data: Progressi): { text: string; met: boolean } {
  * today's sentence and «Inizia il ripasso» in ink. On a phone the ring and the streak sit side by side
  * above the sentence and a full-width button.
  */
-export function ProgressBand({ data, onStart, nothingLeft, overlay }: ProgressBandProps) {
+export function ProgressBand({ data, onStart, nothingLeft, celebrate = false, onCelebrated }: ProgressBandProps) {
+  const ringRef = useRef<HTMLDivElement>(null);
   const empty = data !== null && data.oggi.dovute === 0 && data.oggi.nuove === 0 && data.stati.nuove + data.stati.apprendimento + data.stati.consolidate === 0;
   const line = data ? goalLine(data) : null;
 
@@ -40,7 +44,9 @@ export function ProgressBand({ data, onStart, nothingLeft, overlay }: ProgressBa
     <div className={cn(TILE, 'relative grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5 gap-y-4 overflow-hidden p-4 md:grid-cols-[auto_auto_minmax(0,1fr)] md:gap-x-8 md:p-6')} aria-busy={data === null}>
       {data ? (
         <>
-          <GoalRing ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+          <div ref={ringRef}>
+            <GoalRing ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+          </div>
           <StreakBadge attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
         </>
       ) : (
@@ -79,7 +85,8 @@ export function ProgressBand({ data, onStart, nothingLeft, overlay }: ProgressBa
           </p>
         )}
       </div>
-      {overlay}
+      {data?.oggi.raggiunto && <GoalStamp giorno={data.oggi.giorno} serie={data.serie.attuale} press={celebrate} className="absolute right-3 top-3" />}
+      {celebrate && <ConfettiBurst originRef={ringRef} onDone={onCelebrated} />}
     </div>
   );
 }

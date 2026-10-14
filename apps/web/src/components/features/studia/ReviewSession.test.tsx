@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
-  studiaService: { session: vi.fn(), review: vi.fn() },
+  studiaService: { session: vi.fn(), review: vi.fn(), progress: vi.fn() },
 }));
 
 // The reader is tested with the dossier; here it is a stand-in that shows which article it was given.
@@ -20,11 +20,25 @@ vi.mock('../dossier/DossierItemReader', () => ({
 import { studiaService } from '../../../services/studiaService';
 import { appStore } from '../../../store/useAppStore';
 import { Z_INDEX } from '../../../constants/zIndex';
-import type { SchedaDiRipasso } from '../../../types/studia';
+import type { Progressi, SchedaDiRipasso } from '../../../types/studia';
+import { SESSION_NOTICE_MS } from './progress/Celebration';
 import { ReviewSession } from './ReviewSession';
 
 const session = vi.mocked(studiaService.session);
 const review = vi.mocked(studiaService.review);
+const progress = vi.mocked(studiaService.progress);
+
+const CELEBRATED_KEY = 'visualex.studia.festeggiato';
+
+/** The dashboard's read as the end screen asks it: today's goal and the streak. */
+const progressAnswer = (ripassi: number, raggiunto: boolean, serie: number): Progressi => ({
+  oggi: { giorno: '2026-10-19', ripassi, obiettivo: 10, raggiunto, dovute: 0, nuove: 0 },
+  serie: { attuale: serie, record: 9, ultimiGiorni: ['13', '14', '15', '16', '17', '18', '19'].map((d) => ({ giorno: `2026-10-${d}`, stato: 'fatto' as const })) },
+  stati: { nuove: 0, apprendimento: 1, consolidate: 0 },
+  materie: [],
+  calendario: [],
+  prossimi: [],
+});
 
 const CIVILE_URN = 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453';
 
@@ -70,6 +84,9 @@ beforeEach(() => {
   session.mockReset();
   review.mockReset();
   review.mockResolvedValue({ registrata: true, prossimoRipasso: '2026-10-12', scheduledDays: 1 });
+  progress.mockReset();
+  progress.mockResolvedValue(progressAnswer(3, false, 2));
+  localStorage.removeItem(CELEBRATED_KEY);
   appStore.setState({ searchTrigger: null });
 });
 
@@ -425,6 +442,14 @@ describe('the review session', () => {
       expect(await screen.findByText('Hai ripassato 2 schede, nessuna da rifare. Le prossime: 8 giorni.')).toBeInTheDocument();
     });
 
+    it('shows today’s goal and the streak as they now stand', async () => {
+      progress.mockResolvedValue(progressAnswer(11, true, 6));
+      renderSession([card('a')]);
+      await gradeAll([3]);
+      expect(await screen.findByRole('img', { name: 'Obiettivo di oggi: 11 di 10 ripassi, raggiunto' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Serie: 6 giorni di fila, record 9' })).toBeInTheDocument();
+    });
+
     it('does not claim a review when the session was empty', async () => {
       renderSession([]);
       expect(await screen.findByText('Nessuna scheda da ripassare per ora.')).toBeInTheDocument();
@@ -442,5 +467,51 @@ describe('the review session', () => {
     session.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('a')] });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova' }));
     expect(await screen.findByText('Domanda a?')).toBeInTheDocument();
+  });
+});
+
+describe('the goal of the day in the session (Studia progress spec §6.4)', () => {
+  const closing = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, oggi: { giorno: '2026-10-19', ripassi: 10, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 3 } };
+  const open = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, oggi: { giorno: '2026-10-19', ripassi: 9, obiettivo: 10, raggiunto: false, appenaRaggiunto: false, serie: 2 } };
+
+  it('celebrates on the grade that closes the goal, says it to a screen reader, then remembers the day', async () => {
+    review.mockResolvedValueOnce(open).mockResolvedValueOnce(closing);
+    renderSession([card('a'), card('b'), card('c')]);
+    const user = userEvent.setup();
+    await show();
+    await user.click(screen.getByRole('button', { name: /Bene/ }));
+    expect(screen.queryByText('Serie di 3 giorni')).not.toBeInTheDocument();
+    await show();
+    await user.click(screen.getByRole('button', { name: /Bene/ }));
+
+    expect(await screen.findByText('Serie di 3 giorni')).toBeInTheDocument();
+    expect(screen.getByText('Obiettivo di oggi raggiunto · serie di 3 giorni')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Serie di 3 giorni')).not.toBeInTheDocument(), { timeout: SESSION_NOTICE_MS + 1000 });
+    expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
+  });
+
+  it('leaves the keys to the review while it plays: space reveals, a number grades', async () => {
+    review.mockResolvedValueOnce(closing);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Serie di 3 giorni')).toBeInTheDocument();
+
+    expect(await screen.findByText('Domanda b?')).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: ' ' });
+    expect(await screen.findByText('Risposta b.')).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: '3' });
+    await waitFor(() => expect(review).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Serie di 3 giorni')).toBeInTheDocument();
+  });
+
+  it('does not celebrate twice in a day on this browser', async () => {
+    localStorage.setItem(CELEBRATED_KEY, '2026-10-19');
+    review.mockResolvedValueOnce(closing);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Obiettivo di oggi raggiunto · serie di 3 giorni')).toBeInTheDocument();
+    expect(screen.queryByText('Serie di 3 giorni')).not.toBeInTheDocument();
   });
 });

@@ -57,9 +57,12 @@ beforeEach(() => {
   savePreferences.mockReset();
   preferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: [] });
   localStorage.removeItem(STORAGE_KEY);
+  // jsdom draws nothing: a celebration's burst ends at once, as it does without a canvas.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
 });
 afterEach(() => {
   localStorage.removeItem(STORAGE_KEY);
+  vi.restoreAllMocks();
 });
 
 describe('ReviewHome', () => {
@@ -196,6 +199,47 @@ describe('ReviewHome', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(screen.getByText('Oggi: 7 da ripassare · 7 nuove')).toBeInTheDocument();
     expect(screen.queryByText('Oggi: 9 da ripassare · 9 nuove')).not.toBeInTheDocument();
+  });
+
+  describe('the celebration (Studia progress spec §6.4)', () => {
+    const CELEBRATED_KEY = 'visualex.studia.festeggiato';
+    beforeEach(() => {
+      localStorage.removeItem(CELEBRATED_KEY);
+    });
+    afterEach(() => {
+      localStorage.removeItem(CELEBRATED_KEY);
+    });
+
+    it('plays once when the goal was met today, stamps the band, and remembers the day', async () => {
+      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+      renderHome();
+      expect(await screen.findByTestId('goal-stamp')).toHaveTextContent('Obiettivo raggiunto');
+      expect(screen.getByTestId('goal-stamp')).toHaveTextContent('19 ottobre 2026 · giorno 5');
+      await waitFor(() => expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19'));
+    });
+
+    it('keeps the stamp at rest, without a new burst, once the day was celebrated', async () => {
+      localStorage.setItem(CELEBRATED_KEY, '2026-10-19');
+      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+      const { container } = renderHome();
+      expect(await screen.findByTestId('goal-stamp')).toBeInTheDocument();
+      expect(container.querySelector('canvas')).toBeNull();
+    });
+
+    it('does not celebrate a day that counted with nothing reviewed', async () => {
+      progress.mockResolvedValue(answer(0, 0, { ripassi: 0, raggiunto: true }, 5));
+      const { container } = renderHome();
+      expect(await screen.findByTestId('goal-stamp')).toBeInTheDocument();
+      expect(container.querySelector('canvas')).toBeNull();
+      expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    it('shows no stamp before the goal', async () => {
+      progress.mockResolvedValue(answer(3, 0));
+      renderHome();
+      await screen.findByText('Oggi: 3 da ripassare · 0 nuove');
+      expect(screen.queryByTestId('goal-stamp')).not.toBeInTheDocument();
+    });
   });
 
   it('holds the study settings, closed, at the bottom', async () => {
