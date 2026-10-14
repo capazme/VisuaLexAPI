@@ -236,6 +236,12 @@ interface UnitInfo {
 const MARKS = /\(\(|\)\)/g;
 const WORD = /\S+/g;
 const FOLDED_OUT = /[^\p{L}\p{N}]+/gu;
+/**
+ * A token made only of note references that cannot be anything else: two or more together
+ * («(260a)(276)») or the doubled form («((348))»). The parser decorates the ones whose note is
+ * in the text; this keeps the others (a note the download lacks) from counting as words.
+ */
+const REFERENCE_TOKEN = /^(?:(?:\(\d{1,4}[a-z]?\)){2,}|\(\(\d{1,4}[a-z]?\)\))[.,;:]?$/;
 const BARE_REFERENCE = /\(\d{1,4}[a-z]?\)/g;
 /** What makes a notice a repeal: the parser's `notice` also covers OMISSIS, MODIFICAT and SOSTITUIT. */
 const REPEAL_WORDS = /ABROGAT|SOPPRESS/;
@@ -279,6 +285,11 @@ function inspect(raw: string, unit: CompareUnit, structure: ArticleStructure): U
   WORD.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = WORD.exec(text)) !== null) {
+    if (REFERENCE_TOKEN.test(m[0])) {
+      // out of the compared text too, not only out of the words («invariato» reads `folded`)
+      for (let i = m.index; i < m.index + m[0].length; i++) chars[i] = ' ';
+      continue;
+    }
     const key = m[0].replace(MARKS, '');
     if (key === '') continue;
     tokens.push({ start: unit.start + m.index, end: unit.start + m.index + m[0].length, key });
@@ -290,7 +301,7 @@ function inspect(raw: string, unit: CompareUnit, structure: ArticleStructure): U
   const marker = structure.blocks.find((b) => b.start === unit.start && b.kind === 'comma')?.marker;
   return {
     unit,
-    folded: text.replace(MARKS, '').replace(/\s+/g, ' ').trim(),
+    folded: chars.join('').replace(MARKS, '').replace(/\s+/g, ' ').trim(),
     tokens,
     counts,
     total,

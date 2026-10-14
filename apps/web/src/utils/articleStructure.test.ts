@@ -114,6 +114,28 @@ describe('Normattiva — codici (allegato format)', () => {
     expect(decorations(raw, s, 'ref-missing')).toEqual([]);
   });
 
+  it('c.c. 1284: references written together are read one by one, "((348))" included', () => {
+    const raw = fixtureText('nrm-cc-1284');
+    const s = parseArticleStructure(raw);
+    const body = raw.slice(0, s.updates!.start);
+    expect(body).toContain('(260a)(276)');
+    expect(body).toContain('(327)(336a)');
+    const refs = new Set(s.decorations.filter((d) => d.kind === 'ref').map((d) => d.noteId));
+    const printed = [...body.matchAll(/\((\d{1,4}[a-z]?)\)/g)].map((m) => m[1]);
+    expect(printed.length).toBeGreaterThan(20);
+    for (const id of printed) expect(refs, `reference ${id}`).toContain(id);
+    // each one is its own range: "(260a)" and "(276)", not "(260a)(276)"
+    expect(decorations(raw, s, 'ref')).toEqual(expect.arrayContaining(['(260a)', '(276)', '(327)', '(336a)', '((348))']));
+    expect(decorations(raw, s, 'ref').filter((t) => t.includes(')('))).toEqual([]);
+  });
+
+  it('reads a run of references one by one, and only those whose note is in the text', () => {
+    const raw = 'Art. 5\n\n1. Il termine è di dieci giorni. (1)(2)(3) Altro testo (4)(5).\n\n-------------\nAGGIORNAMENTO (1)\n\n Nota uno.\n\n-------------\nAGGIORNAMENTO (3)\n\n Nota tre.';
+    const s = parseArticleStructure(raw);
+    expect(decorations(raw, s, 'ref')).toEqual(['(1)', '(3)']);
+    expect(decorations(raw, s, 'ref-missing')).toEqual([]);
+  });
+
   it('Costituzione art. 3: no rubric', () => {
     const raw = fixtureText('nrm-cost-3');
     const s = parseArticleStructure(raw);

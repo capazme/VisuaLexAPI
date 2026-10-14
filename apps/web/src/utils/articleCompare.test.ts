@@ -362,6 +362,25 @@ describe('note references are not compared', () => {
     const c = compareArticles(article('1. Il termine è di trenta giorni (30).', at('2015-12-31')), article('1. Il termine è di trenta giorni (60).'));
     expect(c.rows[0].label).toBe('modificato');
   });
+  it('is «invariato» on art. 1284 c.c. when only the references written together differ', () => {
+    const raw = fixtureText('nrm-cc-1284');
+    const body = raw.indexOf('AGGIORNAMENTO');
+    // the reader's text, its references (260a)(276) and (327)(336a) changed, the words left alone
+    const other = raw.slice(0, body).replace('(260a)(276)', '(261a)(277)').replace('(327)(336a)', '(328)(337a)').replace('((348))', '((349))') + raw.slice(body);
+    expect(other).not.toBe(raw);
+    const c = compareArticles(article(raw, at('2007-12-29')), article(other));
+    expect(labels(c)).toEqual(Array(c.rows.length).fill('invariato'));
+    expect(c.rows.every((r) => r.diff === undefined)).toBe(true);
+  });
+  it('never counts a run of references as a word, even when their notes are not in the text', () => {
+    const oldRaw = '1. Il saggio degli interessi legali è determinato in misura pari al 5 per cento. (12)(13)';
+    const newRaw = '1. Il saggio degli interessi legali è determinato in misura pari al 5 per cento. (14)(15) ((16))';
+    expect(labels(compareArticles(article(oldRaw, at('2015-12-31')), article(newRaw)))).toEqual(['invariato']);
+    const changed = '1. Il saggio degli interessi legali è determinato in misura pari al 10 per cento. (14)(15)';
+    const row = compareArticles(article(oldRaw, at('2015-12-31')), article(changed)).rows[0];
+    expect(row.label).toBe('modificato');
+    expect(sliced(changed, row.diff!.right)).toEqual(['10']);
+  });
 });
 
 describe('the rubric', () => {
