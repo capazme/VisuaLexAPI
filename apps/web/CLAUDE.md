@@ -803,9 +803,12 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   (`articleTextBetween`, `decisionTextBetween`): no character changes, the `\n` inside an article's passage stays
   and a decision's paragraphs and lines are joined as `decisionPdfModel` joins them (root rule 23). A past text
   takes no marks (gotcha 32); the notes about an article as a whole and a decision's free notes and lost
-  anchors print as in the full text. `loadPdfMarks` (`dossierPdfMarks.ts`) loads the marks through the store's
-  `load…ForArticle` actions and reads them with the readers' keys (`buildItemKey` + `uniqueArticleIdFromNorma`;
-  `decisionKey` + no article).
+  anchors print as in the full text. `loadPdfMarks` (`dossierPdfMarks.ts`) reads the marks from the server with the
+  store's wire prefix and mappers (`getByNormaKeyPrefix`), not through the store's `load…ForArticle`, which
+  swallow a failure and return while a reader's own load is on its way, and keeps those under the readers' keys
+  (`buildItemKey` + `uniqueArticleIdFromNorma`; `decisionKey` + no article). A text whose marks could not be
+  read prints «Evidenziazioni e note non disponibili al momento» and counts in the toast, never «Nessuna parte
+  evidenziata o annotata».
 - **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
   inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
   composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
