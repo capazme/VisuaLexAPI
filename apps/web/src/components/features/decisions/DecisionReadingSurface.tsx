@@ -189,14 +189,14 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   // The passage whose popover is open, with the text it was opened on: a redraw (a highlight made
   // of it) replaces the element it sits by, so the popover goes with it.
   const [openPassage, setOpenPassage] = useState<{ index: number; el: HTMLElement; html: string } | null>(null);
-  const shownPassage = openPassage && openPassage.html === html && showKeyPassages ? openPassage : null;
+  const shownPassage = openPassage && openPassage.html === html && openPassage.el.isConnected && showKeyPassages ? openPassage : null;
   useEffect(() => {
     const root = contentRef.current;
     if (!root || !showKeyPassages) return;
     const onClick = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      // a link, a note's words, a sign or a reference keep their own click
-      if (!target || target.closest('a, button, .citation-hover, .decision-cite, .note-anchor, .vlx-sign, .vlx-ref')) return;
+      // a link, a note's words, a sign or a reference keep their own click; words under a highlight are the reader's
+      if (!target || target.closest('a, button, .citation-hover, .decision-cite, .note-anchor, .vlx-sign, .vlx-ref, .highlight-mark')) return;
       const piece = target.closest<HTMLElement>('[data-key-passage]');
       if (!piece || !root.contains(piece)) return;
       // the end of a selection is not a click on the passage

@@ -4,7 +4,7 @@
  * its body, shared with the preview a list opens (`DecisionPreviewDialog`).
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import type { DecisionReference, FetchDecisionAnswer } from '../../types/decisions';
 import { previewKeyPassage, previewLines } from '../../utils/decisionPreview';
@@ -25,26 +25,30 @@ interface DecisionPreviewPopupProps {
   onMouseLeave?: () => void;
 }
 
+/** A found decision: its heading, then its first key passage when it has one (the first lines of a
+ *  Cassazione decision are its parties), else its first lines. Computed once per answer. */
+function FoundBody({ answer }: { answer: Extract<FetchDecisionAnswer, { esito: 'trovata' }> }) {
+  const passage = useMemo(() => previewKeyPassage(answer.testo, answer.identita.corte), [answer.testo, answer.identita.corte]);
+  const lines = useMemo(() => (passage ? null : previewLines(answer.testo)), [passage, answer.testo]);
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{formatDecisionHeading(answer.identita, answer.attributi)}</div>
+      {passage && (
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-400">
+          {KEY_PASSAGE_LABELS[passage.kind]} <span className="font-normal normal-case tracking-normal text-slate-500 dark:text-slate-400">· evidenziato automaticamente</span>
+        </p>
+      )}
+      <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line max-h-[220px] overflow-y-auto custom-scrollbar">
+        {passage ? passage.text : lines ?? <span className="text-slate-400 italic">Testo non disponibile</span>}
+      </div>
+    </div>
+  );
+}
+
 function Body({ reference, answer }: { reference: DecisionReference; answer: FetchDecisionAnswer }) {
   switch (answer.esito) {
-    case 'trovata': {
-      // its first key passage when it has one (the first lines of a Cassazione decision are its parties)
-      const passage = previewKeyPassage(answer.testo, answer.identita.corte);
-      const lines = passage ? null : previewLines(answer.testo);
-      return (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{formatDecisionHeading(answer.identita, answer.attributi)}</div>
-          {passage && (
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-400">
-              {KEY_PASSAGE_LABELS[passage.kind]} <span className="font-normal normal-case tracking-normal text-slate-500 dark:text-slate-400">· evidenziato automaticamente</span>
-            </p>
-          )}
-          <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line max-h-[220px] overflow-y-auto custom-scrollbar">
-            {passage ? passage.text : lines ?? <span className="text-slate-400 italic">Testo non disponibile</span>}
-          </div>
-        </div>
-      );
-    }
+    case 'trovata':
+      return <FoundBody answer={answer} />;
     case 'ambigua':
       return (
         <div className="text-sm text-slate-700 dark:text-slate-300">

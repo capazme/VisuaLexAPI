@@ -841,8 +841,7 @@
 }
 
 /* A decision's key passages (utils/decisionKeyPassages.ts): computed, never the reader's. A dotted
-   underline in a teal no highlight uses, drawn as a background so that a highlight over the same
-   words (nested inside, `RANK`) paints over it; the label at its start is generated content on an
+   underline in a teal no highlight uses, drawn as a background; the label at its start is generated content on an
    empty-of-text head, so no character is added (root rule 23). `key-passages-hidden` on the
    container switches them off, as `highlights-hidden` does the highlights. */
 .vlx-decision .vlx-key-passage {
@@ -883,9 +882,14 @@
   background-color: hsl(173 60% 18%);
 }
 
-/* Made the reader's own («Fai tua»): the highlight paints over the underline (no padding below the
-   words, so the mark's background covers it) and the label goes. */
-.vlx-decision .vlx-key-head:has(.highlight-mark)::before {
+/* Made the reader's own («Fai tua»), or any highlight over the same words: the passage is nested
+   inside the highlight (`RANK`), and there it loses its underline and its label. */
+.vlx-decision .highlight-mark .vlx-key-passage {
+  cursor: auto;
+  background-image: none;
+}
+
+.vlx-decision .highlight-mark .vlx-key-head::before {
   content: none;
 }
 

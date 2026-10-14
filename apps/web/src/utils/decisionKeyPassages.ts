@@ -300,7 +300,8 @@ export function keyPassageText(testo: DecisionText, passage: KeyPassage): string
       }
       if (i < block.text.length && block.text[i] !== '\n') seen++;
     }
-    return block.text.slice(Math.max(0, from), to).replace(/\s*\n\s*/g, ' ').trim();
+    // each line trimmed and joined by one space (a split, not `/\s*\n\s*/`, quadratic on long runs of spaces)
+    return block.text.slice(Math.max(0, from), to).split('\n').map((line) => line.trim()).filter(Boolean).join(' ');
   }
   return '';
 }

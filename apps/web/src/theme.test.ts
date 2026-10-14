@@ -67,9 +67,9 @@ describe('the reading surface', () => {
     expect(css).toMatch(/\.dark \.vlx-decision \.vlx-key-head::?before\s*\{[^}]*\bcolor:/);
     expect(css).toMatch(/\.key-passages-hidden \.vlx-key-passage\s*\{[^}]*background-image:\s*none/);
     expect(css).toMatch(/\.key-passages-hidden \.vlx-key-head::?before\s*\{[^}]*content:\s*none/);
-    // a passage the reader made theirs loses its label, and its underline sits where the highlight paints
-    expect(css).toMatch(/\.vlx-decision \.vlx-key-head:has\(\.highlight-mark\)::?before\s*\{[^}]*content:\s*none/);
-    expect(css).not.toMatch(/\.vlx-decision \.vlx-key-passage\s*\{[^}]*padding-bottom/);
+    // under a highlight (a passage the reader made theirs) it loses its underline and its label
+    expect(css).toMatch(/\.vlx-decision \.highlight-mark \.vlx-key-passage\s*\{[^}]*background-image:\s*none/);
+    expect(css).toMatch(/\.vlx-decision \.highlight-mark \.vlx-key-head::?before\s*\{[^}]*content:\s*none/);
   }, 30000);
 });
 

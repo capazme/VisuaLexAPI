@@ -131,12 +131,14 @@ describe('renderDecisionHtml', () => {
       expect(heads[0].dataset.keyLabel).toBe(KEY_PASSAGE_LABELS.dispositivo);
     });
 
-    it('puts the reader\'s highlight inside the passage, so it paints over the sign', () => {
+    it('nests the passage inside the reader\'s highlight, where CSS drops its sign', () => {
       const testo = { motivazione: 'Il ricorso è fondato e va accolto.' };
       const plain = decisionProjection(testo);
       const root = document.createElement('div');
-      root.innerHTML = renderDecisionHtml({ testo, highlights: [hl(3, 'ricorso')], annotations: [], keyPassages: [{ kind: 'principio', start: 0, end: plain.length }] });
-      expect(root.querySelector('.vlx-key-passage .highlight-mark')?.textContent).toBe('ricorso');
+      root.innerHTML = renderDecisionHtml({ testo, highlights: [hl(0, 'Il ricorso')], annotations: [], keyPassages: [{ kind: 'principio', start: 0, end: plain.length }] });
+      expect(root.querySelector('.highlight-mark .vlx-key-passage')?.textContent).toBe('Il ricorso');
+      expect(root.querySelector('.highlight-mark .vlx-key-head')?.textContent).toBe('I');
+      expect([...root.querySelectorAll('.vlx-key-passage')].map((e) => e.textContent).join('')).toBe(plain);
     });
 
     it('draws nothing for a passage outside the text, and nothing without passages', () => {

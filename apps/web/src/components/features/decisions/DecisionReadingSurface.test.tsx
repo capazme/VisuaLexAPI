@@ -376,7 +376,19 @@ describe('DecisionReadingSurface — the key passages', () => {
   const mount = (testo: DecisionText = WITH_PASSAGES, identity: DecisionIdentity = IDENTITY) =>
     render(<DecisionReadingSurface identity={identity} testo={testo} attributi={{}} />);
   const settings = appStore.getState().settings;
-  afterEach(() => appStore.setState({ settings }));
+  const realMatchMedia = window.matchMedia;
+  /** `useIsDesktop`: the desktop draws a menu, a phone a sheet. */
+  const atDesktop = (desktop: boolean) => {
+    window.matchMedia = ((query: string) => ({
+      matches: desktop, media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  };
+  beforeEach(() => atDesktop(true));
+  afterEach(() => {
+    appStore.setState({ settings });
+    window.matchMedia = realMatchMedia;
+  });
 
   it('marks them in the text with their label, the text nodes untouched', () => {
     const { container } = mount();
@@ -439,6 +451,39 @@ describe('DecisionReadingSurface — the key passages', () => {
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Mostra i passaggi chiave' }));
     expect(appStore.getState().settings.showKeyPassages).toBe(true);
     expect(hidden()).toBe(false);
+  });
+
+  it('on a phone lists them in a sheet with the legend, and the switch is there too', async () => {
+    atDesktop(false);
+    Element.prototype.scrollIntoView = vi.fn();
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Passaggi chiave (2), evidenziati automaticamente' }));
+    const sheet = screen.getByRole('dialog', { name: 'Passaggi chiave' });
+    expect(within(sheet).getByText('Evidenziati automaticamente: non sono le tue evidenziazioni.')).toBeInTheDocument();
+    expect(within(sheet).getAllByRole('button').slice(1).map((b) => b.textContent)).toEqual([
+      'Principio di diritto — «il fornitore che consegna in ritardo la…»',
+      'Dispositivo — «La Corte accoglie il ricorso»',
+      'Nascondi i passaggi chiave',
+    ]);
+    await act(async () => { fireEvent.click(within(sheet).getByRole('button', { name: /^Dispositivo/ })); });
+    expect(screen.queryByRole('dialog', { name: 'Passaggi chiave' })).toBeNull();
+    expect(await screen.findByRole('dialog', { name: 'Dispositivo, evidenziato automaticamente' })).toBeInTheDocument();
+  });
+
+  it('opens nothing on words the reader has highlighted: they are the reader\'s', async () => {
+    const plain = decisionProjection(WITH_PASSAGES);
+    appStore.setState({ highlights: [{ id: 'own', normaKey: KEY, articleId: '', text: PRINCIPLE, startOffset: plain.indexOf(PRINCIPLE), color: 'yellow' } as Highlight] });
+    const { container } = mount();
+    const covered = container.querySelector<HTMLElement>('.highlight-mark [data-key-passage="principio"]')!;
+    expect(covered).not.toBeNull();
+    await act(async () => { fireEvent.click(covered); });
+    expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
+  });
+
+  it('counts none of them among the reader\'s highlights: there is nothing to export', async () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
+    expect(await screen.findByRole('button', { name: 'Nessuna evidenziazione da esportare' })).toBeDisabled();
   });
 
   it('leaves a link inside a passage to its own click', async () => {
