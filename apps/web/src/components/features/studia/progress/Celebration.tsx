@@ -172,8 +172,9 @@ export function SessionCelebration({ giorno, serie, onStart, onDone }: SessionCe
         {/* The confetti first, so the words and the stamp are drawn over them. */}
         <ConfettiBurst />
         <p className={cn('relative font-serif text-sm font-semibold leading-tight', INK_TEXT)} aria-hidden>
-          Obiettivo di oggi raggiunto
-          <span className="block font-normal">
+          {/* On a phone the stamp says it: one line keeps the notice clear of the card. */}
+          <span className="hidden sm:block">Obiettivo di oggi raggiunto</span>
+          <span className="block sm:font-normal">
             Serie di {serie} {serie === 1 ? 'giorno' : 'giorni'}
           </span>
         </p>
