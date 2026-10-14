@@ -494,8 +494,8 @@ Cassazione or Corte costituzionale dispositivo (without costs, «contributo unif
 and the Corte costituzionale's decision on each question in its «considerato in diritto» (opened where the numbering
 starts again at «1.»); no other court has rules. The patterns are the ones measured in the spec on real decisions kept
 outside the repository: a change to them is a change to measured behaviour, with its tests (synthetic texts, and
-timings on long runs of spaces and many passages). They are ranges of `decisionProjection`, recomputed on every render
-and never stored: `renderDecisionHtml` wraps them (`keyPassages`, mark `key` inside the reader's own marks, its label an
+timings on long runs of spaces and many passages). They are ranges of `decisionProjection`, computed from the text whenever it is
+drawn (memoised per text) and never stored: `renderDecisionHtml` wraps them (`keyPassages`, mark `key` inside the reader's own marks, its label an
 empty-of-text `key-head` drawn by CSS), so root rule 23 holds and nothing the user saves, exports or shares carries one.
 `DecisionReadingSurface` draws them, hides them with `key-passages-hidden` (`settings.showKeyPassages`, on by default,
 persisted in the browser), and puts «Passaggi chiave (n)» in `DecisionReadingToolbar` (`KeyPassagesMenu`: a menu on the
@@ -503,7 +503,8 @@ desktop, a `ui/Sheet` on a phone, with the legend «Evidenziati automaticamente:
 per passage that scrolls to it at once and opens its popover, and the switch). A click on a passage, not on words under a
 highlight, a link, a note or a sign, opens `KeyPassagePopover` (fixed-positioned: an absolute one, opened on a passage
 still out of view, made the page itself scroll): «Fai tua» is the ordinary `addHighlight` over the passage's words at its
-offset, after which the passage, nested in the highlight, loses its underline and label; «Nascondi i passaggi chiave».
+offset, after which the passage, nested in the highlight, loses its underline and label (they come back while the
+highlights are hidden); «Nascondi i passaggi chiave».
 No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRender.ts` is the
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
 `decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks

@@ -195,8 +195,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     if (!root || !showKeyPassages) return;
     const onClick = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      // a link, a note's words, a sign or a reference keep their own click; words under a highlight are the reader's
-      if (!target || target.closest('a, button, .citation-hover, .decision-cite, .note-anchor, .vlx-sign, .vlx-ref, .highlight-mark')) return;
+      // a link, a note's words, a sign or a reference keep their own click; words under a highlight are the
+      // reader's, unless the highlights are hidden (then the passage shows again, and answers again)
+      if (!target || target.closest('a, button, .citation-hover, .decision-cite, .note-anchor, .vlx-sign, .vlx-ref')) return;
+      if (target.closest('.highlight-mark') && !root.classList.contains('highlights-hidden')) return;
       const piece = target.closest<HTMLElement>('[data-key-passage]');
       if (!piece || !root.contains(piece)) return;
       // the end of a selection is not a click on the passage

@@ -29,7 +29,14 @@ const SHEET_ENTRY =
  */
 export function KeyPassagesMenu({ passages, plain, shown, onToggleShown, onGoTo }: KeyPassagesMenuProps) {
   const desktop = useIsDesktop();
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetRequested, setSheetOpen] = useState(false);
+  // a sheet belongs to a phone: widening the window closes it rather than keeping it for later
+  const [wasDesktop, setWasDesktop] = useState(desktop);
+  if (wasDesktop !== desktop) {
+    setWasDesktop(desktop);
+    if (desktop) setSheetOpen(false);
+  }
+  const sheetOpen = sheetRequested && !desktop;
   if (passages.length === 0) return null;
   const labels = keyPassageEntryLabels(passages, plain);
   const name = `Passaggi chiave (${passages.length}), evidenziati automaticamente`;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { keyPassageText, keyPassages } from '../decisionKeyPassages';
 import { previewKeyPassage, previewLines } from '../decisionPreview';
+import { decisionProjection } from '../decisionRender';
 
 // Synthetic texts written for these tests: no court's words.
 const PRINCIPLE = 'il fornitore che consegna in ritardo la merce deperibile\nrisponde del danno anche quando il ritardo dipende dal vettore';
@@ -38,5 +39,16 @@ describe('keyPassageText', () => {
     const testo = { epigrafe: 'TESTA\nDELLA DECISIONE', motivazione: 'Il motivo.', dispositivo: 'P.Q.M.\n\nLa Corte\naccoglie\nil ricorso.' };
     const [passage] = keyPassages(testo, 'cassazione');
     expect(keyPassageText(testo, passage)).toBe('La Corte accoglie il ricorso.');
+  });
+});
+
+describe('keyPassageText — in linear time', () => {
+  it('reads a passage holding a long run of spaces and a few line breaks quickly', () => {
+    const motivazione = `il fornitore${' '.repeat(50000)}risponde\ndel danno\nanche quando il ritardo dipende dal vettore`;
+    const testo = { motivazione };
+    const started = performance.now();
+    const text = keyPassageText(testo, { kind: 'principio', start: 0, end: decisionProjection(testo).length });
+    expect(performance.now() - started).toBeLessThan(250);
+    expect(text.endsWith('risponde del danno anche quando il ritardo dipende dal vettore')).toBe(true);
   });
 });

@@ -70,6 +70,8 @@ describe('the reading surface', () => {
     // under a highlight (a passage the reader made theirs) it loses its underline and its label
     expect(css).toMatch(/\.vlx-decision \.highlight-mark \.vlx-key-passage\s*\{[^}]*background-image:\s*none/);
     expect(css).toMatch(/\.vlx-decision \.highlight-mark \.vlx-key-head::?before\s*\{[^}]*content:\s*none/);
+    // and back with the highlights hidden
+    expect(css).toMatch(/\.vlx-decision\.highlights-hidden:not\(\.key-passages-hidden\) \.highlight-mark \.vlx-key-head::?before\s*\{[^}]*content:\s*attr\(data-key-label\)/);
   }, 30000);
 });
 

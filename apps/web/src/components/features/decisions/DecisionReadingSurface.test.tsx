@@ -483,6 +483,17 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
   });
 
+  it('with the highlights hidden, a passage under one answers again', async () => {
+    const plain = decisionProjection(WITH_PASSAGES);
+    appStore.setState({ highlights: [{ id: 'own', normaKey: KEY, articleId: '', text: PRINCIPLE, startOffset: plain.indexOf(PRINCIPLE), color: 'yellow' } as Highlight] });
+    const { container } = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Nascondi evidenziazioni' }));
+    await waitFor(() => expect(container.querySelector('.highlights-hidden')).not.toBeNull());
+    await act(async () => { fireEvent.click(container.querySelector<HTMLElement>('.highlight-mark [data-key-passage="principio"]')!); });
+    expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
+  });
+
   it('counts none of them among the reader\'s highlights: there is nothing to export', async () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));

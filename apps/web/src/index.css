@@ -893,6 +893,19 @@
   content: none;
 }
 
+/* With the highlights hidden, the passage under one shows again (more specific than the two rules above),
+   unless the passages are switched off too. */
+.highlights-hidden:not(.key-passages-hidden) .vlx-decision .highlight-mark .vlx-key-passage,
+.vlx-decision.highlights-hidden:not(.key-passages-hidden) .highlight-mark .vlx-key-passage {
+  cursor: pointer;
+  background-image: linear-gradient(to right, hsl(var(--key-passage)) 55%, transparent 0);
+}
+
+.highlights-hidden:not(.key-passages-hidden) .vlx-decision .highlight-mark .vlx-key-head::before,
+.vlx-decision.highlights-hidden:not(.key-passages-hidden) .highlight-mark .vlx-key-head::before {
+  content: attr(data-key-label);
+}
+
 .key-passages-hidden .vlx-key-passage {
   cursor: auto;
   background-image: none;
