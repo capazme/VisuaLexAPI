@@ -1,6 +1,6 @@
 # «Ambienti» into the Forum: dossiers of work, dossiers of study, «Pubblica nel Forum»
 
-Date: 13 October 2026. Status: **proposal, waiting for the owner** on the questions at the end (Q1–Q8). The
+Date: 13 October 2026. Status: **proposal, waiting for the owner** on the questions at the end (Q1–Q10), to be decided by both owners where the programme of 11 October differs. The
 direction is decided: the owner's document of 13 October («La voce "Ambienti" deve essere assorbita all'interno della
 sezione "Forum"»; «distinguendo nettamente "dossier interni di lavoro", "dossier interni di studio" e "ambienti del
 forum"»; «una funzione diretta per trasformare/convertire un dossier interno in ambiente condiviso nel forum»; «I futuri
@@ -133,17 +133,46 @@ gaps it lists close), `docs/merlt/claude-notes.md` (where `forum_download` fires
   the note with its chip; withdraw it and see it vanish for the second account; add a pack; recover an archived
   environment.
 
+## Beside the programme of 11 October (P-019…P-031)
+
+The other developer's programme of 11 October, still a proposal to be approved by both owners (P-019…P-031), touches
+this round. Point by point, in this spec's words:
+
+| Point | The programme | This spec | Where they differ |
+| --- | --- | --- | --- |
+| Modules and timing | Work first, then Study, then a Community module (P-019); naming the three objects and «import as a new dossier» in the first phase, the guided bridge from private to public in a later one | Rename, absorb Ambienti and publish from the dossier now, as the owner asked on 13 October | **Timing** of publishing (Q10) |
+| The private object | One «Dossier», private, for a practice or for study | One dossier with a kind, `lavoro` or `studio` (D2) | None: the kind is an attribute of the same object |
+| The public object | A public collection with its own name, replacing today's shared environment | «dossier pubblicato» (D1), or «ambiente del Forum» as in the owner's document | **The name** (Q1) |
+| Personal environment | Disappears; export and import of a dossier take its place | Disappears; old ones kept read-only (D11b); the dossier's JSON export stays | None |
+| Merge | «Import as a new dossier», never changing an existing one | Download, recovery and packs create new study dossiers, never touch an existing dossier (D8–D10) | None. Notes, though, live on the article (D4): imported ones show wherever the user reads it |
+| Notes in what is published | The public collection carries **no notes** | Notes and highlights travel, each one excludable, those also used in a dossier di lavoro unchecked (D3–D5) — the owner's document wants «note e versioni annotate ed evidenziate» | **Notes** (Q4) |
+| Link to the source dossier | The public copy keeps **no link** to the dossier; the dossier is never changed | `sourceDossierId` on the Forum item, owner-only, never in public content, never syncing (D4, D6); the dossier itself is not changed | **The link** (Q9) |
+| The check before publishing | Recognition of names and data, a preview to confirm, the question rewritten in the abstract | A full preview and a warning with a required checkbox (D3, D5); no recognition, no pseudonymisation (owner, 13 Oct) | **Recognition** (Q4) |
+| Licence of public contributions | CC BY-SA 4.0 for every public contribution (P-023) | Not stated: P-023 is not approved and there are no terms of use yet | A line in the dialog once both exist; nothing to decide now |
+| Personal study sources | Always private; only cards rewritten and anchored enter the community (P-025) | A published dossier carries the user's own notes | D5 gains a line against copying manuals and commentaries (Q4) |
+| Access without an account | Public collections readable without an account | The Forum stays behind the login | Out of this round |
+
 ## Questions for the owner
 
-1. **The Forum's items**: «dossier pubblicati» (recommended: one word fewer, and it says what they are), or keep
-   «ambienti del Forum», as in your document?
+1. **The Forum's items**: «dossier pubblicati» (recommended: it says what they are, and needs no new word); or
+   «ambienti del Forum», as in your document; or a name of their own, as the programme of 11 October proposes.
+   «Dossier pubblicati» also fits the programme's model: one private object, one public copy of it.
 2. **Private environments already saved**: a read-only archive inside the Forum with «Recupera i dossier» and
    «Esporta», no new ones (recommended); or convert them all into study dossiers at once (duplicates: each is a copy
    of the workspace); or delete them after an export.
 3. **«Sostituisci tutto»** goes, with the route that deletes all of a user's notes in one request (recommended).
    Since #171 the replaced dossiers go to the trash, but notes and highlights are still lost for good.
-4. **The privacy warning** (D5): approve or change the wording; the required checkbox, the per-row exclusion, and
-   notes also used in a dossier di lavoro starting unchecked (recommended).
+4. **What a published dossier carries, and the check** (D3–D5).
+   - Notes: (a) notes and highlights travel, each excludable, those also used in a dossier di lavoro unchecked — the
+     spec as written; (b) no notes, as the programme proposes; (c) highlights travel, **every note starts
+     unchecked** and is added one by one after reading it (recommended: it keeps the annotated texts your document
+     asks for, and nothing personal leaves by default). A highlight's attached note counts as a note.
+   - Recognition: (a) none, the warning and the preview only; (b) the preview marks, without changing them, the
+     patterns a machine finds without guessing — codice fiscale, partita IVA, e-mail and PEC, telephone numbers, IBAN
+     (recommended: cheap, no false names, no pseudonymisation); (c) names too, later, with the programme's guided
+     bridge.
+   - The wording of D5, with one more sentence: «Non copiare testi di manuali o commentari.» The required checkbox
+     (recommended).
 5. **Who can be published**: both kinds, a dossier di lavoro with one more line of warning (recommended); or only
    dossiers di studio (a working dossier is first switched in «Modifica»).
 6. **The examples**: each pack's 2–4 dossiers become study dossiers, plus one «articoli chiave» with its other
@@ -151,3 +180,10 @@ gaps it lists close), `docs/merlt/claude-notes.md` (where `forum_download` fires
 7. **MCP**: no tool publishes to the Forum; `tipo` added to the dossier tools (recommended).
 8. **An item the admin withdrew** (e.g. after a report of personal data) cannot be republished by its author
    (recommended); today it can.
+9. **The link between a dossier and its published copy**: (a) kept, visible only to its owner, never in the public
+   content, never syncing on its own — it lets the dossier show «Pubblicato» with «Aggiorna», «Ritira» and «Elimina»
+   (recommended); (b) none, as the programme proposes: each publication is a new item, updated or withdrawn from the
+   Forum only. Either way the private dossier is never changed by publishing.
+10. **When**: (a) publishing from the dossier now, among the closed beta's testers, as asked on 13 October
+    (recommended: the preview and the check are already the core of the programme's bridge, which can grow on it);
+    (b) now only the names, the kinds and «Aggiungi ai miei dossier», with publishing left to the community phase.

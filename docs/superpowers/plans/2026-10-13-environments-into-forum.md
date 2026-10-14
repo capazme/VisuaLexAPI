@@ -2,7 +2,7 @@
 
 Spec: `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`. Three PRs of code into `develop`, each
 task reviewed before the next. Code starts after the dossier session's PRs are merged and the owner has answered
-Q1–Q8; the tasks assume the recommended answers and change where he chose otherwise.
+Q1–Q10; the tasks assume the recommended answers and change where he chose otherwise.
 
 ## Global constraints
 
