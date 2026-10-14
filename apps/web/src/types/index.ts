@@ -480,6 +480,8 @@ export interface PublishEnvironmentPayload {
     tags?: string[];
     includeNotes?: boolean;
     includeHighlights?: boolean;
+    /** The dossier it is published from (once per dossier; the link is the owner's alone). */
+    sourceDossierId?: string;
 }
 
 export interface SharedEnvironmentReport {

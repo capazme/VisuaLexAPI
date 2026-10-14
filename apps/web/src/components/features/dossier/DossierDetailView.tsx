@@ -61,6 +61,7 @@ import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { kindLabel } from './dossierKinds';
+import { DossierForumActions } from './DossierForumActions';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
@@ -518,6 +519,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               <Download size={16} aria-hidden />
               <span className="hidden sm:inline">Esporta</span>
             </MenuButton>
+            <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={SECONDARY_BUTTON} />
             <MenuButton
               label="Altre azioni"
               triggerClassName={ICON_BUTTON}
