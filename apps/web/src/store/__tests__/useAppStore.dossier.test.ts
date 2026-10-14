@@ -9,7 +9,7 @@ vi.mock('../../services/dossierService', () => ({
         delete: vi.fn(),
         addItem: vi.fn(),
         updateItem: vi.fn(),
-        deleteItem: vi.fn(),
+        trashItems: vi.fn(),
         moveItem: vi.fn(),
         reorderItems: vi.fn(),
     },
@@ -83,7 +83,7 @@ describe('useAppStore dossier sync', () => {
 
     describe('moveToDossier', () => {
         // The server moves the row itself: one call per item, no re-creation.
-        // The old addItem+deleteItem pair re-created the row, which handed the
+        // The old addItem+delete pair re-created the row, which handed the
         // item a fresh server id (so a star or a delete on the moved row 404'd
         // against the target dossier until a reload) and reset its added-at
         // date, and left the item in both dossiers whenever the delete failed.
@@ -128,7 +128,7 @@ describe('useAppStore dossier sync', () => {
             // starring or deleting it in the target no longer 404s.
             expect(appStore.getState().dossiers.find(d => d.id === 'd-dst')?.items[0].id).toBe('item-1');
             expect(dossierService.addItem).not.toHaveBeenCalled();
-            expect(dossierService.deleteItem).not.toHaveBeenCalled();
+            expect(dossierService.trashItems).not.toHaveBeenCalled();
             expect(appStore.getState().lastSyncError).toBeNull();
         });
 

@@ -147,12 +147,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   so a `PATCH` in flight finishes before the payload is read and one that comes
   after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
   saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
-  `/lingo/cards/trash` — the two dossier routes for exchanged tokens only; the card
-  trash is open to the web app too, and the web app's `DELETE /dossiers/:id` moves the
-  whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
+  `/lingo/cards/trash` — `/dossiers/:id/trash` is for exchanged tokens only; the
+  card trash and `trash-items` are open to the web app too (a session's `trash-items` takes
+  up to 5000 ids, an exchanged token's 1 to 50), and so are the web app's own deletions: `DELETE /dossiers/:id` moves
+  the whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
   once), whatever it holds (`trashDossier` with no `seenItemIds`), answering
-  `{ trashId, itemCount }` for the page's «Annulla»; the web app's removal of single
-  entries stays immediate. A deletion by the user's session is stored with no client,
+  `{ trashId, itemCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
+  moves that one entry (question 181, «ok come raccomandi»), answering
+  `{ trashId, moved, notFound }`, as `trash-items` does for a selection: one trash entry per action,
+  restored with the entries' ids, a note's `aboutItemId` and `createdBy`. Nothing the web app reaches
+  deletes an entry for good any more. A deletion by the user's session is stored with no client,
   no name and no grant (`BY_THE_USER`, `DeletedBy` all null) and listed with
   `byApplication: false`, while one through a connected application is
   `byApplication: true` even when its name is unknown. `GET /api/trash`,

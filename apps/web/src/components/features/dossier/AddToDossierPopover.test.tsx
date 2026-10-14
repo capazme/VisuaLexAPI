@@ -7,7 +7,7 @@ vi.mock('../../../services/dossierService', () => ({
     create: vi.fn(async () => ({ id: 'srv-new', name: 'Nuova pratica', items: [], created_at: '2026-08-25T00:00:00Z', updated_at: '2026-08-25T00:00:00Z' })),
     update: vi.fn(async () => ({})), delete: vi.fn(async () => {}),
     addItem: vi.fn(async () => ({ id: 'item-srv' })),
-    updateItem: vi.fn(async () => ({})), deleteItem: vi.fn(async () => {}),
+    updateItem: vi.fn(async () => ({})),
     reorderItems: vi.fn(async () => {}),
   },
 }));

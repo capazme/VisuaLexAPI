@@ -525,8 +525,8 @@ interface AppState {
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
     addToDossier: (dossierId: string, item: DossierNormaData | DossierSentenzaData | string, type: 'norma' | 'note' | 'sentenza') => void;
-    removeFromDossier: (dossierId: string, itemId: string) => void;
-    restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
+    /** Moves entries to the trash in one call; the trash entry's id (for «Annulla»), or null when refused (put back, error shown). */
+    trashDossierItems: (dossierId: string, itemIds: string[]) => Promise<string | null>;
     setDossierItemOrder: (dossierId: string, itemIds: string[]) => void;
     /**
      * Reads one dossier again from the server (after a restore from the trash): replaces it, or adds it
@@ -1683,131 +1683,52 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            removeFromDossier: (dossierId, itemId) => {
-                const state = get();
-                const dossier = state.dossiers.find(d => d.id === dossierId);
-                const item = dossier?.items.find(i => i.id === itemId);
+            // Removes entries from a dossier by moving them to the trash for 30 days, in ONE call (owner,
+            // 13 October 2026, question 181): the server keeps them as one trash entry with their ids, so
+            // the caller's «Annulla» is a restore, not a re-creation. Optimistic, as every removal: a
+            // refusal puts each entry back where it was, says so, and answers null.
+            // An entry whose addToDossier POST is still in flight has no server id: the whole removal
+            // waits for the user to retry (a half-removal would make the message untrue).
+            trashDossierItems: async (dossierId, itemIds) => {
+                const dossier = get().dossiers.find(d => d.id === dossierId);
+                const wanted = new Set(itemIds);
+                const removed = (dossier?.items ?? [])
+                    .map((item, index) => ({ item, index }))
+                    .filter(({ item }) => wanted.has(item.id));
+                if (!dossier || removed.length === 0) return null;
+                if (removed.some(({ item }) => get().pendingDossierItemIds[item.id])) {
+                    get().pushSyncError('Alcuni elementi non sono ancora salvati e non sono stati rimossi. Riprova tra un istante.');
+                    return null;
+                }
 
                 // Optimistic update
                 set((state) => {
-                    const d = state.dossiers.find(d => d.id === dossierId);
-                    if (d) {
-                        d.items = d.items.filter(i => i.id !== itemId);
-                    }
+                    const d = state.dossiers.find(x => x.id === dossierId);
+                    if (d) d.items = d.items.filter(i => !wanted.has(i.id));
                 });
 
-                // API call
-                dossierService.deleteItem(dossierId, itemId).catch(err => {
-                    console.error('Failed to remove item from dossier:', err);
-                    // Rollback
-                    if (item) {
-                        set((state) => {
-                            const d = state.dossiers.find(d => d.id === dossierId);
-                            if (d) {
-                                d.items.push(item);
-                            }
-                        });
-                    }
-                });
-            },
-
-            // Used for undo-delete: re-inserts a previously removed item back
-            // into the dossier at its original position, preserving id, status,
-            // and addedAt locally. The server gets a fresh `addItem` call
-            // (best-effort, silent on failure) so the restored item survives a
-            // reload — at the cost of a new server-side id that only matters
-            // if something external references it, which currently nothing does.
-            restoreDossierItem: (dossierId, item, atIndex) => {
-                // The re-inserted item keeps its OLD local id, but addItem creates
-                // a NEW server row with a different id. Reconcile local id ->
-                // created.id once the server confirms (mirrors addToDossier),
-                // otherwise any later status/delete/reorder targets a stale id and
-                // 404s server-side. The old id is the reconciliation handle.
-                const localId = item.id;
-                set((state) => {
-                    const dossier = state.dossiers.find(d => d.id === dossierId);
-                    if (!dossier) return;
-                    const clamped = Math.max(0, Math.min(atIndex, dossier.items.length));
-                    dossier.items.splice(clamped, 0, item);
-                    // Its old id is gone on the server until addItem answers: a
-                    // reorder in that window waits (setDossierItemOrder). And
-                    // addItem appends it on the server, so once it settles the
-                    // local order — where it was — is saved too.
-                    state.pendingDossierItemIds[localId] = true;
-                    state.pendingDossierOrders[dossierId] = true;
-                });
-                // A note comes back through the notes route, still about its
-                // article when the article is still here. The mark of the
-                // application that wrote it cannot come back: no web route sets it.
-                // A norm or a decision comes back as itself, its label recomputed (Q9).
-                const articleStillHere = item.type === 'note' && !!item.aboutItemId
-                    && !!get().dossiers.find(d => d.id === dossierId)?.items.some(i => i.id === item.aboutItemId && i.type === 'norma');
-                const recreate = item.type === 'note'
-                    ? dossierService.addNote(dossierId, { text: item.data, ...(articleStillHere && item.aboutItemId ? { aboutItemId: item.aboutItemId } : {}) })
-                    : dossierService.addItem(dossierId, {
-                        ...serverItemFor(item),
-                        content: itemContentFor(item),
-                    });
-                recreate.then(created => {
-                    // The notes about a restored article still name its old id:
-                    // point them at the new one at once, then tell the server.
-                    const reattached: string[] = [];
+                try {
+                    return (await dossierService.trashItems(dossierId, removed.map(({ item }) => item.id))).trashId;
+                } catch (err) {
+                    console.error('Failed to move dossier items to the trash:', err);
+                    // Rollback, each where it was (ascending, so each index is right once the earlier ones are back)
                     set((state) => {
-                        const dossier = state.dossiers.find(d => d.id === dossierId);
-                        const restored = dossier?.items.find(i => i.id === localId);
-                        if (restored) {
-                            restored.id = created.id;
-                            Object.assign(restored, serverFieldsFromApi(created));
+                        const d = state.dossiers.find(x => x.id === dossierId);
+                        if (!d) return;
+                        for (const { item, index } of removed) {
+                            if (!d.items.some(i => i.id === item.id)) d.items.splice(Math.min(index, d.items.length), 0, item);
                         }
-                        if (item.type === 'norma') {
-                            dossier?.items.forEach((i) => {
-                                if (i.type === 'note' && i.aboutItemId === localId) {
-                                    i.aboutItemId = created.id;
-                                    reattached.push(i.id);
-                                }
-                            });
-                        }
-                        delete state.pendingDossierItemIds[localId];
                     });
-                    // A star set while the item was pending was applied locally
-                    // only (updateDossierItemStatus): persist what it is now.
-                    const settled = get().dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
-                    if (settled && settled.status !== item.status) {
-                        dossierService.updateItem(dossierId, created.id, {
-                            content: itemContentFor(settled),
-                        }).catch(err => console.error('Failed to persist the star of a restored item:', err));
-                    }
-                    reattached.forEach((noteId) => {
-                        dossierService.updateItem(dossierId, noteId, { aboutItemId: created.id }).catch(err => {
-                            console.error('Failed to reattach a note to its restored article:', err);
-                            // Back to what the server still says (gotcha 17), and say so.
-                            set((state) => {
-                                const n = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === noteId);
-                                if (n && n.aboutItemId === created.id) n.aboutItemId = localId;
-                            });
-                            get().pushSyncError('Impossibile ricollegare la nota al suo articolo. Riprova.');
-                        });
-                    });
-                    get().flushDossierOrder(dossierId);
-                }).catch(err => {
-                    console.error('Failed to restore item on server:', err);
-                    // Not on the server: it must not stay on screen as if it were
-                    // (gotcha 17), nor be named in a saved order.
-                    set((state) => {
-                        const dossier = state.dossiers.find(d => d.id === dossierId);
-                        if (dossier) dossier.items = dossier.items.filter(i => i.id !== localId);
-                        delete state.pendingDossierItemIds[localId];
-                    });
-                    get().pushSyncError('Impossibile ripristinare l’elemento. Riprova.');
-                    get().flushDossierOrder(dossierId);
-                });
+                    get().pushSyncError('Impossibile rimuovere dal dossier. Riprova.');
+                    return null;
+                }
             },
 
             // The order of a whole dossier after a drag of its acts (spec §4): the
             // given ids first, then any item they do not name. Optimistic, reverted
             // with a sync error when the server refuses (gotcha 17). While an item
-            // still has a temporary id nothing is sent: addToDossier and
-            // restoreDossierItem flush the order once every id is settled.
+            // still has a temporary id nothing is sent: addToDossier
+            // flushes the order once every id is settled.
             setDossierItemOrder: (dossierId, itemIds) => {
                 const dossier = get().dossiers.find(d => d.id === dossierId);
                 if (!dossier) return;

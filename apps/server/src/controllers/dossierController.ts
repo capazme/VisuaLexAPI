@@ -9,7 +9,7 @@ import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '
 import { citeStoredAct } from '../norms/citation';
 import { citeDecision, citeStoredItem } from '../norms/decisionCitation';
 import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/decisionItem';
-import { BY_THE_USER, trashDossier } from '../trash/trash';
+import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -376,32 +376,15 @@ export const updateDossierItem = async (req: Request, res: Response) => {
 };
 
 /**
- * Delete dossier item
+ * Remove a dossier item from the web app: it goes to the trash for 30 days,
+ * listed «Rimosso da te» (owner, 13 October 2026, question 181; before, it was
+ * gone at once). The answer names the trash entry, so the page's «Annulla»
+ * restores it. 404 when the dossier is not the user's or the entry is not in
+ * it. Not in the delegated table: a connected application uses `trash-items`.
  */
 export const deleteDossierItem = async (req: Request, res: Response) => {
   const { id, itemId } = req.params;
-
-  // Check ownership
-  const dossier = await prisma.dossier.findFirst({
-    where: { id, userId: req.user!.id },
-  });
-
-  if (!dossier) {
-    throw new AppError(404, 'Dossier not found');
-  }
-
-  try {
-    await prisma.dossierItem.delete({
-      where: { id: itemId, dossierId: id },
-    });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-      throw new AppError(404, 'Dossier item not found');
-    }
-    throw err;
-  }
-
-  res.status(204).send();
+  res.json(await trashDossierItems(req.user!.id, id, [itemId], BY_THE_USER));
 };
 
 /**

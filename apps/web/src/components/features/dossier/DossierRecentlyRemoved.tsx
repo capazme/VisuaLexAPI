@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * «Rimossi di recente (n)» at the bottom of a dossier (spec §11): what a
- * connected application removed from it, each entry restored whole. Not drawn
+ * connected application removed from it, and what you removed yourself, each entry restored whole. Not drawn
  * when there is nothing.
  */
 export function DossierRecentlyRemoved({ entries, dossiers, onRestore, onPurge, showToast }: Props) {
