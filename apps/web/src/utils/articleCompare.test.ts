@@ -53,6 +53,28 @@ describe('kind (D1)', () => {
   it('tells an article of one act from the same number in another', () => {
     expect(compareKindOf(article('a', at('2015-12-31')), article('b', { tipo_atto: 'codice penale' }))).toBe('articles');
   });
+  it('sets side by side, never labels, a version the source did not give as asked (gotcha 32)', () => {
+    const window = (extra: Partial<ArticleValidity>): ArticleValidity => ({
+      state: 'current', valid_from: '2020-01-01', valid_to: null, version_number: 3, act_updated: null, request_in_window: null, ...extra,
+    });
+    const inForce = article('Il saggio è del 5 per cento.', {}, { validity: window({}) });
+    // Asked for 31/12/2015, served the text in force from 2020: its window misses the day.
+    const missed = article('Il saggio è del 5 per cento.', at('2015-12-31'), { validity: window({ request_in_window: false }) });
+    expect(compareKindOf(missed, inForce)).toBe('articles');
+    const c = compareArticles(missed, inForce);
+    expect(c.rows.every((r) => r.label === undefined)).toBe(true);
+    expect(summarySentence(c.summary)).not.toMatch(/^Dal testo/);
+    // An article that did not exist yet on the day asked for.
+    const notYet = article('Articolo non ancora in vigore.', at('2015-12-31'), {
+      validity: window({ state: 'not_yet', valid_from: null, request_in_window: false }),
+    });
+    expect(compareKindOf(notYet, inForce)).toBe('articles');
+    // The day inside the window: still two versions.
+    const held = article('Il saggio è del 10 per cento.', at('2015-12-31'), {
+      validity: window({ state: 'historical', valid_from: '2010-01-01', valid_to: '2019-12-31', request_in_window: true }),
+    });
+    expect(compareKindOf(held, inForce)).toBe('versions');
+  });
 });
 
 describe('two requests that name one text', () => {

@@ -431,3 +431,23 @@ describe('CompareView — on a phone', () => {
     expect(names).toEqual([expect.stringMatching(/ · 1$/), expect.stringMatching(/ · 2$/)]);
   });
 });
+
+describe('a version the source did not give as asked (gotcha 32)', () => {
+  it('is set side by side with its banner, never labelled against the other', () => {
+    const missed = past('1. Il saggio è del 5 per cento.');
+    missed.article.validity = {
+      state: 'current', valid_from: '2020-01-01', valid_to: null, version_number: 3, act_updated: null, request_in_window: false,
+    };
+    const inForce = compareArticle('1. Il saggio è del 5 per cento.');
+    inForce.article.validity = {
+      state: 'current', valid_from: '2020-01-01', valid_to: null, version_number: 3, act_updated: null, request_in_window: null,
+    };
+    const { container } = open(missed, inForce);
+    expect(screen.getByTestId('compare-summary').textContent).not.toMatch(/^Dal testo/);
+    expect(pills()).toEqual([]);
+    const warnings = screen.getByTestId('compare-warnings');
+    expect(within(warnings).getAllByRole('alert')).toHaveLength(1);
+    // The text is still drawn, untouched (rule 23).
+    expect(spelled(container, 'left')).toBe(missed.article.article_text!.replace(/\n/g, ''));
+  });
+});

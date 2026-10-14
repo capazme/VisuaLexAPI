@@ -594,7 +594,8 @@ of `useArticleTextInteractions`).
 a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history. The
 body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
 number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
-article in two versions; two different articles are only set side by side. On the desktop a grid (label, left, right; a
+article in two versions, each citable (`describeVersion`; a side whose window misses the day asked for, or that
+did not exist yet, makes it two articles, with that side's `VersionBanner` above the rows); two different articles are only set side by side. On the desktop a grid (label, left, right; a
 hatched `GapCell` where a side has no comma), on a phone (`useIsDesktop`, one layout per breakpoint) one column with a
 44 px switch between the two versions and «Differenze». Each cell is the reader's own markup for that comma:
 `renderArticleHtml` with `only` (the range of whole blocks) and `changes` (the word diff's ranges, wrapped in

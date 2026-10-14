@@ -6,7 +6,8 @@ import type { CompareArticle } from '../../../hooks/useCompare';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { compareArticles, summarySentence, type CompareSide } from '../../../utils/articleCompare';
 import { buildItemKey } from '../../../utils/normaKeys';
-import { versionKey } from '../../../utils/versionDisplay';
+import { describeVersion, versionKey } from '../../../utils/versionDisplay';
+import { VersionBanner } from '../search/VersionBanner';
 import { ArticleHeader } from './ArticleHeader';
 import { CELL_TINT, layoutComparison, readSide, sideNames, tailRange, type Cell, type SideText, type ViewItem } from './compareLayout';
 import { GapCell, LabelPill, TextCell } from './compareParts';
@@ -71,6 +72,16 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
   };
 
   const sentence = summarySentence(comparison.summary);
+  // A side the source did not give as asked (its window misses the day, or the article did not exist
+  // yet) is not labelled against the other (`compareKindOf`); its banner says why (gotcha 32).
+  const warnings = (['left', 'right'] as const).flatMap((side) => {
+    const { article } = side === 'left' ? left : right;
+    const display = describeVersion(article.validity, {
+      versione: article.norma_data.versione,
+      data_versione: article.norma_data.data_versione,
+    });
+    return !display.canCite && display.banner ? [{ side, banner: display.banner }] : [];
+  });
   const tails = { left: tailRange(texts.left), right: tailRange(texts.right) };
 
   return (
@@ -109,6 +120,17 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
           </button>
         )}
       </div>
+
+      {warnings.length > 0 && (
+        <div data-testid="compare-warnings" className="border-b border-slate-100 px-4 pt-3 dark:border-slate-800">
+          {warnings.map(({ side, banner }) => (
+            <div key={side}>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{names[side]}</p>
+              <VersionBanner banner={banner} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {isDesktop ? (
         <DesktopRows

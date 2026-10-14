@@ -16,7 +16,7 @@ import type { ArticleData } from '../types';
 import { buildItemKey } from './normaKeys';
 import { shortNorm } from './sources';
 import { parseArticleStructure, type ArticleStructure, type InlineDecoration, type TextRange } from './articleStructure';
-import { requestedVersion, versionKey, versionLabel, versionTabSuffix, type VersionRequest } from './versionDisplay';
+import { describeVersion, requestedVersion, versionKey, versionLabel, versionTabSuffix, type VersionRequest } from './versionDisplay';
 
 export type CompareKind = 'versions' | 'articles';
 export type CompareSide = 'left' | 'right';
@@ -528,8 +528,19 @@ export function compareKindOf(left: ArticleData, right: ArticleData): CompareKin
   return buildItemKey(left.norma_data) === buildItemKey(right.norma_data)
     && versionKey(left.norma_data) !== versionKey(right.norma_data)
     && !askForTheSameText(left, right)
+    && citable(left) && citable(right)
     ? 'versions'
     : 'articles';
+}
+
+/**
+ * Whether a side's text is the one asked for (gotcha 32): not a version whose window misses the
+ * day asked for, not an article that did not exist yet. Otherwise «Dal testo al … al …» would state
+ * as a fact a change, or no change, between texts the source did not give: the two are only set
+ * side by side, and the view shows each side's banner.
+ */
+function citable(article: ArticleData): boolean {
+  return describeVersion(article.validity, request(article)).canCite;
 }
 
 /**
