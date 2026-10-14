@@ -1,7 +1,7 @@
 # «Ambienti» into the Forum: dossiers of work, dossiers of study, «Pubblica nel Forum»
 
-Date: 13 October 2026. Status: **proposal, waiting for the owner** on the questions at the end (Q1–Q10), to be decided by both owners where the programme of 11 October differs. The
-direction is decided: the owner's document of 13 October («La voce "Ambienti" deve essere assorbita all'interno della
+Date: 13–14 October 2026. Status: **decided.** The owner answered every question at the end (Q1–Q10, his questions
+183–190, 202 and 203) on 14 October: «ok vai con le raccomandate». The direction was decided before: the owner's document of 13 October («La voce "Ambienti" deve essere assorbita all'interno della
 sezione "Forum"»; «distinguendo nettamente "dossier interni di lavoro", "dossier interni di studio" e "ambienti del
 forum"»; «una funzione diretta per trasformare/convertire un dossier interno in ambiente condiviso nel forum»; «I futuri
 ambienti dovranno consistere in dossier mantenuti privati finché l'utente non decida di pubblicarli nel forum,
@@ -57,15 +57,15 @@ Read from develop e08005eb.
 - **MERL-T**: the web sends `forum_like`, `forum_download`, `forum_suggestion_accepted/declined`, keyed on the
   `SharedEnvironment` id (`sharedEnvId`), to `POST /api/merlt/events/forum-signal`, behind the consent guard.
 
-## Decisions (proposed)
+## Decisions
 
 | # | Decision |
 | --- | --- |
 | D1 | **Three names.** «Dossier di lavoro» (a practice, a client's matter: may hold personal data); «Dossier di studio» (a topic studied: the examples, what comes from the Forum); «Forum» (what users publish). The Forum's items are **«dossier pubblicati»** (Q1); the word «ambiente» leaves the interface. Code identifiers stay (`SharedEnvironment`, `features/bulletin`, `sharedEnvId`): renaming tables and the MERL-T wire field is churn with no user benefit. |
 | D2 | **A dossier carries a kind**: `lavoro` \| `studio`, default `lavoro`. Chosen when creating («Di lavoro» pre-selected), changed in «Modifica». The list: filter «Tutti · Di lavoro · Di studio», a label on each study dossier. Every existing dossier becomes `lavoro` — the cautious reading, since nothing tells which hold client matters. Forum downloads, the examples, recovered environments and a dossier taken from a suggestion become `studio`. The trash keeps the kind on restore. |
-| D3 | **«Pubblica nel Forum» from the dossier, one dialog.** In the dossier's header (both kinds, Q5). Fields: title (the dossier's name, editable), description, category, tags. Then **the preview — exactly what will be sent**: every entry (citation and title), every note entry of the dossier in full, and the user's notes and highlights on those articles and decisions, **read from the server** for each entry's key (not from the browser's partial cache), text in full. Every note entry, note and highlight has a checkbox; two global switches «Note» and «Evidenziazioni». **A note or highlight on an article that also sits in one of the user's dossiers di lavoro starts unchecked**, marked «anche nel dossier di lavoro ‹nome›» (the name is shown to the user only). Then the privacy check (D5) and «Pubblica». One request. |
+| D3 | **«Pubblica nel Forum» from the dossier, one dialog.** In the dossier's header (both kinds, Q5). Fields: title (the dossier's name, editable), description, category, tags. Then **the preview — exactly what will be sent**: every entry (citation and title), every note entry of the dossier in full, and the user's notes and highlights on those articles and decisions, **read from the server** for each entry's key (not from the browser's partial cache), text in full. Every note entry, note and highlight has a checkbox; two global switches «Note» and «Evidenziazioni». **Highlights start checked; every note starts unchecked** — the dossier's note entries, the notes on its articles and decisions, and a highlight's attached note — and is added one at a time after reading it (Q4). A row on an article that also sits in one of the user's dossiers di lavoro is marked «anche nel dossier di lavoro ‹nome›» (the name is shown to the user only). **The preview flags, without changing them,** what a pattern finds with no guessing in the title, description, tags and every note: codice fiscale, partita IVA, e-mail and PEC, telephone numbers, IBAN («Possibile dato personale»), with a count above the list (Q4; names are not looked for). Then the privacy check (D5) and «Pubblica». One request. |
 | D4 | **What a published dossier is**: a `SharedEnvironment` whose content holds one dossier — title, description and tags *as typed in the dialog* (never the private name), its entries, its note entries, a note's link to its entry (`aboutItemId`, ids renumbered) — plus the selected notes and highlights, no quick norms, no aliases. The keys that select notes are computed from the entries *as the server will rebuild them* (the web twin `utils/sources/normEntry.ts`), so a downloader's keys match. Anchors on a decision's withdrawn words are left out as today (`travellingSelection`). Exact keys only: a Brocardi section's notes are not included; an entry in its historical text carries the in-force text's notes, deduped if both versions are in the dossier. It records `sourceDossierId`. It is a **snapshot**: later work on the private dossier is published only by «Aggiorna la versione pubblicata» (same dialog, same preview, a new version in replace mode). Nothing syncs on its own. |
-| D5 | **The privacy check** (wording for the owner, Q4). Above «Pubblica», in an amber box: «**Stai per rendere pubblico questo dossier.** Chiunque abbia un account VisuaLex potrà leggerlo e scaricarne una copia: il titolo, la descrizione, le voci, le note e le evidenziazioni spuntate qui sopra, con il tuo nome utente. Le note appartengono all'articolo, non al dossier: controlla anche quelle scritte per altre pratiche. Non pubblicare dati personali dei clienti o di altre persone, né fatti di una pratica che le rendano riconoscibili. Se ritiri il dossier dal Forum, chi l'ha già scaricato ne conserva la copia.» For a dossier di lavoro one more line first: «È un dossier di lavoro: controlla con attenzione titolo e note.» A required checkbox «Ho controllato: non contiene dati personali» enables «Pubblica». No pseudonymisation (owner, 13 Oct). |
+| D5 | **The privacy check** (wording approved, Q4). Above «Pubblica», in an amber box: «**Stai per rendere pubblico questo dossier.** Chiunque abbia un account VisuaLex potrà leggerlo e scaricarne una copia: il titolo, la descrizione, le voci, le note e le evidenziazioni spuntate qui sopra, con il tuo nome utente. Le note appartengono all'articolo, non al dossier: controlla anche quelle scritte per altre pratiche. Non pubblicare dati personali dei clienti o di altre persone, né fatti di una pratica che le rendano riconoscibili. Non copiare testi di manuali o commentari. Se ritiri il dossier dal Forum, chi l'ha già scaricato ne conserva la copia.» For a dossier di lavoro one more line first: «È un dossier di lavoro: controlla con attenzione titolo e note.» A required checkbox «Ho controllato: non contiene dati personali» enables «Pubblica». No pseudonymisation (owner, 13 Oct). |
 | D6 | **The server never trusts Forum content: an allow-list that validates.** `utils/publishedContent.ts`, applied on publish, update and **version restore**, and **on every read** (list, detail, download, versions) so legacy items stop exposing what they carry without rewriting a row. Per row: the dossier (title ≤ 200, description, tags — bounded), entries (today's rebuild), notes (key and article id bounded, no `::art::` inside them; text; anchor text; `startOffset` a non-negative integer), highlights (same, colour from the known set), quick norms (label, search parameters), aliases (trigger, expansion); a cap on rows. Dropped: user ids, `originalAuthor`, `sourceSuggestionId`, `bookmarkId`, usage counts, MCP provenance (`createdByClient*`), colour, any other key. Row ids are **replaced by fresh ones, consistently** (a note's `aboutItemId` follows its entry) so the UI's keys still work. Root rule 23: no trim, no normalisation of text or anchor text. Publishing from a dossier further requires exactly one dossier and no quick norms or aliases; the switches must match the content. |
 | D7 | **Withdrawing hides.** Detail, like, download, versions, a new suggestion and adding items to one answer 404 on a withdrawn item to anyone but its owner and the admin. The owner sees «Ritira dal Forum» and «Elimina dal Forum» in the dossier's header once published. An item **the admin** withdrew cannot be republished by its author (Q8): the admin's withdrawal after a report of personal data must hold. |
 | D8 | **Downloading makes study dossiers, in one server request.** «Aggiungi ai miei dossier» on a Forum item: each dossier of the content becomes a `studio` dossier with the publisher as `originalAuthor` (the «da @utente» chip); if the user keeps the two switches on, the notes and highlights come too, also marked with the publisher, **skipping one identical to one the user has** (same key, offsets and text, compared exactly). They live on the article (D4): they show wherever the user reads it and outlive the study dossier; the chip tells them apart. Legacy items' quick norms and aliases come too, a label or trigger the user has being skipped. An entry the rebuild refuses (a legacy item) is skipped and counted, not fatal. The answer says what was created and what was skipped; the toast reports it and opens the new dossier. `forum_download` is sent after success, as today. No private environment is created any more. |
@@ -97,6 +97,8 @@ Read from develop e08005eb.
 
 **Web** (`apps/web`).
 - `Dossier.kind` in the type, service, store; the create and edit dialogs; the list filter and label.
+- `utils/personalDataPatterns.ts` (pure: the spans of codice fiscale, partita IVA, e-mail and PEC, telephone numbers,
+  IBAN in a string; the preview wraps them in a mark, never changes a character).
 - `features/dossier/PublishDossierDialog.tsx` over `utils/dossierPublication.ts` (pure: rebuilt entries → keys → the
   server's notes and highlights → content + preview rows, one function, so the preview is the payload); D5's check;
   reused for «Aggiorna». The header: «Pubblicato nel Forum · v N» with Aggiorna / Ritira / Elimina / Apri nel Forum,
@@ -124,12 +126,14 @@ gaps it lists close), `docs/merlt/claude-notes.md` (where `forum_download` fires
   `<decisionKey>::art::`), exact-dedupe on a second download, a refused legacy entry skipped and counted, a database
   error rolling everything back; the take's note on a decision now visible. Own DB `visualex_test_forum`.
 - Web: `dossierPublication` (notes of articles never opened are in; keys from the rebuilt entries equal the server's;
-  decision anchors; switches and exclusions; the lavoro-overlap default; preview rows = payload); the dialog (the
+  decision anchors; switches and exclusions; highlights checked and every note unchecked by default; the lavoro
+  overlap marked; preview rows = payload); `personalDataPatterns` (each pattern found and not changed, a near miss
+  not flagged, no name looked for); the dialog (the
   checkbox gates «Pubblica»; the lavoro line); the kind filter; the download toast; the packs; the archive;
   redirects; Sidebar and tour tests updated.
 - MCP: `tipo` accepted and listed; tool names unchanged (`tools.test.ts`).
-- Browser pass (desktop and 390 px, own test accounts): publish a study dossier with a note and a highlight, one note
-  also in a working dossier (starts unchecked); see it from a second account, download it, find the study dossier and
+- Browser pass (desktop and 390 px, own test accounts): publish a study dossier with a highlight and a note added
+  by hand (notes start unchecked), a codice fiscale in a note flagged; see it from a second account, download it, find the study dossier and
   the note with its chip; withdraw it and see it vanish for the second account; add a pack; recover an archived
   environment.
 
@@ -152,38 +156,22 @@ this round. Point by point, in this spec's words:
 | Personal study sources | Always private; only cards rewritten and anchored enter the community (P-025) | A published dossier carries the user's own notes | D5 gains a line against copying manuals and commentaries (Q4) |
 | Access without an account | Public collections readable without an account | The Forum stays behind the login | Out of this round |
 
-## Questions for the owner
+## The owner's answers (14 October 2026)
 
-1. **The Forum's items**: «dossier pubblicati» (recommended: it says what they are, and needs no new word); or
-   «ambienti del Forum», as in your document; or a name of their own, as the programme of 11 October proposes.
-   «Dossier pubblicati» also fits the programme's model: one private object, one public copy of it.
-2. **Private environments already saved**: a read-only archive inside the Forum with «Recupera i dossier» and
-   «Esporta», no new ones (recommended); or convert them all into study dossiers at once (duplicates: each is a copy
-   of the workspace); or delete them after an export.
-3. **«Sostituisci tutto»** goes, with the route that deletes all of a user's notes in one request (recommended).
-   Since #171 the replaced dossiers go to the trash, but notes and highlights are still lost for good.
-4. **What a published dossier carries, and the check** (D3–D5).
-   - Notes: (a) notes and highlights travel, each excludable, those also used in a dossier di lavoro unchecked — the
-     spec as written; (b) no notes, as the programme proposes; (c) highlights travel, **every note starts
-     unchecked** and is added one by one after reading it (recommended: it keeps the annotated texts your document
-     asks for, and nothing personal leaves by default). A highlight's attached note counts as a note.
-   - Recognition: (a) none, the warning and the preview only; (b) the preview marks, without changing them, the
-     patterns a machine finds without guessing — codice fiscale, partita IVA, e-mail and PEC, telephone numbers, IBAN
-     (recommended: cheap, no false names, no pseudonymisation); (c) names too, later, with the programme's guided
-     bridge.
-   - The wording of D5, with one more sentence: «Non copiare testi di manuali o commentari.» The required checkbox
-     (recommended).
-5. **Who can be published**: both kinds, a dossier di lavoro with one more line of warning (recommended); or only
-   dossiers di studio (a working dossier is first switched in «Modifica»).
-6. **The examples**: each pack's 2–4 dossiers become study dossiers, plus one «articoli chiave» with its other
-   articles (recommended); or one study dossier per pack with all its articles.
-7. **MCP**: no tool publishes to the Forum; `tipo` added to the dossier tools (recommended).
-8. **An item the admin withdrew** (e.g. after a report of personal data) cannot be republished by its author
-   (recommended); today it can.
-9. **The link between a dossier and its published copy**: (a) kept, visible only to its owner, never in the public
-   content, never syncing on its own — it lets the dossier show «Pubblicato» with «Aggiorna», «Ritira» and «Elimina»
-   (recommended); (b) none, as the programme proposes: each publication is a new item, updated or withdrawn from the
-   Forum only. Either way the private dossier is never changed by publishing.
-10. **When**: (a) publishing from the dossier now, among the closed beta's testers, as asked on 13 October
-    (recommended: the preview and the check are already the core of the programme's bridge, which can grow on it);
-    (b) now only the names, the kinds and «Aggiungi ai miei dossier», with publishing left to the community phase.
+His words, for every question below: «ok vai con le raccomandate». Each question with the recommendation it adopted:
+
+1. (183) The Forum's items are «dossier pubblicati».
+2. (184) Private environments already saved become a read-only archive in the Forum, with «Recupera i dossier» and
+   «Esporta»; no new ones.
+3. (185) «Sostituisci tutto» goes, with the route that deletes all of a user's notes in one request.
+4. (186) D5's wording plus «Non copiare testi di manuali o commentari.»; the required checkbox «Ho controllato: non
+   contiene dati personali»; notes option (c): highlights travel, every note starts unchecked and is added one at a
+   time; recognition option (b): the preview flags codice fiscale, partita IVA, e-mail and PEC, telephone numbers and
+   IBAN without changing them.
+5. (187) Both kinds can be published, a dossier di lavoro with one more line of warning.
+6. (188) Each pack's 2–4 dossiers become study dossiers, plus one «articoli chiave» with its other articles.
+7. (189) No MCP tool publishes to the Forum; the dossier tools gain the kind.
+8. (190) An item the admin withdrew cannot be republished by its author.
+9. (202) The link between a dossier and its published copy is kept, visible only to its owner, never in the public
+   content, never syncing on its own.
+10. (203) Publishing from the dossier now, among the closed beta's testers.

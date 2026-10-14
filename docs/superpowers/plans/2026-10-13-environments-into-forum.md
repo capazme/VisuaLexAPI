@@ -1,8 +1,8 @@
 # Plan: «Ambienti» into the Forum, dossiers of work and of study, «Pubblica nel Forum»
 
 Spec: `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`. Three PRs of code into `develop`, each
-task reviewed before the next. Code starts after the dossier session's PRs are merged and the owner has answered
-Q1–Q10; the tasks assume the recommended answers and change where he chose otherwise.
+task reviewed before the next. Code starts after the dossier session's open PRs are merged (the EU range, the dossier PDF,
+single items into the trash). The owner answered Q1–Q10 on 14 October: «ok vai con le raccomandate».
 
 ## Global constraints
 
@@ -63,15 +63,17 @@ Commit: `feat: a dossier di lavoro or di studio, on the site and for connected a
 
 **Task 2.2 — «Pubblica nel Forum».** `utils/dossierPublication.ts` (pure): entries rebuilt through
 `utils/sources/normEntry.ts` → keys → notes and highlights fetched by key (`getByNormaKeyPrefix`) → content and
-preview rows; the overlap with dossiers di lavoro. `PublishDossierDialog` (preview, switches, per-row exclusion, D5's
+preview rows (highlights checked, every note unchecked); the overlap with dossiers di lavoro;
+`utils/personalDataPatterns.ts` (codice fiscale, partita IVA, e-mail/PEC, telephone, IBAN: spans flagged, text unchanged). `PublishDossierDialog` (preview, switches, per-row exclusion, D5's
 check and the lavoro line, 409 → «Aggiorna»); the header's published state with Aggiorna / Ritira / Elimina / Apri nel
 Forum; phone sheet.
-Tests: notes of articles never opened are in; keys equal the server rebuild's (fixture shared with Task 1.3); decision
+Tests: every pattern flagged and none on a near miss; the flags change no character; notes start unchecked;
+notes of articles never opened are in; keys equal the server rebuild's (fixture shared with Task 1.3); decision
 anchors; overlap rows start unchecked; preview rows = payload; the checkbox gates «Pubblica».
 Commit: `feat(web): «Pubblica nel Forum» from the dossier, with a preview and a privacy check`.
 
 PR: `merge: feat/publish-dossier — «Pubblica nel Forum» from the dossier; dossiers di lavoro and di studio`.
-Browser pass: publish (one note also in a working dossier), update, withdraw, delete; desktop and 390 px.
+Browser pass: publish (a note added by hand, a codice fiscale flagged), update, withdraw, delete; desktop and 390 px.
 
 ## PR 3 — `feat/forum-absorbs-environments` (apps/web, apps/server)
 
