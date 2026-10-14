@@ -14,6 +14,9 @@ import { GradeBar } from './GradeBar';
 import { ReviewCard } from './ReviewCard';
 import { Sheet } from '../../ui/Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
+import { SessionCelebration } from './progress/Celebration';
+import { SessionEndProgress } from './progress/SessionEndProgress';
+import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useReviewSession, type ReviewSummary } from './useReviewSession';
 
 const HOME_PATH = '/studia/ripasso';
@@ -101,8 +104,13 @@ export function ReviewSession() {
     else setConfirmStop(true);
   }, []);
 
-  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload } =
+  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet } =
     useReviewSession(materia, { paused: confirmStop, onEscape: handleEscape });
+  // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
+  const { celebratedBefore, markCelebrated } = useCelebratedToday();
+  // The day whose notice has run its course here: the notice goes, and a later closing grade (the goal raised) does not bring it back.
+  const [noticeDone, setNoticeDone] = useState<string | null>(null);
+  const celebrating = goalMet !== null && !celebratedBefore(goalMet.giorno) && noticeDone !== goalMet.giorno;
 
   // An article belongs to the step it was opened at: a card that comes back is a new step.
   const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
@@ -133,6 +141,7 @@ export function ReviewSession() {
     body = (
       <div className="space-y-4">
         <p className="max-w-[60ch] font-serif text-xl leading-[1.7] text-slate-900 dark:text-slate-50">{endSentence(summary)}</p>
+        <SessionEndProgress />
         <button type="button" onClick={() => navigate(HOME_PATH)} className={cn(BUTTON, 'border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800')}>
           Torna al ripasso
         </button>
@@ -170,7 +179,19 @@ export function ReviewSession() {
 
   return (
     // Room for the bar pinned at the bottom of a phone.
-    <section aria-label="Ripasso" className="pb-28 md:pb-0">
+    <section aria-label="Ripasso" className="relative pb-28 md:pb-0">
+      {/* A live region of its own, not a second «status»: the screen's status line is the skipped card's. */}
+      <p aria-live="polite" className="sr-only">
+        {goalMet ? `Obiettivo di oggi raggiunto · serie di ${goalMet.serie} ${goalMet.serie === 1 ? 'giorno' : 'giorni'}` : ''}
+      </p>
+      {celebrating && (
+        <SessionCelebration
+          giorno={goalMet.giorno}
+          serie={goalMet.serie}
+          onStart={() => markCelebrated(goalMet.giorno)}
+          onDone={() => setNoticeDone(goalMet.giorno)}
+        />
+      )}
       {skipped && (
         <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
           Questa scheda non è più da ripassare.

@@ -192,11 +192,12 @@ States: while reading, a skeleton of the band and the panels at their final size
 - **Cards by state:** a stacked bar; hovering or tapping a segment says its count and share.
 - **Coming days:** bars with a light grid and two value lines; hovering or tapping a bar says the day and the count.
 - **Subjects:** each row is a button that sets the filter (pressing the selected one clears it), `aria-pressed`.
-- Every interactive mark is at least 44 px on a phone (a bar's hit area is its whole column).
+- Every interactive mark is at least 44 px on a phone (a bar's hit area is its whole column), with one exception: twelve weeks of seven days cannot give a 44 px cell at 390 px, so a calendar cell answers over its whole pitch, gaps included (about 26 px), and the arrow keys and the readout are the precise way in.
 
 ### 6.4 The session
 
-- When a grade's answer says `appenaRaggiunto` and this browser has not celebrated today, the celebration plays in a layer above the session header, never over the card or the grade bar, without moving focus; the keys keep working. Under reduced motion, a one-line status: «Obiettivo di oggi raggiunto · serie di 13 giorni».
+- When a grade's answer says `appenaRaggiunto` and this browser has not celebrated today, the celebration plays in a notice placed in the page over the session's header row («Restano N · Interrompi»), so it scrolls away with that row and never covers the card or the grade bar; 1.5 s (decision 6); no focus, no pointer, the keys keep working. A screen reader hears «Obiettivo di oggi raggiunto · serie di 13 giorni». Under reduced motion the same notice, still: the words and the stamp, no confetti.
+- The day is marked celebrated when the celebration starts, not when it ends, so leaving the page halfway or a new read of the dashboard never plays it a second time.
 - The end screen keeps its sentence and adds the ring and the streak as they are now.
 - Back on the home after a celebration, the stamp is there at rest; the home plays the celebration itself only when the goal was met today and this browser has not celebrated today (a `localStorage` key per day: a per-browser convenience, never the source of the streak).
 

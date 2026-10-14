@@ -9,6 +9,7 @@ import type {
   Giudizio,
   Materia,
   PreferenzeStudio,
+  Progressi,
   RevisioneInput,
   StatoScheda,
   Scheda,
@@ -142,12 +143,18 @@ export const studiaService = {
     return response.data;
   },
 
+  /** Everything the dashboard draws, narrowed to a subject if asked (`GET /lingo/srs/progressi`). */
+  async progress(materia?: Materia): Promise<Progressi> {
+    const response = await apiClient.get('/lingo/srs/progressi', { params: materia ? { materia } : {} });
+    return response.data;
+  },
+
   async preferences(): Promise<PreferenzeStudio> {
     const response = await apiClient.get('/lingo/srs/preferenze');
     return response.data;
   },
 
-  /** Either field alone; the answer is the whole preferences. */
+  /** Any field alone; the answer is the whole preferences. */
   async savePreferences(changes: Partial<PreferenzeStudio>): Promise<PreferenzeStudio> {
     const response = await apiClient.put('/lingo/srs/preferenze', changes);
     return response.data;

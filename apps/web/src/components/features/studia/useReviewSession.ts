@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { studiaService } from '../../../services/studiaService';
-import type { Materia, SchedaDiRipasso, Voto } from '../../../types/studia';
+import type { Materia, OggiDelVoto, SchedaDiRipasso, Voto } from '../../../types/studia';
 
 const MAX_DURATION_MS = 3_600_000;
 
@@ -65,6 +65,9 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
   const [reviewedIds, setReviewedIds] = useState<ReadonlySet<string>>(new Set());
   const [againIds, setAgainIds] = useState<ReadonlySet<string>>(new Set());
   const [nextDue, setNextDue] = useState<number | null>(null);
+  // Today's goal as the last recorded grade left it, and the grade that made the day count (Studia progress spec §5.3).
+  const [today, setToday] = useState<OggiDelVoto | null>(null);
+  const [goalMet, setGoalMet] = useState<OggiDelVoto | null>(null);
   // How many times the queue has moved on: a card that comes straight back is a new step.
   const [step, setStep] = useState(0);
 
@@ -140,6 +143,10 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
           setReviewedIds((before) => new Set(before).add(card.id));
           if (rating === 1) setAgainIds((before) => new Set(before).add(card.id));
           setNextDue((before) => (before === null ? outcome.scheduledDays : Math.min(before, outcome.scheduledDays)));
+          if (outcome.oggi) {
+            setToday(outcome.oggi);
+            if (outcome.oggi.appenaRaggiunto) setGoalMet(outcome.oggi);
+          }
         }
         // The session may have been read again while the post was on its way.
         if (queueRef.current[0]?.card.id === card.id) {
@@ -214,5 +221,9 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     skipped,
     saving,
     reload: load,
+    /** Today's goal after the last recorded grade; null before one. */
+    today,
+    /** The answer of the grade that made the day count, while this session lasts; null until then. */
+    goalMet,
   };
 }

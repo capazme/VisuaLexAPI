@@ -421,12 +421,38 @@ Keys: space reveals (ignored on a focused button or link, in a field, under an `
 «Interrompere il ripasso?»; listed in the «?» dialog's «Ripasso» group. The visual rule of the review
 card (`ReviewCard`) is the spec's §6 and is not to be restyled: the anchor's citation small in slate sans
 above, question and answer in the reader's serif at a 60ch measure, the question a step larger, no
-shadow or gradient; the reveal is the area's one motion (a hairline, then the answer, `motion-safe:`
+shadow or gradient; the reveal is the card's one motion (the dashboard's celebration never touches the card) (a hairline, then the answer, `motion-safe:`
 only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
 but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
 menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
 (`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
 shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
+
+**The progress dashboard** (`ReviewHome`, Studia's home; spec
+`docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»): one read,
+`useProgress` over `GET /lingo/srs/progressi` (the last answer stays on screen, dimmed, while a new one travels;
+an older answer never overwrites a newer one), drawn by `studia/progress/`: `ProgressBand` (`GoalRing`, today's
+reviews against the user's goal `ripassiAlGiorno`, full and green once the day counts; `StreakBadge`, the «§» badge,
+the count and record, the last seven days as register boxes; today's sentence and «Inizia il ripasso»),
+`SubjectChips` (in place of the old `<select>`: the subject narrows the dashboard and the session it starts, kept
+in `localStorage` under `visualex.studia.ripasso.materia`), and `ProgressPanels` (`ActivityCalendar`, 26 weeks on a
+computer and 12 on a phone by `useIsDesktop`, one tab stop with arrow keys and a live readout, a legend under it
+(«meno … più», the counted day's dot, the rest's dashed outline), the whole pitch of a cell hit-testable; `CardStatesBar`;
+`DueForecast`; `SubjectProgress`, whose rows also set the filter); `StudyPreferences` stays closed at the bottom
+and now holds «Ripassi al giorno» too. While the first read travels the band and the panels keep their places
+(`ProgressPanelsSkeleton`); a failed first read stops the pulse and says the progress is not available. Colours are the app's tokens through `progress/tokens.ts` (ink is the
+primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
+hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
+the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
+(`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
+read never replays it; a convenience, never the streak's source) — on the home when
+today counts with at least one review (confetti of «§» and «✓» from the ring, `confetti.ts` pure, on a canvas,
+and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
+whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
+with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
+line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
+`stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
+(`SessionEndProgress`, the same read).
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
