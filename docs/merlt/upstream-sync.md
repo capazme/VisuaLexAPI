@@ -131,7 +131,7 @@ services/merlt/
 
 1. **`docs/merlt/upstream-sync.md`** (questo doc): leggere prima di qualsiasi modifica strutturale a `services/merlt/`.
 2. **Tag baseline** `merlt-baseline-from-alis-core` — riferimento per audit (`git diff merlt-baseline-from-alis-core -- services/merlt/`).
-3. **CODEOWNERS** (futuro, opzionale): assegnare review obbligatorio per modifiche a `services/merlt/`.
+3. **Revisione**: richiesta all'altro sviluppatore, mai obbligatoria (`docs/git-workflow.md`, «Review»).
 
 ---
 

@@ -10,7 +10,7 @@ Indice della documentazione del progetto **VisuaLexAPI**: applicazione per avvoc
 
 ## Inizia da qui
 
-- **[git-workflow.md](./git-workflow.md)**: il modello dei rami — `develop` per lavorare, `main` per le release, pull request, code owner, hotfix.
+- **[git-workflow.md](./git-workflow.md)**: il modello dei rami — `develop` per lavorare, `main` per le release, pull request, revisione, versioni e rilasci, hotfix.
 - **[setup.md](./setup.md)**: da un clone vuoto a uno stack funzionante con le suite verdi.
 - **[deployment.md](./deployment.md)**: lo stack di produzione sulla macchina dedicata (`./start.sh --prod`): primo deploy, Tailscale e MCP, aggiornamenti, backup.
 
@@ -90,4 +90,4 @@ Tracker storici:
 - **Doc MERL-T** → `docs/merlt/` (panoramiche), `docs/merlt/slices/<slice>/` (design + sprint-plan accoppiati), `docs/merlt/decisions/` (ADR).
 - **Design spec nuovi** → `docs/superpowers/specs/AAAA-MM-GG-<tema>-design.md`.
 - Lingua: prosa **italiana**, identificatori/endpoint/percorsi in **inglese** (come nel codice).
-- Documents under `merlt/slices/`, `archive/` and `superpowers/` describe the repository of their time: their paths predate the v2.0.0 layout.
+- Documents under `merlt/slices/`, `archive/` and `superpowers/` describe the repository of their time: their paths predate the unified layout of September 2026.

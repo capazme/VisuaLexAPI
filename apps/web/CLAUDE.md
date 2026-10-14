@@ -421,12 +421,38 @@ Keys: space reveals (ignored on a focused button or link, in a field, under an `
 «Interrompere il ripasso?»; listed in the «?» dialog's «Ripasso» group. The visual rule of the review
 card (`ReviewCard`) is the spec's §6 and is not to be restyled: the anchor's citation small in slate sans
 above, question and answer in the reader's serif at a 60ch measure, the question a step larger, no
-shadow or gradient; the reveal is the area's one motion (a hairline, then the answer, `motion-safe:`
+shadow or gradient; the reveal is the card's one motion (the dashboard's celebration never touches the card) (a hairline, then the answer, `motion-safe:`
 only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
 but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
 menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
 (`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
 shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
+
+**The progress dashboard** (`ReviewHome`, Studia's home; spec
+`docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»): one read,
+`useProgress` over `GET /lingo/srs/progressi` (the last answer stays on screen, dimmed, while a new one travels;
+an older answer never overwrites a newer one), drawn by `studia/progress/`: `ProgressBand` (`GoalRing`, today's
+reviews against the user's goal `ripassiAlGiorno`, full and green once the day counts; `StreakBadge`, the «§» badge,
+the count and record, the last seven days as register boxes; today's sentence and «Inizia il ripasso»),
+`SubjectChips` (in place of the old `<select>`: the subject narrows the dashboard and the session it starts, kept
+in `localStorage` under `visualex.studia.ripasso.materia`), and `ProgressPanels` (`ActivityCalendar`, 26 weeks on a
+computer and 12 on a phone by `useIsDesktop`, one tab stop with arrow keys and a live readout, a legend under it
+(«meno … più», the counted day's dot, the rest's dashed outline), the whole pitch of a cell hit-testable; `CardStatesBar`;
+`DueForecast`; `SubjectProgress`, whose rows also set the filter); `StudyPreferences` stays closed at the bottom
+and now holds «Ripassi al giorno» too. While the first read travels the band and the panels keep their places
+(`ProgressPanelsSkeleton`); a failed first read stops the pulse and says the progress is not available. Colours are the app's tokens through `progress/tokens.ts` (ink is the
+primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
+hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
+the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
+(`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
+read never replays it; a convenience, never the streak's source) — on the home when
+today counts with at least one review (confetti of «§» and «✓» from the ring, `confetti.ts` pure, on a canvas,
+and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
+whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
+with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
+line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
+`stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
+(`SessionEndProgress`, the same read).
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
@@ -487,6 +513,24 @@ highlights are stored under `normaKey = decisionKey(identity)` with `articleId =
 block; `decisionStructure` names them). `DecisionReadingToolbar` draws the notes and highlights
 buttons and the discussion button (`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
 (`UnmatchedAnchors`; a decision found without text hosts it through `DecisionAnchorsWithoutText`).
+**Key passages** (spec `docs/superpowers/specs/2026-10-13-decision-key-passages-design.md`; the owner: «Ok
+proviamo», then «191-194 va bene»): `utils/decisionKeyPassages.ts` finds by rules, never AI, the principle of law a
+Cassazione decision enunciates (its own, never a precedent's or the Prosecutor General's), the operative part of a
+Cassazione or Corte costituzionale dispositivo (without costs, «contributo unificato», anonymisation, «Così deciso»),
+and the Corte costituzionale's decision on each question in its «considerato in diritto» (opened where the numbering
+starts again at «1.»); no other court has rules. The patterns are the ones measured in the spec on real decisions kept
+outside the repository: a change to them is a change to measured behaviour, with its tests (synthetic texts, and
+timings on long runs of spaces and many passages). They are ranges of `decisionProjection`, computed from the text whenever it is
+drawn (memoised per text) and never stored: `renderDecisionHtml` wraps them (`keyPassages`, mark `key` inside the reader's own marks, its label an
+empty-of-text `key-head` drawn by CSS), so root rule 23 holds and nothing the user saves, exports or shares carries one.
+`DecisionReadingSurface` draws them, hides them with `key-passages-hidden` (`settings.showKeyPassages`, on by default,
+persisted in the browser), and puts «Passaggi chiave (n)» in `DecisionReadingToolbar` (`KeyPassagesMenu`: a menu on the
+desktop, a `ui/Sheet` on a phone, with the legend «Evidenziati automaticamente: non sono le tue evidenziazioni», one entry
+per passage that scrolls to it at once and opens its popover, and the switch). A click on a passage, not on words under a
+highlight, a link, a note or a sign, opens `KeyPassagePopover` (fixed-positioned: an absolute one, opened on a passage
+still out of view, made the page itself scroll): «Fai tua» is the ordinary `addHighlight` over the passage's words at its
+offset, after which the passage, nested in the highlight, loses its underline and label (they come back while the
+highlights are hidden); «Nascondi i passaggi chiave».
 No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRender.ts` is the
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
 `decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks
@@ -538,7 +582,10 @@ builds it and the popup's props: a click records the way back from the surface's
 Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the same frame as the norm popup
 (`ui/PreviewFrame`, `calculatePreviewPosition`): the decision's heading and first lines from
 `fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
-leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
+leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference. For a
+found decision the body is its first key passage — the principle, else the dispositivo — read with its line breaks as
+spaces and named with «· evidenziato automaticamente» (`previewKeyPassage`, `keyPassageText`; computed once per answer),
+else its first lines (`previewLines`): the first lines of a Cassazione decision are its parties.
 **A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
 every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
 Cassazione, Brocardi's massime, the Court of Justice's judgments; never an order or an opinion, which go to

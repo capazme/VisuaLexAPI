@@ -263,7 +263,11 @@ describe('the review routes', () => {
       const response = await grade(a, { cardId: c.id, rating: 3, durataMs: 4200 });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2 });
+      // Her only card is graded: the whole queue is finished, so the day counts at once (Studia progress spec D7).
+      expect(response.body).toEqual({
+        registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2,
+        oggi: { giorno: '2026-10-19', ripassi: 1, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 1 },
+      });
       const state = await prisma.lingoStatoRipasso.findUniqueOrThrow({ where: { utenteId_cardId: { utenteId: alice.id, cardId: c.id } } });
       expect(state).toMatchObject({ stability: 2.4, difficulty: 4.93, reps: 1, lapses: 0 });
       expect(state.dueAt.toISOString()).toBe('2026-10-20T22:00:00.000Z'); // 00:00 on the 21st in Rome
@@ -314,7 +318,7 @@ describe('the review routes', () => {
       const response = await grade(a, { cardId: c.id, rating: 3 });
 
       const expected = review({ stability: 2.4, difficulty: 4.93 }, 3, 3);
-      expect(response.body).toEqual({ registrata: true, prossimoRipasso: romeDay(startOfRomeDay('2026-10-22', expected.scheduledDays)), scheduledDays: expected.scheduledDays });
+      expect(response.body).toMatchObject({ registrata: true, prossimoRipasso: romeDay(startOfRomeDay('2026-10-22', expected.scheduledDays)), scheduledDays: expected.scheduledDays });
       const state = await prisma.lingoStatoRipasso.findFirstOrThrow();
       expect(state).toMatchObject({ stability: expected.stability, difficulty: expected.difficulty, reps: 2, lapses: 0 });
       expect(state.dueAt.toISOString()).toBe(startOfRomeDay('2026-10-22', expected.scheduledDays).toISOString());
@@ -452,27 +456,158 @@ describe('the review routes', () => {
     });
   });
 
+  describe('the stored day (Studia progress spec §5.1)', () => {
+    /** Today's stored row for `user` on Rome day `day`, or null. */
+    async function storedDay(user: TestUser, day: string) {
+      const row = await prisma.lingoGiornataStudio.findUnique({ where: { utenteId_giorno: { utenteId: user.id, giorno: new Date(`${day}T00:00:00Z`) } } });
+      return row && { ripassi: row.ripassi, nuove: row.nuove, sbagliate: row.sbagliate, codaFinita: row.codaFinita, valido: row.valido };
+    }
+
+    it('counts each recorded grade into today: reviews, first reviews, wrong ones; a second grade of the day adds nothing', async () => {
+      setClock(MONDAY_MORNING);
+      const [one, two] = [await card(alice), await card(alice), await card(alice)];
+
+      const first = await grade(a, { cardId: one.id, rating: 3 });
+      expect(first.body.oggi).toEqual({ giorno: '2026-10-19', ripassi: 1, obiettivo: 10, raggiunto: false, appenaRaggiunto: false, serie: 0 });
+      await grade(a, { cardId: two.id, rating: 1 });
+      expect(await storedDay(alice, '2026-10-19')).toEqual({ ripassi: 2, nuove: 2, sbagliate: 1, codaFinita: false, valido: false });
+
+      const again = await grade(a, { cardId: one.id, rating: 1 });
+      expect(again.body).toMatchObject({ registrata: false });
+      expect(again.body.oggi).toBeUndefined();
+      expect(await storedDay(alice, '2026-10-19')).toEqual({ ripassi: 2, nuove: 2, sbagliate: 1, codaFinita: false, valido: false });
+
+      // The next day the same card is not new.
+      setClock('2026-10-22T08:00:00Z');
+      await grade(a, { cardId: one.id, rating: 3 });
+      expect(await storedDay(alice, '2026-10-22')).toEqual({ ripassi: 1, nuove: 0, sbagliate: 0, codaFinita: false, valido: false });
+      expect(await storedDay(bob, '2026-10-19')).toBeNull();
+    });
+
+    it('says the goal closed on the grade that reaches N, and only on that one', async () => {
+      setClock(MONDAY_MORNING);
+      const cards = [];
+      for (let i = 0; i < 5; i++) cards.push(await card(alice));
+      await request(app).put(PREFS).set(a).send({ ripassiAlGiorno: 3 });
+
+      const answers = [];
+      for (const c of cards.slice(0, 4)) answers.push((await grade(a, { cardId: c.id, rating: 3 })).body.oggi);
+
+      expect(answers.map((o) => o.appenaRaggiunto)).toEqual([false, false, true, false]);
+      expect(answers.map((o) => o.raggiunto)).toEqual([false, false, true, true]);
+      expect(answers[2]).toEqual({ giorno: '2026-10-19', ripassi: 3, obiettivo: 3, raggiunto: true, appenaRaggiunto: true, serie: 1 });
+    });
+
+    it('counts a day whose whole queue is finished with fewer than N reviews', async () => {
+      setClock(MONDAY_MORNING);
+      const [one, two] = [await card(alice), await card(alice)];
+
+      expect((await grade(a, { cardId: one.id, rating: 3 })).body.oggi.raggiunto).toBe(false);
+      const last = await grade(a, { cardId: two.id, rating: 3 });
+
+      expect(last.body.oggi).toEqual({ giorno: '2026-10-19', ripassi: 2, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 1 });
+      expect(await storedDay(alice, '2026-10-19')).toEqual({ ripassi: 2, nuove: 2, sbagliate: 0, codaFinita: true, valido: true });
+    });
+
+    it('counts two grades racing on the day’s first row, without an error', async () => {
+      setClock(MONDAY_MORNING);
+      const [one, two] = [await card(alice), await card(alice), await card(alice)];
+
+      const answers = await Promise.all([grade(a, { cardId: one.id, rating: 3 }), grade(a, { cardId: two.id, rating: 3 })]);
+
+      expect(answers.map((r) => r.status)).toEqual([200, 200]);
+      expect(answers.map((r) => r.body.oggi.ripassi).sort()).toEqual([1, 2]);
+      expect(await storedDay(alice, '2026-10-19')).toMatchObject({ ripassi: 2, nuove: 2 });
+    });
+
+    it('says the goal closed exactly once when two grades race on the threshold', async () => {
+      setClock(MONDAY_MORNING);
+      const [one, two] = [await card(alice), await card(alice), await card(alice)];
+      await request(app).put(PREFS).set(a).send({ ripassiAlGiorno: 2 });
+
+      const answers = await Promise.all([grade(a, { cardId: one.id, rating: 3 }), grade(a, { cardId: two.id, rating: 3 })]);
+
+      expect(answers.map((r) => r.body.oggi.appenaRaggiunto).sort()).toEqual([false, true]);
+      expect(await storedDay(alice, '2026-10-19')).toMatchObject({ ripassi: 2, valido: true });
+    });
+
+    it('puts a grade at 23:59 and one at 00:01 in Rome on two days', async () => {
+      const [one, two] = [await card(alice), await card(alice), await card(alice)];
+      setClock('2026-10-19T21:59:00Z'); // 23:59 in Rome (CEST)
+      await grade(a, { cardId: one.id, rating: 3 });
+      setClock('2026-10-19T22:01:00Z'); // 00:01 on the 20th
+      await grade(a, { cardId: two.id, rating: 3 });
+
+      expect(await storedDay(alice, '2026-10-19')).toMatchObject({ ripassi: 1 });
+      expect(await storedDay(alice, '2026-10-20')).toMatchObject({ ripassi: 1 });
+    });
+
+    it('counts a day with nothing to review once the session is read, once', async () => {
+      setClock(MONDAY_MORNING);
+      // One card, reviewed before and due next week: nothing to do today.
+      const c = await card(alice);
+      await stateDueOn(alice, c.id, '2026-10-25', new Date('2026-10-18T08:00:00Z'));
+      await session(a);
+      await session(a);
+      expect(await prisma.lingoGiornataStudio.count({ where: { utenteId: alice.id } })).toBe(1);
+      expect(await storedDay(alice, '2026-10-19')).toEqual({ ripassi: 0, nuove: 0, sbagliate: 0, codaFinita: true, valido: true });
+    });
+
+    it('never counts a day for someone with no card to study', async () => {
+      setClock(MONDAY_MORNING);
+      await session(a);
+      expect(await prisma.lingoGiornataStudio.count()).toBe(0);
+    });
+
+    it('writes nothing on a session read while cards are left, or narrowed to one subject', async () => {
+      setClock(MONDAY_MORNING);
+      await card(alice);
+      await session(a);
+      const b = longLived(bob, 'b');
+      await session(b, 'DIRITTO_PENALE');
+      expect(await prisma.lingoGiornataStudio.count()).toBe(0);
+    });
+
+    it('recounts today when the goal changes, and leaves the past days as they were', async () => {
+      setClock(MONDAY_MORNING);
+      for (let i = 0; i < 5; i++) await card(alice);
+      await prisma.lingoGiornataStudio.create({ data: { utenteId: alice.id, giorno: new Date('2026-10-18T00:00:00Z'), ripassi: 3, valido: true } });
+      await request(app).put(PREFS).set(a).send({ ripassiAlGiorno: 3 });
+      for (const c of (await prisma.lingoCard.findMany({ take: 3, orderBy: { createdAt: 'asc' } }))) await grade(a, { cardId: c.id, rating: 3 });
+      expect(await storedDay(alice, '2026-10-19')).toMatchObject({ valido: true });
+
+      await request(app).put(PREFS).set(a).send({ ripassiAlGiorno: 5 });
+
+      expect(await storedDay(alice, '2026-10-19')).toMatchObject({ ripassi: 3, valido: false });
+      expect(await storedDay(alice, '2026-10-18')).toMatchObject({ ripassi: 3, valido: true });
+    });
+  });
+
   describe('the preferences', () => {
     it('answers the defaults without creating a row', async () => {
       const response = await request(app).get(PREFS).set(a);
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ nuoveAlGiorno: 20, materieComunita: [] });
+      expect(response.body).toEqual({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: [] });
       expect(await prisma.lingoPreferenzeStudio.count()).toBe(0);
     });
 
     it('stores the goal and the subjects, each on its own, and answers them', async () => {
       const goal = await request(app).put(PREFS).set(a).send({ nuoveAlGiorno: 5 });
       expect(goal.status).toBe(200);
-      expect(goal.body).toEqual({ nuoveAlGiorno: 5, materieComunita: [] });
+      expect(goal.body).toEqual({ nuoveAlGiorno: 5, ripassiAlGiorno: 10, materieComunita: [] });
 
       const subjects = await request(app).put(PREFS).set(a).send({ materieComunita: ['DIRITTO_PENALE', 'DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
-      expect(subjects.body).toEqual({ nuoveAlGiorno: 5, materieComunita: ['DIRITTO_PENALE', 'DIRITTO_CIVILE'] });
+      expect(subjects.body).toEqual({ nuoveAlGiorno: 5, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_PENALE', 'DIRITTO_CIVILE'] });
       expect((await request(app).get(PREFS).set(a)).body).toEqual(subjects.body);
-      expect((await request(app).get(PREFS).set(authHeader(bob))).body).toEqual({ nuoveAlGiorno: 20, materieComunita: [] });
+      expect((await request(app).get(PREFS).set(authHeader(bob))).body).toEqual({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: [] });
       expect(await prisma.lingoPreferenzeStudio.count()).toBe(1);
 
       const both = await request(app).put(PREFS).set(a).send({ nuoveAlGiorno: 200, materieComunita: [] });
-      expect(both.body).toEqual({ nuoveAlGiorno: 200, materieComunita: [] });
+      expect(both.body).toEqual({ nuoveAlGiorno: 200, ripassiAlGiorno: 10, materieComunita: [] });
+
+      const reviews = await request(app).put(PREFS).set(a).send({ ripassiAlGiorno: 1 });
+      expect(reviews.body).toEqual({ nuoveAlGiorno: 200, ripassiAlGiorno: 1, materieComunita: [] });
+      expect((await request(app).put(PREFS).set(a).send({ ripassiAlGiorno: 200 })).body.ripassiAlGiorno).toBe(200);
     });
 
     it('refuses what is out of range, unknown, or not the user’s to set', async () => {
@@ -481,6 +616,10 @@ describe('the review routes', () => {
         { nuoveAlGiorno: 201 },
         { nuoveAlGiorno: 1.5 },
         { nuoveAlGiorno: '5' },
+        { ripassiAlGiorno: 0 },
+        { ripassiAlGiorno: 201 },
+        { ripassiAlGiorno: 2.5 },
+        { ripassiAlGiorno: '10' },
         { materieComunita: ['DIRITTO_ALIENO'] },
         { materieComunita: 'DIRITTO_CIVILE' },
         { materieComunita: Array(6).fill('DIRITTO_CIVILE') },
@@ -643,6 +782,18 @@ describe('the review routes', () => {
       expect((await session(a)).body.cards.some((x: { id: string; nuova: boolean }) => x.id === c.id && x.nuova)).toBe(false);
     });
 
+    it('leaves the stored study days as they were, through the trash and back (Studia progress spec D13)', async () => {
+      const c = await studiedDraft();
+      const days = () => prisma.lingoGiornataStudio.findMany({ orderBy: { giorno: 'asc' } });
+      const before = await days();
+      expect(before).toHaveLength(2);
+
+      await trash(a, c.id);
+      expect(await days()).toEqual(before);
+      await restore(a);
+      expect(await days()).toEqual(before);
+    });
+
     it('takes along only the author’s reviews, not another user’s', async () => {
       const c = await studiedDraft();
       await prisma.lingoRevisioneSRS.create({ data: { utenteId: bob.id, cardId: c.id, rating: 3, scheduledDays: 2, stability: 2.4, difficulty: 4.93 } });
@@ -686,6 +837,8 @@ describe('the review routes', () => {
       expect((await request(app).post(GRADE).set(token).send({ cardId: c.id, rating: 3 })).status).toBe(403);
       expect((await request(app).get(PREFS).set(token)).status).toBe(403);
       expect((await request(app).put(PREFS).set(token).send({ nuoveAlGiorno: 5 })).status).toBe(403);
+      expect((await request(app).put(PREFS).set(token).send({ ripassiAlGiorno: 5 })).status).toBe(403);
+      expect((await request(app).get('/api/lingo/srs/progressi').set(token)).status).toBe(403);
       const write = await delegated(alice, 'lingo:cards:write');
       expect((await request(app).post(GRADE).set(write).send({ cardId: c.id, rating: 3 })).status).toBe(403);
       expect(await prisma.lingoRevisioneSRS.count()).toBe(0);

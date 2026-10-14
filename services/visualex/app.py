@@ -51,7 +51,7 @@ from visualex_api.services.decisions.resolver import (
 )
 from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
-from visualex_api.tools.text_op import parse_article_input, normalize_act_type
+from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import cite_act, cite_article
@@ -59,6 +59,7 @@ from visualex_api.tools.alias_resolver import resolve_alias
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
 from visualex_api.tools.exceptions import (
+    IndexUnavailableError,
     ValidationError,
     ResourceNotFoundError,
     RateLimitExceededError,
@@ -496,7 +497,7 @@ class NormaController:
         # this guard the loop below iterates the dict's KEYS and builds one
         # NormaVisitata with numero_articolo='error', whose URN ends in ~arterror.
         if isinstance(articles, dict) and 'error' in articles:
-            raise ValidationError(articles['error'])
+            raise article_input_error(articles)
 
         # Validate and sanitize annex parameter
         annex_value = data.get('annex')
@@ -791,6 +792,9 @@ class NormaController:
             status = 400
         elif isinstance(exc, RateLimitExceededError):
             status = 429
+        elif isinstance(exc, IndexUnavailableError):
+            # The act's index could not be read: the request may work later.
+            status = 503
         else:
             status = 500
         log.error("Request failed", endpoint=endpoint, status=status,
