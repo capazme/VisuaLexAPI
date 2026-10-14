@@ -53,11 +53,8 @@ export function ReportModal({ environmentId, onClose, onReported }: ReportModalP
       );
       onReported();
     } catch (err) {
-      if (getErrorMessage(err)?.includes('already reported')) {
-        setError('Hai già segnalato questo ambiente');
-      } else {
-        setError(getErrorMessage(err) || 'Errore durante la segnalazione');
-      }
+      // The server says why in Italian (a second report: «Hai già segnalato questo elemento.»).
+      setError(getErrorMessage(err) || 'Errore durante la segnalazione');
     } finally {
       setLoading(false);
     }

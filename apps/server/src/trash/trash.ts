@@ -359,6 +359,8 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             isPinned: Boolean(dossier.isPinned),
             // An entry stored before dossiers had a kind restores as a dossier di lavoro, like every old dossier.
             kind: dossier.kind === 'studio' ? 'studio' : 'lavoro',
+            // An admin's block outlives the trash (question 190).
+            forumBlockedAt: typeof dossier.forumBlockedAt === 'string' ? new Date(dossier.forumBlockedAt) : null,
             createdAt: new Date(dossier.createdAt),
             createdByClientId: (dossier.createdByClientId as string | null) ?? null,
             createdByClientName: (dossier.createdByClientName as string | null) ?? null,

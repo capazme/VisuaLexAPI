@@ -54,5 +54,7 @@ router.get('/admin/shared-environments', requireAdmin, controller.adminListEnvir
 router.post('/admin/shared-environments/:id/withdraw', requireAdmin, controller.adminWithdrawEnvironment);
 router.post('/admin/shared-environments/:id/republish', requireAdmin, controller.adminRepublishEnvironment);
 router.delete('/admin/shared-environments/:id', requireAdmin, controller.adminDeleteEnvironment);
+router.get('/admin/forum-blocks', requireAdmin, controller.adminListForumBlocks);
+router.delete('/admin/forum-blocks/:dossierId', requireAdmin, controller.adminClearForumBlock);
 
 export default router;

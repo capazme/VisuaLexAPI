@@ -6,7 +6,8 @@
 CREATE TYPE "DossierKind" AS ENUM ('lavoro', 'studio');
 
 -- AlterTable
-ALTER TABLE "dossiers" ADD COLUMN "kind" "DossierKind" NOT NULL DEFAULT 'lavoro';
+ALTER TABLE "dossiers" ADD COLUMN "forum_blocked_at" TIMESTAMP(3),
+ADD COLUMN "kind" "DossierKind" NOT NULL DEFAULT 'lavoro';
 
 -- AlterTable
 ALTER TABLE "shared_environments" ADD COLUMN "source_dossier_id" TEXT,

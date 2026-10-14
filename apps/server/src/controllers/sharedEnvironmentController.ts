@@ -4,10 +4,51 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 import { dossierItemFromEntry, rebuildDossierPayload, type EntryItem } from '../utils/suggestionEntries';
-import { rebuildEnvironmentDossiers } from '../utils/environmentDossiers';
+import { publishedContent, type PublishedContent } from '../utils/publishedContent';
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
+
+const NOT_FOUND = 'Elemento del Forum non trovato';
+const NOT_FOUND_OR_NOT_YOURS = 'Elemento del Forum non trovato o non tuo';
+
+/**
+ * A Forum item as someone may reach it: a withdrawn one exists only for its owner and the
+ * admin (D7). Everyone else gets the same 404 as for an item that never existed.
+ */
+async function reachableEnvironment(id: string, user: { id: string; isAdmin?: boolean }) {
+  const env = await prisma.sharedEnvironment.findUnique({ where: { id } });
+  if (!env || (!env.isActive && env.userId !== user.id && !user.isAdmin)) throw new AppError(404, NOT_FOUND);
+  return env;
+}
+
+/** The content of an item published from a dossier: one dossier, named as the Forum item is. */
+function asDossierPublication(
+  content: PublishedContent,
+  fields: { title: string; description: string | null | undefined; tags: string[] },
+  switches: { includeNotes: boolean; includeHighlights: boolean },
+): PublishedContent {
+  if (content.dossiers.length !== 1) throw new AppError(400, 'Un dossier pubblicato contiene un solo dossier.');
+  if (content.quickNorms.length > 0 || (content.customAliases?.length ?? 0) > 0) {
+    throw new AppError(400, 'Un dossier pubblicato non contiene norme rapide né alias.');
+  }
+  if (!switches.includeNotes && content.annotations.length > 0) {
+    throw new AppError(400, 'Le note sono escluse, ma il contenuto ne porta.');
+  }
+  if (!switches.includeHighlights && content.highlights.length > 0) {
+    throw new AppError(400, 'Le evidenziazioni sono escluse, ma il contenuto ne porta.');
+  }
+  // The dossier inside is named by what the dialog showed, never by the private dossier's name.
+  const [dossier] = content.dossiers;
+  const named: Record<string, unknown> = { ...dossier, title: fields.title, tags: fields.tags };
+  if (fields.description) named.description = fields.description;
+  else delete named.description;
+  return { dossiers: [named], quickNorms: [], annotations: content.annotations, highlights: content.highlights };
+}
+
+const isUniqueViolation = (err: unknown) => err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+const ALREADY_PUBLISHED = 'Questo dossier è già pubblicato nel Forum: aggiornane la versione pubblicata.';
+const DOSSIER_BLOCKED = "L'amministrazione ha ritirato questo dossier dal Forum: non puoi ripubblicarlo.";
 
 // Validation schemas
 const publishEnvironmentSchema = z.object({
@@ -24,6 +65,8 @@ const publishEnvironmentSchema = z.object({
   tags: z.array(z.string().max(30)).max(10).optional(),
   includeNotes: z.boolean().optional(),
   includeHighlights: z.boolean().optional(),
+  // The dossier it is published from: the caller's own; never changed afterwards.
+  sourceDossierId: z.string().min(1).max(64).optional(),
 });
 
 const updateEnvironmentSchema = z.object({
@@ -97,11 +140,13 @@ function formatSharedEnvironment(env: any, userId: string) {
   const userLiked = env.likes?.some((l: any) => l.userId === userId) ?? false;
   const pendingSuggestionsCount = env._count?.suggestions ?? 0;
 
+  const isOwner = env.userId === userId;
   return {
     id: env.id,
     title: env.title,
     description: env.description,
-    content: env.content,
+    // Never the stored JSON as it is: only what the allow-list lets through (D6).
+    content: publishedContent(env.content, 'read'),
     category: env.category,
     tags: env.tags,
     includeNotes: env.includeNotes,
@@ -120,7 +165,10 @@ function formatSharedEnvironment(env: any, userId: string) {
       username: env.user.username,
     },
     userLiked,
-    isOwner: env.userId === userId,
+    isOwner,
+    // The owner's alone: the dossier it came from, and whether the admin withdrew it.
+    sourceDossierId: isOwner ? env.sourceDossierId ?? null : undefined,
+    withdrawnByAdmin: isOwner ? env.withdrawnByAdminAt != null : undefined,
     createdAt: env.createdAt,
     updatedAt: env.updatedAt,
   };
@@ -153,11 +201,12 @@ function formatSuggestion(suggestion: any, currentUserId: string) {
   return {
     id: suggestion.id,
     sharedEnvironmentId: suggestion.sharedEnvironmentId,
-    sharedEnvironment: suggestion.sharedEnvironment ? {
-      id: suggestion.sharedEnvironment.id,
-      title: suggestion.sharedEnvironment.title,
-      user: suggestion.sharedEnvironment.user,
-    } : undefined,
+    // A withdrawn item's name and author are its owner's alone (D7): the proposer gets nothing of it
+    // (the web already reads the field as optional).
+    sharedEnvironment: suggestion.sharedEnvironment
+      && !(suggestion.sharedEnvironment.isActive === false && suggestion.sharedEnvironment.user?.id !== currentUserId)
+      ? { id: suggestion.sharedEnvironment.id, title: suggestion.sharedEnvironment.title, user: suggestion.sharedEnvironment.user }
+      : undefined,
     suggester: {
       id: suggestion.suggester.id,
       username: suggestion.suggester.username,
@@ -297,6 +346,7 @@ export const getMySharedEnvironments = async (req: Request, res: Response) => {
 export const getSharedEnvironmentDetail = async (req: Request, res: Response) => {
   const { id } = req.params;
 
+  await reachableEnvironment(id, req.user!);
   const env = await prisma.sharedEnvironment.findUnique({
     where: { id },
     include: {
@@ -307,7 +357,7 @@ export const getSharedEnvironmentDetail = async (req: Request, res: Response) =>
   });
 
   if (!env) {
-    throw new AppError(404, 'Shared environment not found');
+    throw new AppError(404, NOT_FOUND);
   }
 
   // Increment view count (don't count own views)
@@ -326,7 +376,19 @@ export const getSharedEnvironmentDetail = async (req: Request, res: Response) =>
  */
 export const publishEnvironment = async (req: Request, res: Response) => {
   const data = publishEnvironmentSchema.parse(req.body);
-  data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'pubblicato');
+  let content = publishedContent(data.content, 'publish');
+  if (data.sourceDossierId) {
+    // The caller's own dossier, or the same 404 as for one that does not exist.
+    const source = await prisma.dossier.findFirst({ where: { id: data.sourceDossierId, userId: req.user!.id }, select: { id: true, forumBlockedAt: true } });
+    if (!source) throw new AppError(404, 'Dossier non trovato');
+    if (source.forumBlockedAt) throw new AppError(403, DOSSIER_BLOCKED);
+    if (await prisma.sharedEnvironment.count({ where: { sourceDossierId: source.id } })) throw new AppError(409, ALREADY_PUBLISHED);
+    content = asDossierPublication(
+      content,
+      { title: data.title, description: data.description, tags: data.tags ?? [] },
+      { includeNotes: data.includeNotes ?? true, includeHighlights: data.includeHighlights ?? true },
+    );
+  }
 
   // Check daily limit
   const today = new Date();
@@ -340,31 +402,41 @@ export const publishEnvironment = async (req: Request, res: Response) => {
   });
 
   if (publishedToday >= DAILY_PUBLISH_LIMIT) {
-    throw new AppError(429, `You can only publish ${DAILY_PUBLISH_LIMIT} environments per day`);
+    throw new AppError(429, `Puoi pubblicare al massimo ${DAILY_PUBLISH_LIMIT} dossier al giorno: riprova domani.`);
   }
 
   // Validate content size (max 1MB)
-  const contentSize = JSON.stringify(data.content).length;
+  const contentSize = JSON.stringify(content).length;
   if (contentSize > 1024 * 1024) {
-    throw new AppError(400, 'Environment content exceeds maximum size (1MB)');
+    throw new AppError(400, 'Il contenuto supera la dimensione massima (1 MB).');
   }
 
-  const env = await prisma.sharedEnvironment.create({
-    data: {
-      title: data.title,
-      description: data.description,
-      content: data.content,
-      category: data.category as EnvironmentCategory,
-      tags: data.tags || [],
-      includeNotes: data.includeNotes ?? true,
-      includeHighlights: data.includeHighlights ?? true,
-      userId: req.user!.id,
-    },
-    include: {
-      user: { select: { id: true, username: true } },
-      _count: { select: { likes: true } },
-    },
-  });
+  let env;
+  try {
+    env = await prisma.sharedEnvironment.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        content: content as unknown as Prisma.InputJsonValue,
+        category: data.category as EnvironmentCategory,
+        tags: data.tags || [],
+        includeNotes: data.includeNotes ?? true,
+        includeHighlights: data.includeHighlights ?? true,
+        sourceDossierId: data.sourceDossierId ?? null,
+        userId: req.user!.id,
+      },
+      include: {
+        user: { select: { id: true, username: true } },
+        _count: { select: { likes: true } },
+      },
+    });
+  } catch (err) {
+    // Two publications of one dossier at once: the unique index lets one through.
+    if (isUniqueViolation(err)) throw new AppError(409, ALREADY_PUBLISHED);
+    // The dossier went to the trash between the check and the write.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') throw new AppError(404, 'Dossier non trovato');
+    throw err;
+  }
 
   res.status(201).json(formatSharedEnvironment({ ...env, likes: [] }, req.user!.id));
 };
@@ -382,7 +454,7 @@ export const updateSharedEnvironment = async (req: Request, res: Response) => {
   });
 
   if (!existing) {
-    throw new AppError(404, 'Shared environment not found or not owned by you');
+    throw new AppError(404, NOT_FOUND_OR_NOT_YOURS);
   }
 
   const env = await prisma.sharedEnvironment.update({
@@ -415,7 +487,7 @@ export const deleteSharedEnvironment = async (req: Request, res: Response) => {
   });
 
   if (!existing) {
-    throw new AppError(404, 'Shared environment not found or not owned by you');
+    throw new AppError(404, NOT_FOUND_OR_NOT_YOURS);
   }
 
   await prisma.sharedEnvironment.delete({
@@ -431,14 +503,7 @@ export const deleteSharedEnvironment = async (req: Request, res: Response) => {
 export const toggleLike = async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  // Check environment exists
-  const env = await prisma.sharedEnvironment.findUnique({
-    where: { id },
-  });
-
-  if (!env) {
-    throw new AppError(404, 'Shared environment not found');
-  }
+  await reachableEnvironment(id, req.user!);
 
   // Check if already liked
   const existingLike = await prisma.sharedEnvironmentLike.findUnique({
@@ -480,13 +545,7 @@ export const toggleLike = async (req: Request, res: Response) => {
 export const recordDownload = async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const env = await prisma.sharedEnvironment.findUnique({
-    where: { id },
-  });
-
-  if (!env) {
-    throw new AppError(404, 'Shared environment not found');
-  }
+  const env = await reachableEnvironment(id, req.user!);
 
   // Increment download count (don't count own downloads)
   if (env.userId !== req.user!.id) {
@@ -497,7 +556,7 @@ export const recordDownload = async (req: Request, res: Response) => {
   }
 
   res.json({
-    content: env.content,
+    content: publishedContent(env.content, 'read'),
     includeNotes: env.includeNotes,
     includeHighlights: env.includeHighlights,
   });
@@ -510,18 +569,11 @@ export const reportEnvironment = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = reportSchema.parse(req.body);
 
-  // Check environment exists
-  const env = await prisma.sharedEnvironment.findUnique({
-    where: { id },
-  });
-
-  if (!env) {
-    throw new AppError(404, 'Shared environment not found');
-  }
+  const env = await reachableEnvironment(id, req.user!);
 
   // Can't report own environment
   if (env.userId === req.user!.id) {
-    throw new AppError(400, 'You cannot report your own environment');
+    throw new AppError(400, 'Non puoi segnalare un tuo elemento.');
   }
 
   // Check if already reported
@@ -532,7 +584,7 @@ export const reportEnvironment = async (req: Request, res: Response) => {
   });
 
   if (existingReport) {
-    throw new AppError(400, 'You have already reported this environment');
+    throw new AppError(400, 'Hai già segnalato questo elemento.');
   }
 
   await prisma.sharedEnvironmentReport.create({
@@ -627,7 +679,7 @@ export const adminDeleteEnvironment = async (req: Request, res: Response) => {
   });
 
   if (!env) {
-    throw new AppError(404, 'Shared environment not found');
+    throw new AppError(404, NOT_FOUND);
   }
 
   await prisma.sharedEnvironment.delete({
@@ -716,17 +768,22 @@ export const adminWithdrawEnvironment = async (req: Request, res: Response) => {
   });
 
   if (!env) {
-    throw new AppError(404, 'Shared environment not found');
+    throw new AppError(404, NOT_FOUND);
   }
 
-  if (!env.isActive) {
-    throw new AppError(400, 'Environment is already withdrawn');
-  }
-
-  const updated = await prisma.sharedEnvironment.update({
-    where: { id },
-    data: { isActive: false },
-  });
+  // Stamped: its author cannot republish what the admin withdrew (owner, 14 October 2026, question 190) —
+  // also when the author had withdrawn it first, else the author could put it back. The dossier it came
+  // from is stamped too, so deleting this copy and publishing the dossier again does not undo it.
+  const now = new Date();
+  const [updated] = await prisma.$transaction([
+    prisma.sharedEnvironment.update({
+      where: { id },
+      data: { isActive: false, withdrawnByAdminAt: env.withdrawnByAdminAt ?? now },
+    }),
+    ...(env.sourceDossierId
+      ? [prisma.dossier.updateMany({ where: { id: env.sourceDossierId, forumBlockedAt: null }, data: { forumBlockedAt: now } })]
+      : []),
+  ]);
 
   res.json({ id: updated.id, isActive: updated.isActive });
 };
@@ -742,19 +799,45 @@ export const adminRepublishEnvironment = async (req: Request, res: Response) => 
   });
 
   if (!env) {
-    throw new AppError(404, 'Shared environment not found');
+    throw new AppError(404, NOT_FOUND);
   }
 
   if (env.isActive) {
-    throw new AppError(400, 'Environment is already active');
+    throw new AppError(400, "L'elemento è già pubblicato.");
   }
 
-  const updated = await prisma.sharedEnvironment.update({
-    where: { id },
-    data: { isActive: true },
-  });
+  const [updated] = await prisma.$transaction([
+    prisma.sharedEnvironment.update({
+      where: { id },
+      data: { isActive: true, withdrawnByAdminAt: null },
+    }),
+    ...(env.sourceDossierId
+      ? [prisma.dossier.updateMany({ where: { id: env.sourceDossierId }, data: { forumBlockedAt: null } })]
+      : []),
+  ]);
 
   res.json({ id: updated.id, isActive: updated.isActive });
+};
+
+/**
+ * Dossiers whose copy the admin withdrew (question 190): they cannot be published again until the
+ * admin allows it — also after their owner deleted that copy. The dossier's name is private, so
+ * the list names the owner and the date only.
+ */
+export const adminListForumBlocks = async (_req: Request, res: Response) => {
+  const blocked = await prisma.dossier.findMany({
+    where: { forumBlockedAt: { not: null } },
+    select: { id: true, forumBlockedAt: true, user: { select: { id: true, username: true } }, publishedCopy: { select: { id: true, title: true } } },
+    orderBy: { forumBlockedAt: 'desc' },
+  });
+  res.json(blocked.map((d) => ({ dossierId: d.id, blockedAt: d.forumBlockedAt, owner: d.user, publishedCopy: d.publishedCopy })));
+};
+
+/** The admin allows a blocked dossier to be published again. */
+export const adminClearForumBlock = async (req: Request, res: Response) => {
+  const cleared = await prisma.dossier.updateMany({ where: { id: req.params.dossierId, forumBlockedAt: { not: null } }, data: { forumBlockedAt: null } });
+  if (cleared.count === 0) throw new AppError(404, 'Nessun blocco per questo dossier.');
+  res.status(204).send();
 };
 
 // ============================================
@@ -773,7 +856,7 @@ export const withdrawEnvironment = async (req: Request, res: Response) => {
   });
 
   if (!existing) {
-    throw new AppError(404, 'Shared environment not found or not owned by you');
+    throw new AppError(404, NOT_FOUND_OR_NOT_YOURS);
   }
 
   const env = await prisma.sharedEnvironment.update({
@@ -801,7 +884,10 @@ export const republishEnvironment = async (req: Request, res: Response) => {
   });
 
   if (!existing) {
-    throw new AppError(404, 'Shared environment not found or not owned by you');
+    throw new AppError(404, NOT_FOUND_OR_NOT_YOURS);
+  }
+  if (existing.withdrawnByAdminAt) {
+    throw new AppError(403, "Questo elemento è stato ritirato dall'amministrazione: non puoi ripubblicarlo.");
   }
 
   const env = await prisma.sharedEnvironment.update({
@@ -823,7 +909,7 @@ export const republishEnvironment = async (req: Request, res: Response) => {
 export const updateEnvironmentWithVersion = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = updateWithVersionSchema.parse(req.body);
-  if (data.content) data.content.dossiers = rebuildEnvironmentDossiers(data.content.dossiers, 'aggiornato');
+  let content = data.content ? publishedContent(data.content, 'update') : undefined;
 
   // Check ownership
   const existing = await prisma.sharedEnvironment.findFirst({
@@ -834,20 +920,47 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
   });
 
   if (!existing) {
-    throw new AppError(404, 'Shared environment not found or not owned by you');
+    throw new AppError(404, NOT_FOUND_OR_NOT_YOURS);
+  }
+
+  // A copy side by side would be a new, active item: never for one the admin withdrew.
+  if (existing.withdrawnByAdminAt && data.versionMode === 'coexist' && data.content) {
+    throw new AppError(403, "Questo elemento è stato ritirato dall'amministrazione: non puoi ripubblicarlo.");
+  }
+
+  // An item published from a dossier stays one dossier, named as the item is: its content is
+  // rewritten when its name, description or tags change, even with no new content (no new version).
+  let renamedOnly = false;
+  if (existing.sourceDossierId) {
+    if (data.versionMode === 'coexist' && data.content) {
+      throw new AppError(400, 'Un dossier pubblicato ha una sola versione corrente: aggiornala invece di affiancarne una.');
+    }
+    const fieldsChange = data.title !== undefined || data.description !== undefined || data.tags !== undefined;
+    if (content || fieldsChange) {
+      renamedOnly = !content;
+      content = asDossierPublication(
+        content ?? publishedContent(existing.content, 'read'),
+        {
+          title: data.title ?? existing.title,
+          description: data.description !== undefined ? data.description : existing.description,
+          tags: data.tags ?? existing.tags,
+        },
+        { includeNotes: existing.includeNotes, includeHighlights: existing.includeHighlights },
+      );
+    }
   }
 
   // Validate content size if updating content
-  if (data.content) {
-    const contentSize = JSON.stringify(data.content).length;
+  if (content) {
+    const contentSize = JSON.stringify(content).length;
     if (contentSize > 1024 * 1024) {
-      throw new AppError(400, 'Environment content exceeds maximum size (1MB)');
+      throw new AppError(400, 'Il contenuto supera la dimensione massima (1 MB).');
     }
   }
 
   // Handle coexist mode: create a NEW environment, keep original as is
-  if (data.versionMode === 'coexist' && data.content) {
-    const newContent = data.content;
+  if (data.versionMode === 'coexist' && content) {
+    const newContent = content as unknown as Prisma.InputJsonValue;
     const newEnv = await prisma.$transaction(async (tx) => {
       // Create a version snapshot of the original
       await createVersionSnapshot(tx, id, existing.content, 'Versione originale (prima di coesistenza)');
@@ -898,13 +1011,14 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
     ...(data.tags !== undefined && { tags: data.tags }),
   };
 
-  if (data.content) {
-    updateData.content = data.content;
-    updateData.currentVersion = existing.currentVersion + 1;
+  if (content) {
+    updateData.content = content;
+    // A new name alone is not a new version.
+    if (!renamedOnly) updateData.currentVersion = existing.currentVersion + 1;
   }
 
   const env = await prisma.$transaction(async (tx) => {
-    if (data.content) {
+    if (content && !renamedOnly) {
       // Save current content as a version before replacing
       await createVersionSnapshot(tx, id, existing.content, 'Versione precedente');
     }
@@ -920,8 +1034,8 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
     });
 
     // Create new version snapshot with changelog
-    if (data.content && data.changelog) {
-      await createVersionSnapshot(tx, id, data.content, data.changelog);
+    if (content && !renamedOnly && data.changelog) {
+      await createVersionSnapshot(tx, id, content, data.changelog);
     }
 
     return updated;
@@ -944,9 +1058,9 @@ export const createSuggestion = async (req: Request, res: Response) => {
   const env = await prisma.sharedEnvironment.findFirst({
     where: { id, isActive: true },
   });
-  if (!env) throw new AppError(404, 'Shared environment not found or not active');
+  if (!env) throw new AppError(404, NOT_FOUND);
   if (env.userId === req.user!.id) {
-    throw new AppError(400, 'You cannot suggest to your own environment');
+    throw new AppError(400, 'Non puoi proporre contenuti a un tuo elemento.');
   }
 
   const existingOpen = await prisma.environmentSuggestion.findFirst({
@@ -957,7 +1071,7 @@ export const createSuggestion = async (req: Request, res: Response) => {
     },
   });
   if (existingOpen) {
-    throw new AppError(400, 'You already have an open suggestion for this environment');
+    throw new AppError(400, 'Hai già una proposta aperta per questo elemento.');
   }
 
   const totalBytes = JSON.stringify(data.items).length;
@@ -980,7 +1094,7 @@ export const createSuggestion = async (req: Request, res: Response) => {
       items: true,
       suggester: { select: { id: true, username: true } },
       sharedEnvironment: {
-        select: { id: true, title: true, user: { select: { id: true, username: true } } },
+        select: { id: true, title: true, isActive: true, user: { select: { id: true, username: true } } },
       },
     },
   });
@@ -1000,7 +1114,7 @@ export const getReceivedSuggestions = async (req: Request, res: Response) => {
       items: true,
       suggester: { select: { id: true, username: true } },
       sharedEnvironment: {
-        select: { id: true, title: true, user: { select: { id: true, username: true } } },
+        select: { id: true, title: true, isActive: true, user: { select: { id: true, username: true } } },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -1023,7 +1137,7 @@ export const getSentSuggestions = async (req: Request, res: Response) => {
       items: true,
       suggester: { select: { id: true, username: true } },
       sharedEnvironment: {
-        select: { id: true, title: true, user: { select: { id: true, username: true } } },
+        select: { id: true, title: true, isActive: true, user: { select: { id: true, username: true } } },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -1281,13 +1395,15 @@ export const addSuggestionItems = async (req: Request, res: Response) => {
 
   const suggestion = await prisma.environmentSuggestion.findUnique({
     where: { id: suggestionId },
-    include: { items: true },
+    include: { items: true, sharedEnvironment: { select: { isActive: true } } },
   });
 
   if (!suggestion) throw new AppError(404, 'Suggestion not found');
   if (suggestion.suggesterId !== req.user!.id) {
-    throw new AppError(403, 'You can only add items to your own suggestions');
+    throw new AppError(403, 'Puoi aggiungere voci solo alle tue proposte.');
   }
+  // A withdrawn item takes no new proposals, as `createSuggestion` already refused.
+  if (!suggestion.sharedEnvironment.isActive) throw new AppError(404, NOT_FOUND);
 
   const pendingCount = suggestion.items.filter(i => i.status === 'pending').length;
   const reviewedCount = suggestion.items.length - pendingCount;
@@ -1309,7 +1425,7 @@ export const addSuggestionItems = async (req: Request, res: Response) => {
       items: true,
       suggester: { select: { id: true, username: true } },
       sharedEnvironment: {
-        select: { id: true, title: true, user: { select: { id: true, username: true } } },
+        select: { id: true, title: true, isActive: true, user: { select: { id: true, username: true } } },
       },
     },
   });
@@ -1327,14 +1443,7 @@ export const addSuggestionItems = async (req: Request, res: Response) => {
 export const getVersions = async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  // Check environment exists
-  const env = await prisma.sharedEnvironment.findUnique({
-    where: { id },
-  });
-
-  if (!env) {
-    throw new AppError(404, 'Shared environment not found');
-  }
+  await reachableEnvironment(id, req.user!);
 
   const versions = await prisma.sharedEnvironmentVersion.findMany({
     where: { sharedEnvironmentId: id },
@@ -1361,7 +1470,7 @@ export const restoreVersion = async (req: Request, res: Response) => {
   });
 
   if (!env) {
-    throw new AppError(404, 'Shared environment not found or not owned by you');
+    throw new AppError(404, NOT_FOUND_OR_NOT_YOURS);
   }
 
   // Get the version to restore
@@ -1370,19 +1479,24 @@ export const restoreVersion = async (req: Request, res: Response) => {
   });
 
   if (!version) {
-    throw new AppError(404, 'Version not found');
+    throw new AppError(404, 'Versione non trovata.');
   }
 
   const updatedEnv = await prisma.$transaction(async (tx) => {
     // Create snapshot of current state before restoring
     await createVersionSnapshot(tx, id, env.content, 'Prima del ripristino');
 
-    // Restore the content: an old version's entries (norms, decisions, notes) are rebuilt like a publication's (a version
-    // stored before the check would otherwise put them back as they were).
-    const restored = version.content as { dossiers?: unknown } | null;
-    const content = restored && Array.isArray(restored.dossiers)
-      ? { ...restored, dossiers: rebuildEnvironmentDossiers(restored.dossiers, 'ripristinato') }
-      : restored;
+    // Restore the content through the allow-list: an old version's entries (norms, decisions, notes) are rebuilt like a
+    // publication's, and its other rows lose what a publication may not carry (a version stored before the check would
+    // otherwise put them back as they were). An item published from a dossier keeps its one dossier and its name.
+    let content = publishedContent(version.content, 'restore');
+    if (env.sourceDossierId) {
+      content = asDossierPublication(
+        content,
+        { title: env.title, description: env.description, tags: env.tags },
+        { includeNotes: env.includeNotes, includeHighlights: env.includeHighlights },
+      );
+    }
     const updated = await tx.sharedEnvironment.update({
       where: { id },
       data: {

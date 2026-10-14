@@ -76,6 +76,8 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
           updated_at: d.publishedCopy.updatedAt,
         }
       : null,
+    // The admin withdrew its copy from the Forum: it cannot be published again until the admin allows it.
+    forum_blocked: d.forumBlockedAt != null,
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),

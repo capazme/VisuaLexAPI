@@ -428,6 +428,9 @@ model Dossier {
   color       String?
   tags        String[]    @default([])
   kind        DossierKind @default(lavoro)
+  // Set when the admin withdraws the dossier's copy in the Forum: the dossier cannot be published
+  // again (not even after its owner deletes that copy) until the admin allows it (question 190).
+  forumBlockedAt DateTime? @map("forum_blocked_at")
   userId      String   @map("user_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
