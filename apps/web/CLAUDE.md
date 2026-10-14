@@ -421,12 +421,38 @@ Keys: space reveals (ignored on a focused button or link, in a field, under an `
 «Interrompere il ripasso?»; listed in the «?» dialog's «Ripasso» group. The visual rule of the review
 card (`ReviewCard`) is the spec's §6 and is not to be restyled: the anchor's citation small in slate sans
 above, question and answer in the reader's serif at a 60ch measure, the question a step larger, no
-shadow or gradient; the reveal is the area's one motion (a hairline, then the answer, `motion-safe:`
+shadow or gradient; the reveal is the card's one motion (the dashboard's celebration never touches the card) (a hairline, then the answer, `motion-safe:`
 only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
 but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
 menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
 (`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
 shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
+
+**The progress dashboard** (`ReviewHome`, Studia's home; spec
+`docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»): one read,
+`useProgress` over `GET /lingo/srs/progressi` (the last answer stays on screen, dimmed, while a new one travels;
+an older answer never overwrites a newer one), drawn by `studia/progress/`: `ProgressBand` (`GoalRing`, today's
+reviews against the user's goal `ripassiAlGiorno`, full and green once the day counts; `StreakBadge`, the «§» badge,
+the count and record, the last seven days as register boxes; today's sentence and «Inizia il ripasso»),
+`SubjectChips` (in place of the old `<select>`: the subject narrows the dashboard and the session it starts, kept
+in `localStorage` under `visualex.studia.ripasso.materia`), and `ProgressPanels` (`ActivityCalendar`, 26 weeks on a
+computer and 12 on a phone by `useIsDesktop`, one tab stop with arrow keys and a live readout, a legend under it
+(«meno … più», the counted day's dot, the rest's dashed outline), the whole pitch of a cell hit-testable; `CardStatesBar`;
+`DueForecast`; `SubjectProgress`, whose rows also set the filter); `StudyPreferences` stays closed at the bottom
+and now holds «Ripassi al giorno» too. While the first read travels the band and the panels keep their places
+(`ProgressPanelsSkeleton`); a failed first read stops the pulse and says the progress is not available. Colours are the app's tokens through `progress/tokens.ts` (ink is the
+primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
+hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
+the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
+(`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
+read never replays it; a convenience, never the streak's source) — on the home when
+today counts with at least one review (confetti of «§» and «✓» from the ring, `confetti.ts` pure, on a canvas,
+and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
+whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
+with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
+line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
+`stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
+(`SessionEndProgress`, the same read).
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
@@ -487,6 +513,24 @@ highlights are stored under `normaKey = decisionKey(identity)` with `articleId =
 block; `decisionStructure` names them). `DecisionReadingToolbar` draws the notes and highlights
 buttons and the discussion button (`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
 (`UnmatchedAnchors`; a decision found without text hosts it through `DecisionAnchorsWithoutText`).
+**Key passages** (spec `docs/superpowers/specs/2026-10-13-decision-key-passages-design.md`; the owner: «Ok
+proviamo», then «191-194 va bene»): `utils/decisionKeyPassages.ts` finds by rules, never AI, the principle of law a
+Cassazione decision enunciates (its own, never a precedent's or the Prosecutor General's), the operative part of a
+Cassazione or Corte costituzionale dispositivo (without costs, «contributo unificato», anonymisation, «Così deciso»),
+and the Corte costituzionale's decision on each question in its «considerato in diritto» (opened where the numbering
+starts again at «1.»); no other court has rules. The patterns are the ones measured in the spec on real decisions kept
+outside the repository: a change to them is a change to measured behaviour, with its tests (synthetic texts, and
+timings on long runs of spaces and many passages). They are ranges of `decisionProjection`, computed from the text whenever it is
+drawn (memoised per text) and never stored: `renderDecisionHtml` wraps them (`keyPassages`, mark `key` inside the reader's own marks, its label an
+empty-of-text `key-head` drawn by CSS), so root rule 23 holds and nothing the user saves, exports or shares carries one.
+`DecisionReadingSurface` draws them, hides them with `key-passages-hidden` (`settings.showKeyPassages`, on by default,
+persisted in the browser), and puts «Passaggi chiave (n)» in `DecisionReadingToolbar` (`KeyPassagesMenu`: a menu on the
+desktop, a `ui/Sheet` on a phone, with the legend «Evidenziati automaticamente: non sono le tue evidenziazioni», one entry
+per passage that scrolls to it at once and opens its popover, and the switch). A click on a passage, not on words under a
+highlight, a link, a note or a sign, opens `KeyPassagePopover` (fixed-positioned: an absolute one, opened on a passage
+still out of view, made the page itself scroll): «Fai tua» is the ordinary `addHighlight` over the passage's words at its
+offset, after which the passage, nested in the highlight, loses its underline and label (they come back while the
+highlights are hidden); «Nascondi i passaggi chiave».
 No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRender.ts` is the
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
 `decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks
@@ -538,7 +582,10 @@ builds it and the popup's props: a click records the way back from the surface's
 Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the same frame as the norm popup
 (`ui/PreviewFrame`, `calculatePreviewPosition`): the decision's heading and first lines from
 `fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
-leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
+leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference. For a
+found decision the body is its first key passage — the principle, else the dispositivo — read with its line breaks as
+spaces and named with «· evidenziato automaticamente» (`previewKeyPassage`, `keyPassageText`; computed once per answer),
+else its first lines (`previewLines`): the first lines of a Cassazione decision are its parties.
 **A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
 every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
 Cassazione, Brocardi's massime, the Court of Justice's judgments; never an order or an opinion, which go to
@@ -589,6 +636,25 @@ asked for (`request_in_window` false) is shown with a warning and is not cited,
 copied, exported or saved (`copyBlockedReason` says why); the update notes of a
 past text are open by default and can be closed (the `updatesOpenByDefault` option
 of `useArticleTextInteractions`).
+
+**«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
+a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history. The
+body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
+number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
+article in two versions, each citable (`describeVersion`; a side whose window misses the day asked for, or that
+did not exist yet, makes it two articles, with that side's `VersionBanner` above the rows); two different articles are only set side by side. On the desktop a grid (label, left, right; a
+hatched `GapCell` where a side has no comma), on a phone (`useIsDesktop`, one layout per breakpoint) one column with a
+44 px switch between the two versions and «Differenze». Each cell is the reader's own markup for that comma:
+`renderArticleHtml` with `only` (the range of whole blocks) and `changes` (the word diff's ranges, wrapped in
+`.vlx-del`/`.vlx-ins`), so every column still spells its `article_text` minus `\n` (gotcha 23;
+`CompareBody.test.tsx` checks it on the 27 real texts). The heading, the rubric and the AGGIORNAMENTO tail are cells of
+their own (`compareLayout.ts` `layoutComparison`/`tailRange`), so nothing is left out; «Solo le modifiche» folds the
+invariati and a folded comma is not drawn. «(( ))» is a light highlight with the brackets collapsed by CSS (`font-size:
+0`), never removed; `(119)` references are not compared and open their note through `useArticleTextInteractions` (one
+container for both columns, the note read from the article of the column the chip sits in; the tails' fold is shared).
+A comma over `DIFF_WORD_CAP` words that would have been «modificato» is «riscritto» with the line «troppo lungo per il
+confronto parola per parola» (`tooLong`). One scroll replaces the old synchronised scrolling (the rows are the
+alignment).
 
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
@@ -791,7 +857,31 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
-  norma» do not have.
+  norma» do not have (spec `docs/superpowers/specs/2026-10-13-dossier-pdf-decisions-design.md`).
+  «Esporta → PDF» opens `DossierPdfDialog` (a `ui/Modal`), which only asks: «Cosa
+  stampare» («Testo completo», the default, or «Solo le parti evidenziate e annotate») and, when the
+  dossier holds decisions, «Sentenze» (a checkbox per decision, labelled `decisionCitationOf`, all ticked,
+  «Tutte»/«Nessuna»); `DossierDetailView.handleExportPdf({ excerpts, decisionIds })` loads and writes, the
+  dialog shows «Preparo il PDF… n di m» (`role="status"`, one count for texts and decisions), cannot be
+  closed meanwhile and closes when the file is saved. The chosen decisions are a «Giurisprudenza» section after
+  the acts, in the dossier's order: `loadDossierDecisions` reads each through `fetchDecisionCached` (three at a
+  time), `decisionPdfModel` lays it out with the reader's highlights and notes exactly as its own PDF
+  does and `drawDecisionHead`/`drawDecisionBlocks`/`drawDecisionTail` (`decisionPdf.ts`, the pieces of
+  `writeDecisionPdf`) draw it into the dossier's writer; one that cannot be read says
+  «Testo non disponibile al momento» and counts in the toast. «Solo le parti» (`pdfExcerpts.ts`, pure)
+  prints per article and decision the passages the reader marked: `resolveAnchors` over the projection the
+  anchors were made on (`article_text` without `\n`; `decisionProjection`), anchors that overlap or touch
+  merged, each passage followed by the notes anchored in it («Nota: …»), «[…]» where text is left out,
+  «Nessuna parte evidenziata o annotata» for a text with none. The passage is cut from the stored text
+  (`articleTextBetween`, `decisionTextBetween`): no character changes, the `\n` inside an article's passage stays
+  and a decision's paragraphs and lines are joined as `decisionPdfModel` joins them (root rule 23). A past text
+  takes no marks (gotcha 32); the notes about an article as a whole and a decision's free notes and lost
+  anchors print as in the full text. `loadPdfMarks` (`dossierPdfMarks.ts`) reads the marks from the server with the
+  store's wire prefix and mappers (`getByNormaKeyPrefix`), not through the store's `load…ForArticle`, which
+  swallow a failure and return while a reader's own load is on its way, and keeps those under the readers' keys
+  (`buildItemKey` + `uniqueArticleIdFromNorma`; `decisionKey` + no article). A text whose marks could not be
+  read prints «Evidenziazioni e note non disponibili al momento» and counts in the toast, never «Nessuna parte
+  evidenziata o annotata».
 - **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
   inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
   composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
@@ -951,7 +1041,8 @@ Duplicating any of these is a defect, not a shortcut.
   what is shown and what is off: `readOnly`, `doctrineVisible`, `textVisible`,
   `canCite`, `canCopyOrSave` with its reason `copyBlockedReason`,
   `updateNotesOpen`), `versionKey` (which text a request asks for, as one string),
-  `requestIsHistorical` (mirrors the server's
+  `requestedVersion` / `versionLabel` (a request as the original, a day or the text in force, a day winning over
+  «originale» as in the tab; «testo al 31 dicembre 2015», «testo in vigore»), `requestIsHistorical` (mirrors the server's
   `is_historical_request`), `deriveVersionInfo`, `isEuropeanAct` (mirrors
   `get_scraper_for_norma`), `buildTextAtDateParams`, `versionTabSuffix`,
   `historicalItemLabel`. Every surface that renders article text goes through
@@ -1005,6 +1096,9 @@ Duplicating any of these is a defect, not a shortcut.
   what the title does not say (a code's decree, an aliased code's name, «Estremi
   non disponibili»), often empty.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
+- `utils/articleCompare.ts` — `compareArticles(left, right)`: two articles comma by comma, as ranges (units, pairing,
+  labels, per-comma word diff, summary; `summarySentence` writes the sentence). Read its header and
+  `features/compare/CompareBody` before writing another comparison of two texts.
 - `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
   reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
   `getUpdateNoteParagraphs`; `renderArticleHtml` is what `useArticleMarkers`
@@ -1170,7 +1264,7 @@ meant to stay split; add new features as new files, not inside the shells:
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
-  `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `useActDetails.ts`.
+  `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
 - `features/environments/` — `EnvironmentPage.tsx` shell + `EnvironmentCard.tsx` +
   one file per modal; `EnvironmentContentViewer.tsx` renders the shared
   dossier/quickNorm/alias/annotation/highlight tree. Cards carry a category

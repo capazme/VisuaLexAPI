@@ -23,8 +23,8 @@ export interface PdfWriter {
   ensureSpace(height: number): void;
   /** Writes ready-wrapped lines at the left margin, one `lineHeight` apart. */
   writeLines(lines: string[], lineHeight: number): void;
-  /** Wraps `text` to the page width and writes it. */
-  write(text: string, size: number, style: PdfStyle, lineHeight: number, grey?: boolean): void;
+  /** Wraps `text` to the page width and writes it, in the writer's font unless `face` is given. */
+  write(text: string, size: number, style: PdfStyle, lineHeight: number, grey?: boolean, face?: PdfFont): void;
   /** The running footer of the page being finished: `footerLeft` and the page number. */
   footer(): void;
 }
@@ -53,11 +53,22 @@ export function createPdfWriter(doc: jsPDF, options: { footerLeft: string; font?
         writer.y += lineHeight;
       });
     },
-    write(text, size, style, lineHeight, grey = false) {
-      doc.setFontSize(size);
-      doc.setFont(font, style);
-      doc.setTextColor(grey ? 100 : 0);
-      writer.writeLines(doc.splitTextToSize(text, PDF_WIDTH) as string[], lineHeight);
+    write(text, size, style, lineHeight, grey = false, face = font) {
+      const apply = () => {
+        doc.setFontSize(size);
+        doc.setFont(face, style);
+        doc.setTextColor(grey ? 100 : 0);
+      };
+      apply();
+      const lines = doc.splitTextToSize(text, PDF_WIDTH) as string[];
+      lines.forEach((line) => {
+        const page = doc.getNumberOfPages();
+        writer.ensureSpace(lineHeight);
+        // A new page was started after the footer, which leaves its own font, size and colour set.
+        if (doc.getNumberOfPages() !== page) apply();
+        doc.text(line, PDF_MARGIN, writer.y);
+        writer.y += lineHeight;
+      });
       doc.setTextColor(0);
     },
     footer() {

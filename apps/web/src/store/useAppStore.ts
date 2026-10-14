@@ -616,6 +616,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     fontFamily: 'sans',
     focusMode: false,
     splitView: false,
+    showKeyPassages: true,
     studyMode: {
         fontSize: 18,
         lineHeight: 1.8,

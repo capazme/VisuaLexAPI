@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { NotesHighlightsButtons } from '../search/NotesHighlightsButtons';
@@ -22,20 +22,23 @@ export interface DecisionReadingToolbarProps {
   isFindOpen: boolean;
   onToggleFind: (wasPressed: boolean) => void;
   findButtonRef?: Ref<HTMLButtonElement>;
+  /** «Passaggi chiave» (`KeyPassagesMenu`), first in the bar when the decision has any. */
+  keyPassages?: ReactNode;
 }
 
 /**
  * The decision's reading toolbar: the article's own notes and highlights buttons
  * (`NotesHighlightsButtons`) in the same glass bar. `ReadingToolbar` as a whole needs an article's
  * props (quick norm, dossier, copy, export, version, compare), so only these two are drawn, with
- * the article's discussion button (`DiscussionButton`).
+ * the article's discussion button (`DiscussionButton`), and the decision's own «Passaggi chiave».
  */
 export function DecisionReadingToolbar({
   notesCount, highlightsCount, isNotesOpen, isHighlightsOpen, notesButtonRef, highlightsButtonRef, onToggleNotes, onToggleHighlights, onToggleDiscussion, isDiscussionOpen = false,
-  isFindOpen, onToggleFind, findButtonRef,
+  isFindOpen, onToggleFind, findButtonRef, keyPassages,
 }: DecisionReadingToolbarProps) {
   return (
     <div data-pinned-head className={cn('glass-toolbar sticky top-0 mb-4 flex flex-wrap items-center justify-end gap-1 rounded-t-xl border border-b-2 border-slate-200/50 bg-white/80 p-2 backdrop-blur-md dark:border-slate-800/50 dark:bg-slate-900/80', Z_INDEX.sticky)}>
+      {keyPassages}
       <NotesHighlightsButtons
         notesCount={notesCount}
         highlightsCount={highlightsCount}

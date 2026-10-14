@@ -1,0 +1,84 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { GiornoAttivita } from '../../../../types/studia';
+import { addDays, calendarGrid, formatDayLong, heatLevel, niceMax, percent, weekday } from './layout';
+
+const day = (giorno: string, ripassi: number): GiornoAttivita => ({ giorno, ripassi, nuove: 0, sbagliate: 0, valido: ripassi >= 10, riposo: false });
+
+describe('the progress layout', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('walks calendar days and weekdays', () => {
+    expect(addDays('2026-10-25', 1)).toBe('2026-10-26');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDays('2026-10-19', -175)).toBe('2026-04-27');
+    expect(weekday('2026-10-19')).toBe(0); // a Monday
+    expect(weekday('2026-10-25')).toBe(6);
+  });
+
+  it('draws 26 weeks ending on a Sunday: whole columns, Monday on top', () => {
+    const grid = calendarGrid([], '2026-10-25', 26);
+    expect(grid.columns).toBe(26);
+    expect(grid.cells).toHaveLength(26 * 7);
+    expect(grid.cells[0]).toMatchObject({ giorno: '2026-04-27', column: 0, row: 0 });
+    expect(grid.cells.at(-1)).toMatchObject({ giorno: '2026-10-25', column: 25, row: 6 });
+  });
+
+  it('ends the last column on today, a Wednesday', () => {
+    const grid = calendarGrid([], '2026-10-21', 12);
+    expect(grid.columns).toBe(12);
+    expect(grid.cells).toHaveLength(11 * 7 + 3);
+    expect(grid.cells[0].giorno).toBe('2026-08-03');
+    expect(grid.cells.at(-1)).toMatchObject({ giorno: '2026-10-21', column: 11, row: 2 });
+  });
+
+  it('puts the days the server sent in their cells, and finds the busiest', () => {
+    const grid = calendarGrid([day('2026-10-20', 12), day('2026-10-14', 40)], '2026-10-21', 12);
+    expect(grid.cells.find((c) => c.giorno === '2026-10-20')?.day?.ripassi).toBe(12);
+    expect(grid.cells.find((c) => c.giorno === '2026-10-19')?.day).toBeNull();
+    expect(grid.max).toBe(40);
+  });
+
+  it('labels a month over the first column that starts in it', () => {
+    const grid = calendarGrid([], '2026-10-21', 12);
+    expect(grid.months).toEqual([
+      { column: 0, label: 'ago' },
+      { column: 5, label: 'set' },
+      { column: 9, label: 'ott' },
+    ]);
+  });
+
+  it('draws the same grid whatever the browser’s zone', () => {
+    const reference = calendarGrid([day('2026-10-25', 3)], '2026-10-26', 26);
+    for (const zone of ['America/Los_Angeles', 'Pacific/Kiritimati', 'Europe/Rome']) {
+      vi.stubEnv('TZ', zone);
+      expect(calendarGrid([day('2026-10-25', 3)], '2026-10-26', 26)).toEqual(reference);
+      expect(formatDayLong('2026-10-25')).toBe('domenica 25 ottobre');
+    }
+  });
+
+  it('grades the heat by the busiest day', () => {
+    expect(heatLevel(0, 40)).toBe(0);
+    expect(heatLevel(1, 40)).toBe(1);
+    expect(heatLevel(10, 40)).toBe(1);
+    expect(heatLevel(11, 40)).toBe(2);
+    expect(heatLevel(40, 40)).toBe(4);
+    expect(heatLevel(3, 0)).toBe(0);
+  });
+
+  it('rounds a scale up', () => {
+    expect(niceMax([])).toBe(5);
+    expect(niceMax([3, 4])).toBe(5);
+    expect(niceMax([7])).toBe(10);
+    expect(niceMax([23])).toBe(25);
+    expect(niceMax([140])).toBe(140);
+    expect(niceMax([141])).toBe(150);
+    expect(niceMax([260])).toBe(300);
+  });
+
+  it('writes a share as a whole percentage', () => {
+    expect(percent(1, 3)).toBe(33);
+    expect(percent(0, 0)).toBe(0);
+  });
+});

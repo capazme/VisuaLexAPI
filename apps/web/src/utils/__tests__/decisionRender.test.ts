@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { decisionProjection, decisionStructure, isAnchoredNote, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
+import { KEY_PASSAGE_LABELS, decisionProjection, decisionStructure, isAnchoredNote, renderDecisionHtml, unmatchedAnchors } from '../decisionRender';
+import { keyPassages, type KeyPassage } from '../decisionKeyPassages';
 import { DECISION_TEXTS, READER_TEXTS } from '../__fixtures__/decisionTexts';
 import type { Annotation, ArticleDiscussionPassageSummary, Highlight } from '../../types';
 import { openFindOn, wordOf } from '../__fixtures__/openFind';
@@ -84,6 +85,76 @@ describe('renderDecisionHtml', () => {
       });
     }
   }
+
+  describe('key passages', () => {
+    /** The rules' passages for both courts, plus ranges over the head, a block boundary and the special characters. */
+    function passagesOn(testo: Parameters<typeof decisionProjection>[0]): KeyPassage[] {
+      const plain = decisionProjection(testo);
+      const n = plain.length;
+      if (n === 0) return [];
+      const found = [...keyPassages(testo, 'cassazione'), ...keyPassages(testo, 'corte_costituzionale')];
+      const extra: KeyPassage[] = [{ kind: 'principio', start: 0, end: whole(plain, Math.min(n, 40)) }];
+      const blocks = decisionStructure(testo).blocks;
+      if (blocks.length > 1) extra.push({ kind: 'decisione', start: whole(plain, Math.max(0, blocks[0].end - 6)), end: whole(plain, Math.min(n, blocks[1].start + 6)) });
+      const special = /[\u00a0<&\r]|[\ud800-\udbff][\udc00-\udfff]/.exec(plain);
+      if (special) extra.push({ kind: 'dispositivo', start: special.index, end: Math.min(n, special.index + special[0].length + 3) });
+      return [...found, ...extra];
+    }
+
+    for (const [name, testo] of Object.entries(DECISION_TEXTS)) {
+      for (const signs of [false, true]) {
+        it(`${name}: the text nodes spell the projection with the passages on, over marks, signs ${signs ? 'on' : 'off'}`, () => {
+          const { plain, highlights, annotations } = marksOn(testo);
+          const html = renderDecisionHtml({ testo, highlights, annotations, signs, keyPassages: passagesOn(testo) });
+          expect(textNodes(html)).toBe(plain);
+          const root = document.createElement('div');
+          root.innerHTML = html;
+          expect(root.innerHTML).toBe(html.replace(/\u00a0/g, '&nbsp;').replace(/&#13;/g, '\r'));
+        });
+      }
+    }
+
+    it('wraps a passage with its kind, its index and one labelled head on its first character', () => {
+      const testo = { motivazione: 'Il ricorso è fondato.', dispositivo: 'P.Q.M.\n\nLa Corte accoglie il ricorso.' };
+      const plain = decisionProjection(testo);
+      const start = plain.indexOf('La Corte');
+      const root = document.createElement('div');
+      root.innerHTML = renderDecisionHtml({ testo, highlights: [], annotations: [], keyPassages: [{ kind: 'dispositivo', start, end: plain.length }] });
+      const passage = root.querySelectorAll<HTMLElement>('.vlx-key-passage');
+      expect([...passage].map((e) => e.textContent).join('')).toBe('La Corte accoglie il ricorso.');
+      expect(passage[0].dataset).toMatchObject({ keyPassage: 'dispositivo', keyIndex: '0' });
+      // no tooltip of its own: it would show with the passages switched off
+      expect(passage[0].hasAttribute('title')).toBe(false);
+      const heads = root.querySelectorAll<HTMLElement>('.vlx-key-head');
+      expect(heads).toHaveLength(1);
+      expect(heads[0].textContent).toBe('L');
+      expect(heads[0].dataset.keyLabel).toBe(KEY_PASSAGE_LABELS.dispositivo);
+    });
+
+    it('nests the passage inside the reader\'s highlight, where CSS drops its sign', () => {
+      const testo = { motivazione: 'Il ricorso è fondato e va accolto.' };
+      const plain = decisionProjection(testo);
+      const root = document.createElement('div');
+      root.innerHTML = renderDecisionHtml({ testo, highlights: [hl(0, 'Il ricorso')], annotations: [], keyPassages: [{ kind: 'principio', start: 0, end: plain.length }] });
+      expect(root.querySelector('.highlight-mark .vlx-key-passage')?.textContent).toBe('Il ricorso');
+      expect(root.querySelector('.highlight-mark .vlx-key-head')?.textContent).toBe('I');
+      expect([...root.querySelectorAll('.vlx-key-passage')].map((e) => e.textContent).join('')).toBe(plain);
+    });
+
+    it('draws nothing for a passage outside the text, and nothing without passages', () => {
+      const testo = { motivazione: 'Breve.' };
+      const html = renderDecisionHtml({ testo, highlights: [], annotations: [], keyPassages: [{ kind: 'principio', start: 3, end: 99 }] });
+      expect(html).not.toContain('vlx-key');
+      expect(renderDecisionHtml({ testo, highlights: [], annotations: [] })).not.toContain('vlx-key');
+    });
+  });
+
+  it('strips a block with a long run of spaces inside it quickly, keeping the run', () => {
+    const motivazione = `  Inizio${' '.repeat(50000)}fine.  `;
+    const started = performance.now();
+    expect(decisionProjection({ motivazione })).toBe(`Inizio${' '.repeat(50000)}fine.`);
+    expect(performance.now() - started).toBeLessThan(250);
+  });
 
   it('a block whose edges carry spaces renders its stripped text', () => {
     const testo = { epigrafe: '  \n Epi grafe \n', motivazione: '\n\n  Motiva zione.  \n', dispositivo: '\tDispo.\n' };
@@ -347,11 +418,12 @@ describe('discussions: signs count threads, the focus nests, the text nodes stil
 describe('the projection contract — with a search open', () => {
   const texts = { ...DECISION_TEXTS, ...READER_TEXTS };
   for (const [name, testo] of Object.entries(texts).filter(([, t]) => decisionProjection(t) !== '')) {
-    it(`${name}: the search draws ranges and the text nodes still spell the projection`, () => {
+    it(`${name}: the search draws ranges and the text nodes still spell the projection, key passages on`, () => {
       const plain = decisionProjection(testo);
       const { highlights, annotations } = marksOn(testo);
+      const passages = [...keyPassages(testo, 'cassazione'), ...keyPassages(testo, 'corte_costituzionale'), { kind: 'principio' as const, start: 0, end: Math.min(plain.length, 30) }];
       const root = document.createElement('div');
-      root.innerHTML = renderDecisionHtml({ testo, highlights, annotations, signs: true });
+      root.innerHTML = renderDecisionHtml({ testo, highlights, annotations, signs: true, keyPassages: passages.filter((p) => p.end > p.start) });
       document.body.appendChild(root);
       const before = root.innerHTML;
       // the projection glues the last word of a line to the first of the next: the query comes from within the lines
