@@ -9,6 +9,8 @@
 /apps/server/src/controllers/authController.ts @capazme @LP-legal
 /apps/server/src/routes/auth.ts                @capazme @LP-legal
 /apps/server/src/routes/oauth*.ts              @capazme @LP-legal
+/apps/server/src/utils/jwt.ts                  @capazme @LP-legal
+/apps/server/src/utils/password.ts             @capazme @LP-legal
 /apps/mcp/src/auth.ts                          @capazme @LP-legal
 
 # The Prisma schema and migrations

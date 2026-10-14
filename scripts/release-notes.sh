@@ -3,7 +3,7 @@
 # material of a CHANGELOG.md section (docs/git-workflow.md, "Release").
 #
 #   sh scripts/release-notes.sh v1.7.8            # v1.7.8..HEAD
-#   sh scripts/release-notes.sh v1.7.8 develop
+#   sh scripts/release-notes.sh v1.7.8 origin/develop
 #
 # Only the first-parent merges titled "merge: <branch> — <what changes>" count:
 # each is one pull request that landed. The grouping is mechanical; grouping by
@@ -11,6 +11,10 @@
 set -eu
 from="${1:?usage: release-notes.sh <from-ref> [<to-ref>]}"
 to="${2:-HEAD}"
+for ref in "$from" "$to"; do
+  git rev-parse --verify --quiet "$ref^{commit}" >/dev/null ||
+    { echo "release-notes.sh: unknown ref '$ref'" >&2; exit 1; }
+done
 
 git log --first-parent --merges --reverse --format='%h %s' "$from..$to" |
 awk '

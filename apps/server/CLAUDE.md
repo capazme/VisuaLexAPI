@@ -496,7 +496,7 @@ can accept (the shared hook refuses it). To get the exact SQL without a
 database, `npx prisma migrate diff --from-schema-datamodel <copy of the old
 schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 `prisma format` on `schema.prisma`: it realigns about ninety untouched lines
-(measured) and buries the diff that the other developer has to review.
+(measured) and buries the diff that the other developer is asked to review.
 
 ## Tests
 

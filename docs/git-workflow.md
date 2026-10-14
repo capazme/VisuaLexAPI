@@ -85,7 +85,8 @@ whoever merges first.
 - **X** moves only by the owners' decision.
 
 Each release has a section in `CHANGELOG.md`, in English, written from the
-merge titles (`sh scripts/release-notes.sh vPREVIOUS develop` lists them),
+merge titles (`sh scripts/release-notes.sh vPREVIOUS origin/develop` lists
+them, after a `git fetch`),
 and a short note in Italian for the people who use VisuaLex: what changed in
 the parts they use, by area, without technical terms. The note goes in the
 GitHub release.
@@ -101,9 +102,10 @@ A release is cut when the owners say so. The checklist, in order:
    login; search a norm, read it, change its date; open a decision; add both
    to a dossier and export its PDF; the find window; a study card; «Collega
    un'app AI». Anything broken is fixed on `develop` first.
-3. **Changelog.** On `chore/release-X.Y.Z` from `develop`: rename
-   `[Unreleased]` in `CHANGELOG.md` to `[X.Y.Z] - YYYY-MM-DD` and open a new
-   empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`; write the
+3. **Changelog.** On `chore/release-X.Y.Z` from `develop`: bring
+   `[Unreleased]` in `CHANGELOG.md` up to date from `release-notes.sh` (pull
+   requests do not edit it, so they never conflict on it), rename it to
+   `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`; write the
    Italian note. Pull request into `develop`, merge.
 4. **Pull request `develop → main`**, titled `merge: develop — release X.Y.Z`.
    The check "Release source" accepts only `develop` and `hotfix/…` as the

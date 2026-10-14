@@ -32,4 +32,5 @@ if printf '%s\n' "$out" | grep -q "feat/c"; then echo "FAIL a merge git named is
 first="$(printf '%s\n' "$out" | head -n 1)"
 if [ "$first" = "### Features" ]; then echo "ok   Features come first"; else echo "FAIL Features come first (got '$first')"; fail=1; fi
 if (cd "$repo" && sh "$script") >/dev/null 2>&1; then echo "FAIL a missing ref is refused"; fail=1; else echo "ok   a missing ref is refused"; fi
+if (cd "$repo" && sh "$script" v9.9.9) >/dev/null 2>&1; then echo "FAIL an unknown ref is refused"; fail=1; else echo "ok   an unknown ref is refused"; fi
 exit $fail

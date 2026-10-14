@@ -85,8 +85,10 @@ logins stay blocked for 15 minutes after the check.
 
 - **Update:** `./start.sh --prod --branch develop` (or `main`). A backup of the running
   stack is taken first, then the new version is built, migrated and started. Once a
-  release carries `--prod` (v1.8.0), the host runs the latest release, `--branch main`;
-  a `preview/…` branch only when the owner asks (`docs/git-workflow.md`, "Deploy").
+  release carries `--prod` (v1.8.0), the host runs the latest release, `--branch main`, and
+  a `preview/…` branch only when the owner asks (`docs/git-workflow.md`, "Deploy"). Switch
+  to `main` right after a release, while it equals `develop`: a host ahead of `main` by a
+  migration is refused.
 - **Going back to an older version.** Migrations do not walk backwards, so the way back
   for the data is the backup taken before the update:
   1. Check out the older version (`git switch --detach <tag or commit>`).

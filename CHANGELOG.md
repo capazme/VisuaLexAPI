@@ -6,7 +6,8 @@ rather than by kind of change: a reader looks for what moved in the part they
 use. Versions and the release steps are in `docs/git-workflow.md`.
 
 Each section is written from the merge titles of its release
-(`sh scripts/release-notes.sh <previous tag> develop`). The GitHub release
+(`sh scripts/release-notes.sh <previous tag> origin/develop`), when the
+release is prepared. The GitHub release
 carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
@@ -127,7 +128,7 @@ brings in the MERL-T line merged on 27 September 2026.
   published and imported, so no publisher's text reaches a citation.
 - The exported PDF's cache path stays inside the download folder.
 - Each client is counted at its own address behind the ingress.
-- Dependency advisories patched: express (qs, path-to-regexp), ip-address,
+- Dependency advisories patched: express (qs, path-to-regexp),
   brace-expansion, proxy-addr, source-map-js.
 
 ### Deployment and development
