@@ -77,14 +77,22 @@ never run `--dev` on the deployment host. Design:
 - Branch from `develop` (`feat/`, `fix/`, `refactor/`, `chore/`, `docs/`),
   open a pull request into `develop`, merge it yourself with a merge commit
   titled `merge: <branch> — <what changes>` once CI is green.
-- Changes to authentication, the Prisma schema and migrations, licences,
-  `.github/`, `infra/` and the data scripts, `.claude/settings.json`, and
-  `normattiva_scraper.py` are for the other developer to approve. Not enforced
-  yet: `.github/CODEOWNERS` waits for their GitHub account, and until then the
-  owner merges them alone.
-- A release is a pull request `develop → main`, then a tag `vX.Y.Z`. A
-  hotfix starts from `main`, returns to `main`, and `main` is merged into
-  `develop` at once.
+- Review is requested, never awaited: `.github/CODEOWNERS` asks the other
+  developer to review changes to authentication, the Prisma schema and
+  migrations, licences, `.github/`, `infra/` and the data scripts,
+  `.claude/settings.json`, and `normattiva_scraper.py`; the author merges at
+  green CI. The licence, assignment and contribution terms are decided by
+  both owners together.
+- A migration or a file several areas share (this file, `.claude/settings.json`,
+  `.github/`, `infra/`, `start.sh`) is reserved in the owners' coordination
+  register before a branch touches it.
+- A release (`X.Y.Z`: the minor number per batch of features, the patch per
+  hotfix) is a pull request `develop → main`, then a tag `vX.Y.Z`, with its
+  section in `CHANGELOG.md` and a short Italian note for users; the checklist
+  is in `docs/git-workflow.md`. A hotfix starts from `main`, returns to `main`,
+  and `main` is merged into `develop` at once.
+- The deployment host runs the latest release; a `preview/…` branch runs
+  there only when the owner asks.
 - No other long-lived branch: experiments sit behind flags.
 - The shared hook (`.claude/settings.json`) refuses commits on `main` and
   `develop` of this repository, pushes to them, and `prisma migrate

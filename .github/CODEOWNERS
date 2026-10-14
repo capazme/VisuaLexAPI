@@ -1,0 +1,31 @@
+# Review requested, never required (docs/git-workflow.md, "Review"): GitHub asks
+# the other owner to review a pull request that touches these paths; the ruleset
+# does not wait for it. The author of a pull request is never asked.
+
+# Authentication and tokens
+/apps/server/src/oauth/                        @capazme @LP-legal
+/apps/server/src/middleware/auth.ts            @capazme @LP-legal
+/apps/server/src/middleware/internalAuth.ts    @capazme @LP-legal
+/apps/server/src/controllers/authController.ts @capazme @LP-legal
+/apps/server/src/routes/auth.ts                @capazme @LP-legal
+/apps/server/src/routes/oauth*.ts              @capazme @LP-legal
+/apps/mcp/src/auth.ts                          @capazme @LP-legal
+
+# The Prisma schema and migrations
+/apps/server/prisma/                           @capazme @LP-legal
+
+# Licences
+/LICENSE                                       @capazme @LP-legal
+/services/merlt/LICENSE                        @capazme @LP-legal
+
+# CI, the stack, the data scripts, the shared Claude Code rules
+/.github/                                      @capazme @LP-legal
+/infra/                                        @capazme @LP-legal
+/scripts/backup.sh                             @capazme @LP-legal
+/scripts/restore.sh                            @capazme @LP-legal
+/scripts/datakit/                              @capazme @LP-legal
+/.claude/settings.json                         @capazme @LP-legal
+/.claude/hooks/                                @capazme @LP-legal
+
+# The Normattiva text extraction: the offset space of every highlight and note
+/services/visualex/visualex_api/services/normattiva_scraper.py @capazme @LP-legal
