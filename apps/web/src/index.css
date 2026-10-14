@@ -598,6 +598,54 @@
   @apply text-slate-600 dark:text-slate-300;
 }
 
+/* ── «Confronta articoli» ─────────────────────────────────────
+   The comparison draws each comma with the reader's own markup (a `.vlx-art` per
+   cell). Nothing here adds text: the double brackets are collapsed, not removed
+   (`font-size: 0` keeps them in the text nodes and in a copy), and the diff's marks
+   are elements around words that are already there (gotcha 23). */
+.vlx-art--compare {
+  max-width: none;
+  margin-inline: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+/* Normattiva's ((…)): a light highlight instead of the dashed line, brackets collapsed. */
+.vlx-compare .vlx-art .vlx-mod {
+  border-bottom: 0;
+  border-radius: 0.2em;
+  background-color: rgb(251 191 36 / 0.16);
+}
+
+.dark .vlx-compare .vlx-art .vlx-mod {
+  background-color: rgb(251 191 36 / 0.14);
+}
+
+.vlx-compare .vlx-art .vlx-mod .vlx-paren {
+  font-size: 0;
+}
+
+/* The word diff of a «modificato» comma. */
+.vlx-art .vlx-del {
+  text-decoration: line-through;
+  border-radius: 0.2em;
+  @apply bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200;
+}
+
+.vlx-art .vlx-ins {
+  border-radius: 0.2em;
+  @apply bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200;
+}
+
+/* The tails' fold: the class sits on the comparison's root, not on a `.vlx-art`. */
+.vlx-compare.vlx-updates-open .vlx-art .vlx-updates-body {
+  display: block;
+}
+
+.vlx-compare.vlx-updates-open .vlx-art .vlx-updates-toggle::before {
+  content: '▾';
+}
+
 /* ── Annotation signs (round B) ───────────────────────────────
    One per block holding the reader's notes or highlights (articleRender,
    `signs: true`). Empty elements: the icon, the count and the dots are

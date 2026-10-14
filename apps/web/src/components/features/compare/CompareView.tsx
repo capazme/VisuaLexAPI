@@ -1,31 +1,24 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowLeftRight, Link2, Link2Off, Maximize2, Minimize2, FileText, Search, Loader2, Layers, ChevronRight, Zap, Calendar, Clock } from 'lucide-react';
+import { X, ArrowLeftRight, Maximize2, Minimize2, FileText, Search, Loader2, Layers, ChevronRight, ChevronLeft, Zap, Calendar, Clock } from 'lucide-react';
 import { useCompare, openCompareWithArticle, type CompareArticle } from '../../../hooks/useCompare';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
-import { ArticleDiff } from './ArticleDiff';
+import { ArticleHeader } from './ArticleHeader';
+import { CompareBody } from './CompareBody';
+import { readSide, tailRange } from './compareLayout';
+import { TextCell } from './compareParts';
+import { useCompareNotes } from './useCompareNotes';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { versionTabSuffix } from '../../../utils/versionDisplay';
 import { practiceArticleKey } from '../../../utils/practice';
-import { SafeHTML } from '../../../utils/sanitize';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { FOCUS_RING } from '../../../constants/interactions';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
 import { shortNorm } from '../../../utils/sources';
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 // A past text must not be listed, compared or diffed under the label of the text in force.
 function versionSuffixOf(article: ArticleData): string {
@@ -462,73 +455,29 @@ interface ArticlePanelProps {
   article: CompareArticle | null;
   side: 'left' | 'right';
   onRemove: () => void;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  onScroll?: () => void;
-  isFullscreen?: boolean;
 }
 
-function ArticlePanel({ article, side, onRemove, scrollRef, onScroll, isFullscreen }: ArticlePanelProps) {
+/** One article beside an empty selector: its structured text, until the other one is chosen. */
+function ArticlePanel({ article, side, onRemove }: ArticlePanelProps) {
   if (!article) {
     return <ArticleSelectorPanel side={side} />;
   }
+  return <SingleArticle article={article} side={side} onRemove={onRemove} />;
+}
 
-  const articleNumber = article.article.norma_data.numero_articolo;
-  const allegato = article.article.norma_data.allegato;
-
+function SingleArticle({ article, side, onRemove }: { article: CompareArticle; side: 'left' | 'right'; onRemove: () => void }) {
+  const text = useMemo(() => readSide(article.article), [article.article]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { updatesOpen, notePopover } = useCompareNotes(scrollRef, article.label, article.label, { [side]: text });
+  const tail = tailRange(text);
   return (
-    <div className={cn(
-      "flex-1 flex flex-col min-w-0",
-      "bg-white dark:bg-slate-900",
-      "border border-slate-200 dark:border-slate-700 rounded-xl m-2",
-      isFullscreen && "h-full"
-    )}>
-      {/* Panel Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 rounded-t-xl">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className={cn(
-            "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs",
-            side === 'left'
-              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-              : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-          )}>
-            {articleNumber}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm text-slate-900 dark:text-white truncate">
-                Art. {articleNumber}
-              </span>
-              {allegato && (
-                <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">
-                  All. {allegato}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              {article.label}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={onRemove}
-          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-          title="Rimuovi dal confronto"
-        >
-          <X size={16} />
-        </button>
+    <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl m-2">
+      <ArticleHeader article={article} side={side} onRemove={onRemove} className="border-b border-slate-100 dark:border-slate-800 rounded-t-xl" />
+      <div ref={scrollRef} className={cn('vlx-compare flex-1 overflow-y-auto', updatesOpen && 'vlx-updates-open')}>
+        <TextCell side={side} text={text} cell={{ range: { start: 0, end: tail?.start ?? text.raw.length }, changes: [] }} className="md:px-6" />
+        {tail && <TextCell side={side} text={text} cell={{ range: tail, changes: [] }} className="md:px-6" />}
       </div>
-
-      {/* Panel Content */}
-      <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="flex-1 overflow-y-auto p-4 md:p-6"
-      >
-        <SafeHTML
-          html={article.article.article_text || ''}
-          className="prose prose-slate dark:prose-invert prose-sm max-w-none"
-        />
-      </div>
+      {notePopover}
     </div>
   );
 }
@@ -538,49 +487,16 @@ export function CompareView() {
     isOpen,
     leftArticle,
     rightArticle,
-    syncScroll,
     close,
     swap,
     remove,
-    setSyncScroll,
     isComplete,
   } = useCompare();
 
+  const isDesktop = useIsDesktop();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showDiff, setShowDiff] = useState(false);
-
-  const leftScrollRef = useRef<HTMLDivElement>(null);
-  const rightScrollRef = useRef<HTMLDivElement>(null);
-  const isScrolling = useRef(false);
-
-  // Handle synchronized scrolling
-  const handleLeftScroll = () => {
-    if (!syncScroll || isScrolling.current) return;
-    if (leftScrollRef.current && rightScrollRef.current) {
-      isScrolling.current = true;
-      const scrollPercentage = leftScrollRef.current.scrollTop /
-        (leftScrollRef.current.scrollHeight - leftScrollRef.current.clientHeight);
-      rightScrollRef.current.scrollTop = scrollPercentage *
-        (rightScrollRef.current.scrollHeight - rightScrollRef.current.clientHeight);
-      requestAnimationFrame(() => {
-        isScrolling.current = false;
-      });
-    }
-  };
-
-  const handleRightScroll = () => {
-    if (!syncScroll || isScrolling.current) return;
-    if (leftScrollRef.current && rightScrollRef.current) {
-      isScrolling.current = true;
-      const scrollPercentage = rightScrollRef.current.scrollTop /
-        (rightScrollRef.current.scrollHeight - rightScrollRef.current.clientHeight);
-      leftScrollRef.current.scrollTop = scrollPercentage *
-        (leftScrollRef.current.scrollHeight - leftScrollRef.current.clientHeight);
-      requestAnimationFrame(() => {
-        isScrolling.current = false;
-      });
-    }
-  };
+  // A phone's comparison is always the whole screen.
+  const fullscreen = isFullscreen || !isDesktop;
 
   // Handle escape key
   useEffect(() => {
@@ -611,10 +527,10 @@ export function CompareView() {
         className={cn(
           "fixed inset-0 bg-black/50 backdrop-blur-sm",
           Z_INDEX.compare,
-          isFullscreen && "bg-slate-100 dark:bg-slate-950"
+          fullscreen && "bg-slate-100 dark:bg-slate-950"
         )}
         onClick={(e) => {
-          if (e.target === e.currentTarget && !isFullscreen) {
+          if (e.target === e.currentTarget && !fullscreen) {
             close();
           }
         }}
@@ -625,84 +541,76 @@ export function CompareView() {
           exit={{ opacity: 0, y: 20, scale: 0.98 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className={cn(
-            "bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col",
-            isFullscreen
+            "bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col",
+            fullscreen
               ? "fixed inset-0 rounded-none"
-              : "fixed inset-4 md:inset-8 lg:inset-12"
+              : "fixed inset-4 md:inset-8 lg:inset-12 rounded-2xl"
           )}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                <FileText size={20} className="text-primary-600 dark:text-primary-400" />
-              </div>
-              <div>
-                <h2 className="font-bold text-lg text-slate-900 dark:text-white">
-                  Confronto Articoli
+          <div className="flex items-center justify-between gap-2 px-2 md:px-6 py-2 md:py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+            <div className="flex items-center gap-3 min-w-0">
+              {!isDesktop && (
+                <button
+                  type="button"
+                  onClick={close}
+                  className={cn(
+                    'flex min-h-[44px] flex-shrink-0 items-center gap-1 rounded-lg pl-1 pr-2 text-sm font-medium text-primary-700 transition-colors hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-700',
+                    FOCUS_RING,
+                  )}
+                >
+                  <ChevronLeft size={18} aria-hidden />
+                  Pratica
+                </button>
+              )}
+              {isDesktop && (
+                <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                  <FileText size={20} className="text-primary-600 dark:text-primary-400" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h2 className="font-bold text-base md:text-lg text-slate-900 dark:text-white truncate">
+                  Confronta articoli
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {isComplete ? 'Visualizza le differenze tra i due articoli' : 'Seleziona due articoli per confrontarli'}
-                </p>
+                {isDesktop && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {isComplete ? 'I commi dei due articoli, uno di fronte all’altro' : 'Seleziona due articoli per confrontarli'}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Sync scroll toggle - only visible when both articles are loaded */}
-              {isComplete && (
-                <button
-                  onClick={() => setSyncScroll(!syncScroll)}
-                  className={cn(
-                    "p-2 rounded-lg transition-colors hidden md:flex items-center",
-                    syncScroll
-                      ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
-                      : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  )}
-                  title={syncScroll ? 'Scroll sincronizzato attivo - clicca per disattivare' : 'Attiva scroll sincronizzato'}
-                >
-                  {syncScroll ? <Link2 size={16} /> : <Link2Off size={16} />}
-                </button>
-              )}
-
               {/* Swap articles */}
               {isComplete && (
                 <button
                   onClick={swap}
-                  className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                   title="Inverti articoli"
+                  aria-label="Inverti articoli"
                 >
                   <ArrowLeftRight size={16} />
                 </button>
               )}
 
-              {/* Show diff toggle */}
-              {isComplete && (
+              {/* Fullscreen toggle */}
+              {isDesktop && (
                 <button
-                  onClick={() => setShowDiff(!showDiff)}
-                  className={cn(
-                    "px-3 py-2 rounded-lg transition-colors text-sm font-medium hidden md:block",
-                    showDiff
-                      ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-                  )}
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  title={isFullscreen ? 'Esci da schermo intero' : 'Schermo intero'}
+                  aria-label={isFullscreen ? 'Esci da schermo intero' : 'Schermo intero'}
                 >
-                  {showDiff ? 'Nascondi Diff' : 'Mostra Diff'}
+                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
               )}
 
-              {/* Fullscreen toggle */}
-              <button
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                title={isFullscreen ? 'Esci da schermo intero' : 'Schermo intero'}
-              >
-                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </button>
-
-              {/* Close button */}
+              {/* Close */}
               <button
                 onClick={close}
-                className="p-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"
+                title="Chiudi (Esc)"
+                aria-label="Chiudi il confronto"
               >
                 <X size={18} />
               </button>
@@ -710,46 +618,20 @@ export function CompareView() {
           </div>
 
           {/* Content */}
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-            {showDiff && isComplete && leftArticle && rightArticle ? (
-              <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                <ArticleDiff
-                  leftText={stripHtml(leftArticle.article.article_text || '')}
-                  rightText={stripHtml(rightArticle.article.article_text || '')}
-                  leftLabel={leftArticle.label}
-                  rightLabel={rightArticle.label}
-                />
-              </div>
-            ) : (
-              <>
-                <ArticlePanel
-                  article={leftArticle}
-                  side="left"
-                  onRemove={() => remove('left')}
-                  scrollRef={leftScrollRef}
-                  onScroll={handleLeftScroll}
-                  isFullscreen={isFullscreen}
-                />
-
-                {/* Divider */}
-                <div className="hidden md:flex w-px bg-slate-200 dark:bg-slate-700 relative">
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
-                    <ArrowLeftRight size={14} className="text-slate-400" />
-                  </div>
-                </div>
-
-                <ArticlePanel
-                  article={rightArticle}
-                  side="right"
-                  onRemove={() => remove('right')}
-                  scrollRef={rightScrollRef}
-                  onScroll={handleRightScroll}
-                  isFullscreen={isFullscreen}
-                />
-              </>
-            )}
-          </div>
-
+          {isComplete && leftArticle && rightArticle ? (
+            <CompareBody
+              key={`${leftArticle.label}#${rightArticle.label}`}
+              left={leftArticle}
+              right={rightArticle}
+              onRemove={remove}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+              <ArticlePanel article={leftArticle} side="left" onRemove={() => remove('left')} />
+              <div className="hidden md:flex w-px bg-slate-200 dark:bg-slate-700" />
+              <ArticlePanel article={rightArticle} side="right" onRemove={() => remove('right')} />
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>

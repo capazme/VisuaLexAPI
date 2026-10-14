@@ -637,6 +637,25 @@ copied, exported or saved (`copyBlockedReason` says why); the update notes of a
 past text are open by default and can be closed (the `updatesOpenByDefault` option
 of `useArticleTextInteractions`).
 
+**«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
+a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history. The
+body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
+number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
+article in two versions, each citable (`describeVersion`; a side whose window misses the day asked for, or that
+did not exist yet, makes it two articles, with that side's `VersionBanner` above the rows); two different articles are only set side by side. On the desktop a grid (label, left, right; a
+hatched `GapCell` where a side has no comma), on a phone (`useIsDesktop`, one layout per breakpoint) one column with a
+44 px switch between the two versions and «Differenze». Each cell is the reader's own markup for that comma:
+`renderArticleHtml` with `only` (the range of whole blocks) and `changes` (the word diff's ranges, wrapped in
+`.vlx-del`/`.vlx-ins`), so every column still spells its `article_text` minus `\n` (gotcha 23;
+`CompareBody.test.tsx` checks it on the 27 real texts). The heading, the rubric and the AGGIORNAMENTO tail are cells of
+their own (`compareLayout.ts` `layoutComparison`/`tailRange`), so nothing is left out; «Solo le modifiche» folds the
+invariati and a folded comma is not drawn. «(( ))» is a light highlight with the brackets collapsed by CSS (`font-size:
+0`), never removed; `(119)` references are not compared and open their note through `useArticleTextInteractions` (one
+container for both columns, the note read from the article of the column the chip sits in; the tails' fold is shared).
+A comma over `DIFF_WORD_CAP` words that would have been «modificato» is «riscritto» with the line «troppo lungo per il
+confronto parola per parola» (`tooLong`). One scroll replaces the old synchronised scrolling (the rows are the
+alignment).
+
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
 anchored note; `InlineNotePopover` when clicking an existing wavy underline;
@@ -991,7 +1010,8 @@ Duplicating any of these is a defect, not a shortcut.
   what is shown and what is off: `readOnly`, `doctrineVisible`, `textVisible`,
   `canCite`, `canCopyOrSave` with its reason `copyBlockedReason`,
   `updateNotesOpen`), `versionKey` (which text a request asks for, as one string),
-  `requestIsHistorical` (mirrors the server's
+  `requestedVersion` / `versionLabel` (a request as the original, a day or the text in force, a day winning over
+  «originale» as in the tab; «testo al 31 dicembre 2015», «testo in vigore»), `requestIsHistorical` (mirrors the server's
   `is_historical_request`), `deriveVersionInfo`, `isEuropeanAct` (mirrors
   `get_scraper_for_norma`), `buildTextAtDateParams`, `versionTabSuffix`,
   `historicalItemLabel`. Every surface that renders article text goes through
@@ -1045,6 +1065,9 @@ Duplicating any of these is a defect, not a shortcut.
   what the title does not say (a code's decree, an aliased code's name, «Estremi
   non disponibili»), often empty.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
+- `utils/articleCompare.ts` — `compareArticles(left, right)`: two articles comma by comma, as ranges (units, pairing,
+  labels, per-comma word diff, summary; `summarySentence` writes the sentence). Read its header and
+  `features/compare/CompareBody` before writing another comparison of two texts.
 - `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
   reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
   `getUpdateNoteParagraphs`; `renderArticleHtml` is what `useArticleMarkers`
