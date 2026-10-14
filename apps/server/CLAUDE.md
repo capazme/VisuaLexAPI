@@ -102,6 +102,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and never from a body; answered as `created_by: { clientName } | null`.
   Every dossier and item answer goes through `serializeDossier`/`serializeItem`
   in `dossierController.ts`: add a field there, not in a route.
+  A dossier has a `kind`, `lavoro` (a practice: it may hold a client's data; the default, and
+  what every dossier older than the column became) or `studio` (a topic studied: a dossier
+  taken from a Forum suggestion is one); `POST`/`PUT /dossiers` take it. Each dossier answer
+  carries `published` — its copy in the Forum (`SharedEnvironment.sourceDossierId`, unique,
+  `SET NULL`): `{ shared_environment_id, version, is_active, updated_at }` or null; the link is
+  the owner's alone and never part of the Forum's content. A dossier in the trash keeps its kind,
+  and its copy stays published, linked again on restore if still the user's and unlinked (spec
+  `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`).
   `POST /api/dossiers/:id/notes` `{ text, aboutItemId? }` (user session and
   exchanged tokens with `dossier:write`): plain text, 1–4,000 characters; with
   `aboutItemId` the note is about a norm entry of the same dossier as a whole
@@ -220,16 +228,59 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
-- **Published environments** carry dossiers; their entries are rebuilt from closed values when
-  an environment is published, its content updated or an older version restored
-  (`utils/environmentDossiers.ts`): norms through `schemas/normEntry.ts`, decisions through
-  `rebuildDecisionEntry` in `schemas/decisionItem.ts` (unknown keys refused, the label
-  recomputed, a missing one supplied), notes only as text of at most `MAX_NOTE_LENGTH`; around
-  its data an item keeps only its id and date when they are strings, its type and the star
-  (`status: 'important'`, also when it travelled inside the data as `_dossierMeta`). An entry that cannot be rebuilt, or of an
-  unknown type, refuses the operation with an Italian 400 naming the dossier, the entry and why:
-  whoever applies the environment has those entries cited to them, in the MCP deletion dialog
-  too. The web rebuilds them again on import.
+- **The Forum's content** (`SharedEnvironment.content`; spec
+  `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D6–D7). The server trusts
+  none of it: `utils/publishedContent.ts` rebuilds every row from an allow-list — a dossier's
+  title, description and tags; its entries through `utils/environmentDossiers.ts` (norms through
+  `schemas/normEntry.ts`, decisions through `rebuildDecisionEntry` with the label recomputed, notes
+  as text of at most `MAX_NOTE_LENGTH`, an entry keeping only its type, date, star and a note's
+  entry); notes and highlights (key and article id without `::art::`, text, anchor, a non-negative
+  offset, a known colour — a note whose anchor has no valid offset stays, without the anchor); quick norms and aliases (label or trigger, the search's known
+  parameters, a source's own address) — and drops everything else: user ids, `originalAuthor`,
+  `sourceSuggestionId`, `bookmarkId`, usage counts, MCP provenance, any unlisted key. Row ids become
+  positional (`d1`, `d1-2`, `a3`, `h1`, `q1`, `c1`), a note's `aboutItemId` following its entry.
+  Text and anchors travel as stored (root rule 23). On a publication or an update the first row
+  that does not pass refuses the operation with an Italian 400 naming it; restoring a version
+  refuses a bad entry and leaves out other bad rows; **every read** (list, mine, detail,
+  download) goes through it too and leaves out what does not pass, so items published before the
+  filter answer only what it allows, with no row rewritten.
+  **Published from a dossier** (`sourceDossierId` on `POST /shared-environments`, the caller's
+  dossier or 404; a second publication of it 409, the unique index's P2002 too): exactly one
+  dossier, no quick norms or aliases, notes and highlights only when their switch is on, and the
+  dossier inside named by the item's title, description and tags, never the private dossier's
+  name — kept so by `PUT` (a new name rewrites it without a new version; `coexist` refused) and by
+  a restore. The link is answered to the owner only (`sourceDossierId`, `withdrawnByAdmin`), never
+  changed after the publication. **A withdrawn item** is a 404, like a missing one, to everyone
+  but its owner and an admin on detail, like, download, versions, report, a new suggestion and
+  added items; the list shows active items only, and a proposer's sent list keeps only the id of a
+  withdrawn item. An admin's withdrawal stamps `withdrawn_by_admin_at` (also on an item its author
+  had withdrawn first), and the author's republish — or a `coexist` copy — then answers 403 until
+  an admin republishes it (owner, question 190). The dossier it came from is stamped too
+  (`dossiers.forum_blocked_at`, answered as `forum_blocked`, kept through the trash): the author may
+  delete the copy but not publish the dossier again until an admin republishes the copy or lifts
+  the block — both also reach a dossier waiting in the trash, whose stored row carries the block (`GET /admin/forum-blocks` — owner and date, never the dossier's private name —
+  and `DELETE /admin/forum-blocks/:dossierId`). Messages the Forum shows are Italian (the daily limit: «Puoi pubblicare
+  al massimo 5 dossier al giorno: riprova domani.»).
+- **Study dossiers from content** (`services/studyImport.ts`, spec D8–D9, D11–D12): the one way
+  content becomes a user's dossiers — `POST /shared-environments/:id/download` with
+  `{ addNotes, addHighlights }` («Aggiungi ai miei dossier»; without a body an older client still
+  gets the filtered content), `POST /environments/:id/recover` («Recupera i dossier» from the
+  archive) and `POST /dossiers/import-study { content, addNotes?, addHighlights? }` (packs, old
+  links, at most 1 MB; session only, not delegated). Each spends one of `IMPORTS_PER_HOUR` (30) per
+  user (`spendStudyImport`, 429 in Italian; a limiter failure lets it through). The content is read through the allow-list
+  (`readableContent`, which counts what it leaves out as `refused`); each dossier becomes a **new**
+  `studio` dossier (never an existing one changed), entries as the web writes them (title, the star
+  in `_dossierMeta`, a note's `aboutItemId` following its entry); notes and highlights go under the
+  key the web reads (`wireNormaKey`: `<key>::art::<articleId>`, a decision's `<decisionKey>::art::`),
+  a highlight's `endOffset` from its text's length, one identical (same key, text, anchor, offsets,
+  compared exactly) to the user's skipped; a legacy item's quick norms and aliases merge by label
+  (case folded) and trigger (exact). The user's rows are read first, then everything — a download's
+  count too — is written in one transaction (30 s): a database error rolls it all back, a skip
+  never does. Rows from someone else's item carry
+  `originalAuthorId` (the «da @utente» chip); notes live on the article, so they outlive the study
+  dossier. A download counts once per non-owner request. The suggestion «take» stores a note on a
+  decision under its `::art::` key too (before 14 October 2026 it wrote an empty key), and refuses
+  a highlight with no offset (400) instead of marking the article's first characters.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
