@@ -7,7 +7,8 @@
 import { useCallback } from 'react';
 import { AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
 import type { DecisionReference, FetchDecisionAnswer } from '../../types/decisions';
-import { previewLines } from '../../utils/decisionPreview';
+import { previewKeyPassage, previewLines } from '../../utils/decisionPreview';
+import { KEY_PASSAGE_LABELS } from '../../utils/decisionRender';
 import { formatDecisionHeading, formatDecisionShort, notFoundMessage } from '../../utils/decisionLinks';
 import { PreviewFrame } from './PreviewFrame';
 
@@ -27,12 +28,19 @@ interface DecisionPreviewPopupProps {
 function Body({ reference, answer }: { reference: DecisionReference; answer: FetchDecisionAnswer }) {
   switch (answer.esito) {
     case 'trovata': {
-      const lines = previewLines(answer.testo);
+      // its first key passage when it has one (the first lines of a Cassazione decision are its parties)
+      const passage = previewKeyPassage(answer.testo, answer.identita.corte);
+      const lines = passage ? null : previewLines(answer.testo);
       return (
         <div className="space-y-2">
           <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{formatDecisionHeading(answer.identita, answer.attributi)}</div>
+          {passage && (
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-400">
+              {KEY_PASSAGE_LABELS[passage.kind]} <span className="font-normal normal-case tracking-normal text-slate-500 dark:text-slate-400">· evidenziato automaticamente</span>
+            </p>
+          )}
           <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line max-h-[220px] overflow-y-auto custom-scrollbar">
-            {lines ?? <span className="text-slate-400 italic">Testo non disponibile</span>}
+            {passage ? passage.text : lines ?? <span className="text-slate-400 italic">Testo non disponibile</span>}
           </div>
         </div>
       );

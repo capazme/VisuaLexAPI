@@ -123,6 +123,8 @@ describe('renderDecisionHtml', () => {
       const passage = root.querySelectorAll<HTMLElement>('.vlx-key-passage');
       expect([...passage].map((e) => e.textContent).join('')).toBe('La Corte accoglie il ricorso.');
       expect(passage[0].dataset).toMatchObject({ keyPassage: 'dispositivo', keyIndex: '0' });
+      // no tooltip of its own: it would show with the passages switched off
+      expect(passage[0].hasAttribute('title')).toBe(false);
       const heads = root.querySelectorAll<HTMLElement>('.vlx-key-head');
       expect(heads).toHaveLength(1);
       expect(heads[0].textContent).toBe('L');
@@ -143,6 +145,13 @@ describe('renderDecisionHtml', () => {
       expect(html).not.toContain('vlx-key');
       expect(renderDecisionHtml({ testo, highlights: [], annotations: [] })).not.toContain('vlx-key');
     });
+  });
+
+  it('strips a block with a long run of spaces inside it quickly, keeping the run', () => {
+    const motivazione = `  Inizio${' '.repeat(50000)}fine.  `;
+    const started = performance.now();
+    expect(decisionProjection({ motivazione })).toBe(`Inizio${' '.repeat(50000)}fine.`);
+    expect(performance.now() - started).toBeLessThan(250);
   });
 
   it('a block whose edges carry spaces renders its stripped text', () => {

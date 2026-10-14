@@ -852,7 +852,6 @@
   background-position: 0 100%;
   background-repeat: repeat-x;
   background-size: 5px 2px;
-  padding-bottom: 1px;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
@@ -882,6 +881,12 @@
 .dark .vlx-decision .vlx-key-head::before {
   color: hsl(172 66% 75%);
   background-color: hsl(173 60% 18%);
+}
+
+/* Made the reader's own («Fai tua»): the highlight paints over the underline (no padding below the
+   words, so the mark's background covers it) and the label goes. */
+.vlx-decision .vlx-key-head:has(.highlight-mark)::before {
+  content: none;
 }
 
 .key-passages-hidden .vlx-key-passage {

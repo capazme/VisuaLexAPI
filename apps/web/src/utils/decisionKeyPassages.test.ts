@@ -87,6 +87,10 @@ describe('keyPassages — the dispositivo', () => {
     expect(passages({ motivazione: 'Il ricorso è infondato.', dispositivo })).toEqual([['dispositivo', operative]]);
   });
 
+  it('stops at «Cosi deciso» written without its accent', () => {
+    expect(passages({ dispositivo: 'P.Q.M.\n\nLa Corte rigetta il ricorso\n\nCosi deciso in Roma il 2 gennaio 2025.' })).toEqual([['dispositivo', 'La Corte rigetta il ricorso']]);
+  });
+
   it('reads the Corte costituzionale\'s heading and stops at «Così deciso», whatever its accent', () => {
     const dispositivo = 'per questi motivi\n\n LA CORTE COSTITUZIONALE\n\n dichiara l\'illegittimità costituzionale dell\'art. 1 della legge regionale n. 1 del 2020.\n\n Cosí deciso in Roma, nella sede della Corte costituzionale, il 1 marzo 2023.\n\n F.to: Il Presidente';
     expect(passages({ dispositivo }, 'corte_costituzionale')).toEqual([
@@ -166,5 +170,24 @@ describe('keyPassages — the projection', () => {
 
   it('finds nothing in an empty decision', () => {
     expect(keyPassages({}, 'cassazione')).toEqual([]);
+  });
+});
+
+describe('keyPassages — in linear time on long texts', () => {
+  it('reads a dispositivo with a long run of spaces quickly', () => {
+    const dispositivo = `P.Q.M.\n\nLa Corte rigetta il ricorso${' '.repeat(20000)}x`;
+    const started = performance.now();
+    const found = keyPassages({ dispositivo }, 'cassazione');
+    expect(performance.now() - started).toBeLessThan(250);
+    expect(found).toHaveLength(1);
+  });
+
+  it('maps many passages of one long block quickly', () => {
+    const sentence = (i: number) => `${i + 2}.- La questione numero ${i} è fondata.\n\n`;
+    const motivazione = `1.- Il giudice rimettente ha sollevato questioni.\n\n1.- Il Tribunale dubita della legittimità costituzionale.\n\n${Array.from({ length: 1300 }, (_, i) => sentence(i) + 'Motivazione '.repeat(30) + '\n\n').join('')}`;
+    const started = performance.now();
+    const found = keyPassages({ motivazione }, 'corte_costituzionale');
+    expect(performance.now() - started).toBeLessThan(1500);
+    expect(found).toHaveLength(1300);
   });
 });

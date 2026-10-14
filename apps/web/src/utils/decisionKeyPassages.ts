@@ -121,7 +121,8 @@ function principles(text: string): Array<[number, number]> {
 const DISPOSITIVO_HEAD = re(String.raw`^\s*(?:P\.?\s*Q\.?\s*M\.?|PQM\.?|per\s+questi\s+motivi)\s*(?:LA\s+CORTE\s+COSTITUZIONALE\s*)?`);
 /** Where the operative part ends: the costs, the «contributo unificato», anonymisation, the closing formulas. */
 const DISPOSITIVO_TAIL = re(
-  String.raw`(?:^|[.;,]\s*|\n\s*|\s+e\s+|\s+ed\s+|\s+(?=compens${L}*\s))(?=` +
+  // each alternative that opens on a run of spaces starts at the run's first one: linear on long runs
+  String.raw`(?:^|[.;,]\s*|\n\s*|(?<!\s)\s+e\s+|(?<!\s)\s+ed\s+|(?<!\s)\s+(?=compens${L}*\s))(?=` +
     String.raw`(?:(?:l[aoe]\s+|li\s+|gli\s+)?condann${L}*\s+(?:(?:la|il|i|le|gli|parte|l['’]|in\s+solido|ciascun${L}*|entramb${L}*)\s*)?[^.;]{0,100}?(?:pagamento|rifusione|rimborso|rimborsare|rifondere|pagare|spese)` +
     String.raw`|compens${L}*\s+(?:le|tra|fra|integralmente|interamente|per)` +
     String.raw`|ai\s+sensi\s+dell['’]\s*art\.?\s*13|d[àa]\s+atto|spese\s+al\s+merito|liquid${L}*\s+(?:le\s+spese|in)` +
@@ -148,7 +149,8 @@ function operativePart(text: string): Array<[number, number]> {
 // --- The Corte costituzionale's decision on each question ---
 
 const GAP = (n: number) => String.raw`(?:[\p{L}\p{N}_’']+,?\s+){0,${n}}?`;
-const IS = String.raw`(?:è|sono|risulta|risultano|deve\s+ritenersi|devono\s+ritenersi)\s*,?\s+`;
+// «è», «è,», «è ,»: one way to read the spaces around a comma, never two quantifiers side by side
+const IS = String.raw`(?:è|sono|risulta|risultano|deve\s+ritenersi|devono\s+ritenersi)(?:\s*,\s+|\s+)`;
 /** «La questione (non) è fondata», «…è inammissibile», «Va dichiarata l'illegittimità costituzionale…». */
 const OUTCOME = re(
   String.raw`(?:${IS}${GAP(6)}(?:non\s+)?fondat[ae]${wordEnd}(?!\s+su${wordEnd})` +
@@ -220,8 +222,10 @@ export function keyPassages(testo: DecisionText, corte: string): KeyPassage[] {
     if (corte === 'corte_costituzionale' && key === 'motivazione') {
       for (const [s, e] of decisions(text)) ranges.push(['decisione', s, e]);
     }
+    if (ranges.length === 0) continue;
+    const newlines = newlinesBefore(text);
     for (const [kind, s, e] of ranges) {
-      const passage = toProjection(block, s, e);
+      const passage = toProjection(block, newlines, s, e);
       if (passage) found.push({ kind, ...passage });
     }
   }
@@ -229,21 +233,26 @@ export function keyPassages(testo: DecisionText, corte: string): KeyPassage[] {
 }
 
 /** A block range, its whitespace edges dropped, as projection offsets (the block's `\n` are not in the projection). */
-function toProjection(block: { text: string; start: number }, from: number, to: number): { start: number; end: number } | null {
+function toProjection(
+  block: { text: string; start: number },
+  newlines: Uint32Array,
+  from: number,
+  to: number,
+): { start: number; end: number } | null {
   const { text } = block;
   let s = from;
   let e = to;
   while (s < e && /\s/.test(text[s])) s++;
   while (e > s && /\s/.test(text[e - 1])) e--;
   if (s >= e) return null;
-  const at = (i: number) => block.start + i - countNewlines(text, i);
-  return { start: at(s), end: at(e) };
+  return { start: block.start + s - newlines[s], end: block.start + e - newlines[e] };
 }
 
-function countNewlines(text: string, upTo: number): number {
-  let n = 0;
-  for (let i = 0; i < upTo; i++) if (text[i] === '\n') n++;
-  return n;
+/** For every offset of a block, the `\n` before it: counted once per block, however many passages it holds. */
+function newlinesBefore(text: string): Uint32Array {
+  const counts = new Uint32Array(text.length + 1);
+  for (let i = 0; i < text.length; i++) counts[i + 1] = counts[i] + (text[i] === '\n' ? 1 : 0);
+  return counts;
 }
 
 function withoutOverlaps(passages: KeyPassage[]): KeyPassage[] {
@@ -269,4 +278,29 @@ export function keyPassageEntryLabels(passages: readonly KeyPassage[], plain: st
     const quote = words.slice(0, QUOTE_WORDS).join(' ') + (words.length > QUOTE_WORDS ? '…' : '');
     return `${KEY_PASSAGE_LABELS[p.kind]}${count} — «${quote}»`;
   });
+}
+
+/**
+ * A passage as it reads, for a surface that shows it apart from the text (the preview): the block's
+ * own words with each line break read as a space. The projection glues the last word of a line to the
+ * first of the next, so it is never shown as it is.
+ */
+export function keyPassageText(testo: DecisionText, passage: KeyPassage): string {
+  for (const block of decisionBlocks(testo)) {
+    const visible = block.text.replace(/\n/g, '').length;
+    if (passage.start < block.start || passage.start >= block.start + visible) continue;
+    let seen = 0;
+    let from = -1;
+    let to = block.text.length;
+    for (let i = 0; i <= block.text.length; i++) {
+      if (from === -1 && seen === passage.start - block.start) from = i;
+      if (seen === passage.end - block.start) {
+        to = i;
+        break;
+      }
+      if (i < block.text.length && block.text[i] !== '\n') seen++;
+    }
+    return block.text.slice(Math.max(0, from), to).replace(/\s*\n\s*/g, ' ').trim();
+  }
+  return '';
 }

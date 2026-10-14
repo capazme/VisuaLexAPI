@@ -27,7 +27,15 @@ const BLOCKS: ReadonlyArray<readonly [keyof DecisionText, string]> = [
 
 // ASCII whitespace only (spec §8.2), as the API's freeze test strips: never `.trim()`, which
 // also strips the no-break space and the other Unicode spaces.
-const stripEdges = (s: string): string => s.replace(/^[ \t\n\r\f\v]+|[ \t\n\r\f\v]+$/g, '');
+// A scan, not `/[ \t…]+$/`, which tries every run of spaces inside the text and is quadratic on long ones.
+const ASCII_SPACE = new Set([' ', '\t', '\n', '\r', '\f', '\v']);
+const stripEdges = (s: string): string => {
+  let start = 0;
+  let end = s.length;
+  while (start < end && ASCII_SPACE.has(s[start])) start++;
+  while (end > start && ASCII_SPACE.has(s[end - 1])) end--;
+  return s.slice(start, end);
+};
 
 const blockTexts = (testo: DecisionText): Array<[string, string, string]> =>
   BLOCKS.map(([key, name]) => [key, name, stripEdges(testo[key] ?? '')]);
@@ -52,8 +60,9 @@ export function decisionProjection(testo: DecisionText): string {
     .replace(/\n/g, '');
 }
 
+// No `title`: it would still show with the passages switched off; the label and the menu's legend say what it is.
 const keyPassageOpen = (kind: KeyPassageKind, index: number): string =>
-  `<span class="vlx-key-passage" data-key-passage="${kind}" data-key-index="${index}" title="${KEY_PASSAGE_LABELS[kind]} · evidenziato automaticamente">`;
+  `<span class="vlx-key-passage" data-key-passage="${kind}" data-key-index="${index}">`;
 
 export interface DecisionLayout {
   label: string;
