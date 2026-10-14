@@ -226,7 +226,7 @@ export const FULL_ACT_NAMES: ReadonlyArray<readonly [string, string]> = Object.e
  * una parola qualsiasi ("art. 5 bisogna").
  */
 const ARTICLE_SUFFIX_SOURCE = `(?:${ARTICLE_SUFFIX_ALTERNATION})\\b`;
-const ARTICLE_ITEM = `\\d+(?:\\s*-?\\s*${ARTICLE_SUFFIX_SOURCE})?(?:\\s*-\\s*\\d+)?`;
+const ARTICLE_ITEM = `\\d+(?:\\s*(?:-\\s*)?${ARTICLE_SUFFIX_SOURCE})?(?:\\s*-\\s*\\d+)?`;
 
 /**
  * Un elenco di articoli separati da "," o "e": "artt. 1, 2 e 3". L'API
@@ -263,7 +263,7 @@ const FULL_DATE_PATTERNS = [
 /**
  * Pattern per numeri di articolo standalone (senza "art"); supporta range.
  */
-const STANDALONE_NUMBER_PATTERN = new RegExp(`^(\\d+)(?:\\s*-\\s*(\\d+))?\\s*[-]?\\s*(${ARTICLE_SUFFIX_ALTERNATION})?$`, 'i');
+const STANDALONE_NUMBER_PATTERN = new RegExp(`^(\\d+)(?:\\s*-\\s*(\\d+))?\\s*(?:-\\s*)?(${ARTICLE_SUFFIX_ALTERNATION})?$`, 'i');
 
 /**
  * Pattern per numero/anno (es. "241/1990", "679/2016"). L'anno ha due o
@@ -690,7 +690,7 @@ export interface ArticleRef {
  * - "art. 123-bis"
  */
 const ARTICLE_REF_PATTERN = new RegExp(
-  `\\b(?:art(?:icol[oi])?t?\\.?\\s*)(\\d+(?:\\s*-\\s*\\d+)?(?:\\s*[-]?\\s*${ARTICLE_SUFFIX_SOURCE})?)` +
+  `\\b(?:art(?:icol[oi])?t?\\.?\\s*)(\\d+(?:\\s*-\\s*\\d+)?(?:\\s*(?:-\\s*)?${ARTICLE_SUFFIX_SOURCE})?)` +
   `\\s*(?:e\\s+(?:ss\\.?|seg(?:uenti)?\\.?)|(?:c\\.?\\s*c\\.?|c\\.?\\s*p\\.?|c\\.?\\s*p\\.?\\s*c\\.?|c\\.?\\s*p\\.?\\s*p\\.?|cost\\.?|costituzione))?`,
   'gi'
 );

@@ -1,6 +1,7 @@
 /**
  * DecisionPreviewPopup - the hover popup on a decision a text cites (design 2026-10-13 D5): its heading
- * and first lines, or what the source says. The frame is the norm popup's.
+ * and first lines, or what the source says. The frame is the norm popup's. `DecisionPreviewContent` is
+ * its body, shared with the preview a list opens (`DecisionPreviewDialog`).
  */
 
 import { useCallback } from 'react';
@@ -78,6 +79,20 @@ export function DecisionPreviewPopup({
         </button>
       }
     >
+      <DecisionPreviewContent isLoading={isLoading} error={error} reference={reference} answer={answer} />
+    </PreviewFrame>
+  );
+}
+
+/** What a preview says while it loads, when the request failed, or the answer (`Body`). */
+export function DecisionPreviewContent({ isLoading, error, reference, answer }: {
+  isLoading: boolean;
+  error: string | null;
+  reference: DecisionReference | null;
+  answer: FetchDecisionAnswer | null;
+}) {
+  return (
+    <>
       {isLoading && (
         <div className="flex items-center justify-center gap-2 py-8 text-slate-500 dark:text-slate-400">
           <Loader2 size={18} className="animate-spin" />
@@ -91,6 +106,6 @@ export function DecisionPreviewPopup({
         </div>
       )}
       {!isLoading && !error && reference && answer && <Body reference={reference} answer={answer} />}
-    </PreviewFrame>
+    </>
   );
 }

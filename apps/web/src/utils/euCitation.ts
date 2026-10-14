@@ -23,8 +23,12 @@ export const EU_ACT_TYPES: Record<EuActKind, string> = {
   direttiva: 'Direttiva UE',
 };
 
-/** "ue" / "ce" / "cee" / "euratom", with or without parentheses. */
-const EU_MARKER_SOURCE = '\\(?\\s*(?:cee|ce|ue|euratom)\\s*\\)?';
+/**
+ * "ue" / "ce" / "cee" / "euratom", with or without parentheses. Spaces before a closing parenthesis
+ * belong to it and are not the marker's tail: every run of spaces has one way to be read (a quadratic
+ * time on a long run otherwise).
+ */
+const EU_MARKER_SOURCE = '(?:\\(\\s*)?(?:cee|ce|ue|euratom)(?:\\s*\\))?';
 
 /** "regolamento di esecuzione (UE) 2015/2447", "regolamento delegato (UE) 2015/2446". */
 const EU_QUALIFIER_SOURCE = '(?:\\s+(?:di\\s+esecuzione|di\\s+attuazione|delegat[oa]))?';
@@ -37,9 +41,11 @@ const EU_QUALIFIER_SOURCE = '(?:\\s+(?:di\\s+esecuzione|di\\s+attuazione|delegat
  * `hasEuMarker` on the head, or the trailing marker of the pair, afterwards.
  */
 export function buildEuHeadSource(): string {
-  const marker = `(?:${EU_MARKER_SOURCE})?`;
-  const reg = `(?:regolamento${EU_QUALIFIER_SOURCE}|reg\\.?)\\s*${marker}`;
-  const dir = `(?:direttiva${EU_QUALIFIER_SOURCE}|dir\\.?)\\s*${marker}`;
+  // The spaces before the marker belong to the optional marker, so that a long run of spaces can be
+  // split between the two `\\s*` of the head in one way only (a quadratic time otherwise).
+  const marker = `(?:\\s*${EU_MARKER_SOURCE})?`;
+  const reg = `(?:regolamento${EU_QUALIFIER_SOURCE}|reg\\.?)${marker}`;
+  const dir = `(?:direttiva${EU_QUALIFIER_SOURCE}|dir\\.?)${marker}`;
   return `(${reg}|${dir})\\s*(?:n\\.?\\s*)?`;
 }
 

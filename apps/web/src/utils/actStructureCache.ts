@@ -19,6 +19,8 @@ export interface ActRubricheResponse {
   rubriche?: Record<string, string>;
   abrogati?: string[];
   parts?: RubrichePart[];
+  /** Set when the route caught a failure (it still answers 200). */
+  error?: string;
 }
 
 // An act's structure and its article titles are the same for every reader of
@@ -26,16 +28,23 @@ export interface ActRubricheResponse {
 // point of the user's scraping quota. A block that remounts (or React's double
 // effect in development) asked again each time: four trees and four rubriche
 // for one article. Session-only, like articleFetchCache: never persisted, never
-// in the store; a failure is dropped so the next caller asks again.
+// in the store; a failure is dropped so the next caller asks again, and so is
+// an answer `keep` refuses (an empty one that may be a failure in disguise).
 const cache = new Map<string, Promise<unknown>>();
 
-function once<T>(key: string, load: () => Promise<T>): Promise<T> {
+function once<T>(key: string, load: () => Promise<T>, keep: (value: T) => boolean = () => true): Promise<T> {
   const hit = cache.get(key);
   if (hit) return hit as Promise<T>;
-  const promise = load().catch((error: unknown) => {
-    cache.delete(key);
-    throw error;
-  });
+  const promise = load().then(
+    (value) => {
+      if (!keep(value) && cache.get(key) === promise) cache.delete(key);
+      return value;
+    },
+    (error: unknown) => {
+      if (cache.get(key) === promise) cache.delete(key);
+      throw error;
+    },
+  );
   cache.set(key, promise);
   return promise;
 }
@@ -61,10 +70,23 @@ export function fetchActTree(urn: string): Promise<ActTreeResponse> {
   );
 }
 
-/** The article titles of an act, from its Akoma Ntoso export (slow when cold). */
+/**
+ * Whether an answer of /fetch_rubriche says anything. The route answers 200 whatever happens
+ * («never fail the index over its decoration»): a source that timed out (`error`), an export
+ * that could not be read and a page behind EUR-Lex's firewall all come back as an empty answer,
+ * which kept for the session would leave an act without its title until the page is reloaded.
+ */
+export function rubricheSaySomething(answer: ActRubricheResponse): boolean {
+  if (answer.error) return false;
+  return !!answer.title?.trim() || Object.keys(answer.rubriche ?? {}).length > 0 || (answer.parts ?? []).length > 0;
+}
+
+/** The article titles of an act, from its Akoma Ntoso export (slow when cold). An empty answer is not kept. */
 export function fetchActRubriche(urn: string): Promise<ActRubricheResponse> {
-  return once(`rubriche ${urn}`, () =>
-    postJson<ActRubricheResponse>('/fetch_rubriche', { urn }, 'Rubriche non disponibili'),
+  return once(
+    `rubriche ${urn}`,
+    () => postJson<ActRubricheResponse>('/fetch_rubriche', { urn }, 'Rubriche non disponibili'),
+    rubricheSaySomething,
   );
 }
 

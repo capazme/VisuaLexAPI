@@ -38,17 +38,46 @@ export function annexFromActUrn(urn: string): string {
 // annex ('' = body) → rubriche keyed by normalised article id
 type RubricheByAnnex = Record<string, Record<string, string>>;
 
+interface Read {
+  title: string | null;
+  byAnnex: RubricheByAnnex;
+  // A code's articles all sit in the code's own annex, whether an item says so
+  // («2» from a search) or not (nothing from the index): the annex they are read from.
+  codeAnnex: string | null;
+}
+
+// What was last read for each act (by its block key), for the session: a block that
+// mounts again (the search hid the act, the page was left and opened again) shows it
+// at once instead of a blank line until the answer comes back. Acts are public: no
+// reader's data is kept here.
+const lastRead = new Map<string, Read>();
+
+/** The title last read for an act (by its block key) this session: the PDF's fallback when a new reading fails. */
+export function lastActTitle(actKey: string): string | null {
+  return lastRead.get(actKey)?.title ?? null;
+}
+
+/** Tests: start with nothing read. */
+export function forgetActDetails(): void {
+  lastRead.clear();
+}
+
 /**
  * Title and rubriche of one act block: one `/fetch_rubriche` per act (cached for
  * the session), and the act's tree only when the act is made of parts, to tell
  * which part an annex is. Never a rubrica from another part (spec §5).
+ *
+ * Pass the whole act, not what a search left of it. What was read stays on screen
+ * while the act is read again (a new annex, a new article) and when a new reading
+ * fails; only another act starts blank. The title used to vanish on each of these.
  */
 export function useActDetails(block: ActBlock): ActDetails {
-  const [title, setTitle] = useState<string | null>(null);
-  const [byAnnex, setByAnnex] = useState<RubricheByAnnex>({});
-  // A code's articles all sit in the code's own annex, whether an item says so
-  // («2» from a search) or not (nothing from the index): the annex they are read from.
-  const [codeAnnex, setCodeAnnex] = useState<string | null>(null);
+  const actKey = block.key;
+  const [read, setRead] = useState<{ key: string } & Read>(() => ({
+    key: actKey, ...(lastRead.get(actKey) ?? { title: null, byAnnex: {}, codeAnnex: null }),
+  }));
+  // Another act in the same hook (the block is keyed by act, so rarely): never the previous act's.
+  const current: Read = read.key === actKey ? read : (lastRead.get(actKey) ?? { title: null, byAnnex: {}, codeAnnex: null });
 
   // Primitives only, so a new block object for the same act does not load again.
   const knownUrn = actUrnForBlock(block);
@@ -61,10 +90,6 @@ export function useActDetails(block: ActBlock): ActDetails {
   const actDate = first?.data;
 
   useEffect(() => {
-    // Another act: nothing of the previous one stays on screen while this one loads.
-    setTitle(null);
-    setByAnnex({});
-    setCodeAnnex(null);
     if (!actType) return;
     let cancelled = false;
     (async () => {
@@ -88,19 +113,31 @@ export function useActDetails(block: ActBlock): ActDetails {
           }));
         }
         if (cancelled) return;
-        setTitle(isCode ? null : (answer.title?.trim() || null));
-        setByAnnex(maps);
-        setCodeAnnex(ownAnnex);
+        const before = lastRead.get(actKey);
+        // An answer with no title (a source that failed, quietly) does not erase one read before.
+        const next: Read = {
+          title: isCode ? null : (answer.title?.trim() || before?.title || null),
+          byAnnex: { ...before?.byAnnex, ...keepFilled(maps, before?.byAnnex) },
+          codeAnnex: ownAnnex,
+        };
+        lastRead.set(actKey, next);
+        setRead({ key: actKey, ...next });
       } catch (err) {
-        // Decoration only: the rows keep "art. N" (gotcha 18: logged, never swallowed).
+        // Decoration only: what was read stays, else the rows keep "art. N" (gotcha 18: logged, never swallowed).
         console.error('Act title and rubriche unavailable for', urn ?? actType, err);
       }
     })();
     return () => { cancelled = true; };
-  }, [knownUrn, annexesKey, storedCodeAnnex, actType, actNumber, actDate, isCode]);
+  }, [actKey, knownUrn, annexesKey, storedCodeAnnex, actType, actNumber, actDate, isCode]);
 
   const rubricaOf = (norma: NormaVisitata) =>
-    byAnnex[codeAnnex ?? (norma.allegato || '')]?.[normalizeArticleId(norma.numero_articolo)] ?? null;
+    current.byAnnex[current.codeAnnex ?? (norma.allegato || '')]?.[normalizeArticleId(norma.numero_articolo)] ?? null;
 
-  return { title, rubricaOf };
+  return { title: current.title, rubricaOf };
+}
+
+/** An annex answered empty keeps the rubriche read for it before. */
+function keepFilled(maps: RubricheByAnnex, before: RubricheByAnnex | undefined): RubricheByAnnex {
+  return Object.fromEntries(Object.entries(maps).map(([annex, map]) =>
+    [annex, Object.keys(map).length === 0 && before?.[annex] ? before[annex] : map]));
 }

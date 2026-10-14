@@ -334,3 +334,40 @@ describe('extractArticleRefs — article suffixes past decies', () => {
     expect(refs.map(r => r.numero)).toEqual(['25-septiesdecies', '25-ter']);
   });
 });
+
+// The palette reads what a user types or pastes, and `extractArticleRefs` reads footnotes: a long
+// run of spaces must cost time proportional to its length (a quadratic time froze the tab).
+describe('the palette parser — long runs in linear time', () => {
+  const spaces = ' '.repeat(100_000);
+  const hostile: Record<string, string> = {
+    'spaces after «regolamento»': `regolamento${spaces}x`,
+    'spaces after «regolamento (»': `regolamento (${spaces}ue`,
+    'spaces inside a marker': `regolamento (ue${spaces}) 2016/679`,
+    'spaces after «reg. ue»': `reg. ue${spaces}2016${spaces}/${spaces}679`,
+    'spaces after «direttiva»': `direttiva${spaces}95/46`,
+    'spaces after «direttiva (UE)»': `direttiva (UE)${spaces}2016/680`,
+    'spaces after «art. 1» and «direttiva (UE)»': `art. 1 della direttiva (UE)${spaces}x`,
+    'spaces after «art. 1»': `art. 1${spaces}x`,
+    'spaces after «art. 1» and a code': `art. 1${spaces}c.c.`,
+    'spaces after «art.»': `art.${spaces}1`,
+    'spaces after «art. 1-»': `art. 1-${spaces}x`,
+    'spaces around a hyphen': `art. 1${spaces}-${spaces}bis`,
+    'spaces after an act': `legge 241/1990${spaces}x`,
+    'spaces inside an act': `legge${spaces}241${spaces}/${spaces}1990`,
+    'a long number': `art. ${'1'.repeat(100_000)}x`,
+  };
+
+  for (const [name, text] of Object.entries(hostile)) {
+    it(name, () => {
+      const start = performance.now();
+      parseLegalCitation(text);
+      extractArticleRefs(text);
+      expect(performance.now() - start).toBeLessThan(1500);
+    });
+  }
+
+  it('still reads an article across a gap of spaces and a spaced suffix', () => {
+    expect(extractArticleRefs(`art. 5${' '.repeat(500)}c.c.`)).toEqual([{ numero: '5', tipoAtto: 'codice civile', confidence: 0.9 }]);
+    expect(extractArticleRefs('art. 5 - bis e art. 6-ter').map((r) => r.numero)).toEqual(['5-bis', '6-ter']);
+  });
+});

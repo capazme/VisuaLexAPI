@@ -2,9 +2,10 @@ import { apiClient } from './api';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application deleted,
- * kept 30 days. The web app lists, restores and empties it. Its own deletions
- * stay immediate, with an undo, except for study cards: those go through the
- * trash too (`studiaService.trash`).
+ * kept 30 days. The web app lists, restores and empties it. Its own deletions of a
+ * whole dossier (`dossierService.delete`, question 160) and of study cards
+ * (`studiaService.trash`) go there too; removing single entries stays immediate,
+ * with an undo.
  */
 
 export type TrashKind = 'DOSSIER' | 'DOSSIER_ITEMS' | 'LINGO_CARDS';

@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { EuCaseLawAnswer, EuCaseLawDecision } from '../../../types/decisions';
 import { appStore } from '../../../store/useAppStore';
 
 vi.mock('../../../services/euCaseLawService');
+vi.mock('../../../utils/decisionFetchCache', () => ({
+  fetchDecisionCached: () => Promise.resolve({ esito: 'non_trovata', motivo: 'inesistente' }),
+}));
+
 import { searchEuCaseLaw } from '../../../services/euCaseLawService';
 import { EuCaseLawBlock } from './EuCaseLawBlock';
 import { CaseLawFiltersContext } from '../search/caseLaw/caseLawFiltersContext';
@@ -71,7 +75,7 @@ describe('EuCaseLawBlock', () => {
     expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('C-97/23');
   });
 
-  it('opens a judgment beside the article and records the way back', async () => {
+  it('previews a judgment, then opens it beside the article and records the way back', async () => {
     service.mockResolvedValue(found([judgment]));
     const open = vi.fn(() => 'tab');
     const push = vi.fn();
@@ -79,7 +83,10 @@ describe('EuCaseLawBlock', () => {
     appStore.setState({ openDecision: open, pushReadingBack: push, readingBackStack: [] } as never);
     const back = { tabId: 't1', blockId: 'b1', articleId: 'a1', label: 'art. 6 GDPR' };
     render(<MemoryRouter initialEntries={['/']}><EuCaseLawBlock norma={GDPR} besideId="t1" backEntry={back} /></MemoryRouter>);
-    fireEvent.click(await screen.findByText('Corte giust. UE, C-97/23'));
+    const estremi = await screen.findByText('Corte giust. UE, C-97/23');
+    await act(async () => { fireEvent.click(estremi); });
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apri accanto' }));
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ corte: 'corte_giustizia_ue', numero: 97, anno: 2023 }), { fromLink: true, besideId: 't1' });
     expect(push).toHaveBeenCalledExactlyOnceWith(back);
     appStore.setState({ openDecision: saved.openDecision, pushReadingBack: saved.pushReadingBack } as never);

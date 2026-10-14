@@ -39,3 +39,23 @@ async def test_a_failure_answers_no_title(client):
     body = await response.get_json()
     assert response.status_code == 200
     assert body["title"] == ""
+
+
+EU_URL = "https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:32016R0679"
+
+
+async def test_an_eu_act_gets_its_title_from_the_page(client):
+    tree = ([], 0, {"rubriche": {"1": "Oggetto e finalità"}, "title": "relativo alla protezione delle persone fisiche"})
+    with patch("app.get_tree", AsyncMock(return_value=tree)):
+        response = await client.post("/fetch_rubriche", json={"urn": EU_URL})
+    body = await response.get_json()
+    assert body["title"] == "relativo alla protezione delle persone fisiche"
+    assert body["rubriche"] == {"1": "Oggetto e finalità"}
+
+
+async def test_an_eu_page_that_cannot_be_read_answers_no_title(client):
+    with patch("app.get_tree", AsyncMock(side_effect=RuntimeError("waf"))):
+        response = await client.post("/fetch_rubriche", json={"urn": EU_URL})
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body["title"] == "" and body["rubriche"] == {}

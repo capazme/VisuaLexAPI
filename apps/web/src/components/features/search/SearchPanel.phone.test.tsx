@@ -2,9 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
-vi.mock('./QuickNormsManager', () => ({ QuickNormsManager: () => null }));
-vi.mock('../settings/AliasManager', () => ({ AliasManager: () => null }));
 vi.mock('./ReadingBackControl', () => ({ ReadingBackControl: () => null }));
 // The practices' surfaces: the phone's table and its full-screen reader draw these.
 vi.mock('./ArticleTabContent', () => ({ ArticleTabContent: () => <div data-testid="reader" /> }));

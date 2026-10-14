@@ -7,8 +7,8 @@ import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
- * deletes is copied here, as the rows were, and then deleted, in one
- * transaction. The user restores it from the web app for 30 days; then the
+ * deletes, and a dossier or a study card the user deletes from the web app,
+ * is copied here, as the rows were, and then deleted, in one transaction. The user restores it from the web app for 30 days; then the
  * sweep removes it for good. Only the user's session lists, restores or
  * empties it: none of those routes is in the delegated table.
  */
@@ -19,13 +19,16 @@ const SWEEP_EVERY_MS = 10 * 60 * 1000;
 /**
  * Which connection deleted: the trash outlives the client and the grant, so
  * plain values. All null when the user deleted from the web app themselves
- * (study cards only; the dossier's routes stay for connected applications).
+ * (`BY_THE_USER`: a whole dossier, study cards).
  */
 export interface DeletedBy {
   clientId: string | null;
   clientName: string | null;
   grantId: string | null;
 }
+
+/** A deletion by the user's own session, listed «Rimosso da te». */
+export const BY_THE_USER: DeletedBy = { clientId: null, clientName: null, grantId: null };
 
 export interface TrashListEntry {
   id: string;
@@ -112,14 +115,16 @@ async function maybeSweep(): Promise<void> {
 }
 
 /**
- * Moves a whole dossier, with its entries and snapshots, to the trash — only
- * if it still holds exactly the entries the user was shown when confirming
- * (`seenItemIds`): one added or removed meanwhile refuses the move (409).
+ * Moves a whole dossier, with its entries and snapshots, to the trash. A
+ * connected application names the entries the user was shown when confirming
+ * (`seenItemIds`): one added or removed meanwhile refuses the move (409). The
+ * web app's own deletion passes null: whatever the dossier holds goes, and
+ * comes back, together (owner, 13 October 2026, question 160).
  */
 export async function trashDossier(
   userId: string,
   dossierId: string,
-  seenItemIds: string[],
+  seenItemIds: string[] | null,
   by: DeletedBy,
 ): Promise<{ trashId: string; itemCount: number }> {
   await maybeSweep();
@@ -130,8 +135,8 @@ export async function trashDossier(
       include: { items: { orderBy: { position: 'asc' } }, snapshots: { orderBy: { version: 'asc' } } },
     });
     if (!dossier) throw new AppError(404, 'Dossier not found');
-    const seen = new Set(seenItemIds);
-    if (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id))) {
+    const seen = seenItemIds && new Set(seenItemIds);
+    if (seen && (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id)))) {
       throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
     }
     const { items, snapshots, ...row } = dossier;

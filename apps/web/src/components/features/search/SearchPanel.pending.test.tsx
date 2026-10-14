@@ -6,9 +6,6 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../practice/ReadingRow', () => ({ ReadingRow: () => null }));
 vi.mock('../practice/PracticeBar', () => ({ PracticeBar: () => null }));
 vi.mock('../practice/PracticePhoneView', () => ({ PracticePhoneView: () => null }));
-vi.mock('./CommandPalette', () => ({ CommandPalette: () => null }));
-vi.mock('./QuickNormsManager', () => ({ QuickNormsManager: () => null }));
-vi.mock('../settings/AliasManager', () => ({ AliasManager: () => null }));
 vi.mock('./ReadingBackControl', () => ({ ReadingBackControl: () => null }));
 
 import { appStore } from '../../../store/useAppStore';
