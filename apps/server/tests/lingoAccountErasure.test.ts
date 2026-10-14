@@ -177,6 +177,7 @@ describe('what happens to a user’s reviews when the account goes', () => {
     await reviewed(bob, shared.id);
     await prisma.lingoPreferenzeStudio.create({ data: { utenteId: alice.id, nuoveAlGiorno: 5, materieComunita: ['DIRITTO_CIVILE'] } });
     await prisma.lingoPreferenzeStudio.create({ data: { utenteId: bob.id } });
+    for (const who of [alice, bob]) await prisma.lingoGiornataStudio.create({ data: { utenteId: who.id, giorno: new Date('2026-10-18T00:00:00Z'), ripassi: 1 } });
 
     const response = await request(app)
       .delete('/api/auth/account')
@@ -187,6 +188,7 @@ describe('what happens to a user’s reviews when the account goes', () => {
     expect(await prisma.lingoStatoRipasso.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
     expect(await prisma.lingoRevisioneSRS.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
     expect(await prisma.lingoPreferenzeStudio.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
+    expect(await prisma.lingoGiornataStudio.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
   });
 
   it('removes the reviews of a card that goes with its author', async () => {
@@ -271,7 +273,7 @@ describe('exporting an account', () => {
       { cardId: first.id, dataRevisione: '2026-10-18T09:00:00.000Z', rating: 3, scheduledDays: 2, stability: 2.4, difficulty: 4.93, durataMs: 4200 },
       { cardId: second.id, dataRevisione: '2026-10-19T09:00:00.000Z', rating: 4, scheduledDays: 9, stability: 8.2, difficulty: 4.1, durataMs: null },
     ]);
-    expect(response.body.data.lingoPreferenze).toEqual({ nuoveAlGiorno: 12, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
+    expect(response.body.data.lingoPreferenze).toEqual({ nuoveAlGiorno: 12, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
   });
 
   it('has an empty log and no preferences for a user who never studied', async () => {

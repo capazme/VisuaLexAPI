@@ -305,8 +305,13 @@ or a `version_date`) never asks Brocardi, whose commentary carries no date.
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
-input), `ResourceNotFoundError` → 404 (the article is not in the act),
-`RateLimitExceededError` → 429, everything else 500, except `/fetch_decision`,
+input), `ResourceNotFoundError` → 404 (the article is not in the act; a request whose ranges
+find no article in the act's index and that names nothing else), `RateLimitExceededError` → 429, `IndexUnavailableError` → 503 (a
+range, or a whole act, whose index `get_tree` could not read answers
+«Non riesco a leggere ora l'indice di quest'atto, quindi non posso aprire gli artt. 1-5: …»;
+`parse_article_input` returns its error dict with a `kind`, turned into the exception by
+`article_input_error`; until 13 October 2026 `get_tree`'s failure, a message and 0, was read as a
+list of characters and an EU range came back empty with no error), everything else 500, except `/fetch_decision`,
 whose handler answers every failure with `esito` and never with the exception's text.
 What the handler does not write is not its own, on that route too: the per-IP rate
 limit's 429 `{"error": …}`, the login gate's 401/429 through the ingress, and the

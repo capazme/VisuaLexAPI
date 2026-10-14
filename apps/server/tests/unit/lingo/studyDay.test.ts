@@ -123,5 +123,24 @@ describe.each(['UTC', 'America/New_York', 'Europe/Rome', 'Pacific/Auckland'])(
         expect(() => startOfRomeDay('tomorrow')).toThrow(RangeError);
       });
     });
+
+    describe('addDays', () => {
+      it('walks calendar days across months, years and both clock changes', async () => {
+        const { addDays } = await loadUnderZone(zone);
+        expect(addDays('2026-10-24', 1)).toBe('2026-10-25');
+        expect(addDays('2026-10-25', 1)).toBe('2026-10-26');
+        expect(addDays('2027-03-28', 1)).toBe('2027-03-29');
+        expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+        expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+        expect(addDays('2026-10-13', 0)).toBe('2026-10-13');
+        expect(addDays('2026-10-13', -182)).toBe('2026-04-14');
+      });
+
+      it('refuses a day that is not real and a fractional offset', async () => {
+        const { addDays } = await loadUnderZone(zone);
+        expect(() => addDays('2026-02-30', 1)).toThrow(RangeError);
+        expect(() => addDays('2026-10-07', 0.5)).toThrow(RangeError);
+      });
+    });
   }
 );
