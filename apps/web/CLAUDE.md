@@ -722,7 +722,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   until 13 October 2026 one empty answer blanked the act's title for the session,
   and each new annex or search blanked it while it was read. Acts reorder by drag:
   `setDossierItemOrder` saves the whole order and waits, never sending a
-  temporary id, while an added or restored item is pending
+  temporary id, while an added item is pending
   (`pendingDossierOrders`). Articles do not drag. The header has three actions
   and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
 - **Notes**: every note a dossier gets from the web takes the notes route

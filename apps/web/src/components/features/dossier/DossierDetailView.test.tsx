@@ -149,7 +149,8 @@ describe('DossierDetailView — the page by act', () => {
     await act(async () => { await toast?.onUndo(); });
     expect(trashService.restore).toHaveBeenCalledWith('t1');
     expect(dossierService.getById).toHaveBeenCalledWith('d1');
-    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a1', 'a3', 'b1', 'n1']);
+    // Back where they were (the dossier's order before the removal), not where the server appended them.
+    expect(appStore.getState().dossiers[0].items.map((i) => i.id)).toEqual(['a3', 'b1', 'a1', 'n1']);
   });
 
   it('removes a note in one call, and the page trash is read again after the move and after «Annulla»', async () => {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../services/dossierService', () => ({
-  dossierService: { trashItems: vi.fn(), getById: vi.fn(), writesInFlight: vi.fn(() => 0) },
+  dossierService: { trashItems: vi.fn(), getById: vi.fn(), reorderItems: vi.fn(async () => {}), writesInFlight: vi.fn(() => 0) },
 }));
 vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn() } }));
 
@@ -63,6 +63,18 @@ describe('entries removed from a dossier on the web app (question 181)', () => {
     expect(trashChanged).toHaveBeenCalledTimes(2);
     expect(ids()).toEqual(['a', 'b', 'c']);
     expect(appStore.getState().lastSyncError).toBeNull();
+  });
+
+  it('«Annulla» puts them back where they were: the server appends a restored entry at the end', async () => {
+    svc.trashItems.mockResolvedValue({ trashId: 't1', moved: ['a'], notFound: [] });
+    trash.restore.mockResolvedValue({ dossierId: 'd1' });
+    // What the real server answers after the restore: the entry after the dossier's last.
+    svc.getById.mockResolvedValue(api(['b', 'c', 'a']));
+    removeItemsWithUndo('d1', ['a'], 'Elemento rimosso');
+    await vi.waitFor(() => expect(toast).not.toBeNull());
+    await toast!.onUndo();
+    expect(ids()).toEqual(['a', 'b', 'c']);
+    expect(svc.reorderItems).toHaveBeenCalledWith('d1', ['a', 'b', 'c']);
   });
 
   it('a restore that fails says the entries are in the Cestino', async () => {

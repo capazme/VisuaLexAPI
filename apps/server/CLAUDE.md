@@ -109,8 +109,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   A note moved to another dossier loses its `about_item_id`; a client treats one
   that points outside its dossier as a plain note. `PUT /api/dossiers/:id/items/:itemId`
   `{ aboutItemId: id | null }` reattaches or detaches a note (only a note; user
-  session only, the route is not in the delegated table): the web app's undo
-  restores an article with a new id and points its notes at it.
+  session only, the route is not in the delegated table). An undone removal on the
+  web no longer needs it: the trash restores an entry with its own id (question 181).
   `assertArticleOfDossier` is the one check behind both routes.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale

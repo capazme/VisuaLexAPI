@@ -1711,6 +1711,12 @@ const appStore = createStore<AppState>()(
                     return (await dossierService.trashItems(dossierId, removed.map(({ item }) => item.id))).trashId;
                 } catch (err) {
                     console.error('Failed to move dossier items to the trash:', err);
+                    // A 404: they are no longer on the server (removed elsewhere, by Claude or another tab).
+                    // Putting them back would show entries every retry refuses: read what the server holds.
+                    if ((err as { status?: number } | null)?.status === 404) {
+                        await get().refreshDossier(dossierId);
+                        return null;
+                    }
                     // Rollback, each where it was (ascending, so each index is right once the earlier ones are back)
                     set((state) => {
                         const d = state.dossiers.find(x => x.id === dossierId);

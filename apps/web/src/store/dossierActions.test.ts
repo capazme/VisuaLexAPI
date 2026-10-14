@@ -293,6 +293,20 @@ describe('trashDossierItems — removing entries moves them to the trash in one 
     expect(appStore.getState().lastSyncError).toBeNull();
   });
 
+  it('a 404 (removed elsewhere meanwhile) reads the dossier again instead of putting back entries the server no longer has', async () => {
+    seed(['a', 'b', 'c']);
+    vi.mocked(dossierService.trashItems).mockRejectedValueOnce(Object.assign(new Error('Not found'), { status: 404 }));
+    vi.mocked(dossierService.getById).mockResolvedValueOnce({
+      id: 'd1', name: 'P', is_pinned: false, created_at: '', updated_at: '', tags: [],
+      items: ['a', 'c'].map((id) => ({ id, item_type: 'note' as const, title: 'Nota', content: id, position: 0, status: 'unread' as const, created_at: '' })),
+    } as never);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await appStore.getState().trashDossierItems('d1', ['b'])).toBeNull();
+    expect(dossierService.getById).toHaveBeenCalledWith('d1');
+    expect(ids()).toEqual(['a', 'c']);
+    error.mockRestore();
+  });
+
   it('a refusal puts each entry back where it was, says so and answers null', async () => {
     seed(['a', 'b', 'c', 'd', 'e']);
     vi.mocked(dossierService.trashItems).mockRejectedValueOnce(new Error('down'));

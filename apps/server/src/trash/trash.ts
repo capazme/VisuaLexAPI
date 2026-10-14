@@ -202,7 +202,8 @@ export async function trashDossierItems(
     // An entry moved away by a concurrent request between the read and the delete: undo it all.
     if (deleted.count !== moved.length) throw new AppError(409, 'Il dossier è cambiato nel frattempo: riprova.');
     await tx.dossier.update({ where: { id: dossierId }, data: { updatedAt: now } });
-    return { trashId: entry.id, moved, notFound: wanted.filter((id) => !moved.includes(id)) };
+    const movedIds = new Set(moved);
+    return { trashId: entry.id, moved, notFound: wanted.filter((id) => !movedIds.has(id)) };
   });
 }
 
