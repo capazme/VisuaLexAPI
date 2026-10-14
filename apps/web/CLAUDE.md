@@ -72,8 +72,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
-  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Cronologia, Ambienti,
+  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Ambienti,
   Forum, «Analizza documento»; and at the bottom only the user menu, whose dropdown holds Impostazioni,
+  Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
+  and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
   menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
@@ -170,8 +172,8 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   first deciding to rebuild one.
 - **History** (`/history`) — server-side search history. It also hosts
   `NormaChangesSection`, the one place the "a saved norm changed"
-  notifications are listed and marked read; the Cronologia entry in the
-  sidebar badges their unread count (`useForumNotifications().count.normaChanges`,
+  notifications are listed and marked read; the avatar of the user menu and
+  its Cronologia entry count the unread ones (`useForumNotifications().count.normaChanges`,
   deliberately kept out of the Forum's `total`, which nothing on that page
   could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
   on `window` so the badge drops before the next 30s poll. A row is a norm (`act_type`) or a
@@ -1056,8 +1058,8 @@ Duplicating any of these is a defect, not a shortcut.
   `normaChangeLabel`: reopen and label a change notification from the
   snapshot the server stored (null, not a guess, when the snapshot has no
   identity).
-- `hooks/useForumNotifications.ts` — the one 30s poller behind both sidebar
-  badges (Forum `total`, Cronologia `normaChanges`).
+- `hooks/useForumNotifications.ts` — the one 30s poller behind the sidebar's
+  counts (the Forum's `total`; `normaChanges` on the avatar and the menu's Cronologia).
 - `hooks/useServiceHealth.ts` + `ui/ServiceHealthBanner` — probes
   `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
   Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
