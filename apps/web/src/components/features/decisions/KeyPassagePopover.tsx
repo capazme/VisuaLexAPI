@@ -40,6 +40,9 @@ export function KeyPassagePopover({ kind, anchorEl, onMakeOwn, onHideAll, onClos
     open: true,
     onOpenChange: (open) => { if (!open) onClose(); },
     placement: 'bottom-start',
+    // fixed, not absolute: opened while its passage is still being scrolled to, an absolute popover
+    // would sit far down the document and make the page itself scroll (the app's never does)
+    strategy: 'fixed',
     elements: { reference: anchorEl },
     middleware: [offset(8), flip({ fallbackPlacements: ['top-start', 'bottom', 'top'] }), shift({ padding: 12 })],
     whileElementsMounted: autoUpdate,

@@ -41,9 +41,11 @@ export function KeyPassagesMenu({ passages, plain, shown, onToggleShown, onGoTo 
   );
 
   if (!desktop) {
+    // after the sheet has closed and given the focus back to its button, which would otherwise stop
+    // the scroll to the passage halfway
     const choose = (act: () => void) => {
       setSheetOpen(false);
-      act();
+      window.setTimeout(act, 0);
     };
     return (
       <>

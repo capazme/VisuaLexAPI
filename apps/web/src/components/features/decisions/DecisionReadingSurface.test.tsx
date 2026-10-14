@@ -465,7 +465,10 @@ describe('DecisionReadingSurface — the key passages', () => {
       'Dispositivo — «La Corte accoglie il ricorso»',
       'Nascondi i passaggi chiave',
     ]);
-    await act(async () => { fireEvent.click(within(sheet).getByRole('button', { name: /^Dispositivo/ })); });
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: /^Dispositivo/ }));
+      await new Promise((r) => setTimeout(r, 10));
+    });
     expect(screen.queryByRole('dialog', { name: 'Passaggi chiave' })).toBeNull();
     expect(await screen.findByRole('dialog', { name: 'Dispositivo, evidenziato automaticamente' })).toBeInTheDocument();
   });

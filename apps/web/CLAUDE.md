@@ -487,6 +487,23 @@ highlights are stored under `normaKey = decisionKey(identity)` with `articleId =
 block; `decisionStructure` names them). `DecisionReadingToolbar` draws the notes and highlights
 buttons and the discussion button (`ReadingToolbar` needs an article's props). Anchors that do not land are listed, never dropped
 (`UnmatchedAnchors`; a decision found without text hosts it through `DecisionAnchorsWithoutText`).
+**Key passages** (spec `docs/superpowers/specs/2026-10-13-decision-key-passages-design.md`; the owner: «Ok
+proviamo», then «191-194 va bene»): `utils/decisionKeyPassages.ts` finds by rules, never AI, the principle of law a
+Cassazione decision enunciates (its own, never a precedent's or the Prosecutor General's), the operative part of a
+Cassazione or Corte costituzionale dispositivo (without costs, «contributo unificato», anonymisation, «Così deciso»),
+and the Corte costituzionale's decision on each question in its «considerato in diritto» (opened where the numbering
+starts again at «1.»); no other court has rules. The patterns are the ones measured in the spec on real decisions kept
+outside the repository: a change to them is a change to measured behaviour, with its tests (synthetic texts, and
+timings on long runs of spaces and many passages). They are ranges of `decisionProjection`, recomputed on every render
+and never stored: `renderDecisionHtml` wraps them (`keyPassages`, mark `key` inside the reader's own marks, its label an
+empty-of-text `key-head` drawn by CSS), so root rule 23 holds and nothing the user saves, exports or shares carries one.
+`DecisionReadingSurface` draws them, hides them with `key-passages-hidden` (`settings.showKeyPassages`, on by default,
+persisted in the browser), and puts «Passaggi chiave (n)» in `DecisionReadingToolbar` (`KeyPassagesMenu`: a menu on the
+desktop, a `ui/Sheet` on a phone, with the legend «Evidenziati automaticamente: non sono le tue evidenziazioni», one entry
+per passage that scrolls to it at once and opens its popover, and the switch). A click on a passage, not on words under a
+highlight, a link, a note or a sign, opens `KeyPassagePopover` (fixed-positioned: an absolute one, opened on a passage
+still out of view, made the page itself scroll): «Fai tua» is the ordinary `addHighlight` over the passage's words at its
+offset, after which the passage, nested in the highlight, loses its underline and label; «Nascondi i passaggi chiave».
 No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRender.ts` is the
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
 `decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks
@@ -538,7 +555,10 @@ builds it and the popup's props: a click records the way back from the surface's
 Hover for 400 ms (`useDecisionPreview`) shows `DecisionPreviewPopup`, on the same frame as the norm popup
 (`ui/PreviewFrame`, `calculatePreviewPosition`): the decision's heading and first lines from
 `fetchDecisionCached` (one request per decision for the session, none without a hover that lasted; the pointer
-leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference.
+leaving first drops the pending request), «Con questi estremi esistono N decisioni» for an ambiguous reference. For a
+found decision the body is its first key passage — the principle, else the dispositivo — read with its line breaks as
+spaces and named with «· evidenziato automaticamente» (`previewKeyPassage`, `keyPassageText`; computed once per answer),
+else its first lines (`previewLines`): the first lines of a Cassazione decision are its parties.
 **A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
 every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
 Cassazione, Brocardi's massime, the Court of Justice's judgments; never an order or an opinion, which go to

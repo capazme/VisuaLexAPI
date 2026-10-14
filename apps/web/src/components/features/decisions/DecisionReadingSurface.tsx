@@ -210,7 +210,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const goToPassage = (index: number) => {
     const piece = contentRef.current?.querySelector<HTMLElement>(`[data-key-index="${index}"]`);
     if (!piece) return;
-    piece.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // at once, not smoothly: the popover opens on the passage already in view, and the keyboard's focus goes to it
+    piece.scrollIntoView({ block: 'center' });
     const pieces = contentRef.current?.querySelectorAll<HTMLElement>(`[data-key-index="${index}"]`) ?? [];
     pieces.forEach((p) => p.classList.add('vlx-flash'));
     window.setTimeout(() => pieces.forEach((p) => p.classList.remove('vlx-flash')), 1600);
