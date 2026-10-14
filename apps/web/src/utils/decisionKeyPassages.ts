@@ -12,7 +12,7 @@
  * below stand in for them.
  */
 import type { DecisionText } from '../types/decisions';
-import { decisionBlocks } from './decisionRender';
+import { KEY_PASSAGE_LABELS, decisionBlocks } from './decisionRender';
 
 export type KeyPassageKind = 'principio' | 'dispositivo' | 'decisione';
 
@@ -253,4 +253,20 @@ function withoutOverlaps(passages: KeyPassage[]): KeyPassage[] {
     kept.push(p);
   }
   return kept.sort((a, b) => a.start - b.start);
+}
+
+const QUOTE_WORDS = 7;
+
+/** «Decisione 2 di 5 — «La seconda questione non è fondata…»»: what a menu entry says. */
+export function keyPassageEntryLabels(passages: readonly KeyPassage[], plain: string): string[] {
+  const total: Record<string, number> = {};
+  for (const p of passages) total[p.kind] = (total[p.kind] ?? 0) + 1;
+  const seen: Record<string, number> = {};
+  return passages.map((p) => {
+    seen[p.kind] = (seen[p.kind] ?? 0) + 1;
+    const count = total[p.kind] > 1 ? ` ${seen[p.kind]} di ${total[p.kind]}` : '';
+    const words = plain.slice(p.start, p.end).split(/\s+/).filter(Boolean);
+    const quote = words.slice(0, QUOTE_WORDS).join(' ') + (words.length > QUOTE_WORDS ? '…' : '');
+    return `${KEY_PASSAGE_LABELS[p.kind]}${count} — «${quote}»`;
+  });
 }
