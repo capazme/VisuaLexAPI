@@ -116,10 +116,25 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   flags), on the MERL-T routes, and on an article (the `article_sidebar` graph rail, `AskMerltEntry`,
   the selection popup's «Segnala come citazione» and `MissedCitationReporter`, all gated in
   `ArticleTabContent`, on top of the consent gates); the server's guards stay the real barrier.
-  Not behind it: the RLCF trackers and the consent banner (collection is the owner's separate
+  Not behind it: the RLCF trackers and the consent screen (collection is the owner's separate
   decision), the Massimario's panel (`article_case_law`), `article_content_after`, `global` and the
-  implicit citation feedback on a click. The mode is unrelated to the Q&A view's own `useQaDevMode`
+  implicit citation feedback on a click. The citation preview's feedback bar (✓ / ✗ / correct) is a
+  citation report, and is behind it. The mode is unrelated to the Q&A view's own `useQaDevMode`
   (a local toggle for the pipeline trace).
+- `features/merlt/consent/` and `features/merlt/privacy/` — the MERL-T consent (spec
+  `docs/superpowers/specs/2026-10-13-merlt-data-protection-design.md`). The server is its only
+  record (`ConsentContext`, nothing in the browser: until it answers, `canTrack` is false). A level
+  counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
+  administrators edit as new versions in «Testi di VisuaLex Studia»); `ConsentScreen`, in the `global`
+  slot, asks it once as the app loads when it is unanswered — the first entry, then only a new
+  version — and cannot be dismissed («Nessuna raccolta» is one of its three choices). No prompt
+  during work: no banner, no teaser. `ConsentChoiceModal` is the one place a level is chosen (the
+  notice in full as `TextParagraphs`, the three levels of `levels.ts`, the notice's checkbox for
+  «Base» and «Completo»); `ConsentDialog` is it on request, `RevokeConsentDialog` revokes with or
+  without erasing. Impostazioni › «Dati MERL-T» (`MerltDataSection`): the state, «Cambia scelta»,
+  the notice, «Scarica i miei dati», «Elimina i miei dati MERL-T», «Revoca il consenso». The
+  welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
+  its author.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Sheet` (a phone's bottom sheet), plus feature-flavoured modals.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
@@ -1213,8 +1228,7 @@ negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80 — the bar of practices —,
-`bottomNotice` 85 — MERL-T's consent prompt, over the bar —, overlay band
-1000+), never a bare literal. See gotcha 22 before assuming a
+overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
 or Cmd/Ctrl+F opens the find window hidden under it.

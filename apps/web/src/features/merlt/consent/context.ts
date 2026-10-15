@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { MerltConsentResponse } from '../../../services/merltService';
+import type { MerltConsentResponse, MerltNotice } from '../../../services/merltService';
 import type { MerltConsentLevel } from '../merltConsent';
 
 /**
@@ -11,14 +11,28 @@ export interface ConsentContextValue {
   status: 'loading' | 'ready' | 'error';
   /** Full server state once ready, otherwise null. */
   consent: MerltConsentResponse | null;
-  /** Effective level: server value when ready, else the boot cache. */
+  /** What MERL-T may collect now: the server's level once ready, `none` before. */
   level: MerltConsentLevel;
-  /** True when *some* consent (basic|full) is active. */
+  /** True when *some* consent (basic|full) is in force. */
   canTrack: boolean;
+  /** The current notice has not been answered: the consent screen asks it, once. */
+  needsAnswer: boolean;
+  /** The current MERL-T notice, once ready. */
+  notice: MerltNotice | null;
   error: string | null;
-  setConsent: (level: MerltConsentLevel, reason?: string) => Promise<void>;
-  revokeConsent: (reason?: string) => Promise<void>;
+  /** Choose a level under the notice the person read. Rejects with `NoticeChangedError` when it changed. */
+  setConsent: (level: MerltConsentLevel, noticeId: string, reason?: string) => Promise<void>;
+  /** Revoke; with `deleteData`, erase what was collected. Resolves to whether MERL-T confirmed it. */
+  revokeConsent: (options?: { reason?: string; deleteData?: boolean }) => Promise<{ erasureCompleted: boolean }>;
   refresh: () => Promise<void>;
+}
+
+/** The notice changed while the person was reading it: the context has the new one. */
+export class NoticeChangedError extends Error {
+  constructor() {
+    super('L’informativa è stata aggiornata nel frattempo: rileggila e conferma di nuovo la scelta.');
+    this.name = 'NoticeChangedError';
+  }
 }
 
 export const ConsentContext = createContext<ConsentContextValue | null>(null);

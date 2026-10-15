@@ -107,10 +107,10 @@ export function useArticleViewedTracker({
 
   useEffect(() => {
     if (disabled || !articleUrn || !containerRef.current) return;
-    // NOTE: no consent gate here. The observers must run for read-only
-    // (consent-none) users too, so a genuine view can publish `article_viewed`
-    // on the bus and let the ConsentBanner surface (Slice 3 §3.2). The consent
-    // gate is applied ONLY to the BFF POST in the cleanup path below.
+    // NOTE: no consent gate here. The observers run for every reader, so a
+    // genuine view is published on the in-page bus (it never leaves the
+    // browser); the consent gate is applied to the BFF POST in the cleanup
+    // path below, the only thing that sends anything.
 
     const el = containerRef.current;
     const state = stateRef.current;
@@ -213,10 +213,9 @@ export function useArticleViewedTracker({
       // twice for the same article view (at-most-once, no mid-scroll spam).
       state.emitted = true;
 
-      // Publish on the bus regardless of consent: this is what lets the
-      // ConsentBanner trigger for the read-only majority (consent-none users
-      // never reach the POST below). Fire-and-forget, gated only by the genuine-
-      // view decision. Shape matches what ConsentBanner subscribes to.
+      // Publish on the in-page bus regardless of consent (nothing leaves the
+      // browser here; consent-none readers never reach the POST below).
+      // Fire-and-forget, gated only by the genuine-view decision.
       publishMerltEvent({
         interaction_type: MERLT_EVENT_TYPES.articleViewed,
         article_urn: articleUrn,

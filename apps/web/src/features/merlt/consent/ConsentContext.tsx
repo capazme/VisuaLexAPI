@@ -5,23 +5,24 @@ import {
   revokeMerltConsent,
   type MerltConsentResponse,
 } from '../../../services/merltService';
-import { getMerltConsentLevel, setMerltConsentLevel, type MerltConsentLevel } from '../merltConsent';
+import { clearLegacyConsentKeys, type MerltConsentLevel } from '../merltConsent';
 import { isMerltEnabled } from '../featureFlag';
-import { ConsentContext, type ConsentContextValue } from './context';
+import { ConsentContext, NoticeChangedError, type ConsentContextValue } from './context';
 
 /**
- * Single source of truth for MERL-T consent (Slice 2b).
+ * Single source of truth for MERL-T consent: the server (MerltUserPreference, read through
+ * GET /api/merlt/consent). Nothing is kept in the browser: until the server answers, nothing is
+ * collected (`canTrack` false). The server's guards remain the hard gate.
  *
- * The SERVER (MerltUserPreference) is authoritative; this context hydrates
- * from GET /api/merlt/consent on mount and exposes set/revoke. localStorage
- * is a *boot cache only* — it provides the effective level for the first
- * paint (before the GET resolves) and on a transient fetch error, but the
- * server value always wins on reconcile. The server-side consentGuard remains
- * the hard gate for event emission (defence in depth).
+ * A level counts only under the current version of the MERL-T notice: when the person has not
+ * answered it (`needsAnswer`), `ConsentScreen` asks, once, before work begins.
  */
 
 const DISABLED_CONSENT: MerltConsentResponse = {
   level: 'none',
+  storedLevel: 'none',
+  noticeAnswered: true,
+  notice: null,
   contributionEnabled: false,
   validationEnabled: false,
   graphEnabled: false,
@@ -34,21 +35,27 @@ type InternalState =
   | { status: 'ready'; consent: MerltConsentResponse }
   | { status: 'error'; error: string };
 
+/**
+ * A 409 `notice_changed`. `services/api.ts` rejects with `{ status, message, data }`, not axios'
+ * error; the axios shape is read too, for a call made without the interceptor.
+ */
+function isNoticeChanged(err: unknown): boolean {
+  const e = err as
+    | { status?: number; data?: { detail?: string }; response?: { status?: number; data?: { detail?: string } } }
+    | null;
+  const status = e?.status ?? e?.response?.status;
+  const detail = e?.data?.detail ?? e?.response?.data?.detail;
+  return status === 409 && detail === 'notice_changed';
+}
+
 export function ConsentProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<InternalState>(() =>
     isMerltEnabled() ? { status: 'loading' } : { status: 'ready', consent: DISABLED_CONSENT },
   );
-  // Effective level while not 'ready' (loading / error): the boot cache.
-  const [cacheLevel, setCacheLevel] = useState<MerltConsentLevel>(() => getMerltConsentLevel());
 
   // Guards against overlapping fetches (mount hydration vs. an explicit
   // refresh()): a second load is a no-op while one is in flight.
   const inFlightRef = useRef(false);
-
-  const persist = useCallback((consent: MerltConsentResponse) => {
-    setMerltConsentLevel(consent.level);
-    setCacheLevel(consent.level);
-  }, []);
 
   // Async-only loader: every setState happens after `await`, so calling this
   // from the mount effect does not trigger a synchronous in-effect state update.
@@ -57,14 +64,13 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     inFlightRef.current = true;
     try {
       const consent = await fetchMerltConsent();
-      persist(consent);
       setState({ status: 'ready', consent });
     } catch (err) {
       setState({ status: 'error', error: err instanceof Error ? err.message : 'consent_fetch_failed' });
     } finally {
       inFlightRef.current = false;
     }
-  }, [persist]);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!isMerltEnabled() || inFlightRef.current) return;
@@ -73,33 +79,39 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const setConsent = useCallback(
-    async (level: MerltConsentLevel, reason?: string) => {
-      const consent = await setMerltConsent(level, reason);
-      persist(consent);
-      setState({ status: 'ready', consent });
+    async (level: MerltConsentLevel, noticeId: string, reason?: string) => {
+      try {
+        const consent = await setMerltConsent(level, noticeId, reason);
+        setState({ status: 'ready', consent });
+      } catch (err) {
+        if (!isNoticeChanged(err)) throw err;
+        // Read the new notice, then ask the person to read it before choosing.
+        await load();
+        throw new NoticeChangedError();
+      }
     },
-    [persist],
+    [load],
   );
 
   const revokeConsent = useCallback(
-    async (reason?: string) => {
-      const consent = await revokeMerltConsent(reason);
-      persist(consent);
+    async (options: { reason?: string; deleteData?: boolean } = {}) => {
+      const { erasure, ...consent } = await revokeMerltConsent(options);
       setState({ status: 'ready', consent });
+      return { erasureCompleted: erasure.completed };
     },
-    [persist],
+    [],
   );
 
   // Hydrate on mount. setState lives only in the promise callbacks (subscribing
   // to an external system), which satisfies react-hooks/set-state-in-effect.
   useEffect(() => {
+    clearLegacyConsentKeys();
     if (!isMerltEnabled()) return;
     let cancelled = false;
     inFlightRef.current = true;
     fetchMerltConsent()
       .then((consent) => {
         if (cancelled) return;
-        persist(consent);
         setState({ status: 'ready', consent });
       })
       .catch((err) => {
@@ -115,15 +127,19 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [persist]);
+  }, []);
 
-  const level: MerltConsentLevel = state.status === 'ready' ? state.consent.level : cacheLevel;
+  const consent = state.status === 'ready' ? state.consent : null;
+  const level: MerltConsentLevel = consent?.level ?? 'none';
 
   const value: ConsentContextValue = {
     status: state.status,
-    consent: state.status === 'ready' ? state.consent : null,
+    consent,
     level,
     canTrack: level !== 'none',
+    // `=== false`: a server without the notice (older than this web app) answers neither field.
+    needsAnswer: consent !== null && consent.notice != null && consent.noticeAnswered === false,
+    notice: consent?.notice ?? null,
     error: state.status === 'error' ? state.error : null,
     setConsent,
     revokeConsent,

@@ -52,7 +52,6 @@ export function ImportEnvironmentModal({
         interaction_type: MERLT_EVENT_TYPES.forumDownload,
         metadata: {
           shared_env_id: sharedEnvironment.id,
-          original_author_id: sharedEnvironment.user?.id ?? null,
         },
       });
 

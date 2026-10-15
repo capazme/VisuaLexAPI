@@ -25,9 +25,9 @@ vi.mock('../consent/useConsent', () => ({
   useConsent: () => ({ canTrack: true, level: 'full', status: 'ready' }),
 }));
 
-// The banner pulls in dialog/flag machinery irrelevant to tracker wiring.
-vi.mock('../consent/ConsentBanner', () => ({
-  ConsentBanner: () => null,
+// The consent screen pulls in dialog machinery irrelevant to tracker wiring.
+vi.mock('../consent/ConsentScreen', () => ({
+  ConsentScreen: () => null,
 }));
 
 // jsdom has no IntersectionObserver; the dwell tracker is out of scope here.
