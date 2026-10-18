@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
-const account = vi.hoisted(() => ({ isAdmin: false, devMode: false }));
+const account = vi.hoisted(() => ({ isAdmin: false, devMode: false, isValidator: false }));
 const notices = vi.hoisted(() => ({ normaChanges: 0 }));
 vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'u1', username: 'tester' }, isAdmin: account.isAdmin, devMode: account.devMode, logout: vi.fn() }),
+  useAuth: () => ({ user: { id: 'u1', username: 'tester' }, isAdmin: account.isAdmin, devMode: account.devMode, isValidator: account.isValidator, logout: vi.fn() }),
 }));
 vi.mock('../../hooks/useForumNotifications', () => ({
   useForumNotifications: () => ({ count: { total: 3, normaChanges: notices.normaChanges }, markRead: vi.fn(), refetch: vi.fn() }),
@@ -14,6 +14,7 @@ vi.mock('../../hooks/useForumNotifications', () => ({
 import { Sidebar } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
+import { sectionStore } from '../../features/sections/useSection';
 
 /**
  * Every control in the sidebar is an icon. `label` reached the eye only: the
@@ -36,11 +37,19 @@ function renderSidebar(initialPath = '/', props: { theme?: string; isOpen?: bool
   );
 }
 
+function cleanupAndRender(path: string, before: () => void) {
+  cleanup();
+  before();
+  renderSidebar(path);
+}
+
 const openUserMenu = () => fireEvent.click(screen.getByRole('button', { name: /Menu utente/ }));
 
 beforeEach(() => {
   account.isAdmin = false;
   account.devMode = false;
+  account.isValidator = false;
+  sectionStore.setState({ section: 'opus' });
   notices.normaChanges = 0;
   Object.values(handlers).forEach((fn) => fn.mockClear());
 });
@@ -48,7 +57,7 @@ beforeEach(() => {
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
     renderSidebar();
-    for (const name of [/Ricerca/, /Dossier/, /Forum/]) {
+    for (const name of [/Ricerca/, /Dossier/, /Analizza documento/]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
     // «Ambienti» went into the Forum (spec 2026-10-13-environments-into-forum, D13).
@@ -92,14 +101,17 @@ describe('Sidebar — accessible names', () => {
   });
 
   it('folds the notification count into the link name', () => {
-    renderSidebar();
+    renderSidebar('/forum');
     // A badge announced on its own says "3" without saying 3 of what.
     expect(screen.getByRole('link', { name: /Forum, 3 notifiche/ })).toBeInTheDocument();
   });
 
-  it('has the user menu as its only button, with no system buttons beside it', () => {
+  it('has the section switcher and the user menu as its only buttons, with no system buttons beside them', () => {
     renderSidebar();
-    expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Menu utente']);
+    expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Sezione: Opus, cambia sezione, nuove attività nel Forum',
+      'Menu utente',
+    ]);
   });
 
   it('leaves nothing unnamed', () => {
@@ -128,45 +140,90 @@ describe('Sidebar — accessible names', () => {
   });
 });
 
-describe('Sidebar — the development mode (spec D1–D3)', () => {
+const hrefs = () => screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+
+describe('Sidebar — the entries of each section (sections spec S6)', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('shows neither «Assistente» nor «Grafo» nor the «Sviluppo» group without the mode', () => {
-    renderSidebar();
-    expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Assistente/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('Sviluppo')).not.toBeInTheDocument();
+  it('starts every section with the Corpus entries, «Ricerca» and «Analizza documento»', () => {
+    for (const path of ['/', '/studia/ripasso', '/forum']) {
+      const { unmount } = render(
+        <MemoryRouter initialEntries={[path]}>
+          <Sidebar theme="light" isOpen {...handlers} />
+        </MemoryRouter>,
+      );
+      expect(hrefs().slice(0, 2)).toEqual(['/', '/documents']);
+      unmount();
+    }
   });
 
-  it('shows both under a quiet «Sviluppo» separator, after the others, with the mode', () => {
+  it('Opus: the dossiers', () => {
+    renderSidebar('/');
+    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(screen.getByRole('group', { name: 'Opus' })).toContainElement(screen.getByRole('link', { name: 'Dossier' }));
+  });
+
+  it('Gymnasium: Ripasso, Le mie schede and the dossiers; «Da validare» for a validator only', () => {
+    renderSidebar('/studia/schede');
+    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/schede', '/dossier']);
+    expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
+    cleanupAndRender('/studia/schede', () => { account.isValidator = true; });
+    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/schede', '/studia/valida', '/dossier']);
+  });
+
+  it('keeps the section on a Corpus page after it', () => {
+    sectionStore.setState({ section: 'gymnasium' });
+    renderSidebar('/dossier');
+    expect(screen.getByRole('group', { name: 'Gymnasium' })).toBeInTheDocument();
+  });
+
+  it('Forum: the Forum, with its count', () => {
+    renderSidebar('/forum');
+    expect(hrefs()).toEqual(['/', '/documents', '/forum']);
+  });
+
+  it('Academia: «Assistente» and «Grafo», with the development mode only (S12)', () => {
     account.devMode = true;
-    renderSidebar();
-    const group = screen.getByRole('group', { name: 'Sviluppo' });
-    expect(within(group).getByRole('link', { name: 'Assistente' })).toHaveAttribute('href', '/merlt');
-    expect(within(group).getByRole('link', { name: 'Grafo' })).toHaveAttribute('href', '/grafo');
-    expect(within(group).getAllByRole('link')).toHaveLength(2);
-    const links = screen.getAllByRole('link');
-    expect(links.indexOf(screen.getByRole('link', { name: /Analizza documento/ }))).toBeLessThan(links.indexOf(within(group).getByRole('link', { name: 'Assistente' })));
-    expect(links.at(-1)).toBe(within(group).getByRole('link', { name: 'Grafo' }));
+    renderSidebar('/merlt');
+    expect(hrefs()).toEqual(['/', '/documents', '/merlt', '/grafo']);
+    // Without the mode the section is not offered: a stored Academia falls back to Opus.
+    cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
+    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
   });
 
-  it('adds nothing for the mode when VITE_FEATURE_MERLT_GRAPH is off: only «Assistente»', () => {
+  it('Academia follows the MERL-T flags: only «Assistente» with the graph off, nothing with MERL-T off', () => {
     account.devMode = true;
     vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'false');
-    renderSidebar();
-    expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Assistente' })).toBeInTheDocument();
+    renderSidebar('/merlt');
+    expect(hrefs()).toEqual(['/', '/documents', '/merlt']);
+    cleanupAndRender('/merlt', () => vi.stubEnv('VITE_FEATURE_MERLT', 'false'));
+    expect(hrefs()).toEqual(['/', '/documents']);
   });
 
-  it('never grants: with MERL-T itself off the mode shows no entry and no separator', () => {
-    account.devMode = true;
-    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
-    renderSidebar();
-    expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Assistente/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('Sviluppo')).not.toBeInTheDocument();
+  it('offers no Gymnasium when VITE_FEATURE_STUDIA is off', () => {
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    sectionStore.setState({ section: 'gymnasium' });
+    renderSidebar('/');
+    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+  });
+
+  it("is the same list in the phone's copy, closed off-canvas or open (spec D8)", () => {
+    renderSidebar('/', { isOpen: false });
+    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    openUserMenu();
+    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toBeInTheDocument();
+  });
+
+  it("closes the phone's menu when a section is chosen", () => {
+    renderSidebar('/');
+    fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/forum');
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(hrefs()).toEqual(['/', '/documents', '/forum']);
   });
 });
 
@@ -325,45 +382,6 @@ describe('Sidebar — the user menu by keyboard', () => {
       expect(entry).toHaveAttribute('tabindex', '-1');
       expect(entry).toHaveClass('min-h-[44px]', 'md:min-h-0');
     }
-  });
-});
-
-describe('Sidebar — the phone\'s copy (spec D8)', () => {
-  it('is the same reduced list and the same menu, closed off-canvas or open', () => {
-    renderSidebar('/', { isOpen: false });
-    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
-      ['/', '/dossier', '/studia', '/forum', '/documents'],
-    );
-    expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Sentenze|Ricerca Veloce|Impostazioni/ })).toBeNull();
-    openUserMenu();
-    expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toBeInTheDocument();
-  });
-
-  it('follows the mode like the desktop one', () => {
-    account.devMode = true;
-    renderSidebar('/', { isOpen: false });
-    expect(screen.getByRole('link', { name: 'Grafo' })).toBeInTheDocument();
-  });
-});
-
-describe('Sidebar — Studia entry', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('links to /studia by default, after Dossier', () => {
-    renderSidebar();
-    const links = screen.getAllByRole('link');
-    const studia = screen.getByRole('link', { name: /Studia/ });
-    expect(studia).toHaveAttribute('href', '/studia');
-    expect(links.indexOf(studia)).toBe(links.indexOf(screen.getByRole('link', { name: /Dossier/ })) + 1);
-  });
-
-  it('hides the entry when VITE_FEATURE_STUDIA is off', () => {
-    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
-    renderSidebar();
-    expect(screen.queryByRole('link', { name: /Studia/ })).not.toBeInTheDocument();
   });
 });
 

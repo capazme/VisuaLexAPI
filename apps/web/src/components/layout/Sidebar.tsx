@@ -2,11 +2,12 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, GraduationCap, Bot } from 'lucide-react';
+import { Search, Folder, Clock, Moon, Sun, Settings, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
-import { isStudiaEnabled } from '../../features/studia/featureFlag';
+import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
+import { useSection } from '../../features/sections/useSection';
 import { useAppStore } from '../../store/useAppStore';
 import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
@@ -203,7 +204,8 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts }: SidebarProps) {
   const navigate = useNavigate();
   const quickNorms = useAppStore((s) => s.quickNorms);
-  const { user, isAdmin, devMode, logout } = useAuth();
+  const { user, isAdmin, isValidator, logout } = useAuth();
+  const { section, active } = useSection();
   const { count: forumNotifications } = useForumNotifications(!!user);
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
@@ -232,9 +234,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     closeMobile();
   };
 
-  // The development mode's entries (spec D3), on top of the MERL-T flags. Plain flag functions (not
-  // useMerltFeatures) keep the Sidebar free of the consent/auth providers.
-  const showAssistant = devMode && isMerltEnabled();
+  // Academia's entries: the section is offered only with the development mode (sections spec S12), and
+  // the MERL-T flags still decide each entry. Plain flag functions (not useMerltFeatures) keep the
+  // Sidebar free of the consent/auth providers.
+  const showAssistant = isMerltEnabled();
   const showGraph = showAssistant && isMerltGraphEnabled();
 
   // The menu is drawn through a portal, so it is a menu button of its own (WAI-ARIA, as `ui/MenuButton`):
@@ -314,15 +317,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}
     >
-      {/* Logo */}
-      <div className="flex items-center justify-center h-16 border-b border-slate-100 dark:border-slate-800/50">
-        <motion.div
-          whileHover={{ scale: 1.1, rotate: 5 }}
-          whileTap={{ scale: 0.95 }}
-          transition={SPRING_CONFIG}
-        >
-          <BookOpen className="w-7 h-7 text-primary-600 dark:text-primary-400" />
-        </motion.div>
+      {/* The section switcher, where the open book was (sections spec S3). */}
+      <div id="tour-section-switcher" className="flex items-center justify-center h-16 border-b border-slate-100 dark:border-slate-800/50">
+        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} />
       </div>
 
       {/* Navigation */}
@@ -339,20 +336,30 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {quickNorms.length > 0 && (
           <div className="-mt-1 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
         )}
-        <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
-        {isStudiaEnabled() && (
-          <NavItem to="/studia" icon={GraduationCap} label="Studia" id="tour-nav-studia" onClick={closeMobile} />
-        )}
-        <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
-        {showAssistant && (
-          <div role="group" aria-label="Sviluppo" className="mt-1 flex w-full flex-col items-center gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-2">
-            <span aria-hidden className="text-[9px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">Sviluppo</span>
-            <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} />
-            {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
-            {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} />}
-          </div>
-        )}
+        {/* The active section's entries, after the Corpus ones above (sections spec S6). */}
+        <div role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-center gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
+          {section === 'gymnasium' && (
+            <>
+              <NavItem to="/studia/ripasso" icon={Repeat} label="Ripasso" onClick={closeMobile} />
+              <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} />
+              {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} />}
+            </>
+          )}
+          {(section === 'opus' || section === 'gymnasium') && (
+            <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
+          )}
+          {section === 'academia' && showAssistant && (
+            <>
+              <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} />
+              {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
+              {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} />}
+            </>
+          )}
+          {section === 'forum' && (
+            <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
+          )}
+        </div>
       </motion.nav>
 
       {/* User Menu */}

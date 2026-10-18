@@ -10,6 +10,12 @@ export interface MenuItem {
   danger?: boolean;
   disabled?: boolean;
   separatorBefore?: boolean;
+  /** A line under the label (the section switcher's). */
+  description?: string;
+  /** Set on a choice among items (the active section): the item becomes a `menuitemradio`. */
+  checked?: boolean;
+  /** A count drawn beside the label and read with it. */
+  badge?: number;
 }
 
 export interface MenuButtonProps {
@@ -144,7 +150,8 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
               <button
                 ref={(el) => { itemRefs.current[index] = el; }}
                 type="button"
-                role="menuitem"
+                role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+                aria-checked={item.checked}
                 disabled={item.disabled}
                 tabIndex={-1}
                 onClick={() => { close(true); item.onSelect(); }}
@@ -156,8 +163,23 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
                     : 'text-slate-700 hover:bg-slate-100 focus-visible:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:bg-slate-700',
                 )}
               >
-                {item.icon && <item.icon size={16} aria-hidden />}
-                {item.label}
+                {item.icon && <item.icon size={16} aria-hidden className={cn('shrink-0', item.description && 'self-start mt-0.5')} />}
+                {item.description ? (
+                  <span className="flex min-w-0 flex-col">
+                    <span className={cn(item.checked && 'font-semibold')}>{item.label}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
+                  </span>
+                ) : (
+                  item.label
+                )}
+                {(item.badge ?? 0) > 0 && (
+                  <>
+                    <span aria-hidden className="ml-auto self-start min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
+                      {(item.badge ?? 0) > 99 ? '99+' : item.badge}
+                    </span>
+                    <span className="sr-only">, {item.badge} notifiche</span>
+                  </>
+                )}
               </button>
             </div>
           ))}
