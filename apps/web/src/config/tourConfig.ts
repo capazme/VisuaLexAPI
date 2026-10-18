@@ -21,7 +21,6 @@ export const TOUR_KEYS = {
     search: 'search',
     dossier: 'dossier',
     history: 'history',
-    environments: 'environments',
     forum: 'forum',
     // Feature tours
     commandPalette: 'commandPalette',
@@ -52,7 +51,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'Da qui accedi a tutte le sezioni: Ricerca, Dossier per organizzare le tue raccolte, Cronologia e Ambienti di lavoro.',
+            description: 'Da qui accedi alle sezioni: Ricerca, Dossier per organizzare le tue raccolte e Forum, dove trovi i dossier di studio della comunità. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
@@ -61,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Inizia a Cercare',
-            description: 'Clicca Ricerca, oppure premi Cmd+K (Mac) o Ctrl+K (Windows), per aprire la ricerca veloce. Prova subito!',
+            description: 'Ricerca ti porta al campo di ricerca, sempre in cima alla pagina. Da qualsiasi pagina, Cmd+K (Mac) o Ctrl+K (Windows) apre la ricerca veloce. Prova subito!',
             side: 'right',
             align: 'start',
         }
@@ -72,16 +71,16 @@ export const WELCOME_STEPS: DriveStep[] = [
  * Search Page Tour - Panoramica ricerca (4 step)
  *
  * Parte sulla pagina di ricerca, che alla prima visita è vuota: i passi puntano a ciò che la
- * pagina mostra allora (l'invito a cercare, la voce Ricerca, le norme preferite). Il tavolo di
+ * pagina mostra allora (il campo di ricerca in cima, la voce Ricerca, le norme preferite). Il tavolo di
  * lavoro ha i suoi tour (`practice`, `practiceAct`).
  */
 export const SEARCH_STEPS: DriveStep[] = [
     {
-        element: '#tour-main-content',
+        element: '#tour-search-field',
         popover: {
             title: 'Cerca una Norma',
-            description: 'Scrivi una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024": non serve compilare dei campi. Ogni risultato finisce sul tavolo di una pratica.',
-            side: 'top',
+            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024", e premi Invio: non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
+            side: 'bottom',
             align: 'center',
         }
     },
@@ -89,7 +88,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-nav-search',
         popover: {
             title: 'Ricerca e Cmd+K',
-            description: 'Preferisci la tastiera? Usa Ricerca (o Cmd+K) per aprire la ricerca da qualsiasi punto.',
+            description: 'Ricerca riporta al campo. Preferisci la tastiera? Cmd+K (Ctrl+K) apre la ricerca veloce da qualsiasi pagina, con filtri, alias e tutti gli atti.',
             side: 'right',
             align: 'start',
         }
@@ -245,79 +244,20 @@ export const HISTORY_STEPS: DriveStep[] = [
 ];
 
 /**
- * Environments Page Tour - Ambienti di lavoro (6 step)
- */
-export const ENVIRONMENTS_STEPS: DriveStep[] = [
-    {
-        popover: {
-            title: 'Ambienti di Lavoro',
-            description: 'Gli ambienti salvano configurazioni complete: dossier, norme rapide, annotazioni. Perfetti per passare tra progetti diversi. Scorciatoie: <kbd>n</kbd> nuovo, <kbd>/</kbd> cerca, <kbd>i</kbd> importa.',
-            side: 'over',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-env-create',
-        popover: {
-            title: 'Crea Ambiente',
-            description: 'Salva lo stato attuale del tuo workspace. Puoi includere dossier, norme rapide e annotazioni — con selezione granulare. Scorciatoia: <kbd>n</kbd>.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
-        element: '#tour-env-categories',
-        popover: {
-            title: 'Categorie',
-            description: 'Filtra per categoria: Compliance, Civile, Penale, Amministrativo, UE. Il colore a sinistra di ogni card corrisponde alla categoria.',
-            side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-env-card',
-        popover: {
-            title: 'Card Ambiente',
-            description: 'Stripe di categoria a sinistra, statistiche, primi dossier e norme in anteprima, e quando l\'hai aggiornato l\'ultima volta. Clicca per aprire il dettaglio completo.',
-            side: 'right',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-env-apply',
-        popover: {
-            title: 'Unisci rapido',
-            description: 'Un click unisce l\'ambiente al tuo stato attuale, saltando i duplicati. Per sostituire tutto (azione distruttiva) usa la voce nel menu ···.',
-            side: 'left',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-env-menu',
-        popover: {
-            title: 'Altre azioni',
-            description: 'Modifica, esporta in JSON, copia link di condivisione, aggiorna dallo stato corrente, sostituisci tutto o elimina. Il menu si apre passando col mouse sulla card.',
-            side: 'left',
-            align: 'center',
-        }
-    }
-];
-
-/**
- * Forum Page Tour - Forum ambienti community (6 step)
+ * Forum Page Tour - the community's dossiers di studio (6 step)
  *
  * Introduced ex novo when the page was renamed from Bacheca to Forum.
  * List-view-only: steps anchor on the Publish CTA, the tab nav, the
  * explore filters, the first card, and the card's 3-dot menu. The
  * `isFirst` prop on SharedEnvironmentCard marks the first card in the
  * grid with `#tour-forum-card` + `#tour-forum-actions` to avoid
- * duplicate DOM ids (same trick as `tour-env-card`).
+ * duplicate DOM ids.
  */
 export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Forum Ambienti',
-            description: 'Esplora ambienti pubblicati dalla community, condividi i tuoi e suggerisci contenuti agli altri.',
+            title: 'Forum',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. In cima trovi i dossier di studio pronti di VisuaLex.',
             side: 'over',
             align: 'center',
         }
@@ -325,8 +265,8 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         element: '#tour-forum-publish',
         popover: {
-            title: 'Condividi un ambiente',
-            description: 'Pubblica un tuo ambiente (dossier, norme rapide, alias) rendendolo disponibile alla community.',
+            title: 'Pubblica un dossier',
+            description: 'Scegli uno dei tuoi dossier: vedi l\'anteprima di ciò che diventa pubblico, togli le note che vuoi tenere per te e conferma di aver controllato che non contenga dati personali.',
             side: 'bottom',
             align: 'end',
         }
@@ -335,7 +275,7 @@ export const FORUM_STEPS: DriveStep[] = [
         element: '#tour-forum-tabs',
         popover: {
             title: 'Tre sezioni',
-            description: 'Esplora la community, gestisci gli ambienti che hai pubblicato (I Miei) e rivedi i suggerimenti ricevuti o inviati.',
+            description: 'Esplora la comunità, gestisci i dossier che hai pubblicato (I miei pubblicati, con l\'archivio dei vecchi ambienti) e rivedi i suggerimenti ricevuti o inviati.',
             side: 'bottom',
             align: 'center',
         }
@@ -344,7 +284,7 @@ export const FORUM_STEPS: DriveStep[] = [
         element: '#tour-forum-filters',
         popover: {
             title: 'Cerca e filtra',
-            description: 'Cerca per titolo o descrizione, filtra per categoria (la stripe a sinistra delle card riflette la categoria) e ordina per data, popolarità o download.',
+            description: 'Cerca per titolo o descrizione, filtra per categoria (la stripe a sinistra delle card riflette la categoria) e ordina per data, popolarità o aggiunte.',
             side: 'bottom',
             align: 'start',
         }
@@ -352,8 +292,8 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         element: '#tour-forum-card',
         popover: {
-            title: 'Card Ambiente',
-            description: 'Stripe di categoria, versione, statistiche (like, download, visualizzazioni), autore e data di aggiornamento. Passa il mouse sulla data per la versione completa.',
+            title: 'Un dossier pubblicato',
+            description: 'Categoria, versione, statistiche («Mi piace», aggiunte, visualizzazioni), autore e data di aggiornamento. «Ai miei dossier» lo aggiunge ai tuoi come dossier di studio.',
             side: 'right',
             align: 'center',
         }
@@ -362,7 +302,7 @@ export const FORUM_STEPS: DriveStep[] = [
         element: '#tour-forum-actions',
         popover: {
             title: 'Altre azioni',
-            description: 'Dal menu ··· suggerisci contenuti all\'autore o segnala l\'ambiente. Sugli ambienti tuoi trovi modifica, versioni, ritira e elimina.',
+            description: 'Dal menu ··· suggerisci contenuti all\'autore o segnala il dossier. Sui tuoi trovi modifica, versioni, ritira ed elimina.',
             side: 'left',
             align: 'center',
         }
@@ -668,7 +608,6 @@ export const TOUR_STEPS_MAP: Record<TourType, DriveStep[]> = {
     search: SEARCH_STEPS,
     dossier: DOSSIER_STEPS,
     history: HISTORY_STEPS,
-    environments: ENVIRONMENTS_STEPS,
     forum: FORUM_STEPS,
     // Feature tours
     commandPalette: COMMAND_PALETTE_STEPS,

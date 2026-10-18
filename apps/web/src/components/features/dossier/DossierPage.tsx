@@ -100,6 +100,7 @@ export function DossierPage() {
           showToast={showToast}
           trashCount={trash.entries?.length ?? 0}
           onOpenTrash={() => setShowTrash(true)}
+          onTrashChanged={() => void trash.reload()}
         />
       )}
 

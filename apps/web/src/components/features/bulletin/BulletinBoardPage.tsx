@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Share2, Users, Package, Lightbulb } from 'lucide-react';
-import { PublishEnvironmentModal } from './PublishEnvironmentModal';
-import { ImportEnvironmentModal } from './ImportEnvironmentModal';
+import { useNavigate } from 'react-router-dom';
+import { Search, Upload, Users, Package, Lightbulb } from 'lucide-react';
+import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
+import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
 import { SuggestContentModal } from './SuggestContentModal';
 import { EditSharedEnvironmentModal } from './EditSharedEnvironmentModal';
@@ -11,14 +12,18 @@ import { AliasConflictDialog } from './AliasConflictDialog';
 import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
+import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
+import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useTour } from '../../../hooks/useTour';
+import { useAppStore } from '../../../store/useAppStore';
+import { studyImportSentence } from '../../../utils/studyImportReport';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { customAliasService } from '../../../services/customAliasService';
 import { notificationService } from '../../../services/notificationService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
-import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion } from '../../../types';
+import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
 
 type TabType = 'explore' | 'my' | 'suggestions';
 
@@ -62,10 +67,24 @@ export function BulletinBoardPage() {
   const [aliasConflict, setAliasConflict] = useState<{ itemId: string; suggestedTrigger: string; existingAliasId?: string } | null>(null);
 
   // Toast
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; action?: { label: string; onClick: () => void } } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
+  };
+
+  const navigate = useNavigate();
+  const refreshDossiers = useAppStore((s) => s.refreshDossiers);
+
+  /** What became study dossiers (a download, a pack): said, the list read again, the one new dossier one tap away. */
+  const handleStudyDossiersAdded = (report: StudyImportReport) => {
+    void refreshDossiers();
+    const [only] = report.dossiers.length === 1 ? report.dossiers : [];
+    setToast({
+      message: studyImportSentence(report),
+      type: report.dossiers.length ? 'success' : 'info',
+      ...(only ? { action: { label: 'Apri', onClick: () => navigate(`/dossier?dossier=${only.id}`) } } : {}),
+    });
   };
 
   // Tour
@@ -98,7 +117,7 @@ export function BulletinBoardPage() {
         total: response.pagination.total,
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Errore nel caricamento degli ambienti';
+      const message = error instanceof Error ? error.message : 'Errore nel caricamento del Forum';
       showToast(message, 'error');
     } finally {
       setLoading(false);
@@ -162,7 +181,7 @@ export function BulletinBoardPage() {
       setMyEnvironments(prev =>
         prev.map(e => e.id === env.id ? { ...e, isActive: false } : e)
       );
-      showToast('Ambiente ritirato', 'success');
+      showToast('Dossier ritirato dal Forum', 'success');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore';
       showToast(message, 'error');
@@ -175,7 +194,7 @@ export function BulletinBoardPage() {
       setMyEnvironments(prev =>
         prev.map(e => e.id === env.id ? { ...e, isActive: true } : e)
       );
-      showToast('Ambiente ripubblicato', 'success');
+      showToast('Dossier di nuovo nel Forum', 'success');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore';
       showToast(message, 'error');
@@ -192,7 +211,7 @@ export function BulletinBoardPage() {
     setMyEnvironments(prev =>
       prev.map(e => e.id === updated.id ? updated : e)
     );
-    showToast(`Ambiente aggiornato a v${updated.currentVersion}`, 'success');
+    showToast('Dossier pubblicato aggiornato', 'success');
   };
 
   // Delete handler
@@ -207,7 +226,7 @@ export function BulletinBoardPage() {
       await sharedEnvironmentService.delete(deletingEnv.id);
       setMyEnvironments(prev => prev.filter(e => e.id !== deletingEnv.id));
       setDeletingEnv(null);
-      showToast('Ambiente eliminato definitivamente', 'success');
+      showToast('Dossier eliminato dal Forum', 'success');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore';
       showToast(message, 'error');
@@ -331,10 +350,14 @@ export function BulletinBoardPage() {
     setImportingEnv(env);
   };
 
-  // Handle import complete
-  const handleImportComplete = () => {
+  // «Aggiungi ai miei dossier» done: the download is counted for someone else's item.
+  const handleImportComplete = (env: SharedEnvironment, report: StudyImportReport) => {
     setImportingEnv(null);
-    showToast('Ambiente importato con successo!', 'success');
+    if (!env.isOwner) {
+      const bump = (e: SharedEnvironment) => (e.id === env.id ? { ...e, downloadCount: e.downloadCount + 1 } : e);
+      setEnvironments((prev) => prev.map(bump));
+    }
+    handleStudyDossiersAdded(report);
   };
 
   // Handle report
@@ -359,11 +382,12 @@ export function BulletinBoardPage() {
     showToast('Segnalazione inviata. Grazie per il tuo contributo!', 'success');
   };
 
-  // Handle publish complete
-  const handlePublishComplete = (newEnv: SharedEnvironment) => {
+  // A dossier published from the Forum's own button: the lists are read again.
+  const handlePublishComplete = (message: string) => {
     setShowPublishModal(false);
-    setEnvironments(prev => [newEnv, ...prev]);
-    showToast('Ambiente pubblicato con successo!', 'success');
+    showToast(message, 'success');
+    void fetchEnvironments(1);
+    if (activeTab === 'my') void fetchMyEnvironments();
   };
 
   // Handle search submit
@@ -379,55 +403,55 @@ export function BulletinBoardPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Users className="text-primary-600" size={28} />
-            Forum Ambienti
+            Forum
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Esplora e condividi ambienti con la community
+            I dossier di studio pubblicati dalla comunità
           </p>
         </div>
         <button
           id="tour-forum-publish"
           onClick={() => setShowPublishModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm"
+          className="flex min-h-[44px] items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 md:min-h-0"
         >
-          <Share2 size={18} />
-          Condividi un ambiente
+          <Upload size={18} />
+          Pubblica un dossier
         </button>
       </div>
 
       {/* Tab Navigation */}
-      <div id="tour-forum-tabs" className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
+      <div id="tour-forum-tabs" className="flex max-w-full gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab('explore')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
             activeTab === 'explore'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Search size={16} />
+          <Search size={16} className="hidden sm:block" aria-hidden />
           Esplora
         </button>
         <button
           onClick={() => setActiveTab('my')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
             activeTab === 'my'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Package size={16} />
-          I Miei
+          <Package size={16} className="hidden sm:block" aria-hidden />
+          I miei pubblicati
         </button>
         <button
           onClick={() => setActiveTab('suggestions')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
+          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 relative ${
             activeTab === 'suggestions'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Lightbulb size={16} />
+          <Lightbulb size={16} className="hidden sm:block" aria-hidden />
           Suggerimenti
           {pendingCount > 0 && (
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-xs rounded-full flex items-center justify-center">
@@ -462,6 +486,8 @@ export function BulletinBoardPage() {
           onReport={handleReport}
           onSuggest={handleSuggest}
           onPublishClick={() => setShowPublishModal(true)}
+          onPacksAdded={handleStudyDossiersAdded}
+          onPacksError={(message) => showToast(message, 'error')}
           onResetFilters={() => {
             setSearchQuery('');
             setCategory('all');
@@ -484,6 +510,9 @@ export function BulletinBoardPage() {
           onPublishClick={() => setShowPublishModal(true)}
         />
       )}
+      {activeTab === 'my' && (
+        <ArchivedEnvironmentsSection onRecovered={handleStudyDossiersAdded} onMessage={showToast} />
+      )}
 
       {activeTab === 'suggestions' && (
         <ForumSuggestionsView
@@ -500,17 +529,19 @@ export function BulletinBoardPage() {
 
       {/* Modals */}
       {showPublishModal && (
-        <PublishEnvironmentModal
+        <PublishDossierPicker
           onClose={() => setShowPublishModal(false)}
           onPublished={handlePublishComplete}
         />
       )}
 
+      <SharedLinkImport onRecovered={handleStudyDossiersAdded} />
+
       {importingEnv && (
-        <ImportEnvironmentModal
+        <AddToMyDossiersDialog
           sharedEnvironment={importingEnv}
           onClose={() => setImportingEnv(null)}
-          onImported={handleImportComplete}
+          onAdded={(report) => handleImportComplete(importingEnv, report)}
         />
       )}
 
@@ -606,8 +637,8 @@ export function BulletinBoardPage() {
       <ConfirmDialog
         open={deletingEnv !== null}
         variant="danger"
-        title={deletingEnv ? `Eliminare "${deletingEnv.title}"?` : 'Eliminare ambiente?'}
-        message="L'ambiente e tutte le sue versioni, mi piace e segnalazioni verranno rimossi definitivamente dal forum. Questa azione non è reversibile."
+        title={deletingEnv ? `Eliminare «${deletingEnv.title}» dal Forum?` : 'Eliminare dal Forum?'}
+        message="La copia pubblicata, le sue versioni, i «Mi piace» e le segnalazioni vengono eliminati dal Forum. Il tuo dossier resta com'è; chi l'ha già aggiunto ai suoi dossier ne conserva la copia."
         confirmLabel="Elimina definitivamente"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeletingEnv(null)}
@@ -620,6 +651,7 @@ export function BulletinBoardPage() {
           type={toast.type}
           isVisible={!!toast}
           onClose={() => setToast(null)}
+          action={toast.action}
         />
       )}
     </div>

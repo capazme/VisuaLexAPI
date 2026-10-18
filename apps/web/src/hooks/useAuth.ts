@@ -9,6 +9,7 @@ import { appStore } from '../store/useAppStore';
 import { getErrorMessage } from '../utils/errors';
 import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
+import { clearEuCaseLawCache } from '../utils/euCaseLawCache';
 import { clearArticleCardsCache } from '../utils/articleCardsCache';
 
 interface AuthState {
@@ -146,6 +147,7 @@ export function useAuth() {
     appStore.getState().clearUserData();
     clearDecisionCache();
     clearDecisionSearchCache();
+    clearEuCaseLawCache();
     clearArticleCardsCache();
     setState({
       user: null,

@@ -7,8 +7,8 @@ import { PERSONAL_STATES } from '../lingo/deleteUserAccount';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
- * deletes is copied here, as the rows were, and then deleted, in one
- * transaction. The user restores it from the web app for 30 days; then the
+ * deletes, and a dossier or a study card the user deletes from the web app,
+ * is copied here, as the rows were, and then deleted, in one transaction. The user restores it from the web app for 30 days; then the
  * sweep removes it for good. Only the user's session lists, restores or
  * empties it: none of those routes is in the delegated table.
  */
@@ -19,13 +19,16 @@ const SWEEP_EVERY_MS = 10 * 60 * 1000;
 /**
  * Which connection deleted: the trash outlives the client and the grant, so
  * plain values. All null when the user deleted from the web app themselves
- * (study cards only; the dossier's routes stay for connected applications).
+ * (`BY_THE_USER`: a whole dossier, study cards).
  */
 export interface DeletedBy {
   clientId: string | null;
   clientName: string | null;
   grantId: string | null;
 }
+
+/** A deletion by the user's own session, listed «Rimosso da te». */
+export const BY_THE_USER: DeletedBy = { clientId: null, clientName: null, grantId: null };
 
 export interface TrashListEntry {
   id: string;
@@ -112,14 +115,16 @@ async function maybeSweep(): Promise<void> {
 }
 
 /**
- * Moves a whole dossier, with its entries and snapshots, to the trash — only
- * if it still holds exactly the entries the user was shown when confirming
- * (`seenItemIds`): one added or removed meanwhile refuses the move (409).
+ * Moves a whole dossier, with its entries and snapshots, to the trash. A
+ * connected application names the entries the user was shown when confirming
+ * (`seenItemIds`): one added or removed meanwhile refuses the move (409). The
+ * web app's own deletion passes null: whatever the dossier holds goes, and
+ * comes back, together (owner, 13 October 2026, question 160).
  */
 export async function trashDossier(
   userId: string,
   dossierId: string,
-  seenItemIds: string[],
+  seenItemIds: string[] | null,
   by: DeletedBy,
 ): Promise<{ trashId: string; itemCount: number }> {
   await maybeSweep();
@@ -127,14 +132,18 @@ export async function trashDossier(
     if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
-      include: { items: { orderBy: { position: 'asc' } }, snapshots: { orderBy: { version: 'asc' } } },
+      include: {
+        items: { orderBy: { position: 'asc' } },
+        snapshots: { orderBy: { version: 'asc' } },
+        publishedCopy: { select: { id: true } },
+      },
     });
     if (!dossier) throw new AppError(404, 'Dossier not found');
-    const seen = new Set(seenItemIds);
-    if (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id))) {
+    const seen = seenItemIds && new Set(seenItemIds);
+    if (seen && (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id)))) {
       throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
     }
-    const { items, snapshots, ...row } = dossier;
+    const { items, snapshots, publishedCopy, ...row } = dossier;
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -143,7 +152,8 @@ export async function trashDossier(
         dossierId: dossier.id,
         label: dossier.name,
         summary: { itemCount: items.length },
-        payload: asJson({ dossier: row, items, snapshots }),
+        // Its copy in the Forum stays published; the link (cleared with the row) comes back on restore.
+        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -197,7 +207,8 @@ export async function trashDossierItems(
     // An entry moved away by a concurrent request between the read and the delete: undo it all.
     if (deleted.count !== moved.length) throw new AppError(409, 'Il dossier è cambiato nel frattempo: riprova.');
     await tx.dossier.update({ where: { id: dossierId }, data: { updatedAt: now } });
-    return { trashId: entry.id, moved, notFound: wanted.filter((id) => !moved.includes(id)) };
+    const movedIds = new Set(moved);
+    return { trashId: entry.id, moved, notFound: wanted.filter((id) => !movedIds.has(id)) };
   });
 }
 
@@ -331,8 +342,9 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       if (!entry) throw new AppError(404, 'Elemento del cestino non trovato.');
 
       if (entry.kind === 'DOSSIER') {
-        const { dossier, items, snapshots } = entry.payload as unknown as {
+        const { dossier, items, snapshots, publishedCopyId } = entry.payload as unknown as {
           dossier: Record<string, unknown> & { id: string; createdAt: string; updatedAt: string };
+          publishedCopyId?: string | null;
           items: StoredItem[];
           snapshots: { id: string; dossierId: string; version: number; label: string | null; content: unknown; fingerprint: string | null; createdAt: string }[];
         };
@@ -345,6 +357,10 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             color: (dossier.color as string | null) ?? null,
             tags: (dossier.tags as string[]) ?? [],
             isPinned: Boolean(dossier.isPinned),
+            // An entry stored before dossiers had a kind restores as a dossier di lavoro, like every old dossier.
+            kind: dossier.kind === 'studio' ? 'studio' : 'lavoro',
+            // An admin's block outlives the trash (question 190).
+            forumBlockedAt: typeof dossier.forumBlockedAt === 'string' ? new Date(dossier.forumBlockedAt) : null,
             createdAt: new Date(dossier.createdAt),
             createdByClientId: (dossier.createdByClientId as string | null) ?? null,
             createdByClientName: (dossier.createdByClientName as string | null) ?? null,
@@ -367,6 +383,13 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
               fingerprint: s.fingerprint,
               createdAt: new Date(s.createdAt),
             })),
+          });
+        }
+        if (typeof publishedCopyId === 'string' && publishedCopyId) {
+          // Relinked only when the copy is still the user's and linked to nothing else.
+          await tx.sharedEnvironment.updateMany({
+            where: { id: publishedCopyId, userId, sourceDossierId: null },
+            data: { sourceDossierId: dossier.id },
           });
         }
         await tx.trashEntry.delete({ where: { id: entry.id } });

@@ -58,6 +58,14 @@ describe('ConnectPage', () => {
     expect(screen.getByText(REQUEST.scopes[1].label)).toBeInTheDocument();
   });
 
+  it('warns, before the decision, that the app reads the dossiers and should not get personal data of clients', async () => {
+    getRequest.mockResolvedValue(REQUEST);
+    renderAt('/connect?request=req-1');
+    const notice = await screen.findByRole('note', { name: 'Dati personali' });
+    expect(notice).toHaveTextContent(/l’app leggerà i nomi dei tuoi dossier, i titoli e i riferimenti delle voci e le tue schede di studio/i);
+    expect(notice).toHaveTextContent(/non scrivere lì dati personali dei clienti, oppure autorizza solo app AI di cui ti fidi/i);
+  });
+
   it('renders a name built as markup as plain text', async () => {
     getRequest.mockResolvedValue({ ...REQUEST, client: { ...REQUEST.client, name: '<img src=x onerror=alert(1)>VisuaLex' } });
     const { container } = renderAt('/connect?request=req-1');

@@ -9,6 +9,9 @@ import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '
 import { citeStoredAct } from '../norms/citation';
 import { citeDecision, citeStoredItem } from '../norms/decisionCitation';
 import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/decisionItem';
+import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
+import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
+import { readableContent } from '../utils/publishedContent';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -44,15 +47,39 @@ function serializeItem(i: ItemRow) {
   };
 }
 
+/**
+ * What a dossier route includes besides the row: the entries in order, and the
+ * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner).
+ */
+const DOSSIER_INCLUDE = {
+  items: { orderBy: { position: 'asc' } },
+  publishedCopy: { select: { id: true, currentVersion: true, isActive: true, updatedAt: true } },
+} satisfies Prisma.DossierInclude;
+
+type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean; updatedAt: Date };
+
 /** A dossier as every route answers it. */
-function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[] }) {
+function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null }) {
   return {
     id: d.id,
     name: d.name,
     description: d.description,
     color: d.color,
     tags: d.tags,
+    // `lavoro` (a practice) or `studio` (a topic studied).
+    kind: d.kind,
     is_pinned: d.isPinned,
+    // The dossier's copy in the Forum, or null when it was never published (or its copy was deleted).
+    published: d.publishedCopy
+      ? {
+          shared_environment_id: d.publishedCopy.id,
+          version: d.publishedCopy.currentVersion,
+          is_active: d.publishedCopy.isActive,
+          updated_at: d.publishedCopy.updatedAt,
+        }
+      : null,
+    // The admin withdrew its copy from the Forum: it cannot be published again until the admin allows it.
+    forum_blocked: d.forumBlockedAt != null,
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),
@@ -61,11 +88,14 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
 }
 
 // Validation schemas
+const dossierKindSchema = z.enum(['lavoro', 'studio']);
+
 const createDossierSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().optional(),
   color: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  kind: dossierKindSchema.optional(),
 });
 
 const updateDossierSchema = z.object({
@@ -74,6 +104,7 @@ const updateDossierSchema = z.object({
   color: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(),
   isPinned: z.boolean().optional(),
+  kind: dossierKindSchema.optional(),
 });
 
 const createDossierItemSchema = z.object({
@@ -105,11 +136,7 @@ const moveDossierItemSchema = z.object({
 export const listDossiers = async (req: Request, res: Response) => {
   const dossiers = await prisma.dossier.findMany({
     where: { userId: req.user!.id },
-    include: {
-      items: {
-        orderBy: { position: 'asc' },
-      },
-    },
+    include: DOSSIER_INCLUDE,
     orderBy: { createdAt: 'desc' },
   });
 
@@ -124,11 +151,7 @@ export const getDossier = async (req: Request, res: Response) => {
 
   const dossier = await prisma.dossier.findFirst({
     where: { id, userId: req.user!.id },
-    include: {
-      items: {
-        orderBy: { position: 'asc' },
-      },
-    },
+    include: DOSSIER_INCLUDE,
   });
 
   if (!dossier) {
@@ -150,12 +173,11 @@ export const createDossier = async (req: Request, res: Response) => {
       description: data.description,
       color: data.color,
       tags: data.tags ?? [],
+      kind: data.kind ?? 'lavoro',
       userId: req.user!.id,
       ...provenanceFromRequest(req),
     },
-    include: {
-      items: true,
-    },
+    include: DOSSIER_INCLUDE,
   });
 
   res.status(201).json(serializeDossier(dossier));
@@ -185,37 +207,52 @@ export const updateDossier = async (req: Request, res: Response) => {
       ...(data.color !== undefined && { color: data.color }),
       ...(data.tags !== undefined && { tags: data.tags }),
       ...(data.isPinned !== undefined && { isPinned: data.isPinned }),
+      ...(data.kind !== undefined && { kind: data.kind }),
     },
-    include: {
-      items: {
-        orderBy: { position: 'asc' },
-      },
-    },
+    include: DOSSIER_INCLUDE,
   });
 
   res.json(serializeDossier(dossier));
 };
 
+const importStudySchema = z.object({
+  content: z.unknown(),
+  addNotes: z.boolean().default(true),
+  addHighlights: z.boolean().default(true),
+});
+
 /**
- * Delete dossier
+ * New dossiers di studio from content the web app holds: a ready-made pack, an old environment
+ * link (spec docs/superpowers/specs/2026-10-13-environments-into-forum-design.md, D9, D11c, D12).
+ * Filtered as Forum content is, then imported as a download is; never an existing dossier
+ * changed. User session only: not in the delegated table.
+ */
+export const importStudyDossiersRoute = async (req: Request, res: Response) => {
+  const data = importStudySchema.parse(req.body);
+  if (JSON.stringify(data.content ?? null).length > 1024 * 1024) throw new AppError(400, 'Il contenuto supera la dimensione massima (1 MB).');
+  const { content, refused } = readableContent(data.content);
+  if (content.dossiers.length === 0) throw new AppError(400, 'Nessun dossier leggibile da aggiungere.');
+  await spendStudyImport(req.user!.id);
+  const report = await importStudyDossiers(req.user!.id, content, {
+    addNotes: data.addNotes,
+    addHighlights: data.addHighlights,
+    addShortcuts: false,
+    attributeTo: null,
+    refused,
+  });
+  res.status(201).json(report);
+};
+
+/**
+ * Delete a dossier from the web app: it goes to the trash for 30 days, with its
+ * entries and snapshots, listed «Rimosso da te» (owner, 13 October 2026,
+ * question 160; before, it was gone at once). The answer names the trash entry,
+ * so the page's «Annulla» restores it. Not in the delegated table: a connected
+ * application deletes through `POST /dossiers/:id/trash`.
  */
 export const deleteDossier = async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  // Check ownership
-  const existing = await prisma.dossier.findFirst({
-    where: { id, userId: req.user!.id },
-  });
-
-  if (!existing) {
-    throw new AppError(404, 'Dossier not found');
-  }
-
-  await prisma.dossier.delete({
-    where: { id },
-  });
-
-  res.status(204).send();
+  // 404 when the dossier is not the user's (checked under the row lock).
+  res.json(await trashDossier(req.user!.id, req.params.id, null, BY_THE_USER));
 };
 
 /**
@@ -385,32 +422,15 @@ export const updateDossierItem = async (req: Request, res: Response) => {
 };
 
 /**
- * Delete dossier item
+ * Remove a dossier item from the web app: it goes to the trash for 30 days,
+ * listed «Rimosso da te» (owner, 13 October 2026, question 181; before, it was
+ * gone at once). The answer names the trash entry, so the page's «Annulla»
+ * restores it. 404 when the dossier is not the user's or the entry is not in
+ * it. Not in the delegated table: a connected application uses `trash-items`.
  */
 export const deleteDossierItem = async (req: Request, res: Response) => {
   const { id, itemId } = req.params;
-
-  // Check ownership
-  const dossier = await prisma.dossier.findFirst({
-    where: { id, userId: req.user!.id },
-  });
-
-  if (!dossier) {
-    throw new AppError(404, 'Dossier not found');
-  }
-
-  try {
-    await prisma.dossierItem.delete({
-      where: { id: itemId, dossierId: id },
-    });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-      throw new AppError(404, 'Dossier item not found');
-    }
-    throw err;
-  }
-
-  res.status(204).send();
+  res.json(await trashDossierItems(req.user!.id, id, [itemId], BY_THE_USER));
 };
 
 /**
@@ -562,6 +582,21 @@ const addNormsSchema = z.object({
 
 type NormOutcome = 'added' | 'already_present' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
 
+type NormIdentityFields = { urn: string; numero_articolo: string; allegato: string | null };
+
+/**
+ * Which article of which act a stored norm is. The urn alone is not enough:
+ * the Python API gives an EU article the urn of its act (no `~art<N>`), so
+ * every article of the GDPR would read as the same one. The article number
+ * (and the annex, for a code that has them) is part of the identity; for a
+ * Normattiva norm it repeats what the urn already says.
+ */
+function normIdentity(norm: Partial<NormIdentityFields>): string | null {
+  if (typeof norm.urn !== 'string') return null;
+  const article = typeof norm.numero_articolo === 'string' ? norm.numero_articolo.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2') : '';
+  return `${norm.urn}|${norm.allegato ?? ''}|${article}`;
+}
+
 /**
  * Adds norms to a dossier from references in free text ("art. 2043 c.c."),
  * 1 to 50 per call (MCP spike, spec section 7). Each reference is resolved
@@ -582,9 +617,10 @@ export const addDossierNorms = async (req: Request, res: Response) => {
 
   const resolutions = await resolveReferences(references);
   const present = new Set(
-    dossier.items
-      .map((item) => (item.content && typeof item.content === 'object' ? (item.content as { urn?: unknown }).urn : undefined))
-      .filter((urn): urn is string => typeof urn === 'string'),
+    dossier.items.flatMap((item) => {
+      const key = item.content && typeof item.content === 'object' ? normIdentity(item.content as Partial<NormIdentityFields>) : null;
+      return key ? [key] : [];
+    }),
   );
 
   const toCreate: { index: number; urn: string }[] = [];
@@ -596,8 +632,9 @@ export const addDossierNorms = async (req: Request, res: Response) => {
         // `resolved` without a norm cannot happen; reported as unavailable rather than added.
         return { ...base, outcome: resolution.outcome === 'resolved' ? 'unavailable' : resolution.outcome };
       }
-      if (present.has(resolution.norm.urn)) return { ...base, outcome: 'already_present' as const, detail: undefined };
-      present.add(resolution.norm.urn);
+      const identity = normIdentity(resolution.norm);
+      if (identity && present.has(identity)) return { ...base, outcome: 'already_present' as const, detail: undefined };
+      if (identity) present.add(identity);
       toCreate.push({ index, urn: resolution.norm.urn });
       return { ...base, outcome: 'added' as const };
     });

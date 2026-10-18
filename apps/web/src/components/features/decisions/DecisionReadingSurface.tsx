@@ -33,6 +33,9 @@ import { decisionProjection, decisionStructure, renderDecisionHtml, unmatchedAnc
 import { downloadTxt, highlightsTxt, notesTxt, slugify } from '../../../utils/annotationExport';
 import { selectionAsRead } from '../../../utils/decisionText';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
+import { keyPassages } from '../../../utils/decisionKeyPassages';
+import { KeyPassagePopover } from './KeyPassagePopover';
+import { KeyPassagesMenu } from './KeyPassagesMenu';
 
 // A decision's anchors are stored under its key with no article: the wire key is `<key>::art::`.
 const NO_ARTICLE = '';
@@ -69,8 +72,10 @@ export interface DecisionReadingSurfaceProps {
 export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
-    removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle,
+    removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings,
   } = useAppStore(useShallow((s) => ({
+    showKeyPassages: s.settings.showKeyPassages,
+    updateSettings: s.updateSettings,
     triggerSearch: s.triggerSearch,
     pushReadingBack: s.pushReadingBack,
     annotations: s.annotations,
@@ -124,18 +129,22 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
 
   // A bare «art. 5» with no act named stays text: a decision has no act of its own to default to.
   // The decisions it cites are linked after the norms; inside a Cassazione decision a section written
-  // without its court reads as the Cassazione's, and the decision's own name links nowhere.
+  // without its court reads as the Cassazione's, inside a Corte costituzionale decision «sentenza n. … del …»
+  // as the Court's own, and the decision's own name links nowhere.
   const selfPath = decisionPath(identity);
-  const within = identity.corte === 'cassazione' ? 'cassazione' : undefined;
+  const within = identity.corte === 'cassazione' || identity.corte === 'corte_costituzionale' ? identity.corte : undefined;
+  // The key passages (spec 2026-10-13-decision-key-passages-design): computed from the text, always
+  // drawn and hidden by a class, so the switch does not redraw the text; never stored.
+  const passages = useMemo(() => keyPassages(testo, identity.corte), [testo, identity.corte]);
   const html = useMemo(
     () => wrapDecisionCitationsInHtml(
       wrapCitationsInHtml(renderDecisionHtml({
         testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true,
-        threads: locatedThreads, focusedThreadId,
+        threads: locatedThreads, focusedThreadId, keyPassages: passages,
       })),
       { within, selfPath },
     ),
-    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath],
+    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath, passages],
   );
 
   // What each paragraph's sign counts, for the popover it opens (the renderer derives the signs
@@ -172,6 +181,48 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   useEffect(() => {
     contentRef.current?.classList.toggle('highlights-hidden', highlightsHidden);
   }, [highlightsHidden]);
+
+  useEffect(() => {
+    contentRef.current?.classList.toggle('key-passages-hidden', !showKeyPassages);
+  }, [showKeyPassages]);
+
+  // The passage whose popover is open, with the text it was opened on: a redraw (a highlight made
+  // of it) replaces the element it sits by, so the popover goes with it.
+  const [openPassage, setOpenPassage] = useState<{ index: number; el: HTMLElement; html: string } | null>(null);
+  const shownPassage = openPassage && openPassage.html === html && openPassage.el.isConnected && showKeyPassages ? openPassage : null;
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root || !showKeyPassages) return;
+    const onClick = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      // a link, a note's words, a sign or a reference keep their own click; words under a highlight are the
+      // reader's, unless the highlights are hidden (then the passage shows again, and answers again)
+      if (!target || target.closest('a, button, .citation-hover, .decision-cite, .note-anchor, .vlx-sign, .vlx-ref')) return;
+      if (target.closest('.highlight-mark') && !root.classList.contains('highlights-hidden')) return;
+      const piece = target.closest<HTMLElement>('[data-key-passage]');
+      if (!piece || !root.contains(piece)) return;
+      // the end of a selection is not a click on the passage
+      if (window.getSelection()?.isCollapsed === false) return;
+      setOpenPassage({ index: Number(piece.dataset.keyIndex), el: piece, html });
+    };
+    root.addEventListener('click', onClick);
+    return () => root.removeEventListener('click', onClick);
+  }, [showKeyPassages, html]);
+
+  const goToPassage = (index: number) => {
+    const piece = contentRef.current?.querySelector<HTMLElement>(`[data-key-index="${index}"]`);
+    if (!piece) return;
+    // at once, not smoothly: the popover opens on the passage already in view, and the keyboard's focus goes to it
+    piece.scrollIntoView({ block: 'center' });
+    const pieces = contentRef.current?.querySelectorAll<HTMLElement>(`[data-key-index="${index}"]`) ?? [];
+    pieces.forEach((p) => p.classList.add('vlx-flash'));
+    window.setTimeout(() => pieces.forEach((p) => p.classList.remove('vlx-flash')), 1600);
+    setOpenPassage({ index, el: piece, html });
+  };
+  const hideKeyPassages = () => {
+    updateSettings({ showKeyPassages: false });
+    setToast({ message: 'Passaggi chiave nascosti: li riaccendi da «Passaggi chiave» nella barra', type: 'info' });
+  };
 
   const origin = useMemo<ReadingBackEntry | undefined>(
     () => hostTabId ? { tabId: hostTabId, blockId: hostBlockId ?? hostTabId, articleId: '', label } : undefined,
@@ -245,7 +296,29 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         isFindOpen={isFindOpen}
         onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: findHost, targetKey: key, returnFocus: findButtonRef.current }))}
         findButtonRef={findButtonRef}
+        keyPassages={(
+          <KeyPassagesMenu
+            passages={passages}
+            plain={plain}
+            shown={showKeyPassages}
+            onToggleShown={() => (showKeyPassages ? hideKeyPassages() : updateSettings({ showKeyPassages: true }))}
+            onGoTo={goToPassage}
+          />
+        )}
       />
+      {shownPassage && passages[shownPassage.index] && (
+        <KeyPassagePopover
+          kind={passages[shownPassage.index].kind}
+          anchorEl={shownPassage.el}
+          // the passage becomes a highlight of the reader's, through the ordinary action
+          onMakeOwn={() => {
+            const p = passages[shownPassage.index];
+            handlePopupHighlight(plain.slice(p.start, p.end), 'yellow', p.start);
+          }}
+          onHideAll={hideKeyPassages}
+          onClose={() => setOpenPassage(null)}
+        />
+      )}
       <NotesPeekPanel
         isOpen={isNotesOpen}
         anchorEl={notesButtonEl}

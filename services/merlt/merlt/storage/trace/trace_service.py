@@ -9,7 +9,7 @@ Features:
 - Consent-aware data filtering (anonymous, basic, full)
 - Pagination and filtering for list queries
 - Source resolution via bridge_table integration
-- Archival and GDPR-compliant deletion
+- Archival and per-trace deletion (a person's data as a whole: merlt.privacy.user_data)
 
 Pattern follows BridgeTable service architecture.
 """

@@ -10,6 +10,8 @@ router.use(authenticate);
 // Dossier CRUD
 router.get('/dossiers', dossierController.listDossiers);
 router.post('/dossiers', dossierController.createDossier);
+// Study dossiers from a pack or an old environment link (user session only: not delegated).
+router.post('/dossiers/import-study', dossierController.importStudyDossiersRoute);
 router.get('/dossiers/:id', dossierController.getDossier);
 router.put('/dossiers/:id', dossierController.updateDossier);
 router.delete('/dossiers/:id', dossierController.deleteDossier);

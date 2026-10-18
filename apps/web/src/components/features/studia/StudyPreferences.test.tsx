@@ -23,7 +23,7 @@ async function opened(onChanged = vi.fn()) {
 beforeEach(() => {
   preferences.mockReset();
   savePreferences.mockReset();
-  preferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: [] });
+  preferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: [] });
 });
 
 describe('StudyPreferences', () => {
@@ -40,13 +40,13 @@ describe('StudyPreferences', () => {
 
   describe('the daily goal', () => {
     it('shows the goal in force and saves a new one in range', async () => {
-      savePreferences.mockResolvedValue({ nuoveAlGiorno: 35, materieComunita: [] });
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 35, ripassiAlGiorno: 10, materieComunita: [] });
       const { user, onChanged } = await opened();
       const goal = screen.getByLabelText('Nuove schede al giorno');
       expect(goal).toHaveValue(20);
       await user.clear(goal);
       await user.type(goal, '35');
-      await user.click(screen.getByRole('button', { name: 'Salva' }));
+      await user.click(screen.getByRole('button', { name: 'Salva: nuove schede al giorno' }));
       expect(savePreferences).toHaveBeenCalledWith({ nuoveAlGiorno: 35 });
       await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
       expect(screen.getByRole('status')).toHaveTextContent('Salvato');
@@ -57,7 +57,7 @@ describe('StudyPreferences', () => {
       const goal = screen.getByLabelText('Nuove schede al giorno');
       await user.clear(goal);
       if (text) await user.type(goal, text);
-      await user.click(screen.getByRole('button', { name: 'Salva' }));
+      await user.click(screen.getByRole('button', { name: 'Salva: nuove schede al giorno' }));
       expect(screen.getByRole('alert')).toHaveTextContent('Inserisci un numero da 1 a 200.');
       expect(goal).toHaveAttribute('aria-invalid', 'true');
       expect(savePreferences).not.toHaveBeenCalled();
@@ -65,13 +65,39 @@ describe('StudyPreferences', () => {
     });
 
     it('accepts the ends of the range', async () => {
-      savePreferences.mockResolvedValue({ nuoveAlGiorno: 200, materieComunita: [] });
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 200, ripassiAlGiorno: 10, materieComunita: [] });
       const { user } = await opened();
       const goal = screen.getByLabelText('Nuove schede al giorno');
       await user.clear(goal);
       await user.type(goal, '200');
-      await user.click(screen.getByRole('button', { name: 'Salva' }));
+      await user.click(screen.getByRole('button', { name: 'Salva: nuove schede al giorno' }));
       expect(savePreferences).toHaveBeenCalledWith({ nuoveAlGiorno: 200 });
+    });
+  });
+
+  describe('the review goal of the streak', () => {
+    it('shows the goal in force with what it means, and saves a new one on its own', async () => {
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 15, materieComunita: [] });
+      const { user, onChanged } = await opened();
+      const goal = screen.getByLabelText('Ripassi al giorno');
+      expect(goal).toHaveValue(10);
+      expect(goal).toHaveAccessibleDescription('Quanti ripassi tengono viva la serie. Vale anche finire le schede del giorno.');
+      await user.clear(goal);
+      await user.type(goal, '15');
+      await user.click(screen.getByRole('button', { name: 'Salva: ripassi al giorno' }));
+      expect(savePreferences).toHaveBeenCalledWith({ ripassiAlGiorno: 15 });
+      await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+      expect(screen.getByLabelText('Nuove schede al giorno')).toHaveValue(20);
+    });
+
+    it('refuses a number out of range', async () => {
+      const { user } = await opened();
+      const goal = screen.getByLabelText('Ripassi al giorno');
+      await user.clear(goal);
+      await user.type(goal, '0');
+      await user.click(screen.getByRole('button', { name: 'Salva: ripassi al giorno' }));
+      expect(screen.getByRole('alert')).toHaveTextContent('Inserisci un numero da 1 a 200.');
+      expect(savePreferences).not.toHaveBeenCalled();
     });
   });
 
@@ -87,7 +113,7 @@ describe('StudyPreferences', () => {
     });
 
     it('sends a subject switched on, shows what the server kept, and tells the view to count again', async () => {
-      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE'] });
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
       const { user, onChanged } = await opened();
       await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
       expect(savePreferences).toHaveBeenCalledWith({ materieComunita: ['DIRITTO_CIVILE'] });
@@ -97,7 +123,7 @@ describe('StudyPreferences', () => {
     });
 
     it('does not report on the daily goal, nor overwrite a goal being typed', async () => {
-      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE'] });
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
       const { user } = await opened();
       const goal = screen.getByLabelText('Nuove schede al giorno');
       await user.clear(goal);
@@ -109,8 +135,8 @@ describe('StudyPreferences', () => {
     });
 
     it('switches one off, keeping the others', async () => {
-      preferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
-      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, materieComunita: ['DIRITTO_PENALE'] });
+      preferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_PENALE'] });
       const { user } = await opened();
       await waitFor(() => expect(screen.getByRole('switch', { name: 'Diritto civile' })).toHaveAttribute('aria-checked', 'true'));
       await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));

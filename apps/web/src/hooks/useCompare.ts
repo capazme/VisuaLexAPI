@@ -16,7 +16,6 @@ export interface CompareState {
   leftArticle: CompareArticle | null;
   rightArticle: CompareArticle | null;
   mode: 'side-by-side' | 'inline';
-  syncScroll: boolean;
 }
 
 // Global compare state (singleton pattern for cross-component access)
@@ -25,7 +24,6 @@ let compareState: CompareState = {
   leftArticle: null,
   rightArticle: null,
   mode: 'side-by-side',
-  syncScroll: true,
 };
 
 type CompareListener = (state: CompareState) => void;
@@ -81,7 +79,6 @@ export function closeCompare() {
     leftArticle: null,
     rightArticle: null,
     mode: 'side-by-side',
-    syncScroll: true,
   };
   notifyListeners();
 }
@@ -149,10 +146,6 @@ export function useCompare() {
     setCompareState({ mode });
   }, []);
 
-  const setSyncScroll = useCallback((sync: boolean) => {
-    setCompareState({ syncScroll: sync });
-  }, []);
-
   return {
     ...state,
     startCompare,
@@ -161,7 +154,6 @@ export function useCompare() {
     swap,
     remove,
     setMode,
-    setSyncScroll,
     hasLeft: !!state.leftArticle,
     hasRight: !!state.rightArticle,
     isComplete: !!state.leftArticle && !!state.rightArticle,

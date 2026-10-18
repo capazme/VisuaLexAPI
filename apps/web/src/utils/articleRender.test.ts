@@ -503,3 +503,62 @@ describe('the projection invariant — with a search open', () => {
     },
   );
 });
+
+describe('a range and marked words (the comparison draws a comma at a time)', () => {
+  const raw = fixtureText('nrm-cc-1284');
+  const structure = parseArticleStructure(raw);
+  const text = (html: string) => mount(html).textContent;
+
+  it('`only` draws the blocks inside the range and nothing else, every character in place', () => {
+    const commi = structure.blocks.filter((b) => b.kind === 'comma');
+    const second = commi[1];
+    const html = renderArticleHtml({ raw, structure, highlights: [], annotations: [], only: { start: second.start, end: second.end } });
+    expect(text(html)).toBe(raw.slice(second.start, second.end).replace(/\n/g, ''));
+    expect(mount(html).querySelectorAll('.vlx-b')).toHaveLength(1);
+  });
+
+  it('draws the folded tail with its toggle when the range is the tail', () => {
+    const tail = structure.updates!;
+    const html = renderArticleHtml({ raw, structure, highlights: [], annotations: [], only: { start: tail.start, end: raw.length } });
+    expect(mount(html).querySelectorAll('.vlx-updates')).toHaveLength(1);
+    expect(text(html)).toBe(raw.slice(tail.start).replace(/\n/g, ''));
+  });
+
+  it('wraps the marked words in .vlx-del / .vlx-ins without adding a character', () => {
+    const start = raw.indexOf('misura');
+    const html = renderArticleHtml({
+      raw, structure, highlights: [], annotations: [],
+      changes: [{ start, end: start + 'misura'.length, kind: 'del' }, { start: start + 7, end: start + 11, kind: 'ins' }],
+    });
+    const div = mount(html);
+    expect(div.textContent).toBe(raw.replace(/\n/g, ''));
+    expect(div.querySelector('.vlx-del')!.textContent).toBe('misura');
+    expect(div.querySelector('.vlx-ins')!.textContent).toBe(raw.slice(start + 7, start + 11));
+  });
+
+  it('keeps a mark that crosses a modification and a reference well-formed', () => {
+    const privacy = fixtureText('nrm-privacy-2ter');
+    const s = parseArticleStructure(privacy);
+    // From inside the first «((o da atti amministrativi generali))» modification, across its end,
+    // the missing reference «((49))» (ref-missing) and into the next modification.
+    const from = privacy.indexOf('((o da atti');
+    const to = privacy.indexOf('((49))') + '((49))'.length + 6;
+    expect(s.decorations.some((d) => d.kind === 'ref-missing' && d.start > from && d.end < to)).toBe(true);
+    expect(s.decorations.filter((d) => d.kind === 'mod' && d.start < to && d.end > from).length).toBeGreaterThanOrEqual(2);
+    const html = renderArticleHtml({
+      raw: privacy, structure: s, highlights: [], annotations: [],
+      changes: [{ start: from + 3, end: to, kind: 'ins' }],
+    });
+    // Well-formed: the browser's parser rewrites nothing, so what it serialises back is what was written.
+    const parsed = document.createElement('div');
+    parsed.innerHTML = html;
+    expect(parsed.innerHTML).toBe(html);
+    // Nesting follows RANK: the reference is outside the change, the modification too.
+    expect(parsed.querySelector('.vlx-mod .vlx-ins')).not.toBeNull();
+    expect(parsed.querySelector('.vlx-ref-missing .vlx-ins')).not.toBeNull();
+    expect(parsed.querySelector('.vlx-ins .vlx-mod, .vlx-ins .vlx-ref-missing')).toBeNull();
+    // The change, however many pieces it is cut in, covers exactly its range.
+    expect([...parsed.querySelectorAll('.vlx-ins')].map((e) => e.textContent).join('')).toBe(privacy.slice(from + 3, to).replace(/\n/g, ''));
+    expect(parsed.textContent).toBe(privacy.replace(/\n/g, ''));
+  });
+});

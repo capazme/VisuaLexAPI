@@ -3,7 +3,7 @@ import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
   computeNormaGroups, searchParamsFromGroup, tabLabelForGroup, searchesForGroups,
-  dossierItemFromApi,
+  dossierItemFromApi, dossierFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
   validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importReasonsText, importToastType,
   encodeDossierShare, decodeDossierShare,
@@ -570,5 +570,30 @@ describe('dossier share links', () => {
 
   it('refuses a new link whose bytes are not UTF-8', () => {
     expect(() => decodeDossierShare(`u8.${btoa('\xff\xfe')}`)).toThrow();
+  });
+});
+
+describe('dossierFromApi — the kind and the copy in the Forum', () => {
+  const api = { id: 'd', name: 'D', is_pinned: false, created_at: '2026-10-14', updated_at: '2026-10-14', items: [] };
+  it('reads a dossier di studio, its published copy and the admin\'s block', () => {
+    const d = dossierFromApi({
+      ...api, kind: 'studio', forum_blocked: true,
+      published: { shared_environment_id: 'e', version: 3, is_active: false, updated_at: '2026-10-14T10:00:00Z' },
+    });
+    expect(d).toMatchObject({ kind: 'studio', forumBlocked: true, published: { sharedEnvironmentId: 'e', version: 3, isActive: false, updatedAt: '2026-10-14T10:00:00Z' } });
+  });
+  it('reads an answer without them as a dossier di lavoro never published (an older server)', () => {
+    expect(dossierFromApi(api)).toMatchObject({ kind: 'lavoro', published: null, forumBlocked: false });
+  });
+});
+
+describe('shareableDossier — what leaves the account', () => {
+  it('drops the copy in the Forum and the admin\'s block from a share link', () => {
+    const d: Dossier = { id: 'd', title: 'T', createdAt: '2026-10-14', items: [], kind: 'studio', forumBlocked: true,
+      published: { sharedEnvironmentId: 'e', version: 1, isActive: true, updatedAt: '2026-10-14' } };
+    const decoded = JSON.parse(decodeDossierShare(encodeDossierShare(d)));
+    expect(decoded).not.toHaveProperty('published');
+    expect(decoded).not.toHaveProperty('forumBlocked');
+    expect(decoded.kind).toBe('studio');
   });
 });

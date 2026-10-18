@@ -1,6 +1,6 @@
 import { leftOutMessage, travellingAnchors } from './decisionAnchorsTravel';
 import { saveBlob } from './saveBlob';
-import type { Environment, EnvironmentExport, EnvironmentCategory, Dossier, QuickNorm, CustomAlias, Annotation, Highlight } from '../types';
+import type { Environment, EnvironmentExport, CustomAlias, Annotation, Highlight } from '../types';
 
 // ============================================
 // Selection Types for Partial Import/Export
@@ -46,32 +46,6 @@ export interface DetailedEnvironmentStats {
 // Current export format version
 export const ENVIRONMENT_EXPORT_VERSION = 1;
 
-// Category configuration — color values resolve to CSS variables defined in index.css
-// (light + dark theme variants handled automatically)
-export const ENVIRONMENT_CATEGORIES: Record<EnvironmentCategory, { label: string; icon: string; color: string }> = {
-  compliance: { label: 'Compliance', icon: '🔒', color: 'hsl(var(--category-compliance))' },
-  civil: { label: 'Diritto Civile', icon: '⚖️', color: 'hsl(var(--category-civil))' },
-  penal: { label: 'Diritto Penale', icon: '⚔️', color: 'hsl(var(--category-penal))' },
-  administrative: { label: 'Diritto Amministrativo', icon: '🏛️', color: 'hsl(var(--category-administrative))' },
-  eu: { label: 'Diritto UE', icon: '🇪🇺', color: 'hsl(var(--category-eu))' },
-  other: { label: 'Altro', icon: '📁', color: 'hsl(var(--category-other))' },
-};
-
-/**
- * Returns an HSL color string for a category background with configurable alpha.
- * Uses the CSS variable, so light/dark theme handled automatically.
- *
- * @param category - category key or null/undefined → defaults to 'other'
- * @param alpha    - 0 to 1 (e.g. 0.08 for subtle tint)
- */
-export function getCategoryBgAlpha(
-  category: EnvironmentCategory | null | undefined,
-  alpha: number,
-): string {
-  const key = category ?? 'other';
-  return `hsl(var(--category-${key}) / ${alpha})`;
-}
-
 /**
  * The environment as it may leave the account: notes and highlights on a decision only while their
  * words are still in its text (§8.6). `message` says how many were left out, or null.
@@ -103,45 +77,9 @@ export async function exportEnvironmentToFile(env: Environment): Promise<string 
 }
 
 /**
- * Create a shareable link for an environment (base64 encoded). `link` is null if the environment
- * is too large; `message` is the «non incluse» line when anchors on decisions were left out.
- */
-export async function createEnvironmentShareLink(env: Environment): Promise<{ link: string | null; message: string | null }> {
-  const { env: travelling, message } = await environmentForExport(env);
-  const exportData: EnvironmentExport = {
-    version: ENVIRONMENT_EXPORT_VERSION,
-    type: 'environment',
-    exportedAt: new Date().toISOString(),
-    data: travelling,
-  };
-
-  const json = JSON.stringify(exportData);
-  const encoded = btoa(unescape(encodeURIComponent(json)));
-
-  // URL length limit (roughly 2KB for base64)
-  if (encoded.length > 2000) {
-    return { link: null, message }; // Too large for URL sharing
-  }
-
-  return { link: `${window.location.origin}/environments?import=${encodeURIComponent(encoded)}`, message };
-}
-
-/**
- * Parse an environment from a JSON file
- */
-export async function parseEnvironmentFromFile(file: File): Promise<{ success: true; data: Environment } | { success: false; error: string }> {
-  try {
-    const text = await file.text();
-    return parseEnvironmentFromJSON(text);
-  } catch {
-    return { success: false, error: 'Impossibile leggere il file' };
-  }
-}
-
-/**
  * Parse an environment from a JSON string
  */
-export function parseEnvironmentFromJSON(json: string): { success: true; data: Environment } | { success: false; error: string } {
+function parseEnvironmentFromJSON(json: string): { success: true; data: Environment } | { success: false; error: string } {
   try {
     const parsed = JSON.parse(json);
 
@@ -229,46 +167,6 @@ function sanitizeFilename(name: string): string {
     .slice(0, 50);
 }
 
-/**
- * Get stats for an environment
- */
-export function getEnvironmentStats(env: Environment): {
-  dossiers: number;
-  quickNorms: number;
-  annotations: number;
-  highlights: number;
-  articles: number;
-  decisions: number;
-} {
-  const articles = env.dossiers.reduce((acc, d) => acc + d.items.filter(i => i.type === 'norma').length, 0);
-  const decisions = env.dossiers.reduce((acc, d) => acc + d.items.filter(i => i.type === 'sentenza').length, 0);
-
-  return {
-    dossiers: env.dossiers.length,
-    quickNorms: env.quickNorms.length,
-    annotations: env.annotations.length,
-    highlights: env.highlights.length,
-    articles,
-    decisions,
-  };
-}
-
-/**
- * Check if an environment is small enough for link sharing
- */
-export function canShareAsLink(env: Environment): boolean {
-  const exportData: EnvironmentExport = {
-    version: ENVIRONMENT_EXPORT_VERSION,
-    type: 'environment',
-    exportedAt: new Date().toISOString(),
-    data: env,
-  };
-
-  const json = JSON.stringify(exportData);
-  const encoded = btoa(unescape(encodeURIComponent(json)));
-  return encoded.length <= 2000;
-}
-
 // ============================================
 // Detailed Stats & Selection Functions
 // ============================================
@@ -333,141 +231,4 @@ export function getDetailedEnvironmentStats(env: Partial<Environment>): Detailed
       items: highlights,
     },
   };
-}
-
-/**
- * Create a selection with all items selected
- */
-export function createFullSelection(env: Partial<Environment>): EnvironmentSelection {
-  return {
-    dossierIds: (env.dossiers || []).map(d => d.id),
-    quickNormIds: (env.quickNorms || []).map(qn => qn.id),
-    aliasIds: (env.customAliases || []).map(a => a.id),
-    annotationIds: (env.annotations || []).map(a => a.id),
-    highlightIds: (env.highlights || []).map(h => h.id),
-  };
-}
-
-/**
- * Create an empty selection
- */
-export function createEmptySelection(): EnvironmentSelection {
-  return {
-    dossierIds: [],
-    quickNormIds: [],
-    aliasIds: [],
-    annotationIds: [],
-    highlightIds: [],
-  };
-}
-
-/**
- * Filter an environment to only include selected items
- */
-export function filterEnvironmentBySelection(
-  env: Partial<Environment>,
-  selection: EnvironmentSelection
-): Partial<Environment> {
-  const dossierSet = new Set(selection.dossierIds);
-  const quickNormSet = new Set(selection.quickNormIds);
-  const aliasSet = new Set(selection.aliasIds);
-  const annotationSet = new Set(selection.annotationIds);
-  const highlightSet = new Set(selection.highlightIds);
-
-  return {
-    ...env,
-    dossiers: (env.dossiers || []).filter(d => dossierSet.has(d.id)),
-    quickNorms: (env.quickNorms || []).filter(qn => quickNormSet.has(qn.id)),
-    customAliases: (env.customAliases || []).filter(a => aliasSet.has(a.id)),
-    annotations: (env.annotations || []).filter(a => annotationSet.has(a.id)),
-    highlights: (env.highlights || []).filter(h => highlightSet.has(h.id)),
-  };
-}
-
-/**
- * Count total selected items in a selection
- */
-export function countSelectedItems(selection: EnvironmentSelection): number {
-  return (
-    selection.dossierIds.length +
-    selection.quickNormIds.length +
-    selection.aliasIds.length +
-    selection.annotationIds.length +
-    selection.highlightIds.length
-  );
-}
-
-/**
- * Check if all items are selected
- */
-export function isAllSelected(env: Partial<Environment>, selection: EnvironmentSelection): boolean {
-  const full = createFullSelection(env);
-  return (
-    selection.dossierIds.length === full.dossierIds.length &&
-    selection.quickNormIds.length === full.quickNormIds.length &&
-    selection.aliasIds.length === full.aliasIds.length &&
-    selection.annotationIds.length === full.annotationIds.length &&
-    selection.highlightIds.length === full.highlightIds.length
-  );
-}
-
-/**
- * Check if any items exist in the environment
- */
-export function hasAnyContent(env: Partial<Environment>): boolean {
-  return (
-    (env.dossiers?.length || 0) > 0 ||
-    (env.quickNorms?.length || 0) > 0 ||
-    (env.customAliases?.length || 0) > 0 ||
-    (env.annotations?.length || 0) > 0 ||
-    (env.highlights?.length || 0) > 0
-  );
-}
-
-/**
- * Find conflicts between imported environment and current state
- * Returns IDs that exist in both environments
- */
-export function findConflicts(
-  incoming: Partial<Environment>,
-  current: {
-    dossiers: Dossier[];
-    quickNorms: QuickNorm[];
-    customAliases: CustomAlias[];
-    annotations: Annotation[];
-    highlights: Highlight[];
-  }
-): {
-  dossierConflicts: string[];
-  quickNormConflicts: string[];
-  aliasConflicts: string[];
-  annotationConflicts: string[];
-  highlightConflicts: string[];
-} {
-  const currentDossierIds = new Set(current.dossiers.map(d => d.id));
-  const currentQuickNormIds = new Set(current.quickNorms.map(qn => qn.id));
-  const currentAliasIds = new Set(current.customAliases.map(a => a.id));
-  const currentAnnotationIds = new Set(current.annotations.map(a => a.id));
-  const currentHighlightIds = new Set(current.highlights.map(h => h.id));
-
-  return {
-    dossierConflicts: (incoming.dossiers || []).filter(d => currentDossierIds.has(d.id)).map(d => d.id),
-    quickNormConflicts: (incoming.quickNorms || []).filter(qn => currentQuickNormIds.has(qn.id)).map(qn => qn.id),
-    aliasConflicts: (incoming.customAliases || []).filter(a => currentAliasIds.has(a.id)).map(a => a.id),
-    annotationConflicts: (incoming.annotations || []).filter(a => currentAnnotationIds.has(a.id)).map(a => a.id),
-    highlightConflicts: (incoming.highlights || []).filter(h => currentHighlightIds.has(h.id)).map(h => h.id),
-  };
-}
-
-/**
- * Count total conflicts
- */
-export function countConflicts(conflicts: ReturnType<typeof findConflicts>): number {
-  return (
-    conflicts.dossierConflicts.length +
-    conflicts.quickNormConflicts.length +
-    conflicts.aliasConflicts.length +
-    conflicts.annotationConflicts.length +
-    conflicts.highlightConflicts.length
-  );
 }

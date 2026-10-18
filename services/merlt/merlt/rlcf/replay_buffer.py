@@ -40,7 +40,7 @@ Note:
 import random
 import structlog
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List, Tuple, Generic, TypeVar
+from typing import Callable, Dict, Any, Optional, List, Tuple, Generic, TypeVar
 from datetime import datetime, UTC
 from collections import deque
 import threading
@@ -262,6 +262,16 @@ class ExperienceReplayBuffer:
         with self._lock:
             self.buffer.clear()
         log.info("Buffer cleared")
+
+    def remove_where(self, predicate: Callable[[Experience], bool]) -> int:
+        """Drop every experience the predicate matches, keeping the order of the
+        others (a person's data being erased). Returns how many were dropped."""
+        with self._lock:
+            kept = [e for e in self.buffer if not predicate(e)]
+            removed = len(self.buffer) - len(kept)
+            if removed:
+                self.buffer = deque(kept, maxlen=self.capacity)
+        return removed
 
     def __len__(self) -> int:
         """Numero di esperienze nel buffer."""
@@ -634,6 +644,36 @@ class PrioritizedReplayBuffer:
     def __len__(self) -> int:
         """Numero di esperienze."""
         return self.tree.n_entries
+
+    def remove_where(self, predicate: Callable[[Experience], bool]) -> int:
+        """Drop every experience the predicate matches (a person's data being
+        erased). The others keep their priority and their order, oldest first,
+        so the ring still overwrites the oldest one next. Returns how many were
+        dropped."""
+        with self._lock:
+            n = self.tree.n_entries
+            if n < self.capacity:
+                slots = list(range(n))
+            else:
+                # Full ring: the oldest entry sits at the write index.
+                start = self.tree.write_index
+                slots = [(start + i) % self.capacity for i in range(self.capacity)]
+            entries = [
+                (self.tree.tree[slot + self.capacity - 1], self.tree.data[slot])
+                for slot in slots
+                if self.tree.data[slot] is not None
+            ]
+            kept = [(priority, exp) for priority, exp in entries if not predicate(exp)]
+            removed = len(entries) - len(kept)
+            if removed:
+                self.tree = SumTree(self.capacity)
+                for priority, exp in kept:
+                    self.tree.add(priority, exp)
+                self._oldest_ts = min(
+                    (datetime.fromisoformat(exp.timestamp) for _, exp in kept),
+                    default=None,
+                )
+        return removed
 
     def save(self, path: str) -> None:
         """

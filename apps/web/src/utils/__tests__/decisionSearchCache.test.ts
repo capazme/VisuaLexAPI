@@ -24,6 +24,18 @@ describe('searchDecisionsCached', () => {
     expect(mock).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps a page for each range of years, and asks as it always did without one', async () => {
+    mock.mockResolvedValue(OK);
+    await searchDecisionsCached({ tema: 'colpa' }, 1);
+    expect(mock).toHaveBeenLastCalledWith({ tema: 'colpa' }, 1, undefined);
+    await searchDecisionsCached({ tema: 'colpa' }, 1, undefined, { dal: 2022, al: 2023 });
+    expect(mock).toHaveBeenLastCalledWith({ tema: 'colpa' }, 1, undefined, { dal: 2022, al: 2023 });
+    await searchDecisionsCached({ tema: 'colpa' }, 1, undefined, { dal: 2022, al: 2023 });
+    await searchDecisionsCached({ tema: 'colpa' }, 1, undefined, { dal: 2022 });
+    await searchDecisionsCached({ tema: 'colpa' }, 1, undefined, { al: 2022 });
+    expect(mock).toHaveBeenCalledTimes(4);
+  });
+
   it('does not keep an answer that is not results, nor a rejection', async () => {
     mock.mockResolvedValueOnce(DOWN).mockRejectedValueOnce(new Error('net')).mockResolvedValue(OK);
     expect(await searchDecisionsCached({ tema: 'colpa' }, 1)).toEqual(DOWN);

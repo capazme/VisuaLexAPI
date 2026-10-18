@@ -75,6 +75,7 @@ model User {
   lingoStatiRipasso     LingoStatoRipasso[]
   lingoRevisioni        LingoRevisioneSRS[]
   lingoPreferenzeStudio LingoPreferenzeStudio?
+  lingoGiornateStudio   LingoGiornataStudio[]
 
   // LingoLex validation: set by an administrator; the votes this user cast (kept,
   // anonymous, when the account goes), the notice versions they wrote (same) and
@@ -413,12 +414,23 @@ model Highlight {
 // DOSSIERS (Work Folders / Projects)
 // ============================================
 
+// A dossier di lavoro holds a practice (it may carry a client's data); a dossier
+// di studio holds a topic studied: the examples, what comes from the Forum.
+enum DossierKind {
+  lavoro
+  studio
+}
+
 model Dossier {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   name        String
   description String?
   color       String?
-  tags        String[] @default([])
+  tags        String[]    @default([])
+  kind        DossierKind @default(lavoro)
+  // Set when the admin withdraws the dossier's copy in the Forum: the dossier cannot be published
+  // again (not even after its owner deletes that copy) until the admin allows it (question 190).
+  forumBlockedAt DateTime? @map("forum_blocked_at")
   userId      String   @map("user_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -437,6 +449,8 @@ model Dossier {
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items            DossierItem[]
   snapshots        DossierSnapshot[]
+  // Its copy in the Forum, if published: seen by its owner only, never in the public content.
+  publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
   sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
   originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
@@ -818,6 +832,13 @@ model SharedEnvironment {
   currentVersion Int     @default(1) @map("current_version")
   isActive       Boolean @default(true) @map("is_active")
   replacedById   String? @map("replaced_by_id")
+  // Set when the admin withdraws it: its author cannot republish it.
+  withdrawnByAdminAt DateTime? @map("withdrawn_by_admin_at")
+
+  // The dossier it was published from (one Forum item per dossier). Owner-only:
+  // never part of the content nor of any answer to someone else.
+  sourceDossierId String?  @unique @map("source_dossier_id")
+  sourceDossier   Dossier? @relation("SharedEnvironmentSourceDossier", fields: [sourceDossierId], references: [id], onDelete: SetNull)
 
   // Ownership
   userId    String   @map("user_id")
@@ -1190,12 +1211,33 @@ model LingoRevisioneSRS {
 model LingoPreferenzeStudio {
   utenteId        String         @id @map("utente_id")
   nuoveAlGiorno   Int            @default(20) @map("nuove_al_giorno")   // 1–200
+  // The reviews that make a day count for the streak (Studia progress spec D7); 1–200, a CHECK in the migration.
+  ripassiAlGiorno Int            @default(10) @map("ripassi_al_giorno")
   materieComunita LingoMateria[] @default([]) @map("materie_comunita")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
   utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
 
   @@map("lingo_preferenze_studio")
+}
+
+// One Europe/Rome day of a user's review (Studia progress spec §5.1): written with each recorded grade
+// (`lingo/studyDays.ts`) and never by the trash, so deleting a card never rewrites a past day. `valido`
+// (the day counts for the streak) is frozen once the day is over: a later change of the goal leaves it.
+model LingoGiornataStudio {
+  utenteId   String   @map("utente_id")
+  giorno     DateTime @db.Date
+  ripassi    Int      @default(0)
+  nuove      Int      @default(0)
+  sbagliate  Int      @default(0)
+  codaFinita Boolean  @default(false) @map("coda_finita")
+  valido     Boolean  @default(false)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@id([utenteId, giorno])
+  @@map("lingo_giornate_studio")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────

@@ -46,11 +46,12 @@ export const citationClickedRequestSchema = z.object({
 });
 export type CitationClickedRequest = z.infer<typeof citationClickedRequestSchema>;
 
-// 5. forum signals (discriminator field `action`)
+// 5. forum signals (discriminator field `action`). Only the environment: the
+// person who wrote it never consented to MERL-T, so their id is not collected.
+// An older client's `originalAuthorId` is stripped here, never relayed.
 export const forumSignalRequestSchema = z.object({
   action: z.enum(['like', 'download', 'suggestion_accepted', 'suggestion_declined']),
   sharedEnvId: z.string().uuid(),
-  originalAuthorId: z.string().uuid().nullable(),
 });
 export type ForumSignalRequest = z.infer<typeof forumSignalRequestSchema>;
 

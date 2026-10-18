@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../decisionFetchCache', () => ({ fetchDecisionCached: vi.fn() }));
 
 import { fetchDecisionCached } from '../decisionFetchCache';
-import { createEnvironmentShareLink, environmentForExport, exportEnvironmentToFile } from '../environmentUtils';
+import { environmentForExport, exportEnvironmentToFile } from '../environmentUtils';
 import { articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../../test/fixtures/travelFixtures';
 import type { Environment } from '../../types';
 
@@ -16,7 +16,7 @@ beforeEach(() => {
   vi.mocked(fetchDecisionCached).mockResolvedValue(obscuredAnswer as never);
 });
 
-describe('environment export and share link: words a court withdrew stay home', () => {
+describe('an archived environment\'s export: words a court withdrew stay home', () => {
   it('environmentForExport drops them and says so', async () => {
     const out = await environmentForExport(env);
     expect(out.env.annotations.map((a) => a.id)).toEqual(['n-art']);
@@ -45,13 +45,5 @@ describe('environment export and share link: words a court withdrew stay home', 
     const written = JSON.parse(await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.readAsText(blob!); }));
     expect(written.data.annotations.map((a: { id: string }) => a.id)).toEqual(['n-art']);
     expect(written.data.highlights.map((h: { id: string }) => h.id)).toEqual(['h-art']);
-  });
-
-  it('the share link carries only what stands', async () => {
-    const { link, message } = await createEnvironmentShareLink({ ...env, annotations: [decisionNote], highlights: [] });
-    expect(message).toMatch(/1 nota/);
-    const encoded = decodeURIComponent(new URL(link ?? 'http://x/?import=').searchParams.get('import') ?? '');
-    const decoded = encoded ? decodeURIComponent(escape(atob(encoded))) : '';
-    expect(decoded).not.toContain('Mario Rossi');
   });
 });

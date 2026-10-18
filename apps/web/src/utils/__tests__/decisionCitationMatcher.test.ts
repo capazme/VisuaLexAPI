@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { extractDecisionCitations } from '../decisionCitationMatcher';
+import { extractDecisionCitations, type DecisionContext } from '../decisionCitationMatcher';
 import { parseDecisionPath } from '../decisionLinks';
 
 // The sentences and the spans they hold live in the convention's golden file
@@ -15,14 +15,14 @@ function findGolden(from: string): string {
 }
 
 interface GoldenSpan { start: number; end: number; text: string; reference: unknown; path: string }
-interface GoldenCase { text: string; within?: 'cassazione'; spans: GoldenSpan[]; status: string }
+interface GoldenCase { text: string; within?: DecisionContext; spans: GoldenSpan[]; status: string }
 const { today, cases } = (JSON.parse(readFileSync(findGolden(__dirname), 'utf8')) as {
   decision_citations_in_text: { today: string; cases: GoldenCase[] };
 }).decision_citations_in_text;
 const NOW = new Date(`${today}T12:00:00Z`);
 
-const spansOf = (text: string, within?: 'cassazione') => extractDecisionCitations(text, { within, now: NOW });
-const writtenIn = (text: string, within?: 'cassazione') => spansOf(text, within).map((s) => text.slice(s.start, s.end));
+const spansOf = (text: string, within?: DecisionContext) => extractDecisionCitations(text, { within, now: NOW });
+const writtenIn = (text: string, within?: DecisionContext) => spansOf(text, within).map((s) => text.slice(s.start, s.end));
 
 describe('extractDecisionCitations, the golden file', () => {
   it('has the cases', () => {
@@ -205,6 +205,10 @@ const HOSTILE: Array<[string, string]> = [
   ['a Union court', hostile('Corte giust. UE, ')],
   ['acts with numbers', hostile('legge n. 1 del 12 marzo regio decreto-legge ')],
   ['one court and many case numbers', 'Cass. ' + hostile('C-1/2 ')],
+  ['kinds of decision', hostile('sentenze n. 1 del 2000, ord. n. 2 e ')],
+  ['lists of kinds', hostile('sentenza n. 1/2000 e n. 2/2001, n. 3 del 2002 e ')],
+  ['numbers sharing a year', hostile('Cass. n. 1 e n. 2, n. 3 e ')],
+  ['complete shared-year lists', hostile('sentenze n. 1, n. 2 e n. 3 del 2000 ')],
   ['courts the app cannot open', hostile("Trib. Milano, sez. 3, Corte d'appello ")],
   ['lists of precedents', hostile('Cass. n. 1/2020; Sez. 3, n. 2/2021 (in G.U. ')],
 ];
@@ -212,15 +216,17 @@ const HOSTILE: Array<[string, string]> = [
 describe('extractDecisionCitations, hostile text', () => {
   for (const [name, text] of HOSTILE) {
     it(`reads ${HOSTILE_SIZE.toLocaleString('en')} characters of ${name} in a bounded time`, () => {
-      const start = performance.now();
-      const found = extractDecisionCitations(text, { within: 'cassazione', now: NOW });
-      const elapsed = performance.now() - start;
-      expect(elapsed, `${name}: ${elapsed.toFixed(0)} ms`).toBeLessThan(500);
-      let last = 0;
-      for (const s of found) {
-        expect(s.start).toBeGreaterThanOrEqual(last);
-        expect(s.end).toBeGreaterThan(s.start);
-        last = s.end;
+      for (const within of ['cassazione', 'corte_costituzionale'] as const) {
+        const start = performance.now();
+        const found = extractDecisionCitations(text, { within, now: NOW });
+        const elapsed = performance.now() - start;
+        expect(elapsed, `${name} (${within}): ${elapsed.toFixed(0)} ms`).toBeLessThan(500);
+        let last = 0;
+        for (const s of found) {
+          expect(s.start).toBeGreaterThanOrEqual(last);
+          expect(s.end).toBeGreaterThan(s.start);
+          last = s.end;
+        }
       }
     });
   }
@@ -231,7 +237,7 @@ describe('extractDecisionCitations, hostile text', () => {
       ',', '.', ';', ':', '/', '-', '\n', '\n\n', ' ', ' ', ' ', ' ', ' ', '1', '12', '2020', '1999', '99999', '07', 'Corte cost.', 'C. cost.',
       'Cons. Stato', 'Ad. plen.', 'C.G.A.R.S.', 'TAR', 'T.A.R.', 'Lazio', 'Roma', 'T.R.G.A.', 'Bolzano', 'CGUE', 'Corte giust.', 'UE', 'Trib. UE',
       'C-', 'T-', 'causa', 'cause riunite', 'art.', '267', 'TFUE', 'd.l.', 'legge', 'decreto', 'direttiva', 'Il', 'la', 'ha', 'dichiarato',
-      'gennaio', 'aprile', 'sent.', 'ord.', 'sentenza', 'Tribunale', 'di', 'Milano', 'Corte', 'e', "l'", '’', 'à', 'È',
+      'gennaio', 'aprile', 'sentenze', 'sentenza', 'sent.', 'ord.', 'ordinanza', 'Tribunale', 'di', 'Milano', 'Corte', 'e', "l'", '’', 'à', 'È',
     ];
     const random = mulberry32(20261013);
     const texts: string[] = [];
@@ -242,7 +248,7 @@ describe('extractDecisionCitations, hostile text', () => {
       texts.push(text);
     }
     const start = performance.now();
-    const results = texts.map((text, i) => extractDecisionCitations(text, { within: i % 2 === 0 ? 'cassazione' : undefined, now: NOW }));
+    const results = texts.map((text, i) => extractDecisionCitations(text, { within: ([undefined, 'cassazione', 'corte_costituzionale'] as const)[i % 3], now: NOW }));
     const elapsed = performance.now() - start;
     expect(elapsed, `${elapsed.toFixed(0)} ms`).toBeLessThan(1000);
     results.forEach((found, i) => {
@@ -255,5 +261,69 @@ describe('extractDecisionCitations, hostile text', () => {
         last = s.end;
       }
     });
+  });
+});
+
+// The act words that keep a decision's number out of an administrative act («nota», «provvedimento»,
+// «parere»…) must not swallow the administrative court that follows them as a name.
+describe('extractDecisionCitations, administrative acts and administrative courts', () => {
+  it('links a decision after «nota» or «provvedimento» when a court follows', () => {
+    expect(writtenIn('Come nota il T.A.R. Lazio n. 1234/2018.')).toEqual(['T.A.R. Lazio n. 1234/2018']);
+    expect(writtenIn('Come nota il C.d.S. n. 1234/2018.')).toEqual(['C.d.S. n. 1234/2018']);
+    expect(writtenIn('Il provvedimento impugnato T.A.R. Lazio n. 1234/2018.')).toEqual(['T.A.R. Lazio n. 1234/2018']);
+  });
+
+  it("does not link the administrative act of a court («parere del C.d.S.», «nota del T.A.R.»)", () => {
+    expect(writtenIn('Il parere del C.d.S. n. 1234/2018.')).toEqual([]);
+    expect(writtenIn('Il parere del Consiglio di Stato n. 1234/2018.')).toEqual([]);
+    expect(writtenIn('La nota del T.A.R. Lazio n. 1234/2018.')).toEqual([]);
+  });
+});
+
+describe('extractDecisionCitations, «C.d.S.» as the codice della strada', () => {
+  it('does not link the code cited after an article or a preposition', () => {
+    for (const text of [
+      'Il verbale ex art. 142 c.d.s. n. 5/2018 è nullo.',
+      "Si applica l'art. 142 del c.d.s. n. 5/2018.",
+      'Il conducente, in violazione del C.d.S. n. 5/2018, è sanzionato.',
+      "Vale l'art. 142, comma 8, C.d.S., n. 5/2018 per la velocità.",
+      "Vale l'art. 186 cds n. 5/2018 per la guida.",
+      'Vale art. 126-bis c.d.s. n. 5/2018.',
+      'Valgono artt. 142 e 143 C.d.S. n. 5/2018.',
+    ]) {
+      expect(writtenIn(text), text).toEqual([]);
+      expect(writtenIn(text, 'cassazione'), text).toEqual([]);
+    }
+  });
+
+  it('still links the Consiglio di Stato written C.d.S.', () => {
+    expect(writtenIn('Come in C.d.S., sez. IV, n. 5/2018 e nulla più.')).toEqual(['C.d.S., sez. IV, n. 5/2018']);
+    expect(writtenIn('Come affermato (C.d.S. n. 5/2018) in tema di appalti.')).toEqual(['C.d.S. n. 5/2018']);
+    expect(writtenIn('Cfr. art. 142 c.d.s. e C.d.S., sez. IV, n. 5/2018.')).toEqual(['C.d.S., sez. IV, n. 5/2018']);
+    expect(writtenIn('Si veda art. 5. C.d.S. n. 5/2018 ha deciso.')).toEqual(['C.d.S. n. 5/2018']);
+  });
+});
+
+describe('extractDecisionCitations, «C.d.S.» followed by a section is the court', () => {
+  it('links the Consiglio di Stato after «del», «dal» or an article, and in a Cassazione decision too', () => {
+    const forms: [string, string][] = [
+      ['Come afferma la sentenza del C.d.S., sez. IV, n. 5/2018.', 'C.d.S., sez. IV, n. 5/2018'],
+      ['Come ritenuto dal C.d.S., sez. IV, n. 5/2018.', 'C.d.S., sez. IV, n. 5/2018'],
+      ["Vale l'art. 21-nonies, C.d.S., sez. VI, n. 5/2018 per l'annullamento.", 'C.d.S., sez. VI, n. 5/2018'],
+      ["Vale l'art. 21-nonies, C.d.S., Ad. plen., n. 5/2018 per l'annullamento.", 'C.d.S., Ad. plen., n. 5/2018'],
+    ];
+    for (const [text, span] of forms) {
+      for (const within of [undefined, 'cassazione', 'corte_costituzionale'] as const) {
+        expect(writtenIn(text, within), `${within} ${text}`).toEqual([span]);
+        for (const s of spansOf(text, within)) expect(s.reference.corte, text).toBe('consiglio_di_stato');
+      }
+    }
+  });
+
+  it('without a section, «dal/al/nel C.d.S. n. …» stays the code (truly ambiguous)', () => {
+    for (const text of ['Come ritenuto dal C.d.S. n. 5/2018 in tema di appalti.', 'Si rinvia al C.d.S. n. 5/2018.', 'Previsto nel C.d.S. n. 5/2018.']) {
+      expect(writtenIn(text), text).toEqual([]);
+      expect(writtenIn(text, 'cassazione'), text).toEqual([]);
+    }
   });
 });

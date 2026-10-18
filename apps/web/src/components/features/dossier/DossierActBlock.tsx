@@ -9,7 +9,10 @@ import { foldedArticleList, type ActBlock } from './dossierLayout';
 import { useActDetails } from './useActDetails';
 
 export interface DossierActBlockProps {
+  /** What is shown: the act's articles the dossier's search left. */
   block: ActBlock;
+  /** The whole act, for its title and rubriche: a search must not read the act again. */
+  act?: ActBlock;
   /** Off while the dossier's search filters the page. */
   dragDisabled: boolean;
   isFolded: boolean;
@@ -41,7 +44,7 @@ const ACTION_BUTTON =
 /** One act, named once, with its articles beneath it (spec §4). */
 export function DossierActBlock(props: DossierActBlockProps) {
   const { block, dragDisabled, isFolded, onToggleFold } = props;
-  const { title, rubricaOf } = useActDetails(block);
+  const { title, rubricaOf } = useActDetails(props.act ?? block);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.key, disabled: dragDisabled });
   const count = block.articles.length;

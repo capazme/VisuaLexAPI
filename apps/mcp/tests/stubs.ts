@@ -28,6 +28,7 @@ export interface Stub {
   dossiers: {
     id: string;
     name: string;
+    kind?: 'lavoro' | 'studio';
     items: {
       id: string;
       item_type: string;
@@ -81,7 +82,7 @@ export async function startStubs() {
     if (override) return void res.status(override[0]).json(override[1]);
     if (req.method === 'GET' && path === '/dossiers') return void res.json(stub.dossiers);
     if (req.method === 'POST' && path === '/dossiers') {
-      const created = { id: `d${stub.dossiers.length + 1}`, name: req.body.name, items: [] };
+      const created = { id: `d${stub.dossiers.length + 1}`, name: req.body.name, kind: req.body.kind, items: [] };
       stub.dossiers.push(created);
       return void res.status(201).json(created);
     }

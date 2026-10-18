@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-vi.mock('../environments/EnvironmentContentViewer', () => ({
+vi.mock('./EnvironmentContentViewer', () => ({
   EnvironmentContentViewer: ({ onSelectionChange }: { onSelectionChange: (s: unknown) => void }) => (
     <button onClick={() => onSelectionChange({ dossierIds: [], quickNormIds: [], aliasIds: [], annotationIds: ['n-dec', 'n-art'], highlightIds: ['h-dec', 'h-art'] })}>
       Seleziona tutto

@@ -58,6 +58,21 @@ describe('the reading surface', () => {
     expect(css).toMatch(/\.vlx-decision \.vlx-dec-block::?before\s*\{[^}]*\bcolor:\s*var\(--color-slate-500\)/);
     expect(css).toMatch(/\.dark \.vlx-decision \.vlx-dec-block::?before\s*\{[^}]*\bcolor:\s*var\(--color-slate-400\)/);
   }, 30000);
+
+  it('draws a decision\'s key passages and their labels in both themes, and hides them with the switch', async () => {
+    const css = await compile(['block']);
+    expect(css).toMatch(/\.vlx-decision \.vlx-key-passage\s*\{[^}]*background-image:\s*linear-gradient/);
+    expect(css).toMatch(/\.dark \.vlx-decision \.vlx-key-passage\s*\{[^}]*--key-passage:/);
+    expect(css).toMatch(/\.vlx-decision \.vlx-key-head::?before\s*\{[^}]*content:\s*attr\(data-key-label\)/);
+    expect(css).toMatch(/\.dark \.vlx-decision \.vlx-key-head::?before\s*\{[^}]*\bcolor:/);
+    expect(css).toMatch(/\.key-passages-hidden \.vlx-key-passage\s*\{[^}]*background-image:\s*none/);
+    expect(css).toMatch(/\.key-passages-hidden \.vlx-key-head::?before\s*\{[^}]*content:\s*none/);
+    // under a highlight (a passage the reader made theirs) it loses its underline and its label
+    expect(css).toMatch(/\.vlx-decision \.highlight-mark \.vlx-key-passage\s*\{[^}]*background-image:\s*none/);
+    expect(css).toMatch(/\.vlx-decision \.highlight-mark \.vlx-key-head::?before\s*\{[^}]*content:\s*none/);
+    // and back with the highlights hidden
+    expect(css).toMatch(/\.vlx-decision\.highlights-hidden:not\(\.key-passages-hidden\) \.highlight-mark \.vlx-key-head::?before\s*\{[^}]*content:\s*attr\(data-key-label\)/);
+  }, 30000);
 });
 
 describe('the page height', () => {
@@ -68,8 +83,8 @@ describe('the page height', () => {
 });
 
 describe('the practice row\'s columns', () => {
-  it('are the page height less the 4 rem of Layout\'s content padding, in dynamic viewport units with a 100vh fallback', async () => {
+  it('are the page height less the 4 rem of Layout\'s content padding and the search page\'s field, in dynamic viewport units with a 100vh fallback', async () => {
     const css = await compile(['h-app-row']);
-    expect(css).toMatch(/\.h-app-row\s*\{\s*height:\s*calc\(100vh - 4rem\);\s*height:\s*calc\(100dvh - 4rem\);?\s*\}/);
+    expect(css).toMatch(/\.h-app-row\s*\{\s*height:\s*calc\(100vh - 4rem - var\(--search-bar-height, 0px\)\);\s*height:\s*calc\(100dvh - 4rem - var\(--search-bar-height, 0px\)\);?\s*\}/);
   }, 30000);
 });

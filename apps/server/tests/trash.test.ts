@@ -76,6 +76,38 @@ describe('the trash', () => {
     expect(moved.status).toBe(200);
   });
 
+  it('a dossier deleted from the web app goes to the trash as the user\'s own, and comes back whole (question 160)', async () => {
+    const deleted = await request(app).delete(`/api/dossiers/${dossierId}`).set(authHeader(alice));
+    expect(deleted.status).toBe(200);
+    expect(deleted.body).toEqual({ trashId: expect.any(String), itemCount: 3 });
+    expect(await prisma.dossier.count({ where: { id: dossierId } })).toBe(0);
+    const list = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    expect(list).toEqual([expect.objectContaining({
+      id: deleted.body.trashId, kind: 'DOSSIER', dossierId, label: 'Prova', itemCount: 3, clientName: null, byApplication: false,
+    })]);
+    const restored = await request(app).post(`/api/trash/${deleted.body.trashId}/restore`).set(authHeader(alice)).send({});
+    expect(restored.body).toEqual({ dossierId });
+    const back = (await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice))).body;
+    expect(back.items.map((i: { id: string }) => i.id).sort()).toEqual([art3, art25, noteId].sort());
+    expect(back.items.find((i: { id: string }) => i.id === noteId)?.about_item_id).toBe(art3);
+    expect(await prisma.dossierSnapshot.count({ where: { dossierId } })).toBe(1);
+  });
+
+  it("the web app's deletion takes whatever the dossier holds, an empty one too, and never another user's", async () => {
+    const late = await addItem(dossierId, { itemType: 'norm', title: 'legge', content: law('9') });
+    const deleted = await request(app).delete(`/api/dossiers/${dossierId}`).set(authHeader(alice));
+    expect(deleted.body.itemCount).toBe(4);
+    const entry = await prisma.trashEntry.findUniqueOrThrow({ where: { id: deleted.body.trashId } });
+    expect((entry.payload as { items: { id: string }[] }).items.map((i) => i.id)).toContain(late);
+    const empty = (await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Vuoto' })).body.id;
+    expect((await request(app).delete(`/api/dossiers/${empty}`).set(authHeader(alice))).body.itemCount).toBe(0);
+    const bob = await createTestUser('trash-bob-web');
+    const bobs = (await request(app).post('/api/dossiers').set(authHeader(bob)).send({ name: 'Di Bob' })).body.id;
+    expect((await request(app).delete(`/api/dossiers/${bobs}`).set(authHeader(alice))).status).toBe(404);
+    expect(await prisma.dossier.count({ where: { id: bobs } })).toBe(1);
+    expect(await prisma.trashEntry.count({ where: { userId: bob.id } })).toBe(0);
+  });
+
   it('moves exactly the entries given, and reports the ids that are not in this dossier', async () => {
     const other = (await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Altro' })).body.id;
     const elsewhere = await addItem(other, { itemType: 'norm', title: 'legge', content: law('9') });
@@ -106,6 +138,15 @@ describe('the trash', () => {
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [] })).status).toBe(400);
     const many = Array.from({ length: 51 }, (_, i) => `id-${i}`);
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: many })).status).toBe(400);
+  });
+
+  it('the user\'s own session has no cap of 50 (a long selection is one action), but not an empty list', async () => {
+    const many = Array.from({ length: 51 }, (_, i) => `id-${i}`);
+    const own = await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(authHeader(alice)).send({ itemIds: [art3, ...many] });
+    expect(own.status).toBe(200);
+    expect(own.body.moved).toEqual([art3]);
+    expect(own.body.notFound).toHaveLength(51);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(authHeader(alice)).send({ itemIds: [] })).status).toBe(400);
   });
 
   it('lists entries with each citation and the act alone, notes with nulls, newest first', async () => {
@@ -184,7 +225,8 @@ describe('the trash', () => {
     const { bearer } = await connected(alice);
     await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
     await request(app).delete(`/api/dossiers/${dossierId}`).set(authHeader(alice));
-    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    // The dossier went to the trash too: the entries are the other one.
+    const entry = (await request(app).get('/api/trash').set(authHeader(alice))).body.find((e: { kind: string }) => e.kind === 'DOSSIER_ITEMS');
     const asked = await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({});
     expect(asked.status).toBe(409);
     expect(asked.body.detail).toBe('Il dossier non esiste più: scegli dove ripristinare.');
@@ -246,15 +288,76 @@ describe('the trash', () => {
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
   });
 
-  it('a connected application can neither list, restore nor purge; a user session cannot use the moving routes', async () => {
+  it('a connected application can neither list, restore nor purge; a user session can move entries but not use the whole-dossier route', async () => {
     const { bearer } = await connected(alice);
     await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
     const entry = await prisma.trashEntry.findFirstOrThrow();
     expect((await request(app).get('/api/trash').set(bearer)).status).toBe(403);
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(bearer).send({})).status).toBe(403);
     expect((await request(app).delete(`/api/trash/${entry.id}`).set(bearer)).status).toBe(403);
+    // The whole dossier, with seen ids, is for connected applications: the web app uses DELETE /dossiers/:id.
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(authHeader(alice)).send({ itemIds: [] })).status).toBe(403);
-    expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(authHeader(alice)).send({ itemIds: [art25] })).status).toBe(403);
+    expect(await prisma.dossier.count({ where: { id: dossierId } })).toBe(1);
+    const own = await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(authHeader(alice)).send({ itemIds: [art25] });
+    expect(own.status).toBe(200);
+    expect(own.body.moved).toEqual([art25]);
+  });
+
+  it('entries removed from the web app go to the trash as the user\'s own: three ids are one entry with three items (question 181)', async () => {
+    const moved = await request(app)
+      .post(`/api/dossiers/${dossierId}/trash-items`)
+      .set(authHeader(alice))
+      .send({ itemIds: [art3, art25, noteId] });
+    expect(moved.status).toBe(200);
+    expect(moved.body).toEqual({ trashId: expect.any(String), moved: expect.arrayContaining([art3, art25, noteId]), notFound: [] });
+    expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(0);
+    const list = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      id: moved.body.trashId, kind: 'DOSSIER_ITEMS', dossierId, label: 'Prova', itemCount: 3, clientName: null, byApplication: false,
+    });
+    expect(list[0].items).toHaveLength(3);
+    const stored = await prisma.trashEntry.findUniqueOrThrow({ where: { id: moved.body.trashId } });
+    expect(stored).toMatchObject({ clientId: null, clientName: null, grantId: null });
+  });
+
+  it('what the web app removed comes back with its original ids, a note still about its article, and Claude\'s mark', async () => {
+    await prisma.dossierItem.update({ where: { id: art25 }, data: { createdByClientId: 'client-x', createdByClientName: 'Claude Code' } });
+    const before = await prisma.dossierItem.findMany({ where: { dossierId }, orderBy: { position: 'asc' } });
+    const moved = await request(app)
+      .post(`/api/dossiers/${dossierId}/trash-items`)
+      .set(authHeader(alice))
+      .send({ itemIds: [art3, art25, noteId] });
+    const restored = await request(app).post(`/api/trash/${moved.body.trashId}/restore`).set(authHeader(alice)).send({});
+    expect(restored.status).toBe(200);
+    expect(restored.body).toEqual({ dossierId });
+    const read = (await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice))).body;
+    expect(read.items.map((i: { id: string }) => i.id)).toEqual(before.map((i) => i.id));
+    expect(read.items.find((i: { id: string }) => i.id === noteId).about_item_id).toBe(art3);
+    expect(read.items.find((i: { id: string }) => i.id === art25).created_by).toEqual({ clientName: 'Claude Code' });
+    expect(await prisma.dossierItem.findMany({ where: { dossierId }, orderBy: { position: 'asc' } })).toEqual(before);
+    expect(await prisma.trashEntry.count()).toBe(0);
+  });
+
+  it("DELETE of one entry from the web app moves it to the trash and names the entry; another user's dossier or entry is a 404 and nothing moves", async () => {
+    const removed = await request(app).delete(`/api/dossiers/${dossierId}/items/${art3}`).set(authHeader(alice));
+    expect(removed.status).toBe(200);
+    expect(removed.body).toEqual({ trashId: expect.any(String), moved: [art3], notFound: [] });
+    expect(await prisma.dossierItem.count({ where: { id: art3 } })).toBe(0);
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    expect(entry).toMatchObject({ id: removed.body.trashId, kind: 'DOSSIER_ITEMS', itemCount: 1, byApplication: false, clientName: null });
+    expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+    expect(await prisma.dossierItem.count({ where: { id: art3 } })).toBe(1);
+
+    const bob = await createTestUser('trash-bob-web-items');
+    const bobs = (await request(app).post('/api/dossiers').set(authHeader(bob)).send({ name: 'Di Bob' })).body.id;
+    const bobsItem = (await request(app).post(`/api/dossiers/${bobs}/items`).set(authHeader(bob)).send({ itemType: 'norm', title: 'legge', content: law('9') })).body.id as string;
+    expect((await request(app).delete(`/api/dossiers/${bobs}/items/${bobsItem}`).set(authHeader(alice))).status).toBe(404);
+    expect((await request(app).delete(`/api/dossiers/${dossierId}/items/${bobsItem}`).set(authHeader(alice))).status).toBe(404);
+    expect((await request(app).post(`/api/dossiers/${bobs}/trash-items`).set(authHeader(alice)).send({ itemIds: [bobsItem] })).status).toBe(404);
+    expect(await prisma.dossierItem.count({ where: { id: bobsItem } })).toBe(1);
+    expect(await prisma.trashEntry.count({ where: { userId: bob.id } })).toBe(0);
+    expect(await prisma.trashEntry.count({ where: { userId: alice.id } })).toBe(0);
   });
 
   it('no route reachable by an exchanged token deletes for good', () => {
@@ -285,7 +388,7 @@ describe('the trash', () => {
     await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3, noteId] });
     await request(app).delete(`/api/dossiers/${dossierId}`).set(authHeader(alice));
     const target = (await request(app).post('/api/dossiers').set(authHeader(alice)).send({ name: 'Nuovo' })).body.id;
-    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    const entry = (await request(app).get('/api/trash').set(authHeader(alice))).body.find((e: { kind: string }) => e.kind === 'DOSSIER_ITEMS');
     await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({ targetDossierId: target });
     expect((await prisma.dossierItem.findUniqueOrThrow({ where: { id: noteId } })).aboutItemId).toBe(art3);
   });

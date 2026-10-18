@@ -5,7 +5,7 @@ import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { cn } from '../../../lib/utils';
 import { CardForm, type CardFormMode } from './CardForm';
-import { Sheet } from './Sheet';
+import { Sheet } from '../../ui/Sheet';
 
 export interface CardFormDialogProps {
   open: boolean;

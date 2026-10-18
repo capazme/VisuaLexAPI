@@ -12,7 +12,10 @@ import { UndoToastContainer } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
+import { Z_INDEX } from '../../constants/zIndex';
 import { FindWindow } from '../features/search/FindWindow';
+import { GlobalSearch } from '../features/search/GlobalSearch';
+import { SearchField, SEARCH_BAR_HEIGHT } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
@@ -43,9 +46,11 @@ export function Layout() {
   const inReviewSession = pathname.startsWith('/studia/ripasso/sessione');
   const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
   const barPinnedAtBottom = inReviewSession || onValidationQueue;
+  // The search page's field sits above its content, outside the scroller, so it is always on screen
+  // (spec 2026-10-13-fixed-search-design.md); Focus mode hides it, ⌘K still opens the palette.
+  const showSearchBar = onSearchPage && !settings.focusMode;
   // Below lg the menu button floats at the top left over the content: every page starts under it,
-  // except the ones that draw their own header beside it (the search page's phone table, its tab
-  // header and the full-screen reader pad their headers by the button's width instead).
+  // except the search page, whose field sits beside it.
   const headerBesideMenuButton = onSearchPage;
 
   // Leaving the search page closes the window: its matches are in practices no longer on screen.
@@ -198,7 +203,11 @@ export function Layout() {
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+      <main
+        className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
+        // The practice's columns (`h-app-row`) are the viewport less this bar.
+        style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}
+      >
         {/* Floating Focus Toggle */}
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -233,6 +242,20 @@ export function Layout() {
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </motion.button>
+        )}
+
+        {showSearchBar && (
+          <div
+            data-testid="search-bar"
+            style={{ height: SEARCH_BAR_HEIGHT }}
+            // Below lg the menu button floats at the top left: the field starts beside it. From md the
+            // Focus toggle floats at the top right: the field ends before it. Positioned in the dropdown
+            // band, so the line under the field paints over the practice's sticky headings (its blur
+            // makes the bar a stacking context, gotcha 22) and under the floating buttons.
+            className={cn('relative flex flex-shrink-0 items-center justify-center border-b', Z_INDEX.dropdown, 'border-slate-200 bg-white/80 pl-[4.5rem] pr-4 backdrop-blur-xl md:pr-[4.5rem] lg:pl-8 dark:border-slate-800 dark:bg-slate-900/80')}
+          >
+            <SearchField />
+          </div>
         )}
 
         {/* Content Area */}
@@ -271,6 +294,9 @@ export function Layout() {
       <SyncErrorToast />
 
       <ServiceHealthBanner className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />
+
+      {/* The palette (⌘K) and the managers it opens, on every page */}
+      <GlobalSearch />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />

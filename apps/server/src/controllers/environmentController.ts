@@ -3,6 +3,8 @@ import { EnvironmentCategory } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
+import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
+import { readableContent } from '../utils/publishedContent';
 
 // ── Validation ────────────────────────────────────────────────────────────
 
@@ -182,4 +184,26 @@ export const deleteEnvironment = async (req: Request, res: Response) => {
   await prisma.environment.delete({ where: { id } });
 
   res.status(204).send();
+};
+
+const importSwitchesSchema = z.object({
+  addNotes: z.boolean().default(true),
+  addHighlights: z.boolean().default(true),
+});
+
+/**
+ * «Recupera i dossier» from an environment of the archive (spec
+ * docs/superpowers/specs/2026-10-13-environments-into-forum-design.md, D11b): each of its dossiers
+ * becomes a new dossier di studio, with its notes and highlights unless switched off, one
+ * identical to the user's own skipped. The environment itself is left as it is.
+ */
+export const recoverEnvironment = async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError(401, 'Not authenticated');
+  const switches = importSwitchesSchema.parse(req.body ?? {});
+  const env = await prisma.environment.findFirst({ where: { id: req.params.id, userId: req.user.id }, select: { content: true } });
+  if (!env) throw new AppError(404, 'Ambiente non trovato');
+  await spendStudyImport(req.user.id);
+  const { content, refused } = readableContent(env.content);
+  const report = await importStudyDossiers(req.user.id, content, { ...switches, addShortcuts: false, attributeTo: null, refused });
+  res.status(201).json(report);
 };

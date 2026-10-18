@@ -1,5 +1,5 @@
-import { useId, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useCallback, useId, useMemo, useState } from 'react';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import type { MassimaStructured, NormaVisitata } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
@@ -9,11 +9,17 @@ import { citeNorm } from '../../../utils/sources';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
 import { searchNorma } from '../../../utils/decisionSearchNorma';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { getSlotComponents } from '../../../plugins/registry';
 import { DecisionResultList } from '../decisions/DecisionResultList';
+import { EuCaseLawBlock } from '../decisions/EuCaseLawBlock';
 import { MassimeSection } from './MassimeSection';
 import type { MassimeState } from './massimeState';
+import { CaseLawControls } from './caseLaw/CaseLawControls';
+import { CaseLawFiltersContext } from './caseLaw/caseLawFiltersContext';
+import { narrowingCount, NO_FILTERS, type CaseLawFilters } from './caseLaw/caseLawFilter';
+import { mergeYearCounts, type YearCount } from './caseLaw/caseLawYears';
 
 interface CaseLawSectionProps {
   norma: NormaVisitata;
@@ -60,7 +66,8 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
  * «Giurisprudenza» under the article text: Brocardi's massime (their decisions as links), the
  * Massimario's reviews (a plugin panel in the `article_case_law` slot) and, on request, the
  * decisions of the Cassazione that mention the article. Closed by default; its state is kept
- * per host for the session. Nothing is asked of the Cassazione's archive until the button is pressed,
+ * per host for the session. An act of the Union gets the Court of Justice's block (`EuCaseLawBlock`, loaded
+ * when the section opens) in place of the Cassazione's. One set of controls at its head (the years, the text) narrows every block. Nothing is asked of the Cassazione's archive until the button is pressed,
  * and an act of the Union is not offered the archive at all (its search cannot read an EU act;
  * case-law section spec, D2).
  *
@@ -72,12 +79,33 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
   const panelId = useId();
   const [open, setOpen] = useState(() => readOpen(tabId));
   const [searched, setSearched] = useState(false);
+  const desktop = useIsDesktop();
+  const [filters, setFilters] = useState<CaseLawFilters>(NO_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // the years of the rows each block has loaded, for the chips
+  const [reported, setReported] = useState<Record<string, YearCount[]>>({});
   // Another article in the same host: the search starts again from the button
   const [shownKey, setShownKey] = useState(articleUrn);
   if (shownKey !== articleUrn) {
     setShownKey(articleUrn);
     setSearched(false);
+    setFilters(NO_FILTERS);
   }
+
+  const reportYears = useCallback((source: string, years: YearCount[] | null) => {
+    setReported((previous) => {
+      if (years === null) {
+        if (!(source in previous)) return previous;
+        const rest = { ...previous };
+        delete rest[source];
+        return rest;
+      }
+      return previous[source] === years ? previous : { ...previous, [source]: years };
+    });
+  }, []);
+  const provided = useMemo(() => ({ filters, reportYears }), [filters, reportYears]);
+  const counts = useMemo(() => mergeYearCounts(Object.values(reported), filters.order), [reported, filters.order]);
+  const active = narrowingCount(filters);
 
   const toggle = () => {
     const next = !open;
@@ -110,7 +138,31 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
 
       <div id={panelId} hidden={!open} className="mt-3 space-y-6">
         {open && (
-          <>
+          <CaseLawFiltersContext.Provider value={provided}>
+            {/* One set of controls for every block; on a phone they sit behind «Filtri» */}
+            <div>
+              {!desktop && (
+                <button
+                  type="button"
+                  aria-expanded={filtersOpen}
+                  aria-controls={`${panelId}-filters`}
+                  onClick={() => setFiltersOpen((v) => !v)}
+                  className={cn(
+                    'mb-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:text-slate-200',
+                    TOUCH_TARGET_RESPONSIVE,
+                  )}
+                >
+                  <SlidersHorizontal size={14} aria-hidden="true" />
+                  Filtri
+                  {active > 0 && <span aria-hidden="true" className="rounded-full bg-primary-600 px-1.5 text-xs text-white">{active}</span>}
+                </button>
+              )}
+              {/* always there, so «Filtri» controls an element; hidden on a phone until it is opened */}
+              <div id={`${panelId}-filters`} hidden={!desktop && !filtersOpen}>
+                <CaseLawControls filters={filters} onChange={setFilters} counts={counts} />
+              </div>
+            </div>
+
             {massimeState !== 'hidden' && (
               <section aria-labelledby={`${panelId}-massime`} className="space-y-2">
                 <h4 id={`${panelId}-massime`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -167,7 +219,17 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
                 </button>
               )}
             </section>}
-          </>
+
+            {/* An act of the Union has no Cassazione block; its case law is the Union's courts' */}
+            {!offersCassazione && (
+              <section aria-labelledby={`${panelId}-eu`} className="space-y-3">
+                <h4 id={`${panelId}-eu`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Corte di giustizia UE — citano l’articolo
+                </h4>
+                <EuCaseLawBlock norma={norma} besideId={tabId} backEntry={backEntry} />
+              </section>
+            )}
+          </CaseLawFiltersContext.Provider>
         )}
       </div>
     </div>

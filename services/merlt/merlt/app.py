@@ -67,6 +67,7 @@ from merlt.api import (
     ner_router,
     ingestion_mechanical_router,
     rassegne_router,
+    user_data_router,
 )
 from merlt.api.admin_router import router as admin_router
 
@@ -90,6 +91,7 @@ async def lifespan(app: FastAPI):
 
     ai_service = None
     hygiene_task = None
+    retention_task = None
     try:
         # Initialize enrichment database
         await init_db(echo=False)  # Set echo=True for SQL logging in dev
@@ -201,6 +203,31 @@ async def lifespan(app: FastAPI):
             hygiene_task = _asyncio.create_task(_hygiene_loop(_hyg_interval))
             log.info("✅ Graph hygiene loop started", interval_hours=_hyg_interval)
 
+        # Retention: activity events expire (merlt.privacy.retention). Always on:
+        # the period is configurable, the purge is not optional. First pass a few
+        # minutes after boot, so a stack restarted often still purges.
+        import asyncio as _asyncio_ret
+        from merlt.privacy.retention import (
+            FIRST_RUN_DELAY_SECONDS,
+            retention_interval_hours,
+            run_retention,
+        )
+
+        async def _retention_loop(interval_hours: float):
+            delay = FIRST_RUN_DELAY_SECONDS
+            while True:
+                try:
+                    await _asyncio_ret.sleep(delay)
+                    delay = interval_hours * 3600
+                    await run_retention()
+                except _asyncio_ret.CancelledError:
+                    break
+                except Exception as e:  # noqa: BLE001
+                    log.warning("retention pass failed (non-fatal)", error=type(e).__name__)
+
+        retention_task = _asyncio_ret.create_task(_retention_loop(retention_interval_hours()))
+        log.info("✅ Retention loop started", interval_hours=retention_interval_hours())
+
         log.info("=" * 60)
         log.info("MERL-T API Ready")
         log.info("=" * 60)
@@ -219,6 +246,13 @@ async def lifespan(app: FastAPI):
             with contextlib.suppress(Exception):
                 await hygiene_task  # let the loop's CancelledError teardown finish
             log.info("✅ Graph hygiene loop stopped")
+
+        if retention_task is not None:
+            import contextlib
+            retention_task.cancel()
+            with contextlib.suppress(Exception):
+                await retention_task
+            log.info("✅ Retention loop stopped")
 
         if ai_service is not None:
             await ai_service.close()
@@ -286,6 +320,7 @@ app.include_router(api_keys_router, prefix="/api/v1", tags=["api-keys"])
 app.include_router(ner_router, prefix="/api/v1", tags=["ner"])
 app.include_router(ingestion_mechanical_router, prefix="/api/v1", tags=["ingestion-mechanical"])
 app.include_router(rassegne_router, prefix="/api/v1", tags=["rassegne"])
+app.include_router(user_data_router, prefix="/api/v1", tags=["user-data"])
 
 
 # Health check endpoint

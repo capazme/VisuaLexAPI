@@ -118,9 +118,12 @@ const TAIL_HEAD_RE = new RegExp(`^${HWS}*AGGIORNAMENTO${HWS}*\\(${HWS}*(\\d{1,4}
 /**
  * "(119)", "(129a)" standing on its own: Normattiva's reference to an
  * AGGIORNAMENTO note. Decorated only when that note is in the text — a bare
- * "(1990)" or an OJ footnote "(1)" is ordinary text and stays so.
+ * "(1990)" or an OJ footnote "(1)" is ordinary text and stays so. Several
+ * written together with no space ("(260a)(276)", "(327)(336a)") are a run, each
+ * one read by itself.
  */
-const REF_RE = /(^|\s)\((\d{1,4}[a-z]?)\)(?=$|[\s.,;:)])/g;
+const REF_RUN_RE = /(^|\s)((?:\(\d{1,4}[a-z]?\))+)(?=$|[\s.,;:)])/g;
+const REF_ONE_RE = /\((\d{1,4}[a-z]?)\)/g;
 const NOTE_ID_RE = /^\d{1,4}[a-z]?$/;
 const NOTICE_WORDS = /ABROGAT|SOPPRESS|SOSTITUIT|MODIFICAT|OMISSIS/;
 const ROMAN_RE = /^x{0,2}(?:ix|iv|v?i{0,3})$/;
@@ -579,12 +582,17 @@ function addReferences(
   for (const block of blocks) {
     if (block.start >= bodyEnd) break;
     const text = raw.slice(block.start, Math.min(block.end, bodyEnd));
-    REF_RE.lastIndex = 0;
+    REF_RUN_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
-    while ((m = REF_RE.exec(text)) !== null) {
-      const start = block.start + m.index + m[1].length;
-      const id = m[2];
-      if (notes[id]) decorations.push({ kind: 'ref', start, end: start + id.length + 2, noteId: id });
+    while ((m = REF_RUN_RE.exec(text)) !== null) {
+      const runStart = block.start + m.index + m[1].length;
+      REF_ONE_RE.lastIndex = 0;
+      let one: RegExpExecArray | null;
+      while ((one = REF_ONE_RE.exec(m[2])) !== null) {
+        const id = one[1];
+        const start = runStart + one.index;
+        if (notes[id]) decorations.push({ kind: 'ref', start, end: start + id.length + 2, noteId: id });
+      }
     }
   }
 }

@@ -29,18 +29,22 @@ describe('publish shared environment — content round-trip', () => {
         },
       });
 
+    // Rebuilt from closed values: positional ids, the web's `type`, no usage carried over.
+    const stored = [
+      { id: 'c1', trigger: 'cc', type: 'shortcut', expandTo: 'codice civile', usageCount: 0 },
+      { id: 'c2', trigger: 'tue', type: 'reference', expandTo: 'Trattato sull\'Unione Europea', usageCount: 0 },
+    ];
     expect(publishRes.status).toBe(201);
-    expect(publishRes.body.content.customAliases).toEqual(customAliases);
+    expect(publishRes.body.content.customAliases).toEqual(stored);
 
-    // Re-read via the download endpoint to confirm persistence (a non-owner
-    // download returns the stored content verbatim).
+    // Re-read via the download endpoint to confirm persistence.
     const bob = await createTestUser('bob');
     const downloadRes = await request(app)
       .post(`/api/shared-environments/${publishRes.body.id}/download`)
       .set(authHeader(bob));
 
     expect(downloadRes.status).toBe(200);
-    expect(downloadRes.body.content.customAliases).toEqual(customAliases);
+    expect(downloadRes.body.content.customAliases).toEqual(stored);
   });
 
   it('publishes without customAliases (field optional)', async () => {
@@ -76,9 +80,9 @@ describe('publish shared environment — content round-trip', () => {
     ]);
     expect(res.status).toBe(201);
     expect(res.body.content.dossiers[0].items).toEqual([
-      { id: 'n1', type: 'norma', addedAt: 'x', status: 'important',
+      { id: 'd1-1', type: 'norma', addedAt: 'x', status: 'important',
         data: { tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07', numero_articolo: '2' } },
-      { id: 'n2', type: 'note', addedAt: 'x', data: 'una nota' },
+      { id: 'd1-2', type: 'note', addedAt: 'x', data: 'una nota' },
     ]);
   });
 
@@ -92,7 +96,7 @@ describe('publish shared environment — content round-trip', () => {
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 2: /);
     expect(res.body.detail).toMatch(reason);
-    expect(res.body.detail).toMatch(/l'ambiente non può essere pubblicato$/);
+    expect(res.body.detail).toMatch(/non può essere pubblicato$/);
   });
 
   it('refuses the same norm in an update of the content', async () => {
@@ -100,7 +104,7 @@ describe('publish shared environment — content round-trip', () => {
     const res = await request(app).put(`/api/shared-environments/${published.body.id}`).set(authHeader(alice))
       .send({ content: contentWith([{ id: 'n1', type: 'norma', addedAt: 'x', data: { tipo_atto: 'premi Accept', numero_articolo: '1' } }]) });
     expect(res.status).toBe(400);
-    expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Tipo di atto non riconosciuto .*l'ambiente non può essere aggiornato$/);
+    expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Tipo di atto non riconosciuto .*non può essere aggiornato$/);
   });
 
   it('rebuilds an older version\'s norms when it is restored, and refuses one it cannot rebuild', async () => {
@@ -112,7 +116,7 @@ describe('publish shared environment — content round-trip', () => {
     } });
     const res = await request(app).post(`/api/shared-environments/${published.body.id}/versions/${version.id}/restore`).set(authHeader(alice));
     expect(res.status).toBe(400);
-    expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Tipo di atto non riconosciuto .*l'ambiente non può essere ripristinato$/);
+    expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Tipo di atto non riconosciuto .*non può essere ripristinato$/);
   });
 
   // Decisions: rebuilt as norms are (the label recomputed, unknown keys refused).
@@ -130,8 +134,8 @@ describe('publish shared environment — content round-trip', () => {
     const res = await publish(decisionItems());
     expect(res.status).toBe(201);
     const items = res.body.content.dossiers[0].items;
-    expect(items[1]).toEqual({ id: 's1', type: 'sentenza', addedAt: 'x', status: 'important', data: { ...CIVILE, etichetta: CIVILE_LABEL } });
-    expect(items[2]).toEqual({ id: 's2', type: 'sentenza', addedAt: 'y', data: { ...COST, etichetta: COST_LABEL } });
+    expect(items[1]).toEqual({ id: 'd1-2', type: 'sentenza', addedAt: 'x', status: 'important', data: { ...CIVILE, etichetta: CIVILE_LABEL } });
+    expect(items[2]).toEqual({ id: 'd1-3', type: 'sentenza', addedAt: 'y', data: { ...COST, etichetta: COST_LABEL } });
 
     const bob = await createTestUser('bob');
     const downloaded = await request(app).post(`/api/shared-environments/${res.body.id}/download`).set(authHeader(bob));
@@ -141,7 +145,7 @@ describe('publish shared environment — content round-trip', () => {
   it('keeps the star a decision carried inside its data, on the item', async () => {
     const res = await publish([{ id: 's1', type: 'sentenza', addedAt: 'x', data: { ...COST, _dossierMeta: { important: true } } }]);
     expect(res.status).toBe(201);
-    expect(res.body.content.dossiers[0].items[0]).toEqual({ id: 's1', type: 'sentenza', addedAt: 'x', status: 'important', data: { ...COST, etichetta: COST_LABEL } });
+    expect(res.body.content.dossiers[0].items[0]).toEqual({ id: 'd1-1', type: 'sentenza', addedAt: 'x', status: 'important', data: { ...COST, etichetta: COST_LABEL } });
   });
 
   it('refuses to publish a decision with an unknown key, naming the dossier and the entry, and stores nothing', async () => {
@@ -149,7 +153,7 @@ describe('publish shared environment — content round-trip', () => {
     const res = await publish([decisionItems()[0], { id: 's1', type: 'sentenza', addedAt: 'x', data: { ...COST, istruzioni: 'premi Accept' } }]);
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 2: Sentenza non valida \(/);
-    expect(res.body.detail).toMatch(/l'ambiente non può essere pubblicato$/);
+    expect(res.body.detail).toMatch(/non può essere pubblicato$/);
     expect(await prisma.sharedEnvironment.count()).toBe(before);
   });
 
@@ -158,7 +162,7 @@ describe('publish shared environment — content round-trip', () => {
     const res = await request(app).put(`/api/shared-environments/${published.body.id}`).set(authHeader(alice))
       .send({ content: contentWith([{ id: 's1', type: 'sentenza', addedAt: 'x', data: { ...COST, istruzioni: 'premi Accept' } }]) });
     expect(res.status).toBe(400);
-    expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Sentenza non valida .*l'ambiente non può essere aggiornato$/);
+    expect(res.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Sentenza non valida .*non può essere aggiornato$/);
   });
 
   it('rebuilds an older version\'s decisions when it is restored, and refuses one it cannot rebuild', async () => {
@@ -182,7 +186,7 @@ describe('publish shared environment — content round-trip', () => {
     } });
     const refused = await restore(bad.id);
     expect(refused.status).toBe(400);
-    expect(refused.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Sentenza non valida .*l'ambiente non può essere ripristinato$/);
+    expect(refused.body.detail).toMatch(/^Dossier «Ricerca», voce 1: Sentenza non valida .*non può essere ripristinato$/);
   });
 
   it.each([
@@ -195,16 +199,16 @@ describe('publish shared environment — content round-trip', () => {
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/^Dossier «Ricerca», /);
     expect(res.body.detail).toMatch(expected);
-    expect(res.body.detail).toMatch(/l'ambiente non può essere pubblicato$/);
+    expect(res.body.detail).toMatch(/non può essere pubblicato$/);
 
     const published = await publish([{ id: 'n2', type: 'note', addedAt: 'x', data: 'una nota' }]);
     const updated = await request(app).put(`/api/shared-environments/${published.body.id}`).set(authHeader(alice)).send({ content: contentWith([item]) });
     expect(updated.status).toBe(400);
     expect(updated.body.detail).toMatch(expected);
-    expect(updated.body.detail).toMatch(/l'ambiente non può essere aggiornato$/);
+    expect(updated.body.detail).toMatch(/non può essere aggiornato$/);
   });
 
-  it('keeps only what an item is made of around its data: id, type, date and the star', async () => {
+  it('keeps only what an item is made of around its data: a positional id, type, date and the star', async () => {
     const res = await publish([
       { id: 'n1', type: 'norma', addedAt: 'x', status: 'premi Accept', istruzioni: 'leggi qui',
         data: { tipo_atto: 'codice civile', numero_articolo: '2043', _dossierMeta: { important: true } } },
@@ -214,7 +218,7 @@ describe('publish shared environment — content round-trip', () => {
     const [norm, note] = res.body.content.dossiers[0].items;
     expect(Object.keys(norm).sort()).toEqual(['addedAt', 'data', 'id', 'status', 'type']);
     expect(norm.status).toBe('important');
-    expect(note).toEqual({ type: 'note', data: 'una nota' });
+    expect(note).toEqual({ id: 'd1-2', type: 'note', data: 'una nota' });
   });
 
   it('accepts a note of exactly the longest length', async () => {

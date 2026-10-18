@@ -8,7 +8,7 @@
  */
 import { jsPDF } from 'jspdf';
 import type { Annotation, Highlight } from '../../../types';
-import type { DecisionAttributes, DecisionIdentity, FoundDecision } from '../../../types/decisions';
+import type { DecisionAttributes, DecisionIdentity, DecisionText, FoundDecision } from '../../../types/decisions';
 import { resolveAnchors } from '../../../utils/articleAnnotations';
 import { formatDateItalianLong, withPreposition } from '../../../utils/dateUtils';
 import {
@@ -18,7 +18,7 @@ import {
   formatDecisionShort,
 } from '../../../utils/decisionLinks';
 import { decisionProjection, isAnchoredNote, layoutDecision, unmatchedAnchors } from '../../../utils/decisionRender';
-import { PDF_MARGIN, PDF_WIDTH, createPdfWriter } from '../../../utils/pdfWriter';
+import { PDF_MARGIN, PDF_WIDTH, createPdfWriter, type PdfWriter } from '../../../utils/pdfWriter';
 
 export interface DecisionPdfParagraph {
   text: string;
@@ -77,6 +77,43 @@ function runningText(lines: string[], starts: number[]): { text: string; toText(
         if (end ? offset <= to : offset < to) return at[i] + Math.max(0, offset - from);
       }
       return text.length;
+    },
+  };
+}
+
+/**
+ * A decision's projection, its length and a way to read a range of it as the PDF prints it
+ * (root rule 23): the characters of the projection, unchanged; the lines of a paragraph run on as
+ * `runningText` joins them (a space only where neither side has whitespace) and paragraphs are
+ * told apart by `\n`. What the «solo le parti» dossier PDF cuts its passages from.
+ */
+export function decisionTextBetween(testo: DecisionText): {
+  projection: string;
+  length: number;
+  textBetween: (from: number, to: number) => string;
+} {
+  const projection = decisionProjection(testo);
+  const paragraphs = layoutDecision(testo).flatMap((b) => b.paragraphs);
+  return {
+    projection,
+    length: projection.length,
+    textBetween(from, to) {
+      const out: string[] = [];
+      for (const { start, end, ranges } of paragraphs) {
+        if (end <= from || start >= to) continue;
+        const pieces: string[] = [];
+        const starts: number[] = [];
+        for (const r of ranges) {
+          const a = Math.max(r.from, from);
+          const b = Math.min(r.to, to);
+          if (a < b) {
+            pieces.push(projection.slice(a, b));
+            starts.push(a);
+          }
+        }
+        if (pieces.length > 0) out.push(runningText(pieces, starts).text);
+      }
+      return out.join('\n');
     },
   };
 }
@@ -145,8 +182,9 @@ export function decisionPdfModel(answer: FoundDecision, options: DecisionPdfOpti
   };
 }
 
-const BODY = 11;
-const LEADING = BODY * 1.5;
+/** The decision's body text: its size and line height, which the dossier's «solo le parti» passages follow. */
+export const BODY = 11;
+export const LEADING = BODY * 1.5;
 const MARK_FILL: [number, number, number] = [254, 240, 138];
 
 /** Merges overlapping marks so a passage is painted once. */
@@ -160,15 +198,17 @@ function mergeMarks(marks: Array<[number, number]>): Array<[number, number]> {
   return out;
 }
 
-export function writeDecisionPdf(model: DecisionPdfModel): jsPDF {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-  const w = createPdfWriter(doc, { footerLeft: model.footer, font: 'times' });
-
+/** The decision's citation, its heading line and its notices. */
+export function drawDecisionHead(w: PdfWriter, model: DecisionPdfModel): void {
   w.write(model.heading, 13, 'bold', 18);
   w.write(model.subheading, 10, 'normal', 14, true);
   model.notices.forEach((notice) => w.write(notice, 10, 'italic', 14, true));
   w.y += 8;
+}
 
+/** The text: blocks and paragraphs, the marks painted and the notes after their paragraph. */
+export function drawDecisionBlocks(w: PdfWriter, model: DecisionPdfModel): void {
+  const { doc } = w;
   for (const block of model.blocks) {
     w.ensureSpace(LEADING * 3);
     w.y += 6;
@@ -204,7 +244,10 @@ export function writeDecisionPdf(model: DecisionPdfModel): jsPDF {
       w.y += 6;
     }
   }
+}
 
+/** What follows the text: the free notes, the anchors that no longer land and the licence line. */
+export function drawDecisionTail(w: PdfWriter, model: DecisionPdfModel): void {
   if (model.freeNotes.length > 0) {
     w.ensureSpace(48);
     w.y += 10;
@@ -224,7 +267,22 @@ export function writeDecisionPdf(model: DecisionPdfModel): jsPDF {
     w.y += 14;
     w.write(model.licenceLine, 9, 'italic', 12, true);
   }
+}
 
+/**
+ * The decision's body drawn into a writer that is not the decision's own (the dossier's PDF):
+ * headings in the writer's font, the paragraphs in times. No footer: the caller's page owns it.
+ */
+export function drawDecision(w: PdfWriter, model: DecisionPdfModel): void {
+  drawDecisionHead(w, model);
+  drawDecisionBlocks(w, model);
+  drawDecisionTail(w, model);
+}
+
+export function writeDecisionPdf(model: DecisionPdfModel): jsPDF {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const w = createPdfWriter(doc, { footerLeft: model.footer, font: 'times' });
+  drawDecision(w, model);
   w.footer();
   return doc;
 }

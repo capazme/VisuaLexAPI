@@ -16,12 +16,11 @@ describe('dossierService.writesInFlight', () => {
   it('counts every write while it travels, failed ones included, and never a read', async () => {
     const add = later();
     const remove = later();
-    vi.mocked(apiClient.post).mockReturnValueOnce(add.promise as never);
-    vi.mocked(apiClient.delete).mockReturnValueOnce(remove.promise as never);
+    vi.mocked(apiClient.post).mockReturnValueOnce(add.promise as never).mockReturnValueOnce(remove.promise as never);
     vi.mocked(apiClient.get).mockResolvedValueOnce({ data: [] });
     expect(dossierService.writesInFlight()).toBe(0);
     const adding = dossierService.addItem('d1', { itemType: 'note', title: 'x' } as never);
-    const removing = dossierService.deleteItem('d1', 'i1');
+    const removing = dossierService.trashItems('d1', ['i1']);
     expect(dossierService.writesInFlight()).toBe(2);
     await dossierService.getAll();
     expect(dossierService.writesInFlight()).toBe(2);

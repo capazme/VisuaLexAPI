@@ -1,4 +1,4 @@
-import { annotationTargetLabel } from '../environments/annotationLabels';
+import { annotationTargetLabel } from './annotationLabels';
 import { isDecisionKey } from '../../../utils/decisionLinks';
 import type { ReactNode } from 'react';
 import { Check, X as XIcon, Clock, FileText, Highlighter, Folder, Zap, Link2 } from 'lucide-react';

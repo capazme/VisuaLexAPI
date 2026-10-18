@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MassimeSection } from './MassimeSection';
 import { appStore } from '../../../store/useAppStore';
+
+vi.mock('../../../utils/decisionFetchCache', () => ({
+  fetchDecisionCached: () => Promise.resolve({ esito: 'non_trovata', motivo: 'inesistente' }),
+}));
 
 function show(massime: Parameters<typeof MassimeSection>[0]['massime']) {
   return render(<MemoryRouter><MassimeSection massime={massime} /></MemoryRouter>);
@@ -40,7 +44,7 @@ describe('MassimeSection — the decision a Brocardi massima is headed with', ()
 });
 
 describe('MassimeSection — a decision opened from the article', () => {
-  it('opens beside the article and records the way back to it', () => {
+  it('previews the decision, then opens it beside the article and records the way back to it', async () => {
     const open = vi.fn(() => 'tab');
     const push = vi.fn();
     const original = appStore.getState().pushReadingBack;
@@ -55,7 +59,9 @@ describe('MassimeSection — a decision opened from the article', () => {
         />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByText('Cass. civ., n. 31191/2025'));
+    await act(async () => { fireEvent.click(screen.getByText('Cass. civ., n. 31191/2025')); });
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apri accanto' }));
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ numero: 31191 }), { fromLink: true, besideId: 't1' });
     expect(push).toHaveBeenCalledExactlyOnceWith(back);
     appStore.setState({ pushReadingBack: original } as never);
@@ -76,5 +82,35 @@ describe('MassimeSection — its own toggle', () => {
     view.unmount();
     show([{ autorita: 'Cass. civ.', numero: '1', anno: '2020', massima: 'Uno.' }]);
     expect(screen.getByRole('button', { name: '1 di 1 massima' })).toBeInTheDocument();
+  });
+});
+
+describe('MassimeSection — the section’s controls, not its own', () => {
+  const MASSIME = [
+    { autorita: 'Cass. civ.', numero: '1', anno: '2019', massima: 'Il nesso causale.' },
+    { autorita: 'Cass. civ.', numero: '2', anno: '2025', massima: 'La responsabilità del custode.' },
+    { autorita: 'Cons. Stato', numero: '10', anno: '2020', massima: 'Il provvedimento.' },
+    { autorita: null, numero: null, anno: null, massima: 'Senza estremi.' },
+  ];
+
+  it('draws no filter, no year select and no scrolling box of its own', () => {
+    const { container } = show(MASSIME);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(container.querySelector('[class*="overflow-y-"]')).toBeNull();
+    expect(container.querySelector('[class*="max-h-"]')).toBeNull();
+  });
+
+  it('lists the massime newest first, the one with no year last, each with its year and its source', () => {
+    show(MASSIME);
+    const texts = screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
+    expect(texts).toHaveLength(4);
+    expect(texts[0]).toContain('La responsabilità del custode.');
+    expect(texts[1]).toContain('Il provvedimento.');
+    expect(texts[2]).toContain('Il nesso causale.');
+    expect(texts[3]).toContain('Senza estremi.');
+    expect(screen.getAllByText('Brocardi')).toHaveLength(4);
+    expect(screen.getByText('2025').tagName).toBe('TIME');
   });
 });

@@ -270,24 +270,12 @@ describe('toMerltForumSignal', () => {
       {
         action,
         sharedEnvId: '00000000-0000-0000-0000-000000000005',
-        originalAuthorId: '00000000-0000-0000-0000-000000000006',
       },
       userCtx
     );
     expect(out.type).toBe(expectedType);
     expect(out.shared_env_id).toBe('00000000-0000-0000-0000-000000000005');
-    expect(out.target_author_id).toBe('00000000-0000-0000-0000-000000000006');
-  });
-
-  it('preserves null originalAuthorId (deleted author)', () => {
-    const out = toMerltForumSignal(
-      {
-        action: 'like',
-        sharedEnvId: '00000000-0000-0000-0000-000000000005',
-        originalAuthorId: null,
-      },
-      userCtx
-    );
-    expect(out.target_author_id).toBeNull();
+    // The environment's author is a third party: never named.
+    expect('target_author_id' in out).toBe(false);
   });
 });

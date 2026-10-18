@@ -24,6 +24,8 @@ afterEach(async () => {
   // lazily, so the module (and legalFetch behind it) is not loaded before a test mocks them
   const cache = await import('../utils/decisionSearchCache')
   cache.clearDecisionSearchCache()
+  const euCaseLaw = await import('../utils/euCaseLawCache')
+  euCaseLaw.clearEuCaseLawCache()
   const articleCards = await import('../utils/articleCardsCache')
   articleCards.clearArticleCardsCache()
 })

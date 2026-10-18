@@ -341,9 +341,17 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
  */
 const SHARE_PREFIX = 'u8.';
 
+/** A dossier as it leaves the account (a share link, a JSON file): without its copy in the Forum or the
+ *  admin's block, which are its owner's alone. */
+export function shareableDossier(dossier: Dossier): Omit<Dossier, 'published' | 'forumBlocked'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out on purpose
+  const { published, forumBlocked, ...shareable } = dossier;
+  return shareable;
+}
+
 export function encodeDossierShare(dossier: Dossier): string {
   // Never throws on text: JSON.stringify writes a lone surrogate as `\ud800`, and TextEncoder takes any string.
-  const bytes = new TextEncoder().encode(JSON.stringify(dossier));
+  const bytes = new TextEncoder().encode(JSON.stringify(shareableDossier(dossier)));
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return SHARE_PREFIX + btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -479,6 +487,11 @@ export function dossierFromApi(d: DossierApi): Dossier {
     items: d.items.map(dossierItemFromApi),
     tags: d.tags ?? [],
     isPinned: d.is_pinned,
+    kind: d.kind === 'studio' ? 'studio' : 'lavoro',
+    published: d.published
+      ? { sharedEnvironmentId: d.published.shared_environment_id, version: d.published.version, isActive: d.published.is_active, updatedAt: d.published.updated_at }
+      : null,
+    forumBlocked: d.forum_blocked === true,
   };
 }
 

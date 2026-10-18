@@ -92,7 +92,7 @@ Pur essendo classificato "major" nei singoli feature, l'effetto combinato è **b
 ## 3. 🟠 Major — pezzi significativi mancanti o difettosi
 
 **Persistenza dati silenziosamente persa (perdita dati utente):**
-- **Environments apply/import non persistono quickNorms + customAliases** — pushati nello store con `uuidv4()` senza `service.create()`; svaniscono al refresh. Viola gotcha #17; i commenti "client-only" sono obsoleti. `useAppStore.ts:2285-2315` e `2181-2209`.
+- *(Superato: apply e import degli ambienti sono stati tolti con «Ambienti», ottobre 2026.)* **Environments apply/import non persistono quickNorms + customAliases** — pushati nello store con `uuidv4()` senza `service.create()`; svaniscono al refresh. Viola gotcha #17; i commenti "client-only" sono obsoleti. `useAppStore.ts:2285-2315` e `2181-2209`.
 - **Dossier tags mai persistiti** — input UI presente, ma `dossierService.update()` invia solo `{name, description}`, nessuna colonna DB, hydration resetta a `[]`. `useAppStore.ts:1226,504` + `schema.prisma:311-333`.
 - **Dossier `restoreDossierItem` (undo-delete)** non riconcilia l'id locale con il nuovo id server → status/delete/reorder successivi falliscono in silenzio fino al reload. `useAppStore.ts:1347-1361`.
 
@@ -173,7 +173,7 @@ Ordine per impatto decrescente (ogni passo riferito ai gap sopra).
 3. **Fix TreeNavigatorModal** (search): leggere `normaData.norma_data[0].urn` e `treeResponse.articles` come fa SearchForm. `TreeNavigatorModal.tsx:47,59`.
 
 **Fase 2 — Stop perdita dati (correttezza, priorità owner)**
-4. **Environments apply/import**: instradare quickNorms/customAliases via `quickNormService.create`/`customAliasService.create` prima del push allo store (gotcha #17). `useAppStore.ts:2285-2315,2181-2209`.
+4. *(Superato: apply e import degli ambienti non esistono più.)* **Environments apply/import**: instradare quickNorms/customAliases via `quickNormService.create`/`customAliasService.create` prima del push allo store (gotcha #17). `useAppStore.ts:2285-2315,2181-2209`.
 5. **Dossier tags**: aggiungere colonna `tags` allo schema + migrazione, inviarla nell'update, idratarla in `fetchUserData` (oppure rimuovere l'input se fuori scope). `schema.prisma:311-333`, `useAppStore.ts:1226,504`.
 6. **Dossier restoreDossierItem**: riconciliare `item.id = created.id` dopo `addItem` come fa `addToDossier`. `useAppStore.ts:1347-1361`.
 

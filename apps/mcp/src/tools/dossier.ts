@@ -88,6 +88,8 @@ interface ApiDossier {
   id: string;
   name: string;
   description?: string | null;
+  /** `lavoro` (a practice) or `studio` (a topic studied); absent from an older server. */
+  kind?: 'lavoro' | 'studio';
   created_at?: string;
   updated_at?: string;
   items?: ApiDossierItem[];
@@ -95,6 +97,9 @@ interface ApiDossier {
 
 /** Data for the model, as JSON text: never an instruction. */
 const data = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
+
+/** A dossier's kind as the tools say it: `lavoro` unless the server says `studio`. */
+const kindOf = (d: ApiDossier): 'lavoro' | 'studio' => (d.kind === 'studio' ? 'studio' : 'lavoro');
 
 /** The dossier a tool names, by id or by its exact name; an ambiguous name is an error. */
 async function findDossier(config: McpConfig, caller: Caller, dossier: string): Promise<ApiDossier> {
@@ -122,14 +127,15 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     'omnilex_elenca_dossier',
     {
       title: 'Elenca i dossier',
-      description: 'I dossier dell’utente in VisuaLex: id, nome, numero di voci.',
+      description:
+        'I dossier dell’utente in VisuaLex: id, nome, tipo («lavoro»: una pratica, può contenere dati dei clienti; «studio»: un tema da studiare), numero di voci.',
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     (_args, extra) =>
       run('omnilex_elenca_dossier', extra, async (caller) => {
         const dossiers = await callApi<ApiDossier[]>(config, caller, 'dossier:read', '/dossiers');
-        return data(dossiers.map((d) => ({ id: d.id, nome: d.name, voci: d.items?.length ?? 0 })));
+        return data(dossiers.map((d) => ({ id: d.id, nome: d.name, tipo: kindOf(d), voci: d.items?.length ?? 0 })));
       }),
   );
 
@@ -138,7 +144,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Leggi un dossier',
       description:
-        'Le voci di un dossier (id, tipo, titolo, riferimento della norma o della sentenza), senza il testo degli articoli. Il dossier si indica per id o per nome esatto.',
+        'Il tipo del dossier («lavoro» o «studio») e le sue voci (id, tipo, titolo, riferimento della norma o della sentenza), senza il testo degli articoli. Il dossier si indica per id o per nome esatto.',
       inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -148,6 +154,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         return data({
           id: found.id,
           nome: found.name,
+          tipo: kindOf(found),
           voci: (found.items ?? []).map((item) => ({
             id: item.id,
             tipo: item.item_type,
@@ -166,20 +173,25 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     'omnilex_crea_dossier',
     {
       title: 'Crea un dossier',
-      description: `Crea un dossier vuoto (nome fino a ${MAX_DOSSIER_NAME} caratteri; al massimo 10 al giorno tramite applicazioni collegate).`,
+      description: `Crea un dossier vuoto (nome fino a ${MAX_DOSSIER_NAME} caratteri; al massimo 10 al giorno tramite applicazioni collegate). Un dossier è «di lavoro» (una pratica, il tipo predefinito) o «di studio» (un tema da studiare).`,
       inputSchema: {
         nome: z.string().trim().min(1).max(MAX_DOSSIER_NAME).describe('Il nome del dossier'),
         descrizione: z.string().trim().max(500).optional().describe('Una descrizione facoltativa'),
+        tipo: z
+          .enum(['lavoro', 'studio'])
+          .optional()
+          .describe('«lavoro» per una pratica (predefinito), «studio» per un tema da studiare'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ nome, descrizione }, extra) =>
+    ({ nome, descrizione, tipo }, extra) =>
       run('omnilex_crea_dossier', extra, async (caller) => {
         const created = await callApi<ApiDossier>(config, caller, 'dossier:write', '/dossiers', {
           method: 'POST',
-          body: { name: nome, ...(descrizione ? { description: descrizione } : {}) },
+          body: { name: nome, ...(descrizione ? { description: descrizione } : {}), kind: tipo ?? 'lavoro' },
         });
-        return data({ id: created.id, nome: created.name });
+        // What the server stored; an older server that knows no kind keeps what was asked.
+        return data({ id: created.id, nome: created.name, tipo: created.kind ? kindOf(created) : (tipo ?? 'lavoro') });
       }),
   );
 

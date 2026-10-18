@@ -260,10 +260,16 @@ Slice 1 wires 5 user-action signals into MERL-T.
   BFF caches it with a 1 h TTL. When MERL-T is unreachable it serves the stale
   entry, and returns null only when there is no cache and the sync fails. A
   vote that closes a consensus refreshes the voter's entry (`validate.ts`).
-- `services/merlt/deadLetterLog.ts`: NDJSON at
-  `apps/server/logs/merlt-dead-letter.jsonl` (`MERLT_DEAD_LETTER_DIR`). It holds
-  the full event payload, is capped at 50 MB, and is skipped under
-  `NODE_ENV=test` unless `MERLT_DEAD_LETTER_LOG_IN_TESTS=1`.
+- `services/merlt/deadLetterLog.ts`: NDJSON, one file a day
+  (`merlt-dead-letter-YYYY-MM-DD.jsonl` under `MERLT_DEAD_LETTER_DIR`, default
+  `apps/server/logs`). It holds no personal data: the event's name, time, the
+  error's class and an allow-list of what the event was about (URNs cut to 300
+  characters, a shared environment's id, numbers; `redactDeadLetterPayload`),
+  never the user id, a dossier's or a session's id, a text, tags or authority.
+  Days older than `MERLT_DEAD_LETTER_RETENTION_DAYS` (7) are deleted by the
+  sweep `index.ts` starts (at boot and every six hours), with the old single
+  file `merlt-dead-letter.jsonl`; 50 MB at most in all. Skipped under
+  `NODE_ENV=test` unless `MERLT_DEAD_LETTER_LOG_IN_TESTS=1`. Nothing replays it.
 - Prisma models: `MerltUserPreference`, `MerltConsentAudit` and
   `MerltUserAuthorityCache`. The cache column `baselineQual` holds MERL-T's
   authority tier, and the hub labels it "Livello di autorevolezza".
@@ -322,7 +328,8 @@ Emission call-sites. Keep them thin: the tracker hooks do the BFF talk.
 - `BulletinBoardPage` → forum like, suggestion accepted and suggestion
   declined, keyed on `sharedEnvironmentId`. The tracker drops an event
   without it.
-- `ImportEnvironmentModal.handleImport` → `forum_download`.
+- `AddToMyDossiersDialog` («Ai miei dossier») → `forum_download`, after the server's success and never for
+  one's own item (spec `2026-10-13-environments-into-forum`, D15).
 
 **Slice 1 gotchas:**
 1. **Express mount order beats prefix specificity.** `merltRoutes` must be
@@ -333,8 +340,10 @@ Emission call-sites. Keep them thin: the tracker hooks do the BFF talk.
    `services/merlt/merlt/api/models/` and `services/merlt/merlt/disagreement/data/`. Use
    `--exclude='/models/'` to exclude the top level only.
 3. **Tracking is persisted.** `tracking_router` writes `tracking_events`
-   (`TrackingEventRecord`). When the DB is unreachable it falls back to a
-   bounded in-memory buffer and still answers 202. Verify with
+   (`TrackingEventRecord`). When the DB is unreachable it answers 503 and
+   keeps nothing (the BFF dead-letters the event). Events expire after
+   `MERLT_TRACKING_RETENTION_DAYS` and are exported and erased per user
+   (`services/merlt/merlt/privacy/`). Verify with
    `SELECT event_type, user_id, created_at FROM tracking_events ORDER BY created_at DESC`.
    Nothing in MERL-T reads the table yet, so the signals feed neither
    authority nor training.
