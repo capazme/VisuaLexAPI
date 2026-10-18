@@ -346,7 +346,7 @@ export function HistoryView() {
     }, [filteredHistory]);
 
     return (
-        <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
+        <div className="max-w-4xl mx-auto animate-in fade-in duration-200">
             <NormaChangesSection onOpen={handleOpenNorma} />
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {/* Mobile Header */}

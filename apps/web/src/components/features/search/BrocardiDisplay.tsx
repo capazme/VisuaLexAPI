@@ -654,7 +654,7 @@ export function BrocardiDisplay({ info, currentNorma, caseLaw, onArticleClick, i
       </button>
 
       {isMainOpen && (
-        <div className="space-y-4 animate-in slide-in-from-top-2 fade-in duration-300">
+        <div className="space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
           <BrocardiSection
             title={LATIN_MAXIMS_LABEL}
             content={info.Brocardi || null}

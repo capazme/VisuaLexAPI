@@ -436,7 +436,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
 
   return (
-    <div className="animate-in slide-in-from-right-10 duration-300">
+    <div className="animate-in slide-in-from-right-10 duration-200">
       <button
         onClick={onBack}
         className="md:hidden mb-4 flex items-center gap-2 px-4 py-3 text-base font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
