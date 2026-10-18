@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { prisma } from '../../lib/prisma';
+import { effectiveConsent } from './effectiveConsent';
 
 /**
  * Blocks RLCF validation routes unless the user's consent grants validation
@@ -17,19 +17,15 @@ export async function validationGuard(
     return;
   }
   try {
-    const preference = await prisma.merltUserPreference.findUnique({
-      where: { userId: req.user.id },
-      select: { validationEnabled: true },
-    });
-    if (!preference || !preference.validationEnabled) {
+    const consent = await effectiveConsent(req.user.id);
+    if (!consent.validationEnabled) {
       res.status(403).json({ detail: 'validation_consent_required' });
       return;
     }
     next();
   } catch (err) {
-    res.status(500).json({
-      detail: 'consent_check_failed',
-      error: err instanceof Error ? err.message : String(err),
-    });
+    // The error's message stays out of the answer: it can carry the query's parameters.
+    console.error('[merlt] consent check failed:', err instanceof Error ? err.name : err);
+    res.status(500).json({ detail: 'consent_check_failed' });
   }
 }

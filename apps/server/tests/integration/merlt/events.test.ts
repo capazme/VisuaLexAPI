@@ -7,6 +7,7 @@ import {
   authHeader,
   prisma,
   type TestUser,
+  merltNoticeId,
 } from '../../helpers';
 import { _resetMerltClientForTests } from '../../../src/routes/merlt/events';
 
@@ -37,7 +38,7 @@ async function grantConsent(user: TestUser, level: 'basic' | 'full' = 'basic'): 
   await request(app)
     .post('/api/merlt/consent')
     .set(authHeader(user))
-    .send({ level });
+    .send({ level, noticeId: await merltNoticeId() });
 }
 
 const validPayload = {
@@ -301,7 +302,8 @@ describe('POST /api/merlt/events/highlight-annotation (MERLT-1.7)', () => {
         const d = ev.data as Record<string, unknown>;
         return (
           ev.type === 'annotation:created' &&
-          d.note_text === 'Responsabilità extracontrattuale' &&
+          !('note_text' in d) &&
+          !JSON.stringify(d).includes('Fatti del cliente') &&
           d.color === null
         );
       })
@@ -315,7 +317,8 @@ describe('POST /api/merlt/events/highlight-annotation (MERLT-1.7)', () => {
         anchorText: 'art. 2043',
         startOffset: 0,
         articleUrn: 'urn:nir:stato:codice.civile:1942;2043',
-        noteText: 'Responsabilità extracontrattuale',
+        // An older client still sending the note's words: they never reach MERL-T.
+        noteText: 'Fatti del cliente',
       });
 
     expect(res.status).toBe(202);

@@ -237,7 +237,7 @@ export const changePassword = async (req: Request, res: Response) => {
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, merltConsenso, merltConsensoStorico] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -272,6 +272,17 @@ export const exportAccountData = async (req: Request, res: Response) => {
       select: { giorno: true, ripassi: true, nuove: true, sbagliate: true, codaFinita: true, valido: true },
       orderBy: { giorno: 'asc' },
     }),
+    // The MERL-T consent and its history, with the notice version each choice was made under.
+    // What MERL-T itself collected is downloaded from Impostazioni › Dati MERL-T (`GET /api/merlt/data/export`).
+    prisma.merltUserPreference.findUnique({
+      where: { userId },
+      select: { consentLevel: true, createdAt: true, updatedAt: true, informativa: { select: { versione: true } } },
+    }),
+    prisma.merltConsentAudit.findMany({
+      where: { userId },
+      select: { previousLevel: true, nextLevel: true, source: true, reason: true, createdAt: true, informativa: { select: { versione: true } } },
+      orderBy: { createdAt: 'asc' },
+    }),
   ]);
 
   res.json({
@@ -288,6 +299,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       // stored study days ('YYYY-MM-DD', Rome days: a DATE travels as UTC midnight).
       lingoRipassi, lingoPreferenze,
       lingoGiornate: lingoGiornate.map(({ giorno, ...day }) => ({ giorno: dateToDay(giorno), ...day })),
+      merltConsenso, merltConsensoStorico,
     },
   });
 };

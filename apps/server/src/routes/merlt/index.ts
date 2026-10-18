@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import consentRouter from './consent';
+import dataRouter from './data';
 import eventsRouter from './events';
 import graphRouter from './graph';
 import contribRouter from './contrib';
@@ -18,6 +19,7 @@ import { featureGate } from '../../middleware/merlt/featureGate';
  *
  * Slice 1 endpoints:
  *  - /consent           → GET / POST / DELETE (MERLT-1.4)
+ *  - /data/export, /data → GET / DELETE: the person's MERL-T data (per-route auth)
  *  - /events/<name>     → POST per event-name (MERLT-1.5 onward)
  *  - /health            → GET (MERLT-1.5, no auth)
  *  - /profile           → GET (MERLT-1.5, with authority cache)
@@ -81,6 +83,8 @@ router.use(
   featureGate('contribution', [], ['/ner/feedback']),
   nerRouter
 );
+// The person's MERL-T data. Per-route auth → order-safe; before the catch-all (gotcha #1).
+router.use('/', dataRouter);
 router.use('/', consentRouter);
 router.use('/', profileRouter);
 router.use('/', eventsRouter);

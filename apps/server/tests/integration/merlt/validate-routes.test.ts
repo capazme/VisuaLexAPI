@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import nock from 'nock';
-import { request, app, prisma, createTestUser, authHeader, type TestUser } from '../../helpers';
+import { request, app, prisma, createTestUser, authHeader, type TestUser, merltNoticeId } from '../../helpers';
 import { _resetValidateClientForTests } from '../../../src/routes/merlt/validate';
 
 const TEST_MERLT_BASE = 'http://merlt-test.local:8000';
@@ -24,7 +24,7 @@ afterAll(() => {
 });
 
 async function grantFull(user: TestUser): Promise<void> {
-  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full' });
+  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full', noticeId: await merltNoticeId() });
 }
 
 describe('MERL-T validation routes (Slice 2c #8)', () => {

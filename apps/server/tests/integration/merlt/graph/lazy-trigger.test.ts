@@ -7,6 +7,7 @@ import {
   authHeader,
   prisma,
   type TestUser,
+  merltNoticeId,
 } from '../../../helpers';
 import {
   _resetMerltClientForTests,
@@ -46,7 +47,7 @@ afterAll(() => {
 });
 
 async function grantConsent(user: TestUser, level: 'basic' | 'full' = 'basic'): Promise<void> {
-  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level });
+  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level, noticeId: await merltNoticeId() });
 }
 
 function payload(articleUrn: string) {

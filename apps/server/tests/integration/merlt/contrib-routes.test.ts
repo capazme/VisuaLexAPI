@@ -7,6 +7,7 @@ import {
   authHeader,
   prisma,
   type TestUser,
+  merltNoticeId,
 } from '../../helpers';
 import { _resetContribClientForTests } from '../../../src/routes/merlt/contrib';
 
@@ -36,7 +37,7 @@ afterAll(() => {
 });
 
 async function grantFull(user: TestUser): Promise<void> {
-  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full' });
+  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full', noticeId: await merltNoticeId() });
 }
 
 /** MERL-T GET /api/v1/documents/:id answering with `uploadedBy` as the uploader. */

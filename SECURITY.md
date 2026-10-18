@@ -78,7 +78,11 @@ checks none of them.
 
 What leaves depends on the consent level. The BFF stores it
 (`MerltUserPreference`: `none`, `basic`, `full`) and enforces it on every
-route. The frontend copy is only a cache.
+route. The frontend copy is only a cache. A level counts only when it was
+chosen under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a
+versioned text administrators edit as new versions): a level from before, or
+under an older version, collects nothing until the person answers again
+(`services/merlt/effectiveConsent.ts`).
 
 - **Any level, including `none` (reading is free).**
   - Opening the graph side rail or `/grafo` sends the article URN and any graph
@@ -90,7 +94,8 @@ route. The frontend copy is only a cache.
     score:
     - article views: URN, dwell time, scroll depth;
     - highlights: the selected text and its colour;
-    - anchored notes: the note text and the selected text;
+    - anchored notes: the selected text only, never the note's words (the owner, 18 October
+      2026: a lawyer's note may hold a client's facts);
     - bookmark and dossier additions: URN and dossier id;
     - citation clicks: the citation text;
     - forum signals: the shared environment's id (never its author's, since
@@ -112,8 +117,18 @@ route. The frontend copy is only a cache.
     the article text or from an answer.
   - **`search_mining`.** Legal references mined from the user's own questions.
 
-Revoking consent stops new sends. It does not delete what MERL-T already
-stores.
+Revoking consent stops new sends, and offers to erase what was collected.
+A person can download their MERL-T data (`GET /api/merlt/data/export`) and
+erase it (`DELETE /api/merlt/data`); deleting an account erases it too when
+the person ever consented. The erasure is a row in `merlt_erasure_requests`,
+written in the same transaction, and a worker sends it to MERL-T
+(`DELETE /api/v1/user-data/{id}`, admin key) until MERL-T confirms every store;
+then, for an account deleted or a revocation, once more an hour later (work in
+flight can still write), and the row goes: until then it holds the id of an
+account that may be gone. MERL-T deletes the private data and keeps what the
+community took up (approved proposals, votes, reports) with the link to the
+person cut (`services/merlt/merlt/privacy/user_data.py`). Activity events
+expire after `MERLT_TRACKING_RETENTION_DAYS`.
 
 On the VisuaLex side, the BFF keeps:
 

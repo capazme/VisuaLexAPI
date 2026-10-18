@@ -98,7 +98,7 @@ export function toMerltHighlightAnnotation(
     article_urn: normalizeArticleUrn(payload.articleUrn),
     start_offset: payload.startOffset,
     color: payload.color ?? null,
-    note_text: payload.noteText ?? null,
+    // No note_text: MERL-T never collects the words of a note (see the schema).
   };
 }
 

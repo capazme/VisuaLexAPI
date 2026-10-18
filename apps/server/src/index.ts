@@ -3,6 +3,7 @@ import app from './app';
 import { prisma } from './lib/prisma';
 import { startNormaWatcher } from './utils/normaWatcher';
 import { startDeadLetterSweeper } from './services/merlt/deadLetterLog';
+import { startMerltErasureWorker } from './services/merlt/userData';
 import {
   scheduleStuckJobSweeper,
   DEFAULT_EXTRACT_STALE_AFTER_MS,
@@ -45,6 +46,9 @@ let normaWatcherInterval: NodeJS.Timeout | null = null;
 // The MERL-T dead letters expire (services/merlt/deadLetterLog.ts).
 const deadLetterSweeper: NodeJS.Timeout | null =
   config.nodeEnv !== 'test' ? startDeadLetterSweeper() : null;
+// Erasures MERL-T has not confirmed yet are retried (services/merlt/userData.ts).
+const merltErasureWorker: NodeJS.Timeout | null =
+  config.nodeEnv !== 'test' ? startMerltErasureWorker() : null;
 
 const server = app.listen(config.port, () => {
   normaWatcherInterval = startNormaWatcher();
@@ -86,6 +90,7 @@ function shutdown(signal: NodeJS.Signals): void {
   if (watchdogInterval) clearInterval(watchdogInterval);
   if (normaWatcherInterval) clearInterval(normaWatcherInterval);
   if (deadLetterSweeper) clearInterval(deadLetterSweeper);
+  if (merltErasureWorker) clearInterval(merltErasureWorker);
   server.close(() => {
     prisma
       .$disconnect()

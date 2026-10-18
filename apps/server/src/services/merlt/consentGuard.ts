@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { prisma } from '../../lib/prisma';
+import { effectiveConsent } from './effectiveConsent';
 
 /**
  * Express middleware that blocks event-capture requests when the user has
@@ -12,6 +12,8 @@ import { prisma } from '../../lib/prisma';
  *  - consentLevel === 'none' → 403 { detail: 'consent_required' }
  *  - consentLevel === 'basic' | 'full' → next()
  *  - No record at all (first-time user) → treated as 'none' → 403
+ *  - A level chosen under an older version of the MERL-T notice, or before
+ *    it existed → treated as 'none' → 403 (`effectiveConsent`)
  *
  * The Slice 1 design pins the toggle granularity (contribution / validation
  * / graph) to the consent level itself via preferencesForLevel(). The
@@ -31,12 +33,9 @@ export async function consentGuard(
   }
 
   try {
-    const preference = await prisma.merltUserPreference.findUnique({
-      where: { userId: req.user.id },
-      select: { consentLevel: true },
-    });
+    const consent = await effectiveConsent(req.user.id);
 
-    if (!preference || preference.consentLevel === 'none') {
+    if (consent.consentLevel === 'none') {
       res.status(403).json({ detail: 'consent_required' });
       return;
     }
@@ -45,9 +44,8 @@ export async function consentGuard(
   } catch (err) {
     // DB error → fail closed (no tracking) but with 500 so it's visible in
     // logs rather than swallowed as a silent 403.
-    res.status(500).json({
-      detail: 'consent_check_failed',
-      error: err instanceof Error ? err.message : String(err),
-    });
+    // The error's message stays out of the answer: it can carry the query's parameters.
+    console.error('[merlt] consent check failed:', err instanceof Error ? err.name : err);
+    res.status(500).json({ detail: 'consent_check_failed' });
   }
 }

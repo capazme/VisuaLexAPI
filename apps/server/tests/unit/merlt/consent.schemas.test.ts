@@ -18,14 +18,21 @@ describe('merltConsentLevelSchema', () => {
 });
 
 describe('consentSetRequestSchema', () => {
-  it('accepts level only', () => {
-    expect(consentSetRequestSchema.safeParse({ level: 'basic' }).success).toBe(true);
+  const noticeId = '6f1d2a54-8b3e-4c7a-9e21-5d0a7c3b1f48';
+
+  it('accepts a level with the notice it was chosen under', () => {
+    expect(consentSetRequestSchema.safeParse({ level: 'basic', noticeId }).success).toBe(true);
   });
 
-  it('accepts level + reason', () => {
+  it('accepts level + notice + reason', () => {
     expect(
-      consentSetRequestSchema.safeParse({ level: 'full', reason: 'training mode opt-in' }).success
+      consentSetRequestSchema.safeParse({ level: 'full', noticeId, reason: 'training mode opt-in' }).success
     ).toBe(true);
+  });
+
+  it('rejects a level without the notice (a choice counts only under one)', () => {
+    expect(consentSetRequestSchema.safeParse({ level: 'basic' }).success).toBe(false);
+    expect(consentSetRequestSchema.safeParse({ level: 'basic', noticeId: 'not-a-uuid' }).success).toBe(false);
   });
 
   it('rejects missing level', () => {
@@ -49,12 +56,20 @@ describe('consentRevokeRequestSchema', () => {
       consentRevokeRequestSchema.safeParse({ reason: 'changed my mind' }).success
     ).toBe(true);
   });
+
+  it('accepts the choice to erase what was collected', () => {
+    expect(consentRevokeRequestSchema.safeParse({ deleteData: true }).success).toBe(true);
+    expect(consentRevokeRequestSchema.safeParse({ deleteData: 'yes' }).success).toBe(false);
+  });
 });
 
 describe('consentResponseSchema', () => {
   it('accepts a complete state with null dates', () => {
     const result = consentResponseSchema.safeParse({
       level: 'none',
+      storedLevel: 'none',
+      noticeAnswered: false,
+      notice: null,
       contributionEnabled: false,
       validationEnabled: false,
       graphEnabled: false,
@@ -67,6 +82,9 @@ describe('consentResponseSchema', () => {
   it('accepts ISO datetime strings', () => {
     const result = consentResponseSchema.safeParse({
       level: 'full',
+      storedLevel: 'full',
+      noticeAnswered: true,
+      notice: { id: 'n1', versione: 1, titolo: 't', corpo: 'c', conferma: 'ok', azione: 'vai' },
       contributionEnabled: true,
       validationEnabled: true,
       graphEnabled: true,
