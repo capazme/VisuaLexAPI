@@ -102,7 +102,7 @@ const labels = (row: HTMLElement) => [...row.querySelectorAll('button, a')].map(
 describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
   it('shows exactly notes, highlights, discussions, the magnifier and copy, and no «⋯»', () => {
     const { container } = show('beside');
-    expect(labels(desktopRow(container))).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Discussioni sull’articolo', 'Cerca nel testo', 'Copia']);
+    expect(labels(desktopRow(container))).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
     expect(screen.queryByTitle('Altre azioni')).not.toBeInTheDocument();
   });
 
@@ -123,7 +123,7 @@ describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
     const past: ArticleValidity = { state: 'historical', valid_from: '2003-12-25', valid_to: '2007-12-29', version_number: 3, act_updated: null, request_in_window: true };
     show('beside', article({ validity: past, norma_data: { ...NORMA, data_versione: '2005-06-01', versione: 'originale' } }));
     expect(screen.queryByText('Brocardi')).not.toBeInTheDocument();
-    for (const button of screen.getAllByTitle(/Discussioni sull’articolo — /)) expect(button).toBeDisabled();
+    for (const button of screen.getAllByTitle(/Glosse sull’articolo — /)) expect(button).toBeDisabled();
   });
 });
 

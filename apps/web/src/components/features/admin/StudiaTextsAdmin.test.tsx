@@ -37,7 +37,7 @@ async function renderAdmin() {
 describe('StudiaTextsAdmin, the current version', () => {
   it('shows each text in a form filled with its current version', async () => {
     const section = await renderAdmin();
-    expect(screen.getByRole('heading', { level: 2, name: 'Testi di VisuaLex Studia' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Testi di VisuaLex Gymnasium' })).toBeInTheDocument();
     expect(within(section).getByLabelText('Titolo')).toHaveValue('Titolo v3');
     expect(within(section).getByLabelText('Testo')).toHaveValue('Primo paragrafo v3.\n\nSecondo paragrafo v3.');
     expect(within(section).getByLabelText('Etichetta della casella')).toHaveValue('Casella v3');

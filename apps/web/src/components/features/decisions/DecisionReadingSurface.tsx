@@ -123,7 +123,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     plain,
     enabled: plain !== '',
     contentRef,
-    onInvalidSelection: () => setToast({ message: 'Non è possibile aprire una discussione su questa selezione', type: 'error' }),
+    onInvalidSelection: () => setToast({ message: 'Non è possibile aprire una glossa su questa selezione', type: 'error' }),
   });
   const { locatedThreads, textHash, focusedThreadId } = discussion;
 
@@ -399,8 +399,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       <ArticleDiscussionPanel
         anchor={discussionAnchor}
         label={label}
-        heading="Discussioni sulla decisione"
-        textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa discussione."
+        heading="Glosse sulla decisione"
+        textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa glossa."
         detachedPassageNotice="Il passo citato non è più nel testo della decisione."
         textUnavailableNotice="Il passo citato non è mostrato: il testo della decisione non è disponibile."
         withholdDetachedPassage

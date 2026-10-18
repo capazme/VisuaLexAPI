@@ -107,7 +107,7 @@ describe('ReadingToolbar — it fits a 375 px screen', () => {
 describe('ReadingToolbar — a past text is a reading', () => {
     it('switches off the tools keyed by article, and says why in each tooltip', () => {
         setup({ lockedReason: READ_ONLY_REASON });
-        for (const name of ['Aggiungi a norme rapide', 'Apri note', 'Gestisci evidenziazioni', 'Discussioni sull’articolo']) {
+        for (const name of ['Aggiungi a norme rapide', 'Apri note', 'Gestisci evidenziazioni', 'Glosse sull’articolo']) {
             const buttons = screen.getAllByTitle(`${name} — ${READ_ONLY_REASON}`);
             expect(buttons.length).toBeGreaterThan(0);
             buttons.forEach((button) => expect(button).toBeDisabled());
@@ -131,7 +131,7 @@ describe('ReadingToolbar — a past text is a reading', () => {
 
     it('has every tool on for the text in force', () => {
         setup();
-        for (const title of ['Aggiungi a norme rapide', 'Apri note', 'Gestisci evidenziazioni', 'Discussioni sull’articolo', 'Copia']) {
+        for (const title of ['Aggiungi a norme rapide', 'Apri note', 'Gestisci evidenziazioni', 'Glosse sull’articolo', 'Copia']) {
             screen.getAllByTitle(title).forEach((button) => expect(button).toBeEnabled());
         }
     });
@@ -237,14 +237,14 @@ describe('ReadingToolbar — the compact form of a light window (spec §4.1)', (
     it('the desktop row holds notes, highlights, discussions, the magnifier and copy, and no «⋯»', () => {
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = container.querySelector('div.hidden.md\\:flex') as HTMLElement;
-        expect(titles(row, '')).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Discussioni sull’articolo', 'Cerca nel testo', 'Copia']);
+        expect(titles(row, '')).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
         expect(screen.queryByTitle('Altre azioni')).not.toBeInTheDocument();
     });
 
     it('the phone row holds discussions, the magnifier and copy: no quick norm, dossier, Study Mode or source link', () => {
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = container.querySelector('div.flex.md\\:hidden') as HTMLElement;
-        expect(titles(row, '')).toEqual(['Discussioni sull’articolo', 'Cerca nel testo', 'Copia testo']);
+        expect(titles(row, '')).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia testo']);
     });
 
     it('keeps the version chip and the annex badge, which say which text this is', () => {

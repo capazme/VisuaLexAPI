@@ -101,8 +101,8 @@ describe('ArticleDiscussionPanel', () => {
       expect(screen.getByText('Titolo discussione')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /nuova discussione/i }));
-    const titleInput = screen.getByPlaceholderText('Titolo della discussione');
+    fireEvent.click(screen.getByRole('button', { name: /nuova glossa/i }));
+    const titleInput = screen.getByPlaceholderText('Titolo della glossa');
     const bodyInput = screen.getByPlaceholderText(/condividi una domanda/i);
 
     expect(titleInput).toBeRequired();
@@ -137,7 +137,7 @@ describe('ArticleDiscussionPanel', () => {
     expect(onThreadCreated).toHaveBeenCalledWith(newCreatedThread);
   });
 
-  it('with a draft, the composer shows "Discussione sul passo" and the quotation, title is optional, and submitting calls create with { passage, articleUrn, textHash }', async () => {
+  it('with a draft, the composer shows "Glossa sul passo" and the quotation, title is optional, and submitting calls create with { passage, articleUrn, textHash }', async () => {
     const onDraftConsumed = vi.fn();
     const onThreadCreated = vi.fn();
     const onFocusThread = vi.fn();
@@ -165,7 +165,7 @@ describe('ArticleDiscussionPanel', () => {
     );
 
     // Composer opens automatically when draft is present
-    expect(screen.getByText('Discussione sul passo')).toBeInTheDocument();
+    expect(screen.getByText('Glossa sul passo')).toBeInTheDocument();
     expect(screen.getByText(/«risarcimento del danno»/)).toBeInTheDocument();
 
     const titleInput = screen.getByPlaceholderText('Titolo (facoltativo)');
@@ -211,8 +211,8 @@ describe('ArticleDiscussionPanel', () => {
       />
     );
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Impossibile caricare le discussioni sui passaggi.'));
-    expect(screen.queryByText(/Nessuna discussione ancora\./)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Impossibile caricare le glosse sui passaggi.'));
+    expect(screen.queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
     expect(onRetryPassageLoad).toHaveBeenCalledOnce();
 
@@ -228,9 +228,9 @@ describe('ArticleDiscussionPanel', () => {
         passageLoadError={false}
       />
     );
-    await waitFor(() => expect(screen.getByText(/Nessuna discussione ancora\./)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Nessuna glossa ancora\./)).toBeInTheDocument());
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Le discussioni non sono disponibili/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Le glosse non sono disponibili/)).not.toBeInTheDocument();
   });
 
   it('a "detached" state shows "Il passo discusso non si trova nel testo che stai leggendo." and the quotation, and the discussion stays listed', async () => {
@@ -277,7 +277,7 @@ describe('ArticleDiscussionPanel', () => {
     });
 
     expect(
-      screen.getByText('Il testo dell’articolo è cambiato da quando è stata aperta questa discussione.')
+      screen.getByText('Il testo dell’articolo è cambiato da quando è stata aperta questa glossa.')
     ).toBeInTheDocument();
   });
 
@@ -384,8 +384,8 @@ describe('ArticleDiscussionPanel', () => {
         <ArticleDiscussionPanel
           anchor={decisionAnchor}
           label="Cass. civ. n. 99999/2024"
-          heading="Discussioni sulla sentenza"
-          textChangedNotice="Il testo della sentenza è cambiato da quando è stata aperta questa discussione."
+          heading="Glosse sulla sentenza"
+          textChangedNotice="Il testo della sentenza è cambiato da quando è stata aperta questa glossa."
           isOpen={true}
           onClose={vi.fn()}
           textHash={PROJECTION_HASH}
@@ -394,13 +394,13 @@ describe('ArticleDiscussionPanel', () => {
 
       await waitFor(() => expect(screen.getByText('Titolo discussione')).toBeInTheDocument());
       expect(articleDiscussionService.list).toHaveBeenCalledWith(decisionAnchor, 'recent');
-      expect(screen.getByText('Discussioni sulla sentenza')).toBeInTheDocument();
+      expect(screen.getByText('Glosse sulla sentenza')).toBeInTheDocument();
       expect(screen.getByText('Cass. civ. n. 99999/2024')).toBeInTheDocument();
       expect(screen.queryByText(/^Art\./)).not.toBeInTheDocument();
       expect(screen.queryByText(/dell’articolo/)).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /nuova discussione/i }));
-      fireEvent.change(screen.getByPlaceholderText('Titolo della discussione'), { target: { value: 'T' } });
+      fireEvent.click(screen.getByRole('button', { name: /nuova glossa/i }));
+      fireEvent.change(screen.getByPlaceholderText('Titolo della glossa'), { target: { value: 'T' } });
       fireEvent.change(screen.getByPlaceholderText(/condividi una domanda/i), { target: { value: 'B' } });
       fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
 
@@ -432,7 +432,7 @@ describe('ArticleDiscussionPanel', () => {
         pagination: { page: 1, limit: 20, total: 1, pages: 1 },
       });
       const otherHash = '1111111111111111111111111111111111111111111111111111111111111111';
-      const notice = 'Il testo della sentenza è cambiato da quando è stata aperta questa discussione.';
+      const notice = 'Il testo della sentenza è cambiato da quando è stata aperta questa glossa.';
       const ui = (anchor: { normaKey: string; articleId: string }) => (
         <ArticleDiscussionPanel anchor={anchor} isOpen={true} onClose={vi.fn()} textHash={otherHash} textChangedNotice={notice} />
       );
@@ -604,7 +604,7 @@ describe('ArticleDiscussionPanel', () => {
     it('does not use the quotation as the heading of an untitled thread whose words are withheld', async () => {
       await renderPanel(decisionThread({ title: '' }), true, {}, false);
       const heading = screen.getByRole('heading', { level: 4 });
-      expect(heading).toHaveTextContent('Discussione su un passo non più nel testo');
+      expect(heading).toHaveTextContent('Glossa su un passo non più nel testo');
       expect(screen.queryAllByText(/risarcimento del danno/)).toHaveLength(0);
     });
 

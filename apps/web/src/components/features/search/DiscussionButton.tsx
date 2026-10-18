@@ -4,7 +4,7 @@ import { toolbarToggleClass } from './toolbarToggle';
 export interface DiscussionButtonProps {
     isOpen: boolean;
     onToggle: () => void;
-    /** What is discussed, in the tooltip and the accessible name (e.g. «Discussioni sull’articolo»). */
+    /** What is discussed, in the tooltip and the accessible name (e.g. «Glosse sull’articolo»). */
     name: string;
     /** Set when the reader may not discuss (a past text): the button is off, with this as the reason. */
     lockedReason?: string;

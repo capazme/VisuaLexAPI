@@ -268,7 +268,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         plain: plainArticle,
         enabled: Boolean(discussionAnchor.articleId) && Boolean(article_text) && !readOnly,
         contentRef,
-        onInvalidSelection: () => showToast('Non è possibile aprire una discussione su questa selezione', 'error'),
+        onInvalidSelection: () => showToast('Non è possibile aprire una glossa su questa selezione', 'error'),
     });
     const { locatedThreads, textHash, focusedThreadId } = discussion;
 

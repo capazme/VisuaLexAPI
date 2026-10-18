@@ -114,7 +114,7 @@ describe('«Cerca nel testo» on a decision', () => {
 
   it('orders the buttons as the article does: discussion, then find', () => {
     render(withWindow(surface()));
-    const discussion = screen.getByRole('button', { name: /Discussioni/ });
+    const discussion = screen.getByRole('button', { name: /Glosse/ });
     expect(discussion.compareDocumentPosition(magnifier()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

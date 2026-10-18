@@ -21,12 +21,12 @@ export function DecisionDiscussionsWithoutText({ identity, attributi }: { identi
   });
   return (
     <div className="flex justify-end">
-      <DiscussionButton isOpen={discussion.open} onToggle={discussion.toggle} name="Discussioni sulla decisione" />
+      <DiscussionButton isOpen={discussion.open} onToggle={discussion.toggle} name="Glosse sulla decisione" />
       <ArticleDiscussionPanel
         anchor={anchor}
         label={label}
-        heading="Discussioni sulla decisione"
-        textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa discussione."
+        heading="Glosse sulla decisione"
+        textChangedNotice="Il testo della decisione è cambiato da quando è stata aperta questa glossa."
         detachedPassageNotice="Il passo citato non è più nel testo della decisione."
         textUnavailableNotice="Il passo citato non è mostrato: il testo della decisione non è disponibile."
         withholdDetachedPassage

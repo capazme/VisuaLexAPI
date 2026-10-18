@@ -158,7 +158,7 @@ export function ValidationQueueView() {
       {status === 'empty' && <p className="py-8 text-sm text-slate-600 dark:text-slate-300">{materia ? 'Nessuna scheda da validare in questa materia' : 'Nessuna scheda da validare'}</p>}
       {status === 'forbidden' && (
         <div role="alert" className="space-y-1 py-8 text-sm text-slate-600 dark:text-slate-300">
-          <p className="font-medium text-slate-800 dark:text-slate-100">{neverValidator ? 'Questa sezione è riservata ai validatori di VisuaLex Studia' : 'Non sei più tra i validatori'}</p>
+          <p className="font-medium text-slate-800 dark:text-slate-100">{neverValidator ? 'Questa sezione è riservata ai validatori di VisuaLex Gymnasium' : 'Non sei più tra i validatori'}</p>
           <p>Se pensi sia un errore, chiedilo a un amministratore.</p>
         </div>
       )}

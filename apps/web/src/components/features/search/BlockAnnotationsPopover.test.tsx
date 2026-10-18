@@ -183,18 +183,18 @@ describe('BlockAnnotationsPopover', () => {
     expect(within(dialog).getByTitle('Suggerita da @marta')).toBeInTheDocument();
   });
 
-  it('shows the Discussioni section with quote, author, comment count and Apri discussione button', async () => {
+  it('shows the Glosse section with quote, author, comment count and Apri glossa button', async () => {
     const thread = createDummyThread({ commentCount: 1 });
     const onOpenThread = vi.fn();
     const { props } = setup([], [], { onOpenThread }, [thread]);
     const dialog = await screen.findByRole('dialog', { name: TITLE });
 
-    expect(within(dialog).getByRole('heading', { level: 4, name: 'Discussioni' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { level: 4, name: 'Glosse' })).toBeInTheDocument();
     expect(within(dialog).getByText('“prestazioni corrispettive”')).toBeInTheDocument();
     expect(within(dialog).getByText('Disputa sulla risoluzione')).toBeInTheDocument();
     expect(within(dialog).getByText(/@marta · 1 risposta/)).toBeInTheDocument();
 
-    const openBtn = within(dialog).getByRole('button', { name: /Apri discussione/ });
+    const openBtn = within(dialog).getByRole('button', { name: /Apri glossa/ });
     fireEvent.click(openBtn);
     expect(props.onClose).toHaveBeenCalled();
     expect(onOpenThread).toHaveBeenCalledWith('t1');

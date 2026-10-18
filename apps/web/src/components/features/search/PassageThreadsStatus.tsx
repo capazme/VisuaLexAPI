@@ -7,7 +7,7 @@ export function PassageThreadsStatus({ error, loading, onRetry }: { error: boole
     <>
       {error && (
         <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-          <span>Impossibile caricare le discussioni sui passaggi. I segni potrebbero non mostrarle.</span>
+          <span>Impossibile caricare le glosse sui passaggi. I segni potrebbero non mostrarle.</span>
           <button
             type="button"
             onClick={onRetry}
@@ -19,7 +19,7 @@ export function PassageThreadsStatus({ error, loading, onRetry }: { error: boole
       )}
       {loading && (
         <p role="status" className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-          Aggiornamento discussioni sui passaggi…
+          Aggiornamento glosse sui passaggi…
         </p>
       )}
     </>

@@ -425,7 +425,7 @@ describe('annotation signs', () => {
     expect(sign.getAttribute('data-notes')).toBe('0');
     expect(sign.getAttribute('data-highlights')).toBe('0');
     expect(sign.getAttribute('data-threads')).toBe('1');
-    expect(sign.getAttribute('aria-label')).toBe('1 discussione in questo passo');
+    expect(sign.getAttribute('aria-label')).toBe('1 glossa in questo passo');
     const threadsSpan = sign.querySelector('.vlx-sign-threads');
     expect(threadsSpan).not.toBeNull();
     expect(threadsSpan?.getAttribute('data-count')).toBe('1');
