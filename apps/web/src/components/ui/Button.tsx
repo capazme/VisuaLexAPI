@@ -50,10 +50,12 @@ const variantStyles: Record<ButtonVariant, string> = {
 };
 
 // 36 px on a desktop, 44 px on a phone (the touch target); `min-h` so a long label wraps instead of clipping.
+// The line height rides on the size (`text-sm/5`): tailwind-merge drops a separate `leading-*` written
+// before a font size.
 const sizeStyles = {
-  sm: 'min-h-11 md:min-h-8 px-3 text-xs',
-  md: 'min-h-11 md:min-h-9 px-4 text-sm',
-  lg: 'min-h-11 px-5 text-base',
+  sm: 'min-h-11 md:min-h-8 px-3 text-xs/5',
+  md: 'min-h-11 md:min-h-9 px-4 text-sm/5',
+  lg: 'min-h-11 px-5 text-base/5',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -73,7 +75,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-md py-1.5 text-center font-medium leading-5',
+          'inline-flex items-center justify-center gap-2 rounded-md py-1.5 text-center font-medium',
           TRANSITION,
           FOCUS_RING,
           DISABLED,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useIsPresent, useReducedMotion } from 'framer-motion';
 import { CheckCircle2, XCircle, Info, AlertCircle, X, Undo2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { registerUndoToastListener, type UndoToast } from '../../hooks/useUndoableAction';
@@ -149,55 +149,67 @@ export function UndoToastContainer() {
     return registerUndoToastListener(setToast);
   }, []);
 
-  // The share of the time left, drawn as a scale so the bar stays on the compositor.
-  const progress = toast ? toast.timeRemaining / 5000 : 0;
-
   return (
     <AnimatePresence>
-      {toast && (
-        <motion.div
-          {...edgeMotion('bottom', still)}
-          className={cn(
-            // The same placement as the plain toast's (above).
-            'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border md:max-w-md',
-            'bottom-4 inset-x-4 md:inset-x-auto md:bottom-8 md:right-8',
-            'bg-slate-900 dark:bg-white border-slate-700 dark:border-slate-200',
-            'text-white dark:text-slate-900 shadow-lg'
-          )}
-          role="alert"
-        >
-          {/* Progress bar */}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-700 dark:bg-slate-300 rounded-b-xl overflow-hidden">
-            <motion.div
-              className="h-full w-full origin-left bg-blue-500"
-              initial={{ scaleX: 1 }}
-              animate={{ scaleX: progress }}
-              transition={{ duration: 0.1, ease: 'linear' }}
-            />
-          </div>
-
-          <div className="shrink-0">
-            <CheckCircle2 size={18} className="text-emerald-400 dark:text-emerald-600" />
-          </div>
-          <p className="flex-1 font-medium text-sm leading-tight">{toast.message}</p>
-          <button
-            onClick={toast.onUndo}
-            className="shrink-0 px-3 py-1.5 text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors flex items-center gap-1.5"
-          >
-            <Undo2 size={14} />
-            Annulla
-          </button>
-          <button
-            onClick={toast.onDismiss}
-            className="shrink-0 hover:bg-slate-800 dark:hover:bg-slate-200 p-1 rounded-md transition-colors text-slate-400 dark:text-slate-500"
-            aria-label="Chiudi notifica"
-          >
-            <X size={16} />
-          </button>
-        </motion.div>
-      )}
+      {toast && <UndoToastCard toast={toast} still={still} />}
     </AnimatePresence>
   );
 }
 
+/**
+ * One undo toast. Once its countdown resolves (undone, dismissed or run out) AnimatePresence keeps it
+ * on screen for its exit; while it leaves nothing in it answers, so a last-moment «Annulla» is not
+ * taken for a restore that did not happen.
+ */
+function UndoToastCard({ toast, still }: { toast: UndoToast; still: boolean | null }) {
+  const present = useIsPresent();
+  // The share of the time left, drawn as a scale so the bar stays on the compositor.
+  const progress = toast.timeRemaining / 5000;
 
+  return (
+    <motion.div
+      {...edgeMotion('bottom', still)}
+      inert={!present}
+      className={cn(
+        // The same placement as the plain toast's (above).
+        'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border md:max-w-md',
+        'bottom-4 inset-x-4 md:inset-x-auto md:bottom-8 md:right-8',
+        'bg-slate-900 dark:bg-white border-slate-700 dark:border-slate-200',
+        'text-white dark:text-slate-900 shadow-lg',
+        !present && 'pointer-events-none'
+      )}
+      role="alert"
+    >
+      {/* Progress bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-700 dark:bg-slate-300 rounded-b-xl overflow-hidden">
+        <motion.div
+          className="h-full w-full origin-left bg-blue-500"
+          initial={{ scaleX: 1 }}
+          animate={{ scaleX: progress }}
+          transition={{ duration: 0.1, ease: 'linear' }}
+        />
+      </div>
+
+      <div className="shrink-0">
+        <CheckCircle2 size={18} className="text-emerald-400 dark:text-emerald-600" />
+      </div>
+      <p className="flex-1 font-medium text-sm leading-tight">{toast.message}</p>
+      <button
+        onClick={toast.onUndo}
+        disabled={!present}
+        className="shrink-0 px-3 py-1.5 text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors flex items-center gap-1.5"
+      >
+        <Undo2 size={14} />
+        Annulla
+      </button>
+      <button
+        onClick={toast.onDismiss}
+        disabled={!present}
+        className="shrink-0 hover:bg-slate-800 dark:hover:bg-slate-200 p-1 rounded-md transition-colors text-slate-400 dark:text-slate-500"
+        aria-label="Chiudi notifica"
+      >
+        <X size={16} />
+      </button>
+    </motion.div>
+  );
+}

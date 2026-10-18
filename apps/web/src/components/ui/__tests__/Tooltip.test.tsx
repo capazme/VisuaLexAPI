@@ -51,7 +51,20 @@ describe('Tooltip', () => {
 
   it('shows at once on keyboard focus', () => {
     render(<Row />);
-    fireEvent.focus(screen.getByText('due'));
+    const button = screen.getByText('due');
+    fireEvent.keyDown(document.body, { key: 'Tab' });
+    fireEvent.focus(button);
+    expect(screen.getByText('Annota')).toBeInTheDocument();
+  });
+
+  it('leaves the focus a click gives to the pointer\'s timing', () => {
+    render(<Row />);
+    const button = screen.getByText('due');
+    fireEvent.pointerDown(button);
+    fireEvent.focus(button);
+    expect(screen.queryByText('Annota')).toBeNull();
+    fireEvent.mouseEnter(button.parentElement!);
+    act(() => vi.advanceTimersByTime(500));
     expect(screen.getByText('Annota')).toBeInTheDocument();
   });
 });

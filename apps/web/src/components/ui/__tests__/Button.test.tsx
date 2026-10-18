@@ -51,4 +51,17 @@ describe('Button', () => {
       expect(className).not.toMatch(/gradient|shadow-|hover:-?translate-|transition-all/);
     }
   });
+
+  it('keeps a 20 px line at every size', () => {
+    render(
+      <>
+        <Button size="sm">Piccolo</Button>
+        <Button size="md">Medio</Button>
+        <Button size="lg">Grande</Button>
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Piccolo' })).toHaveClass('text-xs/5');
+    expect(screen.getByRole('button', { name: 'Medio' })).toHaveClass('text-sm/5');
+    expect(screen.getByRole('button', { name: 'Grande' })).toHaveClass('text-base/5');
+  });
 });

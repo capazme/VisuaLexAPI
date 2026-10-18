@@ -11,6 +11,15 @@ const TOOLTIP_WARM_MS = 300;
 // at once instead of waiting the first delay again.
 let lastClosedAt = Number.NEGATIVE_INFINITY;
 
+// What moved the focus last, as `:focus-visible` decides it: a key, or a pointer pressed. Read when a
+// tooltip's trigger takes focus, so a click does not open it at once.
+let lastInput: 'keyboard' | 'pointer' = 'keyboard';
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', () => { lastInput = 'keyboard'; }, true);
+  document.addEventListener('pointerdown', () => { lastInput = 'pointer'; }, true);
+  document.addEventListener('mousedown', () => { lastInput = 'pointer'; }, true);
+}
+
 export interface TooltipProps {
   content: string;
   children: ReactNode;
@@ -47,8 +56,11 @@ export function Tooltip({
 
   // A pointer waits the delay, unless another tooltip closed a moment ago.
   const handleMouseEnter = () => show(Date.now() - lastClosedAt < TOOLTIP_WARM_MS);
-  // Keyboard focus shows it at once: what a pointer learns, a keyboard must learn too.
-  const handleFocus = () => show(true);
+  // Keyboard focus shows it at once: what a pointer learns, a keyboard must learn too. A click
+  // also focuses, and is left to the pointer's own timing.
+  const handleFocus = () => {
+    if (lastInput === 'keyboard') show(true);
+  };
 
   const handleHide = () => {
     cancel();
