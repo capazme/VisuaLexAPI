@@ -426,38 +426,38 @@ export function BulletinBoardPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div id="tour-forum-tabs" className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
+      <div id="tour-forum-tabs" className="flex max-w-full gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab('explore')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
             activeTab === 'explore'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Search size={16} />
+          <Search size={16} className="hidden sm:block" aria-hidden />
           Esplora
         </button>
         <button
           onClick={() => setActiveTab('my')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
             activeTab === 'my'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Package size={16} />
+          <Package size={16} className="hidden sm:block" aria-hidden />
           I miei pubblicati
         </button>
         <button
           onClick={() => setActiveTab('suggestions')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
+          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 relative ${
             activeTab === 'suggestions'
               ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Lightbulb size={16} />
+          <Lightbulb size={16} className="hidden sm:block" aria-hidden />
           Suggerimenti
           {pendingCount > 0 && (
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-xs rounded-full flex items-center justify-center">
