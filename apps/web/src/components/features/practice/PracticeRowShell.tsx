@@ -116,7 +116,9 @@ export function PracticeRowShell({
         </button>
       </div>
       {isOpen && (
-        <div id={regionId} className="pb-3 pl-2 pr-1 pt-1 md:pl-6 md:pr-2" style={regionStyle}>
+        // Opacity only, 150 ms: a row opens tens of times a day, and a transform here would move the
+        // reader's sticky toolbar and fixed popovers while it plays (gotchas 22, 26).
+        <div id={regionId} className="animate-in fade-in duration-150 pb-3 pl-2 pr-1 pt-1 md:pl-6 md:pr-2" style={regionStyle}>
           {children}
         </div>
       )}
