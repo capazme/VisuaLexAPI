@@ -16,6 +16,7 @@ from typing import Any, Callable, Awaitable
 import aiohttp
 
 from .config import Config
+from .consent import consent_body, notice_id_from
 from .report import Report, StepFailure
 
 
@@ -252,9 +253,11 @@ class ApiClient:
                           {"body": _truncate(body)})
 
     async def set_consent(self, level: str, reason: str = "e2e") -> dict:
+        # Answer the notice the screen would show: read it, then send its id.
+        _, current = await self.req("GET", f"{self.cfg.bff}/merlt/consent")
         _, body = await self.req(
             "POST", f"{self.cfg.bff}/merlt/consent",
-            json={"level": level, "reason": reason},
+            json=consent_body(level, notice_id_from(current), reason),
         )
         return body
 
