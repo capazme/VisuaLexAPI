@@ -48,9 +48,11 @@ beforeEach(() => {
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
     renderSidebar();
-    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Forum/]) {
+    for (const name of [/Ricerca/, /Dossier/, /Forum/]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
+    // «Ambienti» went into the Forum (spec 2026-10-13-environments-into-forum, D13).
+    expect(screen.queryByRole('link', { name: /Ambienti/ })).toBeNull();
   });
 
   it('has no «Ricerca Veloce» and no «Sentenze»: «Ricerca» leads to the field, ⌘K opens the palette', () => {
@@ -330,7 +332,7 @@ describe('Sidebar — the phone\'s copy (spec D8)', () => {
   it('is the same reduced list and the same menu, closed off-canvas or open', () => {
     renderSidebar('/', { isOpen: false });
     expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
-      ['/', '/dossier', '/studia', '/environments', '/forum', '/documents'],
+      ['/', '/dossier', '/studia', '/forum', '/documents'],
     );
     expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Sentenze|Ricerca Veloce|Impostazioni/ })).toBeNull();

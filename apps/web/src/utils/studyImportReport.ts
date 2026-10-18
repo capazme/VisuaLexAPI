@@ -20,3 +20,8 @@ export function studyImportSentence(report: StudyImportReport): string {
   if (report.refused) parts.push(`Non leggibili e lasciati fuori: ${report.refused}.`);
   return parts.join(' ');
 }
+
+/** «diventa un tuo dossier di studio» / «diventa N tuoi dossier di studio». */
+export function becomesStudyDossiers(count: number): string {
+  return count === 1 ? 'diventa un tuo dossier di studio.' : `diventa ${count} tuoi dossier di studio.`;
+}

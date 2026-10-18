@@ -12,7 +12,7 @@ export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
 const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ReactNode }[] = [
   { value: 'newest', label: 'Più recenti', icon: <Clock size={14} /> },
   { value: 'popular', label: 'Più popolari', icon: <TrendingUp size={14} /> },
-  { value: 'mostDownloaded', label: 'Più scaricati', icon: <Users size={14} /> },
+  { value: 'mostDownloaded', label: 'Più aggiunti', icon: <Users size={14} /> },
 ];
 
 const CATEGORY_OPTIONS: ReadonlyArray<{ value: EnvironmentCategory | 'all'; label: string }> = [
@@ -365,7 +365,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
       <div className="flex items-center gap-2 mb-3">
         <Trophy size={16} className="text-amber-500" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h3>
-              </div>
+      </div>
       <ul className="space-y-1">
         {items.map((env, idx) => (
           <li key={env.id}>

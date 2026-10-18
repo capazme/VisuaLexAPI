@@ -146,8 +146,8 @@ async def run(ctx: Context, report: Report) -> None:
         await ua.req("DELETE", f"{bff}/bookmarks/{bm['id']}", expect=204)
 
     with report.step("cleanup: item-level deletes (alias, quicknorm, highlight, annotation, dossier)"):
-        # Item-level on purpose: the collection-level DELETE /annotations|/highlights
-        # wipes the WHOLE user and stays reserved to applyEnvironment(replace).
+        # Item-level: there is no collection-level DELETE /annotations|/highlights
+        # (removed with environments' «Sostituisci», spec 2026-10-13-environments-into-forum, D10).
         await ua.req("DELETE", f"{bff}/custom-aliases/{alias_id}", expect=204)
         await ua.req("DELETE", f"{bff}/quick-norms/{quicknorm_id}", expect=204)
         await ua.req("DELETE", f"{bff}/highlights/{highlight_id}", expect=204)

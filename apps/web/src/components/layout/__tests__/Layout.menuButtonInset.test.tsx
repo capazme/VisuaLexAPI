@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 
 describe('Layout — page headers clear the floating menu button below lg', () => {
-  it.each(['/dossier', '/dossier?dossier=d1', '/history', '/environments', '/forum', '/studia/schede', '/documents'])(
+  it.each(['/dossier', '/dossier?dossier=d1', '/history', '/forum', '/studia/schede', '/documents'])(
     'starts the content under the button on %s',
     (path) => {
       at(path);

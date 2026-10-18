@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { annotationTargetLabel } from '../annotationLabels';
+import { annotationTargetLabel } from './annotationLabels';
 
 describe('annotationTargetLabel', () => {
   it('names a decision by its short citation', () => {

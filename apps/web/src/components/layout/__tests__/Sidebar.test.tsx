@@ -65,7 +65,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     account.devMode = true;
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents', '/merlt', '/grafo']);
+    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/forum', '/documents', '/merlt', '/grafo']);
     // exactly one hub entry
     expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
     // «Analizza documento», the last of the others, sits above the MERL-T entries
@@ -74,7 +74,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar();
-    expect(navHrefs()).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents']);
+    expect(navHrefs()).toEqual(['/', '/dossier', '/studia', '/forum', '/documents']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -82,7 +82,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     isMerltEnabledMock.mockReturnValue(false);
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/environments', '/forum', '/documents']);
+    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/forum', '/documents']);
     expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
   });
 });

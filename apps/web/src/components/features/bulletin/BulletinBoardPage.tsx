@@ -12,6 +12,8 @@ import { AliasConflictDialog } from './AliasConflictDialog';
 import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
+import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
+import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useTour } from '../../../hooks/useTour';
@@ -514,6 +516,9 @@ export function BulletinBoardPage() {
           onPublishClick={() => setShowPublishModal(true)}
         />
       )}
+      {activeTab === 'my' && (
+        <ArchivedEnvironmentsSection onRecovered={handleStudyDossiersAdded} onMessage={showToast} />
+      )}
 
       {activeTab === 'suggestions' && (
         <ForumSuggestionsView
@@ -535,6 +540,8 @@ export function BulletinBoardPage() {
           onPublished={handlePublishComplete}
         />
       )}
+
+      <SharedLinkImport onRecovered={handleStudyDossiersAdded} />
 
       {importingEnv && (
         <AddToMyDossiersDialog

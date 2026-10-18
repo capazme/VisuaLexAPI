@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useLeftOutNotice } from '../environments/useLeftOutNotice';
+import { useLeftOutNotice } from './useLeftOutNotice';
 import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
 import { X, Send } from 'lucide-react';
-import { EnvironmentContentViewer } from '../environments/EnvironmentContentViewer';
+import { EnvironmentContentViewer } from './EnvironmentContentViewer';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { useAppStore } from '../../../store/useAppStore';
 import type { Environment, SuggestionItemType } from '../../../types';

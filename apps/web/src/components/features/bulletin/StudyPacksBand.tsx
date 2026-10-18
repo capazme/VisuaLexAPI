@@ -24,6 +24,8 @@ const SHOWN_AT_FIRST = 6;
 export function StudyPacksBand({ category, onAdded, onError }: Props) {
   const dossiers = useAppStore((s) => s.dossiers);
   const [adding, setAdding] = useState<string | null>(null);
+  // Added in this visit: marked at once, before the dossier list is read again, so a second tap makes no second copy.
+  const [addedNow, setAddedNow] = useState<ReadonlySet<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const packs = STUDY_PACKS.filter((p) => category === 'all' || p.category === category);
   if (packs.length === 0) return null;
@@ -32,7 +34,9 @@ export function StudyPacksBand({ category, onAdded, onError }: Props) {
   const add = async (pack: StudyPack) => {
     setAdding(pack.key);
     try {
-      onAdded(await dossierService.importStudy(packContent(pack), { addNotes: false, addHighlights: false }));
+      const report = await dossierService.importStudy(packContent(pack), { addNotes: false, addHighlights: false });
+      setAddedNow((prev) => new Set(prev).add(pack.key));
+      onAdded(report);
     } catch (err) {
       onError(getErrorMessage(err) || 'Non è stato possibile aggiungere il pacchetto. Riprova.');
     } finally {
@@ -49,7 +53,7 @@ export function StudyPacksBand({ category, onAdded, onError }: Props) {
       </div>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {shown.map((pack) => {
-          const added = packAlreadyAdded(pack, dossiers);
+          const added = addedNow.has(pack.key) || packAlreadyAdded(pack, dossiers);
           return (
             <li key={pack.key} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 p-2 dark:border-slate-700">
               <span className="min-w-0">
