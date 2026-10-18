@@ -43,7 +43,8 @@ export function RevokeConsentDialog({ open, onClose, onDone }: RevokeConsentDial
     <Modal
       isOpen={open}
       onClose={onClose}
-      title="Revocare il consenso a MERL-T?"
+      // A non-breaking space and hyphen: on a phone the title broke inside «MERL-T».
+      title={'Revocare il consenso a\u00A0MERL\u2011T?'}
       size="md"
       variant="danger"
       footer={
