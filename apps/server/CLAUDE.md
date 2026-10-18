@@ -285,13 +285,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
-  (the forum entity) — a personal env can be promoted, the tables stay distinct.
+  (the forum entity), the tables stay distinct. Since «Ambienti» went into the Forum the web
+  app only lists, exports, recovers and deletes them (the archive, spec
+  `2026-10-13-environments-into-forum` D11b); the create and update routes are still served.
 - **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
   entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
   the controller maps Prisma P2002 to 409.
-- **Scoped bulk deletes**: `DELETE /annotations` and `DELETE /highlights`, both
-  scoped to `req.user.id`. Intended caller is `applyEnvironment(replace)` ONLY —
-  do not wire into end-user UI without a dedicated confirm flow.
+- **No bulk delete of notes or highlights**: `DELETE /annotations` and `DELETE /highlights`
+  (one request that wiped all of a user's notes, for good) went with environments' «Sostituisci»,
+  their only caller (spec `2026-10-13-environments-into-forum`, D10; the owner's answer 185).
+  Notes and highlights are deleted one at a time.
 - Dossier item mutations are scoped to their dossier (IDOR fix — keep it that
   way when adding item routes). `POST`/`GET /dossiers/:id/snapshots` are
   scoped to the owner the same way. Write-only from the UI today ("Snapshot"

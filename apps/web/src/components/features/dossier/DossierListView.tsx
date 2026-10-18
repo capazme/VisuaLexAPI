@@ -11,6 +11,7 @@ import {
   Trash2,
   ExternalLink,
   Upload,
+  BookOpen,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { appStore, useAppStore } from '../../../store/useAppStore';
@@ -370,17 +371,27 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               description={
                 searchQuery || selectedTag || kindFilter !== 'all'
                   ? 'Prova a modificare i filtri di ricerca.'
-                  : 'I dossier ti permettono di organizzare articoli per tema, progetto o caso. Crea il tuo primo dossier per iniziare.'
+                  : 'I dossier ti permettono di organizzare articoli per tema, progetto o caso. Crea il tuo primo dossier, o parti da un dossier di studio pronto.'
               }
               action={
                 !(searchQuery || selectedTag || kindFilter !== 'all') && (
-                  <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                  >
-                    <FolderPlus size={18} />
-                    Crea il tuo primo dossier
-                  </button>
+                  <div className="flex flex-col items-center gap-2 sm:flex-row">
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    >
+                      <FolderPlus size={18} />
+                      Crea il tuo primo dossier
+                    </button>
+                    {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12). */}
+                    <button
+                      onClick={() => navigate('/forum')}
+                      className="px-5 py-2.5 rounded-lg inline-flex items-center gap-2 text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-slate-800 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    >
+                      <BookOpen size={18} aria-hidden />
+                      Dossier di studio pronti
+                    </button>
+                  </div>
                 )
               }
             />

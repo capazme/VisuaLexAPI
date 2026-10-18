@@ -67,7 +67,7 @@ const createDossier = (
 export const gdprEnvironment: Environment = {
     id: generateId(),
     name: 'GDPR & Privacy Compliance',
-    description: 'Ambiente completo per la compliance GDPR con riferimenti al Regolamento UE 2016/679 e al Codice Privacy italiano (D.Lgs. 196/2003). Include i principali articoli su diritti degli interessati, basi giuridiche, obblighi informativi e sicurezza.',
+    description: 'Pacchetto completo per la compliance GDPR con riferimenti al Regolamento UE 2016/679 e al Codice Privacy italiano (D.Lgs. 196/2003). Include i principali articoli su diritti degli interessati, basi giuridiche, obblighi informativi e sicurezza.',
     author: 'VisuaLex Team',
     version: '1.0',
     createdAt: new Date().toISOString(),

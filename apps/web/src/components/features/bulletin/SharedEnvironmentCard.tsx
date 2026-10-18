@@ -1,8 +1,9 @@
-import { Heart, Download, Eye, MoreHorizontal, Flag, User, Edit, EyeOff, History, Lightbulb, MessageSquare, Trash2 } from 'lucide-react';
+import { Heart, Download, Eye, MoreHorizontal, Flag, User, Edit, EyeOff, History, Lightbulb, MessageSquare, Trash2, FolderPlus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { SharedEnvironment, EnvironmentCategory } from '../../../types';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 
 interface SharedEnvironmentCardProps {
   environment: SharedEnvironment;
@@ -46,14 +47,7 @@ const CATEGORY_STRIPE: Record<EnvironmentCategory, string> = {
   other: '#64748b',
 };
 
-const CATEGORY_LABELS: Record<EnvironmentCategory, string> = {
-  compliance: 'Compliance',
-  civil: 'Civile',
-  penal: 'Penale',
-  administrative: 'Amministrativo',
-  eu: 'Europeo',
-  other: 'Altro',
-};
+const categoryLabel = (c: EnvironmentCategory) => FORUM_CATEGORIES.find((o) => o.value === c)?.label ?? 'Altro';
 
 export function SharedEnvironmentCard({
   environment,
@@ -135,7 +129,7 @@ export function SharedEnvironmentCard({
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <span className={`text-xs font-semibold uppercase tracking-wide ${categoryTextClass}`}>
-              {CATEGORY_LABELS[environment.category]}
+              {categoryLabel(environment.category)}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 flex-shrink-0">
               v{environment.currentVersion}
@@ -345,10 +339,11 @@ export function SharedEnvironmentCard({
           </button>
           <button
             onClick={() => onImport(environment)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+            aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
-            <Download size={16} />
-            Importa
+            <FolderPlus size={16} aria-hidden />
+            Ai miei dossier
           </button>
         </div>
       </div>

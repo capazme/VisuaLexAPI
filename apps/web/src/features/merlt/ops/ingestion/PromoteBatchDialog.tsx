@@ -19,7 +19,7 @@ type SubmitState = { status: 'idle' } | { status: 'submitting' } | { status: 'er
  * Uses `Modal` directly (not the generic ConfirmDialog) because it needs a
  * summary of what enters, the conflict list, a conditional "force" checkbox,
  * and an optional reason field. Follows the held-id + confirm pattern used
- * across the codebase (EnvironmentPage's replace-mode guard).
+ * across the codebase.
  */
 export function PromoteBatchDialog({ batch, onClose, onPromoted }: PromoteBatchDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);

@@ -80,7 +80,7 @@ export function ForumSuggestionsView({
               Nessun suggerimento ricevuto
             </h3>
             <p className="text-slate-600 dark:text-slate-400">
-              Quando qualcuno suggerirà contenuti per i tuoi ambienti, li vedrai qui.
+              Quando qualcuno suggerirà contenuti per i tuoi dossier pubblicati, li vedrai qui.
             </p>
           </div>
         ) : (
@@ -125,7 +125,7 @@ export function ForumSuggestionsView({
               Nessun suggerimento inviato
             </h3>
             <p className="text-slate-600 dark:text-slate-400">
-              Esplora gli ambienti della community e suggerisci contenuti!
+              Esplora i dossier della comunità e suggerisci contenuti.
             </p>
           </div>
         ) : (

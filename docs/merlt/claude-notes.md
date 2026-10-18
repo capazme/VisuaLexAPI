@@ -328,7 +328,8 @@ Emission call-sites. Keep them thin: the tracker hooks do the BFF talk.
 - `BulletinBoardPage` → forum like, suggestion accepted and suggestion
   declined, keyed on `sharedEnvironmentId`. The tracker drops an event
   without it.
-- `ImportEnvironmentModal.handleImport` → `forum_download`.
+- `AddToMyDossiersDialog` («Ai miei dossier») → `forum_download`, after the server's success and never for
+  one's own item (spec `2026-10-13-environments-into-forum`, D15).
 
 **Slice 1 gotchas:**
 1. **Express mount order beats prefix specificity.** `merltRoutes` must be

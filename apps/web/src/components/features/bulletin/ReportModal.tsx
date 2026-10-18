@@ -67,7 +67,7 @@ export function ReportModal({ environmentId, onClose, onReported }: ReportModalP
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Flag size={20} className="text-red-500" />
-            Segnala ambiente
+            Segnala il dossier pubblicato
           </h2>
           <button
             onClick={onClose}

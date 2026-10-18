@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Globe, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, GraduationCap, Bot } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, GraduationCap, Bot } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -343,7 +343,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         {isStudiaEnabled() && (
           <NavItem to="/studia" icon={GraduationCap} label="Studia" id="tour-nav-studia" onClick={closeMobile} />
         )}
-        <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
         {showAssistant && (

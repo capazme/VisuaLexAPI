@@ -1,11 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { SearchPage } from './pages/SearchPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
-import { EnvironmentPage } from './components/features/environments/EnvironmentPage';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
 import { DocumentReviewPage } from './components/features/documents/DocumentReviewPage';
 import { ConsentProvider } from './features/merlt/consent/ConsentContext';
@@ -47,6 +46,13 @@ const ReviewHome = lazy(() =>
 const ReviewSession = lazy(() =>
   import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
+
+/** «Ambienti» went into the Forum (spec 2026-10-13-environments-into-forum, D11c, D13): an old address, and its share
+ * link's `?import=`, land there. */
+function EnvironmentsRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: '/forum', search }} replace />;
+}
 
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
 function NotFoundPage() {
@@ -97,7 +103,7 @@ function App() {
           <Route index element={<SearchPage />} />
           <Route path="dossier" element={<DossierPage />} />
           <Route path="history" element={<HistoryView />} />
-          <Route path="environments" element={<EnvironmentPage />} />
+          <Route path="environments" element={<EnvironmentsRedirect />} />
           <Route path="forum" element={<BulletinBoardPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
           {/* How to connect an AI application through MCP, and the connected ones (user menu). */}

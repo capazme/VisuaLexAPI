@@ -31,7 +31,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
   (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
-  `/history`, `/environments`, `/forum`, `/documents`, `/collega-app` («Collega un'app AI»,
+  `/history`, `/forum` (`/environments`, the page «Ambienti» was, redirects there keeping an old share link's
+  `?import=`), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
@@ -53,8 +54,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/admin/*` (admins only).
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
-- `components/features/` — `search`, `workspace`, `dossier`, `environments`,
-  `bulletin` (the Forum), `history`, `compare`, `settings`, `studia` (VisuaLex
+- `components/features/` — `search`, `workspace`, `dossier`,
+  `bulletin` (the Forum, which absorbed «Ambienti»), `history`, `compare`, `settings`, `studia` (VisuaLex
   Studia: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
@@ -72,7 +73,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
-  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag), Ambienti,
+  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag),
   Forum, «Analizza documento»; and at the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
@@ -135,7 +136,7 @@ One Zustand store (`store/useAppStore.ts`) with Immer. Always mutate through
 actions.
 
 **Server-backed** (hydrated by `fetchUserData`, mutated optimistically then
-synced): bookmarks, dossiers + items, environments, quickNorms, customAliases,
+synced): bookmarks, dossiers + items, environments (read-only: the Forum's archive), quickNorms, customAliases,
 annotations and highlights (these two hydrate per-article via
 `loadAnnotationsForArticle` / `loadHighlightsForArticle`). The search history is
 not a store slice: `HistoryView` keeps it in local state and reloads it on mount.
@@ -537,18 +538,16 @@ renderer and the one definition of the layout (`decisionProjection`, `layoutDeci
 that the rendered text nodes spell the projection (root rule 23). The .txt export of notes and
 highlights is shared with the article (`utils/annotationExport.ts`). Only what really
 leaves the account carries just the anchors whose words are still in the decision's text: an
-environment's export file, its share link and the Forum (publishing, editing, suggestions), through
+archived environment's export file and the Forum (publishing, suggestions), through
 `utils/decisionAnchorsTravel.ts` (`travellingAnchors`, `travellingSelection`): «the decision's
 current text» is the server's cached copy (up to 30 days, the owner's choice), so words a court
 has withdrawn can travel until it expires; lookups run per distinct decision, at most four at a
 time, and a failure is not cached. `isAnchoredNote` (`decisionRender.ts`) is the one definition of
 a note that quotes words (a note without a quote is free). The decision downloads, the notes and
-highlights .txt, an environment's file and a dossier's JSON go through `utils/saveBlob.ts` (the
+highlights .txt, an archived environment's file and a dossier's JSON go through `utils/saveBlob.ts` (the
 object URL is revoked later, not at once); a few older exports still make their own link. `DecisionTextView` renders a
 found decision only for a host that mounts `DecisionView` without the reading surface; a practice's
-entry always passes the surface. A private
-environment save (create, create from a selection, update, refresh) stays in the account and keeps
-every anchor, decisions included (the owner, 8 Oct 2026). The personal files are not filtered
+entry always passes the surface. The personal files are not filtered
 either: the .txt export and the PDF «Con le mie evidenziazioni e note» list the anchors that no
 longer land (the PDF under «Non ritrovate nel testo attuale»), like the account export — the user's
 own data (decided by the owner, 8 Oct 2026).
@@ -847,10 +846,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   spostato nel cestino» has «Annulla», which restores that entry and reads the dossier
   back; a refusal puts it back where it was with a sync error and no toast. «Salva come
   dossier» that saved nothing discards its empty dossier from the trash at once
-  (`discardEmptyDossier`, only when the server says it held nothing), and
-  `applyEnvironment(replace)` and `importEnvironmentPartial(replace)` send the dossiers they
-  replace there too (their confirmation says so; annotations and highlights are still deleted
-  for good). The page's trash is read again after a deletion and after «Annulla». Entries removed from
+  (`discardEmptyDossier`, only when the server says it held nothing). Nothing replaces a
+  workspace any more: «Sostituisci» went with environments (spec
+  `2026-10-13-environments-into-forum`, D10). The page's trash is read again after a deletion and after «Annulla». Entries removed from
   a dossier go there too (owner, 13 October 2026, question 181): one article, a whole act
   («Rimuovi l'atto»), a multiple selection, a note, a decision. `removeItemsWithUndo`
   (`dossier/removeItemsWithUndo.ts`, wired in `DossierDetailView`) calls the store's
@@ -1297,16 +1295,27 @@ meant to stay split; add new features as new files, not inside the shells:
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
   `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
-- `features/environments/` — `EnvironmentPage.tsx` shell + `EnvironmentCard.tsx` +
-  one file per modal; `EnvironmentContentViewer.tsx` renders the shared
-  dossier/quickNorm/alias/annotation/highlight tree. Cards carry a category
-  stripe and a stale/fresh chip; primary action is "Unisci", replace lives in the
-  3-dot menu behind a danger `ConfirmDialog`.
-- `features/bulletin/` — the Forum. Folder and component names stay `bulletin`
-  because they match the backend `SharedEnvironment` model; the route is `/forum`
-  and the UI label is "Forum". `BulletinBoardPage.tsx` is a shell over three dumb
-  views (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`).
-  The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
+- `features/bulletin/` — the Forum: «I dossier di studio pubblicati dalla comunità» (spec
+  `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`; it absorbed «Ambienti»). Folder and
+  component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
+  `/forum`. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`). «Pubblica un dossier»
+  is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
+  `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
+  (`EditSharedEnvironmentModal`) edits its name, description, category and tags only — what it holds changes
+  from the dossier. Content becomes the user's dossiers di studio through one dialog, `StudyImportDialog` (the
+  dossiers listed, notes and highlights as switches, one server request, never an existing dossier changed;
+  the toast is `studyImportSentence`): «Ai miei dossier» on a card (`AddToMyDossiersDialog`, `POST
+  /shared-environments/:id/download`, then `forum_download` unless the item is the user's own), an environment
+  of the archive (`ArchivedEnvironmentsSection` under «I miei pubblicati»: «Ambienti salvati (archivio)», «Recupera
+  i dossier» through `POST /environments/:id/recover`, «Esporta JSON», «Elimina»; absent for a user with none; no
+  environment is created any more) and an old share link (`SharedLinkImport`, reading `?import=`, through `POST
+  /dossiers/import-study`, quick norms and aliases left out). «Dossier di studio pronti» (`StudyPacksBand`, over
+  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›:
+  articoli chiave») follows Explore's category and adds a pack through `import-study`; the empty dossier list
+  points to it. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
+  content's dossiers, quick norms, aliases, notes and highlights), `useLeftOutNotice` and `annotationLabels` serve
+  the suggestions. The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
   `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,
   `AddItemsDialog` and `AttributionChip` (see gotchas 20-21).
 - `features/search/` — `ArticleTabContent.tsx` (the reading surface),
@@ -1450,11 +1459,10 @@ meant to stay split; add new features as new files, not inside the shells:
     travels through `onAddNote(text, startOffset, rect)`.
 17. **Every user-owned slice is server-backed** — every create/update/delete must
     round-trip the backend. The canonical regressions were `importDossier` and
-    `applyEnvironment`, which pushed a local `uuidv4()` into the store; the UI
+    `applyEnvironment` (since removed), which pushed a local `uuidv4()` into the store; the UI
     looked fine until the first `addItem` 404'd on a ghost entity. Creation goes
     through `service.create()` first so the store holds server ids; mutations are
-    optimistic + sync + revert. `applyEnvironment(replace)` also wipes
-    server-side first, gated behind a danger `ConfirmDialog`. The one deliberate
+    optimistic + sync + revert. The one deliberate
     exception is the practices (spec D6): UI state, browser-only, saved in
     localStorage and never sent to the server.
 18. **Never silently swallow errors in load paths** — `.catch(() => [])` in

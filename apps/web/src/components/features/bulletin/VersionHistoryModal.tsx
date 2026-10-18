@@ -81,7 +81,7 @@ export function VersionHistoryModal({ environment, onClose, onRestored }: Versio
           </div>
         ) : versions.length === 0 ? (
           <div className="py-8 text-center text-slate-500 dark:text-slate-400 text-sm">
-            Nessuna versione precedente. Le versioni vengono create quando modifichi l'ambiente.
+            Nessuna versione precedente. Una versione nuova nasce a ogni «Aggiorna la versione pubblicata» dal dossier.
           </div>
         ) : (
           <ul className="space-y-2">

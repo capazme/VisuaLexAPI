@@ -38,8 +38,7 @@ vi.mock('../pages/LoginPage', () => ({ LoginPage: () => <div /> }));
 vi.mock('../pages/RegisterPage', () => ({ RegisterPage: () => <div /> }));
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div /> }));
-vi.mock('../components/features/environments/EnvironmentPage', () => ({ EnvironmentPage: () => <div /> }));
-vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div /> }));
+vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div data-testid="forum" /> }));
 // Lazy-loaded pages (vi.mock also intercepts dynamic import()).
 vi.mock('../pages/AdminPage', () => ({ AdminPage: () => <div /> }));
 vi.mock('../pages/MerltHubPage', () => ({ MerltHubPage: () => <div data-testid="merlt-hub" /> }));
@@ -86,6 +85,14 @@ describe('App routing', () => {
     renderAt('/merlt/chiedi');
     expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/grafo');
+  });
+
+  // «Ambienti» absorbed by the Forum (spec 2026-10-13-environments-into-forum, D11c): an old share link keeps its content.
+  it('sends /environments to the Forum, keeping an old link\'s ?import=', async () => {
+    renderAt('/environments?import=abc');
+    expect(await screen.findByTestId('forum')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/forum');
+    expect(window.location.search).toBe('?import=abc');
   });
 
   it('renders the global 404 page inside the layout for unknown paths', async () => {

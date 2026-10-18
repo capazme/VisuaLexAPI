@@ -472,6 +472,17 @@ export interface SharedEnvironmentListResponse {
     };
 }
 
+/** What becoming study dossiers did (a Forum download, a pack, an archived environment): the server's report. */
+export interface StudyImportReport {
+    dossiers: Array<{ id: string; name: string; entries: number }>;
+    notes: { added: number; skipped: number };
+    highlights: { added: number; skipped: number };
+    quickNorms: { added: number; skipped: number };
+    aliases: { added: number; skipped: number };
+    /** Rows of the content that could not be read. */
+    refused: number;
+}
+
 export interface PublishEnvironmentPayload {
     title: string;
     description?: string;
