@@ -11,6 +11,7 @@ import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { cleanSectionTitle } from '../../../utils/sectionTitle';
 import { abrogatiFor, rubricheFor } from '../../../utils/actRubriche';
+import { spring } from '../../../lib/motion';
 
 /** Window geometry, also used to keep the parked position inside the viewport. */
 const WINDOW_WIDTH = 420;
@@ -586,7 +587,7 @@ export function TreeViewPanel({
                           <motion.div
                             layoutId="annexActiveGlow"
                             className="absolute inset-0 bg-gradient-to-br from-primary-400/20 to-transparent"
-                            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                            transition={spring.snappy}
                           />
                         )}
                         <span className="relative block truncate max-w-[140px]">{annex.label}</span>
@@ -784,7 +785,7 @@ export function TreeViewPanel({
             initial={{ x: '100%', opacity: 0.9 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.9 }}
-            transition={{ type: 'spring', damping: 35, stiffness: 400 }}
+            transition={spring.snappy}
             className="fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-slate-900 shadow-2xl z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800"
           >
             {panelBody}

@@ -10,6 +10,7 @@ import { cn } from '../../../lib/utils';
 import { getActTypesByGroup } from '../../../constants/actTypes';
 import { useTour } from '../../../hooks/useTour';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { spring } from '../../../lib/motion';
 
 interface QuickNormsManagerProps {
   isOpen: boolean;
@@ -155,7 +156,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        transition={spring.snappy}
         className={cn(
           'relative w-full max-w-2xl max-h-[85vh] overflow-hidden',
           'bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl',

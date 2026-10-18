@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Plus, Sun, Moon, BookOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { StudyModeTheme } from './StudyMode';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeSettingsProps {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export function StudyModeSettings({
             initial={{ opacity: 0, scale: 0.95, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            transition={spring.snappy}
             className={cn(
               "fixed z-40 rounded-xl shadow-2xl border overflow-hidden",
               // Mobile: nearly full width, centered horizontally

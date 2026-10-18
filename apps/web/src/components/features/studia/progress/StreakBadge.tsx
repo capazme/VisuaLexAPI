@@ -5,6 +5,7 @@ import { cn } from '../../../../lib/utils';
 import type { StatoGiorno } from '../../../../types/studia';
 import { formatDayLong } from './layout';
 import { INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from './tokens';
+import { spring } from '../../../../lib/motion';
 
 export interface StreakBadgeProps {
   attuale: number;
@@ -52,7 +53,7 @@ export function StreakBadge({ attuale, record, ultimiGiorni, pop = false }: Stre
             key={`${attuale}-${pop}`}
             initial={grew && !reduce ? { scale: 1.35 } : false}
             animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 14 }}
+            transition={spring.gentle}
             className={cn('inline-block origin-left font-serif text-4xl font-bold leading-none tabular-nums md:text-5xl', INK_TEXT)}
           >
             {attuale}

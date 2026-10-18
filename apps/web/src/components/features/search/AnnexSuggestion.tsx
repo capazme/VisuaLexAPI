@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
+import { spring } from '../../../lib/motion';
 
 interface AnnexSuggestionProps {
   /** Current article number */
@@ -90,12 +91,7 @@ export function AnnexSuggestion({
           initial={{ opacity: 0, y: -10, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -10, scale: 0.98 }}
-          transition={{
-            type: 'spring',
-            damping: 25,
-            stiffness: 350,
-            duration: 0.3
-          }}
+          transition={spring.snappy}
           className={cn(
             "flex items-center gap-3 p-3 rounded-xl border overflow-hidden relative",
             "bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20",
@@ -117,7 +113,7 @@ export function AnnexSuggestion({
             className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-amber-500/30"
             initial={{ rotate: -10 }}
             animate={{ rotate: 0 }}
-            transition={{ type: 'spring', damping: 10 }}
+            transition={spring.gentle}
           >
             <Sparkles size={18} className="text-white" />
           </motion.div>

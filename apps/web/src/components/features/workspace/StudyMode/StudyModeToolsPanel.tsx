@@ -7,6 +7,7 @@ import type { StudyModeTheme } from './StudyMode';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../../utils/highlightColors';
 import { revealAnnotation } from '../../../../utils/revealAnnotation';
 import { StudyModeSummary } from './StudyModeSummary';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeToolsPanelProps {
   visible: boolean;
@@ -148,7 +149,7 @@ export function StudyModeToolsPanel({
           initial={{ x: '-100%', opacity: 0.8 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '-100%', opacity: 0.8 }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          transition={spring.snappy}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           style={{ touchAction: 'pan-y' }}

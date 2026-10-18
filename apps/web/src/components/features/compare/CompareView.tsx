@@ -19,6 +19,7 @@ import { FOCUS_RING } from '../../../constants/interactions';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
 import { shortNorm } from '../../../utils/sources';
+import { spring } from '../../../lib/motion';
 
 // A past text must not be listed, compared or diffed under the label of the text in force.
 function versionSuffixOf(article: ArticleData): string {
@@ -539,7 +540,7 @@ export function CompareView() {
           initial={{ opacity: 0, y: 20, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.98 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          transition={spring.snappy}
           className={cn(
             "bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col",
             fullscreen

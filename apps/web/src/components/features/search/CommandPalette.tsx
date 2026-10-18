@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { defaultSearchFilters } from '../../../utils/searchFilters';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
+import { spring } from '../../../lib/motion';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -911,7 +912,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 <motion.div
                   className="w-4 h-4 rounded-full bg-white shadow-sm"
                   animate={{ x: includeBrocardi ? 24 : 0 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                  transition={spring.snappy}
                 />
               </div>
             </div>
