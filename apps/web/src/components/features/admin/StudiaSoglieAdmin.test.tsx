@@ -73,6 +73,18 @@ describe('StudiaSoglieAdmin, the preview', () => {
     expect(salva).toBeEnabled();
   });
 
+  it('keeps the preview when the same number is typed again ("03" for 3)', async () => {
+    const user = userEvent.setup();
+    const { approvazioni } = await renderSection();
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '3');
+    await screen.findByText('Con questa soglia 3 schede diventano validate e 1 archiviate.');
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '03');
+    expect(screen.getByText('Con questa soglia 3 schede diventano validate e 1 archiviate.')).toBeInTheDocument();
+    expect(screen.queryByText('Calcolo l’effetto…')).not.toBeInTheDocument();
+  });
+
   it('refuses a value out of its range, in Italian, and asks nothing of the server', async () => {
     const user = userEvent.setup();
     const { approvazioni, errate, salva } = await renderSection();

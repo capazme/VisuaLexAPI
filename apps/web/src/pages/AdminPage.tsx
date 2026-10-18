@@ -518,8 +518,8 @@ export function AdminPage() {
                 )}
               </div>
             </div>
-            <div className="flex min-w-0 items-center gap-1 sm:gap-3 relative z-50">
-              <span className="min-w-0 max-w-[9rem] truncate text-sm text-gray-500 dark:text-gray-400 sm:max-w-none">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-3 relative z-50">
+              <span className="hidden min-w-0 truncate text-sm text-gray-500 dark:text-gray-400 sm:block sm:max-w-xs">
                 {user?.email}
               </span>
               <button

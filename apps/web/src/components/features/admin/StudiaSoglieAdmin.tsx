@@ -37,8 +37,9 @@ export function StudiaSoglieAdmin() {
   // Bumped to read again, on «Riprova».
   const [round, setRound] = useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [preview, setPreview] = useState<StudiaSoglieEffetto | null>(null);
-  const [previewFailed, setPreviewFailed] = useState(false);
+  // Each answer is kept with the two numbers it was asked for: it shows only while they are the draft's.
+  const [preview, setPreview] = useState<{ key: string; effetto: StudiaSoglieEffetto } | null>(null);
+  const [previewFailed, setPreviewFailed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -67,25 +68,26 @@ export function StudiaSoglieAdmin() {
   // The preview follows the draft a moment after the last keystroke; an answer for an older draft is dropped.
   const previewApprovazioni = changed && soglie ? soglie.approvazioni : null;
   const previewErrate = changed && soglie ? soglie.errate : null;
+  const previewKey = previewApprovazioni === null || previewErrate === null ? null : `${previewApprovazioni}/${previewErrate}`;
   useEffect(() => {
-    if (previewApprovazioni === null || previewErrate === null) return;
+    if (previewApprovazioni === null || previewErrate === null || previewKey === null) return;
     let live = true;
     const timer = window.setTimeout(() => {
       adminService.previewStudiaSoglie({ approvazioni: previewApprovazioni, errate: previewErrate }).then(
-        (effect) => live && setPreview(effect),
-        () => live && setPreviewFailed(true),
+        (effetto) => live && setPreview({ key: previewKey, effetto }),
+        () => live && setPreviewFailed(previewKey),
       );
     }, 300);
     return () => {
       live = false;
       window.clearTimeout(timer);
     };
-  }, [previewApprovazioni, previewErrate]);
+  }, [previewApprovazioni, previewErrate, previewKey]);
+  const effetto = preview && preview.key === previewKey ? preview.effetto : null;
+  const anteprimaFallita = previewKey !== null && previewFailed === previewKey;
 
   const edit = (field: keyof Draft) => (value: string) => {
     setDraft({ ...(shown ?? { approvazioni: '', errate: '' }), [field]: value });
-    setPreview(null);
-    setPreviewFailed(false);
   };
 
   const save = async () => {
@@ -131,7 +133,7 @@ export function StudiaSoglieAdmin() {
   const { limiti, predefinite } = settings;
   const testoApprovazioni = `Da ${limiti.approvazioni.min} a ${limiti.approvazioni.max}.`;
   const testoErrate = `Da ${limiti.errate.min} a ${limiti.errate.max}.`;
-  const canSave = Boolean(soglie && changed && preview && !previewFailed && !saving);
+  const canSave = Boolean(soglie && changed && effetto && !anteprimaFallita && !saving);
 
   return (
     <section aria-labelledby={headingId} className={cn(PANEL, 'space-y-5')}>
@@ -169,11 +171,11 @@ export function StudiaSoglieAdmin() {
 
       <div aria-live="polite" className="min-h-[1.25rem] text-sm text-gray-700 dark:text-gray-300">
         {!changed && <p className="text-gray-500 dark:text-gray-400">Le soglie in vigore sono {current?.approvazioni} approvazioni e {current?.errate} «errata».</p>}
-        {changed && previewFailed && <p className="text-red-600 dark:text-red-400">Non riesco a calcolare l’effetto. Modifica il valore per riprovare.</p>}
-        {changed && !previewFailed && !preview && <p className="text-gray-500 dark:text-gray-400">Calcolo l’effetto…</p>}
-        {changed && preview && (
+        {changed && anteprimaFallita && <p className="text-red-600 dark:text-red-400">Non riesco a calcolare l’effetto. Modifica il valore per riprovare.</p>}
+        {changed && !anteprimaFallita && !effetto && <p className="text-gray-500 dark:text-gray-400">Calcolo l’effetto…</p>}
+        {changed && effetto && (
           <p>
-            Con questa soglia {preview.validate} schede diventano validate e {preview.archiviate} archiviate.
+            Con questa soglia {effetto.validate} schede diventano validate e {effetto.archiviate} archiviate.
           </p>
         )}
       </div>
