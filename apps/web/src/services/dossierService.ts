@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { DossierKind } from '../types';
+import type { DossierKind, StudyImportReport } from '../types';
 
 // API types matching backend response format
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
@@ -110,6 +110,14 @@ export const dossierService = {
   async getById(id: string): Promise<DossierApi> {
     const response = await apiClient.get(`/dossiers/${id}`);
     return response.data;
+  },
+
+  /**
+   * New dossiers di studio from content the app holds (a ready-made pack, an old environment link): filtered and
+   * imported by the server (spec D9, D11c, D12). Never changes an existing dossier.
+   */
+  async importStudy(content: unknown, switches: { addNotes: boolean; addHighlights: boolean } = { addNotes: true, addHighlights: true }): Promise<StudyImportReport> {
+    return tracked(async () => (await apiClient.post('/dossiers/import-study', { content, ...switches })).data);
   },
 
   // Create dossier

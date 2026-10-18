@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { EnvironmentCategory } from '../types';
+import type { EnvironmentCategory, StudyImportReport } from '../types';
 
 // Wire shape for a personal environment as returned by the backend.
 // Matches `environmentController.serialize` in the backend.
@@ -43,6 +43,12 @@ export interface EnvironmentUpdatePayload {
 }
 
 export const environmentService = {
+  /** «Recupera i dossier»: an archived environment's dossiers become study dossiers (spec D11b). */
+  async recover(id: string, switches: { addNotes: boolean; addHighlights: boolean } = { addNotes: true, addHighlights: true }): Promise<StudyImportReport> {
+    const response = await apiClient.post(`/environments/${id}/recover`, switches);
+    return response.data;
+  },
+
   async getAll(): Promise<EnvironmentApi[]> {
     const response = await apiClient.get('/environments');
     return response.data;

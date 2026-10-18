@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Search, Share2, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
+import { Search, Upload, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
 import { SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { EmptyState } from '../../ui/EmptyState';
+import { StudyPacksBand } from './StudyPacksBand';
+import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
-import type { SharedEnvironment, EnvironmentCategory } from '../../../types';
+import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '../../../types';
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
 
@@ -13,14 +15,9 @@ const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ReactNode }[
   { value: 'mostDownloaded', label: 'Più scaricati', icon: <Users size={14} /> },
 ];
 
-const CATEGORY_OPTIONS: { value: EnvironmentCategory | 'all'; label: string }[] = [
+const CATEGORY_OPTIONS: ReadonlyArray<{ value: EnvironmentCategory | 'all'; label: string }> = [
   { value: 'all', label: 'Tutte le categorie' },
-  { value: 'compliance', label: 'Compliance' },
-  { value: 'civil', label: 'Civile' },
-  { value: 'penal', label: 'Penale' },
-  { value: 'administrative', label: 'Amministrativo' },
-  { value: 'eu', label: 'Europeo' },
-  { value: 'other', label: 'Altro' },
+  ...FORUM_CATEGORIES,
 ];
 
 interface ForumExploreViewProps {
@@ -46,6 +43,8 @@ interface ForumExploreViewProps {
   onReport: (id: string) => void;
   onSuggest: (env: SharedEnvironment) => void;
   onPublishClick: () => void;
+  onPacksAdded: (report: StudyImportReport) => void;
+  onPacksError: (message: string) => void;
   onResetFilters: () => void;
 }
 
@@ -72,6 +71,8 @@ export function ForumExploreView({
   onReport,
   onSuggest,
   onPublishClick,
+  onPacksAdded,
+  onPacksError,
   onResetFilters,
 }: ForumExploreViewProps) {
   const selectedSort = SORT_OPTIONS.find(o => o.value === sort)!;
@@ -92,7 +93,8 @@ export function ForumExploreView({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca ambienti..."
+            placeholder="Cerca nel Forum…"
+            aria-label="Cerca nel Forum"
             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </form>
@@ -189,13 +191,14 @@ export function ForumExploreView({
         />
       )}
 
-      {/* Top environments social proof */}
+      {/* Ready-made study dossiers, then the community's most added */}
+      <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} />
       <TopEnvironmentsWidget onImport={onImport} />
 
       {/* Results count */}
       {!loading && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          {pagination.total} {pagination.total === 1 ? 'ambiente trovato' : 'ambienti trovati'}
+          {pagination.total} {pagination.total === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
         </p>
       )}
 
@@ -224,13 +227,13 @@ export function ForumExploreView({
         hasFilter ? (
           <EmptyState
             variant="search"
-            title="Nessun ambiente corrisponde ai filtri"
+            title="Nessun dossier pubblicato corrisponde ai filtri"
             description={
               searchQuery && category !== 'all'
                 ? `Nessun risultato per "${searchQuery}" nella categoria ${selectedCategory.label.toLowerCase()}.`
                 : searchQuery
                 ? `Nessun risultato per "${searchQuery}".`
-                : `Nessun ambiente nella categoria "${selectedCategory.label}".`
+                : `Nessun dossier pubblicato nella categoria "${selectedCategory.label}".`
             }
             action={
               <button
@@ -245,15 +248,15 @@ export function ForumExploreView({
         ) : (
           <EmptyState
             variant="generic"
-            title="Ancora nessun ambiente nel forum"
-            description="Sii il primo a condividere un ambiente con la community."
+            title="Ancora nessun dossier nel Forum"
+            description="Pubblica un tuo dossier di studio: gli altri lo aggiungono ai loro dossier."
             action={
               <button
                 onClick={onPublishClick}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
               >
-                <Share2 size={16} />
-                Condividi un ambiente
+                <Upload size={16} />
+                Pubblica un dossier
               </button>
             }
           />
@@ -310,8 +313,8 @@ interface TopEnvironmentsWidgetProps {
   onImport: (env: SharedEnvironment) => void;
 }
 
-// Small social-proof block listing the 3 most-downloaded shared
-// environments. Self-contained: fetches once on mount via the existing
+// Small social-proof block listing the 3 most-added published
+// dossiers. Self-contained: fetches once on mount via the existing
 // `sort=mostDownloaded&limit=3` list endpoint (no backend changes). Renders
 // nothing on error or when there is no download history yet.
 function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
@@ -326,7 +329,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
         setState({ status: 'success', items: res.data });
       })
       .catch((err) => {
-        console.error('TopEnvironmentsWidget: failed to load top environments:', err);
+        console.error('TopEnvironmentsWidget: failed to load the most-added dossiers:', err);
         if (!active) return;
         setState({ status: 'error' });
       });
@@ -342,7 +345,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
         <div className="flex items-center gap-2 mb-3">
           <Trophy size={16} className="text-amber-500" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Top Ambienti</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h3>
         </div>
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
@@ -353,7 +356,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
     );
   }
 
-  // Only environments with a real download history are worth surfacing.
+  // Only dossiers someone actually added are worth surfacing.
   const items = state.items.filter((env) => env.downloadCount > 0);
   if (items.length === 0) return null;
 
@@ -361,9 +364,8 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
       <div className="flex items-center gap-2 mb-3">
         <Trophy size={16} className="text-amber-500" />
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Top Ambienti</h3>
-        <span className="text-xs text-slate-400 dark:text-slate-500">i più scaricati</span>
-      </div>
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h3>
+              </div>
       <ul className="space-y-1">
         {items.map((env, idx) => (
           <li key={env.id}>
