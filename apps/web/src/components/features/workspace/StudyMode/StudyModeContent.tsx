@@ -1,6 +1,7 @@
 import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowUpRight, StickyNote } from 'lucide-react';
+import { dur, ease } from '../../../../lib/motion';
 import { SelectionPopup } from '../../search/SelectionPopup';
 import { SafeHTML } from '../../../../utils/sanitize';
 import { cn } from '../../../../lib/utils';
@@ -293,9 +294,9 @@ export function StudyModeContent({
         <>
           {/* Floating Button - responsive positioning */}
           <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
+            initial={{ opacity: 0, transform: 'scale(0.96)' }}
+            animate={{ opacity: 1, transform: 'scale(1)' }}
+            transition={{ duration: dur.pop, ease: ease.out }}
             onClick={toggleFootnotesPanel}
             className={cn(
               // Base styles

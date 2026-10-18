@@ -29,7 +29,7 @@ describe('LoginForm', () => {
       </MemoryRouter>,
     );
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@b.it' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'secret' } });
     fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!);
     await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/connect?request=req-1'));
   });

@@ -1,21 +1,21 @@
 /**
- * Login form component - Refactored with glassmorphism and micro-interactions
+ * Login form: the colophon beside the form, on paper (spec 2026-10-18-redesign-inchiostro §5.3.4).
  */
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { BookOpen, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { getErrorMessage } from '../../utils/errors';
 import { locationToPath, takeReturnTo } from '../../utils/returnTo';
+
+const FIELD =
+  'w-full h-11 rounded-md border border-slate-200 bg-slate-50 px-3.5 text-base md:text-[15px] text-slate-900 placeholder:text-slate-400 outline-none transition-[border-color,box-shadow] focus:border-primary-500 focus:ring-2 focus:ring-primary-500/25 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
-  const [isEmailFocused, setIsEmailFocused] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   const { login, loading, error: authError } = useAuth();
   const navigate = useNavigate();
@@ -29,14 +29,13 @@ export function LoginForm() {
     e.preventDefault();
     setFormError('');
 
-    // Client-side validation
     if (!email || !password) {
-      setFormError('Email and password are required');
+      setFormError('Inserisci email e password.');
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setFormError('Invalid email format');
+      setFormError('Questo indirizzo email non sembra valido.');
       return;
     }
 
@@ -45,106 +44,68 @@ export function LoginForm() {
       const stashed = takeReturnTo(); // always spent, so a stale address never returns later
       navigate(fromState ?? stashed ?? '/', { replace: true });
     } catch (error) {
-      setFormError(getErrorMessage(error) || 'Login failed. Please check your credentials.');
+      setFormError(getErrorMessage(error) || 'Accesso non riuscito: controlla email e password.');
     }
   };
 
   const error = formError || authError;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 relative overflow-hidden px-4">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-[420px] w-full relative z-10 p-6">
-        {/* Logo/Header */}
-        <div className="text-center mb-10 space-y-3">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 mb-2 transform transition-transform hover:scale-105 duration-300">
-            <LogIn size={28} strokeWidth={2.5} />
-          </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Visua<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Lex</span>
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex items-center px-4 py-10 md:px-10">
+      <div className="mx-auto grid w-full max-w-5xl items-center gap-12 md:grid-cols-[minmax(0,1fr)_420px] md:gap-16">
+        <header className="space-y-5">
+          <BookOpen aria-hidden="true" size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
+          <h1 className="font-serif text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-50 md:text-6xl">
+            VisuaLex
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">
-            Accedi alla tua piattaforma legale
+          <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
+            Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
           </p>
-        </div>
+          <ul className="space-y-1.5 text-sm text-slate-500 dark:text-slate-400">
+            <li>Normattiva · EUR-Lex · Brocardi</li>
+            <li>Cassazione · Corte costituzionale · Corte di giustizia</li>
+            <li>Pratiche, dossier e schede di ripasso</li>
+          </ul>
+        </header>
 
-        {/* Login Card with Glass Effect */}
-        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8 transition-all duration-300">
-          {/* Error Message */}
+        <main className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg md:p-10 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="mb-6 font-serif text-3xl font-medium text-slate-900 dark:text-slate-50">Accedi</h2>
+
           {error && (
-            <div className="mb-6 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-              <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
-              <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
+            <div role="alert" className="mb-6 flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3.5 animate-in fade-in slide-in-from-top-2 dark:border-red-900/50 dark:bg-red-950/40">
+              <AlertCircle aria-hidden="true" size={18} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email Field */}
-            <div className="space-y-1.5">
-              <label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
+            <div className="space-y-2">
+              <label htmlFor="login-email" className="block text-sm font-medium text-slate-900 dark:text-slate-100">
                 Email
               </label>
-              <div
-                className={cn(
-                  'relative group transition-all duration-300',
-                  isEmailFocused ? 'transform scale-[1.02]' : ''
-                )}
-              >
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail
-                    size={18}
-                    className={cn(
-                      'transition-colors',
-                      isEmailFocused ? 'text-blue-500' : 'text-slate-400'
-                    )}
-                  />
-                </div>
-                <input
-                  id="login-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => setIsEmailFocused(true)}
-                  onBlur={() => setIsEmailFocused(false)}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
-                  placeholder="name@company.com"
-                  disabled={loading}
-                  autoComplete="email"
-                />
-              </div>
+              <input
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={FIELD}
+                placeholder="nome@studio.it"
+                disabled={loading}
+                autoComplete="email"
+              />
             </div>
 
-            {/* Password Field */}
-            <div className="space-y-1.5">
-              <label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
+            <div className="space-y-2">
+              <label htmlFor="login-password" className="block text-sm font-medium text-slate-900 dark:text-slate-100">
                 Password
               </label>
-              <div
-                className={cn(
-                  'relative group transition-all duration-300',
-                  isPasswordFocused ? 'transform scale-[1.02]' : ''
-                )}
-              >
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock
-                    size={18}
-                    className={cn(
-                      'transition-colors',
-                      isPasswordFocused ? 'text-blue-500' : 'text-slate-400'
-                    )}
-                  />
-                </div>
+              <div className="relative">
                 <input
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  onBlur={() => setIsPasswordFocused(false)}
-                  className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
+                  className={`${FIELD} pr-12`}
                   placeholder="••••••••"
                   disabled={loading}
                   autoComplete="current-password"
@@ -152,44 +113,35 @@ export function LoginForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-white/5"
-                  tabIndex={-1}
+                  aria-label={showPassword ? 'Nascondi la password' : 'Mostra la password'}
+                  aria-pressed={showPassword}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 rounded-xl font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary-600 px-4 font-semibold text-white transition-[background-color,transform] hover:bg-primary-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary-400 dark:text-slate-950 dark:hover:bg-primary-300"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <BookOpen aria-label="Accesso in corso" size={18} className="animate-pulse" />
               ) : (
-                <>
-                  Sign In{' '}
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                </>
+                'Accedi'
               )}
             </button>
           </form>
 
-          {/* Registration Link */}
-          <p className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-6 text-sm text-slate-600 dark:text-slate-400">
             Non hai un account?{' '}
-            <Link to="/register" className="text-blue-600 hover:underline font-medium">
+            <Link to="/register" className="font-medium text-primary-600 hover:underline dark:text-primary-400">
               Registrati
             </Link>
           </p>
-        </div>
-
-        {/* Footer */}
-        <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-6">
-          © 2025 VisuaLex. All rights reserved.
-        </p>
+        </main>
       </div>
     </div>
   );

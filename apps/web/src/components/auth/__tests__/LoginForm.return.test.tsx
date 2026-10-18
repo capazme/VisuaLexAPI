@@ -21,9 +21,9 @@ function renderLogin(state?: unknown) {
       </Routes>
     </MemoryRouter>,
   );
-  fireEvent.change(screen.getByPlaceholderText('name@company.com'), { target: { value: 'a@b.it' } });
+  fireEvent.change(screen.getByPlaceholderText('nome@studio.it'), { target: { value: 'a@b.it' } });
   fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'pw' } });
-  fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^accedi$/i }));
 }
 
 beforeEach(() => { login.mockReset().mockResolvedValue(undefined); sessionStorage.clear(); });
