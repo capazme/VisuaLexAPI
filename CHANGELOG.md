@@ -12,6 +12,13 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+### Licence
+
+- The whole repository is under the Mozilla Public License 2.0 (MPL-2.0),
+  in place of MIT (root), Apache-2.0 (MERL-T) and ISC (the applications).
+  Portions ported from mcp-legal-it keep the MIT terms they were relicensed
+  under.
+
 Everything since v1.7.8: the first release of the unified repository, which
 brings in the MERL-T line merged on 27 September 2026.
 

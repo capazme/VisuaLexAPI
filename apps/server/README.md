@@ -320,4 +320,4 @@ lsof -ti:3001 | xargs kill
 
 ## License
 
-ISC
+Mozilla Public License 2.0 (MPL-2.0) - see [LICENSE](../../LICENSE)

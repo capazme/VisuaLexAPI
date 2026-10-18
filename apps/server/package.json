@@ -24,7 +24,7 @@
     "typescript"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MPL-2.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",
     "@prisma/client": "^5.20.0",
