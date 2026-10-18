@@ -12,6 +12,7 @@
   <meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#070c17" media="(prefers-color-scheme: dark)" />
   <title>VisuaLex</title>
+  <script src="/theme-boot.js"></script>
   <!-- The splash: VisuaLex's book traces itself while the app downloads; React replaces #root's
        content when it starts. Same mark as components/ui/BookMark.tsx. -->
   <style>
@@ -22,7 +23,7 @@
     .vlx-splash svg { animation: vlx-splash-breathe 1.4s ease-in-out 700ms infinite alternate; }
     @keyframes vlx-splash-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
     @keyframes vlx-splash-breathe { to { opacity: 0.4; } }
-    @media (prefers-color-scheme: dark) { .vlx-splash { background: #070c17; color: #6997eb; } }
+    .dark .vlx-splash { background: #070c17; color: #6997eb; }
     @media (prefers-reduced-motion: reduce) { .vlx-splash path, .vlx-splash svg { animation: none; } }
   </style>
 </head>
