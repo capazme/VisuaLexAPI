@@ -32,6 +32,10 @@ vi.mock('../../components/features/admin/StudiaTextsAdmin', () => ({
   StudiaTextsAdmin: () => <div data-testid="studia-texts-admin">texts</div>,
 }));
 
+vi.mock('../../components/features/admin/StudiaSoglieAdmin', () => ({
+  StudiaSoglieAdmin: () => <div data-testid="studia-soglie-admin">soglie</div>,
+}));
+
 vi.mock('../../services/sharedEnvironmentService', () => ({
   sharedEnvironmentService: {
     getReports: vi.fn().mockResolvedValue([]),
@@ -115,6 +119,7 @@ describe('AdminPage — VisuaLex Studia', () => {
     expect(screen.queryByTestId('studia-texts-admin')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Testi di VisuaLex Studia' }));
     expect(screen.getByTestId('studia-texts-admin')).toBeInTheDocument();
+    expect(screen.getByTestId('studia-soglie-admin')).toBeInTheDocument();
   });
 
   const row = (id: string, username: string, validator: boolean) => ({

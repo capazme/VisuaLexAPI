@@ -216,3 +216,39 @@ export const studiaTexts = async (): Promise<StudiaTextGroup[]> => {
 export const saveStudiaText = async (chiave: string, body: StudiaTextBody): Promise<StudiaTextVersion> => {
   return post<StudiaTextVersion>(`/admin/studia/testi/${encodeURIComponent(chiave)}`, body);
 };
+
+// ============================================
+// VisuaLex Studia: the thresholds of the community's validation
+// ============================================
+
+/** The two numbers: approvals needed to validate a proposed card, «errata» votes needed to archive it. */
+export interface StudiaSoglie {
+  approvazioni: number;
+  errate: number;
+}
+
+export interface StudiaSoglieSettings {
+  soglie: StudiaSoglie;
+  limiti: { approvazioni: { min: number; max: number }; errate: { min: number; max: number } };
+  predefinite: StudiaSoglie;
+}
+
+/** What a change would do (or did): how many proposed cards become validated and archived. */
+export interface StudiaSoglieEffetto {
+  validate: number;
+  archiviate: number;
+}
+
+export const studiaSoglie = async (): Promise<StudiaSoglieSettings> => {
+  return get<StudiaSoglieSettings>('/admin/studia/soglie');
+};
+
+/** Read-only: the counts the thresholds would give now. */
+export const previewStudiaSoglie = async (soglie: StudiaSoglie): Promise<StudiaSoglieEffetto> => {
+  return post<StudiaSoglieEffetto>('/admin/studia/soglie/anteprima', soglie);
+};
+
+/** Saves both values and recomputes the proposed cards; answers the values and the counts applied. */
+export const saveStudiaSoglie = async (soglie: StudiaSoglie): Promise<StudiaSoglieEffetto & { soglie: StudiaSoglie }> => {
+  return put<StudiaSoglieEffetto & { soglie: StudiaSoglie }>('/admin/studia/soglie', soglie);
+};
