@@ -189,7 +189,8 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
         const title = newTitle.trim();
         if (!title || busy) return;
         setBusy(true);
-        const id = await createDossier(title);
+        // In Gymnasium a dossier made here is di studio, so the section's list shows it (sections spec S7).
+        const id = await createDossier(title, undefined, sectionKind ?? undefined);
         setBusy(false);
         if (!id) return; // creation failed: stay open, the name is not lost
         add(id);

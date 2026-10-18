@@ -107,6 +107,19 @@ describe('AddToDossierPopover', () => {
     const created = appStore.getState().dossiers.find(d => d.id === 'srv-new')!;
     expect(created.items).toHaveLength(1);
   });
+  it("creates the inline dossier with the active section's kind (sections spec S7)", async () => {
+    sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
+    try {
+      const onAdded = renderPopover();
+      fireEvent.click(screen.getByRole('button', { name: /nuovo dossier/i }));
+      fireEvent.change(screen.getByPlaceholderText(/nome del dossier/i), { target: { value: 'Nuova pratica' } });
+      fireEvent.submit(screen.getByRole('form', { name: /crea dossier/i }));
+      await vi.waitFor(() => expect(onAdded).toHaveBeenCalled());
+      expect(appStore.getState().dossiers.find(d => d.id === 'srv-new')!.kind).toBe('studio');
+    } finally {
+      sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
+    }
+  });
 });
 
 describe('AddToDossierPopover with a decision', () => {
