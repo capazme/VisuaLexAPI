@@ -456,8 +456,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   a null `autoreId` fails a bare `not`, hence the `OR`) and not yet voted on by them, oldest first.
   The vote locks the card row, refuses one's own card (403), a second vote (409) and a card that
   is no longer proposed (404), stores the vote and lets `lingo/validationRule.ts` decide the
-  state: **provisional** (to confirm with the other developer), 2 approvals and no «errata»
-  validate, one «errata» archives, in two named constants. An archived card is its author's
+  state with the thresholds in force, read after the card's lock: **provisional** (to confirm
+  with the other developer), defaults 2 approvals and no «errata» validate, one «errata»
+  archives. The thresholds are stored (`lingo_impostazioni`, `lingo/validationSettings.ts`)
+  and set by an administrator in `routes/adminStudiaSoglie.ts` (`GET /api/admin/studia/soglie`,
+  `POST …/anteprima` for the counts a change would give, `PUT …` to save: 1–5 approvals, 1–3
+  «errata»; every change logged in `lingo_impostazioni_log`). Saving recomputes every
+  **proposed** card in one transaction; validated and archived cards never change. An archived card is its author's
   alone (`PERSONAL_STATES`), so one whose author's account is gone is deleted in the vote's
   transaction instead of archived (nobody could see or delete it); the answer still says
   `ARCHIVIATA`. `GET /api/lingo/testi/:chiave` gives
