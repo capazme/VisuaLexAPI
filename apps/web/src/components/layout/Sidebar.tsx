@@ -148,7 +148,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
       id={id}
       aria-label={accessibleName}
       className={({ isActive }) => cn(
-        "relative flex items-center justify-center rounded-xl transition-all duration-200",
+        "relative flex items-center justify-center rounded-xl transition-colors duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
         // Mobile: larger touch target (min 44px)
         "w-12 h-12 md:w-11 md:h-11",
@@ -373,7 +373,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
           onKeyDown={onTriggerKeyDown}
           className={cn(
-            "relative flex items-center justify-center rounded-xl transition-all duration-200",
+            "relative flex items-center justify-center rounded-xl transition-colors duration-200",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
             "w-12 h-12 md:w-11 md:h-11",
             showUserMenu && "bg-primary-50 dark:bg-primary-900/10"

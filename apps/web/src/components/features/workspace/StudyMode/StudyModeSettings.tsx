@@ -101,7 +101,7 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('light')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'light'
                         ? 'border-yellow-500 bg-yellow-50 shadow-sm'
                         : cn('border-transparent', styles.button)
@@ -113,7 +113,7 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('sepia')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'sepia'
                         ? 'border-amber-500 bg-amber-50 shadow-sm'
                         : cn('border-transparent', styles.button)
@@ -125,7 +125,7 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('dark')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'dark'
                         ? 'border-blue-500 bg-slate-800 shadow-sm'
                         : cn('border-transparent', styles.button)

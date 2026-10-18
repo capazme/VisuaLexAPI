@@ -256,7 +256,7 @@ export function StudyModeToolsPanel({
                       </p>
                       <button
                         onClick={() => onRemoveAnnotation(note.id)}
-                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-[color,background-color,border-color,opacity]"
                       >
                         <X size={14} />
                       </button>
@@ -293,7 +293,7 @@ export function StudyModeToolsPanel({
                         </p>
                         <button
                           onClick={() => onRemoveHighlight(h.id)}
-                          className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                          className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-[color,background-color,border-color,opacity]"
                         >
                           <X size={14} />
                         </button>

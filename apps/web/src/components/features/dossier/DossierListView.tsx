@@ -399,7 +399,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     onSelect(dossier.id);
                   }
                 }}
-                className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-[color,background-color,border-color,box-shadow,scale] cursor-pointer group relative active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 <div className="flex justify-between items-start mb-3 md:mb-4 gap-2">
                   <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -508,7 +508,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 </p>
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                   <span className="text-xs text-slate-400">{formatTimestampLong(dossier.createdAt)}</span>
-                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-[color,background-color,border-color,translate] flex-shrink-0" />
                 </div>
               </div>
             );

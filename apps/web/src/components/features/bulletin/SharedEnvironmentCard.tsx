@@ -109,7 +109,7 @@ export function SharedEnvironmentCard({
   return (
     <div
       id={isFirst ? 'tour-forum-card' : undefined}
-      className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
+      className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-[color,background-color,border-color,box-shadow,opacity] duration-200 overflow-hidden ${
       isWithdrawn
         ? 'border-slate-300 dark:border-slate-600 opacity-75'
         : 'border-slate-200 dark:border-slate-700'
@@ -328,7 +328,7 @@ export function SharedEnvironmentCard({
           <button
             onClick={() => onLike(environment.id)}
             disabled={isLiking}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-[color,background-color,border-color,opacity] ${
               environment.userLiked
                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'

@@ -145,7 +145,7 @@ export function AnnexSuggestion({
               "bg-gradient-to-r from-amber-500 to-orange-500 text-white",
               "hover:from-amber-600 hover:to-orange-600",
               "shadow-md shadow-amber-500/30 hover:shadow-lg hover:shadow-amber-500/40",
-              "transition-all duration-200",
+              "transition-[--tw-gradient-from,--tw-gradient-to,box-shadow,opacity] duration-200",
               isLoading && "opacity-80 cursor-wait"
             )}
           >

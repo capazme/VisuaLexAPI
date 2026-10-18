@@ -374,7 +374,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 type="button"
                 onClick={() => setStep('select_act')}
                 className={cn(
-                  "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
+                  "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer",
                   step === 'select_act'
                     ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
                     : selectedAct
@@ -391,7 +391,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                   type="button"
                   onClick={() => selectedAct && setStep('input_details')}
                   className={cn(
-                    "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
+                    "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer",
                     step === 'input_details'
                       ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
                       : (actNumber && actDate)
@@ -405,7 +405,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               )}
 
               <div className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow]",
                 step === 'input_article'
                   ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-400"
@@ -552,7 +552,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                   </div>
                   <button
                     onClick={handleSubmitArticle}
-                    className="aspect-square w-12 h-12 bg-primary-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/20 active:scale-90 transition-all"
+                    className="aspect-square w-12 h-12 bg-primary-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/20 active:scale-90 transition-[color,background-color,border-color,scale]"
                   >
                     <ArrowRight size={20} strokeWidth={3} />
                   </button>
@@ -622,7 +622,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                       value={`cerca-sentenze ${topic}`}
                       onSelect={handleSearchTopic}
                       className={cn(
-                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
                         "bg-white dark:bg-slate-900 border border-transparent",
                         "aria-selected:bg-emerald-50 dark:aria-selected:bg-emerald-900/10 aria-selected:border-emerald-200/50 dark:aria-selected:border-emerald-800/30"
                       )}
@@ -660,7 +660,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                           value={`preferito ${qn.label}`}
                           onSelect={() => handleSelectQuickNorm(qn.id)}
                           className={cn(
-                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
                             "bg-white dark:bg-slate-900 border border-transparent",
                             "aria-selected:bg-primary-50 dark:aria-selected:bg-primary-900/10 aria-selected:border-primary-200/50 dark:aria-selected:border-primary-800/30"
                           )}
@@ -710,7 +710,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         value={`alias ${alias.trigger} ${alias.expandTo}`}
                         onSelect={() => handleSelectAlias(alias)}
                         className={cn(
-                          "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                          "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
                           "bg-white dark:bg-slate-900 border border-transparent",
                           "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-200/50 dark:aria-selected:border-indigo-800/30"
                         )}
@@ -736,7 +736,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                       value="alias gestisci crea scorciatoie"
                       onSelect={handleOpenAliasManager}
                       className={cn(
-                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
                         "border border-dashed border-indigo-300 dark:border-indigo-800",
                         "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-500",
                         !hasAliases && "sm:col-span-2"
@@ -781,7 +781,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                           value={`preset ${trigger} ${preset.act_type}`}
                           onSelect={() => handleSelectPreset(trigger)}
                           className={cn(
-                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
                             "bg-white dark:bg-slate-900 border border-transparent",
                             "aria-selected:bg-emerald-50 dark:aria-selected:bg-emerald-900/10 aria-selected:border-emerald-200/50 dark:aria-selected:border-emerald-800/30"
                           )}
@@ -822,7 +822,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                               value={act.value}
                               onSelect={() => handleSelectAct(act.value)}
                               className={cn(
-                                "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                                "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-[color,background-color,border-color,box-shadow]",
                                 "bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/50",
                                 "aria-selected:bg-primary-500 aria-selected:border-primary-600 aria-selected:shadow-lg aria-selected:shadow-primary-500/20",
                                 isSelected && !step.includes('select_act') && "border-emerald-500 ring-2 ring-emerald-500/5"
@@ -860,7 +860,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 <button
                   onClick={step === 'input_details' ? handleSubmitDetails : handleSubmitArticle}
                   disabled={step === 'input_details' ? (!actNumber || !actDate) : !article}
-                  className="w-full flex items-center justify-center gap-3 h-14 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white font-black uppercase tracking-widest rounded-2xl transition-all shadow-xl shadow-primary-500/20 disabled:shadow-none active:scale-[0.98]"
+                  className="w-full flex items-center justify-center gap-3 h-14 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white font-black uppercase tracking-widest rounded-2xl transition-[color,background-color,border-color,scale] shadow-xl shadow-primary-500/20 disabled:shadow-none active:scale-[0.98]"
                 >
                   <span>Continua</span>
                   <ArrowRight size={20} strokeWidth={3} />
@@ -872,7 +872,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 {step === 'input_article' && onBrowseStructure && (
                   <button
                     onClick={handleBrowse}
-                    className="mt-3 w-full flex items-center justify-center gap-3 h-12 rounded-2xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/30 active:scale-[0.98]"
+                    className="mt-3 w-full flex items-center justify-center gap-3 h-12 rounded-2xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold transition-[color,background-color,border-color,scale] hover:bg-emerald-100 dark:hover:bg-emerald-900/30 active:scale-[0.98]"
                   >
                     <List size={18} strokeWidth={2.5} />
                     <span>Apri l'indice e sfoglia</span>
@@ -888,7 +888,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             <div id="command-palette-brocardi-toggle" className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-4">
                 <div className={cn(
-                  "p-2 rounded-xl border transition-all",
+                  "p-2 rounded-xl border transition-[color,background-color,border-color,box-shadow]",
                   includeBrocardi
                     ? "bg-purple-500 text-white border-purple-600 shadow-md shadow-purple-500/20"
                     : "bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700"

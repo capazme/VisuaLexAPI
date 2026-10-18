@@ -102,7 +102,7 @@ function BrocardiSectionContent({ title, content, icon }: BrocardiSectionProps) 
   }
 
   return (
-    <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl mb-3 overflow-hidden transition-all hover:shadow-md">
+    <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl mb-3 overflow-hidden transition-[color,background-color,border-color,box-shadow] hover:shadow-md">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-left"
@@ -179,10 +179,10 @@ function RelazioniSection({
   };
 
   return (
-    <div className="card bg-white dark:bg-slate-800 border border-amber-200/60 dark:border-amber-900/40 shadow-sm rounded-xl mb-3 overflow-hidden transition-all hover:shadow-md group/relazioni">
+    <div className="card bg-white dark:bg-slate-800 border border-amber-200/60 dark:border-amber-900/40 shadow-sm rounded-xl mb-3 overflow-hidden transition-[color,background-color,border-color,box-shadow] hover:shadow-md group/relazioni">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-50/50 to-transparent dark:from-amber-950/20 hover:from-amber-100/50 dark:hover:from-amber-900/30 transition-all text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-50/50 to-transparent dark:from-amber-950/20 hover:from-amber-100/50 dark:hover:from-amber-900/30 transition-colors text-left"
       >
         <strong className="text-xs font-bold text-amber-700 dark:text-amber-500 uppercase flex items-center gap-2.5">
           <BookOpen size={16} className="text-amber-500" />
@@ -246,10 +246,10 @@ function RelazioneCostituzione({ relazione }: { relazione: NonNullable<BrocardiI
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="card bg-white dark:bg-slate-800 border border-purple-200/60 dark:border-purple-900/40 shadow-sm rounded-xl mb-3 overflow-hidden transition-all hover:shadow-md">
+    <div className="card bg-white dark:bg-slate-800 border border-purple-200/60 dark:border-purple-900/40 shadow-sm rounded-xl mb-3 overflow-hidden transition-[color,background-color,border-color,box-shadow] hover:shadow-md">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:from-purple-100/50 dark:hover:from-purple-900/30 transition-all text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:from-purple-100/50 dark:hover:from-purple-900/30 transition-colors text-left"
       >
         <strong className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase flex items-center gap-2.5">
           <BookOpen size={16} className="text-purple-500" />
@@ -307,7 +307,7 @@ function FootnotesSection({
   };
 
   return (
-    <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl mb-3 overflow-hidden transition-all hover:shadow-md">
+    <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl mb-3 overflow-hidden transition-[color,background-color,border-color,box-shadow] hover:shadow-md">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-left"
@@ -388,10 +388,10 @@ function CrossReferencesSection({
   };
 
   return (
-    <div className="card bg-white dark:bg-slate-800 border border-indigo-200/60 dark:border-indigo-900/40 shadow-sm rounded-xl mb-3 overflow-hidden transition-all hover:shadow-md">
+    <div className="card bg-white dark:bg-slate-800 border border-indigo-200/60 dark:border-indigo-900/40 shadow-sm rounded-xl mb-3 overflow-hidden transition-[color,background-color,border-color,box-shadow] hover:shadow-md">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-50/50 to-transparent dark:from-indigo-950/20 hover:from-indigo-100/50 dark:hover:from-indigo-900/30 transition-all text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-50/50 to-transparent dark:from-indigo-950/20 hover:from-indigo-100/50 dark:hover:from-indigo-900/30 transition-colors text-left"
       >
         <strong className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase flex items-center gap-2.5">
           <Link2 size={16} className="text-indigo-500" />
@@ -418,7 +418,7 @@ function CrossReferencesSection({
                     key={`crossref-${sezione}-${idx}`}
                     onClick={() => handleArticleClick(ref.articolo, ref.tipo_atto)}
                     title={ref.tipo_atto ? `${ref.tipo_atto} - Art. ${ref.articolo}` : `Art. ${ref.articolo}`}
-                    className="flex items-center gap-1.5 pl-2 pr-2.5 py-1 text-xs bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer transition-all border border-indigo-100 dark:border-indigo-900/20 shadow-sm"
+                    className="flex items-center gap-1.5 pl-2 pr-2.5 py-1 text-xs bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer transition-colors border border-indigo-100 dark:border-indigo-900/20 shadow-sm"
                   >
                     <span className="font-semibold">Art. {ref.articolo}</span>
                     {ref.tipo_atto && <span className="text-indigo-400 text-[10px]">({ref.tipo_atto})</span>}

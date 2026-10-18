@@ -252,7 +252,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   <button
                     key={item.id}
                     onClick={() => handleSelectArticle(item)}
-                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group"
+                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center font-bold text-sm shrink-0">
                       {item.article.norma_data.numero_articolo}
@@ -336,7 +336,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                 <button
                   onClick={() => setVersion('vigente')}
                   className={cn(
-                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all",
+                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow]",
                     version === 'vigente'
                       ? "bg-primary-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
@@ -347,7 +347,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                 <button
                   onClick={() => setVersion('originale')}
                   className={cn(
-                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all",
+                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow]",
                     version === 'originale'
                       ? "bg-amber-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
@@ -358,7 +358,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                 <button
                   onClick={() => setVersion('data')}
                   className={cn(
-                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1",
+                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow] flex items-center justify-center gap-1",
                     version === 'data'
                       ? "bg-blue-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
@@ -425,7 +425,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   <button
                     key={item.id}
                     onClick={() => handleSelectArticle(item)}
-                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 transition-all group"
+                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
                       {item.article.norma_data.numero_articolo}

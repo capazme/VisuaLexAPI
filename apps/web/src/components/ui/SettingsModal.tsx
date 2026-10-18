@@ -172,7 +172,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             onClick={() => updateSettings({ theme: 'light' })}
                             aria-pressed={settings.theme === 'light'}
                             className={cn(
-                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
                                 settings.theme === 'light'
                                     ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -184,7 +184,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             onClick={() => updateSettings({ theme: 'dark' })}
                             aria-pressed={settings.theme === 'dark'}
                             className={cn(
-                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
                                 settings.theme === 'dark'
                                     ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"

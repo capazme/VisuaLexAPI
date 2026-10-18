@@ -174,7 +174,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-all"
+            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-colors"
           >
             <X size={20} />
           </button>
@@ -193,7 +193,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
               <button
                 onClick={() => setInputMode('manual')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'manual'
                     ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
                     : 'text-slate-600 dark:text-slate-400'
@@ -205,7 +205,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
               <button
                 onClick={() => setInputMode('url')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'url'
                     ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
                     : 'text-slate-600 dark:text-slate-400'
