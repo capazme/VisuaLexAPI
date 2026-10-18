@@ -285,7 +285,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
-  (the forum entity) — a personal env can be promoted, the tables stay distinct.
+  (the forum entity), the tables stay distinct. Since «Ambienti» went into the Forum the web
+  app only lists, exports, recovers and deletes them (the archive, spec
+  `2026-10-13-environments-into-forum` D11b); the create and update routes are still served.
 - **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
   entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
   the controller maps Prisma P2002 to 409.
