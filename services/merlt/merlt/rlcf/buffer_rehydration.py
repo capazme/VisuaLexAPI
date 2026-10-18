@@ -194,6 +194,11 @@ def build_experience(
         "feedback_id": feedback.id,
         "trace_id": trace.trace_id,
     }
+    # When the judgement was given: a rebuilt experience is stamped now, and the
+    # 24-month expiry (merlt/privacy/retention.py) must count from the judgement.
+    created_at = getattr(feedback, "created_at", None)
+    if created_at is not None:
+        metadata["created_at"] = created_at.isoformat()
     return ExperienceInput(trace_data, ml_feedback, reward, metadata)
 
 
