@@ -156,7 +156,7 @@ async def test_the_purge_deletes_only_the_expired_questions_and_judgements():
         async with maker() as s:
             deleted = await retention.purge_expired_assistant_data(s, 730)
             await s.commit()
-        assert deleted >= 4
+        assert deleted >= 5
         async with maker() as s:
             traces = (await s.execute(
                 text("SELECT trace_id FROM qa_traces WHERE trace_id IN (:o, :n)"), {"o": old, "n": new}
@@ -173,6 +173,10 @@ async def test_the_purge_deletes_only_the_expired_questions_and_judgements():
         assert log_rows == 0
     finally:
         async with maker() as s:
+            await s.execute(
+                text("DELETE FROM devils_advocate_log WHERE trace_id IN (:o, :n, :g)"),
+                {"o": old, "n": new, "g": f"trace_gone_{tag}"},
+            )
             await s.execute(text("DELETE FROM qa_feedback WHERE trace_id IN (:o, :n)"), {"o": old, "n": new})
             await s.execute(text("DELETE FROM qa_traces WHERE trace_id IN (:o, :n)"), {"o": old, "n": new})
             await s.commit()
