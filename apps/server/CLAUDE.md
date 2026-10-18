@@ -287,7 +287,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
   (the forum entity), the tables stay distinct. Since «Ambienti» went into the Forum the web
   app only lists, exports, recovers and deletes them (the archive, spec
-  `2026-10-13-environments-into-forum` D11b); the create and update routes are still served.
+  `2026-10-13-environments-into-forum` D11b). The server serves only list, read, delete and recover: the create and update routes were removed in the stabilisation of 1.8.0 (`tests/environmentsWriteRoutesRemoved.test.ts`).
 - **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
   entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
   the controller maps Prisma P2002 to 409.

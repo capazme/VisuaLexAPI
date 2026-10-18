@@ -6,43 +6,6 @@ import { AppError } from '../middleware/errorHandler';
 import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
 import { readableContent } from '../utils/publishedContent';
 
-// ── Validation ────────────────────────────────────────────────────────────
-
-const categoryEnum = z.enum([
-  'compliance',
-  'civil',
-  'penal',
-  'administrative',
-  'eu',
-  'other',
-]);
-
-const createEnvironmentSchema = z.object({
-  name: z.string().min(1).max(200),
-  description: z.string().optional().nullable(),
-  author: z.string().optional().nullable(),
-  version: z.string().optional().nullable(),
-  category: categoryEnum.optional().nullable(),
-  color: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional(),
-  // The environment "content" is an opaque JSON blob holding dossiers,
-  // quickNorms, customAliases, annotations, highlights. We don't validate
-  // its internal shape here because the frontend owns the schema and we
-  // always hydrate the whole thing.
-  content: z.any(),
-});
-
-const updateEnvironmentSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  description: z.string().optional().nullable(),
-  author: z.string().optional().nullable(),
-  version: z.string().optional().nullable(),
-  category: categoryEnum.optional().nullable(),
-  color: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional(),
-  content: z.any().optional(),
-});
-
 // Small helper so every response shape stays in lock-step.
 // Snake_case keys match the existing dossier/bookmark conventions.
 type PrismaEnvironment = {
@@ -102,65 +65,6 @@ export const getEnvironment = async (req: Request, res: Response) => {
   if (!env) {
     throw new AppError(404, 'Environment not found');
   }
-
-  res.json(serialize(env));
-};
-
-/**
- * Create a personal environment.
- */
-export const createEnvironment = async (req: Request, res: Response) => {
-  if (!req.user) throw new AppError(401, 'Not authenticated');
-
-  const data = createEnvironmentSchema.parse(req.body);
-
-  const env = await prisma.environment.create({
-    data: {
-      name: data.name,
-      description: data.description ?? null,
-      author: data.author ?? null,
-      version: data.version ?? null,
-      category: data.category ?? null,
-      color: data.color ?? null,
-      tags: data.tags ?? [],
-      content: data.content ?? {},
-      userId: req.user.id,
-    },
-  });
-
-  res.status(201).json(serialize(env));
-};
-
-/**
- * Update a personal environment. Ownership enforced.
- */
-export const updateEnvironment = async (req: Request, res: Response) => {
-  if (!req.user) throw new AppError(401, 'Not authenticated');
-
-  const { id } = req.params;
-  const data = updateEnvironmentSchema.parse(req.body);
-
-  const existing = await prisma.environment.findFirst({
-    where: { id, userId: req.user.id },
-  });
-
-  if (!existing) {
-    throw new AppError(404, 'Environment not found');
-  }
-
-  const env = await prisma.environment.update({
-    where: { id },
-    data: {
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.description !== undefined && { description: data.description }),
-      ...(data.author !== undefined && { author: data.author }),
-      ...(data.version !== undefined && { version: data.version }),
-      ...(data.category !== undefined && { category: data.category }),
-      ...(data.color !== undefined && { color: data.color }),
-      ...(data.tags !== undefined && { tags: data.tags }),
-      ...(data.content !== undefined && { content: data.content }),
-    },
-  });
 
   res.json(serialize(env));
 };
