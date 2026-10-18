@@ -317,8 +317,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}
     >
-      {/* The section switcher, where the open book was (sections spec S3). */}
-      <div id="tour-section-switcher" className="flex items-center justify-center h-16 border-b border-slate-100 dark:border-slate-800/50">
+      {/* The section switcher, where the open book was (sections spec S3). Below `lg` the layout's floating
+          menu button sits at the top left, over this place: the switcher goes under it. */}
+      <div id="tour-section-switcher" className="flex items-center justify-center pt-[4.5rem] pb-2 lg:p-0 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
         <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} />
       </div>
 

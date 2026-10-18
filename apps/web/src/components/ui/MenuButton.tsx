@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 
@@ -172,13 +172,19 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
                 ) : (
                   item.label
                 )}
-                {(item.badge ?? 0) > 0 && (
-                  <>
-                    <span aria-hidden className="ml-auto self-start min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
-                      {(item.badge ?? 0) > 99 ? '99+' : item.badge}
-                    </span>
-                    <span className="sr-only">, {item.badge} notifiche</span>
-                  </>
+                {((item.badge ?? 0) > 0 || item.checked) && (
+                  <span className="ml-auto flex shrink-0 items-center gap-2 self-start">
+                    {(item.badge ?? 0) > 0 && (
+                      <>
+                        <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
+                          {(item.badge ?? 0) > 99 ? '99+' : item.badge}
+                        </span>
+                        <span className="sr-only">, {item.badge} notifiche</span>
+                      </>
+                    )}
+                    {/* The checked item says so in more than its weight; `aria-checked` says it to a screen reader. */}
+                    {item.checked && <Check size={16} aria-hidden className="text-primary-600 dark:text-primary-400" />}
+                  </span>
                 )}
               </button>
             </div>
