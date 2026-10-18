@@ -96,7 +96,7 @@ describe('discussions anchored on a court decision', () => {
     }
     const missing = await request(app).patch('/api/admin/article-discussions/no-such-thread').set(authHeader(admin)).send({ hidden: true });
     expect(missing.status).toBe(404);
-    expect(missing.body.detail).toBe('Discussione non trovata');
+    expect(missing.body.detail).toBe('Glossa non trovata');
   });
 
   it('refuses a malformed key, a bad court shape, a future year, a version, an URN or an article id', async () => {
@@ -158,7 +158,7 @@ describe('discussions anchored on a court decision', () => {
     expect(short.status).toBe(400);
     expect(short.body.detail).toBe('Il testo deve avere almeno 3 caratteri');
     const untitled = await open(alice, { title: undefined });
-    expect(untitled.body.detail).toBe('Il titolo è obbligatorio (almeno 3 caratteri) per una discussione senza un passo citato');
+    expect(untitled.body.detail).toBe('Il titolo è obbligatorio (almeno 3 caratteri) per una glossa senza un passo citato');
     const badPassage = await open(alice, { title: undefined, passage: { ...PASSAGE, start: -1 } });
     expect(badPassage.body.detail).toBe('La posizione del passo non è valida');
 

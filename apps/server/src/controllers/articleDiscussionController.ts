@@ -22,9 +22,9 @@ const INVALID_DECISION_KEY = 'La chiave della decisione non è valida';
 function checkAnchor(anchor: { normaKey: string; articleId: string; version?: string; articleUrn?: string }) {
   if (inDecisionKeySpace(anchor.normaKey)) {
     if (!readDecisionKey(anchor.normaKey)) throw new AppError(400, INVALID_DECISION_KEY);
-    if (anchor.articleId !== '') throw new AppError(400, 'Una discussione su una decisione non ha un articolo');
-    if (anchor.version !== undefined) throw new AppError(400, 'Una discussione su una decisione non ha una versione');
-    if (anchor.articleUrn !== undefined) throw new AppError(400, 'Una discussione su una decisione non ha un URN');
+    if (anchor.articleId !== '') throw new AppError(400, 'Una glossa su una decisione non ha un articolo');
+    if (anchor.version !== undefined) throw new AppError(400, 'Una glossa su una decisione non ha una versione');
+    if (anchor.articleUrn !== undefined) throw new AppError(400, 'Una glossa su una decisione non ha un URN');
     return 'decision' as const;
   }
   if (anchor.articleId.length < 1) throw new AppError(400, 'L’articolo è obbligatorio');
@@ -71,7 +71,7 @@ const createThreadSchema = anchorSchema.extend({
   const title = data.title ?? '';
   if (!data.passage && title.length < 3) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['title'],
-      message: 'Il titolo è obbligatorio (almeno 3 caratteri) per una discussione senza un passo citato' });
+      message: 'Il titolo è obbligatorio (almeno 3 caratteri) per una glossa senza un passo citato' });
   }
   if (data.passage && title.length > 0 && title.length < 3) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['title'],
@@ -309,7 +309,7 @@ export const createThread = async (req: Request, res: Response) => {
 export const createComment = async (req: Request, res: Response) => {
   const data = parseItalian(createCommentSchema, req.body);
   const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
-  if (!thread || thread.isHidden) throw new AppError(404, 'Discussione non trovata');
+  if (!thread || thread.isHidden) throw new AppError(404, 'Glossa non trovata');
 
   if (data.parentId) {
     const parent = await prisma.articleComment.findFirst({ where: { id: data.parentId, threadId: thread.id } });
@@ -334,7 +334,7 @@ export const createComment = async (req: Request, res: Response) => {
 
 export const toggleThreadVote = async (req: Request, res: Response) => {
   const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
-  if (!thread || thread.isHidden) throw new AppError(404, 'Discussione non trovata');
+  if (!thread || thread.isHidden) throw new AppError(404, 'Glossa non trovata');
   const existing = await prisma.articleThreadVote.findUnique({ where: { threadId_userId: { threadId: thread.id, userId: req.user!.id } } });
   if (existing) await prisma.articleThreadVote.delete({ where: { id: existing.id } });
   else await prisma.articleThreadVote.create({ data: { threadId: thread.id, userId: req.user!.id } });
@@ -355,7 +355,7 @@ export const toggleCommentVote = async (req: Request, res: Response) => {
 export const reportThread = async (req: Request, res: Response) => {
   const data = parseItalian(reportSchema, req.body);
   const thread = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
-  if (!thread) throw new AppError(404, 'Discussione non trovata');
+  if (!thread) throw new AppError(404, 'Glossa non trovata');
   await prisma.articleThreadReport.upsert({
     where: { threadId_userId: { threadId: thread.id, userId: req.user!.id } },
     create: { threadId: thread.id, userId: req.user!.id, reason: data.reason, details: data.details },
@@ -369,7 +369,7 @@ export const moderateThread = async (req: Request, res: Response) => {
   const data: { isHidden?: boolean; passageReleasedAt?: Date | null; passageReleasedById?: string | null } = {};
   if (body.hidden !== undefined) data.isHidden = body.hidden;
   const existing = await prisma.articleThread.findUnique({ where: { id: req.params.threadId } });
-  if (!existing) throw new AppError(404, 'Discussione non trovata');
+  if (!existing) throw new AppError(404, 'Glossa non trovata');
   if (body.passageReleased !== undefined) {
     if (existing.targetKind !== 'decision' || existing.passageQuote === null) {
       throw new AppError(400, 'Solo il passo citato di una decisione può essere rimesso in chiaro');

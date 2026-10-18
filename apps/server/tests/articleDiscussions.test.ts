@@ -84,7 +84,7 @@ describe('article discussions', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.detail).toBe('Il titolo è obbligatorio (almeno 3 caratteri) per una discussione senza un passo citato');
+    expect(res.body.detail).toBe('Il titolo è obbligatorio (almeno 3 caratteri) per una glossa senza un passo citato');
   });
 
   it('rejects a passage thread with a title of 2 characters (400)', async () => {
