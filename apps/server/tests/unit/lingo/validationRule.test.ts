@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { LingoCardStato, LingoGiudizio } from '@prisma/client';
-import { APPROVALS_TO_VALIDATE, ERRATA_TO_ARCHIVE, stateAfterVotes } from '../../../src/lingo/validationRule';
+import { SOGLIE_PREDEFINITE, stateAfterVotes } from '../../../src/lingo/validationRule';
 
 const A: LingoGiudizio = 'APPROVATA';
 const M: LingoGiudizio = 'MIGLIORABILE';
 const E: LingoGiudizio = 'ERRATA';
+
+const DEFAULT = { approvazioni: 2, errate: 1 };
 
 const TABLE: Array<[string, LingoGiudizio[], LingoCardStato]> = [
   ['no votes', [], 'PROPOSTA_COMMUNITY'],
@@ -17,17 +19,24 @@ const TABLE: Array<[string, LingoGiudizio[], LingoCardStato]> = [
 ];
 
 describe('stateAfterVotes', () => {
-  it.each(TABLE)('%s', (_name, votes, expected) => {
-    expect(stateAfterVotes(votes)).toBe(expected);
+  it.each(TABLE)('%s, with the defaults', (_name, votes, expected) => {
+    expect(stateAfterVotes(votes, DEFAULT)).toBe(expected);
   });
 
   it('does not depend on the order of the votes', () => {
-    expect(stateAfterVotes([E, A, A])).toBe('ARCHIVIATA');
-    expect(stateAfterVotes([M, A, A])).toBe('VALIDATA');
+    expect(stateAfterVotes([E, A, A], DEFAULT)).toBe('ARCHIVIATA');
+    expect(stateAfterVotes([M, A, A], DEFAULT)).toBe('VALIDATA');
   });
 
-  it('keeps its two numbers as named constants', () => {
-    expect(APPROVALS_TO_VALIDATE).toBe(2);
-    expect(ERRATA_TO_ARCHIVE).toBe(1);
+  it('reads the thresholds it is given', () => {
+    expect(stateAfterVotes([A], { approvazioni: 1, errate: 1 })).toBe('VALIDATA');
+    expect(stateAfterVotes([A, A], { approvazioni: 3, errate: 1 })).toBe('PROPOSTA_COMMUNITY');
+    expect(stateAfterVotes([A, A, A], { approvazioni: 3, errate: 1 })).toBe('VALIDATA');
+    expect(stateAfterVotes([E], { approvazioni: 2, errate: 2 })).toBe('PROPOSTA_COMMUNITY');
+    expect(stateAfterVotes([E, E], { approvazioni: 2, errate: 2 })).toBe('ARCHIVIATA');
+  });
+
+  it('starts from the defaults the migration seeds: 2 approvals and 1 «errata»', () => {
+    expect(SOGLIE_PREDEFINITE).toEqual(DEFAULT);
   });
 });

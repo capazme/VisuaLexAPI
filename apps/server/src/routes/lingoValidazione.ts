@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
 import { serialize } from '../lingo/serializeCard';
 import { stateAfterVotes } from '../lingo/validationRule';
+import { leggiSoglie } from '../lingo/validationSettings';
 
 /**
  * Validating the community's cards (spec §5, decisions 12–15). Only a
@@ -77,7 +78,9 @@ router.post('/:cardId', async (req, res) => {
       if (already) throw new AppError(409, 'Hai già votato questa scheda.');
       await tx.lingoValidazioneCard.create({ data: { cardId, utenteId: me, giudizio, motivazione: motivazione || null } });
       const votes = await tx.lingoValidazioneCard.findMany({ where: { cardId }, select: { giudizio: true } });
-      const next = stateAfterVotes(votes.map((v) => v.giudizio));
+      // Read after the card's lock, not before: a change of the thresholds that committed first is seen here.
+      const soglie = await leggiSoglie(tx);
+      const next = stateAfterVotes(votes.map((v) => v.giudizio), soglie);
       // An archived card belongs to its author alone (PERSONAL_STATES): with the author's
       // account gone nobody could see or delete it, so it goes now, with its votes and anchors.
       if (next === 'ARCHIVIATA' && card.autore_id === null) await tx.lingoCard.delete({ where: { id: cardId } });

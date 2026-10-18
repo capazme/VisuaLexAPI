@@ -84,6 +84,8 @@ model User {
   lingoValidazioni      LingoValidazioneCard[]
   lingoTestiScritti     LingoTestoVersione[]
   lingoAccettazioni     LingoAccettazioneTesto[]
+  lingoImpostazioniAggiornate LingoImpostazione[]
+  lingoImpostazioniLog        LingoImpostazioneLog[]
 
   // Development mode: the administrator allows it (set only on the admin route), the
   // user then turns it on or off. It only shows or hides surfaces, never a permission.
@@ -1268,6 +1270,41 @@ model LingoGiornataStudio {
 
   @@id([utenteId, giorno])
   @@map("lingo_giornate_studio")
+}
+
+// The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the
+// range of each value is a CHECK in the migration (not in this model), and lingo/validationSettings.ts.
+enum LingoImpostazioneChiave {
+  SOGLIA_APPROVAZIONI
+  SOGLIA_ERRATE
+}
+
+model LingoImpostazione {
+  chiave       LingoImpostazioneChiave @id
+  valore       Int
+  aggiornataIl DateTime                @default(now()) @map("aggiornata_il")
+  // The administrator who last changed it; null once that account is gone.
+  aggiornataDa String?                 @map("aggiornata_da")
+
+  autore User? @relation(fields: [aggiornataDa], references: [id], onDelete: SetNull)
+
+  @@map("lingo_impostazioni")
+}
+
+// Every change of a threshold, append-only: who, when, the old and the new value.
+model LingoImpostazioneLog {
+  id               String                 @id @default(uuid())
+  chiave           LingoImpostazioneChiave
+  valorePrecedente Int                    @map("valore_precedente")
+  valoreNuovo      Int                    @map("valore_nuovo")
+  // Null once the administrator's account is gone: the change stays.
+  utenteId         String?                @map("utente_id")
+  createdAt        DateTime               @default(now()) @map("created_at")
+
+  utente User? @relation(fields: [utenteId], references: [id], onDelete: SetNull)
+
+  @@index([chiave, createdAt])
+  @@map("lingo_impostazioni_log")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
