@@ -10,7 +10,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
-  in `infra/compose.app.yml`), which also hides the Sidebar's «Studia»; `/studia` redirects to `ripasso` (see «Card review» below); «Le mie schede» is
+  in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/studia` redirects to `ripasso` (see «Card review» below); «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
@@ -70,11 +70,19 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, `EuCaseLawBlock`, the Union's courts' decisions that cite an article of a regulation or a directive, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
-- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. The sidebar, for everyone: «Ricerca»
+- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. **The sections** (D-076, spec
+  `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
+  over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
+  `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
+  active section — from the address on `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
+  browser under `visualex-section`, Opus by default; `SectionSwitcher`: the menu button at the top of the sidebar,
+  `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
+  another section). The sidebar: the Corpus entries for everyone — «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
-  `#tour-nav-search` is what the welcome and search tours point at), Dossier, Studia (flag),
-  Forum, «Analizza documento»; and at the bottom only the user menu, whose dropdown holds Impostazioni,
+  `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
+  section's, in a group named after it: Opus, Dossier; Gymnasium, Ripasso, Le mie schede, Da validare (validators)
+  and Dossier; Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count. At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
@@ -113,7 +121,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `PUT /auth/dev-mode`, makes the answer the shared `/auth/me` and publishes it
   (`services/authEvents.ts`), so every mounted `useAuth` — the sidebar, an article, a route guard —
   follows at once, with no reload. **The mode hides and never grants:** it is drawn in the sidebar
-  («Assistente» and «Grafo», under a «Sviluppo» separator, on top of their `VITE_FEATURE_MERLT*`
+  (the Academia section, whose «Assistente» and «Grafo» sit on top of their `VITE_FEATURE_MERLT*`
   flags), on the MERL-T routes, and on an article (the `article_sidebar` graph rail, `AskMerltEntry`,
   the selection popup's «Segnala come citazione» and `MissedCitationReporter`, all gated in
   `ArticleTabContent`, on top of the consent gates); the server's guards stay the real barrier.

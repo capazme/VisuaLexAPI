@@ -30,9 +30,9 @@ vi.mock('../../../store/useAppStore', () => ({
 
 import { Sidebar } from '../Sidebar';
 
-function renderSidebar() {
+function renderSidebar(path = '/merlt') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <Sidebar
         theme="light"
         toggleTheme={vi.fn()}
@@ -57,24 +57,22 @@ beforeEach(() => {
   account.devMode = false;
 });
 
+// The MERL-T entries are Academia's, a section offered only in the development mode (sections spec S6, S12).
 describe('Sidebar navigation (MERL-T single entry)', () => {
-  it('development mode on → "Assistente" (hub) plus "Grafo" (the deliberation surface), after the others', () => {
+  it('development mode on → Academia holds "Assistente" (hub) plus "Grafo" (the deliberation surface)', () => {
     // Slice 3 D1 had a single entry; Slice 4 Decision A (absorb) made /grafo
     // the Q&A surface and points the sidebar at it too, the hub stays /merlt.
-    // Both only for an account in the development mode (spec D3).
     account.devMode = true;
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/forum', '/documents', '/merlt', '/grafo']);
+    expect(hrefs).toEqual(['/', '/documents', '/merlt', '/grafo']);
     // exactly one hub entry
     expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
-    // «Analizza documento», the last of the others, sits above the MERL-T entries
-    expect(hrefs.indexOf('/documents')).toBeLessThan(hrefs.indexOf('/merlt'));
   });
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
-    renderSidebar();
-    expect(navHrefs()).toEqual(['/', '/dossier', '/studia', '/forum', '/documents']);
+    renderSidebar('/');
+    expect(navHrefs()).toEqual(['/', '/documents', '/dossier']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -82,7 +80,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     isMerltEnabledMock.mockReturnValue(false);
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/studia', '/forum', '/documents']);
+    expect(hrefs).toEqual(['/', '/documents']);
     expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
   });
 });

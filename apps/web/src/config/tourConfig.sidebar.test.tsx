@@ -14,7 +14,7 @@ import { TOUR_STEPS_MAP } from './tourConfig';
 
 const steps = Object.values(TOUR_STEPS_MAP).flat();
 const sidebarSelectors = [...new Set(
-  steps.map((s) => s.element).filter((e): e is string => typeof e === 'string' && /^#tour-(sidebar|nav-|quick-search)/.test(e)),
+  steps.map((s) => s.element).filter((e): e is string => typeof e === 'string' && /^#tour-(sidebar|section-switcher|nav-|quick-search)/.test(e)),
 )];
 
 // Spec D9: the steps that pointed at «Ricerca Veloce» point at «Ricerca»; none points at a removed control.

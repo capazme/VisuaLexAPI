@@ -48,10 +48,19 @@ export const WELCOME_STEPS: DriveStep[] = [
         }
     },
     {
+        element: '#tour-section-switcher',
+        popover: {
+            title: 'Le sezioni',
+            description: 'Da questa icona passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. La barra laterale cambia con la sezione.',
+            side: 'right',
+            align: 'start',
+        }
+    },
+    {
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'Da qui accedi alle sezioni: Ricerca, Dossier per organizzare le tue raccolte e Forum, dove trovi i dossier di studio della comunità. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Opus o il Ripasso in Gymnasium. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
