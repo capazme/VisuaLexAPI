@@ -19,6 +19,7 @@ import { SearchField, SEARCH_BAR_HEIGHT } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
+import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
 import { ServiceHealthBanner } from '../ui/ServiceHealthBanner';
 import { PluginSlot } from '../../plugins/PluginSlot';
@@ -68,8 +69,12 @@ export function Layout() {
     },
   });
 
-  // Auto-start welcome tour on first visit
+  // Auto-start welcome tour on first visit, once the MERL-T consent screen is not (or no longer)
+  // asking: a tour's overlay over that screen would be two first-run surfaces at once.
+  const consent = useConsentIfProvided();
+  const consentAsking = consent !== null && (consent.status === 'loading' || consent.needsAnswer);
   useEffect(() => {
+    if (consentAsking) return;
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
       if (!hasSeenTour('welcome')) {
@@ -77,7 +82,7 @@ export function Layout() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [hasSeenTour, startTour]);
+  }, [hasSeenTour, startTour, consentAsking]);
 
   // Apply Theme & Typography Effects
   useEffect(() => {

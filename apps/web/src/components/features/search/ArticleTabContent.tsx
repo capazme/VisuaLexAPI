@@ -198,12 +198,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { showPreview, hidePreview } = citationPreviewState;
     const isHoveringPopupRef = useRef(false);
 
-    // Full-consent contributors get the inline NER feedback bar on the citation
-    // preview popup (surface=article_xref, Loop β #2). Gated strictly on
-    // canContribute (level === 'full'); never widen this.
-    // qaAskable/consentLevel drive the in-article "Chiedi su questo articolo"
-    // entry (Slice 3 §3.5): shown from `basic`, teaser-at-`none`.
-    const { canContribute, qaAskable, consentLevel, merltEnabled } = useMerltFeatures();
+    // Full-consent contributors in the development mode get the inline NER feedback bar on the
+    // citation preview popup (surface=article_xref, Loop β #2): a citation report, like the
+    // selection popup's. Gated strictly on canContribute (level === 'full'); never widen this.
+    // qaAskable drives the in-article "Chiedi su questo articolo" entry (Slice 3 §3.5): shown
+    // from `basic`; at `none` nothing (the consent is asked once, by the consent screen).
+    const { canContribute, qaAskable, merltEnabled } = useMerltFeatures();
     // The MERL-T surfaces on an article (the graph rail, «Chiedi su questo articolo», the citation
     // reports) are drawn in the development mode only. It hides, never grants: the consent gates
     // above still decide. The tracker, the Massimario's panel and the implicit citation feedback
@@ -335,7 +335,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 anchored: Boolean(anchor),
                 anchor_text: anchor?.anchorText ?? '',
                 start_offset: anchor?.startOffset ?? 0,
-                note_text: text,
+                // Never the note's words: MERL-T does not collect them (the owner, 18 October 2026).
                 text_length: text.length,
             },
         }),
@@ -988,7 +988,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 <AskMerltEntry
                     merltEnabled={merltEnabled}
                     qaAskable={qaAskable}
-                    consentNone={consentLevel === 'none'}
                     articleUrn={norma_data.urn}
                     articleNumber={norma_data.numero_articolo}
                     actType={norma_data.tipo_atto}
@@ -1118,7 +1117,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 position={citationPreviewState.position}
                 onClose={hidePreview}
                 onOpenCitation={handleOpenCitation}
-                nerFeedbackEnabled={canContribute}
+                nerFeedbackEnabled={devMode && canContribute}
                 onNerFeedback={handleCitationNerFeedback}
                 onMouseEnter={() => { isHoveringPopupRef.current = true; }}
                 onMouseLeave={() => {

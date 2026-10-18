@@ -41,31 +41,10 @@ describe('useForumSignalTracker', () => {
       });
     });
 
+    // Never the author, even when a publisher still puts one on the bus: a third party.
     expect(sendEventMock).toHaveBeenCalledWith({
       action,
       sharedEnvId: '00000000-0000-0000-0000-00000000face',
-      originalAuthorId: '00000000-0000-0000-0000-00000000fade',
-    });
-    unmount();
-  });
-
-  it('forwards null originalAuthorId when author is deleted', () => {
-    const { unmount } = renderHook(() => useForumSignalTracker());
-
-    act(() => {
-      publishMerltEvent({
-        interaction_type: MERLT_EVENT_TYPES.forumLike,
-        metadata: {
-          shared_env_id: '00000000-0000-0000-0000-00000000face',
-          original_author_id: null,
-        },
-      });
-    });
-
-    expect(sendEventMock).toHaveBeenCalledWith({
-      action: 'like',
-      sharedEnvId: '00000000-0000-0000-0000-00000000face',
-      originalAuthorId: null,
     });
     unmount();
   });
@@ -78,7 +57,6 @@ describe('useForumSignalTracker', () => {
         interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
         metadata: {
           suggestion_id: '00000000-0000-0000-0000-0000000000bb',
-          original_author_id: null,
         },
       });
     });
@@ -96,7 +74,6 @@ describe('useForumSignalTracker', () => {
         metadata: {
           suggestion_id: '00000000-0000-0000-0000-0000000000bb',
           shared_env_id: '00000000-0000-0000-0000-0000000000ee',
-          original_author_id: null,
         },
       });
     });
@@ -104,7 +81,6 @@ describe('useForumSignalTracker', () => {
     expect(sendEventMock).toHaveBeenCalledWith({
       action: 'suggestion_declined',
       sharedEnvId: '00000000-0000-0000-0000-0000000000ee',
-      originalAuthorId: null,
     });
     unmount();
   });

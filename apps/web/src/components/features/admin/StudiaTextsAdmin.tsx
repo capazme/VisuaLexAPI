@@ -14,6 +14,8 @@ import { TextParagraphs } from '../studia/TextParagraphs';
 /** How the admin names each text; a key it does not know is shown as it is. */
 const KEY_LABEL: Record<string, string> = {
   PROPOSTA_SCHEDA: 'Avviso per proporre una scheda',
+  // Answered with a consent level on the consent screen; a new version asks every user again.
+  INFORMATIVA_MERLT: 'Informativa MERL-T (consenso alla raccolta dei dati)',
 };
 
 // The server's limits (`POST /api/admin/studia/testi/:chiave`).

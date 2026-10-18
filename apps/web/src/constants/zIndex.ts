@@ -50,13 +50,6 @@ export const Z_INDEX = {
   dock: 'z-[80]',
 
   /**
-   * A non-blocking notice pinned to the bottom of the screen (MERL-T's consent prompt): over the
-   * dock and the bar of practices, which sit in the same place, under the floating tools and the
-   * overlay band.
-   */
-  bottomNotice: 'z-[85]',
-
-  /**
    * Floating structure (index) window. Above the bar of practices and the windows beside the table,
    * because it is a tool held over the content it drives; below the overlay
    * band, so modals still cover it.

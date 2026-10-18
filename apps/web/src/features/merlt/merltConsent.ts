@@ -1,21 +1,16 @@
-const MERLT_CONSENT_KEY = 'visualex.merlt.consent';
-
 export type MerltConsentLevel = 'none' | 'basic' | 'full';
 
-export function getMerltConsentLevel(): MerltConsentLevel {
-    const value = localStorage.getItem(MERLT_CONSENT_KEY);
-    if (value === 'basic' || value === 'full') return value;
-    return 'none';
-}
+/**
+ * Keys the app once wrote in this browser for MERL-T consent: the level as a boot cache, and the
+ * snooze of the old banner. The server is the only record of a consent; on a shared browser the
+ * cache handed the next person the previous one's level until the server answered. Removed once.
+ */
+const LEGACY_KEYS = ['visualex.merlt.consent', 'visualex.merlt.consent-snooze', 'visualex.merlt.ask-teaser-dismissed'];
 
-export function setMerltConsentLevel(level: MerltConsentLevel): void {
-    if (level === 'none') {
-        localStorage.removeItem(MERLT_CONSENT_KEY);
-        return;
+export function clearLegacyConsentKeys(): void {
+    try {
+        for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+    } catch {
+        // storage refused (private window, blocked site data): nothing was kept there either
     }
-    localStorage.setItem(MERLT_CONSENT_KEY, level);
-}
-
-export function hasMerltConsent(): boolean {
-    return getMerltConsentLevel() !== 'none';
 }

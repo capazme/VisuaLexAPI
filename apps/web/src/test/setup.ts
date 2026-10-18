@@ -15,6 +15,7 @@ vi.mock('../hooks/useTour', () => ({
     startTour: vi.fn(), stopTour: vi.fn(), resetTour: vi.fn(), resetAndStartTour: vi.fn(),
     hasSeenTour: () => true, tryStartTour: vi.fn(), getTourVersion: () => 0, isActive: () => false, isMobile: () => false,
   }),
+  holdTours: vi.fn(),
 }))
 
 // Cleanup after each test

@@ -61,7 +61,7 @@ describe('useHighlightAnnotationTracker', () => {
     unmount();
   });
 
-  it('forwards annotation events with note_text', () => {
+  it("forwards annotation events without the note's words, even when the bus carries them", () => {
     const { unmount } = renderHook(() => useHighlightAnnotationTracker());
 
     act(() => {
@@ -83,8 +83,8 @@ describe('useHighlightAnnotationTracker', () => {
       anchorText: 'art. 2043',
       startOffset: 0,
       articleUrn: 'urn:nir~art2043',
-      noteText: 'Responsabilità extracontrattuale',
     });
+    expect(JSON.stringify(sendEventMock.mock.calls)).not.toContain('Responsabilità');
     unmount();
   });
 

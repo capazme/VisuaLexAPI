@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { ShieldCheck, BookOpen, MessageSquare, GraduationCap } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { cn } from '../../../lib/utils';
 import { HubCard } from './HubCard';
 import { useConsent } from '../consent/useConsent';
+import { RevokeConsentDialog } from '../consent/RevokeConsentDialog';
 import type { MerltConsentLevel } from '../merltConsent';
 
 /**
  * Consenso & privacy card (§3.3). Renders the current level, the read→ask→teach
- * ladder as a visual, plus change (opens the shared dialog) and REVOKE — the
- * latter wires the previously-dead `revokeConsent` DELETE (design D3).
+ * ladder as a visual, plus change (opens the shared dialog) and revoke, through the
+ * same dialog as Impostazioni: revoke only, or revoke and erase what was collected.
  */
 
 export interface ConsentCardProps {
@@ -34,24 +34,8 @@ const LADDER: { min: MerltConsentLevel; icon: typeof BookOpen; label: string; de
 const LEVEL_RANK: Record<MerltConsentLevel, number> = { none: 0, basic: 1, full: 2 };
 
 export function ConsentCard({ onManage }: ConsentCardProps) {
-  const { level, consent, revokeConsent } = useConsent();
-  const [confirmRevoke, setConfirmRevoke] = useState(false);
-  const [revoking, setRevoking] = useState(false);
-
-  const handleRevoke = () => {
-    setRevoking(true);
-    // revokeConsent is async; the context reconciles the level on success. On
-    // failure we surface nothing louder than the console — the dialog closes and
-    // the level stays as the server reports it (context handles the error state).
-    revokeConsent('revoked from hub')
-      .catch((err) => {
-        console.error('hub: consent revoke failed:', err);
-      })
-      .finally(() => {
-        setRevoking(false);
-        setConfirmRevoke(false);
-      });
-  };
+  const { level, consent } = useConsent();
+  const [revokeOpen, setRevokeOpen] = useState(false);
 
   return (
     <HubCard testId="hub-card-consent" icon={ShieldCheck} title="Consenso & Privacy">
@@ -91,21 +75,13 @@ export function ConsentCard({ onManage }: ConsentCardProps) {
           Gestisci
         </Button>
         {level !== 'none' && (
-          <Button variant="ghost" size="sm" onClick={() => setConfirmRevoke(true)}>
+          <Button variant="ghost" size="sm" onClick={() => setRevokeOpen(true)}>
             Revoca
           </Button>
         )}
       </div>
 
-      <ConfirmDialog
-        open={confirmRevoke}
-        variant="danger"
-        title="Revocare il consenso?"
-        message="MERL-T smetterà di raccogliere qualsiasi segnale dalla tua attività. I dati già associati alle tue contribuzioni restano attribuiti a te. Potrai riattivare il consenso in qualsiasi momento."
-        confirmLabel={revoking ? 'Revoca in corso…' : 'Revoca consenso'}
-        onConfirm={handleRevoke}
-        onCancel={() => setConfirmRevoke(false)}
-      />
+      <RevokeConsentDialog open={revokeOpen} onClose={() => setRevokeOpen(false)} />
     </HubCard>
   );
 }

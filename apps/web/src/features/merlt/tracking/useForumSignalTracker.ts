@@ -11,12 +11,8 @@ import { useConsent } from '../consent/useConsent';
  * community signals (like, download, suggestion accept/decline) to
  * /api/merlt/events/forum-signal.
  *
- * `target_author_id` attribution policy (per docs/merlt-forum-authoring-decision.md):
- *   - like / download   → originalAuthorId of the SharedEnvironment
- *   - suggestion_*      → originalAuthorId of the SuggestionItem
- *                         (which preserves the chain via sourceSuggestionId
- *                         and originalAuthorId — gotcha #21 of CLAUDE.md)
- * Both arrive via metadata.original_author_id from the call-site.
+ * Only the environment is sent: its author, or a suggestion's, is a third
+ * party who never consented to MERL-T (docs/merlt/decisions/forum-authoring.md).
  *
  * Mounted in the `global` plugin slot (Layout-level) so it works
  * outside of any article view. Fire-and-forget.
@@ -25,7 +21,6 @@ import { useConsent } from '../consent/useConsent';
 interface Metadata {
     shared_env_id?: string;
     suggestion_id?: string;
-    original_author_id?: string | null;
     [k: string]: unknown;
 }
 
@@ -59,14 +54,7 @@ export function useForumSignalTracker(disabled = false): void {
             const sharedEnvId = meta.shared_env_id;
             if (typeof sharedEnvId !== 'string') return;
 
-            const payload: ForumSignalEventInput = {
-                action,
-                sharedEnvId,
-                originalAuthorId:
-                    typeof meta.original_author_id === 'string'
-                        ? meta.original_author_id
-                        : null,
-            };
+            const payload: ForumSignalEventInput = { action, sharedEnvId };
 
             void sendForumSignalEvent(payload).catch((err) => {
                 console.warn('[merlt] forum-signal emit failed:', err);
