@@ -57,7 +57,8 @@ function textOf(value: unknown): string | null {
 const wrongType = (value: unknown): boolean =>
   value !== undefined && value !== null && value !== '' && textOf(value) === null;
 
-function sourceUrl(value: unknown): string | null {
+/** An address kept only when it is a source's own (Normattiva, EUR-Lex), over https; else null. */
+export function sourceUrl(value: unknown): string | null {
   const raw = textOf(value);
   if (!raw || raw.length > 500) return null;
   try {

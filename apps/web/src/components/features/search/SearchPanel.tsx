@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CommandPalette } from './CommandPalette';
-import { QuickNormsManager } from './QuickNormsManager';
-import { AliasManager } from '../settings/AliasManager';
 const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
@@ -16,10 +13,12 @@ import { cn } from '../../../lib/utils';
 import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { getErrorMessage } from '../../../utils/errors';
+import { responseErrorMessage } from '../../../utils/responseError';
 import { buildNormaKey } from '../../../utils/normaKeys';
-import { resolveAct } from '../../../utils/actUrn';
 import { ReadingBackControl } from './ReadingBackControl';
 import { matchesSearchFilters } from '../../../utils/searchFilters';
+import { isTypedSearch } from '../../../hooks/useSearchActions';
+import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
 import { deriveVersionInfo, requestIsHistorical } from '../../../utils/versionDisplay';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
@@ -94,9 +93,8 @@ export function SearchPanel() {
     searchTrigger, clearSearchTrigger,
     searchQueue, drainNextSearch,
     quickNorms, selectQuickNorm, triggerSearch,
-    commandPaletteOpen, openCommandPalette, closeCommandPalette,
     pendingDecision, drainPendingDecision,
-    quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
+    openQuickNormsManager,
   } = useAppStore(useShallow(s => ({
     searchTrigger: s.searchTrigger,
     clearSearchTrigger: s.clearSearchTrigger,
@@ -105,14 +103,9 @@ export function SearchPanel() {
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
     triggerSearch: s.triggerSearch,
-    commandPaletteOpen: s.commandPaletteOpen,
-    openCommandPalette: s.openCommandPalette,
-    closeCommandPalette: s.closeCommandPalette,
     pendingDecision: s.pendingDecision,
     drainPendingDecision: s.drainPendingDecision,
-    quickNormsManagerOpen: s.quickNormsManagerOpen,
     openQuickNormsManager: s.openQuickNormsManager,
-    closeQuickNormsManager: s.closeQuickNormsManager,
   })));
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
   const [customTabLabel, setCustomTabLabel] = useState<string | null>(null);
@@ -331,7 +324,8 @@ export function SearchPanel() {
         signal: controller.signal,
       });
 
-      if (!response.ok) throw new Error('Errore nella richiesta');
+      // The API says why in Italian (a range whose index cannot be read, an article not in the act).
+      if (!response.ok) throw new Error(await responseErrorMessage(response, 'Errore nella richiesta'));
 
       // Stream results - articles appear as they're fetched
       if (!response.body) return;
@@ -533,9 +527,10 @@ export function SearchPanel() {
     }
   });
 
-  // Register search for auto-switch detection when search trigger is used
+  // Register search for auto-switch detection when search trigger is used. A search the user typed
+  // (the palette, the field) runs as the palette always ran it, unchecked.
   useEffect(() => {
-    if (searchTrigger && !searchTrigger.annex) {
+    if (searchTrigger && !searchTrigger.annex && !isTypedSearch(searchTrigger)) {
       registerSearch(searchTrigger);
     }
   }, [searchTrigger, registerSearch]);
@@ -576,37 +571,6 @@ export function SearchPanel() {
   }, [handleSearch]);
 
 
-  /**
-   * "Open a code and browse" — the entry point the app never had.
-   *
-   * Resolves the act's URN structurally (no article text is fetched), drops an
-   * article-less act on the active practice and points the structure window at
-   * it. From there every pick loads into that act.
-   */
-  const handleBrowseStructure = useCallback(async (params: SearchParams) => {
-    setError(null);
-    try {
-      // The resolved identity, not the requested one: asking for "codice
-      // civile" comes back as regio decreto 262/1942, and an act built from
-      // the request would never match that same act arriving from a later
-      // search — the practice would grow a duplicate act for it.
-      const { norma } = await resolveAct({
-        act_type: params.act_type,
-        act_number: params.act_number || undefined,
-        date: params.date || undefined,
-      });
-
-      // The act lands on the active practice (created when there is none) and the structure window
-      // points at it, in one step (spec §5.1).
-      appStore.getState().addActIndexToPractice(null, norma);
-    } catch (e) {
-      // Loud on purpose: the user asked for a door and must be told when it
-      // does not open (CLAUDE.md gotcha #18 — no silent fallbacks).
-      console.error('handleBrowseStructure: URN resolution failed:', e);
-      setError(getErrorMessage(e) || "Impossibile aprire l'indice di questo atto.");
-    }
-  }, []);
-
   const handleViewPdf = async (urn: string) => {
     setPdfState({ isOpen: true, url: null, isLoading: true });
     try {
@@ -635,13 +599,6 @@ export function SearchPanel() {
 
   return (
     <>
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={closeCommandPalette}
-        onSearch={handleSearch}
-        onBrowseStructure={handleBrowseStructure}
-      />
-
       {/* One global control: the back-stack is global, so a per-practice copy would
           sit inside the very place an entry points at. */}
       <ReadingBackControl
@@ -671,24 +628,13 @@ export function SearchPanel() {
         <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
       )}
 
-      {/* QuickNorms Manager Modal */}
-      <QuickNormsManager
-        isOpen={quickNormsManagerOpen}
-        onClose={closeQuickNormsManager}
-        onSearch={handleSearch}
-      />
-
-      {/* Alias Manager Modal */}
-      <AliasManager />
-
       {/* Main Content Area - Empty state when no practices */}
       {!hasTabs && !isLoading && (
         <div id="tour-main-content" className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700 bg-slate-50 dark:bg-slate-950">
-          {/* Interactive Search Icon */}
+          {/* Search Icon */}
           <div
-            className="relative group cursor-pointer active:scale-95 transition-transform"
-            onClick={openCommandPalette}
-            title="Apri ricerca (Cmd+K)"
+            // The picture is not a control: the button under it is (a click on it reached both).
+            className="relative group"
           >
             {/* Blur Background */}
             <div className="absolute inset-0 bg-primary-500/20 rounded-[2.5rem] blur-2xl group-hover:bg-primary-500/30 transition-all duration-700 animate-pulse" />
@@ -696,7 +642,6 @@ export function SearchPanel() {
             {/* Icon Container - Glass Card */}
             <div className="relative w-32 h-32 sm:w-40 sm:h-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2.5rem] shadow-glass-lg flex items-center justify-center border border-white dark:border-slate-800 transition-all duration-500 group-hover:shadow-primary-500/10 group-hover:-translate-y-2">
               <Search size={64} className="text-primary-500 stroke-[1.2] w-14 h-14 sm:w-16 sm:h-16 group-hover:scale-110 transition-transform duration-500" />
-              <span className="sr-only">Apri la ricerca</span>
 
               {/* Keyboard Shortcut Badge */}
               <div className="absolute -bottom-2 -right-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg border-4 border-slate-50 dark:border-slate-950 uppercase tracking-widest">
@@ -704,7 +649,7 @@ export function SearchPanel() {
               </div>
             </div>
             <button
-              onClick={openCommandPalette}
+              onClick={() => focusSearchFieldOrPalette()}
               className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all focus-ring"
             >
               <Search size={16} />
@@ -724,7 +669,8 @@ export function SearchPanel() {
               {["Art. 2043 c.c.", "Art. 5 GDPR", "Art. 1 Costituzione"].map((example) => (
                 <button
                   key={example}
-                  onClick={openCommandPalette}
+                  // The example goes into the field, ready to search with Enter or to be changed.
+                  onClick={() => focusSearchFieldOrPalette(example)}
                   className="px-3 py-1.5 rounded-full border border-primary-200 dark:border-primary-800 bg-primary-50/70 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 text-xs font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-colors focus-ring"
                 >
                   {example}

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 // The viewer is a stub with one button that selects the dossier: what is pinned here is the payload the dialog sends.
-vi.mock('../environments/EnvironmentContentViewer', () => ({
+vi.mock('./EnvironmentContentViewer', () => ({
   EnvironmentContentViewer: ({ onSelectionChange }: { onSelectionChange: (s: unknown) => void }) => (
     <button onClick={() => onSelectionChange({ dossierIds: ['d1'], quickNormIds: [], aliasIds: [], annotationIds: [], highlightIds: [] })}>
       Seleziona il dossier

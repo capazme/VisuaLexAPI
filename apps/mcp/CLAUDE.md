@@ -52,7 +52,12 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   description tells the model not to fall back to a note; design
   `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2), `omnilex_aggiungi_nota_dossier` (one plain-text
   note up to 4,000 characters, in a dossier or about one of its articles with
-  `voce`; add-only), `omnilex_stato_account`. `omnilex_leggi_dossier` says which
+  `voce`; add-only), `omnilex_stato_account`. A dossier has a kind, `tipo` in the tools:
+  `omnilex_crea_dossier` takes `lavoro` (a practice, the default) or `studio` (a topic
+  studied), and `omnilex_elenca_dossier` / `omnilex_leggi_dossier` say it (an older server's
+  answer without one reads as `lavoro`). No tool publishes to the Forum: publishing makes data
+  public and stays a human act, with the preview and the privacy check in front of the user
+  (owner, 14 October 2026, question 189). `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
   `created_by`) and which article a note is about (`nota_su`). A norm or a decision is named by the
   server's citation (`citation` on dossier items, `display` on the norms

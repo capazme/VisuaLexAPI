@@ -223,6 +223,8 @@ export interface AppSettings {
     fontFamily: 'sans' | 'serif' | 'mono';
     focusMode: boolean;
     splitView: boolean;
+    /** A decision's key passages are drawn (`utils/decisionKeyPassages.ts`); on by default (the owner, 13 Oct 2026). */
+    showKeyPassages: boolean;
     /**
      * Study Mode reading preferences, persisted across sessions. Without
      * this slice the user had to re-pick the font size, line height, and
@@ -279,6 +281,17 @@ export interface Highlight {
     originalAuthor?: OriginalAuthor | null;
 }
 
+/** A dossier di lavoro holds a practice (it may carry a client's data); a dossier di studio a topic studied. */
+export type DossierKind = 'lavoro' | 'studio';
+
+/** The dossier's copy in the Forum, seen by its owner only. */
+export interface DossierPublication {
+    sharedEnvironmentId: string;
+    version: number;
+    isActive: boolean;
+    updatedAt: string;
+}
+
 export interface Dossier {
     id: string;
     title: string;
@@ -287,6 +300,11 @@ export interface Dossier {
     items: DossierItem[];
     tags?: string[];
     isPinned?: boolean;
+    /** Absent before the server answered: read as `lavoro`, the cautious kind. */
+    kind?: DossierKind;
+    published?: DossierPublication | null;
+    /** The admin withdrew its copy from the Forum: it cannot be published again until the admin allows it. */
+    forumBlocked?: boolean;
     sourceSuggestionId?: string | null;
     originalAuthor?: OriginalAuthor | null;
 }
@@ -454,6 +472,17 @@ export interface SharedEnvironmentListResponse {
     };
 }
 
+/** What becoming study dossiers did (a Forum download, a pack, an archived environment): the server's report. */
+export interface StudyImportReport {
+    dossiers: Array<{ id: string; name: string; entries: number }>;
+    notes: { added: number; skipped: number };
+    highlights: { added: number; skipped: number };
+    quickNorms: { added: number; skipped: number };
+    aliases: { added: number; skipped: number };
+    /** Rows of the content that could not be read. */
+    refused: number;
+}
+
 export interface PublishEnvironmentPayload {
     title: string;
     description?: string;
@@ -462,6 +491,8 @@ export interface PublishEnvironmentPayload {
     tags?: string[];
     includeNotes?: boolean;
     includeHighlights?: boolean;
+    /** The dossier it is published from (once per dossier; the link is the owner's alone). */
+    sourceDossierId?: string;
 }
 
 export interface SharedEnvironmentReport {

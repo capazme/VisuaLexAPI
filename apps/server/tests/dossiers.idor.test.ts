@@ -50,6 +50,7 @@ describe('dossier item IDOR', () => {
 
     expect(res.status).toBe(404);
     expect(await prisma.dossierItem.findUnique({ where: { id: victimItem.id } })).not.toBeNull();
+    expect(await prisma.trashEntry.count({ where: { userId: attacker.id } })).toBe(0);
   });
 
   it('does not let an attacker reorder a victim item through their own dossier', async () => {
@@ -126,7 +127,9 @@ describe('dossier item IDOR', () => {
     const removed = await request(app)
       .delete(`/api/dossiers/${dossier.id}/items/${item.id}`)
       .set(authHeader(owner));
-    expect(removed.status).toBe(204);
+    // It goes to the trash (question 181), and the answer names the entry.
+    expect(removed.status).toBe(200);
+    expect(removed.body).toEqual({ trashId: expect.any(String), moved: [item.id], notFound: [] });
     expect(await prisma.dossierItem.findUnique({ where: { id: item.id } })).toBeNull();
   });
 });

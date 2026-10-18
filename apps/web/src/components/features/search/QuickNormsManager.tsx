@@ -14,7 +14,8 @@ import { AttributionChip } from '../bulletin/AttributionChip';
 interface QuickNormsManagerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSearch?: (params: SearchParams) => void; // Optional - QuickNorms use triggerSearch from store
+  /** Runs a quick norm used from the list (the host brings the reader to the search page); without it, the store's trigger. */
+  onSearch?: (params: SearchParams) => void;
 }
 
 type InputMode = 'url' | 'manual';
@@ -29,7 +30,7 @@ function formatLastUsed(iso?: string): string | null {
   return `ultima ${formatDistanceToNow(date, { addSuffix: true, locale: it })}`;
 }
 
-export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
+export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManagerProps) {
   const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, selectQuickNorm, triggerSearch } = useAppStore();
   const { tryStartTour } = useTour();
 
@@ -114,9 +115,9 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
 
   const handleUseQuickNorm = useCallback((qn: QuickNorm) => {
     selectQuickNorm(qn.id);
-    triggerSearch(qn.searchParams);
+    (onSearch ?? triggerSearch)(qn.searchParams);
     onClose();
-  }, [selectQuickNorm, triggerSearch, onClose]);
+  }, [selectQuickNorm, triggerSearch, onSearch, onClose]);
 
   const handleStartEdit = useCallback((qn: QuickNorm) => {
     setEditingId(qn.id);

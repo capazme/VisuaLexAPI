@@ -14,6 +14,15 @@ describe('account data controls', () => {
     expect(response.body.data).toHaveProperty('threads');
     expect(response.body.data.lingoRipassi).toEqual([]);
     expect(response.body.data.lingoPreferenze).toBeNull();
+    expect(response.body.data.lingoGiornate).toEqual([]);
+  });
+
+  it('exports the study days and the review goal', async () => {
+    await prisma.lingoPreferenzeStudio.create({ data: { utenteId: alice.id, ripassiAlGiorno: 15 } });
+    await prisma.lingoGiornataStudio.create({ data: { utenteId: alice.id, giorno: new Date('2026-10-19T00:00:00Z'), ripassi: 12, nuove: 3, sbagliate: 2, valido: true } });
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+    expect(response.body.data.lingoPreferenze).toEqual({ nuoveAlGiorno: 20, ripassiAlGiorno: 15, materieComunita: [] });
+    expect(response.body.data.lingoGiornate).toEqual([{ giorno: '2026-10-19', ripassi: 12, nuove: 3, sbagliate: 2, codaFinita: false, valido: true }]);
   });
 
   it('requires the current password and exact confirmation before deletion', async () => {

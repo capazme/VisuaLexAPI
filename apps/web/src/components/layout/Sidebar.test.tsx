@@ -3,15 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const account = vi.hoisted(() => ({ isAdmin: false, devMode: false }));
+const notices = vi.hoisted(() => ({ normaChanges: 0 }));
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'u1', username: 'tester' }, isAdmin: account.isAdmin, devMode: account.devMode, logout: vi.fn() }),
 }));
 vi.mock('../../hooks/useForumNotifications', () => ({
-  useForumNotifications: () => ({ count: { total: 3 }, markRead: vi.fn(), refetch: vi.fn() }),
+  useForumNotifications: () => ({ count: { total: 3, normaChanges: notices.normaChanges }, markRead: vi.fn(), refetch: vi.fn() }),
 }));
 
 import { Sidebar } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
+import { subscribeSearchField } from '../../utils/searchFieldControl';
 
 /**
  * Every control in the sidebar is an icon. `label` reached the eye only: the
@@ -39,18 +41,21 @@ const openUserMenu = () => fireEvent.click(screen.getByRole('button', { name: /M
 beforeEach(() => {
   account.isAdmin = false;
   account.devMode = false;
+  notices.normaChanges = 0;
   Object.values(handlers).forEach((fn) => fn.mockClear());
 });
 
 describe('Sidebar — accessible names', () => {
   it('names every link', () => {
     renderSidebar();
-    for (const name of [/Ricerca/, /Dossier/, /Ambienti/, /Cronologia/]) {
+    for (const name of [/Ricerca/, /Dossier/, /Forum/]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
+    // «Ambienti» went into the Forum (spec 2026-10-13-environments-into-forum, D13).
+    expect(screen.queryByRole('link', { name: /Ambienti/ })).toBeNull();
   });
 
-  it('has no «Ricerca Veloce» and no «Sentenze»: «Ricerca» and ⌘K open the palette', () => {
+  it('has no «Ricerca Veloce» and no «Sentenze»: «Ricerca» leads to the field, ⌘K opens the palette', () => {
     renderSidebar();
     expect(screen.queryByRole('button', { name: /Ricerca Veloce/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /Ricerca Veloce/ })).toBeNull();
@@ -67,6 +72,17 @@ describe('Sidebar — accessible names', () => {
     expect(search.compareDocumentPosition(dot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.getElementById('tour-sidebar')).toContainElement(dot);
     appStore.setState({ quickNorms: [] });
+  });
+
+  it('«Ricerca» goes to the search page with the cursor in its field, no window over it (the owner, D1)', () => {
+    const field = vi.fn();
+    const unsubscribe = subscribeSearchField(field);
+    renderSidebar('/dossier');
+    fireEvent.click(screen.getByRole('link', { name: 'Ricerca' }));
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
+    expect(field).toHaveBeenCalledWith({});
+    expect(appStore.getState().commandPaletteOpen).toBe(false);
+    unsubscribe();
   });
 
   it('gives «Ricerca» the id the tours point at', () => {
@@ -99,7 +115,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar();
     openUserMenu();
     const entries = screen.getAllByRole('menuitem');
-    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
     for (const entry of entries) expect(entry).toHaveAccessibleName();
   });
 
@@ -154,12 +170,47 @@ describe('Sidebar — the development mode (spec D1–D3)', () => {
   });
 });
 
+describe('Sidebar — Cronologia in the user menu (the owner, 13 Oct 2026)', () => {
+  it('is not in the navigation: it is an entry of the user menu, after Impostazioni, that opens the history', () => {
+    renderSidebar('/dossier');
+    expect(screen.queryByRole('link', { name: /Cronologia/ })).toBeNull();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cronologia' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/history');
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('counts the saved norms that changed on the avatar and beside the entry, in words for a screen reader', () => {
+    notices.normaChanges = 2;
+    renderSidebar();
+    const avatar = screen.getByRole('button', { name: 'Menu utente, 2 norme salvate cambiate' });
+    expect(within(avatar).getByText('2')).toBeInTheDocument();
+    openUserMenu();
+    const entry = screen.getByRole('menuitem', { name: 'Cronologia, 2 norme salvate cambiate' });
+    expect(within(entry).getByText('2')).toBeInTheDocument();
+  });
+
+  it('says one norm in the singular', () => {
+    notices.normaChanges = 1;
+    renderSidebar();
+    expect(screen.getByRole('button', { name: 'Menu utente, 1 norma salvata cambiata' })).toBeInTheDocument();
+  });
+
+  it('draws no count when nothing changed', () => {
+    renderSidebar();
+    const avatar = screen.getByRole('button', { name: 'Menu utente' });
+    expect(avatar.textContent?.trim()).toBe('T');
+    openUserMenu();
+    expect(screen.getByRole('menuitem', { name: 'Cronologia' }).textContent?.trim()).toBe('Cronologia');
+  });
+});
+
 describe('Sidebar — the user menu (spec D2)', () => {
-  it('holds Impostazioni, the theme, Scorciatoie and Esci; «Pannello Admin» only for an admin', () => {
+  it("holds Impostazioni, Cronologia, «Collega un'app AI», the theme, Scorciatoie and Esci; «Pannello Admin» only for an admin", () => {
     renderSidebar();
     openUserMenu();
     expect(screen.getByRole('menu', { name: 'Menu utente' })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
     expect(screen.queryByRole('menuitem', { name: /Pannello Admin/ })).toBeNull();
   });
 
@@ -187,6 +238,15 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menuitem', { name: /Impostazioni/ })).toBeNull();
   });
 
+  it("opens «Collega un'app AI» and closes the menu (and the phone's menu)", () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /Collega un'app AI/ }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/collega-app');
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
   it('opens the shortcuts', () => {
     renderSidebar();
     openUserMenu();
@@ -212,7 +272,7 @@ describe('Sidebar — the user menu by keyboard', () => {
     fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
-    expect(screen.getByRole('menuitem', { name: /Tema scuro/ })).toHaveFocus();
+    expect(screen.getByRole('menuitem', { name: /Cronologia/ })).toHaveFocus();
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowUp' });
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toHaveFocus();
     // Enter on a focused button is its click.
@@ -272,7 +332,7 @@ describe('Sidebar — the phone\'s copy (spec D8)', () => {
   it('is the same reduced list and the same menu, closed off-canvas or open', () => {
     renderSidebar('/', { isOpen: false });
     expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
-      ['/', '/dossier', '/studia', '/history', '/environments', '/forum', '/documents'],
+      ['/', '/dossier', '/studia', '/forum', '/documents'],
     );
     expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Sentenze|Ricerca Veloce|Impostazioni/ })).toBeNull();

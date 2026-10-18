@@ -2307,6 +2307,6 @@ citation.
 
 - [ ] **Step 1: Write the failing tests** for `trashSummary`, the service, the row (hidden when the dossier has no entries; restore calls the service and reloads), the page (all three kinds, the 409 path asks for a dossier, LingoLex cards only here).
 - [ ] **Step 2: Run them to verify they fail.**
-- [ ] **Step 3: Implement**; the dossier's own deletions in the web keep their undo toast (S10): nothing in the web writes to the trash.
+- [ ] **Step 3: Implement**; the dossier's own deletions in the web keep their undo toast (S10): nothing in the web writes to the trash. (S10 amended on 13 October 2026: a whole dossier deleted from the web now goes to the trash.)
 - [ ] **Step 4: Run every web suite, build, lint; browser pass** with an entry trashed through the API as the MCP round's e2e does.
 - [ ] **Step 5: Commit, PR, merge** (`merge: feat/dossier-trash — what Claude removed can be restored from the dossier and from the trash`).

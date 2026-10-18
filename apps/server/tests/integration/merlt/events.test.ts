@@ -571,7 +571,7 @@ describe('POST /api/merlt/events/forum-signal (MERLT-1.10)', () => {
         return (
           ev.type === expectedType &&
           d.shared_env_id === '00000000-0000-0000-0000-00000000face' &&
-          d.target_author_id === '00000000-0000-0000-0000-00000000fade'
+          !('target_author_id' in d)
         );
       })
       .reply(200, { received: 1, timestamp: 't-forum' });
@@ -582,21 +582,21 @@ describe('POST /api/merlt/events/forum-signal (MERLT-1.10)', () => {
       .send({
         action,
         sharedEnvId: '00000000-0000-0000-0000-00000000face',
-        originalAuthorId: '00000000-0000-0000-0000-00000000fade',
       });
 
     expect(res.status).toBe(202);
   });
 
-  it('accepts null originalAuthorId (deleted author)', async () => {
+  it('never relays the author an older client still sends (a third party)', async () => {
     await grantConsent(user, 'basic');
     nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
 
+    let relayed: Record<string, unknown> | null = null;
     nock(TEST_MERLT_BASE)
       .post('/api/v1/tracking/events', (body: unknown) => {
         const b = body as { events: Array<Record<string, unknown>> };
-        const d = b.events[0].data as Record<string, unknown>;
-        return d.target_author_id === null;
+        relayed = b.events[0].data as Record<string, unknown>;
+        return true;
       })
       .reply(200, { received: 1, timestamp: 't' });
 
@@ -606,10 +606,11 @@ describe('POST /api/merlt/events/forum-signal (MERLT-1.10)', () => {
       .send({
         action: 'like',
         sharedEnvId: '00000000-0000-0000-0000-00000000face',
-        originalAuthorId: null,
+        originalAuthorId: '00000000-0000-0000-0000-00000000fade',
       });
 
     expect(res.status).toBe(202);
+    expect(JSON.stringify(relayed)).not.toContain('00000000-0000-0000-0000-00000000fade');
   });
 
   it('rejects without consent (403)', async () => {
@@ -619,7 +620,6 @@ describe('POST /api/merlt/events/forum-signal (MERLT-1.10)', () => {
       .send({
         action: 'like',
         sharedEnvId: '00000000-0000-0000-0000-00000000face',
-        originalAuthorId: null,
       });
     expect(res.status).toBe(403);
   });
@@ -632,7 +632,6 @@ describe('POST /api/merlt/events/forum-signal (MERLT-1.10)', () => {
       .send({
         action: 'comment',
         sharedEnvId: '00000000-0000-0000-0000-00000000face',
-        originalAuthorId: null,
       });
     expect(res.status).toBe(400);
   });

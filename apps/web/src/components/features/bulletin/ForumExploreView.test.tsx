@@ -60,12 +60,14 @@ function renderView() {
       onReport={noop}
       onSuggest={noop}
       onPublishClick={noop}
+      onPacksAdded={noop}
+      onPacksError={noop}
       onResetFilters={noop}
     />
   );
 }
 
-describe('ForumExploreView - Top Ambienti widget', () => {
+describe('ForumExploreView - «I più aggiunti» widget', () => {
   beforeEach(() => {
     listMock.mockReset();
   });
@@ -85,7 +87,7 @@ describe('ForumExploreView - Top Ambienti widget', () => {
     expect(listMock).toHaveBeenCalledWith({ sort: 'mostDownloaded', limit: 3 });
 
     await waitFor(() => {
-      expect(screen.getByText('Top Ambienti')).toBeInTheDocument();
+      expect(screen.getByText('I più aggiunti')).toBeInTheDocument();
     });
     expect(screen.getByText('Compliance Privacy')).toBeInTheDocument();
     expect(screen.getByText('Diritto Civile')).toBeInTheDocument();
@@ -102,7 +104,7 @@ describe('ForumExploreView - Top Ambienti widget', () => {
 
     await waitFor(() => expect(listMock).toHaveBeenCalled());
     await waitFor(() => {
-      expect(screen.queryByText('Top Ambienti')).not.toBeInTheDocument();
+      expect(screen.queryByText('I più aggiunti')).not.toBeInTheDocument();
     });
   });
 });

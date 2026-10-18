@@ -1,5 +1,6 @@
 """POST /search_decisions: the decisions whose text mentions an article or a topic (design
-2026-10-05 §5). Italgiure only, the last five years; a page is cached for a day."""
+2026-10-05 §5). Italgiure only, the last five years; a page is cached for a day. The deposit
+years can be bounded (`anno_dal`, `anno_al`) and the answer counts the matches per year."""
 from __future__ import annotations
 
 import asyncio
@@ -10,6 +11,7 @@ from typing import Any
 import structlog
 
 from ...tools.cache_manager import get_cache_manager
+from ..normattiva_validity import _today_in_rome
 from .resolver import _SOURCE_ERRORS, ITALGIURE_TIMEOUT, SEARCH_NS, get_resolver
 from .search import UnsupportedAct, article_clause, build_query, index_clause, topic_clause
 
@@ -20,7 +22,8 @@ ARCHIVES = ("civile", "penale")
 NORMA_FIELDS = ("tipo_atto", "numero_articolo", "numero_atto", "data")
 # Prefix of the cache key: bump it whenever the shape of the answer changes, so pages cached
 # before are not served again.
-CACHE_VERSION = "v1"
+CACHE_VERSION = "v2"
+FIRST_YEAR = 1900
 
 
 def get_searcher():
@@ -47,6 +50,26 @@ async def archive_since(archivio: str | None) -> str | None:
     return min(results)
 
 
+def current_year() -> int:
+    return _today_in_rome().year
+
+
+def _year_errors(body: dict) -> dict[str, str]:
+    """`anno_dal` and `anno_al`: integers from FIRST_YEAR to this year (Rome), the first not after
+    the second. One alone is an open range; an explicit null is the field left out."""
+    errors: dict[str, str] = {}
+    last = current_year()
+    for field in ("anno_dal", "anno_al"):
+        value = body.get(field)
+        if value is not None and (not isinstance(value, int) or isinstance(value, bool)
+                                  or not FIRST_YEAR <= value <= last):
+            errors[field] = f"L'anno va dal {FIRST_YEAR} al {last}"
+    if not errors and None not in (body.get("anno_dal"), body.get("anno_al")) \
+            and body["anno_dal"] > body["anno_al"]:
+        errors["anno_dal"] = "L'anno iniziale non può seguire quello finale"
+    return errors
+
+
 def _errors(body: Any) -> dict[str, str]:
     if not isinstance(body, dict):
         return {"norma": "Serve un articolo o un tema"}
@@ -68,7 +91,7 @@ def _errors(body: Any) -> dict[str, str]:
         errors["archivio"] = "Archivio non riconosciuto"
     if body.get("modo") not in (None, "indice", "testo"):
         errors["modo"] = "Modo non riconosciuto"
-    return errors
+    return {**errors, **_year_errors(body)}
 
 
 async def search_decisions(body: Any) -> tuple[dict, int]:
@@ -103,8 +126,10 @@ async def search_decisions(body: Any) -> tuple[dict, int]:
     archivio = body.get("archivio") or archivio_default
     pagina = 1 if body.get("pagina") is None else body["pagina"]
     q = build_query(article, topic, archivio)
+    dal, al = body.get("anno_dal"), body.get("anno_al")
+    anni = (dal, al) if dal is not None or al is not None else None
     key = hashlib.sha256(json.dumps([CACHE_VERSION, q, pagina, modo, hl_query,
-                                     coords and [coords.gen, coords.art]]).encode()).hexdigest()
+                                     coords and [coords.gen, coords.art], anni]).encode()).hexdigest()
     cache = get_cache()
     try:
         cached = await cache.get(key)
@@ -117,7 +142,7 @@ async def search_decisions(body: Any) -> tuple[dict, int]:
     since = asyncio.ensure_future(archive_since(archivio))
     try:
         page = await asyncio.wait_for(
-            get_searcher().search(q, pagina, ROWS, coords=coords, hl_query=hl_query),
+            get_searcher().search(q, pagina, ROWS, coords=coords, hl_query=hl_query, anni=anni),
             ITALGIURE_TIMEOUT)
     except _SOURCE_ERRORS as exc:
         since.cancel()
@@ -133,6 +158,8 @@ async def search_decisions(body: Any) -> tuple[dict, int]:
         "decisioni": [{"identita": h.identita.to_dict(), "attributi": h.attributi,
                        "trovata": h.trovata, "frammento": h.frammento} for h in page.decisioni],
     }
+    if page.anni is not None:
+        answer["anni"] = page.anni
     if archivio_dal is not None:  # an answer without its start is not kept for a day
         try:
             await cache.set(key, answer)

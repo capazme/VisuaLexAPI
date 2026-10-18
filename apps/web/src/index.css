@@ -345,11 +345,12 @@
 }
 
 /* A column of the practice's row beside its windows: the page's height less the content area's
-   padding above and below it (`p-8`, 2 rem each, in `Layout`), so the scroller's content is never
+   padding above and below it (`p-8`, 2 rem each, in `Layout`) and less the search page's field
+   (`--search-bar-height`, set by `Layout` while the field is drawn), so the scroller's content is never
    taller than the scroller and a `scrollIntoView` inside a window does not move the page. */
 @utility h-app-row {
-  height: calc(100vh - 4rem);
-  height: calc(100dvh - 4rem);
+  height: calc(100vh - 4rem - var(--search-bar-height, 0px));
+  height: calc(100dvh - 4rem - var(--search-bar-height, 0px));
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -597,6 +598,54 @@
   @apply text-slate-600 dark:text-slate-300;
 }
 
+/* ── «Confronta articoli» ─────────────────────────────────────
+   The comparison draws each comma with the reader's own markup (a `.vlx-art` per
+   cell). Nothing here adds text: the double brackets are collapsed, not removed
+   (`font-size: 0` keeps them in the text nodes and in a copy), and the diff's marks
+   are elements around words that are already there (gotcha 23). */
+.vlx-art--compare {
+  max-width: none;
+  margin-inline: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+/* Normattiva's ((…)): a light highlight instead of the dashed line, brackets collapsed. */
+.vlx-compare .vlx-art .vlx-mod {
+  border-bottom: 0;
+  border-radius: 0.2em;
+  background-color: rgb(251 191 36 / 0.16);
+}
+
+.dark .vlx-compare .vlx-art .vlx-mod {
+  background-color: rgb(251 191 36 / 0.14);
+}
+
+.vlx-compare .vlx-art .vlx-mod .vlx-paren {
+  font-size: 0;
+}
+
+/* The word diff of a «modificato» comma. */
+.vlx-art .vlx-del {
+  text-decoration: line-through;
+  border-radius: 0.2em;
+  @apply bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200;
+}
+
+.vlx-art .vlx-ins {
+  border-radius: 0.2em;
+  @apply bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200;
+}
+
+/* The tails' fold: the class sits on the comparison's root, not on a `.vlx-art`. */
+.vlx-compare.vlx-updates-open .vlx-art .vlx-updates-body {
+  display: block;
+}
+
+.vlx-compare.vlx-updates-open .vlx-art .vlx-updates-toggle::before {
+  content: '▾';
+}
+
 /* ── Annotation signs (round B) ───────────────────────────────
    One per block holding the reader's notes or highlights (articleRender,
    `signs: true`). Empty elements: the icon, the count and the dots are
@@ -837,6 +886,81 @@
 
 .vlx-decision .vlx-dec-line + .vlx-dec-line::before {
   content: " ";
+}
+
+/* A decision's key passages (utils/decisionKeyPassages.ts): computed, never the reader's. A dotted
+   underline in a teal no highlight uses, drawn as a background; the label at its start is generated content on an
+   empty-of-text head, so no character is added (root rule 23). `key-passages-hidden` on the
+   container switches them off, as `highlights-hidden` does the highlights. */
+.vlx-decision .vlx-key-passage {
+  --key-passage: 173 80% 30%;
+  cursor: pointer;
+  background-image: linear-gradient(to right, hsl(var(--key-passage)) 55%, transparent 0);
+  background-position: 0 100%;
+  background-repeat: repeat-x;
+  background-size: 5px 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.dark .vlx-decision .vlx-key-passage {
+  --key-passage: 172 66% 52%;
+}
+
+.vlx-decision .vlx-key-head::before {
+  content: attr(data-key-label);
+  display: inline-block;
+  margin-right: 0.35em;
+  padding: 0 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.68em;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: 0.15em;
+  color: hsl(173 80% 24%);
+  background-color: hsl(173 70% 92%);
+  @apply font-sans;
+}
+
+/* A rule of its own, as the block labels' (a `dark:` utility inside `::before` is dropped). */
+.dark .vlx-decision .vlx-key-head::before {
+  color: hsl(172 66% 75%);
+  background-color: hsl(173 60% 18%);
+}
+
+/* Made the reader's own («Fai tua»), or any highlight over the same words: the passage is nested
+   inside the highlight (`RANK`), and there it loses its underline and its label. */
+.vlx-decision .highlight-mark .vlx-key-passage {
+  cursor: auto;
+  background-image: none;
+}
+
+.vlx-decision .highlight-mark .vlx-key-head::before {
+  content: none;
+}
+
+/* With the highlights hidden, the passage under one shows again (more specific than the two rules above),
+   unless the passages are switched off too. */
+.highlights-hidden:not(.key-passages-hidden) .vlx-decision .highlight-mark .vlx-key-passage,
+.vlx-decision.highlights-hidden:not(.key-passages-hidden) .highlight-mark .vlx-key-passage {
+  cursor: pointer;
+  background-image: linear-gradient(to right, hsl(var(--key-passage)) 55%, transparent 0);
+}
+
+.highlights-hidden:not(.key-passages-hidden) .vlx-decision .highlight-mark .vlx-key-head::before,
+.vlx-decision.highlights-hidden:not(.key-passages-hidden) .highlight-mark .vlx-key-head::before {
+  content: attr(data-key-label);
+}
+
+.key-passages-hidden .vlx-key-passage {
+  cursor: auto;
+  background-image: none;
+}
+
+.key-passages-hidden .vlx-key-head::before {
+  content: none;
 }
 
 /* ═══════════════════════════════════════════════════════════

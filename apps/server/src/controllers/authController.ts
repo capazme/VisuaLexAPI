@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
+import { dateToDay } from '../lingo/studyDays';
 
 // Password validation regex: min 8 chars, at least 1 uppercase, 1 lowercase, 1 number
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -236,7 +237,7 @@ export const changePassword = async (req: Request, res: Response) => {
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, merltConsenso, merltConsensoStorico] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, merltConsenso, merltConsensoStorico] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -265,7 +266,12 @@ export const exportAccountData = async (req: Request, res: Response) => {
       select: { cardId: true, dataRevisione: true, rating: true, scheduledDays: true, stability: true, difficulty: true, durataMs: true },
       orderBy: [{ dataRevisione: 'asc' }, { id: 'asc' }],
     }),
-    prisma.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId }, select: { nuoveAlGiorno: true, materieComunita: true } }),
+    prisma.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId }, select: { nuoveAlGiorno: true, ripassiAlGiorno: true, materieComunita: true } }),
+    prisma.lingoGiornataStudio.findMany({
+      where: { utenteId: userId },
+      select: { giorno: true, ripassi: true, nuove: true, sbagliate: true, codaFinita: true, valido: true },
+      orderBy: { giorno: 'asc' },
+    }),
     // The MERL-T consent and its history, with the notice version each choice was made under.
     // What MERL-T itself collected is downloaded from Impostazioni › Dati MERL-T (`GET /api/merlt/data/export`).
     prisma.merltUserPreference.findUnique({
@@ -289,8 +295,10 @@ export const exportAccountData = async (req: Request, res: Response) => {
       threads: threads.map(({ passageReleasedById: _releasedBy, ...thread }) => thread),
       comments, lingoCards, lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
-      // The review log (the scheduling state is derived from it and not exported) and the daily goal.
+      // The review log (the scheduling state is derived from it and not exported), the daily goals, and the
+      // stored study days ('YYYY-MM-DD', Rome days: a DATE travels as UTC midnight).
       lingoRipassi, lingoPreferenze,
+      lingoGiornate: lingoGiornate.map(({ giorno, ...day }) => ({ giorno: dateToDay(giorno), ...day })),
       merltConsenso, merltConsensoStorico,
     },
   });

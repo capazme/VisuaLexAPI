@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, Share2 } from 'lucide-react';
+import { Package, Upload } from 'lucide-react';
 import { SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { VersionHistoryModal } from './VersionHistoryModal';
 import type { SharedEnvironment } from '../../../types';
@@ -63,17 +63,17 @@ export function ForumMyEnvironmentsView({
       <div className="text-center py-12">
         <Package size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-          Nessun ambiente pubblicato
+          Nessun dossier pubblicato
         </h3>
         <p className="text-slate-600 dark:text-slate-400 mb-4">
-          Non hai ancora condiviso nessun ambiente con la community.
+          Non hai ancora pubblicato un dossier nel Forum.
         </p>
         <button
           onClick={onPublishClick}
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
-          <Share2 size={16} />
-          Condividi un ambiente
+          <Upload size={16} />
+          Pubblica un dossier
         </button>
       </div>
     );
@@ -82,7 +82,7 @@ export function ForumMyEnvironmentsView({
   return (
     <>
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        {environments.length} {environments.length === 1 ? 'ambiente pubblicato' : 'ambienti pubblicati'}
+        {environments.length} {environments.length === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {environments.map((env) => {

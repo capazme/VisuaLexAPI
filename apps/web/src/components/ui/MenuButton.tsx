@@ -23,6 +23,10 @@ export interface MenuButtonProps {
   /** Where the list opens: under the trigger (default), or over it for a trigger at the bottom of
    *  the screen (the bar of practices). */
   placement?: 'below' | 'above';
+  /** A line of explanation over the items, read with the menu but never focused. */
+  heading?: string;
+  /** Classes for the list (a wider one, a capped height that scrolls), merged over the default `w-56`. */
+  menuClassName?: string;
 }
 
 /**
@@ -30,7 +34,7 @@ export interface MenuButtonProps {
  * and End move, Escape and Tab close, focus returns to the trigger, a click
  * outside closes. Clicks never reach the card it sits in. The dossier's menus.
  */
-export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below' }: MenuButtonProps) {
+export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
@@ -119,14 +123,21 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
           id={menuId}
           role="menu"
           aria-label={label}
+          aria-describedby={heading ? `${menuId}-heading` : undefined}
           onKeyDown={onMenuKey}
           className={cn(
             Z_INDEX.dropdown,
             'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800',
             placement === 'above' ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
+            menuClassName,
           )}
         >
+          {heading && (
+            <p id={`${menuId}-heading`} role="presentation" className="px-3 pb-1.5 pt-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
+              {heading}
+            </p>
+          )}
           {items.map((item, index) => (
             <div key={item.label}>
               {item.separatorBefore && <div className="my-1 border-t border-slate-200 dark:border-slate-700" aria-hidden />}

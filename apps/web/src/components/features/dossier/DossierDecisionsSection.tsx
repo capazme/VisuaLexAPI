@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import type { DossierItem } from '../../../types';
-import { decisionPath, identityOf } from '../../../utils/decisionLinks';
+import { identityOf } from '../../../utils/decisionLinks';
+import { DecisionLink } from '../decisions/DecisionLink';
 import { decisionCitationOf } from './dossierUtils';
 import type { SentenzaItem } from './dossierLayout';
 
@@ -11,8 +11,8 @@ interface Props {
 }
 
 /**
- * «Giurisprudenza», after the acts: one row per decision, in stored order, its citation linking
- * to the decision's address (which opens its tab). The minimal list the owner chose for Sentenze PR C (4 October 2026);
+ * «Giurisprudenza», after the acts: one row per decision, in stored order, its citation a
+ * `DecisionLink`: a click opens its preview, whose «Apri la sentenza» goes to the decision's address. The minimal list the owner chose for Sentenze PR C (4 October 2026);
  * the dossier-by-act round's PR 3 gives each row the star and the reader in place. The citation
  * is recomputed from the stored identity, never the stored copy (source convention, Q9).
  */
@@ -31,12 +31,12 @@ export function DossierDecisionsSection({ decisions, onRemove }: Props) {
           const citation = decisionCitationOf(item.data);
           return (
             <li key={item.id} className="group flex items-center gap-2">
-              <Link
-                to={decisionPath(identityOf(item.data))}
+              <DecisionLink
+                to={identityOf(item.data)}
                 className="flex min-h-[44px] min-w-0 flex-1 items-center rounded text-sm text-primary-600 hover:underline md:min-h-0 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 <span className="truncate">{citation}</span>
-              </Link>
+              </DecisionLink>
               <button
                 type="button"
                 onClick={() => onRemove(item)}

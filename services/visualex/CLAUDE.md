@@ -77,7 +77,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     of `conventions/sources/tar-seats.json`; design 2026-10-12-administrative-courts), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
     User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
-    (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`.
+    (an article or a topic as one Solr query), `search_route.py`, `pdf_route.py`; behind
+    `POST /search_eu_case_law`: `eu_case_law.py` (the Union's courts' decisions that cite an article,
+    from CELLAR).
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -184,7 +186,14 @@ POST unless noted, JSON bodies.
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
   AKN index, and the act's `title` (`presentable_title`: no Gazzetta code, no
   amendment brackets, accents restored; `''` when there is none), so the
-  dossier names an act with one call. Structure only: it never carries the
+  dossier names an act with one call. An EU act's title is its subject («relativo
+  alla protezione delle persone fisiche …») from the page the tree is read from
+  (`_extract_eurlex_title`: the OJ's `eli-main-title`, the consolidated
+  `title-doc-last`, the legacy page's `DC.description`; a run with no date line, a
+  Treaty's, gives none). `get_tree` keeps no failed or empty tree, in memory as on
+  disk (`_no_tree`), so a page EUR-Lex's firewall refused is asked again. Always 200: a failure is
+  an empty answer (with `error` when the handler itself failed), which the web
+  does not cache. Structure only: it never carries the
   display text
 - `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
@@ -225,13 +234,36 @@ POST unless noted, JSON bodies.
   start and every six hours (`sweep_decision_caches`). Design:
   docs/superpowers/specs/2026-10-01-sentenze-design.md
 - `/search_decisions` — the Cassazione decisions that mention an article or a topic:
-  `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?}` → `esito`
-  risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, and per decision its identity,
-  attributes, `trovata` and `frammento`; cached a day), non_supportata, richiesta_non_valida
+  `{norma?, tema?, archivio?: civile | penale, modo?: indice | testo, pagina?, anno_dal?, anno_al?}`
+  → `esito` risultati (a page of 20 with `totale`, `modo`, `archivio_dal`, `anni` (`[{anno, n}]`,
+  the matches per year of the decision's number (its deposit year), newest first, over every year
+  whatever the range; absent when the archive sent no facet), and per decision its identity, attributes, `trovata` and `frammento`; cached a
+  day; the range bounds the deposit year as a filter query, 1900 to this year, one bound alone is
+  open), non_supportata, richiesta_non_valida
   400, fonte_non_raggiungibile 503, errore_interno 500 (a bug: a fixed body). Italgiure only,
   the last five years; the index serves codes and the Constitution, any other act goes to the
   text search, and an act no way can phrase (an EU act among them) answers non_supportata. Design:
   docs/superpowers/specs/2026-10-05-norms-decisions-search-design.md
+- `/search_eu_case_law` — the decisions of the Court of Justice and the General Court that cite an
+  article of a regulation, a directive or a decision of the Union: `{celex, articolo}` (the act's CELEX,
+  `32016R0679`; the article as digits, 1 to 9999; both checked against strict patterns before they enter
+  the SPARQL query) → `esito` risultati (`decisioni`: `{corte, causa, ecli, data, tipo, celex, identita}`
+  newest first, `identita` = `{corte, numero, anno}` as `/fetch_decision` takes it, `tipo` JUDG | ORDER |
+  OPIN_AG, the Advocates General's opinions included; `totale`; `troncato` when the query hit its 500-row
+  limit; cached 3 days per act and article, `cache_manager.EU_CASE_LAW_TTL`), non_supportata 200 (a
+  well-formed CELEX that is not `3YYYY[RLD]NNNN`: a treaty such as `12012E/TXT` gave no row on 13 October
+  2026 and an empty list would read as «no case law»; never queried, never cached), richiesta_non_valida
+  400, fonte_non_raggiungibile 503 (`fonte: curia`; a timeout, a partial, malformed or unreadable answer:
+  never an empty list, never cached), errore_interno 500 (a bug: a fixed body).
+  CELLAR reifies a decision's citation of an act as an `owl:Axiom` (`owl:annotatedSource` the decision,
+  `owl:annotatedTarget` the act, `annotation:fragment_cited_target` a literal such as `A06P1L1LB`); the
+  fragment is matched `^A0?<n>($|[PL])`, so article 6 never finds `A60`. The list is not complete: the
+  fragments arrive late for recent cases and are thin before 2021. Decisions of other types (a notice,
+  an opinion under art. 218 TFEU) and of the Civil Service Tribunal (closed 2016) are left out.
+  Only a judgment opens with `/fetch_decision`'s CGUE reader (it finds CELEX types CJ and TJ by case):
+  an order or an Advocate General's opinion opens on EUR-Lex by its `celex` (decided 13 October 2026).
+  Measured on 13 October 2026 for a regulation or a directive: 0.06 to 0.8 s, 35 to 114 decisions
+  (5 to 25 KB with `identita`). Design: docs/superpowers/specs/2026-10-12-case-law-section-design.md
 - `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
   PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
   fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.
@@ -273,8 +305,13 @@ or a `version_date`) never asks Brocardi, whose commentary carries no date.
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
-input), `ResourceNotFoundError` → 404 (the article is not in the act),
-`RateLimitExceededError` → 429, everything else 500, except `/fetch_decision`,
+input), `ResourceNotFoundError` → 404 (the article is not in the act; a request whose ranges
+find no article in the act's index and that names nothing else), `RateLimitExceededError` → 429, `IndexUnavailableError` → 503 (a
+range, or a whole act, whose index `get_tree` could not read answers
+«Non riesco a leggere ora l'indice di quest'atto, quindi non posso aprire gli artt. 1-5: …»;
+`parse_article_input` returns its error dict with a `kind`, turned into the exception by
+`article_input_error`; until 13 October 2026 `get_tree`'s failure, a message and 0, was read as a
+list of characters and an EU range came back empty with no error), everything else 500, except `/fetch_decision`,
 whose handler answers every failure with `esito` and never with the exception's text.
 What the handler does not write is not its own, on that route too: the per-IP rate
 limit's 429 `{"error": …}`, the login gate's 401/429 through the ingress, and the

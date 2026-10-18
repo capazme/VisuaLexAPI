@@ -1,6 +1,6 @@
 /** POST /search_decisions through legalFetch (design 2026-10-05 §5). */
 import { legalFetch } from './legalFetch';
-import type { DecisionSearchQuery, SearchDecisionsAnswer } from '../types/decisions';
+import type { DecisionSearchQuery, DecisionSearchYears, SearchDecisionsAnswer } from '../types/decisions';
 
 /** Decisions per page: fixed by the route (`ROWS` in search_route.py), which pages by 20. */
 export const DECISION_PAGE_SIZE = 20;
@@ -26,18 +26,20 @@ function isAnswer(body: unknown): body is SearchDecisionsAnswer {
  * topic. `modo` asks for the Cassazione's index (the default) or the text; the answer's `modo`
  * says which one was used. The query's label is presentation and never travels. Like
  * `fetchDecision`, it answers a `fonte_non_raggiungibile` for a response that is not the
- * route's and rejects when no response arrives.
+ * route's and rejects when no response arrives. `anni` keeps the decisions deposited in those
+ * years (the route's `anno_dal`/`anno_al`); the answer's own `anni` counts them per year.
  */
 export async function searchDecisions(
   query: DecisionSearchQuery,
   pagina: number,
   modo?: 'indice' | 'testo',
+  anni?: DecisionSearchYears,
 ): Promise<SearchDecisionsAnswer> {
   const { norma, tema, archivio } = query;
   const response = await legalFetch('/search_decisions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ norma, tema, archivio, pagina, modo }),
+    body: JSON.stringify({ norma, tema, archivio, pagina, modo, anno_dal: anni?.dal, anno_al: anni?.al }),
   });
   if (response.status === 429) return { esito: 'fonte_non_raggiungibile', fonte: 'quota' };
   let body: unknown = null;

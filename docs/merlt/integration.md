@@ -135,7 +135,7 @@ Il dettaglio di ogni passo, con le chiamate di rete attese, è in [smoke-checkli
 | `MERLT_INGEST_STALE_MS` | 600000 | Rete del watchdog e supersede di `lazyIngest` |
 | `MERLT_EXTRACT_STALE_MS` | 2700000 | Rete per l'estrazione appunti (deve superare il `job_timeout` RQ di 1800 s) |
 | `MERLT_QA_STALE_MS` / `MERLT_QA_RETENTION_DAYS` | 1200000 / 30 | Rete Q&A (su `updatedAt`) e purge dei job terminati |
-| `MERLT_DEAD_LETTER_DIR` | `apps/server/logs` | Dove finisce `merlt-dead-letter.jsonl` |
+| `MERLT_DEAD_LETTER_DIR` / `MERLT_DEAD_LETTER_RETENTION_DAYS` | `apps/server/logs` / 7 | Dove finiscono i file `merlt-dead-letter-AAAA-MM-GG.jsonl` (uno al giorno, senza dati personali) e dopo quanti giorni vengono cancellati |
 
 ### Compose (shell o `.env` nella root; modello in `infra/.env.example`)
 
@@ -150,6 +150,7 @@ Il dettaglio di ogni passo, con le chiamate di rete attese, è in [smoke-checkli
 | `MERLT_SKIP_SEED` / `MERLT_SKIP_EMBEDDINGS` | `false` / `true` | api (il worker ha sempre `MERLT_SKIP_SEED=true`) |
 | `MERLT_EXTRACT_JOB_TIMEOUT` | 1800 | api, perché è chi accoda |
 | `MERLT_HYGIENE_INTERVAL_HOURS` | 24 (0 nel codice = spento) | api |
+| `MERLT_TRACKING_RETENTION_DAYS` / `MERLT_RETENTION_INTERVAL_HOURS` | 365 / 24 | api: dopo quanti giorni gli eventi di `tracking_events` vengono cancellati, e ogni quante ore passa la pulizia (sempre accesa; `merlt/privacy/retention.py`) |
 | `MERLT_NEURAL_TRAVERSAL_ENABLED`, `MERLT_REACT_ENABLED`, `MERLT_SEMANTIC_SEARCH_ENABLED`, `MERLT_ADVANCED_ROUTING_ENABLED` | `true` | api, worker |
 | `MERLT_BFF_CALLBACK_URL`, `MERLT_BFF_EXTRACTION_CALLBACK_URL` / `MERLT_BFF_QA_CALLBACK_URL` | `http://host.docker.internal:3001/api/merlt/internal/...` | worker / api |
 

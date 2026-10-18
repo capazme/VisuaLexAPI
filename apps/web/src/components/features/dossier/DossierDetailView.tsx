@@ -41,22 +41,27 @@ import {
 import { useAppStore } from '../../../store/useAppStore';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
-import { showUndoToast } from '../../../hooks/useUndoableAction';
-import type { Dossier, DossierItem } from '../../../types';
+import type { Dossier, DossierItem, DossierKind } from '../../../types';
 import {
-  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, type NormaGroup,
+  formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, shareableDossier, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
+import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
+import { removeItemsWithUndo, removeSelectionMessage } from './removeItemsWithUndo';
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
-import { buildPdfBlocks, loadDossierTexts, writeDossierPdf } from './dossierPdf';
-import { resolveBlockUrn } from './useActDetails';
+import { buildPdfBlocks, countMarksUnavailable, countUnavailable, loadDossierDecisions, loadDossierTexts, writeDossierPdf } from './dossierPdf';
+import { loadPdfMarks } from './dossierPdfMarks';
+import { DossierPdfDialog, type DossierPdfOptions } from './DossierPdfDialog';
+import { lastActTitle, resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
+import { kindLabel } from './dossierKinds';
+import { DossierForumActions } from './DossierForumActions';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
@@ -85,9 +90,6 @@ interface Props {
 export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) {
   const {
     dossiers,
-    deleteDossier,
-    removeFromDossier,
-    restoreDossierItem,
     updateDossier,
     toggleDossierPin,
     setDossierItemOrder,
@@ -117,6 +119,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
 
   // Hydrate the snapshot list, or the "• N snapshot" counter reads 0 after a
   // reload even when rows exist. Logged on failure, never hidden (gotcha 18).
@@ -242,46 +245,21 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   const clearSelection = () => setSelectedItems(new Set());
 
-  // Remove one item with a 5s undo window. Snapshot id + position + data up
-  // front so undo can re-insert at the exact spot with status/addedAt intact.
+  // Removing goes to the trash for 30 days, with «Annulla» for 5 s (question 181); the page's trash is
+  // read again so «Rimossi di recente» and «Cestino» count it.
+  const trashChanged = trash ? () => void trash.reload() : undefined;
+
   const handleRemoveSingle = (item: DossierItem) => {
-    const atIndex = dossier.items.findIndex((i) => i.id === item.id);
-    if (atIndex < 0) return;
-    void showUndoToast({
-      action: () => {
-        removeFromDossier(dossier.id, item.id);
-        return { item, atIndex };
-      },
-      undo: ({ item: snap, atIndex: idx }) => restoreDossierItem(dossier.id, snap, idx),
-      message: 'Elemento rimosso',
-    });
+    removeItemsWithUndo(dossier.id, [item.id], 'Elemento rimosso', trashChanged);
   };
 
   const confirmBulkDelete = () => {
     if (selectedItems.size === 0) return;
     setBulkDeleteConfirmOpen(false);
-    // Snapshot items + their indexes BEFORE deletion, in ascending order so
-    // undo can restore them in the same sequence (later items get the right
-    // index once earlier ones have been re-inserted).
-    const snapshots = Array.from(selectedItems)
-      .map((itemId) => {
-        const atIndex = dossier.items.findIndex((i) => i.id === itemId);
-        return atIndex >= 0 ? { item: dossier.items[atIndex], atIndex } : null;
-      })
-      .filter((s): s is { item: DossierItem; atIndex: number } => s !== null)
-      .sort((a, b) => a.atIndex - b.atIndex);
-    const count = snapshots.length;
+    const ids = dossier.items.filter((i) => selectedItems.has(i.id)).map((i) => i.id);
     clearSelection();
-    void showUndoToast({
-      action: () => {
-        snapshots.forEach((s) => removeFromDossier(dossier.id, s.item.id));
-        return snapshots;
-      },
-      undo: (snaps) => {
-        snaps.forEach((s) => restoreDossierItem(dossier.id, s.item, s.atIndex));
-      },
-      message: count === 1 ? 'Elemento rimosso' : `${count} elementi rimossi`,
-    });
+    if (ids.length === 0) return;
+    removeItemsWithUndo(dossier.id, ids, ids.length === 1 ? 'Elemento rimosso' : `${ids.length} elementi rimossi`, trashChanged);
   };
 
   const handleMoveToDossier = (targetDossierId: string) => {
@@ -321,25 +299,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     setOpenPickerGroups(normaGroups);
   };
 
-  // All the act's articles, behind one undo toast that puts them back where they were.
+  // All the act's articles, as one trash entry behind one undo toast.
   const handleRemoveAct = (block: ActBlock) => {
-    const snapshots = block.articles
-      .map((item) => ({ item: item as DossierItem, atIndex: dossier.items.findIndex((i) => i.id === item.id) }))
-      .filter((s) => s.atIndex >= 0)
-      .sort((a, b) => a.atIndex - b.atIndex);
-    if (snapshots.length === 0) return;
-    void showUndoToast({
-      action: () => {
-        snapshots.forEach((s) => removeFromDossier(dossier.id, s.item.id));
-        return snapshots;
-      },
-      undo: (snaps) => snaps.forEach((s) => restoreDossierItem(dossier.id, s.item, s.atIndex)),
-      message: snapshots.length === 1 ? 'Articolo rimosso' : `${snapshots.length} articoli rimossi`,
-    });
+    const ids = block.articles.map((item) => item.id).filter((id) => dossier.items.some((i) => i.id === id));
+    if (ids.length === 0) return;
+    removeItemsWithUndo(dossier.id, ids, ids.length === 1 ? 'Articolo rimosso' : `${ids.length} articoli rimossi`, trashChanged);
   };
 
   const exportDossierJSON = () => {
-    const data = JSON.stringify(dossier, null, 2);
+    const data = JSON.stringify(shareableDossier(dossier), null, 2);
     saveBlob(new Blob([data], { type: 'application/json' }), `${dossier.title.replace(/[^a-z0-9]/gi, '_')}.json`);
   };
 
@@ -392,13 +360,24 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   // The PDF as the page is: notes, then each act once with its articles and
-  // every text, fetched like the reader's (spec §9). Titles come from the
-  // session cache the act blocks already filled.
-  const handleExportPdf = async () => {
+  // every text, fetched like the reader's (spec §9), then the chosen decisions. Titles come from the
+  // session cache the act blocks already filled. `options` is what the export dialog asked for.
+  const handleExportPdf = async ({ excerpts, decisionIds }: DossierPdfOptions) => {
     if (pdfProgress) return;
     setPdfProgress({ done: 0, total: 0 });
     try {
-      const texts = await loadDossierTexts(dossier.items, (done, total) => setPdfProgress({ done, total }));
+      const chosen = new Set(decisionIds);
+      // Texts and decisions load side by side; one count covers both for the dialog.
+      const counts = { texts: { done: 0, total: 0 }, decisions: { done: 0, total: 0 } };
+      const report = () => setPdfProgress({
+        done: counts.texts.done + counts.decisions.done,
+        total: counts.texts.total + counts.decisions.total,
+      });
+      const [texts, decisions, marks] = await Promise.all([
+        loadDossierTexts(dossier.items, (done, total) => { counts.texts = { done, total }; report(); }),
+        loadDossierDecisions(dossier.items, chosen, (done, total) => { counts.decisions = { done, total }; report(); }),
+        loadPdfMarks(dossier.items, { articles: excerpts, decisionIds: chosen }),
+      ]);
       const titles = new Map<string, string | null>();
       await Promise.all(fullLayout.acts.map(async (block) => {
         if (block.isCode) return;
@@ -409,19 +388,24 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             console.error('PDF: act title unavailable for', block.heading, err);
             return null;
           });
-        titles.set(block.key, answer?.title?.trim() || null);
+        // A source that fails now keeps the title the block shows.
+        titles.set(block.key, answer?.title?.trim() || lastActTitle(block.key));
       }));
-      const blocks = buildPdfBlocks(dossier.items, texts, titles);
+      const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
       const doc = writeDossierPdf(
         { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine, exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );
       doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
-      const missing = blocks.reduce((n, b) => n + (b.kind === 'act' ? b.articles.filter((a) => a.missing === 'unavailable').length : 0), 0);
-      if (missing > 0) {
-        showToast(`PDF salvato: ${missing === 1 ? '1 testo non disponibile' : `${missing} testi non disponibili`}`, 'info');
-      }
+      setPdfDialogOpen(false);
+      const missing = countUnavailable(blocks);
+      const unmarked = countMarksUnavailable(blocks);
+      const gaps = [
+        ...(missing > 0 ? [missing === 1 ? '1 testo non disponibile' : `${missing} testi non disponibili`] : []),
+        ...(unmarked > 0 ? [unmarked === 1 ? 'evidenziazioni e note di 1 testo non disponibili' : `evidenziazioni e note di ${unmarked} testi non disponibili`] : []),
+      ];
+      if (gaps.length > 0) showToast(`PDF salvato: ${gaps.join('; ')}`, 'info');
     } catch (err) {
       console.error('Failed to export the dossier PDF:', err);
       showToast('Impossibile creare il PDF del dossier', 'error');
@@ -443,9 +427,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     }
   };
 
-  const handleUpdateDossier = (title: string, description: string, tags: string[]) => {
+  const handleUpdateDossier = (title: string, description: string, tags: string[], kind: DossierKind) => {
     if (editingDossier) {
-      updateDossier(editingDossier.id, { title, description, tags });
+      updateDossier(editingDossier.id, { title, description, tags, kind });
     }
   };
 
@@ -494,7 +478,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               </div>
             )}
             <div className="text-xs md:text-sm text-slate-400 mt-2">
-              Creato il {formatTimestampLong(dossier.createdAt)} · {countsLine}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}
+              {kindLabel(dossier.kind)} · Creato il {formatTimestampLong(dossier.createdAt)} · {countsLine}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}
             </div>
           </div>
 
@@ -526,19 +510,16 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               align="left"
               triggerClassName={SECONDARY_BUTTON}
               items={[
-                { label: 'PDF', icon: Download, onSelect: () => void handleExportPdf(), disabled: !!pdfProgress },
+                { label: 'PDF', icon: Download, onSelect: () => setPdfDialogOpen(true), disabled: !!pdfProgress },
                 { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
                 { label: 'JSON', icon: FileJson, onSelect: exportDossierJSON },
                 { label: snapshotBusy ? 'Salvo lo snapshot…' : 'Salva snapshot', icon: History, onSelect: () => void handleCreateSnapshot(), disabled: snapshotBusy },
               ]}
             >
               <Download size={16} aria-hidden />
-              {pdfProgress ? (
-                <span role="status">Preparo il PDF…{pdfProgress.total > 0 ? ` ${pdfProgress.done} di ${pdfProgress.total}` : ''}</span>
-              ) : (
-                <span className="hidden sm:inline">Esporta</span>
-              )}
+              <span className="hidden sm:inline">Esporta</span>
             </MenuButton>
+            <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={SECONDARY_BUTTON} />
             <MenuButton
               label="Altre azioni"
               triggerClassName={ICON_BUTTON}
@@ -683,6 +664,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                     <DossierActBlock
                       key={block.key}
                       block={block}
+                      act={fullBlocks.get(block.key) ?? block}
                       dragDisabled={hasFilter}
                       isFolded={foldedActs.has(block.key)}
                       onToggleFold={() => toggleFolded(block.key)}
@@ -763,15 +745,23 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         />
       )}
 
+      <DossierPdfDialog
+        isOpen={pdfDialogOpen}
+        onClose={() => setPdfDialogOpen(false)}
+        decisions={fullLayout.decisions}
+        progress={pdfProgress}
+        onExport={(options) => void handleExportPdf(options)}
+      />
+
       <ConfirmDialog
         open={confirmDeleteOpen}
         variant="danger"
         title="Eliminare questo dossier?"
-        message={`"${dossier.title}" verrà rimosso. Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati.`}
+        message={deleteDossierMessage(dossier.title)}
         confirmLabel="Elimina"
         onConfirm={() => {
           setConfirmDeleteOpen(false);
-          deleteDossier(dossier.id);
+          deleteDossierWithUndo(dossier, trashChanged);
           onBack();
         }}
         onCancel={() => setConfirmDeleteOpen(false)}
@@ -781,7 +771,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         open={bulkDeleteConfirmOpen}
         variant="danger"
         title={selectedItems.size === 1 ? 'Eliminare l’elemento selezionato?' : `Eliminare ${selectedItems.size} elementi?`}
-        message="Verranno rimossi da questo dossier. Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati."
+        message={removeSelectionMessage}
         confirmLabel="Elimina"
         onConfirm={confirmBulkDelete}
         onCancel={() => setBulkDeleteConfirmOpen(false)}

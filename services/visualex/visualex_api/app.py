@@ -19,6 +19,7 @@ from visualex_api.tools.config import Settings, HISTORY_LIMIT, RATE_LIMIT, RATE_
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.tools.logging_config import configure_logging, log_request
 from visualex_api.tools.exceptions import (
+    IndexUnavailableError,
     VisuaLexError, ValidationError, ResourceNotFoundError, 
     RateLimitExceededError, get_exception_for_status
 )
@@ -29,7 +30,7 @@ from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_poo
 from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
-from visualex_api.tools.text_op import parse_article_input
+from visualex_api.tools.text_op import article_input_error, parse_article_input
 from visualex_api.tools.cache_warmup import warmup_cache_background
 from visualex_api.tools.cache_manager import get_cache_manager
 from visualex_api.tools.map import extract_codice_details
@@ -246,6 +247,8 @@ class NormaController:
                 status_code = 400
             elif isinstance(error, RateLimitExceededError):
                 status_code = 429
+            elif isinstance(error, IndexUnavailableError):
+                status_code = 503
             
             return jsonify({'error': error.message}), status_code
         
@@ -346,7 +349,7 @@ class NormaController:
         logger.debug("Articles parsed", extra={"articles": articles})
         
         if isinstance(articles, dict) and 'error' in articles:
-            raise ValidationError(articles['error'])
+            raise article_input_error(articles)
 
         # Validate and sanitize annex parameter
         annex_value = data.get('annex')

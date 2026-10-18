@@ -1,13 +1,15 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../../services/trashService', () => ({ trashService: { purge: vi.fn(async () => {}) } }));
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
-    create: vi.fn(), addItem: vi.fn(), reorderItems: vi.fn(), delete: vi.fn(), updateItem: vi.fn(), deleteItem: vi.fn(),
+    create: vi.fn(), addItem: vi.fn(), reorderItems: vi.fn(), delete: vi.fn(), updateItem: vi.fn(),
   },
 }));
 
 import { dossierService } from '../../../services/dossierService';
+import { trashService } from '../../../services/trashService';
 import { appStore } from '../../../store/useAppStore';
 import { useSavePracticeAsDossier } from './useSavePracticeAsDossier';
 import { searchesIntoOnePractice } from '../dossier/openInPractice';
@@ -32,7 +34,7 @@ beforeEach(() => {
     id: `srv-${++counter}`, item_type: 'norm', title: 't', content: {}, position: counter, status: 'unread', created_at: '2026-10-12T00:00:00Z',
   })) as never);
   svc.reorderItems.mockResolvedValue(undefined as never);
-  svc.delete.mockResolvedValue(undefined as never);
+  svc.delete.mockResolvedValue({ trashId: 'trash-d', itemCount: 0 } as never);
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -95,6 +97,8 @@ describe('useSavePracticeAsDossier (spec §7)', () => {
     const { result } = renderHook(() => useSavePracticeAsDossier());
     await act(async () => { await result.current.saveAsNew(id); });
     expect(svc.delete).toHaveBeenCalledWith('srv-d');
+    // The user deleted nothing: the empty dossier does not stay in their trash.
+    await vi.waitFor(() => expect(trashService.purge).toHaveBeenCalledWith('trash-d'));
     expect(s().dossiers).toHaveLength(0);
     expect(s().lastSyncError?.message).toContain('nessun elemento è stato salvato');
     expect(result.current.notice).toBeNull();

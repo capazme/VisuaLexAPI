@@ -110,6 +110,9 @@ async def init_db(
         url,
         echo=echo,
         pool_pre_ping=True,  # Verify connections before use
+        # An error's message never carries the statement's parameters: they hold
+        # user ids and the text of people's notes (see merlt/privacy/).
+        hide_parameters=True,
         pool_size=pool_size,
         max_overflow=max_overflow,
         poolclass=AsyncAdaptedQueuePool,

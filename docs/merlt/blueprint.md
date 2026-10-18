@@ -884,7 +884,7 @@ divergenze qui sotto sono recepite e restano come registro.*
 4. **Nuove route grafo:** `/graph/provisional-review[/:nodeId]` (igiene grafo),
    `/experts/trace/:traceId`, `/experts/feedback/relation`, `/contrib/me/jobs`, più `subgraphCache`.
 5. **Il tracking NON è più solo in-memory.** `tracking_router` ora persiste su Postgres
-   `tracking_events` con fallback buffer; il replay buffer RLCF è persistito su JSON e i pesi su volume
+   `tracking_events` (senza buffer in memoria dall'ottobre 2026: con il DB giù risponde 503; gli eventi scadono, `merlt/privacy/retention.py`); il replay buffer RLCF è persistito su JSON e i pesi su volume
    durabile. La nota "future: PostgreSQL" è obsoleta.
 6. **`GET /api/merlt/features` non esiste** (mai implementato): le capability sono derivate client-side
    in `useMerltFeatures.ts`.

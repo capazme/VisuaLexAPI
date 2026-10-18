@@ -6,15 +6,13 @@ import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
 import { useTour } from '../../../hooks/useTour';
 import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../../../constants/actTypes';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { motion, AnimatePresence } from 'framer-motion';
 import { defaultSearchFilters } from '../../../utils/searchFilters';
-import { legalFetch } from '../../../services/legalFetch';
-import { parseDecisionCitation } from '../../../utils/decisionCitationParser';
+import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 
 interface CommandPaletteProps {
@@ -26,6 +24,9 @@ interface CommandPaletteProps {
    * path. Skips the article step entirely.
    */
   onBrowseStructure?: (params: SearchParams) => void;
+  /** Called once a decision or a topic was put in the practices: the host shows the search page, which
+   *  alone draws them. */
+  onShowSearch?: () => void;
 }
 
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
@@ -40,7 +41,7 @@ function requiresDetails(actValue: string): boolean {
 }
 
 
-export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, onShowSearch }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
     customAliases, trackAliasUsage, openAliasManager, openDecision, openTopicSearch, takeCommandPaletteQuery, commandPaletteQuery
@@ -141,112 +142,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     [presetEntries]
   );
 
-  // Smart citation parsing - include custom aliases for resolution
-  // Es. "art 5 gdpr" risolve "gdpr" in Regolamento UE 679/2016
-  // A court decision ("Cass. civ. 10787/2024") is read first, but only an input that starts with a
-  // court: the norm parser keeps everything else, and an alias trigger of the user's wins over it.
-  const decisionRef = useMemo(
-    () => (inputValue.length >= 4
-      ? parseDecisionCitation(inputValue, { aliasTriggers: customAliases.map(a => a.trigger) })
-      : null),
-    [inputValue, customAliases],
-  );
-
-  const localCitation = useMemo<ParsedCitation | null>(() => {
-    if (!inputValue || inputValue.length < 2 || decisionRef) return null;
-    return parseLegalCitation(inputValue, customAliases);
-  }, [inputValue, customAliases, decisionRef]);
-
-  // Server-side fallback for act names the client does not carry.
-  //
-  // The parser above knows the ~40 acts in constants/actTypes.ts plus the
-  // ABBREVIATION_MAP hand-copied from the backend's NORMATTIVA_SEARCH. The
-  // backend resolver knows 387 names — "statuto dei lavoratori", "legge
-  // fornero", "TUSL", "GDPR" — so a lawyer typing any of them got "Nessun
-  // risultato trovato" and an Enter that could only autocomplete, because
-  // isSearchReady needs an act_type the client had no way to produce.
-  //
-  // Rather than grow a second copy of those tables here (they would drift the
-  // first time the backend gained a name), ask the endpoint that already
-  // resolves them. Only as a FALLBACK: whatever the client recognises today
-  // still wins, so nothing that works now changes.
-  // The answer carries the query it answered, so "is this still current?" is
-  // derived at render instead of reset by a synchronous setState in the effect
-  // (CLAUDE.md gotcha 11 — derive, do not silence the rule).
-  const [serverResult, setServerResult] = useState<{ query: string; citation: ParsedCitation | null } | null>(null);
-
-  // Gated on "not search-ready", not merely "act unnamed". Both shapes reach
-  // here: "statuto dei lavoratori" the client cannot name at all, and "gdpr"
-  // it names as regolamento UE but without the number and year that
-  // isSearchReady requires — so both left the palette on ENTER COMPLETA.
-  const remoteQuery = useMemo(() => {
-    const query = inputValue.trim();
-    return query.length >= 3 && !decisionRef && !isSearchReady(localCitation) ? query : null;
-  }, [inputValue, localCitation, decisionRef]);
-
-  useEffect(() => {
-    if (!remoteQuery) return;
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      legalFetch('/parse_query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: remoteQuery }),
-        signal: controller.signal,
-      })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then(payload => {
-          const parsed = payload?.recognized ? payload.parsed : null;
-          setServerResult({
-            query: remoteQuery,
-            citation: parsed?.act_type
-              ? {
-                  act_type: parsed.act_type,
-                  act_number: parsed.act_number || undefined,
-                  date: parsed.date || undefined,
-                  article: parsed.article || undefined,
-                  annex: parsed.annex || undefined,
-                  // Named by the server's curated tables, not guessed.
-                  confidence: 0.9,
-                }
-              : null,
-          });
-        })
-        .catch(err => {
-          if ((err as Error).name === 'AbortError') return;
-          // Never swallowed (CLAUDE.md gotcha 18): the palette degrades to
-          // local-only matching, but a backend that stopped answering is
-          // visible rather than silent.
-          console.error('Error resolving query server-side:', remoteQuery, err);
-          setServerResult({ query: remoteQuery, citation: null });
-        });
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [remoteQuery]);
-
-  const serverCitation = useMemo(
-    () => (remoteQuery && serverResult?.query === remoteQuery ? serverResult.citation : null),
-    [remoteQuery, serverResult]
-  );
-  const resolvingRemotely = Boolean(remoteQuery) && serverResult?.query !== remoteQuery;
-
-  // The client wins when its own parse is already searchable; otherwise the
-  // server fills in. Nothing that resolves locally today changes.
-  const parsedCitation = useMemo<ParsedCitation | null>(
-    () => (decisionRef ? null : isSearchReady(localCitation) ? localCitation : serverCitation ?? localCitation),
-    [localCitation, serverCitation, decisionRef]
-  );
-
-  const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
-  const citationPreview = useMemo(() => parsedCitation ? formatParsedCitation(parsedCitation) : '', [parsedCitation]);
+  // What the box names (a decision, a norm, a topic): one reading, shared with the search page's field.
+  const { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic } = useSearchQuery(inputValue);
 
   // Reset on close
   useEffect(() => {
@@ -344,26 +241,19 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     );
   }, [catalog.presets]);
 
-  // Words that are neither a decision nor a norm: a topic to look for in the Cassazione's decisions.
-  // A custom alias as the first word is the user's own shortcut, not a topic.
-  const topic = useMemo(() => {
-    const words = inputValue.trim();
-    if (words.length < 3 || !/[\p{L}\p{N}]/u.test(words) || decisionRef || parsedCitation || resolvingRemotely) return null;
-    const first = foldAlias(words.split(/\s+/)[0]);
-    return customAliases.some((a) => foldAlias(a.trigger) === first) ? null : words;
-  }, [inputValue, decisionRef, parsedCitation, resolvingRemotely, customAliases]);
-
   const handleSearchTopic = useCallback(() => {
     if (!topic) return;
     openTopicSearch({ tema: topic }, `Tema: ${topic}`);
     onClose();
-  }, [topic, openTopicSearch, onClose]);
+    onShowSearch?.();
+  }, [topic, openTopicSearch, onClose, onShowSearch]);
 
   const handleOpenDecision = useCallback(() => {
     if (!decisionRef) return;
     openDecision(decisionRef, { fromLink: true });
     onClose();
-  }, [decisionRef, openDecision, onClose]);
+    onShowSearch?.();
+  }, [decisionRef, openDecision, onClose, onShowSearch]);
 
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
@@ -374,15 +264,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     }
 
     if (citationReady) {
-      const params = toSearchParams(parsedCitation);
-      onSearch({
-        ...params,
-        date: params.date ? parseItalianDate(params.date) : '',
-        version: 'vigente',
-        version_date: '',
-        show_brocardi_info: includeBrocardi,
-        filters,
-      });
+      onSearch(citationSearchParams(parsedCitation, { showBrocardi: includeBrocardi, filters }));
       onClose();
     } else if (parsedCitation.act_type) {
       setSelectedAct(parsedCitation.act_type);

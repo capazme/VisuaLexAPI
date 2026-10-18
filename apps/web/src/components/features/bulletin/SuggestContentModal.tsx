@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { X, Lightbulb, Send, AlertCircle } from 'lucide-react';
-import { EnvironmentContentViewer } from '../environments/EnvironmentContentViewer';
+import { EnvironmentContentViewer } from './EnvironmentContentViewer';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { useAppStore } from '../../../store/useAppStore';
 import type { SharedEnvironment, Environment } from '../../../types';
 import type { EnvironmentSelection } from '../../../utils/environmentUtils';
-import { useLeftOutNotice } from '../environments/useLeftOutNotice';
+import { useLeftOutNotice } from './useLeftOutNotice';
 import { travellingSelection } from '../../../utils/decisionAnchorsTravel';
 import { dossierSuggestionPayload } from '../dossier/dossierUtils';
 

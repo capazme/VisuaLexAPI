@@ -9,7 +9,9 @@ import {
   NOT_YET_REASON,
   requestIsHistorical,
   UNRELIABLE_REASON,
+  requestedVersion,
   versionKey,
+  versionLabel,
   versionTabSuffix,
 } from './versionDisplay';
 
@@ -374,5 +376,27 @@ describe('versionKey', () => {
   });
   it('tells the original text from the text in force', () => {
     expect(versionKey({ versione: 'originale' })).not.toBe(versionKey({ versione: 'vigente' }));
+  });
+});
+
+describe('versionLabel — the text a request asks for, in words', () => {
+  it('names the text in force, the original and a day', () => {
+    expect(versionLabel({})).toBe('testo in vigore');
+    expect(versionLabel({ versione: 'vigente' })).toBe('testo in vigore');
+    expect(versionLabel({ versione: 'originale' })).toBe('testo originale');
+    expect(versionLabel({ versione: 'vigente', data_versione: '2015-12-31' })).toBe('testo al 31 dicembre 2015');
+  });
+  it('elides the preposition before 8 and 11 and takes the ordinal for the 1st', () => {
+    expect(versionLabel({ data_versione: '2014-09-08' })).toBe("testo all'8 settembre 2014");
+    expect(versionLabel({ data_versione: '2007-12-11' })).toBe("testo all'11 dicembre 2007");
+    expect(versionLabel({ data_versione: '2020-01-01' })).toBe('testo al 1° gennaio 2020');
+  });
+  it('reads a day before the original, as the tab does, and writes it as an ISO day', () => {
+    expect(requestedVersion({ versione: 'Originale', data_versione: '2015-12-31' })).toEqual({ kind: 'date', date: '2015-12-31' });
+    expect(requestedVersion({ data_versione: '31/12/2015' })).toEqual({ kind: 'date', date: '2015-12-31' });
+    expect(requestedVersion({ versione: 'Originale' })).toEqual({ kind: 'original' });
+    expect(versionLabel({ versione: 'originale', data_versione: '31/12/2015' })).toBe('testo al 31 dicembre 2015');
+    expect(requestedVersion({ data_versione: ' 2015-12-31 ' })).toEqual({ kind: 'date', date: '2015-12-31' });
+    expect(requestedVersion(null)).toEqual({ kind: 'current' });
   });
 });

@@ -113,7 +113,7 @@ router.post('/events/article-viewed', async (req: Request, res: Response): Promi
       return;
     }
     if (err instanceof MerltClientError) {
-      logDeadLetter('article-viewed', req.user.id, merltPayload, err);
+      logDeadLetter('article-viewed', merltPayload, err);
       res.status(503).json({ detail: 'merlt_unavailable' });
       return;
     }
@@ -137,7 +137,7 @@ router.post('/events/article-viewed', async (req: Request, res: Response): Promi
       ingestionJob = { jobId: ensured.jobId, status: ensured.status };
     }
   } catch (err) {
-    logDeadLetter('graph-lazy-trigger', req.user.id, { articleUrn: parsed.data.articleUrn }, err);
+    logDeadLetter('graph-lazy-trigger', { articleUrn: parsed.data.articleUrn }, err);
   }
 
   // MERL-T's tracking endpoint returns { received, timestamp } — there is
@@ -199,7 +199,7 @@ router.post('/events/highlight-annotation', async (req: Request, res: Response):
       return;
     }
     if (err instanceof MerltClientError) {
-      logDeadLetter('highlight-annotation', req.user.id, merltPayload, err);
+      logDeadLetter('highlight-annotation', merltPayload, err);
       res.status(503).json({ detail: 'merlt_unavailable' });
       return;
     }
@@ -255,7 +255,7 @@ router.post('/events/dossier-bookmark', async (req: Request, res: Response): Pro
       return;
     }
     if (err instanceof MerltClientError) {
-      logDeadLetter('dossier-bookmark', req.user.id, merltPayload, err);
+      logDeadLetter('dossier-bookmark', merltPayload, err);
       res.status(503).json({ detail: 'merlt_unavailable' });
       return;
     }
@@ -309,7 +309,7 @@ router.post('/events/citation-clicked', async (req: Request, res: Response): Pro
       return;
     }
     if (err instanceof MerltClientError) {
-      logDeadLetter('citation-clicked', req.user.id, merltPayload, err);
+      logDeadLetter('citation-clicked', merltPayload, err);
       res.status(503).json({ detail: 'merlt_unavailable' });
       return;
     }
@@ -323,11 +323,8 @@ router.post('/events/citation-clicked', async (req: Request, res: Response): Pro
  * Community signals from the Forum (ex Bulletin Board): like, download,
  * suggestion accept/decline. MERL-T `type` is `forum:<action>`.
  *
- * `target_author_id` attribution policy (per docs/merlt-forum-authoring-decision.md):
- *   - like / download   → originalAuthorId of the SharedEnvironment
- *   - suggestion_*      → originalAuthorId of the SuggestionItem
- * Both arrive via payload.originalAuthorId — the route does not decide,
- * the call-site does.
+ * Only the environment is relayed: its author, or a suggestion's, is a third
+ * party who never consented to MERL-T (docs/merlt/decisions/forum-authoring.md).
  */
 router.post('/events/forum-signal', async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -368,7 +365,7 @@ router.post('/events/forum-signal', async (req: Request, res: Response): Promise
       return;
     }
     if (err instanceof MerltClientError) {
-      logDeadLetter('forum-signal', req.user.id, merltPayload, err);
+      logDeadLetter('forum-signal', merltPayload, err);
       res.status(503).json({ detail: 'merlt_unavailable' });
       return;
     }

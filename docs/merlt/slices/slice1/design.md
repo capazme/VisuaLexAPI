@@ -170,7 +170,7 @@ tests/merlt.test.ts                  [ARCHIVE in tests/_archived_pre_slice1/]
 ```prisma
 model MerltConsent {
   userId          String    @id
-  consentBase     Boolean   @default(false)    // invio eventi pseudonimizzati
+  consentBase     Boolean   @default(false)    // invio eventi (never built: events carry the user id in clear)
   consentFull     Boolean   @default(false)    // profilo authority calcolato
   consentVersion  Int                           // versione testo legale accettato
   acceptedAt      DateTime

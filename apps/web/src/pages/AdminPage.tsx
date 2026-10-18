@@ -143,7 +143,7 @@ export function AdminPage() {
         total: response.pagination.total,
       });
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel caricamento degli ambienti');
+      setError(getErrorMessage(err) || 'Errore nel caricamento dei dossier pubblicati');
     } finally {
       setEnvLoading(false);
     }
@@ -203,7 +203,7 @@ export function AdminPage() {
       await adminService.withdrawSharedEnvironment(id);
       setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: false } : e));
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel ritirare l\'ambiente');
+      setError(getErrorMessage(err) || 'Errore nel ritirare il dossier pubblicato');
     } finally {
       setActionLoading(false);
     }
@@ -215,7 +215,7 @@ export function AdminPage() {
       await adminService.republishSharedEnvironment(id);
       setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: true } : e));
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nel ripubblicare l\'ambiente');
+      setError(getErrorMessage(err) || 'Errore nel ripubblicare il dossier pubblicato');
     } finally {
       setActionLoading(false);
     }
@@ -229,7 +229,7 @@ export function AdminPage() {
       setEnvironments(prev => prev.filter(e => e.id !== showDeleteEnvConfirm));
       setShowDeleteEnvConfirm(null);
     } catch (err) {
-      setError(getErrorMessage(err) || 'Errore nell\'eliminazione dell\'ambiente');
+      setError(getErrorMessage(err) || 'Errore nell\'eliminazione del dossier pubblicato');
     } finally {
       setActionLoading(false);
     }
@@ -473,7 +473,7 @@ export function AdminPage() {
                   )}
                 >
                   <Package size={16} />
-                  Ambienti
+                  Forum
                 </button>
                 <button
                   onClick={() => setActiveTab('reports')}
@@ -900,7 +900,7 @@ export function AdminPage() {
                 <div className="flex items-center gap-2">
                   <Package size={20} className="text-gray-500" />
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Ambienti Pubblicati ({envPagination.total})
+                    Dossier pubblicati ({envPagination.total})
                   </h2>
                 </div>
               </div>
@@ -913,7 +913,7 @@ export function AdminPage() {
                       type="text"
                       value={envSearch}
                       onChange={(e) => setEnvSearch(e.target.value)}
-                      placeholder="Cerca ambiente..."
+                      placeholder="Cerca un dossier pubblicato…"
                       className="pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64"
                     />
                   </div>
@@ -950,12 +950,12 @@ export function AdminPage() {
               {envLoading && environments.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
                   <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-                  Caricamento ambienti...
+                  Caricamento dei dossier pubblicati…
                 </div>
               ) : environments.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
                   <Package size={32} className="mx-auto mb-2 opacity-50" />
-                  Nessun ambiente trovato
+                  Nessun dossier pubblicato trovato
                 </div>
               ) : (
                 <>
@@ -964,7 +964,7 @@ export function AdminPage() {
                       <thead className="bg-gray-50 dark:bg-gray-700/50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            Ambiente
+                            Dossier
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Autore
@@ -1078,7 +1078,7 @@ export function AdminPage() {
                   {envPagination.pages > 1 && (
                     <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                       <p className="text-sm text-gray-500">
-                        Pagina {envPagination.page} di {envPagination.pages} ({envPagination.total} ambienti)
+                        Pagina {envPagination.page} di {envPagination.pages} ({envPagination.total} dossier pubblicati)
                       </p>
                       <div className="flex items-center gap-2">
                         <button
@@ -1175,7 +1175,7 @@ export function AdminPage() {
                           </span>
                         </div>
                         <p className="text-sm text-gray-700 dark:text-gray-300">
-                          Ambiente: <span className="font-medium">{r.environment.title}</span>
+                          Dossier pubblicato: <span className="font-medium">{r.environment.title}</span>
                         </p>
                         {r.details && (
                           <p className="mt-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
@@ -1448,10 +1448,10 @@ export function AdminPage() {
                 <Trash2 size={24} />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Elimina Ambiente
+                Elimina dal Forum
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Sei sicuro di voler eliminare questo ambiente? L'azione eliminerà permanentemente l'ambiente e tutte le sue versioni.
+                La copia pubblicata e tutte le sue versioni vengono eliminate dal Forum per sempre. Il dossier del suo autore resta com'è.
               </p>
               <div className="flex justify-center gap-3">
                 <button

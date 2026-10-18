@@ -20,7 +20,7 @@
  */
 import type { Annotation, Highlight } from '../types';
 import { HIGHLIGHT_STYLES } from './highlightColors';
-import type { ArticleStructure, DecorationKind, StructureBlock } from './articleStructure';
+import type { ArticleStructure, DecorationKind, StructureBlock, TextRange } from './articleStructure';
 import {
   groupAnchorsByBlock,
   resolveAnchors,
@@ -47,9 +47,19 @@ export interface RenderArticleInput {
   threads?: readonly LocatedThread[];
   /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
   focusedThreadId?: string | null;
+  /**
+   * Render only the blocks inside this range of `raw` (the comparison draws a comma at a time).
+   * The range is whole blocks; offsets stay the text's own.
+   */
+  only?: TextRange;
+  /**
+   * Words a comparison marks, as ranges of `raw`: wrapped in `.vlx-del` (deleted) or `.vlx-ins`
+   * (inserted). Elements around existing words, never text of their own.
+   */
+  changes?: ReadonlyArray<TextRange & { kind: 'del' | 'ins' }>;
 }
 
-export type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread';
+export type MarkKind = 'marker' | DecorationKind | 'key' | 'key-head' | 'note' | 'highlight' | 'thread' | 'change';
 
 /**
  * Nesting order, outermost first. The printed enumerator is outermost and so
@@ -67,6 +77,12 @@ const RANK: Record<MarkKind, number> = {
   note: 4,
   highlight: 5,
   thread: 6,
+  // A decision's key passage (computed, never the reader's): inside the reader's own marks, so CSS
+  // can drop its sign where a highlight covers the same words; its head (the label) inside it.
+  key: 7,
+  'key-head': 7,
+  // A comparison's changed words (an article's, never a decision's: the two never meet).
+  change: 7,
   'mod-paren': 8,
   'rubric-paren': 8,
   hidden: 9,
@@ -169,6 +185,8 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   }
 
   const structure = input.structure;
+  const changes = input.changes ?? [];
+  for (const c of changes) pushRaw(c.start, c.end, 'change', `<span class="vlx-${c.kind}">`, '</span>');
   if (!structure) return renderSpan(raw, 0, raw.length, marks, true);
   if (!coversText(structure, raw.length)) {
     // A structure parsed from another text (a stale memo, a caller bug) would
@@ -178,19 +196,26 @@ export function renderArticleHtml(input: RenderArticleInput): string {
       blocks: structure.blocks.length,
       lastEnd: structure.blocks[structure.blocks.length - 1]?.end ?? null,
     });
-    return renderSpan(raw, 0, raw.length, marks, true);
+    return renderSpan(raw, input.only?.start ?? 0, input.only?.end ?? raw.length, marks, true);
   }
 
   for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
   const groups = input.signs ? groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors]) : null;
-  return renderBlocks(raw, structure, marks, groups);
+  return renderBlocks(raw, structure, marks, groups, input.only);
 }
 
-function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[], groups: BlockAnnotations[] | null): string {
+function renderBlocks(
+  raw: string,
+  structure: ArticleStructure,
+  marks: Mark[],
+  groups: BlockAnnotations[] | null,
+  only?: TextRange,
+): string {
   const parts: string[] = [];
   const tail = structure.updates;
   let inTail = false;
   for (const [index, block] of structure.blocks.entries()) {
+    if (only && (block.end <= only.start || block.start >= only.end)) continue;
     if (tail && !inTail && block.start >= tail.start) {
       inTail = true;
       // Folded by CSS through a class on the container (useArticleTextInteractions),

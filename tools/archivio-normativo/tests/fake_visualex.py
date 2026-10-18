@@ -132,7 +132,7 @@ class FakeVisuaLex:
         numbers = [raw.strip().lower().replace(" ", "-") for raw in str(body.get("article", "")).split(",")]
         rejected = next((n for n in numbers if n in s["reject_numbers"]), None)
         if rejected is not None:
-            return web.json_response({"error": f"Invalid article format: {rejected}"}, status=400)
+            return web.json_response({"error": f"Formato dell'articolo non valido: «{rejected}»"}, status=400)
         annex = body.get("annex") if body.get("annex") not in (None, "") else s["annex"]
         lines = []
         for number in numbers:

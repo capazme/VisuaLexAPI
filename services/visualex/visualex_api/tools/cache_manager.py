@@ -15,6 +15,12 @@ log = structlog.get_logger()
 
 CacheBackend = Any  # PersistentCache or RedisCache — same async get/set interface
 
+# The Union's courts' decisions that cite an article: three days. CELLAR answers in under a second
+# (0.06 to 0.8 s measured on 13 October 2026), so the cache spares the endpoint rather than the
+# reader. The citation fragments are indexed late (weeks), so a fresher list would not be a more
+# complete one.
+EU_CASE_LAW_TTL = 3 * 24 * 3600
+
 
 _redis_fallback_warned = False
 
@@ -84,6 +90,8 @@ class CacheManager:
             "decisions_pending": _create_cache("decisions_pending", ttl=24 * 3600),
             # One page of /search_decisions, per query: a day.
             "decisions_search": _create_cache("decisions_search", ttl=24 * 3600),
+            # The Union's courts' decisions that cite an article (decisions/eu_case_law.py).
+            "eu_case_law": _create_cache("eu_case_law", ttl=EU_CASE_LAW_TTL),
             # A found act date never changes: keep it a year (act_dates.py).
             "act_dates": _create_cache("act_dates", ttl=365 * 24 * 3600),
         }

@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import type { DossierKind, StudyImportReport } from '../types';
 
 // API types matching backend response format
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
@@ -25,7 +26,11 @@ export interface DossierApi {
   description?: string | null;
   color?: string | null;
   tags?: string[];
+  kind?: DossierKind;
   is_pinned: boolean;
+  // The owner's copy in the Forum, or null.
+  published?: { shared_environment_id: string; version: number; is_active: boolean; updated_at: string } | null;
+  forum_blocked?: boolean;
   created_at: string;
   updated_at: string;
   items: DossierItemApi[];
@@ -36,6 +41,7 @@ export interface DossierCreate {
   description?: string;
   color?: string;
   tags?: string[];
+  kind?: DossierKind;
 }
 
 export interface DossierUpdate {
@@ -44,6 +50,7 @@ export interface DossierUpdate {
   color?: string | null;
   tags?: string[];
   isPinned?: boolean;
+  kind?: DossierKind;
 }
 
 export interface DossierItemCreate {
@@ -105,6 +112,14 @@ export const dossierService = {
     return response.data;
   },
 
+  /**
+   * New dossiers di studio from content the app holds (a ready-made pack, an old environment link): filtered and
+   * imported by the server (spec D9, D11c, D12). Never changes an existing dossier.
+   */
+  async importStudy(content: unknown, switches: { addNotes: boolean; addHighlights: boolean } = { addNotes: true, addHighlights: true }): Promise<StudyImportReport> {
+    return tracked(async () => (await apiClient.post('/dossiers/import-study', { content, ...switches })).data);
+  },
+
   // Create dossier
   async create(data: DossierCreate): Promise<DossierApi> {
     return tracked(async () => (await apiClient.post('/dossiers', data)).data);
@@ -115,9 +130,9 @@ export const dossierService = {
     return tracked(async () => (await apiClient.put(`/dossiers/${id}`, data)).data);
   },
 
-  // Delete dossier
-  async delete(id: string): Promise<void> {
-    await tracked(() => apiClient.delete(`/dossiers/${id}`));
+  /** Moves the dossier to the trash for 30 days (question 160): the entry's id is what «Annulla» restores. */
+  async delete(id: string): Promise<{ trashId: string; itemCount: number }> {
+    return tracked(async () => (await apiClient.delete(`/dossiers/${id}`)).data);
   },
 
   // Add item to dossier
@@ -130,9 +145,13 @@ export const dossierService = {
     return tracked(async () => (await apiClient.put(`/dossiers/${dossierId}/items/${itemId}`, data)).data);
   },
 
-  // Delete dossier item
-  async deleteItem(dossierId: string, itemId: string): Promise<void> {
-    await tracked(() => apiClient.delete(`/dossiers/${dossierId}/items/${itemId}`));
+  /**
+   * Moves entries of one dossier to the trash for 30 days, as ONE trash entry (question 181):
+   * `trashId` is what «Annulla» restores, with the entries' own ids. `notFound` lists ids that
+   * were not in the dossier any more; the call fails (404) when none was.
+   */
+  async trashItems(dossierId: string, itemIds: string[]): Promise<{ trashId: string; moved: string[]; notFound: string[] }> {
+    return tracked(async () => (await apiClient.post(`/dossiers/${dossierId}/trash-items`, { itemIds })).data);
   },
 
   // A note, in the dossier or about one of its articles (the route Claude's notes take too).

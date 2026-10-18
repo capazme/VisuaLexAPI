@@ -112,8 +112,8 @@ apps/web/src/
 │   │   ├── workspace/         # Study Mode, article navigation (the reading tables are in features/practice/)
 │   │   │   └── StudyMode/     # Distraction-free study mode
 │   │   ├── history/           # Search history
-│   │   ├── dossier/           # Research collections
-│   │   └── environments/      # Environment snapshots
+│   │   ├── dossier/           # Research collections (di lavoro, di studio)
+│   │   └── bulletin/          # The Forum: published dossiers, ready-made study dossiers, the environments' archive
 │   │
 │   ├── layout/                # Layout components
 │   │   ├── Layout.tsx         # Main layout wrapper
@@ -227,7 +227,8 @@ apps/web/src/
 │   ├── / (index)        → SearchPage
 │   ├── /dossier         → DossierPage
 │   ├── /history         → HistoryView
-│   └── /environments    → EnvironmentPage
+│   ├── /forum           → BulletinBoardPage
+│   └── /environments    → redirects to /forum (keeps ?import=)
 
 /login                   → LoginPage (public)
 /register                → RegisterPage (public)
@@ -252,7 +253,7 @@ dossiers: Dossier[]
 annotations: Annotation[]
 highlights: Highlight[]
 quickNorms: QuickNorm[]
-environments: Environment[]
+environments: Environment[]   // read-only: the Forum's archive
 
 // UI State
 sidebarVisible: boolean

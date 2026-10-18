@@ -13,6 +13,7 @@ import type {
   CreateSuggestionPayload,
   AddSuggestionItemsPayload,
   UpdateEnvironmentWithVersionPayload,
+  StudyImportReport,
 } from '../types';
 
 export interface ListSharedEnvironmentsParams {
@@ -100,6 +101,15 @@ export const sharedEnvironmentService = {
    */
   async download(id: string): Promise<DownloadResponse> {
     const response = await apiClient.post(`/shared-environments/${id}/download`);
+    return response.data;
+  },
+
+  /**
+   * «Aggiungi ai miei dossier»: the item becomes the user's study dossiers, in one request (spec D8).
+   * Counts as a download.
+   */
+  async addToMyDossiers(id: string, switches: { addNotes: boolean; addHighlights: boolean }): Promise<StudyImportReport> {
+    const response = await apiClient.post(`/shared-environments/${id}/download`, switches);
     return response.data;
   },
 

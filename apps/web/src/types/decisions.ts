@@ -144,12 +144,21 @@ export type SearchDecisionsAnswer =
       modo: 'indice' | 'testo';
       archivio: DecisionArchive | null;
       archivio_dal: string | null;
+      /** The matches per decision year, newest first, over every year whatever the range; absent when
+       *  the archive sent no counts. In index mode they count like `totale`, before the citation re-check. */
+      anni?: Array<{ anno: number; n: number }>;
       decisioni: DecisionSearchHit[];
     }
   | { esito: 'non_supportata' }
   | { esito: 'richiesta_non_valida'; errori: Record<string, string> }
   | { esito: 'fonte_non_raggiungibile'; fonte: string }
   | { esito: 'errore_interno' };
+
+/** The years a search keeps (deposit years); one bound alone is an open range. */
+export interface DecisionSearchYears {
+  dal?: number;
+  al?: number;
+}
 
 /** A decision kept in a dossier: its identity and what the row shows, never its text. */
 export interface DossierSentenzaData extends DecisionIdentity {
@@ -161,3 +170,24 @@ export interface DossierSentenzaData extends DecisionIdentity {
   cause_riunite?: string[];
   etichetta: string;
 }
+
+/** One decision of the Union's courts that cites an article (`/search_eu_case_law`, eu_case_law.py):
+ *  `identita` is the shape `/fetch_decision` takes, `celex` the decision's own, `data` null when the
+ *  source gave none. Only a judgment opens with the CGUE reader; an order or an opinion opens on EUR-Lex. */
+export interface EuCaseLawDecision {
+  corte: 'corte_giustizia_ue' | 'tribunale_ue';
+  causa: string;
+  ecli: string | null;
+  data: string | null;
+  tipo: 'JUDG' | 'ORDER' | 'OPIN_AG';
+  celex: string;
+  identita: DecisionIdentity;
+}
+
+/** The answers `/search_eu_case_law` writes; `fonte` is also `quota`, `rete` or `risposta <status>` when the web app made it up. */
+export type EuCaseLawAnswer =
+  | { esito: 'risultati'; celex: string; articolo: string; totale: number; troncato: boolean; decisioni: EuCaseLawDecision[] }
+  | { esito: 'non_supportata' }
+  | { esito: 'richiesta_non_valida'; errori: Record<string, string> }
+  | { esito: 'fonte_non_raggiungibile'; fonte: string }
+  | { esito: 'errore_interno' };

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const getHistory = vi.fn();
@@ -9,6 +9,8 @@ vi.mock('../../../services/historyService', () => ({
   clearHistory: vi.fn(),
 }));
 vi.mock('./NormaChangesSection', () => ({ NormaChangesSection: () => null }));
+const fetchDecisionCached = vi.fn();
+vi.mock('../../../utils/decisionFetchCache', () => ({ fetchDecisionCached: (...a: unknown[]) => fetchDecisionCached(...a) }));
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi.fn() }) }));
 
 import { appStore } from '../../../store/useAppStore';
@@ -26,15 +28,22 @@ function mount() {
 
 beforeEach(() => {
   getHistory.mockReset();
+  fetchDecisionCached.mockReset();
+  fetchDecisionCached.mockResolvedValue({ esito: 'non_trovata', motivo: 'inesistente' });
   appStore.setState({ practices: [], activePracticeId: null, phoneReader: null });
 });
 
 describe('HistoryView — decisions', () => {
-  it('lists a decision by its short citation and reopens it in a practice', async () => {
+  it('lists a decision by its short citation, previews it, and reopens it in a practice from the preview', async () => {
     getHistory.mockResolvedValue([decision]);
     mount();
     const buttons = await screen.findAllByRole('button', { name: /Cass\. civ\., n\. 99999\/2024/ });
-    fireEvent.click(buttons[0]);
+    expect(buttons[0]).toHaveAttribute('aria-haspopup', 'dialog');
+    await act(async () => { fireEvent.click(buttons[0]); });
+    expect(fetchDecisionCached).toHaveBeenCalledWith({ corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 });
+    expect(appStore.getState().practices).toEqual([]);
+    expect(screen.getByTestId('where').textContent).toBe('/history');
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apri la sentenza' }));
     expect(appStore.getState().practices.flatMap((p) => p.decisions.map((d) => d.reference))).toEqual([
       { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 },
     ]);

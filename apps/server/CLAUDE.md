@@ -66,7 +66,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   replayed refresh token the whole grant. Introspection answers only the MCP
   server's credential (`mcp-omnilex`, HTTP Basic, `OAUTH_MCP_CLIENT_SECRET`).
   `GET`/`DELETE /api/oauth/grants` list and revoke the user's connected
-  applications. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
+  applications. `GET /api/oauth/connection` gives the «Collega un'app AI» page the MCP
+  address (`OAUTH_MCP_RESOURCE`; null in production when it is a loopback address, the
+  compose default of a stack without `MCP_PUBLIC_URL`) and every scope worded as the
+  consent page words it (`SCOPE_LABELS`); session only, like every `/api/oauth` route but
+  the quota. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
   at most every ten minutes: never fire-and-forget it, a background sweep
   deadlocked the test suite's TRUNCATE.
 - **Exchanged tokens: how the MCP server acts for a user** (spec section 5).
@@ -98,6 +102,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and never from a body; answered as `created_by: { clientName } | null`.
   Every dossier and item answer goes through `serializeDossier`/`serializeItem`
   in `dossierController.ts`: add a field there, not in a route.
+  A dossier has a `kind`, `lavoro` (a practice: it may hold a client's data; the default, and
+  what every dossier older than the column became) or `studio` (a topic studied: a dossier
+  taken from a Forum suggestion is one); `POST`/`PUT /dossiers` take it. Each dossier answer
+  carries `published` — its copy in the Forum (`SharedEnvironment.sourceDossierId`, unique,
+  `SET NULL`): `{ shared_environment_id, version, is_active, updated_at }` or null; the link is
+  the owner's alone and never part of the Forum's content. A dossier in the trash keeps its kind,
+  and its copy stays published, linked again on restore if still the user's and unlinked (spec
+  `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`).
   `POST /api/dossiers/:id/notes` `{ text, aboutItemId? }` (user session and
   exchanged tokens with `dossier:write`): plain text, 1–4,000 characters; with
   `aboutItemId` the note is about a norm entry of the same dossier as a whole
@@ -105,8 +117,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   A note moved to another dossier loses its `about_item_id`; a client treats one
   that points outside its dossier as a plain note. `PUT /api/dossiers/:id/items/:itemId`
   `{ aboutItemId: id | null }` reattaches or detaches a note (only a note; user
-  session only, the route is not in the delegated table): the web app's undo
-  restores an article with a new id and points its notes at it.
+  session only, the route is not in the delegated table). An undone removal on the
+  web no longer needs it: the trash restores an entry with its own id (question 181).
   `assertArticleOfDossier` is the one check behind both routes.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
@@ -143,10 +155,17 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   so a `PATCH` in flight finishes before the payload is read and one that comes
   after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
   saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
-  `/lingo/cards/trash` — the two dossier routes for exchanged tokens only,
-  whose own deletions in the web app stay immediate; the card trash is open to
-  the web app too: a deletion by the user's session is stored with no client,
-  no name and no grant (`DeletedBy` all null) and listed with
+  `/lingo/cards/trash` — `/dossiers/:id/trash` is for exchanged tokens only; the
+  card trash and `trash-items` are open to the web app too (a session's `trash-items` takes
+  up to 5000 ids, an exchanged token's 1 to 50), and so are the web app's own deletions: `DELETE /dossiers/:id` moves
+  the whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
+  once), whatever it holds (`trashDossier` with no `seenItemIds`), answering
+  `{ trashId, itemCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
+  moves that one entry (question 181, «ok come raccomandi»), answering
+  `{ trashId, moved, notFound }`, as `trash-items` does for a selection: one trash entry per action,
+  restored with the entries' ids, a note's `aboutItemId` and `createdBy`. Nothing the web app reaches
+  deletes an entry for good any more. A deletion by the user's session is stored with no client,
+  no name and no grant (`BY_THE_USER`, `DeletedBy` all null) and listed with
   `byApplication: false`, while one through a connected application is
   `byApplication: true` even when its name is unknown. `GET /api/trash`,
   `POST /api/trash/:id/restore {targetDossierId?}`, `DELETE /api/trash/:id` are the user's session's.
@@ -209,26 +228,73 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
-- **Published environments** carry dossiers; their entries are rebuilt from closed values when
-  an environment is published, its content updated or an older version restored
-  (`utils/environmentDossiers.ts`): norms through `schemas/normEntry.ts`, decisions through
-  `rebuildDecisionEntry` in `schemas/decisionItem.ts` (unknown keys refused, the label
-  recomputed, a missing one supplied), notes only as text of at most `MAX_NOTE_LENGTH`; around
-  its data an item keeps only its id and date when they are strings, its type and the star
-  (`status: 'important'`, also when it travelled inside the data as `_dossierMeta`). An entry that cannot be rebuilt, or of an
-  unknown type, refuses the operation with an Italian 400 naming the dossier, the entry and why:
-  whoever applies the environment has those entries cited to them, in the MCP deletion dialog
-  too. The web rebuilds them again on import.
+- **The Forum's content** (`SharedEnvironment.content`; spec
+  `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D6–D7). The server trusts
+  none of it: `utils/publishedContent.ts` rebuilds every row from an allow-list — a dossier's
+  title, description and tags; its entries through `utils/environmentDossiers.ts` (norms through
+  `schemas/normEntry.ts`, decisions through `rebuildDecisionEntry` with the label recomputed, notes
+  as text of at most `MAX_NOTE_LENGTH`, an entry keeping only its type, date, star and a note's
+  entry); notes and highlights (key and article id without `::art::`, text, anchor, a non-negative
+  offset, a known colour — a note whose anchor has no valid offset stays, without the anchor); quick norms and aliases (label or trigger, the search's known
+  parameters, a source's own address) — and drops everything else: user ids, `originalAuthor`,
+  `sourceSuggestionId`, `bookmarkId`, usage counts, MCP provenance, any unlisted key. Row ids become
+  positional (`d1`, `d1-2`, `a3`, `h1`, `q1`, `c1`), a note's `aboutItemId` following its entry.
+  Text and anchors travel as stored (root rule 23). On a publication or an update the first row
+  that does not pass refuses the operation with an Italian 400 naming it; restoring a version
+  refuses a bad entry and leaves out other bad rows; **every read** (list, mine, detail,
+  download) goes through it too and leaves out what does not pass, so items published before the
+  filter answer only what it allows, with no row rewritten.
+  **Published from a dossier** (`sourceDossierId` on `POST /shared-environments`, the caller's
+  dossier or 404; a second publication of it 409, the unique index's P2002 too): exactly one
+  dossier, no quick norms or aliases, notes and highlights only when their switch is on, and the
+  dossier inside named by the item's title, description and tags, never the private dossier's
+  name — kept so by `PUT` (a new name rewrites it without a new version; a new content sets the two
+  switches from what it holds, so a later version may carry notes the first had none of; `coexist`
+  refused) and by a restore. The link is answered to the owner only (`sourceDossierId`, `withdrawnByAdmin`), never
+  changed after the publication. **A withdrawn item** is a 404, like a missing one, to everyone
+  but its owner and an admin on detail, like, download, versions, report, a new suggestion and
+  added items; the list shows active items only, and a proposer's sent list keeps only the id of a
+  withdrawn item. An admin's withdrawal stamps `withdrawn_by_admin_at` (also on an item its author
+  had withdrawn first), and the author's republish — or a `coexist` copy — then answers 403 until
+  an admin republishes it (owner, question 190). The dossier it came from is stamped too
+  (`dossiers.forum_blocked_at`, answered as `forum_blocked`, kept through the trash): the author may
+  delete the copy but not publish the dossier again until an admin republishes the copy or lifts
+  the block — both also reach a dossier waiting in the trash, whose stored row carries the block (`GET /admin/forum-blocks` — owner and date, never the dossier's private name —
+  and `DELETE /admin/forum-blocks/:dossierId`). Messages the Forum shows are Italian (the daily limit: «Puoi pubblicare
+  al massimo 5 dossier al giorno: riprova domani.»).
+- **Study dossiers from content** (`services/studyImport.ts`, spec D8–D9, D11–D12): the one way
+  content becomes a user's dossiers — `POST /shared-environments/:id/download` with
+  `{ addNotes, addHighlights }` («Aggiungi ai miei dossier»; without a body an older client still
+  gets the filtered content), `POST /environments/:id/recover` («Recupera i dossier» from the
+  archive) and `POST /dossiers/import-study { content, addNotes?, addHighlights? }` (packs, old
+  links, at most 1 MB; session only, not delegated). Each spends one of `IMPORTS_PER_HOUR` (30) per
+  user (`spendStudyImport`, 429 in Italian; a limiter failure lets it through). The content is read through the allow-list
+  (`readableContent`, which counts what it leaves out as `refused`); each dossier becomes a **new**
+  `studio` dossier (never an existing one changed), entries as the web writes them (title, the star
+  in `_dossierMeta`, a note's `aboutItemId` following its entry); notes and highlights go under the
+  key the web reads (`wireNormaKey`: `<key>::art::<articleId>`, a decision's `<decisionKey>::art::`),
+  a highlight's `endOffset` from its text's length, one identical (same key, text, anchor, offsets,
+  compared exactly) to the user's skipped; a legacy item's quick norms and aliases merge by label
+  (case folded) and trigger (exact). The user's rows are read first, then everything — a download's
+  count too — is written in one transaction (30 s): a database error rolls it all back, a skip
+  never does. Rows from someone else's item carry
+  `originalAuthorId` (the «da @utente» chip); notes live on the article, so they outlive the study
+  dossier. A download counts once per non-owner request. The suggestion «take» stores a note on a
+  decision under its `::art::` key too (before 14 October 2026 it wrote an empty key), and refuses
+  a highlight with no offset (400) instead of marking the article's first characters.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
-  (the forum entity) — a personal env can be promoted, the tables stay distinct.
+  (the forum entity), the tables stay distinct. Since «Ambienti» went into the Forum the web
+  app only lists, exports, recovers and deletes them (the archive, spec
+  `2026-10-13-environments-into-forum` D11b); the create and update routes are still served.
 - **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
   entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
   the controller maps Prisma P2002 to 409.
-- **Scoped bulk deletes**: `DELETE /annotations` and `DELETE /highlights`, both
-  scoped to `req.user.id`. Intended caller is `applyEnvironment(replace)` ONLY —
-  do not wire into end-user UI without a dedicated confirm flow.
+- **No bulk delete of notes or highlights**: `DELETE /annotations` and `DELETE /highlights`
+  (one request that wiped all of a user's notes, for good) went with environments' «Sostituisci»,
+  their only caller (spec `2026-10-13-environments-into-forum`, D10; the owner's answer 185).
+  Notes and highlights are deleted one at a time.
 - Dossier item mutations are scoped to their dossier (IDOR fix — keep it that
   way when adding item routes). `POST`/`GET /dossiers/:id/snapshots` are
   scoped to the owner the same way. Write-only from the UI today ("Snapshot"
@@ -400,7 +466,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   saves a new one numbered above the highest (two at once: the unique index refuses the second,
   409). A version is never updated or deleted: acceptances and cards point at it with
   `RESTRICT`. Version 1 of each key is written by the migration that creates the key
-  (`20261019100000_lingo_validation` for `PROPOSTA_SCHEDA`, `20261021100001_merlt_privacy_notice` for
+  (`20261019100000_lingo_validation` for `PROPOSTA_SCHEDA`, `20261024100001_merlt_privacy_notice` for
   `INFORMATIVA_MERLT`, the MERL-T notice: a key added to the enum cannot be used in the transaction
   that added it, hence the second migration). The MERL-T notice is accepted through the consent
   route, not `LingoAccettazioneTesto`: a person answers it with a level. `GET /auth/me` and the login answer
@@ -423,8 +489,34 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   again inside it (404, nothing written), a second grade the same Rome day answered
   `registrata: false` with nothing written; otherwise FSRS's `review` with the elapsed
   Rome days, the state row upserted (`dueAt` = 00:00 Rome of the due day, `reps`,
-  `lapses`) and a log row appended. `GET`/`PUT /preferenze`: the daily goal (1–200,
-  default 20) and the community subjects; `GET` never creates the row.
+  `lapses`) and a log row appended. `GET`/`PUT /preferenze`: the daily goal of new cards
+  (1–200, default 20), the review goal `ripassiAlGiorno` (1–200, default 10) and the
+  community subjects; `GET` never creates the row.
+- **The streak and the progress dashboard** (spec
+  `docs/superpowers/specs/2026-10-13-studia-progress-design.md`; session only, like the rest
+  of `/api/lingo/srs`). `LingoGiornataStudio` (`lingo_giornate_studio`) holds one row per user
+  and Rome day: reviews, first reviews, wrong ones, `coda_finita`, `valido` (the day counts:
+  at least `ripassiAlGiorno` reviews, or the whole day's queue finished). `lingo/studyDays.ts`
+  writes it and nothing else does: `recordGradeDay`, inside the grade's transaction after the
+  log row (the row created `ON CONFLICT DO NOTHING`, then locked `FOR UPDATE`, so racing grades
+  of one user both count); `markQueueFinished`, when a read of the session (not narrowed to a
+  subject) or of the progress finds the queue finished, so a day with nothing to do counts;
+  `recountToday`, when the goal changes (past days stay as stored). The trash never touches the
+  rows, so trashing a studied card does not rewrite a past day. `lingo/todayQueue.ts`
+  `queueFinished` is the one definition of a finished queue (nothing due in the whole scope, no
+  new slot or no new card left), and it is false for someone who never reviewed a card in scope.
+  `lingo/streak.ts` `computeStreak` is the one definition of the streak: one missed day in seven
+  is a rest (`REST_SPACING_DAYS`), today still open never breaks it. The grade's answer carries
+  `oggi: { giorno, ripassi, obiettivo, raggiunto, appenaRaggiunto, serie }` when the grade is recorded;
+  `appenaRaggiunto` is true on the one grade that made the day count. `GET /progressi?materia=`
+  (`lingo/progress.ts`): `oggi`, `serie`, `stati` (new / learning / consolidated at
+  `CONSOLIDATED_DAYS` = 21, `lingo/cardMaturity.ts`), `materie` (all five), `calendario`
+  (26 weeks from a Monday, whole-day rows; narrowed to a subject, its counts from the log, the
+  flags still the whole day's), `prossimi` (14 days, overdue counted today). **In SQL a review's
+  Rome day is `(data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome'`**: the review
+  columns are `TIMESTAMP` without a zone holding UTC, and `AT TIME ZONE 'Europe/Rome'` alone
+  reads them as Rome time (off by one or two hours). A `DATE` column travels through Prisma as
+  UTC midnight: `dayToDate` / `dateToDay`, never `romeDay`.
 - **`lingo/studyDay.ts`** — what «a day» is (spec decision 18): `romeDay`, `daysBetween`
   and `startOfRomeDay`, on `Intl` alone, the same under any `TZ`. `startOfRomeDay` takes
   Rome's offset at the UTC-midnight guess and subtracts it: exact, because Rome changes
@@ -454,7 +546,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   the append-only log `LingoRevisioneSRS` (`lingo_revisioni_srs`, kept to fit the weights
   later) cascade from the user and from the card, `LingoPreferenzeStudio`
   (`lingo_preferenze_studio`) from the user; the export carries the log as `data.lingoRipassi` (not the derived state)
-  and the preferences as `data.lingoPreferenze` (null when never saved).
+  and the preferences as `data.lingoPreferenze` (null when never saved), and the stored study days
+  as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD'); `LingoGiornataStudio` cascades from the user.
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
@@ -497,7 +590,7 @@ can accept (the shared hook refuses it). To get the exact SQL without a
 database, `npx prisma migrate diff --from-schema-datamodel <copy of the old
 schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 `prisma format` on `schema.prisma`: it realigns about ninety untouched lines
-(measured) and buries the diff that the other developer has to review.
+(measured) and buries the diff that the other developer is asked to review.
 
 ## Tests
 
@@ -529,8 +622,9 @@ Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it sha
 MERL-T (`MERLT_INTERNAL_SECRET`, `MERLT_API_KEY`) come from `infra/.env`, not from
 `apps/server/.env`, whose `DATABASE_URL` points at localhost for the development flow;
 `apps/server/.env` keeps the server's own (the JWT secret, the admin seed). The MERL-T
-dead-letter log (`MERLT_DEAD_LETTER_DIR`, default `./logs`) is a volume and the root
-filesystem is read-only.
+dead-letter log (`MERLT_DEAD_LETTER_DIR`, default `./logs`; a file a day, deleted after
+`MERLT_DEAD_LETTER_RETENTION_DAYS`, no personal data: `docs/merlt/claude-notes.md`) is a
+volume and the root filesystem is read-only.
 
 ## Environment Variables
 
