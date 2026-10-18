@@ -13,6 +13,7 @@ import { getErrorMessage } from '../utils/errors';
 import { isMerltEnabled } from '../features/merlt/featureFlag';
 import { isStudiaEnabled } from '../features/studia/featureFlag';
 import { IngestionAdminPanel } from '../features/merlt/ops/ingestion/IngestionAdminPanel';
+import { StudiaSoglieAdmin } from '../components/features/admin/StudiaSoglieAdmin';
 import { StudiaTextsAdmin } from '../components/features/admin/StudiaTextsAdmin';
 import {
   Users,
@@ -421,8 +422,8 @@ export function AdminPage() {
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-6">
+              <div className="flex shrink-0 items-center gap-3">
                 <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-lg flex items-center justify-center">
                   <Shield size={20} />
                 </div>
@@ -433,7 +434,7 @@ export function AdminPage() {
               </div>
 
               {/* Tabs */}
-              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
+              <div className="flex min-w-0 items-center gap-1 overflow-x-auto bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 [&>button]:shrink-0">
                 <button
                   onClick={() => setActiveTab('users')}
                   className={cn(
@@ -517,8 +518,8 @@ export function AdminPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3 relative z-50">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-3 relative z-50">
+              <span className="hidden min-w-0 truncate text-sm text-gray-500 dark:text-gray-400 sm:block sm:max-w-xs">
                 {user?.email}
               </span>
               <button
@@ -1227,7 +1228,12 @@ export function AdminPage() {
         )}
 
         {/* ==================== VISUALEX STUDIA TAB ==================== */}
-        {studiaVisible && activeTab === 'studia' && <StudiaTextsAdmin />}
+        {studiaVisible && activeTab === 'studia' && (
+          <div className="space-y-5">
+            <StudiaSoglieAdmin />
+            <StudiaTextsAdmin />
+          </div>
+        )}
 
         {/* ==================== INGESTION TAB ==================== */}
         {activeTab === 'ingestion' && opsVisible && <IngestionAdminPanel />}
