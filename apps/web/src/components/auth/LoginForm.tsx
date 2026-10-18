@@ -5,8 +5,22 @@ import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { BookOpen, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { BookMark } from '../ui/BookMark';
 import { getErrorMessage } from '../../utils/errors';
 import { locationToPath, takeReturnTo } from '../../utils/returnTo';
+
+// Entering the app (spec §6.3.1): once per session the book traces itself, then the app comes in.
+const ENTRY_MS = 720;
+
+function enter(go: () => void) {
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return go();
+  window.setTimeout(() => {
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+    if (doc.startViewTransition) doc.startViewTransition(go);
+    else go();
+  }, ENTRY_MS);
+}
 
 const FIELD =
   'w-full h-11 rounded-md border border-slate-200 bg-slate-50 px-3.5 text-base md:text-[15px] text-slate-900 placeholder:text-slate-400 outline-none transition-[border-color,box-shadow] focus:border-primary-500 focus:ring-2 focus:ring-primary-500/25 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100';
@@ -16,6 +30,7 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
+  const [entering, setEntering] = useState(false);
 
   const { login, loading, error: authError } = useAuth();
   const navigate = useNavigate();
@@ -42,13 +57,22 @@ export function LoginForm() {
     try {
       await login(email, password);
       const stashed = takeReturnTo(); // always spent, so a stale address never returns later
-      navigate(fromState ?? stashed ?? '/', { replace: true });
+      setEntering(true);
+      enter(() => navigate(fromState ?? stashed ?? '/', { replace: true }));
     } catch (error) {
       setFormError(getErrorMessage(error) || 'Accesso non riuscito: controlla email e password.');
     }
   };
 
   const error = formError || authError;
+
+  if (entering) {
+    return (
+      <div role="status" aria-label="Accesso a VisuaLex" className="fixed inset-0 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
+        <BookMark size={56} draw />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex items-center px-4 py-10 md:px-10">

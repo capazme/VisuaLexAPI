@@ -401,7 +401,7 @@ export function BulletinBoardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
             <Users className="text-primary-600" size={28} />
             Forum
           </h1>

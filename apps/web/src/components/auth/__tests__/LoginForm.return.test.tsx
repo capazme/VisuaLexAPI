@@ -31,19 +31,19 @@ beforeEach(() => { login.mockReset().mockResolvedValue(undefined); sessionStorag
 describe('LoginForm: where the reader lands', () => {
   it('back on the whole address a protected route saved, query included', async () => {
     renderLogin({ from: { pathname: '/sentenze/cassazione/99999/2024', search: '?sezione=3', hash: '' } });
-    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/sentenze/cassazione/99999/2024?sezione=3'));
+    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/sentenze/cassazione/99999/2024?sezione=3'), { timeout: 2000 });
   });
 
   it('back on the address stashed when the session ended, and the stash is spent', async () => {
     sessionStorage.setItem('vlx:return-to', '/?norma=abc');
     renderLogin();
-    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/?norma=abc'));
+    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/?norma=abc'), { timeout: 2000 });
     expect(sessionStorage.getItem('vlx:return-to')).toBeNull();
   });
 
   it('never on a foreign address', async () => {
     sessionStorage.setItem('vlx:return-to', '//evil.example/x');
     renderLogin();
-    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/'));
+    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/'), { timeout: 2000 });
   });
 });

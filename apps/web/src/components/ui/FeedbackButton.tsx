@@ -37,14 +37,16 @@ export function FeedbackButton({ className }: FeedbackButtonProps) {
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
           className={cn(
-            'p-3.5 rounded-full shadow-lg transition-colors',
-            'bg-primary-600 hover:bg-primary-700 text-white',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2',
-            'dark:focus:ring-offset-slate-900'
+            // Quiet: one of the page's floating tools, not its loudest object (spec §5.2).
+            'p-3 rounded-full shadow-md border transition-colors',
+            'bg-white border-slate-200 text-slate-600 hover:text-primary-700 hover:border-slate-300',
+            'dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:text-primary-300',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+            'dark:focus-visible:ring-offset-slate-950'
           )}
           aria-label="Invia feedback"
         >
-          <MessageSquarePlus size={22} />
+          <MessageSquarePlus size={20} />
         </motion.button>
       </div>
 

@@ -12,10 +12,23 @@
   <meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#070c17" media="(prefers-color-scheme: dark)" />
   <title>VisuaLex</title>
+  <!-- The splash: VisuaLex's book traces itself while the app downloads; React replaces #root's
+       content when it starts. Same mark as components/ui/BookMark.tsx. -->
+  <style>
+    .vlx-splash { position: fixed; inset: 0; display: grid; place-items: center; background: #fbfaf7; color: #2658ba; }
+    .vlx-splash svg { width: 56px; height: 56px; }
+    .vlx-splash path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100; animation: vlx-splash-trace 600ms cubic-bezier(0.77, 0, 0.175, 1) both; }
+    .vlx-splash path + path { animation-duration: 260ms; animation-delay: 420ms; }
+    .vlx-splash svg { animation: vlx-splash-breathe 1.4s ease-in-out 700ms infinite alternate; }
+    @keyframes vlx-splash-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+    @keyframes vlx-splash-breathe { to { opacity: 0.4; } }
+    @media (prefers-color-scheme: dark) { .vlx-splash { background: #070c17; color: #6997eb; } }
+    @media (prefers-reduced-motion: reduce) { .vlx-splash path, .vlx-splash svg { animation: none; } }
+  </style>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root"><div class="vlx-splash" role="status" aria-label="Caricamento di VisuaLex"><svg viewBox="0 0 24 24" aria-hidden="true"><path pathLength="100" d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/><path pathLength="100" d="M12 7v14"/></svg></div></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

@@ -215,11 +215,11 @@ export function Layout() {
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
           className={cn(
-            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
-            'backdrop-blur-xl shadow-lg border',
+            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-colors',
+            'shadow-sm border',
             settings.focusMode
-              ? 'bg-primary-600/90 text-white border-transparent hover:bg-primary-500/90'
-              : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+              ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
+              : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
           title={settings.focusMode ? 'Esci da Focus Mode (Cmd+Space)' : 'Focus Mode (Cmd+Space)'}
         >

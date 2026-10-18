@@ -148,6 +148,12 @@
     to { opacity: 1; transform: none; }
   }
 
+  /* Type (spec §4.2): Newsreader to read and for titles, Geist for the interface, Geist Mono for
+     identifiers. Self-hosted through @fontsource-variable (imported in main.tsx). */
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, monospace;
+
   /* Radius */
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -431,9 +437,14 @@
   --vlx-indent: 1.75em;    /* item indent per level */
   max-width: 68ch;
   margin-inline: auto;
-  font-size: 1.125rem;
-  line-height: 1.7;
+  font-size: 1.1875rem;
+  line-height: 1.65;
   overflow-wrap: break-word;
+  /* Inchiostro (spec §4.2, §5.3.1): Newsreader at its text size, balanced rag, old-style figures in
+     prose. Presentation only: no character of the text changes (root rule 23). */
+  font-optical-sizing: auto;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  text-wrap: pretty;
   @apply font-serif text-slate-800 dark:text-slate-200;
 }
 
@@ -476,18 +487,21 @@
 }
 
 .vlx-art .vlx-heading {
-  margin-bottom: 0.1em;
-  font-size: 0.78em;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  margin-bottom: 0.15em;
+  font-size: 0.74em;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  font-variant-numeric: lining-nums tabular-nums;
   @apply font-sans text-slate-500 dark:text-slate-400;
 }
 
 .vlx-art .vlx-rubrica {
   margin-bottom: 0.9em;
-  font-size: 1.22em;
-  font-weight: 600;
-  line-height: 1.35;
+  font-size: 1.32em;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
   @apply text-slate-900 dark:text-slate-50;
 }
 
@@ -527,7 +541,8 @@
   margin-right: 0.25em;
   text-indent: 0;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
+  @apply text-slate-500 dark:text-slate-400;
 }
 
 .vlx-art .vlx-comma .vlx-marker {
@@ -1087,6 +1102,22 @@
   box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
 }
 
+/* The book mark (ui/BookMark, and the splash in index.html): the cover traces, then the spine; while
+   something loads it breathes. Under reduced motion the global rule makes both instant. */
+.vlx-book path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+}
+.vlx-book-draw path { animation: vlx-book-trace 600ms var(--ease-in-out) both; }
+.vlx-book-draw path:last-child { animation-duration: 260ms; animation-delay: 420ms; }
+.vlx-book-breathe { animation: vlx-book-breathe 1.4s ease-in-out 700ms infinite alternate; }
+@keyframes vlx-book-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes vlx-book-breathe { to { opacity: 0.4; } }
+
 /* ═══════════════════════════════════════════════════════════
    ENTRANCES — animate-in, fade-in, zoom-in-N, slide-in-from-*
    33 elements in 25 files were written with these classes, but no plugin defined them, so they
@@ -1113,3 +1144,80 @@
 @utility slide-in-from-bottom-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: calc(--value(integer) * var(--spacing)); }
 @utility slide-in-from-top-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: calc(--value(integer) * var(--spacing) * -1); }
 @utility slide-in-from-right-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: calc(--value(integer) * var(--spacing)); }
+
+/* The tours (driver.js, `popoverClass: 'visualex-tour-popover'` in hooks/useTour.ts): the paper surface,
+   the interface face, the primary button. Doubled class, so it wins over driver.css whichever loads last. */
+.driver-popover.visualex-tour-popover {
+  max-width: 340px;
+  padding: 20px 20px 16px;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  box-shadow: 0 0 0 1px rgb(18 25 39 / 0.06), 0 12px 32px -8px rgb(18 25 39 / 0.22);
+}
+.dark .driver-popover.visualex-tour-popover {
+  background: var(--color-ink-900);
+  color: var(--color-ink-100);
+  box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+}
+.driver-popover.visualex-tour-popover .driver-popover-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.driver-popover.visualex-tour-popover .driver-popover-description {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-ink-600);
+}
+.dark .driver-popover.visualex-tour-popover .driver-popover-description { color: var(--color-ink-300); }
+.driver-popover.visualex-tour-popover .driver-popover-footer { margin-top: 16px; }
+.driver-popover.visualex-tour-popover .driver-popover-progress-text {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-500);
+}
+.driver-popover.visualex-tour-popover .driver-popover-footer button {
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-ink-200);
+  background: transparent;
+  color: inherit;
+  font: 500 13px/1 var(--font-sans);
+  text-shadow: none;
+  transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.driver-popover.visualex-tour-popover .driver-popover-footer button:active { transform: scale(0.97); }
+.driver-popover.visualex-tour-popover .driver-popover-footer .driver-popover-next-btn {
+  border-color: transparent;
+  background: var(--color-toga-600);
+  color: #fff;
+}
+.dark .driver-popover.visualex-tour-popover .driver-popover-footer .driver-popover-next-btn {
+  background: var(--color-toga-400);
+  color: var(--color-ink-950);
+}
+.driver-popover.visualex-tour-popover .driver-popover-footer .driver-popover-btn-disabled { opacity: 0.4; }
+.driver-popover.visualex-tour-popover .driver-popover-close-btn { color: var(--color-ink-500); }
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-top { border-top-color: #fff; }
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-bottom { border-bottom-color: #fff; }
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: #fff; }
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: #fff; }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-top { border-top-color: var(--color-ink-900); }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-bottom { border-bottom-color: var(--color-ink-900); }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: var(--color-ink-900); }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: var(--color-ink-900); }
+
+/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. */
+.vlx-section-mark { background: var(--color-toga-600); }
+.vlx-section-mark[data-section="gymnasium"] { background: oklch(31% 0.09 268); }
+.vlx-section-mark[data-section="academia"] { background: oklch(55% 0.09 70); }
+.vlx-section-mark[data-section="forum"] { background: oklch(55% 0.08 190); }
+.dark .vlx-section-mark { background: var(--color-toga-500); }
+.dark .vlx-section-mark[data-section="gymnasium"] { background: oklch(45% 0.11 268); }
+.dark .vlx-section-mark[data-section="academia"] { background: oklch(60% 0.09 70); }
+.dark .vlx-section-mark[data-section="forum"] { background: oklch(58% 0.08 190); }
