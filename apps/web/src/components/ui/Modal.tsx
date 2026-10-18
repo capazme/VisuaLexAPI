@@ -232,7 +232,7 @@ export function Modal({
                       onClick={onClose}
                       aria-label="Chiudi"
                       className={cn(
-                        'p-1.5 rounded-lg ml-auto shrink-0',
+                        'inline-flex min-h-[44px] min-w-[44px] items-center justify-center md:min-h-0 md:min-w-0 p-1.5 rounded-lg ml-auto shrink-0',
                         'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300',
                         'hover:bg-slate-100 dark:hover:bg-slate-800',
                         'transition-colors duration-200',

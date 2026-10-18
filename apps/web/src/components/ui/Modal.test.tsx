@@ -85,4 +85,13 @@ describe('Modal', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('gives the «Chiudi» button a 44 px touch target on a phone', () => {
+    render(
+      <Modal isOpen onClose={() => {}} title="Con il pulsante">
+        <p>corpo</p>
+      </Modal>,
+    );
+    expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
+  });
 });
