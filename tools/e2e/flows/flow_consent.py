@@ -63,13 +63,11 @@ async def run(ctx: Context, report: Report) -> None:
             raise StepFailure(f"expected detail consent_required, got {body!r}")
 
     with report.step("POST level basic -> graph on, contribution/validation off"):
-        _, body = await a.req("POST", consent_url,
-                              json={"level": "basic", "reason": f"e2e {cfg.run_id}"})
+        body = await a.set_consent("basic", reason=f"e2e {cfg.run_id}")
         _assert_consent(body, "basic", False, False, True)
 
     with report.step("POST level full -> all toggles on"):
-        _, body = await a.req("POST", consent_url,
-                              json={"level": "full", "reason": f"e2e {cfg.run_id}"})
+        body = await a.set_consent("full", reason=f"e2e {cfg.run_id}")
         _assert_consent(body, "full", True, True, True)
 
     with report.step("DELETE consent -> revoked to none"):
