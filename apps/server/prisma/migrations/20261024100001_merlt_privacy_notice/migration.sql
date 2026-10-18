@@ -22,7 +22,7 @@ Livello «Base». Raccogliamo, legati al tuo account:
 – le note sul testo: il passo a cui sono ancorate, mai il testo della nota;
 – i segnalibri e gli articoli che aggiungi a un dossier, con le etichette che scegli e l''identificativo del dossier;
 – le citazioni che apri dall''anteprima, con il testo della citazione;
-– nel Forum, i «mi piace» e le proposte che accetti o rifiuti (cosa, mai chi l''ha scritto);
+– nel Forum, i «mi piace», i dossier pubblicati che aggiungi ai tuoi e le proposte che accetti o rifiuti (cosa, mai chi l''ha scritto);
 – le domande che fai all''assistente e le risposte che ricevi.
 A ogni dato si aggiungono il tuo identificativo VisuaLex e il livello di autorevolezza e la qualifica che MERL-T ti attribuisce.
 

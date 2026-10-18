@@ -128,7 +128,7 @@ In `apps/web/.env` metti `VITE_FEATURE_MERLT=false` e riavvia il frontend. L'app
 ### Annotation
 1. Stessa selezione, poi «Aggiungi nota» dal SelectionPopup.
 2. Scrivi la nota e conferma.
-3. Network: `POST /api/merlt/events/highlight-annotation` con `kind:"annotation"`, `noteText` e `anchorText`.
+3. Network: `POST /api/merlt/events/highlight-annotation` con `kind:"annotation"` e `anchorText`, senza `noteText`: il testo della nota non lascia mai il browser.
 
 ### Consenso Nessuno
 `DELETE /api/merlt/consent`, poi ripeti highlight e annotation: non deve partire nessuna chiamata. Il tracker in `GlobalMerltSlot` controlla `canTrack`.

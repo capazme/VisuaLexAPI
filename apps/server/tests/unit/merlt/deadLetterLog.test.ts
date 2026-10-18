@@ -29,7 +29,8 @@ describe('dead letters hold no personal data', () => {
       },
       user
     );
-    const kept = redactDeadLetterPayload(event);
+    // The server no longer relays a note's words; a dead letter from before still held them.
+    const kept = redactDeadLetterPayload({ ...event, note_text: 'la mia nota privata' });
     expect(kept).toEqual({
       type: 'annotation:created',
       article_urn: 'urn:nir:stato:codice.civile:1942-03-16;262~art1453',
