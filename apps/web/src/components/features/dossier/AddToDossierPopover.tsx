@@ -15,6 +15,7 @@ import { Folder, FolderPlus, Check, X, Search } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { dossierRecency, dossierContainsArticle, dossierContainsDecision } from './dossierUtils';
+import { useDossierKind } from '../../../features/sections/useSection';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -147,6 +148,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
     const { dossiers, addToDossier, createDossier } = useAppStore(useShallow((s) => ({
         dossiers: s.dossiers, addToDossier: s.addToDossier, createDossier: s.createDossier,
     })));
+    const sectionKind = useDossierKind();
     const [query, setQuery] = useState('');
     const [creating, setCreating] = useState(false);
     const [newTitle, setNewTitle] = useState('');
@@ -156,8 +158,9 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
         const q = query.trim().toLowerCase();
         return [...dossiers]
             .filter(d => !q || d.title.toLowerCase().includes(q))
-            .sort((a, b) => dossierRecency(b) - dossierRecency(a));
-    }, [dossiers, query]);
+            // The active section's kind first (sections spec S8), then the most recent.
+            .sort((a, b) => Number((b.kind ?? 'lavoro') === sectionKind) - Number((a.kind ?? 'lavoro') === sectionKind) || dossierRecency(b) - dossierRecency(a));
+    }, [dossiers, query, sectionKind]);
     const visible = query.trim() ? sorted : sorted.slice(0, 5);
 
     const contains = (d: Dossier) =>
@@ -186,7 +189,8 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
         const title = newTitle.trim();
         if (!title || busy) return;
         setBusy(true);
-        const id = await createDossier(title);
+        // In Gymnasium a dossier made here is di studio, so the section's list shows it (sections spec S7).
+        const id = await createDossier(title, undefined, sectionKind ?? undefined);
         setBusy(false);
         if (!id) return; // creation failed: stay open, the name is not lost
         add(id);

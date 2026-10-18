@@ -30,6 +30,8 @@ import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { searchesIntoOnePractice } from './openInPractice';
 import type { Dossier, DossierKind } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { useDossierKind } from '../../../features/sections/useSection';
+import { kindLabel } from './dossierKinds';
 import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
 
@@ -54,7 +56,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [kindFilter, setKindFilter] = useState<DossierKind | 'all'>('all');
+  // The section's kind (sections spec S7): Opus lists the dossiers di lavoro, Gymnasium those di studio.
+  const sectionKind = useDossierKind();
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
@@ -93,8 +96,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       result = result.filter((d) => d.tags?.includes(selectedTag));
     }
 
-    if (kindFilter !== 'all') {
-      result = result.filter((d) => (d.kind ?? 'lavoro') === kindFilter);
+    if (sectionKind) {
+      result = result.filter((d) => (d.kind ?? 'lavoro') === sectionKind);
     }
 
     result.sort((a, b) => {
@@ -112,7 +115,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     });
 
     return result;
-  }, [dossiers, searchQuery, selectedTag, kindFilter, sortBy]);
+  }, [dossiers, searchQuery, selectedTag, sectionKind, sortBy]);
 
   // Open-on-dashboard: 0 norms → noop, 1 norm → direct, >1 → picker modal.
   const handleQuickOpen = (dossier: Dossier) => {
@@ -240,7 +243,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   return (
     <div className="animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">I tuoi Dossier</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
         <div className="flex gap-2">
           {trashCount > 0 && onOpenTrash && (
             <button
@@ -307,27 +310,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           </select>
         </div>
 
-        {dossiers.length > 0 && (
-          <div role="group" aria-label="Tipo di dossier" className="flex gap-2 overflow-x-auto -mx-1 px-1">
-            {([['all', 'Tutti'], ['lavoro', 'Di lavoro'], ['studio', 'Di studio']] as const).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setKindFilter(value)}
-                aria-pressed={kindFilter === value}
-                className={cn(
-                  'px-4 py-2 md:px-3 md:py-1 rounded-lg text-sm transition-colors whitespace-nowrap min-h-[44px] md:min-h-0 flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                  kindFilter === value
-                    ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
         {allTags.length > 0 && (
           <div id="tour-dossier-filters" className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <button
@@ -367,14 +349,14 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <div className="col-span-full">
             <EmptyState
               variant="dossier"
-              title={searchQuery || selectedTag || kindFilter !== 'all' ? 'Nessun risultato' : 'Nessun dossier creato'}
+              title={searchQuery || selectedTag ? 'Nessun risultato' : sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
               description={
-                searchQuery || selectedTag || kindFilter !== 'all'
+                searchQuery || selectedTag
                   ? 'Prova a modificare i filtri di ricerca.'
                   : 'I dossier ti permettono di organizzare articoli per tema, progetto o caso. Crea il tuo primo dossier, o parti da un dossier di studio pronto.'
               }
               action={
-                !(searchQuery || selectedTag || kindFilter !== 'all') && (
+                !(searchQuery || selectedTag) && (
                   <div className="flex flex-col items-center gap-2 sm:flex-row">
                     <button
                       onClick={() => setIsModalOpen(true)}

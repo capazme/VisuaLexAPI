@@ -16,7 +16,7 @@ function render(path: string) {
 
 beforeEach(() => {
   account.devMode = false;
-  sectionStore.setState({ section: 'opus' });
+  sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
   vi.unstubAllEnvs();
 });
 
@@ -81,6 +81,15 @@ describe('useSection', () => {
       setItem.mockRestore();
       warn.mockRestore();
     }
+  });
+
+  it('keeps the kind of the last of Opus and Gymnasium for the dossiers, through Academia and the Forum (S7)', () => {
+    const { result } = render('/');
+    act(() => result.current.chooseSection('gymnasium'));
+    act(() => result.current.chooseSection('forum'));
+    expect(sectionStore.getState().dossierKind).toBe('studio');
+    act(() => result.current.chooseSection('opus'));
+    expect(sectionStore.getState().dossierKind).toBe('lavoro');
   });
 
   it("stores a choice and goes to the section's page (S4)", () => {
