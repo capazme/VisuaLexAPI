@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { dur, ease } from '../../lib/motion';
 import { cn } from '../../lib/utils';
+
+/** Within this long of one tooltip closing, the next opens at once and without motion (spec §5.1). */
+const TOOLTIP_WARM_MS = 300;
+
+// When the last tooltip closed, across every Tooltip: moving along a row of icons reads each label
+// at once instead of waiting the first delay again.
+let lastClosedAt = Number.NEGATIVE_INFINITY;
 
 export interface TooltipProps {
   content: string;
@@ -15,23 +23,36 @@ export function Tooltip({
   content,
   children,
   placement = 'top',
-  delay = 200,
+  delay = 500,
   className,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  // Shown without its entrance: opened warm, or by keyboard focus.
+  const [instant, setInstant] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Hover and keyboard focus alike: what a pointer learns, a keyboard must learn too.
-  const handleMouseEnter = () => {
-    if (timeoutId) clearTimeout(timeoutId);
-    const id = setTimeout(() => setIsVisible(true), delay);
-    setTimeoutId(id);
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
   };
 
-  const handleMouseLeave = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
+  useEffect(() => cancel, []);
+
+  const show = (now: boolean) => {
+    cancel();
+    setInstant(now);
+    if (now) setIsVisible(true);
+    else timer.current = setTimeout(() => setIsVisible(true), delay);
+  };
+
+  // A pointer waits the delay, unless another tooltip closed a moment ago.
+  const handleMouseEnter = () => show(Date.now() - lastClosedAt < TOOLTIP_WARM_MS);
+  // Keyboard focus shows it at once: what a pointer learns, a keyboard must learn too.
+  const handleFocus = () => show(true);
+
+  const handleHide = () => {
+    cancel();
+    if (isVisible) lastClosedAt = Date.now();
     setIsVisible(false);
   };
 
@@ -53,19 +74,19 @@ export function Tooltip({
     <div
       className="relative inline-block"
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onFocus={handleMouseEnter}
-      onBlur={handleMouseLeave}
+      onMouseLeave={handleHide}
+      onFocus={handleFocus}
+      onBlur={handleHide}
     >
       {children}
 
       <AnimatePresence>
         {isVisible && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={instant ? false : { opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.1 }}
+            exit={{ opacity: 0, transition: { duration: 0 } }}
+            transition={{ duration: dur.press, ease: ease.out }}
             className={cn(
               'absolute z-50 pointer-events-none',
               placementStyles[placement]
