@@ -4,7 +4,8 @@ MERL-T Research Tracking Router
 
 Receives the RLCF interaction events the VisuaLex server relays (Slice 1
 signals). They are personal data: each carries the VisuaLex user id in clear,
-and some the user's own text (a highlight, a note). They are persisted to
+and a highlight the passage the user selected; never the words of a note (the
+owner, 18 October 2026: the server does not relay them). They are persisted to
 PostgreSQL (`tracking_events`), expire after the retention period
 (`merlt.privacy.retention`) and are exported and erased by user
 (`merlt.privacy.user_data`). If the DB is unavailable the endpoint answers 503

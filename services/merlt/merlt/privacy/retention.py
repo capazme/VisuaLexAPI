@@ -101,9 +101,10 @@ async def purge_expired_assistant_data(session, days: int) -> int:
     age left on a newer trace. Returns the rows deleted."""
     cutoff = "NOW() - make_interval(days => :d)"
     params = {"d": int(days)}
+    # The log has no foreign key to the traces: a row whose trace is gone also expires by its own age.
     log_rows = await session.execute(
         text(
-            "DELETE FROM devils_advocate_log WHERE trace_id IN "
+            f"DELETE FROM devils_advocate_log WHERE created_at < {cutoff} OR trace_id IN "
             f"(SELECT trace_id FROM qa_traces WHERE created_at < {cutoff})"
         ),
         params,
@@ -128,14 +129,21 @@ def drop_expired_experiences(days: int) -> int:
 
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
-    def is_expired(exp) -> bool:
+    def parse(value):
         try:
-            stamp = datetime.fromisoformat(exp.timestamp)
+            stamp = datetime.fromisoformat(value)
         except (TypeError, ValueError):
-            return False
+            return None
         if stamp.tzinfo is not None:
             stamp = stamp.astimezone(timezone.utc).replace(tzinfo=None)
-        return stamp < cutoff
+        return stamp
+
+    def is_expired(exp) -> bool:
+        # The judgement's own date when the experience was rebuilt from the
+        # database (buffer_rehydration), else when it entered the buffer.
+        metadata = exp.metadata if isinstance(exp.metadata, dict) else {}
+        stamps = [s for s in (parse(metadata.get("created_at")), parse(exp.timestamp)) if s is not None]
+        return bool(stamps) and min(stamps) < cutoff
 
     return get_scheduler().drop_experiences(is_expired)
 
@@ -159,12 +167,19 @@ async def run_retention() -> int:
             # The class only: a message can carry the statement's parameters.
             log.warning("retention: step failed", step=name, error=type(e).__name__)
 
-    async def enrichment() -> int:
+    # One transaction per step: a step that fails (a missing table, a payload
+    # jsonb refuses) never holds back the others.
+    async def tracking() -> int:
         async with get_db_session() as session:
-            count = await purge_expired_tracking_events(session, tracking_days)
-            count += await purge_expired_citation_feedback(session, assistant_days)
-            count += await strip_note_text(session)
-            return count
+            return await purge_expired_tracking_events(session, tracking_days)
+
+    async def citations() -> int:
+        async with get_db_session() as session:
+            return await purge_expired_citation_feedback(session, assistant_days)
+
+    async def notes() -> int:
+        async with get_db_session() as session:
+            return await strip_note_text(session)
 
     async def assistant() -> int:
         async with get_async_session() as session:
@@ -173,7 +188,9 @@ async def run_retention() -> int:
     async def buffer() -> int:
         return drop_expired_experiences(assistant_days)
 
-    await step("enrichment", enrichment)
+    await step("tracking_events", tracking)
+    await step("citation_feedback", citations)
+    await step("note_text", notes)
     await step("assistant", assistant)
     await step("replay_buffer", buffer)
     log.info("retention: pass done", rows=deleted, tracking_days=tracking_days, assistant_days=assistant_days)

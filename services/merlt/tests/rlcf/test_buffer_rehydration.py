@@ -188,6 +188,17 @@ def test_rehydration_deduplicates_on_feedback_id(tmp_path):
     assert len(scheduler.buffer) == 1
 
 
+def test_rehydrated_experience_keeps_the_date_of_the_judgement(tmp_path):
+    # The 24-month expiry of the buffer counts from the judgement, not from the rebuild.
+    from datetime import datetime
+
+    scheduler = _scheduler(tmp_path)
+    given = datetime(2025, 3, 1, 9, 30)
+    rehydrate_from_rows(scheduler, [(_feedback(1, inline_rating=4, created_at=given), _trace())])
+
+    assert [e.metadata["created_at"] for e in _experiences(scheduler)] == ["2025-03-01T09:30:00"]
+
+
 def test_rehydration_saves_the_buffer_file(tmp_path):
     scheduler = _scheduler(tmp_path)
     rehydrate_from_rows(scheduler, [(_feedback(1, inline_rating=5), _trace())])

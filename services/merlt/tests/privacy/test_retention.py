@@ -146,6 +146,12 @@ async def test_the_purge_deletes_only_the_expired_questions_and_judgements():
             await s.execute(
                 text("INSERT INTO devils_advocate_log (trace_id, feedback_text) VALUES (:t, 'x')"), {"t": old}
             )
+            # A log row whose trace never existed, old: it expires by its own age.
+            await s.execute(
+                text("INSERT INTO devils_advocate_log (trace_id, feedback_text, created_at) "
+                     "VALUES (:t, 'orfano', NOW() - make_interval(days => 800))"),
+                {"t": f"trace_gone_{tag}"},
+            )
             await s.commit()
         async with maker() as s:
             deleted = await retention.purge_expired_assistant_data(s, 730)
@@ -159,7 +165,8 @@ async def test_the_purge_deletes_only_the_expired_questions_and_judgements():
                 text("SELECT trace_id FROM qa_feedback WHERE trace_id IN (:o, :n)"), {"o": old, "n": new}
             )).scalars().all()
             log_rows = (await s.execute(
-                text("SELECT count(*) FROM devils_advocate_log WHERE trace_id = :o"), {"o": old}
+                text("SELECT count(*) FROM devils_advocate_log WHERE trace_id IN (:o, :g)"),
+                {"o": old, "g": f"trace_gone_{tag}"},
             )).scalar_one()
         assert traces == [new]
         assert feedback == [new]
@@ -184,6 +191,12 @@ def test_the_buffer_drops_the_expired_experiences(monkeypatch):
         experiences = [e for e in scheduler.buffer.tree.data if e is not None] \
             if hasattr(scheduler.buffer, "tree") else scheduler.buffer.get_all()
         experiences[0].timestamp = "2020-01-01T00:00:00"
+        assert retention.drop_expired_experiences(730) == 1
+        left = [e for e in scheduler.buffer.tree.data if e is not None] \
+            if hasattr(scheduler.buffer, "tree") else scheduler.buffer.get_all()
+        assert [e.feedback_data["user_id"] for e in left] == ["b"]
+        # Rebuilt from the database today, but the judgement is old: its own date counts.
+        scheduler.add_experience({"t": 3}, {"user_id": "c"}, 1.0, metadata={"created_at": "2020-06-01T10:00:00"})
         assert retention.drop_expired_experiences(730) == 1
         left = [e for e in scheduler.buffer.tree.data if e is not None] \
             if hasattr(scheduler.buffer, "tree") else scheduler.buffer.get_all()
