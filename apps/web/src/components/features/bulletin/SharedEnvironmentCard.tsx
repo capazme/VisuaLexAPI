@@ -337,14 +337,16 @@ export function SharedEnvironmentCard({
             <Heart size={16} className={environment.userLiked ? 'fill-current' : ''} />
             {environment.userLiked ? 'Piaciuto' : 'Mi piace'}
           </button>
-          <button
-            onClick={() => onImport(environment)}
-            aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-          >
-            <FolderPlus size={16} aria-hidden />
-            Ai miei dossier
-          </button>
+          {!environment.isOwner && (
+            <button
+              onClick={() => onImport(environment)}
+              aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            >
+              <FolderPlus size={16} aria-hidden />
+              Ai miei dossier
+            </button>
+          )}
         </div>
       </div>
 
