@@ -18,14 +18,15 @@ export const articleViewedRequestSchema = z.object({
 });
 export type ArticleViewedRequest = z.infer<typeof articleViewedRequestSchema>;
 
-// 2. highlight + annotation (discriminator field `kind`)
+// 2. highlight + annotation (discriminator field `kind`). Never the text of a note: a lawyer's
+// note may hold a client's facts under professional secrecy (the owner, 18 October 2026, «c»).
+// An older client's `noteText` is stripped here, never relayed.
 export const highlightAnnotationRequestSchema = z.object({
   kind: z.enum(['highlight', 'annotation']),
   anchorText: z.string().min(1).max(2000),
   startOffset: z.number().int().nonnegative(),
   articleUrn: z.string().min(1),
   color: z.string().max(50).optional(),
-  noteText: z.string().max(5000).optional(),
 });
 export type HighlightAnnotationRequest = z.infer<typeof highlightAnnotationRequestSchema>;
 

@@ -1,8 +1,7 @@
 # MERL-T data protection — design
 
-**Status:** in progress, October 2026. The owner decided the direction on 12 October; the
-points marked *open* are questions put to him, each with a recommendation, and this page is
-updated with his answers.
+**Status:** decided, for release 1.8.0. The owner decided the direction on 12 October and
+answered the open questions on 18 October (§5).
 
 ## 1. What was decided
 
@@ -61,8 +60,10 @@ experiences, in memory and on disk. Left as they are: `audit_log` (an append-onl
 `api_keys` (service keys). Every step is idempotent; a failed store makes the answer 503 and the
 server retries.
 
-**Retention.** `tracking_events`: `MERLT_TRACKING_RETENTION_DAYS`, default 365 (*open*: the owner
-decides the period). Dead letters: 7 days, and they no longer hold personal data.
+**Retention** (decided, §5). `tracking_events`: `MERLT_TRACKING_RETENTION_DAYS`, default 365.
+The assistant's questions, the judgements and the citation feedback:
+`MERLT_ASSISTANT_RETENTION_DAYS`, default 730 (#185). Dead letters: 7 days, and they hold no
+personal data.
 
 **Notice and consent** (PR 3). The notice is the text `INFORMATIVA_MERLT` in the store of the
 Studia texts to accept (`LingoTestoVersione`, decision 22 of
@@ -83,16 +84,34 @@ is filled). No level preselected for a user who never answered; their level for 
 Impostazioni gains «Dati MERL-T»: level, the notice, «Scarica i miei dati», «Elimina i miei dati
 MERL-T»; revoking offers «Revoca ed elimina i dati raccolti» and «Revoca soltanto».
 
-## 5. Open questions (put to the owner)
+## 5. The owner's answers (18 October 2026)
 
-1. Existing consents asked again — recommended yes.
-2. Retention — recommended: events 12 months; assistant questions, feedback and citation
-   feedback 24 months; dead letters 7 days, without text.
-3. Forum events: drop the author's id (recommended) or pseudonymise it.
-4. Erasure of community contributions: delete the private, detach the shared (recommended, as
-   Studia does with validated cards).
-5. Who the controller and the contact are, and how they enter the notice without entering the
-   public repository.
-6. What the notice says about the assistant's questions reaching LLM providers through
-   OpenRouter.
-7. The notice wording.
+His words, to the questions as numbered by the orchestrator (213–221):
+
+| # | Question | Answer |
+| --- | --- | --- |
+| 213 | Activity events kept 12 months; dead letters 7 days, without personal data | «ok» |
+| 214 | Forum events without the author's id | «confermo» |
+| 215 | Erasure deletes the private data, keeps what the community approved, unlinked | «confermo» |
+| 216 | Ask existing consents again | «non è stato ancora raccolto nulla, quindi non è una criticità» — kept as built: a level from before the notice collects nothing until answered |
+| 217 | Controller and contact in the notice | «ok poi lo faremo al go-live publico» |
+| 218 | The assistant's questions to LLM providers through OpenRouter, possibly outside the EU | «sì verifico io» |
+| 219 | Questions to the assistant, judgements and citation feedback kept 24 months | «ok» |
+| 220 | The notice wording | «va bene, poi la rivedo io alla fine» |
+| 221 | The text of a lawyer's notes (professional secrecy): (a) as is, (b) only at «Completo», (c) never | «c» |
+
+What follows from them:
+
+- The text of a note is **never** collected: the web does not send it, the server strips it
+  from an older client, MERL-T removes it from stored events at every retention pass.
+- The assistant's questions, judgements and citation feedback expire after 24 months
+  (`MERLT_ASSISTANT_RETENTION_DAYS`, default 730).
+- Version 1 of the notice carries no controller or contact: until the public opening it
+  says they will be stated there, and requests go through «Invia feedback».
+
+**Before the public go-live (must do):**
+
+1. Publish a new version of the notice from the admin screen naming the controller and a
+   contact for the rights (question 217). Every user is asked again at their next entry.
+2. The owner verifies OpenRouter's terms for transfers outside the EU (question 218), and the
+   notice's sentence on it is changed if they do not hold.

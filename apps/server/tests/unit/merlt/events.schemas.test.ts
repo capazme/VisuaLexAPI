@@ -94,15 +94,16 @@ describe('highlightAnnotationRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts annotation kind with noteText', () => {
+  it("strips an older client's noteText: the words of a note are never collected", () => {
     const result = highlightAnnotationRequestSchema.safeParse({
       kind: 'annotation',
       anchorText: 'art. 2043',
       startOffset: 0,
       articleUrn: 'urn:nir:stato:codice.civile:1942;2043',
-      noteText: 'Norma cardine della responsabilità extracontrattuale',
+      noteText: 'Fatti del cliente',
     });
     expect(result.success).toBe(true);
+    expect(result.success && 'noteText' in result.data).toBe(false);
   });
 
   it('rejects invalid kind', () => {

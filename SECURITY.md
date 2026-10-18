@@ -94,7 +94,8 @@ under an older version, collects nothing until the person answers again
     score:
     - article views: URN, dwell time, scroll depth;
     - highlights: the selected text and its colour;
-    - anchored notes: the note text and the selected text;
+    - anchored notes: the selected text only, never the note's words (the owner, 18 October
+      2026: a lawyer's note may hold a client's facts);
     - bookmark and dossier additions: URN and dossier id;
     - citation clicks: the citation text;
     - forum signals: the shared environment's id (never its author's, since

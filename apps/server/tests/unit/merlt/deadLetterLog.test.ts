@@ -26,7 +26,6 @@ describe('dead letters hold no personal data', () => {
         startOffset: 12,
         articleUrn: 'urn:nir:stato:codice.civile:1942-03-16;262~art1453',
         color: 'yellow',
-        noteText: 'la mia nota privata',
       },
       user
     );

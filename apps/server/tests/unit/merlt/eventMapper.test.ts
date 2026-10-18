@@ -163,22 +163,21 @@ describe('toMerltHighlightAnnotation', () => {
     expect(out.entity_text).toBe('la buona fede');
     expect(out.start_offset).toBe(100);
     expect(out.color).toBe('yellow');
-    expect(out.note_text).toBeNull();
+    expect('note_text' in out).toBe(false);
   });
 
-  it('maps annotation kind to type=annotation:created with noteText', () => {
+  it('maps annotation kind to type=annotation:created, never with the note\'s words', () => {
     const out = toMerltHighlightAnnotation(
       {
         kind: 'annotation',
         anchorText: 'art. 2043',
         startOffset: 0,
         articleUrn: 'urn:nir~art2043',
-        noteText: 'Responsabilità extracontrattuale',
       },
       userCtx
     );
     expect(out.type).toBe('annotation:created');
-    expect(out.note_text).toBe('Responsabilità extracontrattuale');
+    expect('note_text' in out).toBe(false);
     expect(out.color).toBeNull();
   });
 });
