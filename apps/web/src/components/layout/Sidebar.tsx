@@ -162,8 +162,8 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
     >
       {({ isActive }) => (
         <>
+          {/* A navigation entry is seen tens of times a day: its hover is the colour alone. */}
           <motion.div
-            whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             transition={SPRING_CONFIG}
           >

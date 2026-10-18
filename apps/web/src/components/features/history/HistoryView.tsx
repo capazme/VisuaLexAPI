@@ -535,15 +535,15 @@ export function HistoryView() {
                                         ) : (
                                             <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
                                                 {/* Timeline dot */}
-                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800 group-hover:scale-125 transition-transform" />
+                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800" />
 
                                                 {/* Item card */}
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative bg-white dark:bg-slate-800 p-4 pl-5 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow,translate] cursor-pointer",
+                                                        "relative bg-white dark:bg-slate-800 p-4 pl-5 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow] cursor-pointer",
                                                         "border-slate-200 dark:border-slate-700",
-                                                        "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5"
+                                                        "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md"
                                                     )}
                                                 >
                                                     {/* Act-type stripe — rounded-l-xl matches card corner so it doesn't

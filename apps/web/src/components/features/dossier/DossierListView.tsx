@@ -403,7 +403,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               >
                 <div className="flex justify-between items-start mb-3 md:mb-4 gap-2">
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Folder className="text-blue-500 group-hover:scale-110 transition-transform" size={28} />
+                    <Folder className="text-blue-500" size={28} />
                     {dossier.isPinned && (
                       <Star size={14} className="text-yellow-500 fill-yellow-500" aria-label="Preferito" />
                     )}
@@ -508,7 +508,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 </p>
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                   <span className="text-xs text-slate-400">{formatTimestampLong(dossier.createdAt)}</span>
-                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-[color,background-color,border-color,translate] flex-shrink-0" />
+                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors flex-shrink-0" />
                 </div>
               </div>
             );

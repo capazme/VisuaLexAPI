@@ -563,7 +563,6 @@ export function TreeViewPanel({
                       <motion.button
                         key={annex.number || 'main'}
                         onClick={() => handleAnnexTabClick(annex.number)}
-                        whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         // No `layout`. The annex list is static — nothing ever
                         // enters, leaves or reorders — so a layout animation has
@@ -572,9 +571,9 @@ export function TreeViewPanel({
                         // rubriche landing seconds after the tree added exactly
                         // such a re-render: the section moved on its own while
                         // the reader was looking at it, and a chip mid-animation
-                        // rendered blank. `whileHover`/`whileTap` stay: a scale
-                        // transform does not affect layout, so siblings hold
-                        // still.
+                        // rendered blank. `whileTap` stays: a scale transform does
+                        // not affect layout, so siblings hold still. No hover
+                        // scale: a row of chips takes the colour change only.
                         className={cn(
                           "relative px-3 py-2 text-xs font-semibold rounded-xl transition-colors border overflow-hidden",
                           isActive
