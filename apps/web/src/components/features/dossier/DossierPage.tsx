@@ -9,6 +9,7 @@ import { ImportDossierModal } from './ImportDossierModal';
 import { TrashPage } from './TrashPage';
 import { useTrash } from './useTrash';
 import { useDossierRefresh } from './useDossierRefresh';
+import { showSectionOfDossier } from '../../../features/sections/useSection';
 import { decodeDossierShare, importReport, importToastType, validateImportedDossier, type ImportCheck } from './dossierUtils';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
@@ -76,6 +77,11 @@ export function DossierPage() {
   };
 
   const selectedDossier = dossiers.find((d) => d.id === selectedDossierId) ?? null;
+  // A dossier opened by its address takes the user to its kind's section (sections spec S7).
+  const selectedKind = selectedDossier ? (selectedDossier.kind ?? 'lavoro') : null;
+  useEffect(() => {
+    if (selectedKind) showSectionOfDossier(selectedKind);
+  }, [selectedKind]);
   const showTrash = searchParams.get('trash') === '1';
   const setShowTrash = (on: boolean) => {
     const next = new URLSearchParams(searchParams);

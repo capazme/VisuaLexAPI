@@ -19,6 +19,7 @@ vi.mock('../../../services/dossierService', () => ({
 // pattern in `src/store/dossierActions.test.ts`.
 import { appStore } from '../../../store/useAppStore';
 import { AddToDossierPopover } from './AddToDossierPopover';
+import { sectionStore } from '../../../features/sections/useSection';
 import type { DossierSentenzaData, NormaVisitata } from '../../../types';
 
 const norma: NormaVisitata = {
@@ -52,6 +53,24 @@ describe('AddToDossierPopover', () => {
     const options = screen.getAllByRole('button', { name: /pratica|duplicato/i }).map(b => b.textContent);
     expect(options[0]).toContain('Pratica recente');
   });
+  it("puts the active section's kind first, then the most recent (sections spec S8)", () => {
+    appStore.setState({
+      dossiers: [
+        ...appStore.getState().dossiers,
+        { id: 'study', title: 'Studio GDPR', kind: 'studio', createdAt: '2026-02-01T00:00:00Z', items: [] },
+      ],
+    });
+    sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
+    try {
+      renderPopover();
+      const options = screen.getAllByRole('button', { name: /pratica|duplicato|studio gdpr/i }).map((b) => b.textContent);
+      expect(options[0]).toContain('Studio GDPR');
+      expect(options[1]).toContain('Pratica recente');
+    } finally {
+      sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
+    }
+  });
+
   it('adds to a dossier and reports through onAdded', () => {
     const onAdded = renderPopover();
     fireEvent.click(screen.getByRole('button', { name: /pratica recente/i }));

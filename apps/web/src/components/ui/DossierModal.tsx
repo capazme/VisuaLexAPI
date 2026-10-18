@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
 import type { DossierKind } from '../../types';
 import { DossierKindChoice } from '../features/dossier/DossierKindChoice';
+import { useDossierKind } from '../../features/sections/useSection';
 
 interface DossierModalProps {
   isOpen: boolean;
@@ -17,8 +18,9 @@ interface DossierModalProps {
 export function DossierModal({ isOpen, onClose }: DossierModalProps) {
   const { createDossier } = useAppStore();
   const [newDossierTitle, setNewDossierTitle] = useState('');
-  // A dossier di lavoro unless the user says otherwise: the cautious kind (spec D2).
-  const [kind, setKind] = useState<DossierKind>('lavoro');
+  // The section's kind, shown and changeable (sections spec S7); di lavoro, the cautious kind (spec D2), without Gymnasium.
+  const startKind = useDossierKind() ?? 'lavoro';
+  const [kind, setKind] = useState<DossierKind>(startKind);
   const [isCreating, setIsCreating] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -30,7 +32,7 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
     setBusy(false);
     if (!id) return; // creation failed: stay open, keep the typed title
     setNewDossierTitle('');
-    setKind('lavoro');
+    setKind(startKind);
     setIsCreating(false);
     onClose();
   };
@@ -48,8 +50,8 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
         {!isCreating ? (
           <button
             onClick={() => {
-              // Every creation starts as a dossier di lavoro, the cautious kind (spec D2), whatever was chosen before «Annulla».
-              setKind('lavoro');
+              // Every creation starts from the section's kind, whatever was chosen before «Annulla».
+              setKind(startKind);
               setIsCreating(true);
             }}
             className={cn(

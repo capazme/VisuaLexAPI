@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
 import { DossierListView } from './DossierListView';
+import { sectionStore } from '../../../features/sections/useSection';
 import type { Dossier, NormaVisitata } from '../../../types';
 
 const CIVIL: NormaVisitata = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1284' };
@@ -20,7 +21,10 @@ function open(items: NormaVisitata[]) {
   fireEvent.click(screen.getByRole('button', { name: 'Apri Pratica Rossi su Dashboard' }));
 }
 
-beforeEach(() => { appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] }); });
+beforeEach(() => {
+  appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
+  sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
+});
 
 describe('DossierListView — the quick-open of a card', () => {
   it('opens a single past group as that text, without doctrine, in the dossier\'s practice', () => {
@@ -154,20 +158,40 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
   ];
   const titles = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
 
-  it('labels a dossier di studio and one published, and filters by kind (a dossier with no kind is di lavoro)', () => {
+  it("lists the section's kind: Opus the dossiers di lavoro (one with no kind among them), Gymnasium those di studio (sections spec S7)", () => {
     appStore.setState({ dossiers: kinds });
+    sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
+    const { unmount } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di lavoro' })).toBeInTheDocument();
+    expect(titles().sort()).toEqual(['Pratica Rossi', 'Senza tipo']);
+    // The kind filter is gone: the section is the filter.
+    expect(screen.queryByRole('group', { name: 'Tipo di dossier' })).toBeNull();
+    unmount();
+
+    sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di studio' })).toBeInTheDocument();
+    expect(titles()).toEqual(['Diritto penale']);
     expect(screen.getAllByText('Di studio', { selector: 'span' })).toHaveLength(1);
     expect(screen.getByText('Pubblicato nel Forum')).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Di studio' }));
-    expect(titles()).toEqual(['Diritto penale']);
-    expect(screen.getByRole('button', { name: 'Di studio' })).toHaveAttribute('aria-pressed', 'true');
+  it('says which kind is empty', () => {
+    appStore.setState({ dossiers: [kinds[0]] });
+    sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    expect(screen.getByText('Nessun dossier di studio')).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Di lavoro' }));
-    expect(titles().sort()).toEqual(['Pratica Rossi', 'Senza tipo']);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Tutti' }));
-    expect(titles()).toHaveLength(3);
+  it('lists every dossier without Gymnasium (VITE_FEATURE_STUDIA off), or the study ones could not be reached', () => {
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    try {
+      appStore.setState({ dossiers: kinds });
+      render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+      expect(titles()).toHaveLength(3);
+      expect(screen.getByRole('heading', { level: 2, name: 'I tuoi Dossier' })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
