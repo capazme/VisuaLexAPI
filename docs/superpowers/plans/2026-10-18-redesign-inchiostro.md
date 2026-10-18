@@ -221,8 +221,24 @@ One PR per bullet or one PR for all; each is small. Re-check every line number f
 | 5 | `SearchPanel.tsx` ~633–644 (`duration-500/700`) | ≤ `duration-300`; the Gymnasium charts' 500–700 ms draw-in stays |
 | 6 | Framer springs typed per file (Modal, Toast, CommandPalette, Layout, Sidebar, StudyMode…) | import from `lib/motion.ts` |
 
+| 7 | 33 × `animate-in` with `fade-in`, `zoom-in-95`, `slide-in-from-*` in 25 files (SelectionPopup, BlockAnnotationsPopover, InlineNotePopover, NotesPeekPanel, Sheet, AddToDossierPopover, KeyPassagePopover, …) | **These classes generate no CSS** (checked against the stylesheet the dev server serves on 18 Oct: zero rules; no `tailwindcss-animate`/`tw-animate-css` is installed or defined). Every entrance they describe is instant today — the same silent failure as gotcha 29. Define them once in `index.css` with `@utility` (`animate-in` = `animation: vlx-enter var(--tw-duration, 180ms) var(--ease-out) both`, reading `--tw-enter-opacity`, `--tw-enter-scale`, `--tw-enter-translate-*` set by `fade-in`, `zoom-in-95`, `slide-in-from-*-N`), cap the durations these files write at 200 ms, add a `theme.test.ts` check that `animate-in` generates a rule. **Then check every one of the 25 surfaces in the browser**: an entrance on the same element floating-ui positions breaks it (gotcha 10), and nobody could see that while the classes were inert. Document the finding as a gotcha in `apps/web/CLAUDE.md` |
+| 8 | `hover:scale-110` (6), `hover:scale-125` (2), `hover:scale-105` (2), `hover:-translate-y-0.5` (3), `hover:translate-x-1` (2) | same as row 4: remove on rows and lists, gate the rest to fine pointers |
+
 Acceptance: `review-animations` on the diff approves; feel-check each in slow motion (DevTools
 Animations panel at 10 %).
+
+### Opportunities (from `find-animation-opportunities`, gated by frequency and purpose)
+
+| # | Where | Today | Purpose | Motion |
+| --- | --- | --- | --- | --- |
+| A | `PracticeRowShell.tsx` ~118 (`{isOpen && …}`) | a row's reader appears at full height at once | preventing a jarring change | height via Framer `layout` + `spring.snappy`; body `clip-path: inset(0 0 100% 0)` → `inset(0)` 240 ms `--ease-out`; reduced motion: opacity 150 ms |
+| B | the popovers of row 7 | instant | spatial consistency | once defined: `zoom-in-95 fade-in` 150 ms from the trigger (`getTransformOrigin`, already wired in `BlockAnnotationsPopover` and `InlineNotePopover`) |
+| C | `removeItemsWithUndo` (dossier rows) | a removed row vanishes | state indication | exit: opacity 1 → 0 and `translateX(-8px)` 180 ms `--ease-out`, then height collapse 200 ms; «Annulla» brings it back with the reverse |
+| D | empty states (`ui/EmptyState`, empty dossier list) | static | delight (rare) | 40 ms stagger of icon, title, text, action, 240 ms `--ease-out`, once per mount |
+
+Rejected: the palette (⌘K, keyboard, dozens a day); the reading text itself and the case-law lists
+(read, not watched); the sidebar entries and the bar of practices' chips (core navigation, tens a day:
+colour change only); the act blocks' drag (already handled by dnd-kit's own transform).
 
 ## P3 — Shell
 
@@ -233,7 +249,10 @@ Coordinate with whoever owns the sections work first. Files: `components/layout/
   switcher mark, the page header's hairline and the section-change wash.
 - One status capsule bottom-left (services state, «Invia feedback», «Modalità focus»); remove the three
   separate floating controls. Keep every behaviour (the services probe cadence is a rule: 5 minutes).
-- `mobile-native` checklist on the shell (sticky hover, tap highlight, `100dvh`, safe areas, 16 px inputs).
+- `mobile-native` checklist on the shell. Found on 18 Oct: the viewport meta lacks `viewport-fit=cover`
+  (so the four `safe-area` uses resolve to 0 on a notched phone); no `-webkit-tap-highlight-color`
+  anywhere (the grey flash on every tap); 14 `100vh`/`h-screen` uses outside `h-app` (the iOS address
+  bar bug); ungated hover transforms (P2 row 8). Inputs are already ≥ 16 px on phones.
 
 ## P4 — Surfaces (one PR each, in this order)
 

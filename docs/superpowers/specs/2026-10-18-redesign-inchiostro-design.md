@@ -253,9 +253,13 @@ transitions, enter from their edge. A practice row opening: height through Frame
 
 ### 6.3 Signature moments (rare, where the delight budget goes)
 
-1. **Entering the app.** After login the § mark draws its stroke (SVG `stroke-dashoffset`, 600 ms) and the
+1. **Entering the app.** After login the mark draws its stroke (SVG `stroke-dashoffset`, 600 ms) and the
    paper card becomes the shell through a View Transition (`document.startViewTransition`, 320 ms
-   `--ease-in-out`). Once per session.
+   `--ease-in-out`). Once per session. The mark of loading and entering is VisuaLex's earlier book logo
+   (the front-end owner's choice): Lucide's `BookOpen` glyph, already a dependency (`lucide-react`, ISC),
+   drawn as an SVG stroke with `pathLength="100"` so it can be traced; the loading screen of
+   `ProtectedRoute` uses the same mark, pulsing its opacity, not spinning. The § stays the mark of the
+   reading surface and of Gymnasium.
 2. **Changing section.** A View Transition: the outgoing page fades and drifts 8 px, the incoming one
    takes the section hue as a 120 ms wash on its header hairline. 240 ms.
 3. **From the search field to the text.** The citation typed in the Scrivania's field travels to become
