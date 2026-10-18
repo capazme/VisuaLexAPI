@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-MPL--2.0-orange)
 
 VisuaLex is an advanced web application designed to research, visualize, and study legal texts from **Normattiva**, **EUR-Lex**, and **Brocardi**. It combines a powerful async Python backend with a rich React-based frontend to transform complex regulations into interactive knowledge graphs and structured views.
 
@@ -58,7 +58,7 @@ The one-time setup (Docker, Node, Python, the `.env` files) is in
 | `apps/web/` | React + Vite web app |
 | `apps/server/` | Express + Prisma: accounts, dossiers, community |
 | `services/visualex/` | Python API (Quart): Normattiva, EUR-Lex, Brocardi |
-| `services/merlt/` | MERL-T knowledge graph and RLCF (Apache-2.0) |
+| `services/merlt/` | MERL-T knowledge graph and RLCF (MPL-2.0) |
 | `tools/` | archive CLI, end-to-end harness |
 | `infra/` | Docker Compose stack |
 | `scripts/` | data backup and restore |
@@ -79,7 +79,12 @@ day-to-day work goes to `develop` — see [docs/git-workflow.md](docs/git-workfl
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Mozilla Public License 2.0 (MPL-2.0) — see [LICENSE](LICENSE). The licence
+covers the whole repository, MERL-T included.
+
+Contributions are accepted under the Developer Certificate of Origin: each
+commit carries a `Signed-off-by` line (`git commit -s`). There is no
+Contributor License Agreement.
 
 The licence covers this software only. The legal texts it retrieves come from
 third parties: please respect the Terms of Service of Normattiva, EUR-Lex,
@@ -89,4 +94,4 @@ open data are licensed CC BY-SA 3.0 and are credited wherever they appear.
 Portions of the act-resolution tables, the Akoma Ntoso parser and the Corte
 costituzionale open-data reader derive from
 [mcp-legal-it](https://github.com/capazme/mcp-legal-it), by the same author,
-relicensed MIT by the copyright holder.
+relicensed MIT by the copyright holder; those portions keep the MIT terms.

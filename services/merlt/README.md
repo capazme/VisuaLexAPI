@@ -92,4 +92,4 @@ community feedback (RLCF)*.
 
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE)
+Mozilla Public License 2.0 (MPL-2.0) - see [LICENSE](../../LICENSE), the licence of the whole repository

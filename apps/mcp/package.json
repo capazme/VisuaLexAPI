@@ -14,7 +14,7 @@
     "start": "node dist/index.js",
     "test": "vitest run"
   },
-  "license": "ISC",
+  "license": "MPL-2.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",
     "dotenv": "^16.3.1",

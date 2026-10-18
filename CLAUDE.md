@@ -25,7 +25,7 @@ security risk.
 | `apps/server/` | Express + Prisma: accounts, dossier, community, the MERL-T gateway, the OAuth authorization server for MCP clients | `apps/server/CLAUDE.md` |
 | `apps/mcp/` | the MCP server (Streamable HTTP, :3002): dossier and LingoLex card tools for Claude Code and LibreLex, deletions confirmed by the user into the trash, no database | `apps/mcp/CLAUDE.md` |
 | `services/visualex/` | Quart: sources, reading text, URNs, citations, AKN | `services/visualex/CLAUDE.md` |
-| `services/merlt/` | MERL-T and RLCF — its own licence (Apache-2.0) | `services/merlt/CLAUDE.md` |
+| `services/merlt/` | MERL-T and RLCF — MPL-2.0, as the rest of the repository | `services/merlt/CLAUDE.md` |
 | `tools/archivio-normativo/` | CLI: a local archive of acts | `tools/archivio-normativo/CLAUDE.md` |
 | `tools/e2e/` | end-to-end and stress harness | `tools/e2e/README.md` |
 | `conventions/` | the convention for legal sources: identity and labels of norms and decisions, as one golden file (read today by the web and API suites, by the others as they adopt it) | `conventions/sources/README.md` |

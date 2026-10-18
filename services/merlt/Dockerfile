@@ -1,5 +1,5 @@
 # MERL-T - Multi-Expert Reinforcement Learning for Legal Text
-# Open Source - Apache 2.0 License
+# Open Source - Mozilla Public License 2.0 (MPL-2.0)
 
 # Build stage with PyTorch (CPU version for smaller image)
 FROM python:3.11-slim AS builder
