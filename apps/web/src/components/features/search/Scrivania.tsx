@@ -10,14 +10,10 @@ import { ArrowUpRight, Plus } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
 import { dossierRecency } from '../dossier/dossierUtils';
+import { greeting } from './scrivaniaGreeting';
 
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 
-function greeting(hour: number): string {
-  if (hour < 13) return 'Buongiorno.';
-  if (hour < 18) return 'Buon pomeriggio.';
-  return 'Buonasera.';
-}
 
 // A 40 ms cascade, once per mount, never blocking input (spec §6.3.6).
 const stagger = (i: number) => ({ animationDelay: `${i * 40}ms` });
