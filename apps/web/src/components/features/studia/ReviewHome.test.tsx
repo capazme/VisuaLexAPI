@@ -278,7 +278,10 @@ describe('ReviewHome', () => {
       const { container, unmount } = renderHome();
       await screen.findByTestId('goal-stamp');
       expect(container.querySelector('canvas')).not.toBeNull();
-      expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
+      // The day is written by the burst's mount effect, which React runs just after the canvas is in the page:
+      // waited for, not read at once (a loaded machine reads between the two). The burst is still on (1.5 s).
+      await waitFor(() => expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19'));
+      expect(container.querySelector('canvas')).not.toBeNull();
       unmount();
 
       const again = renderHome();

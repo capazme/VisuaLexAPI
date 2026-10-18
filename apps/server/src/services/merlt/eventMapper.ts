@@ -138,10 +138,7 @@ export function toMerltForumSignal(
   return {
     ...baseEvent(`forum:${payload.action}`, user),
     shared_env_id: payload.sharedEnvId,
-    // Slice 1 decision (open question §10.3 of design):
-    // target_author_id = originalAuthorId from the SharedEnvironment item.
-    // Story MERLT-1.10 documents the chosen attribution in
-    // docs/merlt-forum-authoring-decision.md and may revisit this.
-    target_author_id: payload.originalAuthorId,
+    // No target_author_id since October 2026: the environment's author is a
+    // third party who never consented (docs/merlt/decisions/forum-authoring.md).
   };
 }

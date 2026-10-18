@@ -2,11 +2,16 @@
 MERL-T Research Tracking Router
 ================================
 
-Receives anonymized RLCF interaction events from the frontend (Slice 1 signals).
-Events are persisted to PostgreSQL (`tracking_events`) so they survive restarts
-and give the feedback loop a durable input substrate. If the DB is unavailable
-the endpoint falls back to a bounded in-memory buffer (best-effort, never fails
-the fire-and-forget event).
+Receives the RLCF interaction events the VisuaLex server relays (Slice 1
+signals). They are personal data: each carries the VisuaLex user id in clear,
+and some the user's own text (a highlight, a note). They are persisted to
+PostgreSQL (`tracking_events`), expire after the retention period
+(`merlt.privacy.retention`) and are exported and erased by user
+(`merlt.privacy.user_data`). If the DB is unavailable the endpoint answers 503
+and keeps nothing: the event is lost, and the VisuaLex server notes the failure
+in its dead-letter log, which keeps no personal data and expires
+(apps/server/src/services/merlt/deadLetterLog.ts). An in-memory buffer here was
+never drained, and an erasure could not reach it.
 
 Endpoints:
 - POST /tracking/events - Receive batch of tracking events
@@ -16,7 +21,7 @@ import structlog
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from merlt.api.auth import verify_api_key
@@ -52,13 +57,9 @@ class TrackingResponse(BaseModel):
 # Persistence helpers
 # =============================================================================
 
-# Bounded fallback buffer used only when the DB is unreachable.
-_event_buffer: List[Dict[str, Any]] = []
-_MAX_BUFFER = 10000
-
-
 def build_tracking_records(events: List[TrackingEvent]) -> List[TrackingEventRecord]:
-    """Map incoming events to ORM rows, lifting an opaque user_id out of the payload."""
+    """Map incoming events to ORM rows, lifting the VisuaLex user id out of the
+    payload into its own column (the erasure and the export find rows by it)."""
     records: List[TrackingEventRecord] = []
     for event in events:
         user_id = None
@@ -85,21 +86,6 @@ async def persist_tracking_events(session, events: List[TrackingEvent]) -> int:
     return len(records)
 
 
-def _buffer_fallback(events: List[TrackingEvent]) -> None:
-    global _event_buffer
-    for event in events:
-        _event_buffer.append(
-            {
-                "type": event.type,
-                "data": event.data,
-                "client_ts": event.timestamp,
-                "server_ts": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-    if len(_event_buffer) > _MAX_BUFFER:
-        _event_buffer = _event_buffer[-_MAX_BUFFER:]
-
-
 # =============================================================================
 # Endpoints
 # =============================================================================
@@ -110,25 +96,19 @@ async def receive_tracking_events(
     api_key: ApiKey = Depends(verify_api_key),
 ) -> TrackingResponse:
     """
-    Receive a batch of anonymized tracking events from the frontend.
+    Receive a batch of tracking events relayed by the VisuaLex server.
 
-    Persisted to PostgreSQL; on DB failure, buffered in memory (best-effort).
+    Persisted to PostgreSQL; on DB failure, 503 and nothing kept.
     """
-    persisted = False
     try:
         async with get_db_session() as session:
             await persist_tracking_events(session, batch.events)
-        persisted = True
     except Exception as e:
-        log.error("Tracking persist failed, falling back to buffer", error=str(e))
-        _buffer_fallback(batch.events)
+        # The class only: the message can carry the payload's SQL parameters.
+        log.error("Tracking persist failed", error=type(e).__name__)
+        raise HTTPException(status_code=503, detail="tracking store unavailable")
 
-    log.debug(
-        "Tracking events received",
-        count=len(batch.events),
-        persisted=persisted,
-        buffer_size=len(_event_buffer),
-    )
+    log.debug("Tracking events received", count=len(batch.events))
 
     return TrackingResponse(
         received=len(batch.events),
