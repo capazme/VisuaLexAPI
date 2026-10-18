@@ -59,12 +59,33 @@ class Check:
 
 # ---- low-level helpers ----
 
+# A probe whose detail starts with this is reported as SKIP: it neither passes nor fails.
+SKIP_PREFIX = "SKIPPED:"
+
+
+def result_of(ok: bool, detail: str, hard: bool) -> str:
+    """The RESULT column for one check: OK, SKIP, FAIL (hard) or SOFT-FAIL."""
+    if ok and detail.startswith(SKIP_PREFIX):
+        return "SKIP"
+    if ok:
+        return "OK"
+    return "FAIL" if hard else "SOFT-FAIL"
+
+
+def migration_env(environ: dict[str, str]) -> dict[str, str] | None:
+    """The environment for `prisma migrate status`: DATABASE_URL when it is set, else None (skip)."""
+    url = environ.get("DATABASE_URL", "").strip()
+    if not url:
+        return None
+    return {**environ, "DATABASE_URL": url}
+
+
 async def _run_cmd(*args: str, cwd: Path | None = None,
-                   timeout: float = 60.0) -> tuple[int, str]:
+                   timeout: float = 60.0, env: dict[str, str] | None = None) -> tuple[int, str]:
     """Run a CLI probe; (-1, reason) when the binary is missing or it hangs."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            *args, cwd=str(cwd) if cwd else None,
+            *args, cwd=str(cwd) if cwd else None, env=env,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
     except FileNotFoundError:
@@ -249,8 +270,13 @@ def build_checks(cfg: Config, session: aiohttp.ClientSession,
         return True, f"{count} nodes in {GRAPH_NAME}"
 
     async def c10_prisma() -> tuple[bool, str]:
+        env = migration_env(dict(os.environ))
+        if env is None:
+            # Without DATABASE_URL Prisma reads apps/server/.env, which a worktree does not have:
+            # say so and skip, rather than fail on a missing file.
+            return True, f"{SKIP_PREFIX} DATABASE_URL not set: migrations not verified"
         rc, out = await _run_cmd("npx", "prisma", "migrate", "status",
-                                 cwd=BACKEND_DIR, timeout=120.0)
+                                 cwd=BACKEND_DIR, timeout=120.0, env=env)
         if "Database schema is up to date!" in out:
             return True, "schema up to date"
         last = out.splitlines()[-1].strip() if out else f"rc={rc}"
@@ -342,13 +368,10 @@ async def run_preflight(cfg: Config = CONFIG,
                 rows.append((check.name, check.gap, "SKIP", "--skip-optional"))
                 continue
             ok, detail = await check.probe()
-            if ok:
-                result = "OK"
-            elif check.hard:
-                result = "FAIL"
+            result = result_of(ok, detail, check.hard)
+            if result == "FAIL":
                 hard_failures += 1
-            else:
-                result = "SOFT-FAIL"
+            elif result == "SOFT-FAIL":
                 skip_tags |= check.skip_tags
             rows.append((check.name, check.gap, result, detail))
 
