@@ -329,6 +329,17 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* On a phone (mobile-native baseline): the document never scrolls (Layout's root is h-app), so
+     pull-to-refresh only ever interrupted reading; no font inflation in landscape; a tap on a control
+     fires at once. No user-select:none: many controls carry titles and citations worth copying. */
+  html, body {
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,

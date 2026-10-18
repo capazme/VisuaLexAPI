@@ -222,7 +222,7 @@ One PR per bullet or one PR for all; each is small. Re-check every line number f
 | 6 | Framer springs typed per file (Modal, Toast, CommandPalette, Layout, Sidebar, StudyMode…) | import from `lib/motion.ts` |
 
 | 7 | 33 × `animate-in` with `fade-in`, `zoom-in-95`, `slide-in-from-*` in 25 files (SelectionPopup, BlockAnnotationsPopover, InlineNotePopover, NotesPeekPanel, Sheet, AddToDossierPopover, KeyPassagePopover, …) | **These classes generate no CSS** (checked against the stylesheet the dev server serves on 18 Oct: zero rules; no `tailwindcss-animate`/`tw-animate-css` is installed or defined). Every entrance they describe is instant today — the same silent failure as gotcha 29. Define them once in `index.css` with `@utility` (`animate-in` = `animation: vlx-enter var(--tw-duration, 180ms) var(--ease-out) both`, reading `--tw-enter-opacity`, `--tw-enter-scale`, `--tw-enter-translate-*` set by `fade-in`, `zoom-in-95`, `slide-in-from-*-N`), cap the durations these files write at 200 ms, add a `theme.test.ts` check that `animate-in` generates a rule. **Then check every one of the 25 surfaces in the browser**: an entrance on the same element floating-ui positions breaks it (gotcha 10), and nobody could see that while the classes were inert. Document the finding as a gotcha in `apps/web/CLAUDE.md` |
-| 8 | `hover:scale-110` (6), `hover:scale-125` (2), `hover:scale-105` (2), `hover:-translate-y-0.5` (3), `hover:translate-x-1` (2) | same as row 4: remove on rows and lists, gate the rest to fine pointers |
+| 8 | `hover:scale-110` (6), `hover:scale-125` (2), `hover:scale-105` (2), `hover:-translate-y-0.5` (3), `hover:translate-x-1` (2) | Tailwind v4's `hover:` already compiles inside `@media (hover: hover)` (checked 19 Oct), so these do not stick on touch. What remains is taste: remove them on rows and lists (motion on something seen tens of times a day) |
 
 Acceptance: `review-animations` on the diff approves; feel-check each in slow motion (DevTools
 Animations panel at 10 %).
@@ -251,8 +251,10 @@ Coordinate with whoever owns the sections work first. Files: `components/layout/
   separate floating controls. Keep every behaviour (the services probe cadence is a rule: 5 minutes).
 - `mobile-native` checklist on the shell. Found on 18 Oct: the viewport meta lacks `viewport-fit=cover`
   (so the four `safe-area` uses resolve to 0 on a notched phone); no `-webkit-tap-highlight-color`
-  anywhere (the grey flash on every tap); 14 `100vh`/`h-screen` uses outside `h-app` (the iOS address
-  bar bug); ungated hover transforms (P2 row 8). Inputs are already ≥ 16 px on phones.
+  anywhere (the grey flash on every tap); 10 `100vh`/`h-screen` uses outside `h-app` (the iOS address
+  bar bug). Inputs are already ≥ 16 px on phones; hover is already gated by Tailwind v4. All of these
+  are fixed in #199 (`min-h-svh` for whole pages, `dvh` for panels, `touch-action: manipulation`,
+  `overscroll-behavior: none` on the root).
 
 ## P4 — Surfaces (one PR each, in this order)
 
