@@ -103,7 +103,7 @@ describe('ArticleTabContent: passage discussion loading', () => {
     renderArticle();
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Impossibile caricare le discussioni sui passaggi.');
+    expect(alert).toHaveTextContent('Impossibile caricare le glosse sui passaggi.');
     fireEvent.click(within(alert).getByRole('button', { name: /riprova/i }));
     expect(reload).toHaveBeenCalledOnce();
   });

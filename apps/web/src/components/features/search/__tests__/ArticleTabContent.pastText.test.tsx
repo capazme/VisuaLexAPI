@@ -183,7 +183,7 @@ describe('ArticleTabContent — a past text is a reading', () => {
 
   it('switches off the tools keyed by article, with the reason in the tooltip', () => {
     show(article(MIDDLE, PAST));
-    for (const name of ['Apri note', 'Gestisci evidenziazioni', 'Discussioni sull’articolo', 'Aggiungi a norme rapide']) {
+    for (const name of ['Apri note', 'Gestisci evidenziazioni', 'Glosse sull’articolo', 'Aggiungi a norme rapide']) {
       screen.getAllByTitle(`${name} — Non disponibile su un testo storico`).forEach((b) => expect(b).toBeDisabled());
     }
   });

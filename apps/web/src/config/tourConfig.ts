@@ -561,7 +561,7 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
         element: '.glass-toolbar',
         popover: {
             title: 'Barra Strumenti',
-            description: 'In una riga aperta: note personali, evidenziatore, discussioni, ricerca nel testo, copia, esportazione e altro.',
+            description: 'In una riga aperta: note personali, evidenziatore, glosse, ricerca nel testo, copia, esportazione e altro.',
             side: 'bottom',
             align: 'center',
         }

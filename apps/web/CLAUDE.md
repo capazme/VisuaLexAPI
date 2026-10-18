@@ -7,7 +7,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 ### Frontend (`apps/web/src`)
 
 - `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
-  `/studia` (VisuaLex Studia, the study cards: `StudiaPage` with its views under
+  `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
   in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/studia` redirects to `ripasso` (see «Card review» below); «Le mie schede» is
@@ -19,7 +19,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
-  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di VisuaLex Studia»
+  validators' `rilievi`, which the list does not carry (a failed read says so, with «Riprova»); the admin page's «Testi di VisuaLex Gymnasium»
   tab (`features/admin/StudiaTextsAdmin`, which keeps an unsaved draft across a reload) saves a text as a new version and its user list
   names the validators; both follow `VITE_FEATURE_STUDIA`. «Da validare» is `/studia/valida`
   (`ValidationQueueView`), linked for validators only (`useAuth().isValidator`, from `lingo_validatore`
@@ -56,7 +56,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`,
   `bulletin` (the Forum, which absorbed «Ambienti»), `history`, `compare`, `settings`, `studia` (VisuaLex
-  Studia: the study cards, see `/studia` above and «Study cards under the article»),
+  Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
   (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
   user drops in — parsed in the browser, never uploaded — each opening the
@@ -134,7 +134,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `docs/superpowers/specs/2026-10-13-merlt-data-protection-design.md`). The server is its only
   record (`ConsentContext`, nothing in the browser: until it answers, `canTrack` is false). A level
   counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
-  administrators edit as new versions in «Testi di VisuaLex Studia»); `ConsentScreen`, in the `global`
+  administrators edit as new versions in «Testi di VisuaLex Gymnasium»); `ConsentScreen`, in the `global`
   slot, asks it once as the app loads when it is unanswered — the first entry, then only a new
   version — and cannot be dismissed («Nessuna raccolta» is one of its three choices). No prompt
   during work: no banner, no teaser. `ConsentChoiceModal` is the one place a level is chosen (the
@@ -510,7 +510,9 @@ subject (the phone view and the desktop panel) and keeps the previous list meanw
 is counted on the round-B sign (`data-threads`, speech-bubble icon). In the text, words stay clean until a
 discussion is opened. The block popover (`BlockAnnotationsPopover`) lists the
 block's passage discussions with their quotation, title, author, reply count,
-and an "Apri discussione" action that opens the discussion panel. The discussed
+and an «Apri glossa» action that opens the discussion panel (the interface calls
+a discussion a «glossa»: «Glosse sull’articolo», «Glosse sulla decisione», «Nuova glossa»,
+«Glossa sul passo»; the code keeps `thread` and `discussion`). The discussed
 words light up only for the discussion open in the panel (`focusedThreadId` →
 `.vlx-thread-focus`), nesting inside any highlight over the same words. When the
 article text changes, a discussion whose words moved re-attaches to the new location;

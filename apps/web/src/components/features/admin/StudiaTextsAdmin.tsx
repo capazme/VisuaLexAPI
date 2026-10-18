@@ -202,7 +202,7 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
 }
 
 /**
- * The admin's «Testi di VisuaLex Studia»: each text the users accept before an action, its current
+ * The admin's «Testi di VisuaLex Gymnasium»: each text the users accept before an action, its current
  * version in a form with a preview, saved as a new version (never over the old one), and the earlier
  * versions beneath it, readable. The body is plain text, drawn by the same `TextParagraphs` the
  * users' dialog uses.
@@ -232,7 +232,7 @@ export function StudiaTextsAdmin() {
 
   return (
     <div className="space-y-5">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Testi di VisuaLex Studia</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Testi di VisuaLex Gymnasium</h2>
 
       {failed && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">

@@ -151,8 +151,8 @@ describe('signColors and signAriaLabel', () => {
     expect(signAriaLabel(1, 0)).toBe('1 nota in questo passo');
     expect(signAriaLabel(2, 1)).toBe('2 note e 1 evidenziazione in questo passo');
     expect(signAriaLabel(0, 3)).toBe('3 evidenziazioni in questo passo');
-    expect(signAriaLabel(0, 0, 1)).toBe('1 discussione in questo passo');
-    expect(signAriaLabel(2, 1, 3)).toBe('2 note, 1 evidenziazione e 3 discussioni in questo passo');
+    expect(signAriaLabel(0, 0, 1)).toBe('1 glossa in questo passo');
+    expect(signAriaLabel(2, 1, 3)).toBe('2 note, 1 evidenziazione e 3 glosse in questo passo');
   });
 });
 

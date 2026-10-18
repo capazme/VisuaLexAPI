@@ -498,7 +498,7 @@ export function AdminPage() {
                     )}
                   >
                     <GraduationCap size={16} />
-                    Testi di VisuaLex Studia
+                    Testi di VisuaLex Gymnasium
                   </button>
                 )}
                 {opsVisible && (
@@ -675,10 +675,10 @@ export function AdminPage() {
                                   checked={u.lingo_validatore}
                                   onChange={() => handleToggleValidator(u.id, u.lingo_validatore)}
                                   disabled={actionLoading}
-                                  aria-label={`Validatore di VisuaLex Studia: ${u.username}`}
+                                  aria-label={`Validatore di VisuaLex Gymnasium: ${u.username}`}
                                   className="h-4 w-4 rounded border-gray-300"
                                 />
-                                Validatore di VisuaLex Studia
+                                Validatore di VisuaLex Gymnasium
                               </label>
                             )}
                             <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">

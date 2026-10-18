@@ -182,7 +182,7 @@ export function signAriaLabel(notes: number, highlights: number, threads = 0): s
   const parts: string[] = [];
   if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'nota' : 'note'}`);
   if (highlights > 0) parts.push(`${highlights} ${highlights === 1 ? 'evidenziazione' : 'evidenziazioni'}`);
-  if (threads > 0) parts.push(`${threads} ${threads === 1 ? 'discussione' : 'discussioni'}`);
+  if (threads > 0) parts.push(`${threads} ${threads === 1 ? 'glossa' : 'glosse'}`);
   if (parts.length === 0) return 'in questo passo';
   if (parts.length === 1) return `${parts[0]} in questo passo`;
   if (parts.length === 2) return `${parts[0]} e ${parts[1]} in questo passo`;

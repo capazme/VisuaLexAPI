@@ -152,7 +152,7 @@ export function ReadingToolbar({
                     aria-expanded={isDiscussionOpen}
                     aria-haspopup="dialog"
                     className={cn("inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary-500")}
-                    title={tip("Discussioni sull’articolo", lockedReason)}
+                    title={tip("Glosse sull’articolo", lockedReason)}
                     {...lock(lockedReason)}
                 >
                     <MessageCircle size={20} />
@@ -228,7 +228,7 @@ export function ReadingToolbar({
                 <DiscussionButton
                     isOpen={isDiscussionOpen}
                     onToggle={onToggleDiscussion}
-                    name="Discussioni sull’articolo"
+                    name="Glosse sull’articolo"
                     lockedReason={lockedReason}
                 />
                 {find && <FindInTextButton ref={desktopFindRef} isOpen={find.isOpen} onToggle={toggleFind} />}

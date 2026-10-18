@@ -219,7 +219,7 @@ export function BlockAnnotationsPopover({
                             )}
                             {group.threads.length > 0 && (
                                 <section className="space-y-2">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Discussioni</h4>
+                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Glosse</h4>
                                     {group.threads.map((thread) => (
                                         <ThreadCard
                                             key={thread.id}
@@ -316,7 +316,7 @@ function ThreadCard({
                     onClick={onOpen}
                     className="inline-flex min-h-[44px] items-center gap-1 rounded px-1 text-xs font-medium text-slate-500 transition-colors hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:py-0.5 dark:text-slate-400 dark:hover:text-primary-400"
                 >
-                    <MessageCircle size={12} aria-hidden /> Apri discussione
+                    <MessageCircle size={12} aria-hidden /> Apri glossa
                 </button>
             </div>
         </div>

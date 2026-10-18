@@ -119,22 +119,22 @@ describe('ArticleTabContent passage discussions', () => {
     );
 
     const readerError = await screen.findByRole('alert');
-    expect(readerError).toHaveTextContent('Impossibile caricare le discussioni sui passaggi.');
+    expect(readerError).toHaveTextContent('Impossibile caricare le glosse sui passaggi.');
     expect(readerError).toHaveTextContent('I segni potrebbero non mostrarle.');
-    expect(screen.queryByText(/Nessuna discussione ancora\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
     expect(container.querySelector('.vlx-sign[data-threads="1"]')).toBeNull();
 
-    fireEvent.click(screen.getAllByTitle('Discussioni sull’articolo')[0]);
-    const panel = await screen.findByRole('dialog', { name: 'Discussioni sull’articolo' });
+    fireEvent.click(screen.getAllByTitle('Glosse sull’articolo')[0]);
+    const panel = await screen.findByRole('dialog', { name: 'Glosse sull’articolo' });
     const panelError = await within(panel).findByRole('alert');
     expect(screen.getAllByRole('alert')).toHaveLength(1);
-    expect(within(panel).queryByText(/Nessuna discussione ancora\./)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
 
     fireEvent.click(within(panelError).getByRole('button', { name: /riprova/i }));
 
-    expect(await within(panel).findByRole('status')).toHaveTextContent('Aggiornamento discussioni sui passaggi…');
+    expect(await within(panel).findByRole('status')).toHaveTextContent('Aggiornamento glosse sui passaggi…');
     expect(within(panel).queryByRole('alert')).not.toBeInTheDocument();
-    expect(within(panel).queryByText(/Nessuna discussione ancora\./)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
     expect(listPassages).toHaveBeenCalledTimes(2);
 
     await act(async () => {
@@ -142,15 +142,15 @@ describe('ArticleTabContent passage discussions', () => {
       await retry.promise;
     });
 
-    const sign = await screen.findByRole('button', { name: '1 discussione in questo passo' });
+    const sign = await screen.findByRole('button', { name: '1 glossa in questo passo' });
     expect(within(panel).queryByRole('status')).not.toBeInTheDocument();
     expect(within(panel).queryByRole('alert')).not.toBeInTheDocument();
-    expect(within(panel).queryByText(/Nessuna discussione ancora\./)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
     expect(container.querySelector('.vlx-sign[data-threads="1"]')).toBeInTheDocument();
     expect(within(panel).getByText('Chiarimento sul pagamento')).toBeInTheDocument();
 
     fireEvent.click(sign);
-    const openThread = await screen.findByRole('button', { name: /apri discussione/i });
+    const openThread = await screen.findByRole('button', { name: /apri glossa/i });
     fireEvent.click(openThread);
 
     expect(await within(panel).findByText('Discussione sulla portata del pagamento.')).toBeInTheDocument();

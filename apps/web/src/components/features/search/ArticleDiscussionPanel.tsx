@@ -61,8 +61,8 @@ interface Props {
 export function ArticleDiscussionPanel({
   anchor: anchorProp,
   label,
-  heading = 'Discussioni sull’articolo',
-  textChangedNotice = 'Il testo dell’articolo è cambiato da quando è stata aperta questa discussione.',
+  heading = 'Glosse sull’articolo',
+  textChangedNotice = 'Il testo dell’articolo è cambiato da quando è stata aperta questa glossa.',
   detachedPassageNotice = 'Il passo discusso non si trova nel testo che stai leggendo.',
   textUnavailableNotice = 'Il passo citato non è mostrato: il testo non è disponibile.',
   isOpen,
@@ -131,7 +131,7 @@ export function ArticleDiscussionPanel({
       const response = await articleDiscussionService.list(anchor, sort);
       setThreads(response.data);
     } catch {
-      setError('Impossibile caricare le discussioni. Riprova tra poco.');
+      setError('Impossibile caricare le glosse. Riprova tra poco.');
     } finally {
       setIsLoading(false);
     }
@@ -213,7 +213,7 @@ export function ArticleDiscussionPanel({
         onFocusThread?.(newThread.id);
       }
     } catch {
-      setError('Impossibile pubblicare la discussione.');
+      setError('Impossibile pubblicare la glossa.');
     }
   };
 
@@ -328,9 +328,9 @@ export function ArticleDiscussionPanel({
             <option value="popular">Più votate</option>
           </select>
           <button type="button" onClick={() => setComposerOpen(value => !value)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700">
-            <Plus size={14} /> Nuova discussione
+            <Plus size={14} /> Nuova glossa
           </button>
-          <button type="button" onClick={onClose} aria-label="Chiudi discussioni" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+          <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
             <X size={18} />
           </button>
         </div>
@@ -341,7 +341,7 @@ export function ArticleDiscussionPanel({
           {draft && (
             <div className="rounded-lg border border-primary-300 dark:border-primary-800 bg-white/70 dark:bg-slate-900/70 p-2.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">
-                Discussione sul passo
+                Glossa sul passo
               </span>
               <p className="mt-1 line-clamp-4 text-xs italic text-slate-700 dark:text-slate-300">
                 «{draft.passage.quote}»
@@ -354,8 +354,8 @@ export function ArticleDiscussionPanel({
             required={!draft}
             minLength={draft ? undefined : 3}
             maxLength={200}
-            placeholder={draft ? "Titolo (facoltativo)" : "Titolo della discussione"}
-            aria-label={draft ? "Titolo (facoltativo)" : "Titolo della discussione"}
+            placeholder={draft ? "Titolo (facoltativo)" : "Titolo della glossa"}
+            aria-label={draft ? "Titolo (facoltativo)" : "Titolo della glossa"}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           <textarea
@@ -365,7 +365,7 @@ export function ArticleDiscussionPanel({
             minLength={3}
             maxLength={10000}
             placeholder="Condividi una domanda o un'osservazione..."
-            aria-label="Testo della discussione"
+            aria-label="Testo della glossa"
             rows={4}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
@@ -383,12 +383,12 @@ export function ArticleDiscussionPanel({
       {error && <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">{error}</div>}
       {passageThreadsLoading && (
         <p role="status" className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-          Aggiornamento discussioni sui passaggi…
+          Aggiornamento glosse sui passaggi…
         </p>
       )}
       {passageLoadError && (
         <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-          <span>Impossibile caricare le discussioni sui passaggi. I segni potrebbero non mostrarle.</span>
+          <span>Impossibile caricare le glosse sui passaggi. I segni potrebbero non mostrarle.</span>
           {onRetryPassageLoad && (
             <button type="button" onClick={onRetryPassageLoad} className="font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               Riprova
@@ -398,11 +398,11 @@ export function ArticleDiscussionPanel({
       )}
       {passageLoadError && threads.length === 0 && !isLoading && (
         <p className="mb-3 rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 dark:border-slate-700">
-          Le discussioni non sono disponibili al momento, quindi l’elenco potrebbe essere incompleto.
+          Le glosse non sono disponibili al momento, quindi l’elenco potrebbe essere incompleto.
         </p>
       )}
       {notice && <div role="status" className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">{notice}</div>}
-      {isLoading ? <p className="text-sm text-slate-400">Caricamento discussioni…</p> : threads.length === 0 && (passageLoadError || passageThreadsLoading) ? null : threads.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-500">Nessuna discussione ancora. Puoi essere il primo a porre una domanda.</p> : (
+      {isLoading ? <p className="text-sm text-slate-400">Caricamento glosse…</p> : threads.length === 0 && (passageLoadError || passageThreadsLoading) ? null : threads.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-500">Nessuna glossa ancora. Puoi essere il primo a porre una domanda.</p> : (
         <div className="space-y-3">
           {threads.map(thread => {
             const isExpanded = expanded.has(thread.id);
@@ -433,7 +433,7 @@ export function ArticleDiscussionPanel({
               passage && !thread.title.trim()
                 ? (shownQuote !== null
                   ? `«${shownQuote}»`
-                  : isDetached ? 'Discussione su un passo non più nel testo' : 'Discussione su un passo')
+                  : isDetached ? 'Glossa su un passo non più nel testo' : 'Glossa su un passo')
                 : thread.title;
 
             return (
@@ -466,7 +466,7 @@ export function ArticleDiscussionPanel({
                   <button
                     type="button"
                     onClick={() => void voteThread(thread)}
-                    aria-label="Vota discussione"
+                    aria-label="Vota glossa"
                     className={cn('inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs', thread.userVoted ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800')}
                   >
                     <ThumbsUp size={13} /> {thread.voteCount}

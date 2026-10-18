@@ -315,7 +315,7 @@ describe('«Da validare», the queue', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Questa sezione è riservata ai validatori di VisuaLex Studia')).toBeInTheDocument();
+    expect(await screen.findByText('Questa sezione è riservata ai validatori di VisuaLex Gymnasium')).toBeInTheDocument();
     expect(screen.queryByText('Non sei più tra i validatori')).toBeNull();
   });
 
