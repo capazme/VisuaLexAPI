@@ -177,9 +177,16 @@ BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
   proposals, votes, issue reports) stays with the link to the person cut. Every
   step is idempotent, and a failed store makes the answer 503 so the BFF retries.
   Errors report the exception's class only: a message can carry the user id.
-- `retention.py`: `tracking_events` expire after `MERLT_TRACKING_RETENTION_DAYS`
-  (default 365); the lifespan loop purges every `MERLT_RETENTION_INTERVAL_HOURS`
-  (default 24), first a few minutes after boot.
+- `retention.py` (periods decided by the owner, 18 October 2026):
+  `tracking_events` expire after `MERLT_TRACKING_RETENTION_DAYS` (default 365);
+  the assistant's questions (`qa_traces`), the judgements on them (`qa_feedback`,
+  the Devil's Advocate log), the citation feedback (`ner_feedback`) and the replay
+  buffer's experiences after `MERLT_ASSISTANT_RETENTION_DAYS` (default 730); each
+  pass also strips `note_text` from stored events. The lifespan loop runs every
+  `MERLT_RETENTION_INTERVAL_HOURS` (default 24), first a few minutes after boot.
+- **MERL-T never collects the text of a note** (the owner, 18 October 2026, «c»):
+  an annotation event carries the anchored passage, never the note's words. The BFF
+  does not relay it; do not add a field that carries it.
 - `api/user_data_router.py`: `GET`/`DELETE /api/v1/user-data/{user_id}`, admin
   key only (`require_role("admin")`).
 

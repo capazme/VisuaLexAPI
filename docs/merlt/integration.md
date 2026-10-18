@@ -150,7 +150,7 @@ Il dettaglio di ogni passo, con le chiamate di rete attese, è in [smoke-checkli
 | `MERLT_SKIP_SEED` / `MERLT_SKIP_EMBEDDINGS` | `false` / `true` | api (il worker ha sempre `MERLT_SKIP_SEED=true`) |
 | `MERLT_EXTRACT_JOB_TIMEOUT` | 1800 | api, perché è chi accoda |
 | `MERLT_HYGIENE_INTERVAL_HOURS` | 24 (0 nel codice = spento) | api |
-| `MERLT_TRACKING_RETENTION_DAYS` / `MERLT_RETENTION_INTERVAL_HOURS` | 365 / 24 | api: dopo quanti giorni gli eventi di `tracking_events` vengono cancellati, e ogni quante ore passa la pulizia (sempre accesa; `merlt/privacy/retention.py`) |
+| `MERLT_TRACKING_RETENTION_DAYS` / `MERLT_ASSISTANT_RETENTION_DAYS` / `MERLT_RETENTION_INTERVAL_HOURS` | 365 / 730 / 24 | api: dopo quanti giorni vengono cancellati gli eventi di `tracking_events` e, rispettivamente, le domande all'assistente, i giudizi e le segnalazioni sulle citazioni; ogni quante ore passa la pulizia (sempre accesa; `merlt/privacy/retention.py`) |
 | `MERLT_NEURAL_TRAVERSAL_ENABLED`, `MERLT_REACT_ENABLED`, `MERLT_SEMANTIC_SEARCH_ENABLED`, `MERLT_ADVANCED_ROUTING_ENABLED` | `true` | api, worker |
 | `MERLT_BFF_CALLBACK_URL`, `MERLT_BFF_EXTRACTION_CALLBACK_URL` / `MERLT_BFF_QA_CALLBACK_URL` | `http://host.docker.internal:3001/api/merlt/internal/...` | worker / api |
 
