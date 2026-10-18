@@ -18,6 +18,7 @@ from typing import Any, Awaitable, Callable
 import aiohttp
 
 from e2e.config import CONFIG, Config
+from e2e.consent import NoticeMissing, consent_body, notice_id_from
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = REPO_ROOT / "apps" / "server"
@@ -274,9 +275,16 @@ def build_checks(cfg: Config, session: aiohttp.ClientSession,
         if not token:
             return False, "no admin token (check 11 failed)"
         hdrs = {"Authorization": f"Bearer {token}"}
+        status, current = await _http(session, "GET", f"{cfg.bff}/merlt/consent", headers=hdrs)
+        if status != 200:
+            return False, f"read consent -> {status} {_short(current, 100)}"
+        try:
+            notice_id = notice_id_from(current)
+        except NoticeMissing as exc:
+            return False, str(exc)
         status, body = await _http(
             session, "POST", f"{cfg.bff}/merlt/consent",
-            json_body={"level": "basic", "reason": "e2e preflight"}, headers=hdrs,
+            json_body=consent_body("basic", notice_id, "e2e preflight"), headers=hdrs,
         )
         if status != 200 or not (isinstance(body, dict) and body.get("graphEnabled") is True):
             return False, f"set basic -> {status} {_short(body, 100)}"
