@@ -30,8 +30,7 @@ Spec: `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`. Three PRs
    Rebase on #187 if it lands first (both touch the admin «studia» tab).
 2. «Discussioni» → «Glosse» in the reader's copy (articles, decisions, passages).
 3. Tests that assert the old copy move to the new one; docs; web suite, build, lint; browser pass.
-4. To Guglielmo's side: the server's «Discussione non trovata» and the other messages in
-   `articleDiscussionController.ts`.
+4. The server's messages (`articleDiscussionController.ts`) are the server side's: done in `fix/glossa-messaggi`.
 
 ## At the end
 

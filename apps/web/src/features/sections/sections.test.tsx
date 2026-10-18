@@ -66,6 +66,23 @@ describe('useSection', () => {
     expect(result.current.section).toBe('opus');
   });
 
+  it('switches section when the browser refuses to save it (full or blocked storage)', () => {
+    const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { result } = render('/');
+      act(() => result.current.chooseSection('forum'));
+      expect(result.current.pathname).toBe('/forum');
+      expect(result.current.section).toBe('forum');
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
+      warn.mockRestore();
+    }
+  });
+
   it("stores a choice and goes to the section's page (S4)", () => {
     const { result } = render('/');
     act(() => result.current.chooseSection('gymnasium'));
