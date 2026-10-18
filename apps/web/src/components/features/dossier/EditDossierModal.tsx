@@ -1,20 +1,22 @@
 import { useState } from 'react';
-import type { Dossier } from '../../../types';
+import type { Dossier, DossierKind } from '../../../types';
+import { DossierKindChoice } from './DossierKindChoice';
 
 interface Props {
   dossier: Dossier;
   onClose: () => void;
-  onSave: (title: string, description: string, tags: string[]) => void;
+  onSave: (title: string, description: string, tags: string[], kind: DossierKind) => void;
 }
 
 export function EditDossierModal({ dossier, onClose, onSave }: Props) {
   const [title, setTitle] = useState(dossier.title);
   const [description, setDescription] = useState(dossier.description ?? '');
   const [tagsInput, setTagsInput] = useState((dossier.tags ?? []).join(', '));
+  const [kind, setKind] = useState<DossierKind>(dossier.kind ?? 'lavoro');
 
   const handleSave = () => {
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
-    onSave(title, description, tags);
+    onSave(title, description, tags, kind);
     onClose();
   };
 
@@ -51,6 +53,7 @@ export function EditDossierModal({ dossier, onClose, onSave }: Props) {
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               />
             </div>
+            <DossierKindChoice value={kind} onChange={setKind} />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <button

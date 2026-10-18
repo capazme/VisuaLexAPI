@@ -977,6 +977,9 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
   // An item published from a dossier stays one dossier, named as the item is: its content is
   // rewritten when its name, description or tags change, even with no new content (no new version).
   let renamedOnly = false;
+  // A new version of a dossier carries the notes and highlights its author ticked this time: the two
+  // switches follow what it holds (the first publication's choice must not refuse a later note).
+  let switches: { includeNotes: boolean; includeHighlights: boolean } | null = null;
   if (existing.sourceDossierId) {
     if (data.versionMode === 'coexist' && data.content) {
       throw new AppError(400, 'Un dossier pubblicato ha una sola versione corrente: aggiornala invece di affiancarne una.');
@@ -984,6 +987,9 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
     const fieldsChange = data.title !== undefined || data.description !== undefined || data.tags !== undefined;
     if (content || fieldsChange) {
       renamedOnly = !content;
+      switches = content
+        ? { includeNotes: content.annotations.length > 0, includeHighlights: content.highlights.length > 0 }
+        : { includeNotes: existing.includeNotes, includeHighlights: existing.includeHighlights };
       content = asDossierPublication(
         content ?? publishedContent(existing.content, 'read'),
         {
@@ -991,7 +997,7 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
           description: data.description !== undefined ? data.description : existing.description,
           tags: data.tags ?? existing.tags,
         },
-        { includeNotes: existing.includeNotes, includeHighlights: existing.includeHighlights },
+        switches,
       );
     }
   }
@@ -1061,6 +1067,10 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
     updateData.content = content;
     // A new name alone is not a new version.
     if (!renamedOnly) updateData.currentVersion = existing.currentVersion + 1;
+  }
+  if (switches) {
+    updateData.includeNotes = switches.includeNotes;
+    updateData.includeHighlights = switches.includeHighlights;
   }
 
   const env = await prisma.$transaction(async (tx) => {

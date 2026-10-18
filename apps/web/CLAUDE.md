@@ -767,6 +767,11 @@ host (a preview such as the palette's result card) registers and records nothing
 ### Dossier
 
 A dossier is where the articles needed for a task are aggregated and read.
+It is **di lavoro** (a practice: it may hold a client's data; the default, and what every older
+dossier is) or **di studio** (a topic studied) — `Dossier.kind`, chosen in `DossierModal` and
+«Modifica» (`DossierKindChoice`), filtered on the list («Tutti · Di lavoro · Di studio») and named in
+the detail's header line (`kindLabel`, `dossierKinds.ts`); `published` (its copy in the Forum, the owner's alone) and
+`forumBlocked` come from the server (spec `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`).
 It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-atto-design.md`).
 
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
@@ -801,6 +806,33 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   keeps the ids (question 181): «Annulla» restores the trash entry, so a note stays
   about its article and Claude's mark survives, as in the MCP trash. The note dialog closes only once
   the server has the note, so a refused note keeps its text.
+- **«Pubblica nel Forum»** (`DossierForumActions` in the header, spec
+  `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D3–D7; the owner's answers of
+  14 October 2026): a dossier never published shows «Pubblica nel Forum» (disabled, «Ritirato dal Forum»,
+  when the admin withdrew its copy: `forumBlocked`); a published one a «Forum» menu naming its state
+  («Nel Forum · v N», «Ritirato dal Forum», «Ritirato dall'amministrazione») with «Aggiorna la versione
+  pubblicata», «Ritira» / «Ripubblica», «Apri il Forum» and «Elimina dal Forum» (danger confirmation);
+  each reads the dossier again (`refreshDossier`). `PublishDossierDialog` (a `ui/Modal`) asks title,
+  description, category (`utils/forumCategories.ts`, the one list) and tags, reads the marks once, at
+  opening, from the server (`publicationMarks.ts`: `loadPdfMarks`, never the browser's partial cache; a
+  decision's anchors only when their words are still in its current text, `travellingSelection`, what is
+  left out said in a sentence), and shows the preview built by
+  `dossierPublication.ts` (`buildPublication`, pure: one function makes the rows and the payload, so
+  nothing leaves that a row did not show). Every entry travels except a norm the rebuild refuses (listed
+  as left out); highlights start ticked, every note — the dossier's own, those on its articles and
+  decisions — unticked; a row whose article also sits in one of the user's dossiers di lavoro says so
+  (the name is never sent). Marks are read under the private item's keys and sent under the rebuilt
+  entry's (`rebuildNormEntry` then `buildItemKey`), so a downloader's reader finds them; text and anchors
+  as stored (root rule 23). The machine's check (`utils/personalDataPatterns.ts`: codice fiscale,
+  partita IVA and IBAN with their check digits, e-mail and PEC, Italian telephone numbers; never names)
+  marks what it finds in the fields and the rows, changing no character; the owner's warning, one more
+  line for a dossier di lavoro, and the required «Ho controllato: non contiene dati personali» stand
+  before «Pubblica». An update starts from what the Forum holds (`getById`, once, never over a field the
+  user changed; the minute's `refreshDossier` neither resets it nor reads the marks again) — its ticks too:
+  exactly the notes, highlights and note entries the published copy carries (`ticksFromPublished`, by each
+  row's `match`), so an update never drops a note sent before nor sends one left out — sends a new
+  version and clears an emptied description (`null`); a 409 on «Pubblica» reads the dossier again and the
+  dialog becomes the update.
 - **The trash** (what a connected application deleted, and the dossiers, the entries removed from a dossier and the study cards the user deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries

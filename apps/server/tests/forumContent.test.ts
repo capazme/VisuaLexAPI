@@ -254,6 +254,26 @@ describe('publishing from a dossier', () => {
     expect(updated.body.content.dossiers[0].items).toHaveLength(2);
   });
 
+  it('takes a note in a later version although the first publication had none, and says so to a downloader', async () => {
+    // As the web publishes a dossier with every note left out.
+    const res = await publish({ includeNotes: false, includeHighlights: false });
+    expect(res.body.includeNotes).toBe(false);
+    const note = { normaKey: 'codice-civile--2043', articleId: '2043', text: 'una nota' };
+    const updated = await request(app).put(`/api/shared-environments/${res.body.id}`).set(authHeader(alice))
+      .send({ content: oneDossier({ annotations: [note] }) });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({ includeNotes: true, includeHighlights: false, currentVersion: 2 });
+    expect(updated.body.content.annotations).toHaveLength(1);
+  });
+
+  it('clears the description of the dossier inside when the item\'s is cleared', async () => {
+    const res = await publish({});
+    const cleared = await request(app).put(`/api/shared-environments/${res.body.id}`).set(authHeader(alice)).send({ description: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.description).toBeNull();
+    expect(cleared.body.content.dossiers[0]).not.toHaveProperty('description');
+  });
+
   it('refuses a version side by side for an item published from a dossier', async () => {
     const res = await publish({});
     const coexist = await request(app).put(`/api/shared-environments/${res.body.id}`).set(authHeader(alice))

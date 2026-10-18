@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, DossierItem, DossierKind, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 import { getErrorMessage } from '../utils/errors';
 import {
@@ -519,10 +519,10 @@ interface AppState {
     removeBookmark: (normaKey: string) => void;
     isBookmarked: (normaKey: string) => boolean;
 
-    createDossier: (title: string, description?: string) => Promise<string | null>; // returns new server-side dossier ID, null on failure
+    createDossier: (title: string, description?: string, kind?: DossierKind) => Promise<string | null>; // returns new server-side dossier ID, null on failure
     /** Moves a dossier to the trash; the trash entry and what it holds, or null when the server refused (put back, error shown). */
     deleteDossier: (id: string) => Promise<{ trashId: string; itemCount: number } | null>;
-    updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
+    updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[]; kind?: DossierKind }) => void;
     toggleDossierPin: (id: string) => void;
     addToDossier: (dossierId: string, item: DossierNormaData | DossierSentenzaData | string, type: 'norma' | 'note' | 'sentenza') => void;
     /** Moves entries to the trash in one call; the trash entry's id (for «Annulla»), or null when refused (put back, error shown). */
@@ -1506,11 +1506,12 @@ const appStore = createStore<AppState>()(
             // id back (e.g. to addToDossier right after) — the old optimistic
             // tempId forced a fragile "read the last dossier in the store"
             // dance that raced with the id swap.
-            createDossier: async (title, description) => {
+            createDossier: async (title, description, kind = 'lavoro') => {
                 try {
                     const created = await dossierService.create({
                         name: title,
                         description,
+                        kind,
                     });
                     set((state) => {
                         upsertById(state.dossiers, {
@@ -1518,7 +1519,11 @@ const appStore = createStore<AppState>()(
                             title,
                             description,
                             createdAt: created.created_at,
-                            items: []
+                            items: [],
+                            // What the server stored (an older server knows no kind: then what was asked).
+                            kind: created.kind ?? kind,
+                            published: null,
+                            forumBlocked: false,
                         });
                     });
                     return created.id;
@@ -1563,6 +1568,7 @@ const appStore = createStore<AppState>()(
                         if (updates.title !== undefined) dossier.title = updates.title;
                         if (updates.description !== undefined) dossier.description = updates.description;
                         if (updates.tags !== undefined) dossier.tags = updates.tags;
+                        if (updates.kind !== undefined) dossier.kind = updates.kind;
                     }
                 });
 
@@ -1571,6 +1577,7 @@ const appStore = createStore<AppState>()(
                     name: updates.title,
                     description: updates.description,
                     ...(updates.tags !== undefined && { tags: updates.tags }),
+                    ...(updates.kind !== undefined && { kind: updates.kind }),
                 }).catch(err => {
                     console.error('Failed to update dossier:', err);
                     get().pushSyncError('Impossibile salvare le modifiche al dossier. Riprova.');

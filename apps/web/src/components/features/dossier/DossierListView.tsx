@@ -27,7 +27,7 @@ import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { searchesIntoOnePractice } from './openInPractice';
-import type { Dossier } from '../../../types';
+import type { Dossier, DossierKind } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
@@ -53,6 +53,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<DossierKind | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
@@ -91,6 +92,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       result = result.filter((d) => d.tags?.includes(selectedTag));
     }
 
+    if (kindFilter !== 'all') {
+      result = result.filter((d) => (d.kind ?? 'lavoro') === kindFilter);
+    }
+
     result.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
@@ -106,7 +111,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     });
 
     return result;
-  }, [dossiers, searchQuery, selectedTag, sortBy]);
+  }, [dossiers, searchQuery, selectedTag, kindFilter, sortBy]);
 
   // Open-on-dashboard: 0 norms → noop, 1 norm → direct, >1 → picker modal.
   const handleQuickOpen = (dossier: Dossier) => {
@@ -143,9 +148,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     triggerMultiSearch(paramsList);
   };
 
-  const handleUpdateDossier = (title: string, description: string, tags: string[]) => {
+  const handleUpdateDossier = (title: string, description: string, tags: string[], kind: DossierKind) => {
     if (editingDossier) {
-      updateDossier(editingDossier.id, { title, description, tags });
+      updateDossier(editingDossier.id, { title, description, tags, kind });
       showToast('Dossier aggiornato', 'success');
     }
   };
@@ -301,6 +306,27 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           </select>
         </div>
 
+        {dossiers.length > 0 && (
+          <div role="group" aria-label="Tipo di dossier" className="flex gap-2 overflow-x-auto -mx-1 px-1">
+            {([['all', 'Tutti'], ['lavoro', 'Di lavoro'], ['studio', 'Di studio']] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setKindFilter(value)}
+                aria-pressed={kindFilter === value}
+                className={cn(
+                  'px-4 py-2 md:px-3 md:py-1 rounded-lg text-sm transition-colors whitespace-nowrap min-h-[44px] md:min-h-0 flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                  kindFilter === value
+                    ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {allTags.length > 0 && (
           <div id="tour-dossier-filters" className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <button
@@ -340,14 +366,14 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <div className="col-span-full">
             <EmptyState
               variant="dossier"
-              title={searchQuery || selectedTag ? 'Nessun risultato' : 'Nessun dossier creato'}
+              title={searchQuery || selectedTag || kindFilter !== 'all' ? 'Nessun risultato' : 'Nessun dossier creato'}
               description={
-                searchQuery || selectedTag
+                searchQuery || selectedTag || kindFilter !== 'all'
                   ? 'Prova a modificare i filtri di ricerca.'
                   : 'I dossier ti permettono di organizzare articoli per tema, progetto o caso. Crea il tuo primo dossier per iniziare.'
               }
               action={
-                !(searchQuery || selectedTag) && (
+                !(searchQuery || selectedTag || kindFilter !== 'all') && (
                   <button
                     onClick={() => setIsModalOpen(true)}
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
@@ -394,7 +420,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     className="flex items-center gap-1 flex-shrink-0"
                   >
                     <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
-                      {dossier.items.length} elementi
+                      {dossier.items.length} {dossier.items.length === 1 ? 'elemento' : 'elementi'}
                     </span>
                     <button
                       type="button"
@@ -436,6 +462,20 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     <AttributionChip author={dossier.originalAuthor} className="ml-1" />
                   )}
                 </div>
+                {(dossier.kind === 'studio' || dossier.published?.isActive) && (
+                  <div className="mb-1 flex flex-wrap gap-1.5">
+                    {dossier.kind === 'studio' && (
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        Di studio
+                      </span>
+                    )}
+                    {dossier.published?.isActive && (
+                      <span className="inline-flex items-center gap-1 rounded bg-violet-50 px-1.5 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        Pubblicato nel Forum
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 min-h-[2.5em]">
                   {dossier.description || 'Nessuna descrizione'}
                 </p>

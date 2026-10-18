@@ -248,8 +248,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   dossier or 404; a second publication of it 409, the unique index's P2002 too): exactly one
   dossier, no quick norms or aliases, notes and highlights only when their switch is on, and the
   dossier inside named by the item's title, description and tags, never the private dossier's
-  name — kept so by `PUT` (a new name rewrites it without a new version; `coexist` refused) and by
-  a restore. The link is answered to the owner only (`sourceDossierId`, `withdrawnByAdmin`), never
+  name — kept so by `PUT` (a new name rewrites it without a new version; a new content sets the two
+  switches from what it holds, so a later version may carry notes the first had none of; `coexist`
+  refused) and by a restore. The link is answered to the owner only (`sourceDossierId`, `withdrawnByAdmin`), never
   changed after the publication. **A withdrawn item** is a 404, like a missing one, to everyone
   but its owner and an admin on detail, like, download, versions, report, a new suggestion and
   added items; the list shows active items only, and a proposer's sent list keeps only the id of a
