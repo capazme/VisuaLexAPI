@@ -10,6 +10,7 @@ import { ArrowUpRight, Plus } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
 import { dossierRecency } from '../dossier/dossierUtils';
+import { kindLabel } from '../dossier/dossierKinds';
 import { greeting } from './scrivaniaGreeting';
 
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
@@ -78,9 +79,9 @@ export function Scrivania() {
               {recent.map((d) => (
                 <li key={d.id}>
                   <button className={ROW} onClick={() => navigate(`/dossier?dossier=${d.id}`)}>
-                    <span className="w-24 shrink-0 text-sm text-slate-500 dark:text-slate-400">{d.kind === 'studio' ? 'Di studio' : 'Dossier'}</span>
+                    <span className="hidden w-36 shrink-0 text-sm text-slate-500 sm:block dark:text-slate-400">{kindLabel(d.kind)}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-serif text-[19px] text-slate-900 dark:text-slate-50">{d.title}</span>
+                      <span title={d.title} className="block truncate font-serif text-[19px] text-slate-900 dark:text-slate-50">{d.title}</span>
                       <span className="block text-sm text-slate-500 dark:text-slate-400">
                         {d.items.length === 1 ? '1 voce' : `${d.items.length} voci`}
                       </span>
@@ -118,7 +119,7 @@ export function Scrivania() {
                       triggerSearch(qn.searchParams);
                     }}
                   >
-                    <span className="min-w-0 flex-1 truncate font-serif text-[19px] text-slate-900 dark:text-slate-50">{qn.label}</span>
+                    <span title={qn.label} className="min-w-0 flex-1 truncate font-serif text-[19px] text-slate-900 dark:text-slate-50">{qn.label}</span>
                     <span className="hidden shrink-0 text-sm text-slate-500 sm:block dark:text-slate-400">{qn.searchParams.act_type}</span>
                     <ArrowUpRight aria-hidden="true" size={16} className="shrink-0 text-slate-400 transition-colors group-hover:text-primary-600" />
                   </button>
