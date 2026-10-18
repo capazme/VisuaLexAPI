@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import * as adminService from '../../../services/adminService';
 import type { StudiaSoglie, StudiaSoglieEffetto, StudiaSoglieSettings } from '../../../services/adminService';
 import { Button } from '../../ui/Button';
@@ -13,6 +14,11 @@ const PANEL = 'rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-7
 const wholeNumber = (text: string): number | null => (/^\d+$/.test(text.trim()) ? Number(text) : null);
 
 type Draft = { approvazioni: string; errate: string };
+
+/** The counts in Italian, with the agreement of «scheda» (1 is singular). */
+const diventano = (n: number) => (n === 1 ? '1 scheda diventa validata' : `${n} schede diventano validate`);
+const validate = (n: number) => (n === 1 ? '1 scheda validata' : `${n} schede validate`);
+const archiviate = (n: number) => (n === 1 ? '1 archiviata' : `${n} archiviate`);
 
 /** The draft as numbers when both are valid, and which of the two is not (each field says its own). */
 function checkDraft(draft: Draft, settings: StudiaSoglieSettings) {
@@ -41,7 +47,8 @@ export function StudiaSoglieAdmin() {
   const [preview, setPreview] = useState<{ key: string; effetto: StudiaSoglieEffetto } | null>(null);
   const [previewFailed, setPreviewFailed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  // The reason a save failed: the server's own message on a 400, else a general one.
+  const [saveFailed, setSaveFailed] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,7 +81,12 @@ export function StudiaSoglieAdmin() {
     let live = true;
     const timer = window.setTimeout(() => {
       adminService.previewStudiaSoglie({ approvazioni: previewApprovazioni, errate: previewErrate }).then(
-        (effetto) => live && setPreview({ key: previewKey, effetto }),
+        (effetto) => {
+          if (!live) return;
+          setPreview({ key: previewKey, effetto });
+          // A value that failed before and works now is no longer failed.
+          setPreviewFailed((before) => (before === previewKey ? null : before));
+        },
         () => live && setPreviewFailed(previewKey),
       );
     }, 300);
@@ -93,15 +105,16 @@ export function StudiaSoglieAdmin() {
   const save = async () => {
     if (!soglie) return;
     setSaving(true);
-    setSaveFailed(false);
+    setSaveFailed(null);
     try {
       const esito = await adminService.saveStudiaSoglie(soglie);
       setSettings((before) => (before ? { ...before, soglie: esito.soglie } : before));
       setDraft(null);
       setPreview(null);
-      setSaved(`Soglie salvate. ${esito.validate} schede validate, ${esito.archiviate} archiviate.`);
-    } catch {
-      setSaveFailed(true);
+      setSaved(`Soglie salvate. ${validate(esito.validate)}, ${archiviate(esito.archiviate)}.`);
+    } catch (error) {
+      const problem = error as { status?: number; message?: string } | null;
+      setSaveFailed(problem?.status === 400 && problem.message ? problem.message : 'Non sono riuscito a salvare le soglie. Riprova.');
     } finally {
       setSaving(false);
     }
@@ -113,7 +126,7 @@ export function StudiaSoglieAdmin() {
         <h3 id={headingId} className="text-base font-semibold text-gray-900 dark:text-white">Soglie di validazione</h3>
         <div role="alert" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
           <p>Non riesco a leggere le soglie. Riprova.</p>
-          <Button variant="outline" size="sm" onClick={() => setRound((value) => value + 1)}>
+          <Button variant="outline" size="sm" className={TOUCH_TARGET_RESPONSIVE} onClick={() => setRound((value) => value + 1)}>
             Riprova
           </Button>
         </div>
@@ -152,6 +165,7 @@ export function StudiaSoglieAdmin() {
           min={limiti.approvazioni.min}
           max={limiti.approvazioni.max}
           value={shown.approvazioni}
+          disabled={saving}
           error={checked?.approvazioniFuori ? testoApprovazioni : undefined}
           helperText={`Predefinito: ${predefinite.approvazioni}`}
           onChange={(e) => edit('approvazioni')(e.target.value)}
@@ -163,6 +177,7 @@ export function StudiaSoglieAdmin() {
           min={limiti.errate.min}
           max={limiti.errate.max}
           value={shown.errate}
+          disabled={saving}
           error={checked?.erroreFuori ? testoErrate : undefined}
           helperText={`Predefinito: ${predefinite.errate}`}
           onChange={(e) => edit('errate')(e.target.value)}
@@ -175,19 +190,19 @@ export function StudiaSoglieAdmin() {
         {changed && !anteprimaFallita && !effetto && <p className="text-gray-500 dark:text-gray-400">Calcolo l’effetto…</p>}
         {changed && effetto && (
           <p>
-            Con questa soglia {effetto.validate} schede diventano validate e {effetto.archiviate} archiviate.
+            Con questa soglia {diventano(effetto.validate)} e {archiviate(effetto.archiviate)}.
           </p>
         )}
       </div>
 
       {saveFailed && (
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
-          <p>Non sono riuscito a salvare le soglie. Riprova.</p>
+          <p>{saveFailed}</p>
         </div>
       )}
 
       <div>
-        <Button disabled={!canSave} onClick={() => void save()}>
+        <Button className={TOUCH_TARGET_RESPONSIVE} disabled={!canSave} onClick={() => void save()}>
           {saving ? 'Salvo…' : 'Salva'}
         </Button>
       </div>

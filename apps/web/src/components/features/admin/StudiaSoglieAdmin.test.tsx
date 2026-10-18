@@ -68,7 +68,7 @@ describe('StudiaSoglieAdmin, the preview', () => {
     const { approvazioni, salva } = await renderSection();
     await user.clear(approvazioni);
     await user.type(approvazioni, '3');
-    expect(await screen.findByText('Con questa soglia 3 schede diventano validate e 1 archiviate.')).toBeInTheDocument();
+    expect(await screen.findByText('Con questa soglia 3 schede diventano validate e 1 archiviata.')).toBeInTheDocument();
     expect(previewStudiaSoglie).toHaveBeenLastCalledWith({ approvazioni: 3, errate: 1 });
     expect(salva).toBeEnabled();
   });
@@ -78,10 +78,10 @@ describe('StudiaSoglieAdmin, the preview', () => {
     const { approvazioni } = await renderSection();
     await user.clear(approvazioni);
     await user.type(approvazioni, '3');
-    await screen.findByText('Con questa soglia 3 schede diventano validate e 1 archiviate.');
+    await screen.findByText('Con questa soglia 3 schede diventano validate e 1 archiviata.');
     await user.clear(approvazioni);
     await user.type(approvazioni, '03');
-    expect(screen.getByText('Con questa soglia 3 schede diventano validate e 1 archiviate.')).toBeInTheDocument();
+    expect(screen.getByText('Con questa soglia 3 schede diventano validate e 1 archiviata.')).toBeInTheDocument();
     expect(screen.queryByText('Calcolo l’effetto…')).not.toBeInTheDocument();
   });
 
@@ -109,6 +109,66 @@ describe('StudiaSoglieAdmin, the preview', () => {
   });
 });
 
+describe('StudiaSoglieAdmin, the review fixes', () => {
+  it('a value whose preview failed works again once it is asked for again', async () => {
+    const user = userEvent.setup();
+    previewStudiaSoglie.mockRejectedValueOnce(new Error('boom'));
+    const { approvazioni, salva } = await renderSection();
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '3');
+    expect(await screen.findByText('Non riesco a calcolare l’effetto. Modifica il valore per riprovare.')).toBeInTheDocument();
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '4');
+    await screen.findByText('Con questa soglia 3 schede diventano validate e 1 archiviata.');
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '3');
+    expect(await screen.findByText('Con questa soglia 3 schede diventano validate e 1 archiviata.')).toBeInTheDocument();
+    expect(screen.queryByText('Non riesco a calcolare l’effetto. Modifica il valore per riprovare.')).not.toBeInTheDocument();
+    await waitFor(() => expect(salva).toBeEnabled());
+  });
+
+  it('shows the server’s own message when it refuses a save with 400', async () => {
+    const user = userEvent.setup();
+    saveStudiaSoglie.mockRejectedValue({ status: 400, message: 'Le errate vanno da 1 a 3.' });
+    const { approvazioni, salva } = await renderSection();
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '3');
+    await waitFor(() => expect(salva).toBeEnabled());
+    await user.click(salva);
+    expect(await screen.findByText('Le errate vanno da 1 a 3.')).toBeInTheDocument();
+  });
+
+  it('locks both fields while the save is in flight, so a value typed then is not lost', async () => {
+    const user = userEvent.setup();
+    let finish: (value: { soglie: { approvazioni: number; errate: number }; validate: number; archiviate: number }) => void = () => {};
+    saveStudiaSoglie.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { approvazioni, errate, salva } = await renderSection();
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '3');
+    await waitFor(() => expect(salva).toBeEnabled());
+    await user.click(salva);
+    expect(approvazioni).toBeDisabled();
+    expect(errate).toBeDisabled();
+    finish({ soglie: { approvazioni: 3, errate: 1 }, validate: 0, archiviate: 0 });
+    await screen.findByText('Soglie salvate. 0 schede validate, 0 archiviate.');
+    expect(approvazioni).toBeEnabled();
+  });
+
+  it('gives the two buttons the 44 px touch target a phone needs', async () => {
+    await renderSection();
+    expect(screen.getByRole('button', { name: 'Salva' }).className).toContain('min-h-[44px]');
+  });
+
+  it('writes one card in the singular', async () => {
+    const user = userEvent.setup();
+    previewStudiaSoglie.mockResolvedValue({ validate: 1, archiviate: 0 });
+    const { approvazioni } = await renderSection();
+    await user.clear(approvazioni);
+    await user.type(approvazioni, '1');
+    expect(await screen.findByText('Con questa soglia 1 scheda diventa validata e 0 archiviate.')).toBeInTheDocument();
+  });
+});
+
 describe('StudiaSoglieAdmin, saving', () => {
   it('saves both values and reports the counts applied', async () => {
     const user = userEvent.setup();
@@ -119,7 +179,7 @@ describe('StudiaSoglieAdmin, saving', () => {
     await waitFor(() => expect(salva).toBeEnabled());
     await user.click(salva);
     expect(saveStudiaSoglie).toHaveBeenCalledWith({ approvazioni: 3, errate: 1 });
-    expect(await screen.findByText('Soglie salvate. 3 schede validate, 1 archiviate.')).toBeInTheDocument();
+    expect(await screen.findByText('Soglie salvate. 3 schede validate, 1 archiviata.')).toBeInTheDocument();
     expect(await screen.findByText('Le soglie in vigore sono 3 approvazioni e 1 «errata».')).toBeInTheDocument();
     expect(salva).toBeDisabled();
   });
