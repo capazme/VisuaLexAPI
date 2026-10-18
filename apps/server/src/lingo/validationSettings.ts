@@ -8,8 +8,10 @@ import { SOGLIE_PREDEFINITE, Soglie, stateAfterVotes } from './validationRule';
  * reset truncates `users` with cascade, which empties the rows.
  *
  * Every function takes the transaction it runs in. The locks are taken in one
- * order: the settings rows, then the proposed cards by id. A vote locks its card
- * and reads the thresholds after that lock (see routes/lingoValidazione.ts).
+ * order everywhere: the cards by id, then the settings (account deletion does the
+ * same: its cards first, then the user row, whose delete sets the settings' author
+ * to null). A vote locks its card and reads the thresholds after that lock (see
+ * routes/lingoValidazione.ts).
  */
 
 /** The range of each value; the database checks it too (`lingo_impostazioni_valore_check`). */
@@ -18,7 +20,7 @@ export const LIMITI_SOGLIE = {
   errate: { min: 1, max: 3 },
 } as const;
 
-type Db = Pick<Prisma.TransactionClient, 'lingoImpostazione' | 'lingoImpostazioneLog' | 'lingoCard' | '$queryRaw'>;
+type Db = Pick<Prisma.TransactionClient, 'lingoImpostazione' | 'lingoImpostazioneLog' | 'lingoCard' | '$queryRaw' | '$executeRaw'>;
 
 export type AnteprimaSoglie = { validate: number; archiviate: number };
 export type EsitoSoglie = AnteprimaSoglie & { soglie: Soglie };
@@ -34,10 +36,13 @@ export async function leggiSoglie(db: Db): Promise<Soglie> {
   };
 }
 
-/** Every proposed card and its votes, the new state each would get under `soglie`. */
-async function calcolaProposte(db: Db, soglie: Soglie) {
+/**
+ * The proposed cards and their votes, the new state each would get under `soglie`.
+ * With `ids`, only those: the ones the caller has locked.
+ */
+async function calcolaProposte(db: Db, soglie: Soglie, ids?: string[]) {
   const schede = await db.lingoCard.findMany({
-    where: { stato: 'PROPOSTA_COMMUNITY' },
+    where: { stato: 'PROPOSTA_COMMUNITY', ...(ids ? { id: { in: ids } } : {}) },
     select: {
       id: true,
       autoreId: true,
@@ -73,7 +78,16 @@ export async function anteprimaSoglie(db: Db, soglie: Soglie): Promise<Anteprima
  * account is gone is deleted, as the vote route does: nobody could see it.
  */
 export async function applicaSoglie(db: Db, nuove: Soglie, utenteId: string): Promise<EsitoSoglie> {
-  // Two administrators' changes take turns; a vote reads the values after its card lock.
+  // The rows exist before they are locked (a truncated test database has none).
+  await db.$executeRaw`
+    INSERT INTO lingo_impostazioni (chiave, valore) VALUES
+      ('SOGLIA_APPROVAZIONI', ${SOGLIE_PREDEFINITE.approvazioni}), ('SOGLIA_ERRATE', ${SOGLIE_PREDEFINITE.errate})
+    ON CONFLICT (chiave) DO NOTHING`;
+  // The proposed cards by id first, as in account deletion: a vote in flight finishes before its card is
+  // read, and one that comes after waits for this transaction and then reads the values it commits.
+  const bloccate = await db.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_cards WHERE stato = 'PROPOSTA_COMMUNITY' ORDER BY id FOR UPDATE`;
+  const ids = bloccate.map((riga) => riga.id);
+  // Two administrators' changes take turns on these rows.
   await db.$queryRaw`SELECT chiave FROM lingo_impostazioni ORDER BY chiave FOR UPDATE`;
   const precedenti = await leggiSoglie(db);
   const cambi = [
@@ -91,10 +105,8 @@ export async function applicaSoglie(db: Db, nuove: Soglie, utenteId: string): Pr
     });
   }
 
-  // The proposed cards are locked in id order before their votes are read: a vote
-  // that committed before the lock is counted, one still in flight finishes first.
-  await db.$queryRaw`SELECT id FROM lingo_cards WHERE stato = 'PROPOSTA_COMMUNITY' ORDER BY id FOR UPDATE`;
-  const proposte = await calcolaProposte(db, nuove);
+  // Only the locked cards are recomputed: a card proposed after the lock has no votes yet.
+  const proposte = await calcolaProposte(db, nuove, ids);
 
   const daValidare = proposte.filter((p) => p.prossimo === 'VALIDATA').map((p) => p.id);
   const daArchiviare = proposte.filter((p) => p.prossimo === 'ARCHIVIATA' && p.autoreId !== null).map((p) => p.id);

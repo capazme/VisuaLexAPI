@@ -49,14 +49,19 @@ Before saving, the admin sees «Con questa soglia N schede diventano validate e 
 
 ## 4. Concurrency
 
-- `PUT /` locks the two setting rows (`FOR UPDATE`), so two administrators' changes take turns.
-- It then locks every proposed card in id order and reads their votes after the lock, so a vote
-  that committed before the lock is counted.
+- `PUT /` locks the proposed cards by id first, then the two setting rows (`FOR UPDATE`), and
+  recomputes only the cards it locked: a card proposed after the lock has no votes yet, so it needs no
+  recompute. Two administrators' changes take turns on the settings rows.
+- The votes of the locked cards are read after their lock, so a vote that committed before the lock
+  is counted; a vote still in flight finishes first.
 - The vote route locks its card first, then reads the thresholds with a plain read. Under READ
   COMMITTED that read sees every threshold committed before it, so a vote can only use a value
   that is already stored, and its card is then recomputed by the change or by the next vote.
-- Lock order is always: settings, then cards by id. A vote takes one card lock and nothing else, so
-  no cycle is possible.
+- The lock order is the same everywhere: cards by id, then settings. Account deletion (cards of the
+  person first, then the user row, whose delete sets the settings' author to null) follows it, so the
+  two cannot deadlock. A vote takes one card lock and nothing else.
+- The rows of the two keys are inserted if missing (`ON CONFLICT DO NOTHING`) before they are locked:
+  a test database truncated by the suite has none.
 
 ## 5. Who reads the rule
 
