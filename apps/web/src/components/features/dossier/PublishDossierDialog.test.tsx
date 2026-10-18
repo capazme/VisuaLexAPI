@@ -131,6 +131,36 @@ describe('PublishDossierDialog', () => {
     await waitFor(() => expect(onAlreadyPublished).toHaveBeenCalled());
   });
 
+  it('keeps on an update the note published before, and leaves out what was left out', async () => {
+    const published = { sharedEnvironmentId: 'e1', version: 2, isActive: true, updatedAt: '' };
+    service.getById.mockResolvedValue({
+      id: 'e1', title: 'Nel Forum', description: '', category: 'civil', tags: [],
+      content: { dossiers: [{ title: 'x', items: [] }], quickNorms: [], annotations: [{ id: 'a1', ...key, text: 'Il cliente RSSMRA85T10A562S' }], highlights: [] },
+    });
+    open(dossier({ published }));
+    await screen.findByDisplayValue('Nel Forum');
+    await screen.findByText(/1 di 1 note · 0 di 1 evidenziazioni/);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ho controllato: non contiene dati personali' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiorna' }));
+    await waitFor(() => expect(service.updateWithVersion).toHaveBeenCalled());
+    const content = service.updateWithVersion.mock.calls[0][1].content;
+    expect(content.annotations.map((a: { text: string }) => a.text)).toEqual(['Il cliente RSSMRA85T10A562S']);
+    expect(content.highlights).toEqual([]);
+  });
+
+  it('shows no row to tick on an update until the published copy is read', async () => {
+    let answer: (value: unknown) => void = () => {};
+    service.getById.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    open(dossier({ published: { sharedEnvironmentId: 'e1', version: 2, isActive: true, updatedAt: '' } }));
+    expect(await screen.findByText('Leggo la versione pubblicata…')).toBeInTheDocument();
+    expect(screen.queryByText('Il cliente')).toBeNull();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1); // only «Ho controllato»
+    answer({ id: 'e1', title: 'Nel Forum', description: '', category: 'civil', tags: [],
+      content: { dossiers: [{ title: 'x', items: [] }], quickNorms: [], annotations: [{ id: 'a1', ...key, text: 'Il cliente RSSMRA85T10A562S' }], highlights: [] } });
+    expect(await screen.findByText(/1 di 1 note/)).toBeInTheDocument();
+    expect(screen.getByText('Partono spuntate le note già pubblicate.')).toBeInTheDocument();
+  });
+
   it('shows the server\'s refusal and stays open', async () => {
     // The shape `services/api.ts` rejects with: the server's Italian detail as the message.
     service.publish.mockRejectedValue({ status: 409, message: 'Questo dossier è già pubblicato nel Forum: aggiornane la versione pubblicata.' });

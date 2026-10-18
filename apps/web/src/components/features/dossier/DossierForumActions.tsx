@@ -72,7 +72,12 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
           disabled={blocked || dossier.items.length === 0}
           title={blocked ? "L'amministrazione ha ritirato questo dossier dal Forum: non puoi ripubblicarlo." : undefined}
           aria-label={blocked ? 'Ritirato dal Forum' : 'Pubblica nel Forum'}
-          className={cn(buttonClassName, 'disabled:cursor-not-allowed disabled:opacity-40')}
+          // The look `MenuButton` gives the header's other triggers.
+          className={cn(
+            'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+            buttonClassName,
+            'disabled:cursor-not-allowed disabled:opacity-40',
+          )}
         >
           <Upload size={16} aria-hidden />
           <span className="hidden sm:inline" aria-hidden>{blocked ? 'Ritirato dal Forum' : 'Pubblica nel Forum'}</span>

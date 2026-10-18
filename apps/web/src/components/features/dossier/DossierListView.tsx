@@ -420,7 +420,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     className="flex items-center gap-1 flex-shrink-0"
                   >
                     <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
-                      {dossier.items.length} elementi
+                      {dossier.items.length} {dossier.items.length === 1 ? 'elemento' : 'elementi'}
                     </span>
                     <button
                       type="button"

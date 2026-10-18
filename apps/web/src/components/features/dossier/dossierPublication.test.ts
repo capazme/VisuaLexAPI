@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Annotation, Dossier, DossierItem, Highlight, NormaVisitata } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { decisionKey } from '../../../utils/decisionLinks';
-import { buildPublication, defaultIncluded } from './dossierPublication';
+import { buildPublication, defaultIncluded, ticksFromPublished } from './dossierPublication';
 import type { PdfMarks } from './dossierPdf';
 
 const NORM: NormaVisitata = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043' };
@@ -122,5 +122,24 @@ describe('buildPublication', () => {
     const first = buildPublication(dossier(items), marks, [], fields, null);
     const again = buildPublication(dossier(items), marks, [], fields, defaultIncluded(first.rows));
     expect(again.content).toEqual(first.content);
+  });
+
+  it('starts an update from exactly what the published copy holds', () => {
+    const sent = buildPublication(dossier(items), marks, [], fields, new Set(['note:a1', 'entry:k1']));
+    const { rows } = buildPublication(dossier(items), marks, [], fields, null);
+    const ticks = ticksFromPublished(rows, sent.content);
+    // The note sent before stays ticked; the highlight left out then is not put back; the entries always travel.
+    expect([...ticks].sort()).toEqual(['entry:k1', 'entry:n1', 'entry:s1', 'note:a1']);
+    expect(ticksFromPublished(rows, null)).toEqual(new Set(['entry:n1', 'entry:s1']));
+  });
+
+  it('tells apart two notes with one text on one article by their anchors', () => {
+    const twin = new Map<string, PdfMarks>([['n1', { highlights: [], notes: [
+      note('x1', NORM, 'da verificare', { anchorText: 'fatto doloso', startOffset: 10 }),
+      note('x2', NORM, 'da verificare', { anchorText: 'colposo', startOffset: 30 }),
+    ] }]]);
+    const sent = buildPublication(dossier([norm('n1', NORM)]), twin, [], fields, new Set(['note:x1']));
+    const { rows } = buildPublication(dossier([norm('n1', NORM)]), twin, [], fields, null);
+    expect([...ticksFromPublished(rows, sent.content)].sort()).toEqual(['entry:n1', 'note:x1']);
   });
 });

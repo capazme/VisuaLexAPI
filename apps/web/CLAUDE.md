@@ -828,7 +828,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   marks what it finds in the fields and the rows, changing no character; the owner's warning, one more
   line for a dossier di lavoro, and the required «Ho controllato: non contiene dati personali» stand
   before «Pubblica». An update starts from what the Forum holds (`getById`, once, never over a field the
-  user changed; the minute's `refreshDossier` neither resets it nor reads the marks again), sends a new
+  user changed; the minute's `refreshDossier` neither resets it nor reads the marks again) — its ticks too:
+  exactly the notes, highlights and note entries the published copy carries (`ticksFromPublished`, by each
+  row's `match`), so an update never drops a note sent before nor sends one left out — sends a new
   version and clears an emptied description (`null`); a 409 on «Pubblica» reads the dossier again and the
   dialog becomes the update.
 - **The trash** (what a connected application deleted, and the dossiers, the entries removed from a dossier and the study cards the user deleted, 30 days; spec §10-11):

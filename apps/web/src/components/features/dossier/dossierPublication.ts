@@ -42,6 +42,8 @@ export interface PublicationRow {
   defaultIncluded: boolean;
   /** How many spans of personal data the machine found in its text and anchor. */
   personalData: number;
+  /** What the row sends, as the published copy holds it (`ticksFromPublished`); entries have none. */
+  match?: string;
 }
 
 export interface PublicationFields {
@@ -106,6 +108,13 @@ function locate(item: DossierItem): Located | { leftOut: string } {
   return { item, label: labelOf(item), readKey: null, sendKey: null, data: item.data };
 }
 
+const noteEntryMatch = (text: string) => JSON.stringify(['noteEntry', text]);
+// A note's anchor is part of it: two notes with one text on one article stay two.
+const noteMatch = (normaKey: string, articleId: string, text: string, anchorText?: string, start?: number) =>
+  JSON.stringify(['note', normaKey, articleId, text, anchorText ?? null, start ?? null]);
+const markMatch = (normaKey: string, articleId: string, text: string, start: number | undefined) =>
+  JSON.stringify(['mark', normaKey, articleId, text, start ?? null]);
+
 function personalCount(...texts: Array<string | undefined>): number {
   return texts.reduce((sum, text) => sum + (text ? findPersonalData(text).length : 0), 0);
 }
@@ -164,7 +173,7 @@ export function buildPublication(
         : undefined;
       const row: PublicationRow = {
         id: `entry:${item.id}`, kind: 'noteEntry', label: about ? `Nota su ${about}` : label, text: item.data,
-        overlap: [], defaultIncluded: false, personalData: personalCount(item.data),
+        overlap: [], defaultIncluded: false, personalData: personalCount(item.data), match: noteEntryMatch(item.data),
       };
       rows.push(row);
       if (isIn(row)) {
@@ -192,6 +201,9 @@ export function buildPublication(
       const row: PublicationRow = {
         id: `note:${note.id}`, kind: 'note', label, text: note.text, anchorText: note.anchorText,
         overlap, defaultIncluded: false, personalData: personalCount(note.text, note.anchorText),
+        match: note.anchorText !== undefined && typeof note.startOffset === 'number'
+          ? noteMatch(sendKey.normaKey, sendKey.articleId, note.text, note.anchorText, note.startOffset)
+          : noteMatch(sendKey.normaKey, sendKey.articleId, note.text),
       };
       rows.push(row);
       if (isIn(row)) {
@@ -207,6 +219,7 @@ export function buildPublication(
       const row: PublicationRow = {
         id: `mark:${mark.id}`, kind: 'highlight', label, text: mark.text,
         overlap, defaultIncluded: true, personalData: personalCount(mark.text),
+        match: markMatch(sendKey.normaKey, sendKey.articleId, mark.text, mark.startOffset),
       };
       rows.push(row);
       if (isIn(row)) {
@@ -246,6 +259,22 @@ export function withFields(content: SharedEnvironmentContent, fields: Publicatio
   if (description) named.description = description;
   else delete named.description;
   return { ...content, dossiers: [named] } as unknown as SharedEnvironmentContent;
+}
+
+/**
+ * The ticks an update starts from: exactly what the published copy holds, nothing else — a note sent before is
+ * not dropped by an update, and a note or highlight left out before (or made since) is not sent unless ticked.
+ */
+export function ticksFromPublished(rows: PublicationRow[], published: SharedEnvironmentContent | null): Set<string> {
+  const held = new Set<string>();
+  if (published) {
+    for (const a of published.annotations ?? []) held.add(noteMatch(a.normaKey, a.articleId, a.text, a.anchorText, a.startOffset));
+    for (const h of published.highlights ?? []) held.add(markMatch(h.normaKey, h.articleId, h.text, h.startOffset));
+    for (const d of published.dossiers ?? []) {
+      for (const item of d.items ?? []) if (item.type === 'note') held.add(noteEntryMatch(item.data));
+    }
+  }
+  return new Set(rows.filter((r) => r.kind === 'entry' || (r.match !== undefined && held.has(r.match))).map((r) => r.id));
 }
 
 /** The ids ticked at first: what `buildPublication` with `null` sends. */

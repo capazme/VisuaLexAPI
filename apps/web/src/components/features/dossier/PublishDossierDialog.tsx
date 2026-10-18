@@ -3,13 +3,13 @@ import { ShieldAlert, Upload } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
-import type { Dossier, EnvironmentCategory } from '../../../types';
+import type { Dossier, EnvironmentCategory, SharedEnvironmentContent } from '../../../types';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { getErrorMessage } from '../../../utils/errors';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { PERSONAL_DATA_LABELS, findPersonalData, splitPersonalData } from '../../../utils/personalDataPatterns';
 import type { PdfMarks } from './dossierPdf';
-import { buildPublication, defaultIncluded, withFields, type PublicationRow } from './dossierPublication';
+import { buildPublication, defaultIncluded, ticksFromPublished, withFields, type PublicationRow } from './dossierPublication';
 import { loadPublicationMarks } from './publicationMarks';
 
 interface Props {
@@ -80,6 +80,8 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyUnread, setCopyUnread] = useState(false);
+  // An update's starting ticks are the published copy's: `undefined` while it is read, `null` when it could not be.
+  const [publishedCopy, setPublishedCopy] = useState<SharedEnvironmentContent | null | undefined>(undefined);
   // Fields the user changed: the published copy's values never overwrite them.
   const touched = useRef(false);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -104,7 +106,10 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
     let alive = true;
     sharedEnvironmentService.getById(updatingId)
       .then((env) => {
-        if (!alive || touched.current) return;
+        if (!alive) return;
+        setPublishedCopy(env.content ?? null);
+        if (!env.content) setCopyUnread(true);
+        if (touched.current) return;
         setTitle(env.title);
         setDescription(env.description ?? '');
         setCategory(env.category);
@@ -112,7 +117,10 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
       })
       .catch((err) => {
         console.error('Publish: the published copy could not be read', err);
-        if (alive) setCopyUnread(true);
+        if (alive) {
+          setCopyUnread(true);
+          setPublishedCopy(null);
+        }
       });
     return () => { alive = false; };
   }, [updatingId]);
@@ -128,7 +136,15 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
     () => buildPublication(dossier, load.status === 'ready' ? load.marks : NO_MARKS, otherDossiers, { title: '', description: '', tags: [] }, included),
     [dossier, load, otherDossiers, included],
   );
-  const ticked = included ?? defaultIncluded(publication.rows);
+  // `buildPublication` with `null` sends the defaults: an update's starting ticks are resolved here, once the rows exist.
+  const sendable = useMemo(
+    () => (included || !updatingId ? publication : buildPublication(dossier, load.status === 'ready' ? load.marks : NO_MARKS, otherDossiers, { title: '', description: '', tags: [] }, ticksFromPublished(publication.rows, publishedCopy ?? null))),
+    [publication, included, updatingId, dossier, load, otherDossiers, publishedCopy],
+  );
+  // An update starts from what the Forum holds (nothing but the entries when it could not be read); a publication
+  // from the defaults (highlights ticked, notes not).
+  const startingTicks = updatingId ? ticksFromPublished(publication.rows, publishedCopy ?? null) : defaultIncluded(publication.rows);
+  const ticked = included ?? startingTicks;
   const notes = publication.rows.filter((r) => r.kind === 'note' || r.kind === 'noteEntry');
   const highlights = publication.rows.filter((r) => r.kind === 'highlight');
   const entries = publication.rows.filter((r) => r.kind === 'entry');
@@ -136,10 +152,11 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
 
   const titleError = title.trim().length < TITLE_MIN ? `Il titolo deve avere almeno ${TITLE_MIN} caratteri.` : null;
   const tagsError = tags.length > TAGS_MAX || tags.some((t) => t.length > TAG_MAX) ? `Al massimo ${TAGS_MAX} tag, di ${TAG_MAX} caratteri.` : null;
-  const canPublish = load.status === 'ready' && checked && !titleError && !tagsError && !busy && entries.length > 0;
+  const copyRead = !updatingId || publishedCopy !== undefined;
+  const canPublish = load.status === 'ready' && copyRead && checked && !titleError && !tagsError && !busy && entries.length > 0;
 
   const setTicks = (rows: PublicationRow[], on: boolean) => setIncluded((prev) => {
-    const next = new Set(prev ?? defaultIncluded(publication.rows));
+    const next = new Set(prev ?? startingTicks);
     for (const row of rows) {
       if (on) next.add(row.id);
       else next.delete(row.id);
@@ -153,7 +170,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
     if (!canPublish) return;
     setBusy(true);
     setError(null);
-    const content = withFields(publication.content, { title: title.trim(), description, tags });
+    const content = withFields(sendable.content, { title: title.trim(), description, tags });
     try {
       if (updatingId) {
         // An emptied description is cleared (null), never left as it was in the Forum.
@@ -168,8 +185,8 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
           category,
           tags,
           content,
-          includeNotes: publication.includeNotes,
-          includeHighlights: publication.includeHighlights,
+          includeNotes: sendable.includeNotes,
+          includeHighlights: sendable.includeHighlights,
           sourceDossierId: dossier.id,
         });
         onPublished('Dossier pubblicato nel Forum');
@@ -209,7 +226,8 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
       <div className="space-y-5">
         {copyUnread && (
           <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            Non riesco a leggere la versione pubblicata: controlla titolo, descrizione, categoria e tag prima di aggiornare.
+            Non riesco a leggere la versione pubblicata: controlla titolo, descrizione, categoria, tag e quali note ed
+            evidenziazioni includere prima di aggiornare.
           </p>
         )}
         <div className="grid gap-3">
@@ -248,7 +266,10 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
           {load.status === 'error' && (
             <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">Non riesco a leggere le note e le evidenziazioni. Chiudi e riprova.</p>
           )}
-          {load.status === 'ready' && (
+          {load.status === 'ready' && !copyRead && (
+            <p role="status" className="mt-2 text-sm text-slate-500">Leggo la versione pubblicata…</p>
+          )}
+          {load.status === 'ready' && copyRead && (
             <div className="mt-2 space-y-4">
               <p className="text-sm text-slate-600 dark:text-slate-300">
                 {entries.length} {entries.length === 1 ? 'voce' : 'voci'} · {notes.filter((r) => ticked.has(r.id)).length} di {notes.length} note · {highlights.filter((r) => ticked.has(r.id)).length} di {highlights.length} evidenziazioni
@@ -279,7 +300,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
 
               <RowGroup
                 heading="Note"
-                hint="Ogni nota parte esclusa: aggiungila dopo averla riletta."
+                hint={updatingId ? 'Partono spuntate le note già pubblicate.' : 'Ogni nota parte esclusa: aggiungila dopo averla riletta.'}
                 rows={notes}
                 ticked={ticked}
                 onToggle={toggle}
