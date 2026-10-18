@@ -135,7 +135,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   without erasing. Impostazioni › «Dati MERL-T» (`MerltDataSection`): the state, «Cambia scelta»,
   the notice, «Scarica i miei dati», «Elimina i miei dati MERL-T», «Revoca il consenso». The
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
-  its author.
+  its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Sheet` (a phone's bottom sheet), plus feature-flavoured modals.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window

@@ -24,9 +24,10 @@ import { useConsent } from '../consent/useConsent';
  * The hook is fire-and-forget: errors are logged but do not block UI.
  */
 
+// Never the words of a note: a lawyer's note may hold a client's facts under professional
+// secrecy (the owner, 18 October 2026, «c»). The anchored passage is the law's own text.
 interface Metadata {
     anchor_text?: string;
-    note_text?: string;
     color?: string;
     start_offset?: number;
     [k: string]: unknown;
@@ -48,7 +49,6 @@ function mapAnnotation(articleUrn: string, metadata: Metadata): HighlightAnnotat
         anchorText: typeof metadata.anchor_text === 'string' ? metadata.anchor_text : '',
         startOffset: typeof metadata.start_offset === 'number' ? metadata.start_offset : 0,
         articleUrn,
-        noteText: typeof metadata.note_text === 'string' ? metadata.note_text : undefined,
     };
 }
 

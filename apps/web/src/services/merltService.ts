@@ -260,7 +260,7 @@ export interface HighlightAnnotationEventInput {
     startOffset: number;
     articleUrn: string;
     color?: string;
-    noteText?: string;
+    // No note text: MERL-T never collects the words of a note.
 }
 
 export type HighlightAnnotationEventResponse = MerltEventResponse;

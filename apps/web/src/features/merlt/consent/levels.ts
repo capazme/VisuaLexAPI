@@ -17,7 +17,7 @@ export const CONSENT_LEVELS: LevelMeta[] = [
     level: 'basic',
     title: 'Base',
     summary:
-      'Le tue letture, evidenziazioni, note, segnalibri, citazioni aperte, segnali del Forum e le domande all’assistente.',
+      'Le tue letture, evidenziazioni, note (mai il loro testo), segnalibri, citazioni aperte, segnali del Forum e le domande all’assistente.',
   },
   {
     level: 'full',

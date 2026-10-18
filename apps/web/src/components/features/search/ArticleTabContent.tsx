@@ -335,7 +335,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 anchored: Boolean(anchor),
                 anchor_text: anchor?.anchorText ?? '',
                 start_offset: anchor?.startOffset ?? 0,
-                note_text: text,
+                // Never the note's words: MERL-T does not collect them (the owner, 18 October 2026).
                 text_length: text.length,
             },
         }),
