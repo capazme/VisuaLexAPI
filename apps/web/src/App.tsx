@@ -47,7 +47,6 @@ const ReviewSession = lazy(() =>
   import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
 
-// Global 404 rendered inside the authenticated layout so the sidebar stays visible.
 /** «Ambienti» went into the Forum (spec 2026-10-13-environments-into-forum, D11c, D13): an old address, and its share
  * link's `?import=`, land there. */
 function EnvironmentsRedirect() {
@@ -55,6 +54,7 @@ function EnvironmentsRedirect() {
   return <Navigate to={{ pathname: '/forum', search }} replace />;
 }
 
+// Global 404 rendered inside the authenticated layout so the sidebar stays visible.
 function NotFoundPage() {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-3 p-6 text-center">

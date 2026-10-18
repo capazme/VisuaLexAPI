@@ -2477,6 +2477,7 @@ const appStore = createStore<AppState>()(
                     if ((err as { status?: number })?.status !== 404) {
                         console.error('deleteEnvironment failed:', err);
                         set((state) => { state.environments.push(previous); });
+                        get().pushSyncError("Impossibile eliminare l'ambiente. Riprova.");
                     }
                 }
             }

@@ -8,7 +8,17 @@ import { dossierService } from '../../../services/dossierService';
 import { parseEnvironmentFromBase64 } from '../../../utils/environmentUtils';
 import { StudyImportDialog } from './StudyImportDialog';
 import { becomesStudyDossiers } from '../../../utils/studyImportReport';
-import type { StudyImportReport } from '../../../types';
+import type { Dossier, Environment, StudyImportReport } from '../../../types';
+
+/** The link read, and the dossiers it holds that can be listed: anyone can write a link, so its shape is checked. */
+function readLink(encoded: string): { ok: true; env: Environment; dossiers: Dossier[] } | { ok: false } {
+  const parsed = parseEnvironmentFromBase64(encoded);
+  if (!parsed.success) return { ok: false };
+  const dossiers = parsed.data.dossiers.filter((d): d is Dossier => typeof d?.title === 'string' && Array.isArray(d.items));
+  if (dossiers.length === 0) return { ok: false };
+  const list = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+  return { ok: true, env: { ...parsed.data, annotations: list(parsed.data.annotations), highlights: list(parsed.data.highlights) }, dossiers };
+}
 
 interface Props {
   onRecovered: (report: StudyImportReport) => void;
@@ -23,7 +33,7 @@ interface Props {
 export function SharedLinkImport({ onRecovered }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const encoded = searchParams.get('import');
-  const parsed = useMemo(() => (encoded ? parseEnvironmentFromBase64(encoded) : null), [encoded]);
+  const parsed = useMemo(() => (encoded ? readLink(encoded) : null), [encoded]);
   if (!parsed) return null;
 
   const clear = () => setSearchParams((prev) => {
@@ -32,7 +42,7 @@ export function SharedLinkImport({ onRecovered }: Props) {
     return next;
   }, { replace: true });
 
-  if (!parsed.success) {
+  if (!parsed.ok) {
     return (
       <Modal
         isOpen
@@ -47,18 +57,18 @@ export function SharedLinkImport({ onRecovered }: Props) {
     );
   }
 
-  const env = parsed.data;
+  const { env, dossiers } = parsed;
   return (
     <StudyImportDialog
       title="Recupera i dossier"
-      intro={`Il link condiviso «${env.name}» ${becomesStudyDossiers(env.dossiers.length)}`}
-      dossiers={env.dossiers}
+      intro={`Il link condiviso «${env.name}» ${becomesStudyDossiers(dossiers.length)}`}
+      dossiers={dossiers}
       notes={env.annotations.length}
       highlights={env.highlights.length}
       confirmLabel="Recupera i dossier"
       failure="Non è stato possibile recuperare i dossier. Riprova."
       run={(switches) => dossierService.importStudy(
-        { dossiers: env.dossiers, quickNorms: [], annotations: env.annotations, highlights: env.highlights },
+        { dossiers, quickNorms: [], annotations: env.annotations, highlights: env.highlights },
         switches,
       )}
       onClose={clear}

@@ -42,6 +42,11 @@ describe('SharedLinkImport', () => {
     expect(screen.getByTestId('where')).toHaveTextContent(/^$/);
   });
 
+  it('treats a link without a dossier that can be listed as unreadable', () => {
+    show(`?import=${encode({ name: 'x', dossiers: [{}], quickNorms: [] })}`);
+    expect(screen.getByRole('dialog', { name: 'Link non valido' })).toBeInTheDocument();
+  });
+
   it('says when the link cannot be read', () => {
     show('?import=%%%');
     expect(screen.getByRole('dialog', { name: 'Link non valido' })).toBeInTheDocument();
