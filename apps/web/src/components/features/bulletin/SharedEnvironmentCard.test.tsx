@@ -48,4 +48,10 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
     expect(screen.queryByRole('button', { name: /ai miei dossier/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Ai miei dossier')).not.toBeInTheDocument();
   });
+
+  it('names the card’s «⋯» menu and gives it a 44 px touch target on a phone', () => {
+    renderCard(base);
+    const menu = screen.getByRole('button', { name: 'Azioni su «Ricorso Rossi»' });
+    expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
+  });
 });
