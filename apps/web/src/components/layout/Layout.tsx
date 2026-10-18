@@ -204,7 +204,8 @@ export function Layout() {
       )}
 
       <main
-        className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
+        // `vlx-page`: the one part a section change animates (index.css, spec §6.3.2); the sidebar stays still.
+        className="vlx-page flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
         // The practice's columns (`h-app-row`) are the viewport less this bar.
         style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}
       >
