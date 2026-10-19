@@ -1,3 +1,4 @@
+import { HIDDEN_SCROLLBAR } from '../../../../constants/interactions';
 import { cn } from '../../../../lib/utils';
 import type { Materia } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
@@ -24,8 +25,8 @@ export function SubjectChips({ selected, onSelect }: SubjectChipsProps) {
         : 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800',
     );
   return (
-    // One scrolling row on a phone, where six chips would take four lines; wrapped from `md`.
-    <div role="group" aria-label="Materia" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
+    // One scrolling row on a phone, where six chips would take four lines, its bar not drawn; wrapped from `md`.
+    <div role="group" aria-label="Materia" className={cn('-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0', HIDDEN_SCROLLBAR)}>
       <button type="button" aria-pressed={selected === undefined} onClick={() => onSelect(undefined)} className={chip(selected === undefined)}>
         Tutte le materie
       </button>

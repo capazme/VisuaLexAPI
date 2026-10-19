@@ -1,4 +1,4 @@
-import type { Materia } from '../../../../types/studia';
+import type { ConteggiStati, Materia } from '../../../../types/studia';
 
 /**
  * Direction D, «Registro vivo» (Studia progress spec §6.1): the app's own tokens, light and dark. Ink is the
@@ -43,3 +43,10 @@ export const HEAT_FILL = [
   'fill-primary-600 dark:fill-primary-500',
   'fill-primary-900 dark:fill-primary-300',
 ] as const;
+
+/** The three states, their names and their swatches: the bar here and the road's stops (Gymnasium spec §5.2). */
+export const CARD_STATES: { key: keyof ConteggiStati; label: string; swatch: string }[] = [
+  { key: 'nuove', label: 'Nuove', swatch: 'bg-amber-500 dark:bg-amber-400' },
+  { key: 'apprendimento', label: 'In apprendimento', swatch: 'bg-primary-500' },
+  { key: 'consolidate', label: 'Consolidate', swatch: 'bg-emerald-600 dark:bg-emerald-500' },
+];
