@@ -94,8 +94,8 @@ export function ForumExploreView({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca nel Forum…"
-            aria-label="Cerca nel Forum"
+            placeholder="Cerca nei dossier pubblici…"
+            aria-label="Cerca nei dossier pubblici"
             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </form>

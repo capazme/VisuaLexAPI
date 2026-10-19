@@ -157,19 +157,19 @@ export const DOSSIER_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-dossier-filters',
-        popover: {
-            title: 'Filtri per Tag',
-            description: 'Clicca sui tag per filtrare i dossier. Puoi combinare più tag per ricerche precise.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
         element: '#tour-dossier-sort',
         popover: {
             title: 'Ordinamento',
             description: 'Ordina per data, nome o numero di elementi per trovare subito ciò che cerchi.',
+            side: 'bottom',
+            align: 'end',
+        }
+    },
+    {
+        element: '#tour-dossier-filters',
+        popover: {
+            title: 'Filtra per categoria',
+            description: 'Scegli una categoria dal menu per vedere solo i dossier che la portano; «Tutte le categorie» li mostra di nuovo tutti.',
             side: 'bottom',
             align: 'end',
         }
@@ -253,7 +253,7 @@ export const HISTORY_STEPS: DriveStep[] = [
 ];
 
 /**
- * Forum Page Tour - the community's dossiers di studio (6 step)
+ * Forum Page Tour - «Dossier pubblici», the community's dossiers di studio (6 step)
  *
  * Introduced ex novo when the page was renamed from Bacheca to Forum.
  * List-view-only: steps anchor on the Publish CTA, the tab nav, the
@@ -265,7 +265,7 @@ export const HISTORY_STEPS: DriveStep[] = [
 export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Forum',
+            title: 'Dossier pubblici',
             description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. In cima trovi i dossier di studio pronti di VisuaLex.',
             side: 'over',
             align: 'center',

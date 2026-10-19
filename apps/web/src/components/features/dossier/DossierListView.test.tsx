@@ -1,10 +1,17 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
 import { DossierListView } from './DossierListView';
 import { sectionStore } from '../../../features/sections/useSection';
 import type { Dossier, NormaVisitata } from '../../../types';
+
+// The list's viewport (`useIsDesktop`): a phone, as jsdom's matchMedia shim says, unless a test says otherwise.
+const viewport = vi.hoisted(() => ({ desktop: false }));
+vi.mock('../../../hooks/useIsDesktop', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../hooks/useIsDesktop')>()),
+  useIsDesktop: () => viewport.desktop,
+}));
 
 const CIVIL: NormaVisitata = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1284' };
 const PENAL: NormaVisitata = { tipo_atto: 'codice penale', numero_atto: '1398', data: '1930-10-19', numero_articolo: '575' };
@@ -22,6 +29,7 @@ function open(items: NormaVisitata[]) {
 }
 
 beforeEach(() => {
+  viewport.desktop = false;
   appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
   sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
 });
@@ -193,5 +201,111 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe('DossierListView — the category menu (D1)', () => {
+  const tagged = (id: string, title: string, tags: string[], kind: Dossier['kind'] = 'lavoro'): Dossier =>
+    ({ ...dossier([CIVIL]), id, title, tags, kind });
+  const listed = [
+    tagged('a', 'Accesso agli atti', ['accesso', 'DPO']),
+    tagged('b', 'Ricorso in appello', ['appello']),
+    tagged('c', 'Registro trattamenti', ['gdpr']),
+    tagged('d', 'Valutazione d\'impatto', ['GDPR', 'cancellazione']),
+  ];
+  const titles = () => screen.queryAllByRole('heading', { level: 3 }).map((h) => h.textContent).sort();
+  const renderList = () => render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+
+  it('lists the categories capitalised and in alphabetical order, «Tutte le categorie» first, one for «gdpr» and «GDPR»', () => {
+    viewport.desktop = true;
+    appStore.setState({ dossiers: listed });
+    renderList();
+    const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
+    expect(menu).toHaveAttribute('id', 'tour-dossier-filters');
+    const options = Array.from((menu as HTMLSelectElement).options).map((o) => o.textContent);
+    expect(options).toEqual(['Tutte le categorie', 'Accesso', 'Appello', 'Cancellazione', 'DPO', 'GDPR']);
+    // The chips are gone.
+    expect(screen.queryByRole('button', { name: 'Tutti' })).toBeNull();
+  });
+
+  it('says «Tutte» on a phone, where the half-width menu has no room for «Tutte le categorie»', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' }) as HTMLSelectElement;
+    expect(Array.from(menu.options).map((o) => o.textContent)).toEqual(['Tutte', 'Accesso', 'Appello', 'Cancellazione', 'DPO', 'GDPR']);
+    expect(menu.value).toBe('');
+  });
+
+  it('filters by the category chosen, and «Tutte le categorie» brings the list back', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
+    fireEvent.change(menu, { target: { value: 'appello' } });
+    expect(titles()).toEqual(['Ricorso in appello']);
+    // «gdpr» and «GDPR» are one category: both dossiers.
+    fireEvent.change(menu, { target: { value: 'gdpr' } });
+    expect(titles()).toEqual(['Registro trattamenti', 'Valutazione d\'impatto']);
+    fireEvent.change(menu, { target: { value: '' } });
+    expect(titles()).toHaveLength(4);
+  });
+
+  it('shows the labels capitalised on the cards and never changes the stored tags', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    expect(screen.getByText('Accesso', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByText('DPO', { selector: 'span' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filtra per categoria' }), { target: { value: 'accesso' } });
+    expect(appStore.getState().dossiers.map((d) => d.tags)).toEqual([['accesso', 'DPO'], ['appello'], ['gdpr'], ['GDPR', 'cancellazione']]);
+  });
+
+  it('offers only the categories of the dossiers the section lists', () => {
+    appStore.setState({ dossiers: [...listed, tagged('s', 'Diritto penale', ['penale'], 'studio')] });
+    const values = () => Array.from((screen.getByRole('combobox', { name: 'Filtra per categoria' }) as HTMLSelectElement).options).map((o) => o.value);
+    const { unmount } = renderList();
+    expect(values()).not.toContain('penale');
+    unmount();
+    sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
+    renderList();
+    expect(values()).toEqual(['', 'penale']);
+  });
+
+  it('gives both menus the same look, 44 px and half the row each on a phone', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    for (const name of ['Ordina i dossier', 'Filtra per categoria']) {
+      expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('flex-1 min-w-0'));
+      expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('min-h-[44px] md:min-h-0'));
+    }
+  });
+
+  it('has no menu when no dossier has a category, and the order menu stays', () => {
+    appStore.setState({ dossiers: [dossier([CIVIL])] });
+    renderList();
+    expect(screen.queryByRole('combobox', { name: 'Filtra per categoria' })).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Ordina i dossier' })).toBeInTheDocument();
+  });
+
+  it('shows «Tutte le categorie» again when the chosen category leaves the list', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' }) as HTMLSelectElement;
+    fireEvent.change(menu, { target: { value: 'appello' } });
+    act(() => { appStore.setState({ dossiers: listed.filter((d) => d.id !== 'b') }); });
+    expect(menu.value).toBe('');
+    expect(titles()).toHaveLength(3);
+    // The category back (an undone deletion) does not filter again on its own.
+    act(() => { appStore.setState({ dossiers: listed }); });
+    expect(menu.value).toBe('');
+    expect(titles()).toHaveLength(4);
+  });
+
+  it('says «Cerca nei dossier…» without the shortcut, which still puts the cursor there', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    const field = screen.getByRole('textbox', { name: 'Cerca nei dossier' });
+    expect(field).toHaveAttribute('placeholder', 'Cerca nei dossier…');
+    expect(field).toHaveAttribute('aria-keyshortcuts', '/');
+    fireEvent.keyDown(window, { key: '/' });
+    expect(field).toHaveFocus();
   });
 });

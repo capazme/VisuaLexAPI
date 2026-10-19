@@ -31,8 +31,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
   (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
-  `/history`, `/forum` (`/environments`, the page «Ambienti» was, redirects there keeping an old share link's
-  `?import=`), `/documents`, `/collega-app` («Collega un'app AI»,
+  `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
+  share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
+  Forum's title (`SECTION_TITLES.forum`), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
+  server route), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
@@ -83,7 +85,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
   section's, in a group named after it: Opus, Dossier; Gymnasium in two groups (Gymnasium spec §4), «Studia»
   (Oggi, the home `/studia/ripasso`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
-  Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count.
+  Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
+  `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
+  named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community»; its title
+  with a phrase, «Forum: il luogo del dibattito giuridico» (the owner's, 19 Oct 2026), is the Community page's `h1`;
+  the sections' phrases live in `SECTION_TITLES` (`sections.ts`) only, with Opus's «Opus: la tua officina giuridica»
+  not shown yet (its page takes it in its own change).
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
@@ -917,10 +924,11 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   the server has the note, so a refused note keeps its text.
 - **«Pubblica nel Forum»** (`DossierForumActions` in the header, spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D3–D7; the owner's answers of
-  14 October 2026): a dossier never published shows «Pubblica nel Forum» (disabled, «Ritirato dal Forum»,
-  when the admin withdrew its copy: `forumBlocked`); a published one a «Forum» menu naming its state
-  («Nel Forum · v N», «Ritirato dal Forum», «Ritirato dall'amministrazione») with «Aggiorna la versione
-  pubblicata», «Ritira» / «Ripubblica», «Apri il Forum» and «Elimina dal Forum» (danger confirmation);
+  14 October 2026): a dossier never published shows «Pubblica nel Forum» (disabled, «Ritirato dai dossier
+  pubblici», when the admin withdrew its copy: `forumBlocked`); a published one a «Forum» menu naming its state
+  («Nel Forum · v N», «Ritirato dai dossier pubblici», «Ritirato dall'amministrazione») with «Aggiorna la versione
+  pubblicata», «Ritira dai dossier pubblici» / «Ripubblica nel Forum», «Apri i dossier pubblici» and «Elimina dai
+  dossier pubblici» (danger confirmation, «Eliminare la copia pubblicata?»);
   each reads the dossier again (`refreshDossier`). `PublishDossierDialog` (a `ui/Modal`) asks title,
   description, category (`utils/forumCategories.ts`, the one list) and tags, reads the marks once, at
   opening, from the server (`publicationMarks.ts`: `loadPdfMarks`, never the browser's partial cache; a
@@ -1279,6 +1287,13 @@ Duplicating any of these is a defect, not a shortcut.
 - `components/features/dossier/dossierLayout.ts` — `layoutDossier`, `actKeyOf`,
   `codeName`, `compareArticles`, `articleLabel`, `foldedArticleList`,
   `dossierItemOrder`, `actsSummary`: the dossier by act.
+- `utils/tagLabel.ts` — `tagLabel(tag)`: a dossier's tag as shown, its first letter capitalised and
+  the rest as typed («accesso» → «Accesso», «DPO» stays). Display only — the stored tag never changes,
+  every filter compares stored values, and the PDF and the editors show the tag as typed. The list's
+  card, the dossier's header, the import dialog and the Forum's card go through it.
+  `tagCategories(tags)` makes the dossier list's category menu (Italian alphabetical order, case and
+  accents ignored; values that differ only by case are one category filtering all of them, labelled by
+  the spelling with the most capitals) and `hasTagCategory` filters by it.
 - `utils/actRubriche.ts` — `matchRubrichePart`, `rubricheFor`, `abrogatiFor`:
   which article titles belong to the articles in view. An act in parts gets the
   part matched by article numbers (on a tie, the one of the annex's size; still
@@ -1400,15 +1415,20 @@ meant to stay split; add new features as new files, not inside the shells:
 
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
   `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
-  `i`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  `i`; the search, then two menus — the order and «Filtra per categoria», one
+  category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
+  there are none — on one row on a computer, half and half under the search on
+  a phone), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
   `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
-- `features/bulletin/` — the Forum: «I dossier di studio pubblicati dalla comunità» (spec
+- `features/bulletin/` — the Forum. Its area «Dossier pubblici»: «I dossier di studio pubblicati dalla comunità» (spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`; it absorbed «Ambienti»). Folder and
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
-  `/forum`. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
+  «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
+  (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
