@@ -34,7 +34,16 @@ router.use(authenticate);
 const MAX_DUE_PER_SESSION = 500;
 const MAX_COMMUNITY_SUBJECTS = Object.keys(LingoMateria).length;
 
-const sessionSchema = z.object({ materia: z.nativeEnum(LingoMateria).optional() });
+const subjectQuerySchema = z.object({ materia: z.nativeEnum(LingoMateria).optional() });
+const sessionSchema = z
+  .object({
+    materia: z.nativeEnum(LingoMateria).optional(),
+    istituto: z.string().trim().min(1).max(200).refine(hasNoNul, { message: 'L’istituto contiene un carattere non valido.' }).optional(),
+  })
+  .refine((query) => query.istituto === undefined || query.materia !== undefined, {
+    message: 'L’istituto richiede la materia.',
+    path: ['istituto'],
+  });
 const gradeSchema = z
   .object({
     cardId: z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' }),
@@ -52,13 +61,15 @@ const preferencesSchema = z
 
 const cardNotFound = () => new AppError(404, 'Scheda non trovata.');
 
+// `?materia=` narrows the session to a subject; `?istituto=` (only with `materia`) to one institute of it, matched
+// exactly as `/percorso` lists it. Either way the day's queue is not marked finished.
 router.get('/sessione', async (req, res) => {
   const userId = req.user!.id;
-  const { materia } = sessionSchema.parse(req.query);
+  const { materia, istituto } = sessionSchema.parse(req.query);
   const today = romeDay(new Date());
 
   const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
-  const scope = reviewScope(userId, materieComunita, materia);
+  const scope = reviewScope(userId, materieComunita, materia, istituto);
 
   const due = dueWhere(userId, scope, today);
   const [dovute, dueRows, introduced] = await Promise.all([
@@ -81,7 +92,7 @@ router.get('/sessione', async (req, res) => {
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         take: newSlots,
       });
-  // Nothing left in the whole queue (not just in one subject): today counts (Studia progress spec D7).
+  // Nothing left in the whole queue (not just in one subject or institute): today counts (Studia progress spec D7).
   if (!materia && dovute === 0 && newCards.length === 0 && (await queueFinished(prisma, userId, today))) {
     await markQueueFinished(prisma, userId, today);
   }
@@ -168,7 +179,7 @@ router.post('/revisioni', async (req, res) => {
 
 // Everything the Studia dashboard draws, in one read (Studia progress spec §5.2).
 router.get('/progressi', async (req, res) => {
-  const { materia } = sessionSchema.parse(req.query);
+  const { materia } = subjectQuerySchema.parse(req.query);
   res.json(await readProgress(req.user!.id, materia));
 });
 
