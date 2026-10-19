@@ -40,7 +40,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
   names, entry titles and citations, study cards; no clients' personal data there, or only trusted AI apps — the owner,
   13 Oct 2026, in place of pseudonymisation; the consent page `/connect` carries the same notice), what a connected app can do, and
-  `ConnectedAppsSection`, the same list Impostazioni shows; reached from the user menu), then `/sentenze` and
+  `ConnectedAppsSection`, the same list Impostazioni shows; reached from the user menu. The page has two parts, named
+  by two anchors at its top: «VisuaLex» (`#visualex`, all of the above) and «mcp-legal-it» (`#mcp-legal-it`, a
+  separate MCP server installed on the user's own computer, no account, drawn whatever the address says):
+  `legalItClients.ts`, the same card shape (`ClientCard`, without the deletion line), uv first, Claude Desktop and
+  Claude Code, the clients that cannot run it, the rest left to the README. Its privacy sentence is the owner's,
+  word for word; it writes no version number (`releases/latest`, `legal-it-….mcpb`), links only to the repository
+  and its latest release, names neither the licence nor Brocardi — `legalItClients.test.ts` reads the file and
+  checks all of it), then `/sentenze` and
   `/sentenze/:corte/:numero/:anno` (both `DecisionAddress`: they redirect to `/`, a decision
   address queues the decision for the search space to open in a practice; `/sentenze` alone and an
   address that does not parse both open the palette, and only the address that does not parse
