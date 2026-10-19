@@ -150,7 +150,7 @@ export function RegisterForm() {
         </div>
 
         {/* Registration Card with Glass Effect */}
-        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8 transition-all duration-300">
+        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8">
           {/* Error Message */}
           {formError && (
             <div className="mb-6 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
@@ -167,7 +167,7 @@ export function RegisterForm() {
               </label>
               <div
                 className={cn(
-                  'relative group transition-all duration-300',
+                  'relative group transition-transform duration-300',
                   focusedField === 'email' ? 'transform scale-[1.02]' : ''
                 )}
               >
@@ -186,7 +186,7 @@ export function RegisterForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="nome@email.com"
                   disabled={loading}
                   autoComplete="email"
@@ -201,7 +201,7 @@ export function RegisterForm() {
               </label>
               <div
                 className={cn(
-                  'relative group transition-all duration-300',
+                  'relative group transition-transform duration-300',
                   focusedField === 'username' ? 'transform scale-[1.02]' : ''
                 )}
               >
@@ -220,7 +220,7 @@ export function RegisterForm() {
                   onChange={(e) => setUsername(e.target.value)}
                   onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="mario_rossi"
                   disabled={loading}
                   autoComplete="username"
@@ -248,7 +248,7 @@ export function RegisterForm() {
               </label>
               <div
                 className={cn(
-                  'relative group transition-all duration-300',
+                  'relative group transition-transform duration-300',
                   focusedField === 'password' ? 'transform scale-[1.02]' : ''
                 )}
               >
@@ -267,7 +267,7 @@ export function RegisterForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
+                  className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="••••••••"
                   disabled={loading}
                   autoComplete="new-password"
@@ -320,7 +320,7 @@ export function RegisterForm() {
               </label>
               <div
                 className={cn(
-                  'relative group transition-all duration-300',
+                  'relative group transition-transform duration-300',
                   focusedField === 'confirmPassword' ? 'transform scale-[1.02]' : ''
                 )}
               >
@@ -339,7 +339,7 @@ export function RegisterForm() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   onFocus={() => setFocusedField('confirmPassword')}
                   onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="••••••••"
                   disabled={loading}
                   autoComplete="new-password"
@@ -361,7 +361,7 @@ export function RegisterForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 rounded-xl font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-6"
+              className="w-full py-3.5 px-4 rounded-xl font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] transition-[color,background-color,--tw-gradient-from,--tw-gradient-to,opacity,scale] duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-6"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

@@ -116,7 +116,7 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
                 onlyChanges ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600',
               )}
             >
-              <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all', onlyChanges ? 'left-[1.1rem]' : 'left-0.5')} />
+              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform', onlyChanges && 'translate-x-[0.975rem]')} />
             </span>
             Solo le modifiche
           </button>

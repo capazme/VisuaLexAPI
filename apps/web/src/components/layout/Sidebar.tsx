@@ -13,6 +13,7 @@ import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
 import { Z_INDEX } from '../../constants/zIndex';
+import { spring } from '../../lib/motion';
 
 interface SidebarProps {
   theme: string;
@@ -57,7 +58,6 @@ function CountBadge({ count, className }: { count: number; className?: string })
 }
 
 // Spring config for smooth animations
-const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
 /**
  * The hover label of a sidebar control. Portalled to `document.body` and placed from the control's
@@ -148,7 +148,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
       id={id}
       aria-label={accessibleName}
       className={({ isActive }) => cn(
-        "relative flex items-center justify-center rounded-xl transition-all duration-200",
+        "relative flex items-center justify-center rounded-xl transition-colors duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
         // Mobile: larger touch target (min 44px)
         "w-12 h-12 md:w-11 md:h-11",
@@ -162,10 +162,10 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
     >
       {({ isActive }) => (
         <>
+          {/* A navigation entry is seen tens of times a day: its hover is the colour alone. */}
           <motion.div
-            whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            transition={SPRING_CONFIG}
+            transition={spring.snappy}
           >
             <Icon
               size={22}
@@ -184,7 +184,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
             <motion.span
               layoutId="activeIndicator"
               className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-600 rounded-r-full"
-              transition={SPRING_CONFIG}
+              transition={spring.snappy}
             />
           )}
 
@@ -373,7 +373,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
           onKeyDown={onTriggerKeyDown}
           className={cn(
-            "relative flex items-center justify-center rounded-xl transition-all duration-200",
+            "relative flex items-center justify-center rounded-xl transition-colors duration-200",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
             "w-12 h-12 md:w-11 md:h-11",
             showUserMenu && "bg-primary-50 dark:bg-primary-900/10"
@@ -382,7 +382,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           <motion.div
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            transition={SPRING_CONFIG}
+            transition={spring.snappy}
             className={cn(
               "rounded-lg flex items-center justify-center text-sm font-semibold",
               "w-9 h-9 md:w-8 md:h-8",

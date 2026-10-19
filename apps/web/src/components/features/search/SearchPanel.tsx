@@ -31,6 +31,7 @@ import { PracticeNotice, type PracticeStreaming } from '../practice/PracticePart
 import { ReadingRow } from '../practice/ReadingRow';
 import { PracticeBar } from '../practice/PracticeBar';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
+import { dur, ease } from '../../../lib/motion';
 
 /** The practice whose light window or, on a phone, full-screen reader `askerId` names: where a norm
  *  cited in its text is searched and opened. */
@@ -690,7 +691,7 @@ export function SearchPanel() {
                       className="h-full origin-left bg-primary-600 dark:bg-primary-400"
                       initial={{ transform: 'scaleX(0)' }}
                       animate={{ transform: `scaleX(${loadingProgress.loaded / loadingProgress.total})` }}
-                      transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+                      transition={{ duration: dur.panel, ease: ease.out }}
                     />
                   </div>
                 )}

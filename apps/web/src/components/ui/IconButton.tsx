@@ -59,10 +59,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         isActive && 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
       ),
       solid: cn(
-        'text-white',
-        'bg-primary-600 hover:bg-primary-700',
-        'shadow-sm hover:shadow-md',
-        isActive && 'bg-primary-700'
+        'text-white bg-toga-600 hover:bg-toga-700 active:bg-toga-800',
+        'dark:text-ink-950 dark:bg-toga-400 dark:hover:bg-toga-300',
+        isActive && 'bg-toga-700 dark:bg-toga-300'
       ),
       danger: cn(
         'text-slate-500 dark:text-slate-400',
@@ -78,7 +77,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         type="button"
         className={cn(
           // Base styles
-          'inline-flex items-center justify-center rounded-lg',
+          'inline-flex items-center justify-center rounded-md',
           TRANSITION,
           FOCUS_RING,
           DISABLED,
@@ -93,10 +92,11 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           className
         )}
         disabled={disabled || loading}
+        aria-busy={loading || undefined}
         {...props}
       >
         {loading ? (
-          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
         ) : (
           icon
         )}

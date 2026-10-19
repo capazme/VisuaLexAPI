@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
+import { ACTIVE, FOCUS_RING, HOVER_LIFT, TRANSITION } from './constants/interactions';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -144,6 +145,32 @@ describe('the entrance utilities', () => {
     expect(css).toContain('.slide-in-from-bottom');
     expect(css).toContain('.slide-in-from-top-2');
     expect(css).toContain('.slide-in-from-right-10');
+  }, 30000);
+
+  it('never last past 200 ms, whatever duration the class writes', async () => {
+    const css = await compile(['animate-in', 'duration-300']);
+    expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-duration:\s*min\(var\(--tw-duration,\s*180ms\),\s*200ms\)/);
+  }, 30000);
+});
+
+describe('the interaction constants', () => {
+  it('move what TRANSITION names, scale and translate included, and never the focus ring', async () => {
+    const [property] = TRANSITION.split(' ');
+    const css = await compile([property]);
+    // The selector as Tailwind escapes it: `[`, `]` and `,` behind a backslash.
+    const selector = '.' + property.replace(/[[\],]/g, (c) => `\\${c}`);
+    const rule = css.split(`${selector} {`)[1]?.split('}')[0] ?? '';
+    // Tailwind v4's scale-* and translate-* write the `scale` and `translate` properties, not `transform`.
+    expect(rule).toMatch(/transition-property:[^;]*\btranslate\b[^;]*\bscale\b/);
+    expect(rule).not.toMatch(/box-shadow|\ball\b/);
+  }, 30000);
+
+  it('press with scale, lift on a fine pointer only, and ring in toga on the paper', async () => {
+    const css = await compile([ACTIVE, HOVER_LIFT, ...FOCUS_RING.split(' ')]);
+    expect(css).toMatch(/\.active\\:scale-\\\[0\\\.97\\\][^{]*\{\s*&:active\s*\{\s*scale:\s*0\.97/);
+    expect(css).toMatch(/pointer\\:fine\\\)\\\]\\:hover\\:-translate-y-px\s*\{\s*@media \(hover:hover\) and \(pointer:fine\)/);
+    expect(css).toContain('.focus-visible\\:ring-toga-500');
+    expect(css).toContain('.focus-visible\\:ring-offset-background');
   }, 30000);
 });
 

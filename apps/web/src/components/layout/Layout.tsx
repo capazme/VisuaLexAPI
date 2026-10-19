@@ -23,6 +23,7 @@ import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
 import { ServiceHealthBanner } from '../ui/ServiceHealthBanner';
 import { PluginSlot } from '../../plugins/PluginSlot';
+import { spring } from '../../lib/motion';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -174,7 +175,7 @@ export function Layout() {
           width: sidebarVisible && !settings.focusMode ? 64 : 0,
           opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
         }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={spring.snappy}
         className="hidden lg:block flex-shrink-0 h-full"
       >
         {sidebarVisible && !settings.focusMode && (

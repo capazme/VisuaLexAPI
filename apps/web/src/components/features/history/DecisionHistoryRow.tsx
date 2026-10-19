@@ -37,7 +37,7 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
   return (
     <div id={id} data-history-decision className="relative group">
       {variant === 'desktop' && (
-        <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800 group-hover:scale-125 transition-transform" />
+        <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800" />
       )}
       <div className={cn(
         'relative flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700',
