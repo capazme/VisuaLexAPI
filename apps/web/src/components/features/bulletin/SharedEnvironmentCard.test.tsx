@@ -55,3 +55,11 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
     expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
   });
 });
+
+describe('SharedEnvironmentCard — its tags', () => {
+  it('shows them with a capital letter, as typed past the first (D1)', () => {
+    renderCard({ ...base, tags: ['appello', 'GDPR'] });
+    expect(screen.getByText('Appello')).toBeInTheDocument();
+    expect(screen.getByText('GDPR')).toBeInTheDocument();
+  });
+});

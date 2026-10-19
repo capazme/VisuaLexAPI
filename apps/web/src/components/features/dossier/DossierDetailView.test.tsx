@@ -19,6 +19,7 @@ const pdf = vi.hoisted(() => ({
   loadDossierDecisions: vi.fn(),
   loadPdfMarks: vi.fn(),
   built: [] as unknown[][],
+  written: [] as unknown[][],
 }));
 vi.mock('./dossierPdf', async (importOriginal) => {
   const real = await importOriginal<typeof import('./dossierPdf')>();
@@ -27,7 +28,7 @@ vi.mock('./dossierPdf', async (importOriginal) => {
     loadDossierTexts: pdf.loadDossierTexts,
     loadDossierDecisions: pdf.loadDossierDecisions,
     buildPdfBlocks: (...args: Parameters<typeof real.buildPdfBlocks>) => { pdf.built.push(args); return real.buildPdfBlocks(...args); },
-    writeDossierPdf: () => ({ save: pdf.save }),
+    writeDossierPdf: (...args: unknown[]) => { pdf.written.push(args); return { save: pdf.save }; },
   };
 });
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
@@ -119,6 +120,13 @@ describe('DossierDetailView — the page by act', () => {
     expect(within(notes).getByText('Verificare la decorrenza')).toBeInTheDocument();
     const firstAct = screen.getByRole('region', { name: L247 });
     expect(notes.compareDocumentPosition(firstAct) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows its tags with a capital letter, as typed past the first (D1)', () => {
+    renderView({ ...dossier, tags: ['accesso', 'GDPR'] });
+    expect(screen.getByText('Accesso')).toBeInTheDocument();
+    expect(screen.getByText('GDPR')).toBeInTheDocument();
+    expect(appStore.getState().dossiers[0].tags).toEqual(['accesso', 'GDPR']);
   });
 
   it('counts acts, articles and notes', () => {
@@ -357,6 +365,7 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pdf.built.length = 0;
+    pdf.written.length = 0;
     pdf.loadDossierTexts.mockImplementation(async (_items: unknown, progress: (d: number, t: number) => void) => { progress(3, 3); return new Map(); });
     pdf.loadDossierDecisions.mockImplementation(async (_items: unknown, _ids: unknown, progress: (d: number, t: number) => void) => { progress(0, 0); return new Map(); });
     pdf.loadPdfMarks.mockResolvedValue(new Map());
@@ -385,6 +394,13 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
     expect(pdf.loadPdfMarks).toHaveBeenCalledWith(expect.any(Array), { articles: false, decisionIds: new Set(['s1', 's2']) });
     expect(pdf.built[0][3]).toMatchObject({ excerpts: false });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('prints the tags as stored: the PDF is a document, not the screen (D1)', async () => {
+    open({ ...dossier, tags: ['accesso', 'GDPR'] });
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(pdf.save).toHaveBeenCalled());
+    expect(pdf.written[0][0]).toMatchObject({ tags: ['accesso', 'GDPR'] });
   });
 
   it('passes the choices on: only the marked passages, and not the decision left out', async () => {
