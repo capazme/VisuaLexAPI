@@ -35,7 +35,7 @@ const SUBJECT_TOKEN: Record<Materia, string> = {
   DIRITTO_PENALE: '--category-penal',
   DIRITTO_AMMINISTRATIVO: '--category-administrative',
   DIRITTO_PROCESSUALE_CIVILE: '--category-compliance',
-  DIRITTO_PROCESSUALE_PENALE: '--brocardi',
+  DIRITTO_PROCESSUALE_PENALE: '--category-penal-procedure',
 };
 
 /** The subject's hue as a CSS colour, for an inline style: it follows the theme through the variable. */
