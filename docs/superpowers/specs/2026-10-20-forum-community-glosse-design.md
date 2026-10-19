@@ -2,7 +2,8 @@
 
 20 October 2026. Status: **proposal**, to be read by both owners before any code (G-304). Target release: 1.10.
 Builds on the draft pull request #205 (`feat/glosse-forum`, spec `2026-10-19-glosse-forum-design.md`) and on the
-decisions G-265, G-266, G-283, G-291, G-292, G-293.
+decisions G-265, G-266, G-283, G-291, G-292, G-293. The owner's answers to this design's questions (G-306 to G-312,
+20 October 2026) are folded in; G-309 to G-312 also wait for the other developer's word (§11).
 
 ## 1. What was decided, and what it means
 
@@ -21,13 +22,13 @@ This has three consequences that shape everything below:
    accepted answer, editing and deletion, moderation by moderators, reports on replies, notifications, a page.
 2. **A discussion always has a subject in the law.** Every glossa has an anchor (an article, a decision, optionally a
    passage). There is no free-floating question «tra colleghi» without a norm or a decision; that is the deliberate
-   price of G-304 (see §11, question 2).
+   price of G-304, confirmed for the first cut (G-311).
 3. **The reader and the Community are one conversation seen from two places.** A reply written in the Community shows
    in the reader's discussion panel and the reverse. Nothing is copied.
 
 The other developer's earlier idea (19 October: a post with a dossier attached, the debate turned by AI into glosse
 that the participants validate) is **not** in this design. It is compatible with it as a later step (§9) and needs
-decisions this spec does not take (§11, question 6).
+decisions this spec does not take (§11).
 
 ### Words
 
@@ -57,7 +58,8 @@ decisions this spec does not take (§11, question 6).
   (points and levels are G-303's spec).
 
 **Anti-goals: it fails even if it works when**
-- someone's words outlive their deletion or their account without their choice (§7);
+- someone's words outlive their own deletion of them (§4.4), or outlive their account without their having been told
+  so beforehand (§7.3);
 - a moderator acts with no trace, or a glossa's author can silence the replies that disagree with them (§5);
 - a decision's withdrawn quotation leaks through the Community (G-291, §4.6);
 - the reader's anchors move or vanish because of anything the Community does (root rule 23: the Community never
@@ -78,7 +80,7 @@ glossa; sorts `recent|popular|active|unanswered`; filters `kind`, `act`, `normaK
 quotation outside the reader (G-291), the composer's notice that a glossa is public, and an unstyled «Glosse» tab.
 
 **What #205 must change before it merges: nothing in its server routes.** This design extends them (new fields and
-filters) without changing what they already answer. One point is the owners' (§11, question 1): where its tab lives.
+filters) without changing what they already answer. Where its tab lives is the other developer's call (G-309, §6.1).
 #205 puts «Glosse» inside «Dossier pubblici»; under this design the glosse feed *is* the Community page, so the tab
 belongs at `/forum/community`, replacing F1's placeholder. If #205 merges first as it is, the move is part of this
 design's web work.
@@ -93,8 +95,7 @@ design's web work.
 - `deleted_at` — set when the author deletes a glossa that others answered (§4.4).
 - `locked_at`, `locked_by` — a moderator closed it to new replies (`locked_by` FK to `users`, `SET NULL`).
 - `materia` — nullable `LingoMateria` (the five subjects of Gymnasium), the author's choice (§6.2).
-- `user_id` becomes **nullable**, `ON DELETE SET NULL` instead of `CASCADE` — only if the owners choose option (b) of
-  §7.3; otherwise unchanged.
+- `user_id` becomes **nullable**, `ON DELETE SET NULL` instead of `CASCADE` (G-307, §7.3).
 - indexes `(is_hidden, created_at)` and `(is_hidden, updated_at)` for the feed (#205's decision 3).
 
 On both `article_threads` and `article_comments`:
@@ -102,12 +103,15 @@ On both `article_threads` and `article_comments`:
 - `licence_text_id` — FK to the versioned text the author accepted when writing it (§7.2), `RESTRICT`; null for what
   was written before the text existed.
 
-`article_comments` (replies and comments) gains `edited_at`, `deleted_at`, and the same nullable `user_id` under §7.3 (b).
+`article_comments` (replies and comments) gains `edited_at`, `deleted_at`, and the same nullable `user_id`
+(`SET NULL`, G-307).
 
 New tables:
 - `article_comment_reports` — as `article_thread_reports` (one per user and reply, `reason`, `details`, `status`), plus
-  on both report tables `resolved_by` (FK `users`, `SET NULL`), `resolved_at`, `resolution_note`, and what §11
-  question 8 decides about keeping the reported text.
+  on both report tables `resolved_by` (FK `users`, `SET NULL`), `resolved_at`, `resolution_note` and `reported_text`
+  (G-308, §5.2). On both, the item's foreign key becomes nullable with `SET NULL`, so a report outlives the item it
+  copied; the reporter's `user_id` becomes nullable with `SET NULL` too, so a pending report outlives its reporter's
+  account *(my call: it is the moderators' evidence)*.
 - `forum_notifications` — `user_id` (the recipient, cascade), `kind`, `thread_id`, `comment_id` (both cascade),
   `created_at`, `read_at`. No actor column: the reply names its author already; a notification whose reply is
   deleted goes with it.
@@ -157,8 +161,8 @@ New tables:
 - **Deleting a glossa**: if no one else replied, the glossa is deleted with its own replies. If others replied, its
   title and body are emptied, `deleted_at` set, and it shows «Glossa cancellata dall'autore» with its anchor and passage
   (the law's words, not the author's) and the replies, which belong to their authors. The deletion is final: emptied
-  text is not kept anywhere, save what §11 question 8 decides for reported text *(my call: the point of deleting
-  is that the words go)*.
+  text is not kept anywhere, save the copy a report keeps for the moderators (G-308, §5.2) *(my call: the point of
+  deleting is that the words go)*.
 - Routes: `DELETE /article-discussions/:threadId`, `DELETE /article-discussion-comments/:commentId`; the answer says
   which happened (`{ outcome: 'deleted' | 'emptied' }`). Not through the trash: the trash holds a user's private
   material, and a public contribution emptied in place has nothing to restore.
@@ -195,7 +199,7 @@ presentation (unchanged; server-side withholding there remains the precondition 
 - In the app: `users.forum_moderator`, set by an admin in `PUT /admin/users/:id { forumModerator, reason }`. The reason
   is required for both appointment and revocation and goes to `forum_moderation_log` (`target_kind: user`). The flag is
   read from the database on every moderation call, like `lingoValidatore`. The request and the written commitment stay
-  outside the app (§11, question 4).
+  outside the app (G-312).
 - An admin can do everything a moderator can. A moderator cannot appoint, cannot release a decision's quotation
   (that stays an admin's act, G-291), cannot delete for good.
 
@@ -210,6 +214,13 @@ presentation (unchanged; server-side withholding there remains the precondition 
 - Queue: `GET /moderation/reports?status=pending|resolved|dismissed` (moderators and admins): one row per reported item
   with its reports grouped (count, reasons, details, the earliest date), the item's full text even if hidden, its
   anchor and a link to its glossa. Oldest pending first.
+- **The reported text is kept** (G-308): each report stores `reported_text`, the item's title and body as they were
+  when that report was made (a replaced report takes a new copy). The queue shows it beside the item's current text,
+  and in its place when the author edited, emptied or deleted the item, so deleting stays the author's right and the
+  moderators keep what was reported. Only moderators and admins read it; it never appears in the item's views, the
+  feed or an export. Ninety days after the report is resolved or dismissed the copy is erased (the column set to null,
+  the report kept as a record), by a sweep that runs at most once a day and is awaited, never fired and forgotten (as
+  the trash's sweep).
 - Decision: `POST /moderation/reports/:kind/:itemId/resolve { action: 'hide' | 'dismiss', reason }` closes every pending
   report of that item at once, hides it or not, and logs it. *(My call: one decision per item, not per report.)*
 - **No automatic hiding** in the first cut, whatever the count *(my call: with a small community a few accounts could
@@ -224,7 +235,7 @@ presentation (unchanged; server-side withholding there remains the precondition 
   which only moderators and admins read *(my call: a free text may name who reported)*. The existing admin route keeps
   working for `passageReleased` (admins) and logs too.
 - A hidden glossa disappears from every list and its page is a 404 «Glossa non trovata», except to its author, who sees
-  it with «Nascosta dalla moderazione: <categoria in parole>» and can still delete it (subject to §11, question 8), and
+  it with «Nascosta dalla moderazione: <categoria in parole>» and can still delete it (its reports keep their copy, G-308), and
   to moderators. A hidden reply shows as
   «Contenuto rimosso dalla moderazione» where something visible hangs on it, else not at all; its author sees their text
   with the same notice.
@@ -253,7 +264,11 @@ presentation (unchanged; server-side withholding there remains the precondition 
 
 ### 6.1 Addresses
 
-- `/forum/community` — the feed, replacing F1's placeholder (and #205's tab, §3).
+- **Where the glosse sit in the Forum is the other developer's decision** (G-309: the owner said «ok», then left the
+  exact placement to the other developer). The owner's «ok» settles that the glosse are the Community's subject; the
+  routes and the page are as below whatever is decided. Recommended: `/forum/community` is the feed, replacing F1's
+  placeholder and #205's tab (§3), and «Dossier pubblici» keeps only dossiers.
+- `/forum/community` — the feed (recommended placement).
 - `/forum/community/glossa/:threadId` — one glossa with its discussion.
 - From the reader: each glossa in the discussion panel gets «Apri nella Community», and the Community's «Apri nel testo»
   (#205: an article through its recorded URN and `triggerSearch`, a decision by its `/sentenze/…` address) opens the
@@ -316,28 +331,38 @@ comment whose author has not accepted the **current** version carries that versi
 (`{ detail, richiedeTesto }`), nothing written; a new version asks again. Every contribution records the version it was
 written under (`licence_text_id`), so what is under the licence is known row by row. Accepting it licenses what one
 writes from then on. What was written before (`licence_text_id` null) stays visible inside VisuaLex as it is today, and
-is not relicensed silently (§11, question 3). *(My calls: version 1 in the migration, a new acceptance per version, the
+is not relicensed silently (G-310: «ok»). *(My calls: version 1 in the migration, a new acceptance per version, the
 version on each row.)*
 
-### 7.3 Deleting the account
+### 7.3 Deleting the account (G-307)
 
-Today deleting an account deletes its glosse **with every reply others wrote under them** (cascade). Under a Community
-that is no longer acceptable. Options:
-- (a) keep it: the person's glosse go with every discussion under them;
-- (b) **the person's words go, the discussions stay** (recommended): the account deletion applies §4.4 to each of
-  their contributions — what nobody answered is deleted, what others answered is emptied and shown without an author
-  (`user_id` null); votes and reports go; notifications go;
-- (c) as Gymnasium's community cards: kept with their text, without an author.
-
-(b) needs `user_id` nullable on both tables and `deleteUserAccount` to do the work in its transaction. The deletion
-dialog says what happens.
+Today deleting an account deletes its glosse **with every reply others wrote under them** (cascade). The owner chose
+(G-307, «c»): **the contributions stay, with their text, without an author**.
+- `user_id` becomes null on the person's glosse, replies and comments (`ON DELETE SET NULL` replaces the cascade), and
+  every view names the author «utente cancellato». What others wrote under them is never deleted.
+- What goes with the account: their votes and their notifications. Their reports stay without a reporter (§4.1);
+  the moderation log keeps each act with `actor_id` null.
+- What the person had emptied (§4.4) stays emptied; an accepted answer stays accepted.
+- An anonymous contribution can no longer be edited, deleted or accepted by anyone, its glossa's acceptance included.
+  Moderators can still hide it.
+- **Before deleting**, the person can delete their contributions one by one (§4.4), and the deletion dialog says so:
+  glosse, replies and comments stay, anonymous, unless deleted first; it links the Community filtered on «Le mie
+  glosse» and «Dove ho risposto». **The privacy notice** (VisuaLex's, at its next version) must say the same:
+  published contributions outlive the account, without the author's name.
+- **Residual risk**: a text can identify its author by itself — a signature, a firm's name, a case only they handled,
+  a recognisable style — and other people's replies may name their username. Making a contribution anonymous removes
+  the link in the database, not what the words say. After the account is gone, the person can still ask the owners to
+  empty a contribution: an admin empties it as §4.4 does, logged with the request as reason *(my call: erasure must
+  stay possible after the account is gone)*.
+- `deleteUserAccount` does it in its transaction: the `SET NULL`s do most of it, as for Gymnasium's community cards.
 
 ### 7.4 Export
 
 `GET /auth/export` carries the person's glosse and replies (text, anchor, dates, edited/deleted marks), their votes
 (target ids), their reports (reason, details, date) and their notifications. **It must not carry other people's
-replies**: today it includes every comment under the person's threads, with their authors' ids and text — a defect to
-fix whatever is decided here (§11, question 5).
+replies**: today it includes every comment under the person's threads, with their authors' ids and text. The owner
+approved the fix (G-306); it is its own pull request, `fix/export-other-users-data`, outside this design. The
+Community's export builds on it. A report's `reported_text` is never exported: it is the moderators' record.
 
 ### 7.5 What leaves VisuaLex
 
@@ -347,6 +372,8 @@ Nothing. The Community sends no event to MERL-T and nothing to an AI in this cut
 
 - Ownership is checked on every edit, delete and accept against the session's user (IDOR); a hidden or deleted item
   answers like a missing one to whoever may not see it.
+- A contribution may have no author (§7.3): every view and check handles a null `user_id` (today `threadView` reads
+  `thread.user.id`, which would throw), and a null author is never anyone's own.
 - Moderator and admin rights are read from the database on each call; `requireAdmin` stays for admin-only acts.
 - Body rendering: §4.5.
 - Every new route answers its 400/403/404/409/429 in Italian through `parseItalian`.
@@ -356,7 +383,8 @@ Nothing. The Community sends no event to MERL-T and nothing to an AI in this cut
 
 **First cut (1.10)**, in this order, each a pull request with its review:
 1. Server, data: the migration (§4.1) and the licence key's migration (a new enum value cannot be used in the
-   transaction that adds it: two migrations, as `20261024100000`/`…01`), export fix, account deletion (§7.3).
+   transaction that adds it: two migrations, as `20261024100000`/`…01`), account deletion (§7.3), the reports' copy
+   and its sweep (§5.2). The export fix is already its own pull request (G-306).
 2. Server, routes: replies at two levels, edit, delete, accept, own-vote refusal, closed report reasons and reply
    reports, moderation queue and acts with the log, notifications, limits, feed filters. **The reader's discussion
    panel changes in the same pull request**, so the reader never breaks between the two: it sends a reason from the
@@ -372,7 +400,7 @@ Nothing. The Community sends no event to MERL-T and nothing to an AI in this cut
 
 **Later**
 - The other developer's idea: a dossier attached to a discussion; AI drawing ordered glosse from a debate, valid only once the
-  participants validate them (needs §11, question 6).
+  participants validate them (§11).
 - Edit history visible to moderators; suspension from the Community; auto-hiding past a threshold; muting a glossa's
   notifications; e-mail digests; mentions.
 - Votes and accepted answers as inputs to points, levels and authority (G-303's spec).
@@ -387,30 +415,27 @@ emptied text is not kept; deletion outside the trash; closed report reasons; one
 automatic hiding; the daily limits; the personal-data check in the composer; no MCP access; the feed's default order;
 the subject column and its pre-selection; notifications kept 90 days; existing data left as stored; the moderator's
 free reason kept to the log, a category shown to the author; the licence's version 1 in the migration, a new acceptance
-per version and the version on each row; the reader's panel kept complete and changed with the server routes.
+per version and the version on each row; the reader's panel kept complete and changed with the server routes; reports
+outliving their reporter's account; an admin emptying an anonymous contribution on request; the reported text's
+sweep once a day.
 
-## 11. Questions only the owners can answer
+## 11. The owners' answers, and what is still open
 
-1. **Where the glosse live** (both owners). The other developer sees the glosse as annotations within dossiers, in «Dossier
-   pubblici»; G-304 makes them the Community's subject. Recommended: the feed moves to `/forum/community` and
-   «Dossier pubblici» keeps only dossiers; #205 merges as it is and its tab moves in the Community's web work.
-2. **Only glosse, no free questions?** Under G-304 a discussion needs an article or a decision. Recommended: yes for the
-   first cut; a free question without an anchor is a later, separate decision.
-3. **Licence** (G-283, both owners): CC BY-SA 4.0 through a versioned text accepted at the first write; glosse written
-   before keep today's terms until their author accepts. Recommended as written.
-4. **Moderators' request and commitment**: inside the app (a form and a text to accept) or outside (an e-mail to the
-   association, the reason typed by the owner who appoints)? Recommended: outside for now; the app records only the
-   appointment, the revocation and their reasons.
-5. **The export defect** (§7.4): fix it now in a small pull request, before 1.10? Recommended: yes, now — it hands one
-   user other users' text and ids.
-6. **The AI step** (later): who answers for a glossa an AI drew from a debate, whether participants' replies may be
-   read by an AI at all (MERL-T consent, the forum-authoring decision), and who validates (all participants, a
-   majority, each for their own part). Not needed for the first cut; recorded so it is not lost.
-7. **Account deletion** (§7.3): (a), (b) or (c)? Recommended: (b).
-8. **Deleting what was reported** (§4.4, §5). The author may delete their words for good, but then a moderator loses
-   what was reported, and an offensive reply can vanish as soon as it is reported. Options: (a) the author can delete
-   whatever its state, and the evidence goes; (b) a report keeps a copy of the reported text, kept until 90 days after
-   the report is resolved and then erased, and the author can still delete; (c) the author cannot delete while a report
-   is pending or the item is hidden. Recommended: (b): erasure stays the author's, moderation keeps what it needs for a
-   limited time, and the copy is readable only by moderators and admins. It adds a `reported_text` column to the
-   reports, which then survive the item (`target` `SET NULL`).
+The owner answered on 20 October 2026; G-309 to G-312 also need the other developer's word.
+
+| Question | Answer |
+| --- | --- |
+| G-306 The export hands over other users' replies: fix it now? | «ok»: its own pull request, `fix/export-other-users-data` (§7.4) |
+| G-307 Account deletion | «c»: the text stays, without an author (§7.3) |
+| G-308 Deleting what was reported | «ok»: a report keeps a copy for the moderators until 90 days after it is closed (§5.2) |
+| G-309 Where the glosse live | «ok», the exact placement left to the other developer (§6.1) |
+| G-310 Licence CC BY-SA 4.0, a versioned text accepted at the first write | «ok» (§7.2) |
+| G-311 First cut: only discussions anchored on a norm or a decision | «ok» (§1) |
+| G-312 Moderators' request and commitment outside the app | «ok» (§5.1) |
+
+**Still open**
+- The other developer: the placement of the glosse in the Forum (G-309; recommended in §6.1), and their word on
+  G-310, G-311 and G-312.
+- Later, not needed for the first cut: the AI step (a dossier attached to a discussion, glosse drawn from a debate) —
+  who answers for a glossa an AI drew, whether participants' replies may be read by an AI at all (MERL-T consent, the
+  forum-authoring decision), and who validates (all participants, a majority, each for their own part).
