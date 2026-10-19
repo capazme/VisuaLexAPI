@@ -231,6 +231,18 @@ describe('ConnectAiAppPage — mcp-legal-it', () => {
     }
   });
 
+  it('keeps every «Copia» button 44 px tall at every width, not only on a phone', async () => {
+    render(<ConnectAiAppPage />);
+    await screen.findByRole('region', { name: /come collegare la tua app/i });
+    const buttons = screen.getAllByRole('button', { name: /^copia/i });
+    expect(buttons.length).toBeGreaterThan(5);
+    for (const button of buttons) {
+      expect(button).toHaveClass('min-h-[44px]');
+      // No breakpoint may lower it again (the 66x24 button seen at 1470 px wide).
+      expect([...button.classList].filter((name) => /^(sm|md|lg|xl|2xl):(min-h|h|py)-/.test(name))).toEqual([]);
+    }
+  });
+
   it('is there while the address loads and when it cannot be read', async () => {
     getConnectionInfo.mockRejectedValue({ status: 500, message: 'Errore del server' });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
