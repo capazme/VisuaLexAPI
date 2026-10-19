@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import type { Materia } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
-import { StudyPreferences } from './StudyPreferences';
-import { ProgressBand } from './progress/ProgressBand';
+import { ConfettiBurst } from './progress/Celebration';
 import { ProgressPanels, ProgressPanelsSkeleton } from './progress/ProgressPanels';
+import { StudyStrip } from './progress/StudyStrip';
 import { SubjectChips } from './progress/SubjectChips';
+import { SubjectRoad, SubjectRoadSkeleton } from './progress/SubjectRoad';
+import { TodayCard } from './progress/TodayCard';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
-import { FOCUS_RING } from './progress/tokens';
+import { PANEL_HEADING } from './progress/tokens';
 
 const STORAGE_KEY = 'visualex.studia.ripasso.materia';
 const MATERIE = Object.keys(MATERIA_LABEL) as Materia[];
@@ -34,21 +36,23 @@ function rememberMateria(materia: Materia | undefined): void {
 }
 
 /**
- * «Ripasso», Studia's home (Studia progress spec §6.2, direction D): the band with today's goal, the streak
- * and «Inizia il ripasso»; the subject chips, which narrow the dashboard and the session it starts; the
- * activity calendar, the cards by state, the coming days and the subjects; the study settings closed at
- * the bottom. Everything comes from one read (`useProgress`); the server decides what «today» is.
+ * «Oggi», Gymnasium's home (Gymnasium spec §5.1): the strip (streak, goal, the gear of the study
+ * settings), the action (what is on today, what it costs, «Inizia»), «Cosa ripassi» (the subject chips,
+ * which narrow the page and the session it starts), the road of subjects, and the progress at the
+ * bottom («I tuoi progressi», until it has a page of its own). Everything comes from one read
+ * (`useProgress`); the server decides what «today» is.
  */
 export function ReviewHome() {
   const navigate = useNavigate();
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const progress = useProgress(materia);
   const data = progress.data;
+  const ringRef = useRef<HTMLDivElement>(null);
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose burst has run its course on this page.
   const [burstDone, setBurstDone] = useState<string | null>(null);
-  // Once a day (spec decision 10): here, when the goal was met today with some review and this browser had not
-  // celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the
+  // Once a day (progress spec decision 10): here, when the goal was met today with some review and this browser had
+  // not celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the
   // same way). It follows the data on screen, not the read's status, so a new read halfway does not cut it short.
   const celebrate = data !== null && data.oggi.raggiunto && data.oggi.ripassi > 0 && !celebratedBefore(data.oggi.giorno) && burstDone !== data.oggi.giorno;
 
@@ -56,39 +60,41 @@ export function ReviewHome() {
     setMateria(next);
     rememberMateria(next);
   };
-  const nothingLeft = progress.status === 'ready' && progress.data.oggi.dovute === 0 && progress.data.oggi.nuove === 0;
   const start = () => navigate(materia ? `/studia/ripasso/sessione?materia=${materia}` : '/studia/ripasso/sessione');
+  const loading = progress.status === 'loading';
 
   return (
-    <section className="max-w-5xl space-y-5 pb-8">
-      <h2 className="sr-only">Ripasso</h2>
-      <ProgressBand
-        data={data}
-        failed={progress.status === 'error'}
-        filtered={materia !== undefined}
-        onStart={start}
-        nothingLeft={nothingLeft}
-        celebrate={celebrate}
-        onCelebrationStart={() => data && markCelebrated(data.oggi.giorno)}
-        onCelebrated={() => data && setBurstDone(data.oggi.giorno)}
-      />
-      {progress.status === 'error' && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-          Non riesco a leggere i tuoi progressi.{' '}
-          <button type="button" onClick={progress.reload} className={cn('min-h-[44px] rounded px-1 font-medium underline md:min-h-0', FOCUS_RING)}>
-            Riprova
-          </button>
-        </p>
-      )}
-      <SubjectChips selected={materia} onSelect={choose} />
-      {data ? (
-        <div className={cn('space-y-4 transition-opacity', progress.status === 'loading' && 'opacity-60')} aria-busy={progress.status === 'loading'}>
-          <ProgressPanels data={data} materia={materia} onSelectMateria={choose} />
+    // One column, at a reading measure; the progress at the bottom takes the width its calendar wants.
+    <section className="max-w-5xl space-y-6 pb-8">
+      <h2 className="sr-only">Oggi</h2>
+      {/* The confetti start from the ring and fall over the strip and the action, never over the rest. */}
+      <div className="relative max-w-3xl space-y-4">
+        <StudyStrip data={data} loading={loading && data === null} onSettingsChanged={progress.reload} ringRef={ringRef} celebrate={celebrate} />
+        <TodayCard data={data} failed={progress.status === 'error'} onRetry={progress.reload} filtered={materia !== undefined} onStart={start} celebrate={celebrate} />
+        {celebrate && data && (
+          <ConfettiBurst originRef={ringRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
+        )}
+      </div>
+
+      <section aria-labelledby="studia-cosa" className="max-w-3xl space-y-3">
+        <h3 id="studia-cosa" className={PANEL_HEADING}>
+          Cosa ripassi
+        </h3>
+        <SubjectChips selected={materia} onSelect={choose} />
+      </section>
+
+      <div className={cn('space-y-6 transition-opacity', loading && data !== null && 'opacity-60')} aria-busy={loading}>
+        <div className="max-w-3xl">
+          {data ? <SubjectRoad materie={data.materie} selected={materia} /> : <SubjectRoadSkeleton pulsing={loading} />}
         </div>
-      ) : (
-        <ProgressPanelsSkeleton pulsing={progress.status === 'loading'} />
-      )}
-      <StudyPreferences onChanged={progress.reload} />
+
+        <section aria-labelledby="studia-progressi" className="space-y-4 border-t border-slate-200 pt-6 dark:border-slate-800">
+          <h3 id="studia-progressi" className="font-serif text-xl text-slate-900 dark:text-slate-50">
+            I tuoi progressi
+          </h3>
+          {data ? <ProgressPanels data={data} materia={materia} onSelectMateria={choose} /> : <ProgressPanelsSkeleton pulsing={loading} />}
+        </section>
+      </div>
     </section>
   );
 }

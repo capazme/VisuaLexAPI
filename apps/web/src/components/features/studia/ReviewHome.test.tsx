@@ -75,12 +75,12 @@ describe('ReviewHome', () => {
   it('says what is on today, how far the goal is, and offers to start', async () => {
     progress.mockResolvedValue(answer(18, 20));
     renderHome();
-    expect(await screen.findByText('Oggi: 18 da ripassare · 20 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi: 18 da ripassare, 20 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 6 di 10 ripassi' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Serie: 4 giorni di fila, record 9' })).toBeInTheDocument();
     expect(screen.getByText('Ancora 4 ripassi per tenere viva la serie.')).toBeInTheDocument();
-    const start = screen.getByRole('button', { name: 'Inizia il ripasso' });
+    const start = screen.getByRole('button', { name: 'Inizia' });
     expect(start).toBeEnabled();
     await userEvent.setup().click(start);
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
@@ -111,22 +111,22 @@ describe('ReviewHome', () => {
   it('narrows the dashboard to the subject chosen, starts the session on it, and remembers it', async () => {
     progress.mockResolvedValue(answer(18, 20));
     const { unmount } = renderHome();
-    await screen.findByText('Oggi: 18 da ripassare · 20 nuove');
+    await screen.findByText('Oggi: 18 da ripassare, 20 nuove');
     const chips = screen.getByRole('group', { name: 'Materia' });
     expect(within(chips).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'true');
 
     progress.mockResolvedValue(answer(2, 5));
     await userEvent.setup().click(within(chips).getByRole('button', { name: 'Diritto penale' }));
-    expect(await screen.findByText('Oggi: 2 da ripassare · 5 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi: 2 da ripassare, 5 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenLastCalledWith('DIRITTO_PENALE');
     expect(localStorage.getItem(STORAGE_KEY)).toBe('DIRITTO_PENALE');
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Inizia il ripasso' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Inizia' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione?materia=DIRITTO_PENALE');
     unmount();
 
     renderHome();
-    await screen.findByText('Oggi: 2 da ripassare · 5 nuove');
+    await screen.findByText('Oggi: 2 da ripassare, 5 nuove');
     expect(progress).toHaveBeenLastCalledWith('DIRITTO_PENALE');
   });
 
@@ -134,22 +134,24 @@ describe('ReviewHome', () => {
     localStorage.setItem(STORAGE_KEY, 'DIRITTO_ALIENO');
     progress.mockResolvedValue(answer(1, 1));
     renderHome();
-    await screen.findByText('Oggi: 1 da ripassare · 1 nuove');
+    await screen.findByText('Oggi: 1 da ripassare, 1 nuova');
     expect(progress).toHaveBeenCalledWith(undefined);
   });
 
-  it('does not offer a start when nothing is due and nothing is new', async () => {
+  it('says the day is done, with the next day that has cards, and offers no start when nothing is due and nothing is new', async () => {
     progress.mockResolvedValue(answer(0, 0, { raggiunto: true }));
     renderHome();
-    expect(await screen.findByText('Per oggi hai finito. Le prossime schede tornano domani.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Inizia il ripasso' })).toBeDisabled();
+    expect(await screen.findByText('Hai finito per oggi.')).toBeInTheDocument();
+    // `prossimi` has 2 cards each day after today.
+    expect(screen.getByText('Le prossime schede: domani.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^(Inizia|Continua)$/ })).toBeNull();
   });
 
   it('starts with new cards alone', async () => {
     progress.mockResolvedValue(answer(0, 7));
     renderHome();
-    await screen.findByText('Oggi: 0 da ripassare · 7 nuove');
-    expect(screen.getByRole('button', { name: 'Inizia il ripasso' })).toBeEnabled();
+    await screen.findByText('Oggi: 0 da ripassare, 7 nuove');
+    expect(screen.getByRole('button', { name: 'Inizia' })).toBeEnabled();
   });
 
   it('speaks of the first day of the streak to someone who has none yet', async () => {
@@ -165,7 +167,7 @@ describe('ReviewHome', () => {
   it('says a subject has nothing left, and never asks to finish the day from one subject’s counts', async () => {
     progress.mockResolvedValue(answer(5, 5));
     renderHome();
-    await screen.findByText('Oggi: 5 da ripassare · 5 nuove');
+    await screen.findByText('Oggi: 5 da ripassare, 5 nuove');
     progress.mockResolvedValue(answer(0, 0, { ripassi: 2 }));
     await userEvent.setup().click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
     expect(await screen.findByText('Niente da ripassare in questa materia, per oggi.')).toBeInTheDocument();
@@ -179,7 +181,7 @@ describe('ReviewHome', () => {
     expect(screen.getByText('Carico i tuoi progressi…')).toBeInTheDocument();
     expect(container.querySelectorAll('.motion-safe\\:animate-pulse').length).toBeGreaterThan(2);
     fail(new Error('down'));
-    expect(await screen.findByText('I tuoi progressi non sono disponibili, per ora.')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere i tuoi progressi.');
     expect(container.querySelectorAll('.motion-safe\\:animate-pulse')).toHaveLength(0);
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
@@ -190,7 +192,12 @@ describe('ReviewHome', () => {
     progress.mockResolvedValue(empty);
     renderHome();
     expect(await screen.findByText('Non hai ancora schede da ripassare.')).toBeInTheDocument();
-    expect(screen.getByText(/Scrivi una scheda da «Le mie schede»/)).toBeInTheDocument();
+    // «Le mie schede» has no way to write a card yet (G4): the text says how to start from an article.
+    expect(screen.getByText(/apri un articolo dalla/)).toHaveTextContent('«+ Nuova scheda» sotto il testo');
+    expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
+    expect(screen.queryByRole('button', { name: 'Inizia' })).toBeNull();
+    // A first-time user: the ring at zero, the first day of the streak, a road with nothing started.
+    expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 0 di 10 ripassi' })).toBeInTheDocument();
   });
 
   it('says so, keeps the start usable, and reads again on request, when the progress cannot be read', async () => {
@@ -198,24 +205,24 @@ describe('ReviewHome', () => {
     renderHome();
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Non riesco a leggere i tuoi progressi.');
-    expect(screen.getByRole('button', { name: 'Inizia il ripasso' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Inizia' })).toBeEnabled();
     progress.mockResolvedValue(answer(1, 0));
     await userEvent.setup().click(within(alert).getByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByText('Oggi: 1 da ripassare · 0 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi: 1 da ripassare, 0 nuove')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
   it('reads again after a setting changed', async () => {
     progress.mockResolvedValue(answer(3, 0));
     renderHome();
-    await screen.findByText('Oggi: 3 da ripassare · 0 nuove');
+    await screen.findByText('Oggi: 3 da ripassare, 0 nuove');
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
     progress.mockResolvedValue(answer(3, 12));
     savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
     await user.click(await screen.findByRole('switch', { name: 'Diritto civile' }));
     expect(savePreferences).toHaveBeenCalledWith({ materieComunita: ['DIRITTO_CIVILE'] });
-    expect(await screen.findByText('Oggi: 3 da ripassare · 12 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi: 3 da ripassare, 12 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenCalledTimes(2);
   });
 
@@ -223,7 +230,7 @@ describe('ReviewHome', () => {
     const pending: Array<(value: Progressi) => void> = [];
     progress.mockResolvedValueOnce(answer(1, 1));
     renderHome();
-    await screen.findByText('Oggi: 1 da ripassare · 1 nuove');
+    await screen.findByText('Oggi: 1 da ripassare, 1 nuova');
     progress.mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
     const user = userEvent.setup();
     const chips = screen.getByRole('group', { name: 'Materia' });
@@ -232,11 +239,11 @@ describe('ReviewHome', () => {
     expect(pending).toHaveLength(2);
     // The newer request answers first, the older one after.
     pending[1](answer(7, 7));
-    expect(await screen.findByText('Oggi: 7 da ripassare · 7 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi: 7 da ripassare, 7 nuove')).toBeInTheDocument();
     pending[0](answer(9, 9));
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(screen.getByText('Oggi: 7 da ripassare · 7 nuove')).toBeInTheDocument();
-    expect(screen.queryByText('Oggi: 9 da ripassare · 9 nuove')).not.toBeInTheDocument();
+    expect(screen.getByText('Oggi: 7 da ripassare, 7 nuove')).toBeInTheDocument();
+    expect(screen.queryByText('Oggi: 9 da ripassare, 9 nuove')).not.toBeInTheDocument();
   });
 
   describe('the celebration (Studia progress spec §6.4)', () => {
@@ -322,14 +329,120 @@ describe('ReviewHome', () => {
     it('shows no stamp before the goal', async () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
-      await screen.findByText('Oggi: 3 da ripassare · 0 nuove');
+      await screen.findByText('Oggi: 3 da ripassare, 0 nuove');
       expect(screen.queryByTestId('goal-stamp')).not.toBeInTheDocument();
     });
   });
 
-  it('holds the study settings, closed, at the bottom', async () => {
+  it('holds the study settings, closed, behind the gear of the strip', async () => {
     progress.mockResolvedValue(answer(1, 1));
     renderHome();
     expect(await screen.findByRole('button', { name: 'Impostazioni dello studio' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  describe('«Oggi» (Gymnasium spec §5.1)', () => {
+    it('says what today costs, «circa N minuti», from the cards due and new', async () => {
+      progress.mockResolvedValue(answer(18, 8));
+      renderHome();
+      expect(await screen.findByText('Oggi: 18 da ripassare, 8 nuove')).toBeInTheDocument();
+      // ceil(26 × 20 / 60) = 9.
+      expect(screen.getByText('circa 9 minuti')).toBeInTheDocument();
+      // The one primary button of the page.
+      expect(screen.getAllByRole('button', { name: /^(Inizia|Continua)$/ })).toHaveLength(1);
+    });
+
+    it('stamps the day and offers «Continua» once the goal is met with cards left', async () => {
+      localStorage.setItem('visualex.studia.festeggiato', '2026-10-19');
+      progress.mockResolvedValue(answer(4, 2, { ripassi: 12, raggiunto: true }, 5));
+      renderHome();
+      expect(await screen.findByRole('button', { name: 'Continua' })).toBeEnabled();
+      expect(screen.getByTestId('goal-stamp')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Inizia' })).toBeNull();
+      expect(screen.getByText('circa 2 minuti')).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Continua' }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
+      localStorage.removeItem('visualex.studia.festeggiato');
+    });
+
+    it('says the day is done with the next day by name, or that none is coming', async () => {
+      const later = answer(0, 0, { raggiunto: true });
+      later.prossimi = later.prossimi.map((day, i) => ({ ...day, schede: i === 3 ? 6 : 0 }));
+      progress.mockResolvedValue(later);
+      const { unmount } = renderHome();
+      expect(await screen.findByText('Le prossime schede: giovedì 22 ottobre.')).toBeInTheDocument();
+      unmount();
+      const none = answer(0, 0, { raggiunto: true });
+      none.prossimi = none.prossimi.map((day) => ({ ...day, schede: 0 }));
+      progress.mockResolvedValue(none);
+      renderHome();
+      expect(await screen.findByText('Nessuna scheda in programma nei prossimi 14 giorni.')).toBeInTheDocument();
+    });
+
+    it('starts the session from «Inizia» when the progress cannot be read', async () => {
+      progress.mockRejectedValue(new Error('down'));
+      renderHome();
+      expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere i tuoi progressi.');
+      expect(screen.getByText('Puoi ripassare lo stesso: il ripasso legge le sue schede.')).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Inizia' }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
+    });
+
+    it('opens the study settings in a sheet from the gear, and closes it', async () => {
+      progress.mockResolvedValue(answer(1, 1));
+      renderHome();
+      const user = userEvent.setup();
+      const gear = await screen.findByRole('button', { name: 'Impostazioni dello studio' });
+      expect(gear).toHaveAttribute('aria-haspopup', 'dialog');
+      await user.click(gear);
+      const sheet = screen.getByRole('dialog', { name: 'Impostazioni dello studio' });
+      expect(gear).toHaveAttribute('aria-expanded', 'true');
+      // The content of the settings, open, with no disclosure of its own.
+      expect(await within(sheet).findByLabelText('Ripassi al giorno')).toBeInTheDocument();
+      expect(within(sheet).queryByRole('button', { name: 'Impostazioni dello studio' })).toBeNull();
+      await user.click(within(sheet).getByRole('button', { name: 'Chiudi' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('draws the strip: the streak and the goal, small', async () => {
+      progress.mockResolvedValue(answer(3, 0));
+      renderHome();
+      expect(await screen.findByRole('img', { name: 'Obiettivo di oggi: 6 di 10 ripassi' })).toHaveTextContent('6 di 10');
+      expect(screen.getByRole('group', { name: 'Serie: 4 giorni di fila, record 9' })).toHaveTextContent('4');
+    });
+
+    it('draws one stop a subject, by the cards still open, and «Ripassa» starts a session on it', async () => {
+      const data = answer(3, 3);
+      data.materie = [
+        { materia: 'DIRITTO_CIVILE', nuove: 0, apprendimento: 2, consolidate: 400, ripassi30: 210 },
+        { materia: 'DIRITTO_PENALE', nuove: 9, apprendimento: 1, consolidate: 0, ripassi30: 1 },
+        { materia: 'DIRITTO_AMMINISTRATIVO', nuove: 0, apprendimento: 0, consolidate: 0, ripassi30: 0 },
+        { materia: 'DIRITTO_PROCESSUALE_CIVILE', nuove: 2, apprendimento: 0, consolidate: 0, ripassi30: 0 },
+        { materia: 'DIRITTO_PROCESSUALE_PENALE', nuove: 0, apprendimento: 0, consolidate: 3, ripassi30: 0 },
+      ];
+      progress.mockResolvedValue(data);
+      renderHome();
+      const road = await screen.findByRole('list', { name: 'Il percorso' });
+      const stops = within(road).getAllByRole('listitem');
+      expect(stops.map((li) => li.querySelector('p')?.textContent)).toEqual([
+        'Diritto penale', 'Diritto civile', 'Diritto processuale civile', 'Diritto amministrativo', 'Diritto processuale penale',
+      ]);
+      expect(stops[1]).toHaveTextContent('0 nuove · 2 in apprendimento · 400 consolidate');
+      expect(stops[1]).toHaveTextContent('210 ripassi negli ultimi 30 giorni');
+      // A subject with no card has nothing to start.
+      expect(stops[3]).toHaveTextContent('Nessuna scheda, per ora.');
+      expect(within(stops[3]).queryByRole('button')).toBeNull();
+      await userEvent.setup().click(within(stops[0]).getByRole('button', { name: 'Ripassa Diritto penale' }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione?materia=DIRITTO_PENALE');
+    });
+
+    it('keeps the progress at the bottom, under «I tuoi progressi»', async () => {
+      progress.mockResolvedValue(answer(3, 0));
+      renderHome();
+      const heading = await screen.findByRole('heading', { name: 'I tuoi progressi' });
+      for (const name of ['Attività', 'Schede per stato', 'Prossimi 14 giorni', 'Per materia']) {
+        expect(heading.compareDocumentPosition(screen.getByRole('heading', { name })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+      expect(screen.getByRole('heading', { name: 'Il percorso' }).compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
   });
 });
