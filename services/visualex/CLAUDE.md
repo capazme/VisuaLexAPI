@@ -7,15 +7,16 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 - **`app.py`** (this folder): main server, UI + API. **`services/visualex/visualex_api/app.py`**:
   alternative server with `/api/*` prefix and Swagger.
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
-  `brocardi_scraper.py` (annotations), `pdfextractor.py` (Playwright pool),
+  `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
   `request(..., max_retries=n)` lowers the retry budget for a caller that paces
   itself, `None` keeps `HTTP_MAX_RETRIES`).
-  - `brocardi_scraper.py` also emits `Glossario` (links to Brocardi's legal
-    dictionary, `{termine, url, dizionario_id}`). Any new `brocardi_info` key
-    must be whitelisted in **all three** wire literals in `app.py` (this folder)
-    (`stream_article_text`, `fetch_brocardi_info`, `fetch_all_data`) — a key
-    missing from any one of them never reaches the frontend.
+  - `brocardi_scraper.py` is **switched off**: Brocardi is no longer a source
+    (D-078). No route calls it, no answer carries `brocardi_info` or
+    `brocardi_error` (a client's `show_brocardi_info` is ignored),
+    `/fetch_brocardi_info` answers 410, and its hosts are out of
+    `ALLOWED_HOSTS`, so `ThrottledHttpClient` refuses them. The scraper, its
+    tables in `map.py`, its tests and fixtures stay until they are deleted.
   - `akn_parser.py` / `akn_fetch.py` — Normattiva's Akoma Ntoso export.
     **Structure and fallback only, never the display text**: the export
     transliterates every accent ("attivita'", "e'"), and `article_text` is the
@@ -53,8 +54,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     ("ARTICOLO ABROGATO", "PROVVEDIMENTO ABROGATO") is recognised by its words in any
     `ins-akn`, not by the `art_abrogato-akn` class (the class only matters to the structural
     fallback). Best effort: a page it cannot read yields no `validity` key at all, never a
-    guess. It also holds the two request guards, `reject_future_version_date` and
-    `is_historical_request`.
+    guess. It also holds the request guard `reject_future_version_date`, and
+    `is_historical_request`, which guarded the Brocardi calls and has no caller since
+    they stopped (D-078).
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
     portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
     down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
@@ -104,7 +106,7 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     them and those codici lost their default annex
   - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
     brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
-    `brocardi_scraper.do_know` asks. The lookup is **by identity**: every label
+    `brocardi_scraper.do_know` asks — unused since Brocardi was switched off (D-078). The lookup is **by identity**: every label
     embeds the act's extremes ("Statuto dei lavoratori(L. 20 maggio 1970, n.
     300)"), `parse_brocardi_estremi()` reads them once into (tipo esteso, anno,
     numero), and a norma matches only its own triple — the year is what tells
@@ -179,8 +181,8 @@ POST unless noted, JSON bodies.
 - `/fetch_norma_data` — build norm structure from params
 - `/fetch_article_text` — fetch article text (array response)
 - `/stream_article_text` — stream results as NDJSON, one object per line
-- `/fetch_brocardi_info` — Brocardi annotations (position, ratio, spiegazione, massime)
-- `/fetch_all_data` — article text + Brocardi in one call
+- `/fetch_brocardi_info` — 410 Gone: Brocardi is no longer a source (D-078)
+- `/fetch_all_data` — article text and `norma_data` (and `validity`) in one call
 - `/fetch_tree` — article tree for a complete URN
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
@@ -288,7 +290,7 @@ POST unless noted, JSON bodies.
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
-- `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
+- `GET /health/detailed` — probes Normattiva and EUR-Lex **for
   real**, on the shared client and circuit breakers. One result is cached
   for `HEALTH_DETAILED_TTL` seconds (120) behind an `asyncio.Lock`, so N
   concurrent cold callers run one probe; the body carries `cached` and the
@@ -300,8 +302,7 @@ cannot be read): `{state, valid_from, valid_to, version_number, act_updated,
 request_in_window}`, dates in ISO form. It is the source's own statement of which
 version came back; `norma_data.data_versione` is only the date the caller sent. A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
-current text and say nothing — and a request for a past text (`version: "originale"`
-or a `version_date`) never asks Brocardi, whose commentary carries no date.
+current text and say nothing.
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
@@ -377,7 +378,7 @@ in a loop: each act it cannot find costs a request (a miss is not cached).
 
 1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
    EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
-   state law, Brocardi for annotations on Normattiva sources.
+   state law.
    EU acts come from the Official Journal page unless the request names a
    `celex_consolidated` (sector-0 CELEX, `02002L0058-20091219`): then the
    tree, rubriche and article text are read from that consolidated page,
@@ -565,8 +566,8 @@ Breaking one of these breaks the product. Read before editing.
     The window says which text was in force, not which discipline
     governs a fact: transitional provisions and retroactive rules are not on the page.
     `version` is read stripped and lower-cased wherever it is read
-    (`is_historical_request`, `append_version_info`): a spelling that keeps Brocardi
-    out must also build the URN of the past text, or the text in force goes out
+    (`is_historical_request`, `append_version_info`): a spelling read as a past
+    text must also build the URN of the past text, or the text in force goes out
     labelled as a past one.
     `tests/test_normattiva_validity_live.py` (`-m live`) re-checks the extraction
     against the portal.

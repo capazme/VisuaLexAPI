@@ -46,7 +46,7 @@ La co-autorialità (la nostra UX) vive nel **Loop α**. Il **Loop β** è integr
 ## 1. Il progetto VisuaLexAPI (e cosa integra da MERL-T)
 
 ### 1.1 Cosa eseguiamo (runtime di VisuaLexAPI)
-- **Python API — Quart, :5000** (`app.py`, `services/visualex/visualex_api/`): ricerca norme, scraping Normattiva/EUR-Lex/Brocardi, export PDF. È il cuore storico del prodotto.
+- **Python API — Quart, :5000** (`app.py`, `services/visualex/visualex_api/`): ricerca norme, scraping Normattiva/EUR-Lex (Brocardi spento, D-078), export PDF. È il cuore storico del prodotto.
 - **Node BFF — Express + Prisma, :3001** (`apps/server/`): auth, dati utente, e **tutto il traffico MERL-T via `/api/merlt/*`** — il frontend non chiama mai il sidecar `:8000` direttamente.
 - **Frontend — React + Vite, :5173** (`apps/web/`): SPA. Le superfici MERL-T sono `/grafo` (grafo + Q&A), `/merlt` (hub «Assistente»), `/merlt/valida`, `/merlt/contribuisci` e la tab «Ingestione» in `/admin`. Il tracking e il side rail passano dal *plugin host*; `ArticleTabContent` importa comunque alcune parti MERL-T in modo diretto. Tutto è dietro i flag `VITE_FEATURE_MERLT` / `VITE_FEATURE_MERLT_GRAPH`.
 - **Sidecar MERL-T** (`infra/compose.yml`, gate `MERLT_ENABLED`): 7 servizi. Sempre attivi: `postgres` (anche i database della piattaforma), `redis`, `falkordb`, `qdrant`. Sotto il profilo `merlt`, avviato da `start.sh` con `MERLT_ENABLED=true`: `mcp-legal-it` (tool giuridici live, :8011), `merlt-api` (:8000) e `merlt-worker` (RQ su `merlt_ingest`, `merlt_extract`, `merlt_ner_train`). Codice Python **vendorizzato in `services/merlt/`** (copia selettiva di `ALIS_CORE/merlt`, poi divergente: vedi `upstream-sync.md`).

@@ -66,6 +66,9 @@ def test_the_allowlist_is_not_vacuous():
         ("https://www.normattiva.it.evil.test/phish", False),
         ("http://169.254.169.254/latest/meta-data/", False),
         ("not-a-url", False),
+        # Brocardi is no longer a source (D-078): refused at request time.
+        ("https://www.brocardi.it/codice-civile/", False),
+        ("https://brocardi.it/x", False),
     ],
 )
 def test_is_allowed(url, expected):

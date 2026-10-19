@@ -1,6 +1,6 @@
 """F1 - Python API (:5000) search journey on codice civile art. 2043.
 
-Hits Normattiva/Brocardi LIVE (~6 scraper requests + 1 Playwright PDF): run at
+Hits Normattiva LIVE (~5 scraper requests + 1 Playwright PDF): run at
 most once per invocation, never in parallel, never from stress. The Python API
 is unauthenticated; the user_a client is used only for latency recording.
 """
@@ -49,7 +49,9 @@ async def run(ctx: Context, report: Report) -> None:
         _expect(isinstance(first.get("article_text"), str) and first["article_text"].strip(),
                 "article_text is empty", {"result": first})
 
-    with report.step("POST /stream_article_text (NDJSON + brocardi)"):
+    with report.step("POST /stream_article_text (NDJSON, no Brocardi)"):
+        # An older client still sends the flag: Brocardi is no longer a source
+        # (D-078), so the line carries neither of its fields.
         lines = await c.req_ndjson(
             f"{py}/stream_article_text",
             json={**SEARCH_BODY, "show_brocardi_info": True},
@@ -58,13 +60,12 @@ async def run(ctx: Context, report: Report) -> None:
         line = lines[0]
         _expect("error" not in line and isinstance(line.get("article_text"), str),
                 "stream line has no article_text", {"line_keys": sorted(line)})
-        if "brocardi_info" in line:
-            report.note("brocardi_info present in stream line")
-        elif "brocardi_error" in line:
-            report.note(f"brocardi_error (external site hiccup): {line['brocardi_error']}")
-        else:
-            raise StepFailure("stream line carries neither brocardi_info nor brocardi_error",
-                              {"line_keys": sorted(line)})
+        _expect("brocardi_info" not in line and "brocardi_error" not in line,
+                "stream line still carries a Brocardi field", {"line_keys": sorted(line)})
+
+    with report.step("POST /fetch_brocardi_info (410 Gone)"):
+        await c.req("POST", f"{py}/fetch_brocardi_info", json=SEARCH_BODY, expect=410,
+                    timeout=cfg.search_timeout)
 
     with report.step("POST /fetch_tree (base URN, count + metadata.annexes)"):
         _, tree = await c.req(
