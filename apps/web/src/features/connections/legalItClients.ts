@@ -45,9 +45,7 @@ export const LEGAL_IT_CLIENTS: LegalItClient[] = [
         text: 'Scarica il file legal-it-….mcpb dall’ultima versione pubblicata.',
         link: { href: LEGAL_IT_RELEASES_URL, label: 'Apri l’ultima versione su GitHub' },
       },
-      {
-        text: 'Fai doppio clic sul file. In alternativa: Impostazioni → Estensioni → Impostazioni avanzate → Sviluppatore estensioni → «Installa file .mcpb».',
-      },
+      { text: 'Fai doppio clic sul file.' },
       { text: 'Riavvia Claude.' },
     ],
     limits: [
@@ -75,9 +73,7 @@ export const LEGAL_IT_CLIENTS: LegalItClient[] = [
         codeLabel: 'il comando per installare il plugin mcp-legal-it',
       },
     ],
-    limits: [
-      'Gli aggiornamenti automatici sono spenti all’inizio: per accenderli scrivi /plugin, apri la scheda Marketplaces, scegli mcp-legal-it e poi «Enable auto-update».',
-    ],
+    limits: [],
   },
 ];
 

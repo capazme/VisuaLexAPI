@@ -61,6 +61,8 @@ describe('legalItClients', () => {
   it('writes no version number and no tagged uvx command', () => {
     expect(source).not.toMatch(/\bv?\d+\.\d+(?:\.\d+)?\b/);
     expect(source).not.toMatch(/@v\d/);
+    expect(source).not.toMatch(/\bv\d+\b/);
+    expect(source).not.toMatch(/legal-it-\d/);
     expect(source).not.toMatch(/\buvx\b/);
     expect(source).toContain('legal-it-….mcpb');
   });

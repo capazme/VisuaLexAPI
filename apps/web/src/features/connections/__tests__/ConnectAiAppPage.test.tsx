@@ -162,6 +162,8 @@ describe('ConnectAiAppPage — mcp-legal-it', () => {
       ['VisuaLexOnline, con il tuo account', '#visualex'],
       ['mcp-legal-itSul tuo computer, senza account', '#mcp-legal-it'],
     ]);
+    expect(screen.getByRole('heading', { level: 2, name: 'VisuaLex' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'mcp-legal-it' })).toBeInTheDocument();
     expect(document.getElementById('visualex')).toBe(screen.getByRole('region', { name: 'VisuaLex' }));
     expect(document.getElementById('mcp-legal-it')).toBe(screen.getByRole('region', { name: 'mcp-legal-it' }));
   });
@@ -204,6 +206,7 @@ describe('ConnectAiAppPage — mcp-legal-it', () => {
     render(<ConnectAiAppPage />);
     const text = screen.getByRole('region', { name: 'mcp-legal-it' }).textContent ?? '';
     expect(text).not.toMatch(/\bv?\d+\.\d+(?:\.\d+)?\b/);
+    expect(text).not.toMatch(/\bv\d+\b|legal-it-\d/);
     expect(text).not.toMatch(/\blicenz|\bApache\b|\bMPL\b/i);
     expect(text).not.toMatch(/brocardi/i);
     expect(text).toContain('legal-it-….mcpb');

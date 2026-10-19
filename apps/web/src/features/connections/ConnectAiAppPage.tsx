@@ -9,7 +9,6 @@ import { AI_TOOLS, UNSUPPORTED_CLIENTS, aiClients, type AiClient } from './aiCli
 import {
   LEGAL_IT_CLIENTS,
   LEGAL_IT_PRIVACY,
-  LEGAL_IT_RELEASES_URL,
   LEGAL_IT_REPO_URL,
   LEGAL_IT_UNSUPPORTED,
   UV_INSTALL,
@@ -28,6 +27,7 @@ const sectionTitle = 'text-base font-semibold text-slate-900 dark:text-white';
 const card = 'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800';
 // An anchor scrolled to the top clears the floating menu button (below lg) and the Focus toggle (from md).
 const anchorTarget = 'scroll-mt-20';
+const partTitle = 'font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 /** A page outside VisuaLex, in a new tab, said so to a screen reader; 44 px high on a phone. */
@@ -107,13 +107,13 @@ function LegalItSection() {
       className={cn(anchorTarget, 'space-y-4 border-t border-slate-200 pt-8 dark:border-slate-700')}
     >
       <header>
-        <h2 id="legal-it-title" className="font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+        <h2 id="legal-it-title" className={partTitle}>
           mcp-legal-it
         </h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Un server MCP che aggiunge a Claude oltre 200 strumenti di diritto italiano: il testo vigente delle norme da
-          Normattiva ed EUR-Lex, la giurisprudenza, i calcoli legali e i modelli di atti. Si installa sul tuo computer e non
-          richiede un account VisuaLex.
+          Un server MCP che aggiunge a Claude oltre 200 strumenti di diritto italiano: le norme da Normattiva ed EUR-Lex, la
+          giurisprudenza, i calcoli legali e i modelli di atti. Si installa sul tuo computer e non richiede un account
+          VisuaLex.
         </p>
       </header>
 
@@ -122,21 +122,12 @@ function LegalItSection() {
         <span>{LEGAL_IT_PRIVACY}</span>
       </p>
 
-      <ul className="flex flex-col gap-x-6 text-sm sm:flex-row sm:flex-wrap">
-        <li>
-          <ExternalAnchor href={LEGAL_IT_REPO_URL}>Repository e istruzioni complete</ExternalAnchor>
-        </li>
-        <li>
-          <ExternalAnchor href={LEGAL_IT_RELEASES_URL}>Ultima versione</ExternalAnchor>
-        </li>
-      </ul>
-
       <div aria-labelledby="legal-it-uv" role="group" className={card}>
         <h3 id="legal-it-uv" className="text-sm font-semibold text-slate-900 dark:text-white">
           Prima installa uv
         </h3>
         <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-          uv installa da solo Python e le librerie necessarie: è l’unico prerequisito.
+          uv installa da solo Python e le librerie necessarie. Serve sia per Claude Desktop sia per Claude Code.
         </p>
         <ul className="mt-3 space-y-3 text-sm text-slate-700 dark:text-slate-200">
           {UV_INSTALL.map((step) => (
@@ -222,7 +213,7 @@ export function ConnectAiAppPage() {
       <nav aria-label="Le due parti della pagina" className="space-y-2">
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Sono due cose diverse: VisuaLex collega l’app AI al tuo account e ai tuoi dossier, online; mcp-legal-it si installa sul
-          tuo computer e le dà strumenti di diritto italiano, senza account.
+          tuo computer e dà all’app AI strumenti di diritto italiano, senza account.
         </p>
         <ul className="grid gap-2 sm:grid-cols-2">
           {PARTS.map((part) => (
@@ -242,7 +233,10 @@ export function ConnectAiAppPage() {
         </ul>
       </nav>
 
-      <section id="visualex" aria-label="VisuaLex" className={cn(anchorTarget, 'space-y-8')}>
+      <section id="visualex" aria-labelledby="visualex-title" className={cn(anchorTarget, 'space-y-8')}>
+        <h2 id="visualex-title" className={partTitle}>
+          VisuaLex
+        </h2>
         <section
           aria-labelledby="ai-personal-data"
           className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
