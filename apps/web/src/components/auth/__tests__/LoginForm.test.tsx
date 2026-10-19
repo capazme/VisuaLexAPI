@@ -49,4 +49,10 @@ describe('LoginForm', () => {
     expect(await screen.findByRole('status', { name: 'Accesso a VisuaLex' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/'), { timeout: 2000 });
   });
+
+  it('names only the sources VisuaLex still reads: Brocardi is no longer one', () => {
+    render(<MemoryRouter><LoginForm /></MemoryRouter>);
+    expect(screen.getByText('Normattiva · EUR-Lex')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/brocardi/i);
+  });
 });
