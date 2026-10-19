@@ -143,7 +143,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar();
     openUserMenu();
     const entries = screen.getAllByRole('menuitem');
-    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
+    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Crediti', 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
     for (const entry of entries) expect(entry).toHaveAccessibleName();
   });
 
@@ -298,11 +298,11 @@ describe('Sidebar — Cronologia in the user menu (the owner, 13 Oct 2026)', () 
 });
 
 describe('Sidebar — the user menu (spec D2)', () => {
-  it("holds Impostazioni, Cronologia, «Collega un'app AI», the services' status, the theme, Scorciatoie (no «(?)»: the key still opens it) and Esci; «Pannello Admin» only for an admin", () => {
+  it("holds Impostazioni, Cronologia, «Collega un'app AI», «Crediti», the services' status, the theme, Scorciatoie (no «(?)»: the key still opens it) and Esci; «Pannello Admin» only for an admin", () => {
     renderSidebar();
     openUserMenu();
     expect(screen.getByRole('menu', { name: 'Menu utente' })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Crediti', 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
     expect(screen.queryByRole('menuitem', { name: /Pannello Admin/ })).toBeNull();
   });
 
@@ -339,6 +339,15 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
+  it('opens «Crediti», the public page of the sources, and closes the menu (and the phone\'s menu)', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Crediti' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/crediti');
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
   it('opens the shortcuts', () => {
     renderSidebar();
     openUserMenu();
@@ -365,14 +374,14 @@ describe('Sidebar — the services\' status in the user menu (S1)', () => {
     ['degraded', 'Alcune fonti non disponibili'],
     ['offline', 'Servizio non raggiungibile'],
     ['checking', 'Controllo servizi…'],
-  ] as const)('writes the phrase of the state (%s), after «Collega un\'app AI» and before the theme', (state, phrase) => {
+  ] as const)('writes the phrase of the state (%s), after «Crediti» and before the theme', (state, phrase) => {
     serviceHealth.snapshot.overall = state;
     renderSidebar();
     openUserMenu();
     const entry = screen.getByRole('menuitem', { name: `Stato dei servizi: ${phrase}` });
     expect(entry).toHaveTextContent(phrase);
     const entries = screen.getAllByRole('menuitem');
-    expect(entries.indexOf(entry)).toBe(entries.indexOf(screen.getByRole('menuitem', { name: "Collega un'app AI" })) + 1);
+    expect(entries.indexOf(entry)).toBe(entries.indexOf(screen.getByRole('menuitem', { name: 'Crediti' })) + 1);
     expect(entries[entries.indexOf(entry) + 1]).toHaveTextContent('Tema scuro');
   });
 
@@ -393,7 +402,7 @@ describe('Sidebar — the services\' status in the user menu (S1)', () => {
     renderSidebar();
     openUserMenu();
     const menu = screen.getByRole('menu');
-    for (let i = 0; i < 3; i++) fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    for (let i = 0; i < 4; i++) fireEvent.keyDown(menu, { key: 'ArrowDown' });
     const entry = screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' });
     expect(entry).toHaveFocus();
     // Enter on a focused button is its click: the focus stays on the entry.

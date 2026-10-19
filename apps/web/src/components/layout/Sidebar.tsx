@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
+import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, Repeat, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -598,6 +598,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/collega-app'))} className={menuItemClass}>
                   <Bot size={16} />
                   Collega un'app AI
+                </button>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/crediti'))} className={menuItemClass}>
+                  <ScrollText size={16} />
+                  Crediti
                 </button>
                 <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(toggleTheme)} className={menuItemClass}>
