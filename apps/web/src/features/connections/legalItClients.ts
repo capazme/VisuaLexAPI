@@ -58,7 +58,7 @@ export const LEGAL_IT_CLIENTS: LegalItClient[] = [
     kind: 'Terminale (macOS, Linux, Windows)',
     steps: [
       {
-        text: 'Serve anche git. Su Mac, se non c’è, si installa con:',
+        text: 'Serve anche git. Su Windows installa Git for Windows; su Mac, se non c’è, si installa con:',
         code: 'xcode-select --install',
         codeLabel: 'il comando per installare git su Mac',
       },
@@ -73,7 +73,9 @@ export const LEGAL_IT_CLIENTS: LegalItClient[] = [
         codeLabel: 'il comando per installare il plugin mcp-legal-it',
       },
     ],
-    limits: [],
+    limits: [
+      'Al primo avvio Claude Code può rinunciare dopo 30 secondi con «connection timed out», mentre uv scarica Python: scrivi /mcp, scegli il server di mcp-legal-it e premi «Reconnect».',
+    ],
   },
 ];
 

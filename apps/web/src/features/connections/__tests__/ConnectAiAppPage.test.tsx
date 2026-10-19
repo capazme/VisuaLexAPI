@@ -174,13 +174,15 @@ describe('ConnectAiAppPage — mcp-legal-it', () => {
     expect(within(legalIt).getByText(/oltre 200 strumenti di diritto italiano/i)).toBeInTheDocument();
     expect(within(legalIt).getByText(LEGAL_IT_PRIVACY)).toBeInTheDocument();
     expect(within(legalIt).getByRole('group', { name: 'Prima installa uv' })).toBeInTheDocument();
-    expect(within(legalIt).getByText(/chiudi del tutto Claude \(⌘Q su Mac/)).toBeInTheDocument();
+    expect(within(legalIt).getByText(/chiudi del tutto Claude \(⌘Q su Mac.*Con Claude Code apri invece un nuovo terminale/)).toBeInTheDocument();
     expect(within(legalIt).getAllByRole('article').map((card) => within(card).getByRole('heading').textContent)).toEqual([
       'Claude Desktop (consigliato)',
       'Claude Code (plugin)',
     ]);
     expect(within(legalIt).getByText(/circa un minuto/)).toBeInTheDocument();
     expect(within(legalIt).getByText(/Serve anche git/)).toBeInTheDocument();
+    const claudeCode = within(legalIt).getByRole('article', { name: 'Claude Code (plugin)' });
+    expect(within(claudeCode).getByText(/rinunciare dopo 30 secondi con «connection timed out».*\/mcp/)).toBeInTheDocument();
     for (const name of ['claude.ai sul web', 'Le app mobili di Claude', 'L’agente cloud di Claude Desktop (Cowork)']) {
       expect(within(legalIt).getByText(name)).toBeInTheDocument();
     }

@@ -139,7 +139,8 @@ function LegalItSection() {
         </ul>
         <p className="mt-3 flex items-start gap-2 text-sm font-medium text-slate-800 dark:text-slate-100">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
-          Dopo l’installazione chiudi del tutto Claude (⌘Q su Mac: non basta chiudere la finestra) e riaprilo.
+          Dopo l’installazione chiudi del tutto Claude (⌘Q su Mac: non basta chiudere la finestra) e riaprilo. Con Claude Code
+          apri invece un nuovo terminale: quello già aperto non trova ancora uv (non vede il nuovo PATH).
         </p>
       </div>
 

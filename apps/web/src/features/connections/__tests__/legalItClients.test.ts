@@ -67,6 +67,12 @@ describe('legalItClients', () => {
     expect(source).toContain('legal-it-….mcpb');
   });
 
+  it('tells a Claude Code user how to get past the first launch’s timeout, and where git comes from on Windows', () => {
+    const claudeCode = LEGAL_IT_CLIENTS.find((client) => client.id === 'legal-it-claude-code');
+    expect(claudeCode?.limits).toEqual([expect.stringMatching(/30 secondi con «connection timed out».*\/mcp.*«Reconnect»/)]);
+    expect(claudeCode?.steps[0].text).toMatch(/Git for Windows/);
+  });
+
   it('names neither the licence nor Brocardi', () => {
     expect(source).not.toMatch(/\blicenz|\bApache\b|\bMPL\b/i);
     expect(source).not.toMatch(/brocardi/i);
